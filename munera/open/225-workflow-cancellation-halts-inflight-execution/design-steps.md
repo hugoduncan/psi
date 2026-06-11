@@ -890,7 +890,7 @@
 
 ## Inconsistency follow-ups (ψ pass 27, 2026-06-11)
 
-- [ ] Qualify the Intent section's absolute cancellation guarantee so it matches the
+- [x] Qualify the Intent section's absolute cancellation guarantee so it matches the
       later scoped contract. Intent currently says that after cancel no further child
       sessions spawn and no new side effects are initiated (commits, journal writes)
       transitively across nested sub-runs. D6/Acceptance #3 scope the deterministic
@@ -901,3 +901,7 @@
       Reword Intent to state the D23 cascade-set + D31 checkpoint + D30 forbidden-vs-
       allowed boundary, and explicitly point to the D27 exception, so the top-level
       intent no longer contradicts the refined contract.
+      → design.md Intent now states the D23 cascade-set + D31 checkpoint + D30
+      forbidden-vs-allowed boundary, names the D27 bounded direct-sub-run
+      post-enumeration spawn exception, and no longer presents the refined contract
+      as an absolute no-new-child-session/no-new-side-effect guarantee.

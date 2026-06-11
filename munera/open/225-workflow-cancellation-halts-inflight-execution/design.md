@@ -7,11 +7,17 @@ Cancelling a running delegated workflow must actually stop it. Today, cancelling
 **future** driving the workflow forward: it keeps advancing steps, spawning child
 agent sessions, and committing to the worktree. A cancelled run is a runaway.
 
-This task makes cancellation authoritative: after a cancel, no further steps
-execute, no further child sessions spawn, and **no new side effects are
-initiated** (commits, journal writes) — transitively across nested sub-runs. A
-single tool call already in syscall flight at the interrupt instant may complete;
-nothing past that point starts (see D6).
+This task makes cancellation authoritative: after the D31 cancel checkpoint (the
+apply-phase CAS that commits `:cancelled`), every run in the D23 enumerated
+cascade set stops ordinary workflow advancement. Those cascade-set runs must not
+start further step attempts, delegate sub-runs, ordinary child sessions, tool
+calls, commits, or ordinary child-turn journal writes; required cancellation
+control writes/effects remain allowed (D30). Transitive cancellation therefore
+applies to the enumerated cancelled subtree, with the bounded direct-sub-run
+post-enumeration spawn exception explicitly accepted in D27. A single tool call
+already in syscall flight at the interrupt instant, and work that started before
+the D31 checkpoint, may complete; nothing in the cascade set starts ordinary
+advancement after that checkpoint (see D6).
 
 ## Evidence (observed this session)
 

@@ -2033,3 +2033,19 @@ One new actionable inconsistency found:
    contradicts those later decisions by making the no-new-child-session/no-side-effect
    claim absolute again. Qualify Intent to the cascade-set/D31/D30 contract and point
    at the D27 exception.
+
+## Inconsistency follow-up resolution (ψ pass 27, 2026-06-11)
+
+Executed the single newly added pass-27 design follow-up. Updated `design.md`
+Intent to match the refined cancellation contract instead of the older absolute
+wording:
+
+- deterministic guarantee is scoped to runs in the D23 enumerated cascade set;
+- the guarantee begins at the D31 cancel checkpoint (apply-phase CAS committing
+  `:cancelled`);
+- forbidden ordinary workflow/child-turn advancement is distinguished from allowed
+  cancellation-control writes/effects (D30);
+- the bounded direct-sub-run post-enumeration spawn exception is explicitly named
+  as D27.
+
+Marked the follow-up complete in `design-steps.md`. No blockers.
