@@ -389,6 +389,35 @@
         (is (= "Delegated workflow cancelled or removed" (get-in result [:payload :message])))
         (is (= {:status :removed} (get-in result [:payload :details])))))))
 
+(deftest live-top-level-remove-cancels-parked-future-and-drops-inflight-entry-test
+  ;; Tests acceptance criterion #2 end-to-end through canonical live remove:
+  ;; a real parked top-level worker future is interrupted before the re-entrant
+  ;; terminal remove drops the inflight handle.
+  (let [started (promise)
+        interrupted (promise)
+        release (promise)
+        fut (future
+              (deliver started true)
+              (try
+                @release
+                (catch InterruptedException _
+                  (deliver interrupted true))))
+        ctx (assoc (make-ctx)
+                   :workflow-inflight-runs-handle (atom {"run-1" {:future fut}}))]
+    @started
+    (install-run! ctx (run "run-1" :running))
+    (let [result (dispatch/dispatch! ctx :psi.workflow/remove-run {:run-id "run-1"} {:origin :core})]
+      (is (true? (:psi.workflow/removed? result)))
+      (is (true? (deref interrupted 1000 false))
+          "live top-level remove must interrupt the parked worker future")
+      (is (true? (future-cancelled? fut))
+          "live top-level remove must future-cancel the top-level worker")
+      (is (nil? (get @(:workflow-inflight-runs-handle ctx) "run-1"))
+          "re-entrant terminal remove must drop the inflight entry")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"]))))
+    (deliver release true)
+    (future-cancel fut)))
+
 (deftest inflight-run-effect-execution-test
   ;; Tests cancellation/cleanup effects against real isolated runtime-handle atoms.
   (testing "cancel-inflight-run future-cancels exact run handle before drop removes it"

@@ -517,3 +517,57 @@
         "stale synthetic follow-up prepare must not record ordinary request state after cancellation")
     (is (empty? (kernel/event-log-entries))
         "stale synthetic follow-up effects must not re-enter ordinary prompt lifecycle events")))
+
+(deftest workflow-cancel-after-guarded-nested-dispatch-build-before-apply-blocks-stale-nested-results-test
+  ;; Regression for task 225 pass 26: a workflow-guarded dispatch effect may
+  ;; pass its outer stop check and admit a nested handler while the run is live;
+  ;; if cancellation lands before that nested pure result is applied, the nested
+  ;; root update and adjacent effects must still no-op.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        run-id "run-nested-dispatch-built-then-cancelled"
+        file (java.io.File/createTempFile "psi-stale-nested-journal" ".ndedn")
+        assistant-msg {:role "assistant"
+                       :content [{:type :text :text "must not append"}]
+                       :timestamp (java.time.Instant/now)}
+        entry (persist/message-entry assistant-msg)
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)
+        _ (ss/assoc-state-value-in! ctx (ss/state-path :flush-state session-id)
+                                    {:flushed? false :session-file file})
+        append-result ((:fn (kernel/handler-entry :session/append-journal-entry))
+                       ctx
+                       {:session-id session-id
+                        :entry entry
+                        :workflow-run-id run-id})
+        usage-result ((:fn (kernel/handler-entry :session/update-context-usage))
+                      ctx
+                      {:session-id session-id
+                       :tokens 42
+                       :window 100
+                       :workflow-run-id run-id})]
+    (is (fn? (:root-state-update append-result))
+        "live append-journal handler builds a root update")
+    (is (= [:persist/session-journal-io] (mapv :effect/type (:effects append-result)))
+        "live append-journal handler builds the adjacent persistence effect")
+    (is (every? #(= run-id (:workflow-run-id %)) (:effects append-result))
+        "workflow-owned append-journal effects carry the workflow guard")
+    (is (fn? (:root-state-update usage-result))
+        "live context-usage handler builds a root update")
+    (is (every? dispatch-schema/valid-effect? (:effects append-result))
+        "workflow-guarded nested effects must remain valid")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "nested dispatch built before cancel"}
+                          {:origin :core})
+    (ss/apply-root-state-update-in! ctx (:root-state-update append-result))
+    (ss/apply-root-state-update-in! ctx (:root-state-update usage-result))
+    (doseq [effect (:effects append-result)]
+      (dispatch-effects/execute-effect! ctx effect))
+    (is (= [] (journal-messages ctx session-id))
+        "stale append-journal root update must not append after cancellation")
+    (is (nil? (:context-tokens (ss/get-session-data-in ctx session-id)))
+        "stale context-usage root update must not record token usage after cancellation")
+    (is (nil? (:context-window (ss/get-session-data-in ctx session-id)))
+        "stale context-usage root update must not record context window after cancellation")
+    (is (false? (:flushed? (ss/get-state-value-in ctx (ss/state-path :flush-state session-id))))
+        "stale journal IO effect must not mark flush state after cancellation")))

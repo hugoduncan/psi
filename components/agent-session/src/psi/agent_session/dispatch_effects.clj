@@ -301,12 +301,20 @@
   (when-not (workflow-effect-stop-signal ctx effect)
     ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect))))
 
+(defn- workflow-guarded-event-data
+  [effect]
+  (let [event-data (or (:event-data effect) {})]
+    (cond-> event-data
+      (and (:workflow-run-id effect)
+           (not (contains? event-data :workflow-run-id)))
+      (assoc :workflow-run-id (:workflow-run-id effect)))))
+
 (defmethod execute-effect! :runtime/dispatch-event [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (or (:event-data effect) {}) {:origin (or (:origin effect) :core)})))
+    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
 (defmethod execute-effect! :runtime/dispatch-event-with-effect-result [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (or (:event-data effect) {}) {:origin (or (:origin effect) :core)})))
+    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
 
 (defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
@@ -403,11 +411,12 @@
       nil)))
 
 (defmethod execute-effect! :persist/session-journal-io [ctx effect]
-  (let [request (:request effect)
-        result  (execute-session-journal-io! ctx effect)]
-    (when (= :flush-journal (:op request))
-      (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
-    result))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (let [request (:request effect)
+          result  (execute-session-journal-io! ctx effect)]
+      (when (= :flush-journal (:op request))
+        (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
+      result)))
 
 (defmethod execute-effect! :persist/project-prefs-update [ctx effect]
   (try

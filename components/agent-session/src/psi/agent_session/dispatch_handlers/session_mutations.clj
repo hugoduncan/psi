@@ -17,7 +17,8 @@
    [psi.session-state.state :as session]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
-   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
@@ -412,8 +413,12 @@
 
   (register-core-handler!
    :session/update-context-usage
-   (fn [_ctx {:keys [session-id tokens window]}]
-     {:root-state-update (session/session-update session-id #(assoc % :context-tokens tokens :context-window window))}))
+   (fn [ctx {:keys [session-id tokens window] :as data}]
+     (let [run-id (workflow-guard/event-or-session-run-id ctx data)]
+       {:root-state-update
+        (workflow-guard/guard-root-state-update
+         (session/session-update session-id #(assoc % :context-tokens tokens :context-window window))
+         run-id)})))
 
   (register-core-handler!
    :session/record-extension-prompt

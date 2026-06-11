@@ -3266,3 +3266,26 @@ under-proved at the composition boundary. Add that regression through the canoni
 remove path.
 
 No tests run (review-only pass).
+
+## Follow-up pass 26 + test review (ψ, 2026-06-11)
+
+Completed the newly added follow-ups from the preceding review pass.
+
+- Guarded nested dispatch stale pure results: `:runtime/dispatch-event` and
+  `:runtime/dispatch-event-with-effect-result` now propagate their top-level
+  `:workflow-run-id` guard into nested event data when the nested payload lacks it.
+  `:session/append-journal-entry` wraps its root-state update with the shared
+  workflow cancellation guard, tags `:persist/session-journal-io` with the run id,
+  and the journal IO executor re-checks the canonical stop signal before disk/flush
+  side effects. `:session/update-context-usage` now uses the same shared stale-result
+  guard. Added a regression that builds nested append-journal/context-usage handler
+  results while live, cancels before apply/effects, then proves no journal append,
+  no flush marker, and no context usage write occurs.
+- Live top-level remove acceptance #2: added a canonical dispatch regression with a
+  real parked future in `:workflow-inflight-runs-handle`; `:psi.workflow/remove-run`
+  interrupts/cancels the future and the re-entrant terminal remove drops the handle
+  and canonical run record.
+
+Verification: focused cancellation namespaces green (19 tests / 125 assertions),
+adjacent journal/prompt lifecycle namespaces green (30 tests / 132 assertions), focused
+clj-kondo clean.

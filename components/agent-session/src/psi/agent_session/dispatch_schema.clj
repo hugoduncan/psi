@@ -143,6 +143,7 @@
      [:workflow-run-id {:optional true} :string]]]
    [:persist/session-journal-io
     [:map [:effect/type [:= :persist/session-journal-io]]
+     [:workflow-run-id {:optional true} :string]
      [:request [:map
                 [:op [:enum :append-entry :flush-journal]]
                 [:session-id :string]

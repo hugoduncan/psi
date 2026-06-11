@@ -11,7 +11,8 @@
    [psi.session-state.state :as session]
    [psi.turn-runtime.recording :as turn-recording]
    [psi.turn-runtime.request :as turn-request]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]))
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
 
 (defn- now-inst []
   (java.time.Instant/now))
@@ -208,20 +209,6 @@
             :session-id session-id}
    :return-effect-result? true})
 
-(defn- live-workflow-run-in-state?
-  [state-map run-id]
-  (let [run (get-in state-map [:workflows :runs run-id])]
-    (and run (not= :cancelled (:status run)))))
-
-(defn- guard-workflow-root-update
-  [root-state-update run-id]
-  (if-not (and root-state-update run-id)
-    root-state-update
-    (fn [state-map]
-      (if (live-workflow-run-in-state? state-map run-id)
-        (root-state-update state-map)
-        state-map))))
-
 (defn prompt-record-response-handler
   [ctx {:keys [session-id execution-result progress-queue]}]
   (let [session-data (session/get-session-data-in ctx session-id)
@@ -241,7 +228,7 @@
                                  (when sd (:context-window sd)))]
             (cond-> result
               (:root-state-update result)
-              (update :root-state-update guard-workflow-root-update run-id)
+              (update :root-state-update workflow-guard/guard-root-state-update run-id)
 
               next-event
               (update :effects (fnil conj []) (prompt-record-next-event-effect next-event next-payload run-id))
@@ -332,7 +319,7 @@
         next-turn-id    (when follow-up-msg (str (java.util.UUID/randomUUID)))]
     (cond-> (prompt-finish-base-result session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch run-id)
       follow-up-batch
-      (assoc :root-state-update (guard-workflow-root-update
+      (assoc :root-state-update (workflow-guard/guard-root-state-update
                                  (consume-follow-up-state-update session-id follow-up-batch)
                                  run-id))
       follow-up-msg

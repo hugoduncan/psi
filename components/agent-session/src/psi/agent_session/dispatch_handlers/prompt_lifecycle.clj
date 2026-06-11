@@ -6,6 +6,7 @@
   (:require
    [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.agent-session.prompt-request :as prompt-request]
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -60,22 +61,26 @@
 
   (register-core-handler!
    :session/append-journal-entry
-   (fn [ctx {:keys [session-id entry]}]
+   (fn [ctx {:keys [session-id entry] :as event-data}]
      (let [next-entries (conj (persist/all-entries-in ctx session-id) entry)
            flush-state  (ss/get-state-value-in ctx (ss/state-path :flush-state session-id))
            session-data (ss/get-session-data-in ctx session-id)
+           run-id       (workflow-guard/event-or-session-run-id ctx event-data)
            io-request   (persist/persistence-io-request {:entries next-entries
                                                          :flush-state flush-state
                                                          :session-id session-id
                                                          :worktree-path (:worktree-path session-data)
                                                          :parent-session-id (:parent-session-id session-data)
                                                          :parent-session-path (:parent-session-path session-data)})]
-       (cond-> {:root-state-update (persist/append-journal-entry-root-update session-id entry)
+       (cond-> {:root-state-update (workflow-guard/guard-root-state-update
+                                    (persist/append-journal-entry-root-update session-id entry)
+                                    run-id)
                 :return entry}
          io-request
-         (assoc :effects [{:effect/type :persist/session-journal-io
-                           :session-id session-id
-                           :request io-request}])))))
+         (assoc :effects [(workflow-guard/guarded-effect {:effect/type :persist/session-journal-io
+                                                          :session-id session-id
+                                                          :request io-request}
+                                                         run-id)])))))
 
   (register-core-handler! :session/prompt-prepare-request turn.handlers/prompt-prepare-request-handler)
   (register-core-handler! :session/prompt-record-response turn.handlers/prompt-record-response-handler)
