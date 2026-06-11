@@ -364,3 +364,31 @@
       dispatch 2 and plain remove-of-terminal). Added a "Cross-reference (D5/D17/D18) —
       scope of the D22.1 gate" paragraph stating the gate never re-orphans a terminal
       run. Conflation explicitly called out as the rejected wording.
+
+## Architecture-fit follow-ups (ψ pass 5, 2026-06-10)
+
+- [ ] Pin the transitive cascade re-dispatch mechanism to the effects-as-data
+      dispatch boundary (consistent with D1/D12/D18) and reconcile it with the
+      D4/D20 single-run apply-phase atom-CAS atomicity basis. D3 describes the
+      cascade as "enumerates in-flight nested sub-runs from canonical run-tree
+      state … and **dispatches a cancel for each (recursively)**," and D14 reframes
+      each sub-run cancel as a per-sub-run `:cancelled` terminal transition (D2/D4)
+      + per-in-flight child-abort effect — but, unlike the cancel-then-remove
+      second dispatch (which D18 explicitly pins to a re-entrant
+      `:runtime/dispatch-event` follow-on effect precisely because D1 forbids
+      command-layer/inline orchestration of a re-dispatch), the cascade's
+      per-sub-run terminal transitions have **no stated issue mechanism**. State
+      explicitly whether the cascade is (a) a single multi-run apply-phase
+      `:root-state-update` over the enumerated descendant set within the one
+      parent-cancel dispatch (with each descendant's terminal-status guard inside
+      the `swap!` fn, per D20), or (b) N re-entrant `:runtime/dispatch-event`
+      cancel dispatches (one per descendant, reusing D18's mechanism). In either
+      case keep the recursion out of a command-layer loop / inline cross-handle
+      reach-in (D1/D3/D18). Then reconcile with D4/D20: under (a) state the
+      multi-run guard/idempotency shape; under (b) state the per-descendant
+      CAS/ordering vs the parent's own terminal transition and the D14 single
+      top-level `future-cancel`. Update D3/D14 (and D18 cross-ref) so the cascade
+      side-effecting re-dispatch is committed to the canonical dispatch `:effects`
+      pathway the design otherwise mandates. (AGENTS.md S1 effects / S3 dispatch,
+      `λ(state)`, `λ shims_adapters`; doc/architecture.md dispatch sequencing +
+      State boundary; design.md D1/D4/D12/D18/D20)

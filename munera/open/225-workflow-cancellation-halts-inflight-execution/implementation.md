@@ -937,3 +937,45 @@ terminal run yet still applies `remove-run`), and D22.2 (record drop idempotent 
 absent record). The conflated "cancel/remove handler … no-op for already-terminal"
 wording was the rejected option; the cancellation-transition vs record-drop split is
 chosen. No new contradictions; no step-machine redesign.
+
+## Architecture-fit review (ψ pass 5, 2026-06-10)
+
+Fresh architecture-fit pass over design.md against AGENTS.md VSM (S1 effects /
+S3 dispatch, `λ parity`, `λ extend`, `λ(state)`, `λ shims_adapters`), META.md, and
+doc/architecture.md (State boundary, Dispatch sequencing contract, replay-trim,
+dispatch trace). D1–D22 commit the directly-cancelled run's own terminal
+transition + cancellation effects, the cancel-then-**remove** re-dispatch (D17/D18,
+pinned to the re-entrant `:runtime/dispatch-event` effects-as-data mechanism), the
+signal/handle split (D2/D10/D14/D15), terminalization reuse (D13/D16), and the
+apply-phase atom-CAS atomicity basis (D4/D20). Those all fit.
+
+One **new** actionable misfit:
+
+1. **Transitive cascade re-dispatch mechanism not committed to the effects-as-data
+   dispatch boundary (vs D18) and not reconciled with the D4/D20 single-run
+   atomicity basis.** D3 specifies the cascade as "enumerates in-flight nested
+   sub-runs from canonical run-tree state … and **dispatches a cancel for each
+   (recursively)**, reusing the same cancel mutation path"; D14 reframes each
+   sub-run cancel as emitting a per-sub-run `:cancelled` terminal transition (D2/D4)
+   + per-in-flight child-abort effect. But unlike the cancel-then-remove second
+   dispatch — which D18 explicitly pins to a re-entrant `:runtime/dispatch-event`
+   follow-on effect *because* D1 forbids command-layer / inline orchestration of a
+   re-dispatch — the design never states *how* the per-sub-run cascade terminal
+   transitions are issued: (a) one multi-run apply-phase `:root-state-update` over
+   the enumerated descendant set within the single parent-cancel dispatch, or (b) N
+   re-entrant `:runtime/dispatch-event` cancel dispatches (one per descendant). The
+   same re-dispatch-boundary question D18 answered for `remove` is left open for the
+   cascade, so an implementer could place the recursion in a command-layer loop /
+   inline cross-handle reach-in (violating D1/D3/D18). Compounding it, D4/D20's
+   race-safety is framed for a **single** run (terminal guard inside the
+   single-run `:root-state-update` fn riding one CAS); a subtree cancel under (a)
+   is a multi-run transition whose per-run guard/idempotency is not stated, and
+   under (b) is N separate dispatches/CASes whose ordering vs the parent's own
+   terminal transition + D14 single top-level `future-cancel` is not stated.
+   Architectural fit gap: the cascade's per-sub-run terminal-transition +
+   re-dispatch is under-committed to the canonical dispatch `:effects` pathway the
+   design otherwise mandates (D1/D12/D18), and unreconciled with the D4/D20
+   atomicity shape. Actionable — file as a pass-5 architecture-fit follow-up.
+
+No other new actionable architectural-fit misfit found; D1–D22 cover the remaining
+boundary commitments.
