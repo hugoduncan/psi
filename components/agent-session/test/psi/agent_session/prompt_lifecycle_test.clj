@@ -14,6 +14,8 @@
    [psi.session-persistence.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
+   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [clojure.java.io :as io]
    [psi.ai.providers.anthropic]
    [psi.ai.providers.openai]))
@@ -31,6 +33,21 @@
     (->> journal
          (filter #(= :message (:kind %)))
          (mapv #(get-in % [:data :message])))))
+
+(defn- install-workflow-run!
+  [ctx run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[s _ _] (workflow-registry/register-definition
+                          state
+                          {:definition-id "prompt-lifecycle-cancel-test"
+                           :steps [{:name "plan" :type :session}]})
+                 [s _ _] (workflow-runtime/create-run
+                          s
+                          {:definition-id "prompt-lifecycle-cancel-test"
+                           :run-id run-id
+                           :workflow-input {:input "ship it"}})]
+             s))))
 
 (defn- delete-tree! [path]
   (when path
@@ -69,6 +86,96 @@
       (is (= 3 (count effects)))
       (is (= [:session/prompt-submit :session/prompt :session/prompt-prepare-request]
              (mapv :event-type effects))))))
+
+(deftest workflow-cancel-between-prompt-submit-and-prompt-blocks-streaming-transition-test
+  ;; Regression for task 225 pass 19: a workflow-owned prompt lifecycle must not
+  ;; transition the child session to streaming when cancellation lands after
+  ;; prompt-submit but before :session/prompt.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-submit-to-prompt-cancel"]
+    (install-workflow-run! ctx run-id)
+    (swap! (:state* ctx)
+           update-in (ss/session-data-path session-id)
+           assoc
+           :workflow-owned? true
+           :workflow-run-id run-id
+           :workflow-step-id "plan"
+           :workflow-attempt-id "attempt-plan")
+    (session/dispatch-in! ctx :session/prompt-submit
+                          {:session-id session-id
+                           :user-msg {:role "user"
+                                      :content [{:type :text :text "plan"}]
+                                      :timestamp (java.time.Instant/now)}}
+                          {:origin :core})
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "prompt lifecycle race"}
+                          {:origin :core})
+    (let [result (session/dispatch-in! ctx :session/prompt
+                                       {:session-id session-id}
+                                       {:origin :core})]
+      (is (= {:workflow-stopped? true
+              :reason :cancelled
+              :session-id session-id}
+             result))
+      (is (= :idle (ss/sc-phase-in ctx session-id))
+          "cancelled workflow-owned child sessions must not enter streaming after prompt-submit"))))
+
+(deftest workflow-cancel-between-prompt-and-prepare-blocks-request-preparation-test
+  ;; Regression for task 225 pass 19: after a workflow-owned session has entered
+  ;; streaming, cancellation before :session/prompt-prepare-request must prevent
+  ;; request preparation, memory recovery, and provider execution effects.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-to-prepare-cancel"
+        build-calls* (atom 0)
+        execute-calls* (atom 0)
+        ctx (assoc ctx0
+                   :build-prepared-request-fn
+                   (fn [& _]
+                     (swap! build-calls* inc)
+                     {:prepared-request/id "turn-1"
+                      :prepared-request/messages []})
+                   :execute-prepared-request-fn
+                   (fn [& _]
+                     (swap! execute-calls* inc)
+                     {:execution-result/turn-id "turn-1"
+                      :execution-result/session-id session-id
+                      :execution-result/assistant-message {:role "assistant"
+                                                           :content [{:type :text :text "must not execute"}]
+                                                           :stop-reason :stop}
+                      :execution-result/turn-outcome :turn.outcome/stop}))]
+    (install-workflow-run! ctx run-id)
+    (swap! (:state* ctx)
+           update-in (ss/session-data-path session-id)
+           assoc
+           :workflow-owned? true
+           :workflow-run-id run-id
+           :workflow-step-id "plan"
+           :workflow-attempt-id "attempt-plan")
+    (let [submit-result (session/dispatch-in! ctx :session/prompt-submit
+                                              {:session-id session-id
+                                               :user-msg {:role "user"
+                                                          :content [{:type :text :text "plan"}]
+                                                          :timestamp (java.time.Instant/now)}}
+                                              {:origin :core})]
+      (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+      (session/dispatch-in! ctx :psi.workflow/cancel-run
+                            {:run-id run-id
+                             :reason "prompt prepare race"}
+                            {:origin :core})
+      (let [result (session/dispatch-in! ctx :session/prompt-prepare-request
+                                         {:session-id session-id
+                                          :turn-id (:turn-id submit-result)
+                                          :user-msg (:user-msg submit-result)
+                                          :return-execution-result? true}
+                                         {:origin :core})]
+        (is (= :cancelled (get-in result [:execution-result/assistant-message :workflow-stop-reason])))
+        (is (= 0 @build-calls*)
+            "request preparation must not run after workflow cancellation")
+        (is (= 0 @execute-calls*)
+            "provider execution must not run when request preparation is stopped")
+        (is (nil? (:last-prepared-request-summary (ss/get-session-data-in ctx session-id)))
+            "cancelled prepare must not record ordinary prompt lifecycle state")))))
 
 (deftest prompt-submit-handler-adds-tail-repair-effect-before-user-message-test
   (let [[ctx session-id] (create-session-context {:persist? false})

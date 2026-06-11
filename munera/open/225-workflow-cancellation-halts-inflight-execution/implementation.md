@@ -3003,3 +3003,20 @@ later ordinary dispatch and proves no streaming transition/provider execution
 starts after D31.
 
 No tests run (review-only pass).
+
+## Implementation review follow-up pass 19 (ψ, 2026-06-11)
+
+Completed the production prompt-lifecycle cancellation follow-up. Workflow-owned
+`:session/prompt` statechart entry now re-checks the canonical workflow stop
+signal under the per-run cancellation-entry read lock before transitioning the
+child session to `:streaming`; if D31 has already committed, dispatch returns a
+stopped result and leaves the session idle. `:session/prompt-prepare-request` now
+uses the same lock/stop-signal guard before building the prepared request or
+emitting memory recovery / prompt execution effects, and the prompt execution
+effect re-checks the workflow stop signal before provider execution and again
+before response recording.
+
+Added prompt-lifecycle regressions for cancellation between
+`:session/prompt-submit` and `:session/prompt`, and between `:session/prompt` and
+`:session/prompt-prepare-request`. Focused prompt-lifecycle and cancellation
+suites passed; focused lint for changed files passed.

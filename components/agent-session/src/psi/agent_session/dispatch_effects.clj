@@ -61,6 +61,32 @@
 (defn- effect-agent-ctx [ctx effect] (ss/agent-ctx-in ctx (effect-session-id ctx effect)))
 (defn- effect-sc-session-id [ctx effect] (ss/sc-session-id-in ctx (effect-session-id ctx effect)))
 
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (let [session-data (ss/get-session-data-in ctx session-id)
+        run-id (:workflow-run-id session-data)
+        state* (:state* ctx)
+        run (when (and state* run-id)
+              (get-in @state* [:workflows :runs run-id]))]
+    (when (and (:workflow-owned? session-data) state* run-id)
+      (cond
+        (nil? run) :removed
+        (= :cancelled (:status run)) :cancelled))))
+
+(defn- stopped-workflow-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before provider request"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before provider request"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before provider request"
+   :execution-result/stop-reason :error})
+
 (defn- workflow-abort-guarded? [effect]
   (some #(contains? effect %)
         [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]))
@@ -222,29 +248,37 @@
 (defmethod execute-effect! :runtime/prompt-execute-and-record [ctx effect]
   (let [session-id (effect-session-id ctx effect)
         prepared-request (:prepared-request effect)
-        progress-queue (:progress-queue effect)
-        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)
-        _ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
-        latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
-    (if (= (:execution-result/turn-id execution-result)
-           (:turn-id latest-summary))
-      execution-result
-      {:execution-result/turn-id (:turn-id latest-summary)
-       :execution-result/session-id session-id
-       :execution-result/assistant-message (or (some (fn [entry]
-                                                       (let [message (get-in entry [:data :message])]
-                                                         (when (= "assistant" (:role message))
-                                                           message)))
-                                                     (rseq (vec (persist/all-entries-in ctx session-id))))
-                                               (:execution-result/assistant-message execution-result))
-       :execution-result/turn-outcome (:turn-outcome latest-summary)
-       :execution-result/tool-calls []
-       :execution-result/stop-reason (:stop-reason latest-summary)})))
+        progress-queue (:progress-queue effect)]
+    (if-let [reason (workflow-session-stop-signal ctx session-id)]
+      (stopped-workflow-execution-result session-id reason)
+      (let [execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)]
+        (if-let [reason (workflow-session-stop-signal ctx session-id)]
+          (stopped-workflow-execution-result session-id reason)
+          (let [_ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
+                latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
+            (if (= (:execution-result/turn-id execution-result)
+                   (:turn-id latest-summary))
+              execution-result
+              {:execution-result/turn-id (:turn-id latest-summary)
+               :execution-result/session-id session-id
+               :execution-result/assistant-message (or (some (fn [entry]
+                                                               (let [message (get-in entry [:data :message])]
+                                                                 (when (= "assistant" (:role message))
+                                                                   message)))
+                                                             (rseq (vec (persist/all-entries-in ctx session-id))))
+                                                       (:execution-result/assistant-message execution-result))
+               :execution-result/turn-outcome (:turn-outcome latest-summary)
+               :execution-result/tool-calls []
+               :execution-result/stop-reason (:stop-reason latest-summary)})))))))
 
 (defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
-  (when-let [query-text (:query-text effect)]
-    (memory-runtime/recover-for-query! query-text))
-  (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record)))
+  (let [session-id (effect-session-id ctx effect)]
+    (if-let [reason (workflow-session-stop-signal ctx session-id)]
+      (stopped-workflow-execution-result session-id reason)
+      (do
+        (when-let [query-text (:query-text effect)]
+          (memory-runtime/recover-for-query! query-text))
+        (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record))))))
 
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
   ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect)))

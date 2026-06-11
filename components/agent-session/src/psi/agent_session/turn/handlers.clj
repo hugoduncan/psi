@@ -10,7 +10,8 @@
    [psi.command-registry.registry :as command-registry]
    [psi.session-state.state :as session]
    [psi.turn-runtime.recording :as turn-recording]
-   [psi.turn-runtime.request :as turn-request]))
+   [psi.turn-runtime.request :as turn-request]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]))
 
 (defn- now-inst []
   (java.time.Instant/now))
@@ -92,26 +93,69 @@
     steering-consumed?
     (conj {:effect/type :runtime/agent-clear-steering-queue})))
 
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (let [session-data (session/get-session-data-in ctx session-id)
+        run-id (:workflow-run-id session-data)
+        state* (:state* ctx)
+        run (when (and state* run-id)
+              (get-in @state* [:workflows :runs run-id]))]
+    (when (and (:workflow-owned? session-data) state* run-id)
+      (cond
+        (nil? run) :removed
+        (= :cancelled (:status run)) :cancelled))))
+
+(defn- stopped-workflow-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before request preparation"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before request preparation"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before request preparation"
+   :execution-result/stop-reason :error})
+
+(defn- stopped-workflow-prepare-result
+  [session-id return-execution-result? reason]
+  (cond-> {:return-effect-result? true
+           :return {:workflow-stopped? true
+                    :reason reason
+                    :session-id session-id}}
+    return-execution-result?
+    (assoc :return (stopped-workflow-execution-result session-id reason))))
+
 (defn prompt-prepare-request-handler
   [ctx {:keys [session-id turn-id user-msg runtime-opts progress-queue return-execution-result?]}]
-  (let [prepared-request   ((:build-prepared-request-fn ctx)
-                            ctx session-id {:turn-id turn-id
-                                            :user-message user-msg
-                                            :runtime-opts runtime-opts
-                                            :commands (command-registry/command-names-in (:extension-registry ctx))})
-        api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
-        steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
-    (cond-> {:root-state-update
-             (session/session-update
-              session-id
-              #(cond-> (assoc % :last-prepared-request-summary
-                              (prepared-request-state-summary turn-id prepared-request))
-                 api-key            (assoc :runtime-api-key api-key)
-                 steering-consumed? (assoc :steering-messages [])))
-             :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result?)
-             :return-effect-result? true}
-      (not return-execution-result?)
-      (assoc :return {:prepared-request prepared-request}))))
+  (let [session-data (session/get-session-data-in ctx session-id)
+        run-id (:workflow-run-id session-data)]
+    (cancellation-entry/with-run-read-lock
+      ctx
+      run-id
+      (fn []
+        (if-let [reason (workflow-session-stop-signal ctx session-id)]
+          (stopped-workflow-prepare-result session-id return-execution-result? reason)
+          (let [prepared-request   ((:build-prepared-request-fn ctx)
+                                    ctx session-id {:turn-id turn-id
+                                                    :user-message user-msg
+                                                    :runtime-opts runtime-opts
+                                                    :commands (command-registry/command-names-in (:extension-registry ctx))})
+                api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
+                steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
+            (cond-> {:root-state-update
+                     (session/session-update
+                      session-id
+                      #(cond-> (assoc % :last-prepared-request-summary
+                                      (prepared-request-state-summary turn-id prepared-request))
+                         api-key            (assoc :runtime-api-key api-key)
+                         steering-consumed? (assoc :steering-messages [])))
+                     :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result?)
+                     :return-effect-result? true}
+              (not return-execution-result?)
+              (assoc :return {:prepared-request prepared-request}))))))))
 
 (defn execution-usage-tokens
   [execution-result]
