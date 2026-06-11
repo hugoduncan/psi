@@ -94,3 +94,7 @@
 
 - [x] Qualify the Slice 3 `:runtime/cancel-inflight-run` emission step with the D35 split: **canonical cancellation/cascade** emits worker cancel only for top-level cancel / live top-level remove, while **runtime-handle cleanup** may also emit it for terminal top-level remove (D38) and absent stale-handle cleanup (D36b) before `:runtime/drop-inflight-run`; direct/terminal nested sub-run remove must still emit no worker cancel and must not infer a parent/top-level worker.
 - [x] Reconcile `delegate remove` command-layer background-job cleanup with the adapter-only cancel/remove boundary: remove/reroute the current `cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!` side effect through the canonical `:psi.workflow/remove-run` dispatch/effects path (or explicitly document why any retained pre-remove cleanup is not a cancellation/remove side effect), so steps cover more than the direct `inflight-runs` `swap!`.
+
+## Plan/steps inconsistency follow-ups (ψ, 2026-06-11)
+
+- [ ] Reconcile `plan.md`'s `remove-run` terminal/absent wording with D29/D34/D36b and Slice 3 steps: terminal remove drops an existing canonical record, while absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`).

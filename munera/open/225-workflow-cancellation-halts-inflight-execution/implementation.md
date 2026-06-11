@@ -2262,3 +2262,9 @@ Executed both newly added unchecked plan/steps follow-up items from `steps.md`; 
 - Reconciled Slice 6 and `plan.md` with the adapter-only cancel/remove boundary by explicitly including `delegate remove` active-background-job cleanup (`cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!`) alongside direct `inflight-runs` cleanup as a command-layer side effect to remove/reroute through canonical `:psi.workflow/remove-run` dispatch/effects, unless a retained pre-remove cleanup is explicitly documented as non-cancellation/remove.
 
 No production code/tests/docs were changed in this follow-up pass; the review items only required clarifying implementation steps and plan intent before execution.
+
+## Plan/steps inconsistency review (ψ, 2026-06-11)
+
+Reviewed `plan.md` and `steps.md` against the current D1–D38 design, prior review notes, Acceptance Criteria, and referenced cancel/remove dispatch/effect/runtime code. One new actionable inconsistency found:
+
+1. `plan.md` says the `remove-run` "terminal/absent pass drops the canonical record", but `design.md` D29/D34/D36b and `steps.md` distinguish terminal and absent remove: terminal remove drops an existing canonical record, while absent remove is a success/no-op canonical result with no record found/removed and only the ordered stale-handle cleanup pair. The plan wording conflates terminal and absent semantics and contradicts the step-level absent branch.
