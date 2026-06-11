@@ -381,6 +381,8 @@
 (def ^:private retriable-error-patterns
   [#"(?i)rate.limit"
    #"(?i)too.many.requests"
+   #"(?i)usage.limit"
+   #"(?i)limit.has.been.reached"
    #"(?i)overloaded"
    #"(?i)status[ .:_]429"
    #"(?i)status[ .:_]5\d\d"
@@ -396,6 +398,8 @@
 (def ^:private rate-limit-error-patterns
   [#"(?i)rate.limit"
    #"(?i)too.many.requests"
+   #"(?i)usage.limit"
+   #"(?i)limit.has.been.reached"
    #"(?i)status[ .:_]429"])
 
 (def ^:private overloaded-error-patterns
@@ -488,7 +492,9 @@
 (defn- normalize-header-name
   [header-name]
   (when header-name
-    (-> (str header-name)
+    (-> (if (keyword? header-name)
+          (name header-name)
+          (str header-name))
         str/lower-case
         str/trim)))
 

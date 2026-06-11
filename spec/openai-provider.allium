@@ -664,6 +664,18 @@ rule StreamErrorsNormalized {
     })
 }
 
+rule CodexStreamFailurePreservesRetryMetadata {
+    when: CodexFailedEventReceived(stream, event)
+    requires: event.type in config.codex_failed_event_types
+
+    ensures: Emit(StreamEvent{
+        event_type: error,
+        error_message: CodexErrorMessage(event),
+        http_status: HttpStatusOrNull(event)
+    })
+    ensures: ProviderErrorHeadersPreserved(event)
+}
+
 rule OpenAITransportCloseEmitsDoneIfNotTerminal {
     when: ProviderTransportClosed(stream)
     requires: stream.done = false

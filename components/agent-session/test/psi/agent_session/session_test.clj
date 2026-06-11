@@ -151,6 +151,10 @@
   (testing "retry-error? true for rate limit"
     (is (session/retry-error? :error "rate limit exceeded")))
 
+  (testing "retry-error? true for OpenAI usage limit wording"
+    (is (session/retry-error? :error "The usage limit has been reached (status 429) [request-id req_123]"))
+    (is (session/retry-error? :error "The usage limit has been reached")))
+
   (testing "retry-error? true for overloaded"
     (is (session/retry-error? :error "Service Overloaded")))
 

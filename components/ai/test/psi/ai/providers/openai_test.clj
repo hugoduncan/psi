@@ -797,3 +797,4 @@
     (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
            (:error-message (first @events))))
     (is (= 429 (:http-status (first @events))))))
+
