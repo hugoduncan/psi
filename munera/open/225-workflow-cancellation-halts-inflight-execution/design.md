@@ -903,10 +903,12 @@ handled by the change-chain doc step when implemented.
    `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}` worker
    interrupt effect when the directly-cancelled run is top-level, plus the D3/D14/D15
    cascade), then
-3. a `:runtime/dispatch-event` effect targeting the remove event
-   (`{:effect/type :runtime/dispatch-event :event-type <remove-run dispatch>
-   :event-data {:run-id …}}`), which re-enters dispatch to apply the pure
-   `remove-run` dissoc.
+3. a `:runtime/dispatch-event` effect targeting the canonical remove event
+   (`{:effect/type :runtime/dispatch-event
+      :event-type :psi.workflow/remove-run
+      :event-data {:run-id … :reason … :session-id …}
+      :origin :core}`; optional nil keys may be omitted — D37), which re-enters
+   dispatch to apply the pure `remove-run` dissoc.
 
 Effects within a dispatch execute in declared order, so the terminalize effect (1)
 runs before the re-entrant remove dispatch (3) — i.e. the job is terminalized while
@@ -2007,6 +2009,97 @@ cancelled, cancellation is harmless and drop performs cleanup.
 no canonical record was found/removed and no cancel transition was applied. `:noop?`
 does not mean no runtime cleanup effects emitted. Acceptance #10 targets this
 ordered pair so absent cleanup cannot orphan a live worker.
+
+## Ambiguity Reconciliations (ψ pass 20, 2026-06-11)
+
+Resolves the pass-20 ambiguity follow-up: the design now has exact state-kernel
+entry event keywords and event-data shapes for workflow cancellation/removal, so
+`D18`'s re-entrant `:runtime/dispatch-event` has a concrete target and all public
+surfaces route through one representation.
+
+### D37. Canonical state-kernel workflow run terminal events are `:psi.workflow/cancel-run` and `:psi.workflow/remove-run`
+
+**Decision.** The canonical state-kernel dispatch event types are the fully-qualified
+keywords that mirror the existing public Pathom operation names while remaining
+visibly distinct from the workflow-runtime statechart event `:workflow/cancel`:
+
+- `:psi.workflow/cancel-run`
+- `:psi.workflow/remove-run`
+
+The Pathom mutation symbols `'psi.workflow/cancel-run` and
+`'psi.workflow/remove-run` remain the public mutation API names, but they are **not**
+the state-kernel event representation. They become thin adapters that dispatch the
+corresponding keyword event and translate the dispatch result into the existing
+Pathom output keys.
+
+**Event-data shape.** Both events use the same minimal data shape:
+
+```clojure
+{:run-id string
+ ;; optional; defaulted by the handler when absent
+ :reason string?
+ ;; optional; supplied when the caller has an owning/current session for trace,
+ ;; permission, and effect session-id injection. Never used as the child abort target
+ ;; (D15 uses guarded :execution-session-id instead).
+ :session-id string?}
+```
+
+- `:run-id` is required and is the requested workflow run id.
+- `:reason` is optional. `:psi.workflow/cancel-run` defaults it to `"cancelled"`;
+  `:psi.workflow/remove-run` uses it as the cancel reason only on the live first-pass
+  cancel-then-remove branch, defaulting to `"cancelled by remove"` when absent.
+- `:session-id` is optional dispatch context, not the workflow child-session abort
+  target. Guarded abort effects still carry explicit D15/D28/D33 session ids.
+- No `:then-remove?`, `:reentrant?`, or hidden mode flag is introduced. The
+  live-vs-terminal/absent branch is still derived solely from the canonical run read
+  in the `:psi.workflow/remove-run` handler (D26/D22.1).
+
+**Re-entrant remove effect shape.** D18's follow-on effect is therefore concrete:
+
+```clojure
+{:effect/type :runtime/dispatch-event
+ :event-type  :psi.workflow/remove-run
+ :event-data  {:run-id run-id
+               :reason reason
+               :session-id session-id}
+ :origin      :core}
+```
+
+The `:event-data` may omit nil optional keys. The effect is emitted only by the
+live-run first pass of the `:psi.workflow/remove-run` handler, after terminalization
+and cancellation effects in the ordered effect vector (D18/D26).
+
+**Handler ownership.** The registered state-kernel handlers are:
+
+- `:psi.workflow/cancel-run` → shared cancel-transition helper (D23) + cancellation
+  effect set (D12/D14/D15/D35/D36) + job terminalization (D13), no record drop and
+  no re-entrant remove effect.
+- `:psi.workflow/remove-run` → D26 taxonomy: live first pass invokes the same shared
+  cancel-transition helper and appends the concrete re-entrant
+  `:runtime/dispatch-event` above; terminal/absent pass applies the bare record-drop
+  branch plus D24/D36b runtime-handle cleanup.
+
+**Public routing.** All existing public surfaces route into these keyword events,
+not into workflow-runtime pure functions directly:
+
+- Pathom `'psi.workflow/cancel-run` dispatches `:psi.workflow/cancel-run` with the
+  event-data above and returns the D29 public result shape under the existing
+  `:psi.workflow/*` output keys.
+- Pathom `'psi.workflow/remove-run` dispatches `:psi.workflow/remove-run` and returns
+  the D29 remove result shape (`:removed?`, `:found?`, `:noop?`, etc.) under
+  `:psi.workflow/*` keys.
+- `psi-tool workflow op=cancel-run` routes to `:psi.workflow/cancel-run` (directly or
+  via the Pathom adapter, but with no direct `workflow-runtime/cancel-run` call).
+- `delegate remove` may keep calling the Pathom mutation seam, but the mutation must
+  dispatch `:psi.workflow/remove-run`; the delegate tool must not perform its own
+  `inflight-runs` `swap!`, live-vs-terminal branching, or background-job cleanup
+  outside the dispatch/effects path (superseded by D24/D26/D36b).
+
+**Schema/test implications.** Tests and effect-schema expectations target the exact
+keywords above. In particular, the D18 follow-on effect must assert
+`:event-type :psi.workflow/remove-run` and event-data containing at least the same
+`:run-id`; no placeholder `<remove-run dispatch>`, Pathom symbol event type, or
+alternate keyword (`:workflow/remove-run`) is in scope.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

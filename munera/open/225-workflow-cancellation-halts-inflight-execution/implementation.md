@@ -1868,3 +1868,17 @@ One new actionable ambiguity found:
    Pathom mutations/delegate tool route into them.
 
 No other new actionable ambiguity found in the current D1–D36b design.
+
+## Ambiguity follow-up resolution (ψ pass 20, 2026-06-11)
+
+Executed the newly added pass-20 design follow-up; no blockers.
+
+- Added D37 to pin canonical state-kernel workflow terminal events:
+  `:psi.workflow/cancel-run` and `:psi.workflow/remove-run`.
+- Defined event-data shape: required `:run-id`, optional `:reason`, optional
+  dispatch-context `:session-id`; no `:then-remove?` / `:reentrant?` flag.
+- Replaced D18's `<remove-run dispatch>` placeholder with the concrete
+  `:runtime/dispatch-event` payload targeting `:psi.workflow/remove-run`.
+- Stated routing: Pathom mutation symbols remain public adapters, while Pathom,
+  psi-tool cancel, and delegate remove route into the keyword dispatch events and
+  must not directly call workflow-runtime pure functions or mutate `inflight-runs`.

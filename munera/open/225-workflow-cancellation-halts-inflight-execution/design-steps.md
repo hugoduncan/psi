@@ -824,7 +824,7 @@
 
 ## Ambiguity follow-ups (ψ pass 20, 2026-06-11)
 
-- [ ] Pin the canonical state-kernel dispatch event types for workflow
+- [x] Pin the canonical state-kernel dispatch event types for workflow
       `cancel-run` and `remove-run`. D18's re-entrant `:runtime/dispatch-event`
       requires a keyword `:event-type`, but the current public operations are
       Pathom mutation symbols (`'psi.workflow/cancel-run`,
@@ -833,3 +833,13 @@
       shape, and state how the Pathom mutations / delegate tool route into those
       events so emitters, schema/tests, and the re-entrant remove dispatch have one
       representation.
+      → design.md D37: canonical state-kernel events are
+      `:psi.workflow/cancel-run` and `:psi.workflow/remove-run` (keywords, distinct
+      from Pathom symbols and workflow-runtime `:workflow/cancel`). Event data =
+      required `:run-id` plus optional `:reason` and optional dispatch-context
+      `:session-id`; no `:then-remove?`/`:reentrant?` flag. D18's follow-on effect
+      is now concrete: `{:effect/type :runtime/dispatch-event :event-type
+      :psi.workflow/remove-run :event-data {:run-id … :reason … :session-id …}
+      :origin :core}`. Pathom mutations, psi-tool cancel, and delegate remove route
+      into these keyword events and do not call workflow-runtime pure functions or
+      mutate `inflight-runs` directly. D18 placeholder replaced.
