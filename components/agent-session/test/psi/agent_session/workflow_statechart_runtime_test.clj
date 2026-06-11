@@ -8,6 +8,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.execution-adapter]
+   [psi.workflow-runtime.progression-recording]
    [psi.agent-session.workflow-judge]
    [psi.session-state.state :as ss]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -765,6 +766,229 @@
           "guarded delegate creation must not add a child run after parent cancellation")
       (is (= :cancelled (:status parent))
           "delegate creation must not resurrect the cancelled parent"))))
+
+(deftest post-entry-ordinary-result-write-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 2: cancellation racing
+  ;; after actor result admission but before :step/record-result commits must
+  ;; not record ordinary success or advance/complete a cancelled run.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-record-result-cancel-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-record-result-cancel-race")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id opts]
+                    {:attempt {:attempt-id (:attempt-id opts)
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"}})
+                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                  (fn [& _]
+                    {:status :ok
+                     :session-id "plan-child"
+                     :assistant-message {:role "assistant"
+                                         :content [{:type :text :text "late success"}]}
+                     :assistant-text "late success"
+                     :execution-result {}})
+                  psi.workflow-runtime.progression-recording/record-step-result
+                  (let [real-record psi.workflow-runtime.progression-recording/record-step-result]
+                    (fn [state run-id step-id payload]
+                      (swap! (:state* ctx)
+                             (fn [current-state]
+                               (-> current-state
+                                   (assoc-in [:workflows :runs run-id :status] :cancelled)
+                                   (assoc-in [:workflows :runs run-id :finished-at] (java.time.Instant/now))
+                                   (assoc-in [:workflows :runs run-id :terminal-outcome]
+                                             {:outcome :cancelled
+                                              :reason "result race"
+                                              :step-id step-id}))))
+                      (real-record state run-id step-id payload)))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-record-result-cancel-race")]
+      (is (= :cancelled (:status run)))
+      (is (nil? (get-in run [:step-runs "plan" :accepted-result]))
+          "late actor success must not be recorded after cancellation wins the CAS")
+      (is (empty? (get-in run [:step-runs "build" :attempts]))
+          "ordinary advancement to the next step must not occur after cancellation"))))
+
+(deftest post-entry-ordinary-failure-write-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 2: cancellation racing
+  ;; after actor failure admission but before :step/record-failure commits must
+  ;; not record ordinary execution failure or rewrite the cancelled run.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-record-failure-cancel-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-record-failure-cancel-race")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id opts]
+                    {:attempt {:attempt-id (:attempt-id opts)
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"}})
+                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                  (fn [& _]
+                    {:status :error
+                     :session-id "plan-child"
+                     :assistant-message {:role "assistant"
+                                         :error-message "boom"
+                                         :content [{:type :error :text "boom"}]}
+                     :assistant-text ""
+                     :execution-result {}
+                     :failure {:reason :boom
+                               :message "boom"}})
+                  psi.workflow-runtime.progression-recording/record-attempt-execution-failure
+                  (let [real-record psi.workflow-runtime.progression-recording/record-attempt-execution-failure]
+                    (fn [state run-id step-id payload]
+                      (swap! (:state* ctx)
+                             (fn [current-state]
+                               (-> current-state
+                                   (assoc-in [:workflows :runs run-id :status] :cancelled)
+                                   (assoc-in [:workflows :runs run-id :finished-at] (java.time.Instant/now))
+                                   (assoc-in [:workflows :runs run-id :terminal-outcome]
+                                             {:outcome :cancelled
+                                              :reason "failure race"
+                                              :step-id step-id}))))
+                      (real-record state run-id step-id payload)))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-record-failure-cancel-race")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= :running (:status attempt))
+          "late ordinary failure must not rewrite the already-started attempt after cancellation")
+      (is (nil? (:execution-error attempt))))))
+
+(deftest judge-result-write-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 2: cancellation racing
+  ;; after judge output is admitted but before :judge/record commits must not
+  ;; record judge output or rewrite :cancelled to :completed/:failed/:running.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx judged-definition "run-judge-record-cancel-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-judge-record-cancel-race")]
+    (with-stubbed-runtime {:assistant-text "review-output"
+                           :judge-result {:judge-session-id "judge-race"
+                                          :judge-output "APPROVED"
+                                          :judge-event "APPROVED"
+                                          :routing-result {:action :complete}}}
+      #(with-redefs [psi.workflow-runtime.progression-recording/record-judge-result
+                     (let [real-record psi.workflow-runtime.progression-recording/record-judge-result]
+                       (fn [state run-id step-id judge-result]
+                         (swap! (:state* ctx)
+                                (fn [current-state]
+                                  (-> current-state
+                                      (assoc-in [:workflows :runs run-id :status] :cancelled)
+                                      (assoc-in [:workflows :runs run-id :finished-at] (java.time.Instant/now))
+                                      (assoc-in [:workflows :runs run-id :terminal-outcome]
+                                                {:outcome :cancelled
+                                                 :reason "judge race"
+                                                 :step-id step-id}))))
+                         (real-record state run-id step-id judge-result)))]
+         (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-judge-record-cancel-race")
+          review-attempt (get-in run [:step-runs "review" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (nil? (:judge-session-id review-attempt))
+          "late judge output must not be recorded after cancellation wins")
+      (is (nil? (:judge-output review-attempt))))))
+
+(deftest iteration-exhausted-write-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 2: cancellation racing
+  ;; before :iteration/exhausted commits must not rewrite :cancelled to :failed.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx judged-definition "run-iteration-exhausted-cancel-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-iteration-exhausted-cancel-race")
+        actions-fn (:actions-fn wf-ctx)]
+    (swap! (:working-memory* wf-ctx)
+           (fn [wm]
+             (-> wm
+                 (assoc :judge-results {"review" {:judge-session-id "judge-r"
+                                                  :judge-output "REVISE"
+                                                  :judge-event "REVISE"}}
+                        :step-outputs {"review" {:outputs {:final-llm-reply "needs work"}}}
+                        :iteration-counts {"review" 3})
+                 (assoc-in [:attempt-ids "review"] "attempt-review"))))
+    (swap! (:state* ctx)
+           (fn [state]
+             (-> state
+                 (assoc-in [:workflows :runs "run-iteration-exhausted-cancel-race" :status] :running)
+                 (assoc-in [:workflows :runs "run-iteration-exhausted-cancel-race" :current-step-id] "review")
+                 (assoc-in [:workflows :runs "run-iteration-exhausted-cancel-race" :step-runs "review" :attempts]
+                           [{:attempt-id "attempt-review"
+                             :status :running
+                             :execution-session-id "review-child"}]))))
+    (with-redefs [psi.workflow-runtime.progression-recording/record-judge-result
+                  (let [real-record psi.workflow-runtime.progression-recording/record-judge-result]
+                    (fn [state run-id step-id judge-result]
+                      (swap! (:state* ctx)
+                             (fn [current-state]
+                               (-> current-state
+                                   (assoc-in [:workflows :runs run-id :status] :cancelled)
+                                   (assoc-in [:workflows :runs run-id :finished-at] (java.time.Instant/now))
+                                   (assoc-in [:workflows :runs run-id :terminal-outcome]
+                                             {:outcome :cancelled
+                                              :reason "iteration race"
+                                              :step-id step-id}))))
+                      (real-record state run-id step-id judge-result)))]
+      (actions-fn :iteration/exhausted {:step-id "review"}))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-iteration-exhausted-cancel-race")
+          review-attempt (get-in run [:step-runs "review" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (nil? (:judge-session-id review-attempt)))
+      (is (not= :iteration-limit-reached (get-in run [:terminal-outcome :reason]))))))
+
+(deftest cancel-during-judged-step-judge-turn-does-not-record-judge-output-test
+  ;; Regression for task 225 implementation review pass 2: cancellation during a
+  ;; judged step's judge turn must stop before ordinary judge output is queued or
+  ;; recorded.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx judged-definition "run-judge-turn-cancel")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-judge-turn-cancel")
+        judge-prompts* (atom [])]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id opts]
+                    (let [sid (str (:workflow-step-id opts) "-child")]
+                      {:attempt {:attempt-id (:attempt-id opts)
+                                 :status :pending
+                                 :execution-session-id sid}
+                       :execution-session {:session-id sid}}))
+                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                  (fn [_ctx sid _prompt]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-message {:role "assistant"
+                                         :content [{:type :text :text (if (= sid "plan-child")
+                                                                        "plan text"
+                                                                        "review output")}]}
+                     :assistant-text (if (= sid "plan-child") "plan text" "review output")
+                     :execution-result {}})
+                  psi.workflow-runtime.execution-adapter/create-child-session!
+                  (let [real-create psi.workflow-runtime.execution-adapter/create-child-session!]
+                    (fn [ctx' parent-session-id opts]
+                      (real-create ctx' parent-session-id opts)))
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid text]
+                    (swap! judge-prompts* conj {:session-id sid :text text})
+                    (swap! (:state* ctx)
+                           (fn [state]
+                             (-> state
+                                 (assoc-in [:workflows :runs "run-judge-turn-cancel" :status] :cancelled)
+                                 (assoc-in [:workflows :runs "run-judge-turn-cancel" :finished-at] (java.time.Instant/now))
+                                 (assoc-in [:workflows :runs "run-judge-turn-cancel" :terminal-outcome]
+                                           {:outcome :cancelled
+                                            :reason "judge turn race"
+                                            :step-id "review"}))))
+                    {:status :ok
+                     :session-id sid
+                     :assistant-message {:role "assistant" :content [{:type :text :text "APPROVED"}]}
+                     :assistant-text "APPROVED"
+                     :execution-result {}})]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-judge-turn-cancel")
+          review-attempt (get-in run [:step-runs "review" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 1 (count @judge-prompts*))
+          "the race is cancellation during the in-flight judge turn")
+      (is (string? (:judge-session-id review-attempt))
+          "the in-flight judge session remains addressable for guarded cancellation abort")
+      (is (nil? (:judge-output review-attempt))
+          "ordinary judge output must not be recorded after cancellation during judge turn")
+      (is (empty? (get-in run [:step-runs "build" :attempts]))))))
 
 (deftest cancel-from-blocked-state-test
   (let [[ctx session-id] (create-session-context)

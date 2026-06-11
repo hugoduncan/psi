@@ -67,16 +67,23 @@
 (defn- latest-workflow-attempt-in [ctx run-id step-id]
   (last (get-in @(:state* ctx) [:workflows :runs run-id :step-runs step-id :attempts])))
 
-(defn- live-workflow-attempt? [attempt]
-  (contains? #{:running :validating} (:status attempt)))
+(defn- live-workflow-attempt? [attempt session-kind]
+  (contains? (case session-kind
+               :judge #{:running :validating :succeeded}
+               #{:running :validating})
+             (:status attempt)))
 
 (defn- workflow-abort-guard-matches? [ctx effect]
-  (let [attempt (latest-workflow-attempt-in ctx (:workflow-run-id effect) (:workflow-step-id effect))]
+  (let [attempt (latest-workflow-attempt-in ctx (:workflow-run-id effect) (:workflow-step-id effect))
+        session-kind (or (:workflow-session-kind effect) :attempt)
+        session-key (case session-kind
+                      :judge :judge-session-id
+                      :attempt :execution-session-id)]
     (and attempt
          (= (:workflow-attempt-id effect) (:attempt-id attempt))
-         (= (:expected-session-id effect) (:execution-session-id attempt))
-         (= (:session-id effect) (:execution-session-id attempt))
-         (live-workflow-attempt? attempt))))
+         (= (:expected-session-id effect) (get attempt session-key))
+         (= (:session-id effect) (get attempt session-key))
+         (live-workflow-attempt? attempt session-kind))))
 
 (defn- abort-session! [ctx effect]
   (when-let [turn-ctx (ss/get-state-value-in ctx (ss/state-path :turn-ctx (effect-session-id ctx effect)))]

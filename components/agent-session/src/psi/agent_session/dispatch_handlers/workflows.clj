@@ -93,26 +93,37 @@
     :else
     [(drop-inflight-run-effect run-id)]))
 
-(defn- live-attempt-abort-effect
+(defn- live-attempt-abort-effects
   [run]
   (let [step-id (:current-step-id run)
         attempt (last (get-in run [:step-runs step-id :attempts]))
-        session-id (:execution-session-id attempt)
-        attempt-id (:attempt-id attempt)]
-    (when (and step-id
-               attempt-id
-               session-id
-               (contains? #{:running :validating} (:status attempt)))
-      {:effect/type :runtime/agent-abort
-       :session-id session-id
-       :workflow-run-id (:run-id run)
-       :workflow-step-id step-id
-       :workflow-attempt-id attempt-id
-       :expected-session-id session-id})))
+        attempt-id (:attempt-id attempt)
+        attempt-status (:status attempt)]
+    (when (and step-id attempt-id)
+      (cond-> []
+        (and (:execution-session-id attempt)
+             (contains? #{:running :validating} attempt-status))
+        (conj {:effect/type :runtime/agent-abort
+               :session-id (:execution-session-id attempt)
+               :workflow-run-id (:run-id run)
+               :workflow-step-id step-id
+               :workflow-attempt-id attempt-id
+               :expected-session-id (:execution-session-id attempt)
+               :workflow-session-kind :attempt})
+
+        (and (:judge-session-id attempt)
+             (contains? #{:running :validating :succeeded} attempt-status))
+        (conj {:effect/type :runtime/agent-abort
+               :session-id (:judge-session-id attempt)
+               :workflow-run-id (:run-id run)
+               :workflow-step-id step-id
+               :workflow-attempt-id attempt-id
+               :expected-session-id (:judge-session-id attempt)
+               :workflow-session-kind :judge})))))
 
 (defn- cancellation-effects
   [run cascade-runs]
-  (let [abort-effects (keep live-attempt-abort-effect cascade-runs)]
+  (let [abort-effects (mapcat live-attempt-abort-effects cascade-runs)]
     (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}]
       (top-level-run? run)
       (conj (cancel-inflight-run-effect (:run-id run)))

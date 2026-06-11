@@ -15,12 +15,14 @@
       [:workflow-run-id {:optional true} :string]
       [:workflow-step-id {:optional true} :string]
       [:workflow-attempt-id {:optional true} :string]
-      [:expected-session-id {:optional true} :string]]
+      [:expected-session-id {:optional true} :string]
+      [:workflow-session-kind {:optional true} [:enum :attempt :judge]]]
      [:fn {:error/message "workflow abort guard keys must be all present or all absent, with explicit session-id"}
       (fn [effect]
         (let [guard-keys [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]
               present-count (count (filter #(contains? effect %) guard-keys))]
-          (or (zero? present-count)
+          (or (and (zero? present-count)
+                   (not (contains? effect :workflow-session-kind)))
               (and (= present-count (count guard-keys))
                    (contains? effect :session-id)))))]]]
    [:runtime/cancel-inflight-run

@@ -47,17 +47,27 @@
         (workflow-progression-recording/start-latest-attempt run-id step-id)
         (workflow-progression-recording/increment-iteration-count run-id step-id))))
 
-(defn- append-and-start-attempt-if-live!
-  [ctx run-id step-id attempt]
+(defn- update-state-if-live!
+  "Apply f to canonical root state only while run-id is still live.
+
+   The stop check is inside the compare-and-set loop: if cancellation/removal wins
+   the root-state race after an action has been admitted but before its write
+   commits, the CAS fails, the latest state is re-read, and the ordinary action
+   write is skipped instead of resurrecting or advancing the cancelled run."
+  [ctx run-id f]
   (loop []
     (let [state* (:state* ctx)
           state-map @state*]
       (if (state/workflow-stopped-in-state? state-map run-id)
         false
-        (let [state' (append-and-start-attempt-if-live state-map run-id step-id attempt)]
+        (let [state' (f state-map)]
           (if (compare-and-set! state* state-map state')
             true
             (recur)))))))
+
+(defn- append-and-start-attempt-if-live!
+  [ctx run-id step-id attempt]
+  (update-state-if-live! ctx run-id #(append-and-start-attempt-if-live % run-id step-id attempt)))
 
 (defn- record-started-attempt-working-memory!
   [working-memory* step-id attempt-id execution-session]
@@ -268,29 +278,36 @@
         :step/record-result
         (let [{:keys [payload]} (:pending-actor-result @working-memory*)
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              judged-step? (some? (:judge (state/runtime-step-def workflow-run step-id)))]
-          (if judged-step?
-            (swap! (:state* ctx)
-                   workflow-progression-recording/record-actor-result run-id step-id payload)
-            (swap! (:state* ctx)
-                   workflow-progression-recording/record-step-result run-id step-id payload))
-          (swap! working-memory*
-                 (fn [wm]
-                   (-> wm
-                       (assoc :pending-actor-result nil
-                              :step-outputs (assoc (:step-outputs wm) step-id payload)
-                              :updated-at (state/now)))))
+              judged-step? (some? (:judge (state/runtime-step-def workflow-run step-id)))
+              recorded? (update-state-if-live!
+                         ctx
+                         run-id
+                         (if judged-step?
+                           #(workflow-progression-recording/record-actor-result % run-id step-id payload)
+                           #(workflow-progression-recording/record-step-result % run-id step-id payload)))]
+          (if recorded?
+            (swap! working-memory*
+                   (fn [wm]
+                     (-> wm
+                         (assoc :pending-actor-result nil
+                                :step-outputs (assoc (:step-outputs wm) step-id payload)
+                                :updated-at (state/now)))))
+            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
           nil)
 
         :step/record-failure
-        (let [{:keys [payload]} (:pending-actor-result @working-memory*)]
-          (swap! (:state* ctx)
-                 workflow-progression-recording/record-attempt-execution-failure run-id step-id payload)
-          (swap! working-memory*
-                 (fn [wm]
-                   (-> wm
-                       (assoc :pending-actor-result nil
-                              :updated-at (state/now)))))
+        (let [{:keys [payload]} (:pending-actor-result @working-memory*)
+              recorded? (update-state-if-live!
+                         ctx
+                         run-id
+                         #(workflow-progression-recording/record-attempt-execution-failure % run-id step-id payload))]
+          (if recorded?
+            (swap! working-memory*
+                   (fn [wm]
+                     (-> wm
+                         (assoc :pending-actor-result nil
+                                :updated-at (state/now)))))
+            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
           nil)
 
         :judge/enter
@@ -298,71 +315,82 @@
               step-def (state/runtime-step-def workflow-run step-id)
               judge-spec (:judge step-def)
               routing-table (or (:on step-def) {})
-              actor-session-id (get-in @working-memory* [:sessions step-id])
-              judge-result (execution-adapter/execute-judge!
-                            ctx
-                            parent-session-id
-                            actor-session-id
-                            judge-spec
-                            routing-table
-                            {:current-step-id step-id
-                             :step-order (state/runtime-step-order workflow-run)
-                             :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])
-                             :workflow-run-id run-id
-                             :workflow-run workflow-run})
-              routing-result (:routing-result judge-result)]
-          (swap! working-memory*
-                 (fn [wm]
-                   (-> wm
-                       (assoc :current-step-id step-id
-                              :pending-judge-result judge-result
-                              :pending-routing routing-result
-                              :updated-at (state/now))
-                       (assoc-in [:judge-results step-id] judge-result)
-                       (assoc-in [:sessions (str step-id "-judge")] (:judge-session-id judge-result)))))
-          (queue/enqueue-event! event-queue* working-memory*
-                                (case (:action routing-result)
-                                  :no-match :judge/no-match
-                                  :fail :judge/failed
-                                  :judge/signal)
-                                (cond-> {}
-                                  (:judge-event judge-result) (assoc :signal (:judge-event judge-result))))
+              actor-session-id (get-in @working-memory* [:sessions step-id])]
+          (if (state/workflow-stopped? ctx run-id)
+            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+            (let [judge-result (execution-adapter/execute-judge!
+                                ctx
+                                parent-session-id
+                                actor-session-id
+                                judge-spec
+                                routing-table
+                                {:current-step-id step-id
+                                 :step-order (state/runtime-step-order workflow-run)
+                                 :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])
+                                 :workflow-run-id run-id
+                                 :workflow-run workflow-run
+                                 :workflow-attempt-id (get-in @working-memory* [:attempt-ids step-id])
+                                 :stopped? #(state/workflow-stopped? ctx run-id)})
+                  routing-result (:routing-result judge-result)]
+              (if (state/workflow-stopped? ctx run-id)
+                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                (do
+                  (swap! working-memory*
+                         (fn [wm]
+                           (-> wm
+                               (assoc :current-step-id step-id
+                                      :pending-judge-result judge-result
+                                      :pending-routing routing-result
+                                      :updated-at (state/now))
+                               (assoc-in [:judge-results step-id] judge-result)
+                               (assoc-in [:sessions (str step-id "-judge")] (:judge-session-id judge-result)))))
+                  (queue/enqueue-event! event-queue* working-memory*
+                                        (case (:action routing-result)
+                                          :no-match :judge/no-match
+                                          :fail :judge/failed
+                                          :judge/signal)
+                                        (cond-> {}
+                                          (:judge-event judge-result) (assoc :signal (:judge-event judge-result))))))))
           nil)
 
         :judge/record
         (let [judge-result (:pending-judge-result @working-memory*)
-              routing-result (:routing-result judge-result)]
-          (swap! (:state* ctx)
-                 workflow-progression-recording/record-judge-result run-id step-id judge-result)
-          (swap! (:state* ctx)
-                 (fn [state-map]
-                   (update-in state-map [:workflows :runs run-id]
-                              (fn [workflow-run]
-                                (case (:action routing-result)
-                                  :goto
-                                  (-> workflow-run
-                                      (assoc :current-step-id (:target routing-result)
-                                             :status :running))
+              routing-result (:routing-result judge-result)
+              recorded? (update-state-if-live!
+                         ctx
+                         run-id
+                         (fn [state-map]
+                           (-> state-map
+                               (workflow-progression-recording/record-judge-result run-id step-id judge-result)
+                               (update-in [:workflows :runs run-id]
+                                          (fn [workflow-run]
+                                            (case (:action routing-result)
+                                              :goto
+                                              (-> workflow-run
+                                                  (assoc :current-step-id (:target routing-result)
+                                                         :status :running))
 
-                                  :complete
-                                  (-> workflow-run
-                                      (assoc :status :completed
-                                             :current-step-id nil
-                                             :finished-at (or (:finished-at workflow-run) (state/now))
-                                             :terminal-outcome {:outcome :completed
-                                                                :step-id step-id
-                                                                :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
-                                                                :result-envelope (get-in workflow-run [:step-runs step-id :accepted-result])}))
+                                              :complete
+                                              (-> workflow-run
+                                                  (assoc :status :completed
+                                                         :current-step-id nil
+                                                         :finished-at (or (:finished-at workflow-run) (state/now))
+                                                         :terminal-outcome {:outcome :completed
+                                                                            :step-id step-id
+                                                                            :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
+                                                                            :result-envelope (get-in workflow-run [:step-runs step-id :accepted-result])}))
 
-                                  (-> workflow-run
-                                      (assoc :status :failed
-                                             :finished-at (or (:finished-at workflow-run) (state/now))
-                                             :terminal-outcome {:outcome :failed
-                                                                :reason (or (:reason routing-result) :judge-no-match)
-                                                                :step-id step-id
-                                                                :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
-                                                                :judge-output (:judge-output judge-result)})))))))
-          (clear-pending-judge-state! working-memory*)
+                                              (-> workflow-run
+                                                  (assoc :status :failed
+                                                         :finished-at (or (:finished-at workflow-run) (state/now))
+                                                         :terminal-outcome {:outcome :failed
+                                                                            :reason (or (:reason routing-result) :judge-no-match)
+                                                                            :step-id step-id
+                                                                            :attempt-id (:attempt-id (workflow-progression-recording/latest-attempt workflow-run step-id))
+                                                                            :judge-output (:judge-output judge-result)}))))))))]
+          (if recorded?
+            (clear-pending-judge-state! working-memory*)
+            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
           nil)
 
         :step/block
@@ -381,27 +409,31 @@
               step-def (state/runtime-step-def workflow-run step-id)
               last-judge-result (get-in @working-memory* [:judge-results step-id])
               last-step-output (get-in @working-memory* [:step-outputs step-id])
-              last-judge-signal (:judge-event last-judge-result)]
-          ;; Record judge result for the final iteration before recording terminal outcome
-          (when last-judge-result
-            (swap! (:state* ctx)
-                   workflow-progression-recording/record-judge-result run-id step-id last-judge-result))
-          (swap! (:state* ctx)
-                 (fn [state-map]
-                   (update-in state-map [:workflows :runs run-id]
-                              (fn [wf-run]
-                                (-> wf-run
-                                    (assoc :status :failed
-                                           :finished-at (or (:finished-at wf-run) (state/now))
-                                           :terminal-outcome
-                                           {:outcome :failed
-                                            :reason :iteration-limit-reached
-                                            :step-id step-id
-                                            :iteration-count iteration-count
-                                            :max-iterations (get-in step-def [:on last-judge-signal :max-iterations])
-                                            :last-judge-signal last-judge-signal
-                                            :last-result-text (get-in last-step-output [:outputs :final-llm-reply])}))))))
-          (clear-pending-judge-state! working-memory*)
+              last-judge-signal (:judge-event last-judge-result)
+              recorded? (update-state-if-live!
+                         ctx
+                         run-id
+                         (fn [state-map]
+                           (cond-> state-map
+                             last-judge-result
+                             (workflow-progression-recording/record-judge-result run-id step-id last-judge-result)
+                             true
+                             (update-in [:workflows :runs run-id]
+                                        (fn [wf-run]
+                                          (-> wf-run
+                                              (assoc :status :failed
+                                                     :finished-at (or (:finished-at wf-run) (state/now))
+                                                     :terminal-outcome
+                                                     {:outcome :failed
+                                                      :reason :iteration-limit-reached
+                                                      :step-id step-id
+                                                      :iteration-count iteration-count
+                                                      :max-iterations (get-in step-def [:on last-judge-signal :max-iterations])
+                                                      :last-judge-signal last-judge-signal
+                                                      :last-result-text (get-in last-step-output [:outputs :final-llm-reply])})))))))]
+          (if recorded?
+            (clear-pending-judge-state! working-memory*)
+            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
           nil)
 
         :terminal/record

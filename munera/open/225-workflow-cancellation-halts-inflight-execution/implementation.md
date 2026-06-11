@@ -2428,3 +2428,25 @@ Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 40 tests / 198 assertions green.
 - Focused `clj-kondo --lint` over changed workflow-runtime cancellation source files → clean.
+
+## Review follow-up implementation — post-entry cancellation-safe writes and judge stop (ψ, 2026-06-11)
+
+Executed both newly-added implementation-review pass-2 follow-ups.
+
+- Added a shared CAS guard in `statechart_runtime.clj` for ordinary canonical root-state writes after event admission. `:step/record-result`, `:step/record-failure`, `:judge/record`, and `:iteration/exhausted` now re-check canonical run presence / `:cancelled` inside the compare-and-set loop before committing results, failures, judge routing, or terminal failure/completion updates. If cancellation wins the race, the ordinary write is skipped and workflow cancellation is queued instead of resurrecting/advancing the run.
+- Added judge stop checks before judge-session creation and after judge turn/retry execution. Judge child sessions now carry workflow run/step/attempt linkage and attach their `judge-session-id` to the live attempt with a guarded CAS before the turn runs, making an in-flight judge turn addressable by cancellation while still avoiding ordinary judge output/routing writes after the D31 checkpoint.
+- Extended guarded `:runtime/agent-abort` with `:workflow-session-kind :attempt|:judge`, preserving backward-compatible attempt targeting by default. Cancellation now emits guarded aborts for both live actor attempt sessions and live judge sessions recorded on the current attempt.
+- Added regression coverage for result write, failure write, judge record, iteration-exhausted terminal write, cancellation during a judge turn, and guarded judge abort execution.
+
+Verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test` → 22 tests / 89 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 8 tests / 51 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-judge-test` → 15 tests / 83 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test` → 16 tests / 77 assertions green.
+- Focused `clj-kondo --lint` over changed source/test files → clean.
+
+Additional gate verification after the follow-up:
+
+- `bb test` → green.
+- `clj-kondo --lint components` → errors 0 / warnings 0; existing info-level suggestions outside this pass remain.

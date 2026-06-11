@@ -55,7 +55,8 @@
                                                :workflow-run-id "run-1"
                                                :workflow-step-id "step-1"
                                                :workflow-attempt-id "attempt-1"
-                                               :expected-session-id "child-session"})))
+                                               :expected-session-id "child-session"
+                                               :workflow-session-kind :attempt})))
     (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/agent-abort})))
     (is (false? (dispatch-schema/valid-effect? {:effect/type :runtime/agent-abort
                                                 :workflow-run-id "run-1"})))))
@@ -81,7 +82,8 @@
                  :workflow-run-id "run-1"
                  :workflow-step-id "step-1"
                  :workflow-attempt-id "attempt-1"
-                 :expected-session-id "child-session"}]
+                 :expected-session-id "child-session"
+                 :workflow-session-kind :attempt}]
                (:declared-effects entry))))))
 
   (testing "nested cancel aborts the child attempt without cancelling the parent worker"
@@ -104,7 +106,8 @@
                  :workflow-run-id "child"
                  :workflow-step-id "step-1"
                  :workflow-attempt-id "child-attempt"
-                 :expected-session-id "child-session"}]
+                 :expected-session-id "child-session"
+                 :workflow-session-kind :attempt}]
                (:declared-effects entry))))))
 
   (testing "parent cancel cascades to live descendants and aborts cascade-set attempts"
@@ -135,13 +138,15 @@
                  :workflow-run-id "parent"
                  :workflow-step-id "step-1"
                  :workflow-attempt-id "parent-attempt"
-                 :expected-session-id "parent-session"}
+                 :expected-session-id "parent-session"
+                 :workflow-session-kind :attempt}
                 {:effect/type :runtime/agent-abort
                  :session-id "child-session"
                  :workflow-run-id "child"
                  :workflow-step-id "step-1"
                  :workflow-attempt-id "child-attempt"
-                 :expected-session-id "child-session"}]
+                 :expected-session-id "child-session"
+                 :workflow-session-kind :attempt}]
                (:declared-effects entry)))))))
 
 (deftest remove-run-dispatch-cleanup-effects-test
@@ -186,7 +191,8 @@
                  :workflow-run-id "child"
                  :workflow-step-id "step-1"
                  :workflow-attempt-id "child-attempt"
-                 :expected-session-id "child-session"}
+                 :expected-session-id "child-session"
+                 :workflow-session-kind :attempt}
                 {:effect/type :runtime/dispatch-event
                  :event-type :psi.workflow/remove-run
                  :event-data {:run-id "child" :reason "cancelled by remove"}
@@ -264,6 +270,32 @@
                 :reason "cancelled by remove"}
                (:terminal-payload job)))
         (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))))))
+
+(deftest guarded-judge-abort-effect-test
+  ;; Tests task 225 pass-2 judge cancellation extension: guarded abort can target
+  ;; a judge session recorded on the live workflow attempt, and stale judge guards
+  ;; remain no-ops.
+  (let [ctx (make-ctx)]
+    (install-run! ctx (run "run-judge" :running
+                           :step-runs {"step-1" {:attempts [{:attempt-id "attempt-1"
+                                                             :status :running
+                                                             :execution-session-id "actor-session"
+                                                             :judge-session-id "judge-session"}]}}))
+    (is (= {:aborted? true :session-id "judge-session" :guarded? true}
+           ((:execute-effect-fn ctx) ctx {:effect/type :runtime/agent-abort
+                                          :session-id "judge-session"
+                                          :workflow-run-id "run-judge"
+                                          :workflow-step-id "step-1"
+                                          :workflow-attempt-id "attempt-1"
+                                          :expected-session-id "judge-session"
+                                          :workflow-session-kind :judge})))
+    (is (nil? ((:execute-effect-fn ctx) ctx {:effect/type :runtime/agent-abort
+                                             :session-id "judge-session"
+                                             :workflow-run-id "run-judge"
+                                             :workflow-step-id "step-1"
+                                             :workflow-attempt-id "attempt-1"
+                                             :expected-session-id "stale-judge-session"
+                                             :workflow-session-kind :judge})))))
 
 (deftest delegate-cancelled-run-result-test
   ;; Tests direct nested-run cancellation through the existing delegate result
