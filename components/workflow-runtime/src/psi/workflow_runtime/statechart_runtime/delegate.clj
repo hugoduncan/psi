@@ -99,25 +99,31 @@
         context (workflow-source-resolution/resolve-delegate-context workflow-run (:context delegate-spec))
         parent-run-id (:run-id workflow-run)
         inherited-defaults (when resolve-inherited-defaults-fn
-                             (resolve-inherited-defaults-fn ctx parent-session-id workflow-run step-id))]
-    (if (or (nil? (workflow-runtime/workflow-run-in @(:state* ctx) parent-run-id))
-            (= :cancelled (:status (workflow-runtime/workflow-run-in @(:state* ctx) parent-run-id))))
+                             (resolve-inherited-defaults-fn ctx parent-session-id workflow-run step-id))
+        run-opts (cond-> {:definition-id target-name
+                          :parent-session-id parent-session-id
+                          :delegating-run-id parent-run-id
+                          :workflow-input prompt-string
+                          :workflow-original context}
+                   (contains? workflow-run :session-profile-snapshot)
+                   (assoc :session-profile-snapshot (:session-profile-snapshot workflow-run))
+                   inherited-defaults (assoc :inherited-defaults inherited-defaults))
+        delegate-run-id
+        (loop []
+          (let [state-map @(:state* ctx)]
+            (if (or (nil? (workflow-runtime/workflow-run-in state-map parent-run-id))
+                    (= :cancelled (:status (workflow-runtime/workflow-run-in state-map parent-run-id))))
+              nil
+              (let [[state' delegate-run-id _] (workflow-runtime/create-run state-map run-opts)]
+                (if (compare-and-set! (:state* ctx) state-map state')
+                  delegate-run-id
+                  (recur))))))]
+    (if-not delegate-run-id
       {:pending-kind :failure
        :payload {:message "Delegating workflow cancelled or removed before child workflow start"
                  :target target-name
                  :details {:status :cancelled}}}
-      (let [[state' delegate-run-id _]
-            (workflow-runtime/create-run @(:state* ctx)
-                                         (cond-> {:definition-id target-name
-                                                  :parent-session-id parent-session-id
-                                                  :delegating-run-id parent-run-id
-                                                  :workflow-input prompt-string
-                                                  :workflow-original context}
-                                           (contains? workflow-run :session-profile-snapshot)
-                                           (assoc :session-profile-snapshot (:session-profile-snapshot workflow-run))
-                                           inherited-defaults (assoc :inherited-defaults inherited-defaults)))
-            _ (reset! (:state* ctx) state')
-            delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)
+      (let [delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)
             _ (send-and-drain-fn delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)
             delegate-run (workflow-runtime/workflow-run-in @(:state* ctx) delegate-run-id)
             boundary {:delegate {:target target-name

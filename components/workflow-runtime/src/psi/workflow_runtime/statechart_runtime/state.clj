@@ -53,22 +53,31 @@
                   [step-id execution-session-id])))
         (:step-runs workflow-run)))
 
-(defn workflow-stop-signal
-  "Return the cooperative workflow stop signal for run-id, if any.
+(defn workflow-stop-signal-in-state
+  "Return the cooperative workflow stop signal for run-id in `state-map`, if any.
 
    Cancellation is authoritative in canonical workflow state. A missing run record
    is also a stop signal for workers that were woken after remove-run dropped the
    canonical record. Runtime handles/futures are intentionally not consulted here."
-  [ctx run-id]
-  (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+  [state-map run-id]
+  (let [workflow-run (workflow-runtime/workflow-run-in state-map run-id)]
     (cond
       (nil? workflow-run) :removed
       (= :cancelled (:status workflow-run)) :cancelled
       :else nil)))
 
+(defn workflow-stopped-in-state?
+  [state-map run-id]
+  (boolean (workflow-stop-signal-in-state state-map run-id)))
+
+(defn workflow-stop-signal
+  "Return the cooperative workflow stop signal for run-id, if any."
+  [ctx run-id]
+  (workflow-stop-signal-in-state @(:state* ctx) run-id))
+
 (defn workflow-stopped?
   [ctx run-id]
-  (boolean (workflow-stop-signal ctx run-id)))
+  (workflow-stopped-in-state? @(:state* ctx) run-id))
 
 (defn create-working-memory
   [ctx parent-session-id run-id]

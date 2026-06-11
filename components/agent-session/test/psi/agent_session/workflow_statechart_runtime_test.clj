@@ -681,6 +681,91 @@
         (is (= :failed (:status run)))
         (is (= :execution-failed (:status attempt)))))))
 
+(deftest step-entry-attempt-start-write-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review: cancellation racing after the
+  ;; pre-check but before the attempt-start swap! must not let :step/enter
+  ;; resurrect the run to :running or record a post-cancel attempt.
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx linear-definition "run-step-entry-cancel-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-step-entry-cancel-race")
+        created* (atom [])]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id opts]
+                    (swap! created* conj opts)
+                    (swap! (:state* ctx)
+                           (fn [state]
+                             (-> state
+                                 (assoc-in [:workflows :runs "run-step-entry-cancel-race" :status] :cancelled)
+                                 (assoc-in [:workflows :runs "run-step-entry-cancel-race" :finished-at] (java.time.Instant/now))
+                                 (assoc-in [:workflows :runs "run-step-entry-cancel-race" :terminal-outcome]
+                                           {:outcome :cancelled
+                                            :reason "race"
+                                            :step-id "plan"}))))
+                    {:attempt {:attempt-id (:attempt-id opts)
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"}})
+                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                  (fn [& _]
+                    (throw (ex-info "turn must not start after cancellation wins attempt-start swap" {})))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-step-entry-cancel-race")]
+      (is (= 1 (count @created*))
+          "the race is after child-session creation/pre-check and before attempt-start write")
+      (is (= :cancelled (:status run)))
+      (is (empty? (get-in run [:step-runs "plan" :attempts]))
+          "the guarded attempt-start write must not append an attempt after cancellation")
+      (is (not (contains? #{"build" nil} (:current-step-id run)))
+          "ordinary advancement must not proceed after the cancel checkpoint"))))
+
+(deftest delegate-sub-run-creation-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review: a parent cancel racing after
+  ;; delegate-step pre-check but before create-run must preserve the cancelled
+  ;; parent and create no child run.
+  (let [[ctx session-id] (create-session-context)
+        child-definition {:definition-id "delegate-child-race"
+                          :steps [{:name "only"
+                                   :type :session
+                                   :contributions [{:type :template
+                                                    :text "Child"
+                                                    :vars {}}]}]}
+        parent-definition {:definition-id "delegate-parent-race"
+                           :steps [{:name "delegate"
+                                    :type :delegate
+                                    :target "delegate-child-race"
+                                    :prompt-string "Go"}]}
+        _ (install-run! ctx child-definition "definition-seed")
+        _ (swap! (:state* ctx) update-in [:workflows :runs] dissoc "definition-seed")
+        _ (swap! (:state* ctx) update-in [:workflows :run-order]
+                 (fn [order]
+                   (vec (remove #(= "definition-seed" %) order))))
+        _ (install-run! ctx parent-definition "run-delegate-parent-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-delegate-parent-race")]
+    (with-redefs [psi.workflow-runtime.core/create-run
+                  (let [real-create-run psi.workflow-runtime.core/create-run]
+                    (fn [state opts]
+                      (when (= "delegate-child-race" (:definition-id opts))
+                        (swap! (:state* ctx)
+                               (fn [current-state]
+                                 (-> current-state
+                                     (assoc-in [:workflows :runs "run-delegate-parent-race" :status] :cancelled)
+                                     (assoc-in [:workflows :runs "run-delegate-parent-race" :finished-at] (java.time.Instant/now))
+                                     (assoc-in [:workflows :runs "run-delegate-parent-race" :terminal-outcome]
+                                               {:outcome :cancelled
+                                                :reason "delegate race"
+                                                :step-id "delegate"})))))
+                      (real-create-run state opts)))]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [runs (get-in @(:state* ctx) [:workflows :runs])
+          parent (get runs "run-delegate-parent-race")
+          delegated-runs (filterv #(= "run-delegate-parent-race" (:delegating-run-id %))
+                                  (vals runs))]
+      (is (= :cancelled (:status parent)))
+      (is (empty? delegated-runs)
+          "guarded delegate creation must not add a child run after parent cancellation")
+      (is (= :cancelled (:status parent))
+          "delegate creation must not resurrect the cancelled parent"))))
+
 (deftest cancel-from-blocked-state-test
   (let [[ctx session-id] (create-session-context)
         _ (install-run! ctx linear-definition "run-4")

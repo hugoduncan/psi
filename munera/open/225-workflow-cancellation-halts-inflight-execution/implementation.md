@@ -2402,3 +2402,18 @@ Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-async-path-test` → 29 tests / 155 assertions green.
 - Focused `clj-kondo --lint` over changed workflow cancellation source files → clean.
+
+## Review follow-up implementation — cancellation-safe advancement writes (ψ, 2026-06-11)
+
+Executed both newly-added implementation-review follow-ups.
+
+- Made `:step/enter` attempt append/start cancellation-safe by routing the canonical attempt-start write through a CAS helper that re-reads canonical run presence / `:cancelled` status at the compare-and-set boundary. If cancellation wins after the pre-check and before the attempt-start write, the helper returns false, records no attempt, does not rewrite the run to `:running`, and enqueues workflow cancellation instead. The exception fallback path now uses the same guarded helper and only records a synthetic execution-failure attempt if that guarded start succeeds.
+- Made delegate sub-run creation cancellation-safe by replacing stale-state `create-run` + `reset!` with a CAS loop that re-checks parent run presence / `:cancelled` before committing the child run. If the parent is cancelled/removed before the CAS, no delegated child run is created and the existing cancelled/removed delegate failure result is returned.
+- Added regression coverage in `workflow_statechart_runtime_test.clj`: one test cancels between child-session creation/pre-check and attempt-start write and asserts the parent remains `:cancelled` with no appended attempt or turn execution; one test cancels during delegate child-run creation and asserts no delegated run is added and the parent remains `:cancelled`.
+
+Verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test` → 17 tests / 72 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 7 tests / 49 assertions green.
+- `bb clojure:test:scry --namespace psi.workflow-runtime.statechart-runtime.state-test` → 2 tests / 7 assertions green.
+- Focused `clj-kondo --lint` over changed workflow runtime source and test files → clean.
