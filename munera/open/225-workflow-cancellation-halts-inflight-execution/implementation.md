@@ -2680,3 +2680,31 @@ Validation:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 8 tests / 52 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 21 tests / 101 assertions green.
+
+## Implementation review (ψ pass 10, 2026-06-11)
+
+Reviewed the post-pass-8 implementation against `task-implementation-review`, the
+D30/D31 no-post-checkpoint ordinary-work contract, current task artifacts, changed
+cancellation dispatch/effect/runtime code, docs, and focused cancellation tests. The
+completed judge-abort guard now no-ops after judge output is recorded, and the
+focused suites remain green.
+
+New actionable issue: the pass-6 “initial ordinary start” fix is still a
+check-then-call guard, not a cancellation-safe start protocol. Actor and judge turn
+start (`turn_execution_contract.clj` → `prompt-execution-result`) read canonical
+workflow state, then immediately call the prompt adapter; deterministic operation
+start (`deterministic_operation_runtime/core.clj`) reads canonical workflow state,
+then calls the operation handler. If the D31 cancel CAS lands after that final read
+but before the prompt adapter / operation handler call, a new ordinary turn or
+operation can still be initiated after the cancel checkpoint. Guarded abort may later
+stop a prompt turn, but it does not prevent the forbidden post-checkpoint start, and
+there is no equivalent abort for deterministic operation handlers. Follow-up should
+replace these check-then-call gates with a cancellation-safe start protocol (for
+example a CAS/reservation that makes “started before D31” explicit, or a durable
+per-session/per-invocation stop marker consumed at the actual start boundary) and add
+race regressions for cancel landing after the final read but before actor, judge, and
+invoke starts.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-judge-test` → 39 tests / 193 assertions green.

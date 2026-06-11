@@ -158,3 +158,7 @@
 
 - [x] Make guarded judge abort effects no-op after the judge turn/result is complete: do not treat `:status :succeeded` alone as proof that a judge session is still live; add a judge-specific active/completed marker or active-turn/session liveness check so stale duplicate/concurrent cancellation aborts cannot abort an already-completed judge session, while in-flight judge sessions remain abortable. Add a regression where a guarded judge abort effect is executed after judge output/result is recorded and assert the abort executor no-ops.
   - Covered 2026-06-11: guarded judge aborts now require the absence of the durable `:judge-output` completion marker in addition to live attempt status; regression covers in-flight abortability, stale guard no-op, and completed-judge no-op.
+
+## Implementation review follow-ups (ψ pass 10, 2026-06-11)
+
+- [ ] Replace the final check-then-call gates for actor turn start, judge turn start, and deterministic operation invocation with a cancellation-safe start protocol so a D31 cancel CAS landing after the final workflow-state read but before the prompt adapter / operation handler call cannot initiate new ordinary work after the checkpoint. Add regressions that force cancellation in that final read→call window for actor, judge, and invoke starts.
