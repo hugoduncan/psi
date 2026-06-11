@@ -143,3 +143,7 @@
   - Covered 2026-06-11: ranked fallback now receives the workflow stop predicate and checks it before each non-initial candidate turn; regression asserts cancellation between fallback-worthy failures starts no second actor turn, sets no fallback model, and records no ordinary pending result.
 - [x] Make judge retry loops cancellation-safe: re-check the workflow stop predicate immediately before every structured-output retry turn and every no-match retry turn in `execute-judge!`, so cancellation after a judge response is routed to retry cannot start another ordinary judge turn after the D31 checkpoint; add regression coverage for cancellation between judge retry attempts.
   - Covered 2026-06-11: judge turns go through a live-checking helper used for initial and retry turns; regression coverage asserts no no-match retry or structured-output retry turn starts after the stop predicate trips.
+
+## Implementation review follow-ups (ψ pass 6, 2026-06-11)
+
+- [ ] Make initial ordinary execution starts cancellation-safe: actor session steps, initial judge turns, and invoke deterministic operations must not start after a D31 cancel CAS that lands after the final pre-start stop check; either guard the start through a cancellation-safe protocol or make the guarded abort leave a durable per-session stop marker consumed by turn/operation start. Add regressions for cancellation between the final pre-start stop check and each of: initial actor turn start, initial judge turn start, and invoke-operation start.

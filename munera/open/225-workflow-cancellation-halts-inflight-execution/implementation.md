@@ -2561,3 +2561,26 @@ or judge retry turn and add regressions.
 Executed the two new pass-5 follow-ups. Ranked actor fallback now carries the workflow stop predicate into `execute-with-ranked-fallback!` and checks it before every non-initial candidate turn, so cancellation after a fallback-worthy failure returns control to `execute-session-step!`'s existing stopped path instead of installing the next candidate model or starting another actor turn. Judge execution now funnels initial and retry judge turns through a live-check helper; structured-output retry and no-match retry branches re-check immediately before invoking the retry turn and throw the existing `:workflow-stopped` exception on cancellation.
 
 Regression coverage added for cancellation between ranked fallback candidates, no-match judge retry attempts, and structured-output judge retry attempts. Focused Scry runs over the changed workflow cancellation/judge/statechart namespaces pass (27 tests / 122 assertions and 24 tests / 127 assertions), the three new regression vars pass (3 tests / 9 assertions), and focused clj-kondo over changed source/tests is clean.
+
+## Implementation review (ψ pass 6, 2026-06-11)
+
+Reviewed the post-pass-5 implementation against `task-implementation-review`, the
+D30/D31 no-post-checkpoint ordinary-work contract, current task artifacts, and the
+changed actor/judge retry cancellation code. The retry/fallback follow-ups are
+implemented and covered.
+
+New actionable issue: initial ordinary execution starts still have a cancellation
+race after the last stop check. For normal actor session steps,
+`execute-session-step!` checks `stopped?` before entering the execution branch, but
+then calls `execute-actor-turn!`; if the D31 cancel CAS lands after that check and
+before the turn call, the guarded cancel abort can hit an idle child session and
+then the actor turn may still start after cancellation. Judge execution has the
+same shape in `execute-judge-turn-if-live!`: the pre-turn `assert-workflow-live!`
+can pass, cancel can commit/abort an idle judge session, and the subsequent
+`execute-judge-turn!` can start. Invoke steps likewise check before
+`invoke-step-runtime-result`, but a cancel racing after that check can still start
+the deterministic operation. Follow-up should make initial actor turn, initial
+judge turn, and invoke-operation start gates cancellation-safe (or make the abort
+leave a durable per-session stop marker consumed by turn start) and add regressions
+for cancellation between the final pre-start stop check and each ordinary execution
+start.
