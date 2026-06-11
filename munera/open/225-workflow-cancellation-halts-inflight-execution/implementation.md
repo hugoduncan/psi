@@ -2141,3 +2141,18 @@ avoid parent-worker inference or command-layer reach-in. D23's cascade-set abort
 wording now includes the directly-cancelled run while retaining the pure multi-run
 apply-phase cascade plus guarded effect execution. No new `design-steps.md`
 follow-up item added.
+
+## Ambiguity review (ψ pass 32, 2026-06-11)
+
+Reviewed current `design.md` for ambiguity only after the pass-30 D23/D38
+reconciliations and pass-31 architecture-fit review. Consulted the current design
+contracts (D1–D38), Scope, Design Questions, Acceptance Criteria, and referenced
+runtime/effect code where needed (`dispatch_schema.clj`, `dispatch_effects.clj`,
+workflow runtime handle paths). Did not review task `plan.md` or `steps.md`.
+
+No new actionable ambiguity found. The design now gives single-interpretation
+contracts for canonical cancel/remove events, public routing, effect payloads and
+ordering, cascade-set abort coverage, terminal/absent runtime-handle cleanup,
+top-level vs nested remove behaviour, public result semantics, idempotency, and the
+D23/D31/D27 cancellation guarantee/exception boundary. No new `design-steps.md`
+follow-up item added.
