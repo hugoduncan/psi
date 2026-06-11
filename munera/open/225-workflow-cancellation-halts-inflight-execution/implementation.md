@@ -2013,3 +2013,23 @@ contracts for cancel/remove entry events, effect payloads, nested-sub-run direct
 cancel/remove behaviour, absent/terminal public results, idempotency, runtime-handle
 cleanup, and the D27 bounded exception vs D6/Acceptance #3 cascade-set guarantee.
 No new `design-steps.md` follow-up item added.
+
+## Inconsistency review (ψ pass 27, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-artifact inconsistency after
+pass-26 ambiguity review. Consulted D6/D27/D30/D31 and Acceptance #3/#9a; did not
+review `plan.md` or `steps.md`.
+
+One new actionable inconsistency found:
+
+1. **Intent still states the pre-D27 absolute no-new-child-session/no-new-side-effect
+   contract.** The Intent says that after a cancel "no further child sessions spawn"
+   and "no new side effects are initiated (commits, journal writes) — transitively
+   across nested sub-runs." Later D6/Acceptance #3 scope the deterministic guarantee
+   to runs in the D23 enumerated cascade set after the D31 cancel checkpoint; D27 /
+   Acceptance #9a explicitly accept a bounded direct-sub-run post-enumeration spawn
+   exception; and D30 allows required cancellation-control writes/effects while only
+   forbidding ordinary workflow/child-turn advancement. Read literally, the Intent
+   contradicts those later decisions by making the no-new-child-session/no-side-effect
+   claim absolute again. Qualify Intent to the cascade-set/D31/D30 contract and point
+   at the D27 exception.

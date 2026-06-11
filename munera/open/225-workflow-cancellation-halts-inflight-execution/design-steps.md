@@ -887,3 +887,17 @@
       after their D31 cancel checkpoint. D27 / Acceptance #9a remains the explicit
       bounded, out-of-test-scope exception for a descendant spawned after enumeration
       but before the abort-driven checkpoint refuses it. No blocker.
+
+## Inconsistency follow-ups (ψ pass 27, 2026-06-11)
+
+- [ ] Qualify the Intent section's absolute cancellation guarantee so it matches the
+      later scoped contract. Intent currently says that after cancel no further child
+      sessions spawn and no new side effects are initiated (commits, journal writes)
+      transitively across nested sub-runs. D6/Acceptance #3 scope the deterministic
+      guarantee to **runs in the D23 enumerated cascade set** after the D31 cancel
+      checkpoint; D27/Acceptance #9a accept the bounded direct-sub-run
+      post-enumeration spawn exception; and D30 allows required cancellation-control
+      writes/effects while forbidding ordinary workflow/child-turn advancement.
+      Reword Intent to state the D23 cascade-set + D31 checkpoint + D30 forbidden-vs-
+      allowed boundary, and explicitly point to the D27 exception, so the top-level
+      intent no longer contradicts the refined contract.
