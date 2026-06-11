@@ -3166,3 +3166,13 @@ Verification after pass 22 follow-up execution:
 - `bb clojure:test:scry --namespace psi.agent-session.runtime-test` → 6 tests / 42 assertions green.
 - `bb clojure:test:unit` → passed.
 - `clj-kondo --lint components` → errors 0, warnings 0 (pre-existing info-level notes only).
+
+## Implementation review (ψ pass 23, 2026-06-11)
+
+Reviewed pass-22 prompt-continue/prompt-finish stale pure-result guards against `task-implementation-review`, D30/D31, `turn.handlers/prompt-finish-handler`, `dispatch_effects.clj`, and the prompt-lifecycle cancellation regressions. The direct stale prompt-continue/prompt-finish effect vectors now carry `:workflow-run-id` guards and the focused prompt-lifecycle workflow-cancellation suite is green.
+
+New actionable issue: `prompt-finish` still dispatches `:on-agent-done` as an ordinary nested dispatch, and `:on-agent-done` builds an unguarded pure result. If D31 cancellation lands after the guarded `:runtime/dispatch-event` stop check passes (so the nested dispatch starts) but before `:on-agent-done` applies/effects, its root update can still clear ordinary turn/session fields and its unguarded effects can emit terminal background-job messages / scheduler drain after the cancellation checkpoint. Follow-up should make workflow-owned `:on-agent-done` stale pure results cancellation-safe (derive/carry `:workflow-run-id`, guard root update and effects or route under cancellation-entry ordering) and add a regression for cancellation between `:on-agent-done` handler-result construction and apply/effects.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 7 tests / 36 assertions green.
