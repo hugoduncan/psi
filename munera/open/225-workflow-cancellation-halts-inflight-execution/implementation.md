@@ -2838,3 +2838,9 @@ regressions for cancellation after successful call-begin/final stop read but bef
 the adapter/handler call.
 
 No tests run (review-only pass).
+
+## Follow-up pass 13 — close call-begin to ordinary-call race (ψ, 2026-06-11)
+
+Closed the pass-13 cancellation race by splitting workflow ordinary-call startup into a call-begin marker and a second live-run call-commit CAS immediately before crossing into ordinary work. Actor and judge turns now record `:turn-call-state :begun` at call-begin, then re-check run presence/`:cancelled` in `commit-workflow-turn-call!` before recording `:turn-call-state :committed` and invoking the prompt adapter. Deterministic operations do the analogous `:operation-call-state :begun` → `:committed` transition before invoking the operation handler. Workflow-owned `prompt-dispatch!` now also consumes the canonical cancellation/removal signal at the agent-session turn boundary, so a concurrent cancel that lands before the adapter call returns a stopped execution result instead of submitting a prompt.
+
+Added regressions for actor, judge, and invoke cancellation after successful call-begin and before the adapter/handler call. Focused Scry namespaces `psi.agent-session.workflow-statechart-runtime-cancellation-test` and `psi.agent-session.workflow-judge-cancellation-test` pass (22 tests / 88 assertions). Focused clj-kondo on changed source/test files is clean.

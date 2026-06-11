@@ -78,33 +78,64 @@
     (dispatch/dispatch! ctx :on-abort {:session-id session-id} {:origin :core})
     true))
 
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (let [session-data (ss/get-session-data-in ctx session-id)
+        run-id (:workflow-run-id session-data)
+        state* (:state* ctx)
+        run (when (and state* run-id)
+              (get-in @state* [:workflows :runs run-id]))]
+    (when (and (:workflow-owned? session-data) state* run-id)
+      (cond
+        (nil? run) :removed
+        (= :cancelled (:status run)) :cancelled))))
+
+(defn- stopped-workflow-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before turn start"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before turn start"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before turn start"
+   :execution-result/stop-reason :error})
+
 (defn prompt-dispatch!
   [ctx session-id text images opts]
-  (recover-stranded-streaming-session! ctx session-id)
-  (when-not (ss/idle-in? ctx session-id)
-    (throw (ex-info "Session is not idle" {:phase (ss/sc-phase-in ctx session-id)
-                                           :recovered-stranded-streaming? false})))
-  (let [user-msg {:role      "user"
-                  :content   (cond-> [{:type :text :text text}]
-                               images (into images))
-                  :timestamp (java.time.Instant/now)}
-        turn-id  (:turn-id (dispatch/dispatch! ctx :session/prompt-submit
-                                               {:session-id session-id :user-msg user-msg}
-                                               {:origin :core}))
-        _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
-        result   (dispatch/dispatch! ctx :session/prompt-prepare-request
-                                     (cond-> {:session-id session-id
-                                              :turn-id    turn-id
-                                              :user-msg   user-msg}
-                                       (:progress-queue opts)
-                                       (assoc :progress-queue (:progress-queue opts))
-                                       (:runtime-opts opts)
-                                       (assoc :runtime-opts (:runtime-opts opts))
-                                       (:return-execution-result? opts)
-                                       (assoc :return-execution-result? true))
-                                     {:origin :core})]
-    (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
-    result))
+  (if-let [reason (workflow-session-stop-signal ctx session-id)]
+    (if (:return-execution-result? opts)
+      (stopped-workflow-execution-result session-id reason)
+      {:workflow-stopped? true :reason reason})
+    (do
+      (recover-stranded-streaming-session! ctx session-id)
+      (when-not (ss/idle-in? ctx session-id)
+        (throw (ex-info "Session is not idle" {:phase (ss/sc-phase-in ctx session-id)
+                                               :recovered-stranded-streaming? false})))
+      (let [user-msg {:role      "user"
+                      :content   (cond-> [{:type :text :text text}]
+                                   images (into images))
+                      :timestamp (java.time.Instant/now)}
+            turn-id  (:turn-id (dispatch/dispatch! ctx :session/prompt-submit
+                                                   {:session-id session-id :user-msg user-msg}
+                                                   {:origin :core}))
+            _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
+            result   (dispatch/dispatch! ctx :session/prompt-prepare-request
+                                         (cond-> {:session-id session-id
+                                                  :turn-id    turn-id
+                                                  :user-msg   user-msg}
+                                           (:progress-queue opts)
+                                           (assoc :progress-queue (:progress-queue opts))
+                                           (:runtime-opts opts)
+                                           (assoc :runtime-opts (:runtime-opts opts))
+                                           (:return-execution-result? opts)
+                                           (assoc :return-execution-result? true))
+                                         {:origin :core})]
+        (runtime/safe-maybe-sync-on-git-head-change! ctx session-id)
+        result))))
 
 (defn prompt-in!
   "Submit `text` (and optional `images`) to the agent for `session-id`.

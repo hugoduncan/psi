@@ -268,3 +268,80 @@
         (is (= :started (:turn-start-state attempt))
             "the race is after successful judge turn start commit")
         (is (nil? (:turn-call-state attempt)))))))
+
+(deftest execute-judge-call-begin-to-call-race-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 13: cancellation after
+  ;; successful judge call-begin but before the prompt adapter call must still
+  ;; prevent the ordinary judge turn from starting.
+  (let [prompt-calls* (atom 0)
+        ctx {workflow-execution-adapter/adapter-key
+             (workflow-execution-adapter/create
+              {:create-child-session! (fn [_ctx _parent opts]
+                                        {:psi.agent-session/session-id (:child-session-id opts)})
+               :get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id "run-judge-call-begin-race"
+                                    :workflow-step-id "review"
+                                    :workflow-attempt-id "attempt-review"})
+               :prompt-execution-result! (fn [& _]
+                                           (swap! prompt-calls* inc)
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "APPROVED"}]
+                                             :stop-reason :stop}})})
+             :state* (atom {})
+             :before-workflow-turn-start-fn
+             (fn [ctx _judge-sid {:keys [workflow-run-id workflow-step-id phase]}]
+               (when (= :after-call-begin phase)
+                 (swap! (:state* ctx)
+                        (fn [state]
+                          (-> state
+                              (assoc-in [:workflows :runs workflow-run-id :status] :cancelled)
+                              (assoc-in [:workflows :runs workflow-run-id :finished-at] (java.time.Instant/now))
+                              (assoc-in [:workflows :runs workflow-run-id :terminal-outcome]
+                                        {:outcome :cancelled
+                                         :reason "judge call-begin race"
+                                         :step-id workflow-step-id}))))))}
+        initial-state (let [[s _ _] (workflow-runtime/create-run
+                                     {}
+                                     {:definition {:steps [{:name "review"
+                                                            :type :session}]}
+                                      :run-id "run-judge-call-begin-race"})]
+                        (-> s
+                            (assoc-in [:workflows :runs "run-judge-call-begin-race" :current-step-id] "review")
+                            (assoc-in [:workflows :runs "run-judge-call-begin-race" :step-runs "review" :attempts]
+                                      [{:attempt-id "attempt-review"
+                                        :status :succeeded
+                                        :execution-session-id "actor-review"}])))
+        stopped? #(let [run (get-in @(:state* ctx)
+                                    [:workflows :runs "run-judge-call-begin-race"])]
+                    (or (nil? run) (= :cancelled (:status run))))]
+    (reset! (:state* ctx) initial-state)
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [& _] [])]
+      (let [ex (try
+                 (workflow-judge/execute-judge!
+                  ctx
+                  "parent"
+                  "actor-review"
+                  {:prompt "APPROVED?" :projection :none}
+                  {"APPROVED" {:goto :next}}
+                  {:current-step-id "review"
+                   :step-order ["review"]
+                   :step-runs {}
+                   :workflow-run-id "run-judge-call-begin-race"
+                   :workflow-attempt-id "attempt-review"
+                   :stopped? stopped?})
+                 nil
+                 (catch clojure.lang.ExceptionInfo e e))
+            attempt (get-in @(:state* ctx)
+                            [:workflows :runs "run-judge-call-begin-race"
+                             :step-runs "review" :attempts 0])]
+        (is (= :workflow-stopped (:reason (ex-data ex))))
+        (is (= 0 @prompt-calls*)
+            "the judge turn adapter must not be called after cancellation wins the call-begin window")
+        (is (= :cancelled (get-in @(:state* ctx)
+                                  [:workflows :runs "run-judge-call-begin-race" :status])))
+        (is (= :begun (:turn-call-state attempt))
+            "the race is after successful judge turn call-begin")
+        (is (nil? (:turn-call-committed-at attempt)))))))
