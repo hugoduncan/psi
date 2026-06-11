@@ -1412,3 +1412,36 @@ unconditional), and D23 (shared multi-run cancel transition). D27 is consistent
 with D2/D6/D10/D14/D15/D19/D23 and reuses the D22.2 accepted-race classification.
 No new contradictions; no step-machine redesign; the cancellation effect set is
 unchanged.
+
+## Inconsistency review (ψ pass 9, 2026-06-10)
+
+Fresh internal-consistency pass over design.md (full read, D1–D27 + Scope/Desired/
+Acceptance) targeting design-vs-design contradictions surviving the prior passes.
+D1–D27 reconciliations hold. One **new** actionable contradiction — a residual
+"serialized" qualifier surviving D20:
+
+1. **Residual "serialized dispatch transition" wording (Desired Behaviour + D13)
+   contradicts D20's "dispatch is not serialized."** D20 establishes
+   `dispatch!` "does **not** serialize against concurrent threads (no global
+   lock)"; the run-`:status` terminal transition's atomicity/identity is the
+   apply-phase atom CAS with the guard inside the `:root-state-update` fn, and D20's
+   directive reinterprets "serialized (single-writer) dispatch" everywhere. But
+   three writer-identity sentences still literally call the transition *serialized*:
+   - Desired Behaviour (line 82): "the run's own `:status` is written by the **D4
+     serialized dispatch transition**";
+   - D13 "Two distinct writers" (line 522): "written by the **D4 serialized
+     dispatch terminal transition**";
+   - D13 "Concretely" (line 529): "the cancel dispatch terminal transition (**D4,
+     serialized single-writer**)".
+   D20's pass-3 resolution claimed to align D13's "serialized"/"single-writer"
+   phrasing, yet the literal qualifiers persist, and Desired Behaviour (82) was
+   never in D20's stated alignment scope (D20 listed D4/D13/D16/D17 only). An
+   implementer reading Desired Behaviour or D13 without back-referencing D20 reads a
+   direct contradiction (transition described as "serialized" against a no-lock
+   dispatch). The fix is to strip/correct the "serialized" qualifier in these three
+   spots to D20's atom-CAS basis (the transition routes through dispatch and is the
+   single *logical* writer of run `:status`, but is **not** serialized) — not a
+   step-machine redesign or a change to the cancellation mechanism.
+
+No other new actionable internal contradiction found; D1–D27 + the code premises
+(re-confirmed accurate in prior passes) otherwise hold a single consistent contract.

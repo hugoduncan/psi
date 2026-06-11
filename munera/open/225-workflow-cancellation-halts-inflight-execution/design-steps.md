@@ -614,3 +614,20 @@
       the sub-run case; D14's `future-cancel` reframed as the top-level promptness
       mechanism (not a subtree-bound prerequisite); added Acceptance #9a
       [out-of-test-scope].
+
+## Inconsistency follow-ups (ψ pass 9, 2026-06-10)
+
+- [ ] Strip/correct the residual "serialized" qualifier in the three run-`:status`
+      writer-identity sentences that survived D20's "dispatch is not serialized
+      (no global lock)" reconciliation, so they no longer describe the D4 terminal
+      transition as *serialized*: Desired Behaviour (line ~82, "the run's own
+      `:status` is written by the **D4 serialized dispatch transition**"); D13 "Two
+      distinct writers" (line ~522, "written by the **D4 serialized dispatch
+      terminal transition**"); D13 "Concretely" (line ~529, "the cancel dispatch
+      terminal transition (**D4, serialized single-writer**)"). Replace with D20's
+      atom-CAS basis (the transition routes through dispatch and is the single
+      *logical* writer of run `:status`, atomicity from the apply-phase atom CAS
+      with the guard inside the `:root-state-update` fn — **not** dispatch
+      serialization). D20's pass-3 resolution claimed to align D13 but the literal
+      qualifiers remain, and Desired Behaviour was outside that scope. (design.md
+      Desired Behaviour, D13, D20)
