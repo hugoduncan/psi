@@ -1983,3 +1983,21 @@ Executed the newly added pass-24 design follow-up from `design-steps.md`; no blo
   violation of the cascade-set guarantee.
 - Acceptance #3 now asserts the deterministic guarantee only for cascade-set runs,
   and leaves the post-enumeration spawn race solely under criterion #9a / D27.
+
+## Architecture-fit review (ψ pass 25, 2026-06-11)
+
+Reviewed current `design.md` for architectural fit only after the pass-24
+inconsistency resolution. Consulted AGENTS.md VSM/principles, META.md, and
+`doc/architecture.md` state-boundary, dispatch sequencing, replay-trim,
+dispatch-trace, and ctx-managed-service guidance. Did not review `plan.md` or
+`steps.md`.
+
+No new actionable architectural-fit feedback found. The design remains aligned
+with project boundaries: public surfaces are adapters over canonical
+`:psi.workflow/*` state-kernel events; cancellation state changes happen via
+canonical `:state*` updates; runtime handles stay on ctx and are reached only by
+canonical `:runtime/*` effects with schema/executor parity; replay trimming and
+dispatch trace cover the side effects; abort/cleanup reuse existing runtime-effect
+mechanisms; and the cascade/exception scopes are now explicit enough to preserve
+the no-orphan/no-runaway invariant without introducing adapter shims or hidden
+mutation paths. No new `design-steps.md` follow-up item added.
