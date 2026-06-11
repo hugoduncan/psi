@@ -149,6 +149,31 @@
                                (update :turn-start-count (fnil inc 0)))))
        :committed? true})))
 
+(defn- begin-workflow-turn-call-in-state
+  [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
+  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+        attempt-path (workflow-turn-attempt-path session-data)
+        attempts (get-in state-map attempt-path)
+        latest-idx (latest-attempt-index attempts)
+        latest-attempt (when latest-idx (nth attempts latest-idx))]
+    (cond
+      (nil? run)
+      {:state state-map :begun? false :reason :removed}
+
+      (= :cancelled (:status run))
+      {:state state-map :begun? false :reason :cancelled}
+
+      (not= workflow-attempt-id (:attempt-id latest-attempt))
+      {:state state-map :begun? false :reason :attempt-mismatch}
+
+      :else
+      {:state (update-in state-map (conj attempt-path latest-idx)
+                         (fn [attempt]
+                           (assoc attempt
+                                  :turn-call-state :started
+                                  :turn-call-started-at (java.time.Instant/now))))
+       :begun? true})))
+
 (defn- workflow-turn-start-required?
   [ctx session-data]
   (and (:workflow-owned? session-data)
@@ -181,6 +206,19 @@
         (cond
           (not committed?) {:committed? false :reason reason}
           (compare-and-set! state* state-map state) {:committed? true}
+          :else (recur))))))
+
+(defn- begin-workflow-turn-call!
+  [ctx session-data]
+  (if-not (workflow-turn-start-required? ctx session-data)
+    {:begun? true}
+    (loop []
+      (let [state* (:state* ctx)
+            state-map @state*
+            {:keys [state begun? reason]} (begin-workflow-turn-call-in-state state-map session-data)]
+        (cond
+          (not begun?) {:begun? false :reason reason}
+          (compare-and-set! state* state-map state) {:begun? true}
           :else (recur))))))
 
 (defn- call-workflow-turn-start-hook!
@@ -222,7 +260,16 @@
               (let [{:keys [committed? reason]} (commit-workflow-turn-start! ctx session-data)]
                 (if-not committed?
                   (stopped-execution-result session-id reason)
-                  (execution-adapter/prompt-execution-result! ctx session-id text images opts))))))))))
+                  (do
+                    (call-workflow-turn-start-hook! ctx session-id session-data :after-commit)
+                    (let [{:keys [begun? reason]} (begin-workflow-turn-call! ctx session-data)]
+                      (if-not begun?
+                        (stopped-execution-result session-id reason)
+                        (do
+                          (call-workflow-turn-start-hook! ctx session-id session-data :after-call-begin)
+                          (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
+                            (stopped-execution-result session-id reason)
+                            (execution-adapter/prompt-execution-result! ctx session-id text images opts)))))))))))))))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

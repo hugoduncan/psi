@@ -2795,3 +2795,23 @@ that re-checks after any concurrent cancel effects. Add regressions for cancel a
 successful `:started` commit but before actor, judge, and invoke calls.
 
 No tests run (review-only pass).
+
+## Implementation follow-up pass 12 (ψ, 2026-06-11)
+
+Closed the start-commit → ordinary-call race for workflow-owned actor/judge turns
+and deterministic operations. The previous start protocol reserved and then
+committed `:turn-start-state` / `:operation-start-state` `:started`, but a D31
+cancel CAS could still land before `prompt-execution-result!` / operation handler
+entry. Added a second guarded call-begin CAS (`:turn-call-state` /
+`:operation-call-state`) after the start commit and before the ordinary adapter /
+handler call, plus a final stop-signal read immediately before crossing the
+boundary. Cancellation in the reviewed start-commit window now returns the
+standard workflow-stopped result with no ordinary work; a committed call-begin is
+now the durable marker for cancellation to treat the unit as already in flight.
+
+Added regressions for actor turn, judge turn, and deterministic operation
+cancellation after the start commit and before call-begin. Focused Scry suites passed:
+`psi.deterministic-operation-runtime.core-test`,
+`psi.agent-session.workflow-statechart-runtime-cancellation-test`, and
+`psi.agent-session.workflow-judge-cancellation-test` (21 tests / 82 assertions).
+Focused clj-kondo over touched code/tests passed with 0 warnings.
