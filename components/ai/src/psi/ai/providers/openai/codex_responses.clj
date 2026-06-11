@@ -247,13 +247,16 @@
                     usage-map (assoc :usage usage-map))))))
 
 (defn- emit-codex-error!
-  [model {:keys [done?]} consume-fn options url msg http-status]
-  (when-not @done?
-    (reset! done? true)
-    (let [err (cond-> {:type :error :error-message msg}
-                http-status (assoc :http-status http-status))]
-      (transport/capture-response! model options :openai-codex-responses url err)
-      (consume-fn err))))
+  ([model stream-state consume-fn options url msg http-status]
+   (emit-codex-error! model stream-state consume-fn options url msg http-status nil))
+  ([model {:keys [done?]} consume-fn options url msg http-status headers]
+   (when-not @done?
+     (reset! done? true)
+     (let [err (cond-> {:type :error :error-message msg}
+                 http-status (assoc :http-status http-status)
+                 headers (assoc :headers headers))]
+       (transport/capture-response! model options :openai-codex-responses url err)
+       (consume-fn err)))))
 
 (defn- emit-codex-thinking-boundary!
   [stream-state consume-fn]
@@ -341,6 +344,74 @@
       "reasoning" (emit-codex-thinking-boundary! stream-state consume-fn)
       nil)))
 
+(defn- numeric-http-status
+  [value]
+  (cond
+    (number? value)
+    (let [status (long value)]
+      (when (<= 400 status 599)
+        status))
+
+    (string? value)
+    (try
+      (let [parsed (Long/parseLong value)]
+        (when (<= 400 parsed 599)
+          parsed))
+      (catch Exception _
+        nil))
+
+    :else nil))
+
+(defn- codex-error-http-status
+  [event]
+  (some numeric-http-status
+        [(:http-status event)
+         (:http_status event)
+         (:status event)
+         (:status-code event)
+         (:status_code event)
+         (get-in event [:response :http-status])
+         (get-in event [:response :http_status])
+         (get-in event [:response :status-code])
+         (get-in event [:response :status_code])
+         (get-in event [:response :error :http-status])
+         (get-in event [:response :error :http_status])
+         (get-in event [:response :error :status])
+         (get-in event [:response :error :status-code])
+         (get-in event [:response :error :status_code])
+         (get-in event [:error :http-status])
+         (get-in event [:error :http_status])
+         (get-in event [:error :status])
+         (get-in event [:error :status-code])
+         (get-in event [:error :status_code])]))
+
+(defn- stringify-header-keys
+  [headers]
+  (when (map? headers)
+    (reduce-kv (fn [acc k v]
+                 (assoc acc (if (keyword? k) (name k) (str k)) v))
+               {}
+               headers)))
+
+(defn- codex-error-headers
+  [event]
+  (some-> (or (:provider-error/headers event)
+              (:headers event)
+              (get-in event [:response :headers])
+              (get-in event [:response :error :headers])
+              (get-in event [:error :headers]))
+          stringify-header-keys))
+
+(defn- codex-error-message
+  [event fallback]
+  (or (get-in event [:response :error :message])
+      (get-in event [:error :message])
+      (when (string? (:message event))
+        (:message event))
+      (when (string? (:error event))
+        (:error event))
+      fallback))
+
 (defn- handle-codex-event!
   [stream-state consume-fn model options url strategy event]
   (transport/capture-response! model options :openai-codex-responses url event)
@@ -377,16 +448,15 @@
 
       (= "response.failed" event-type)
       (emit-codex-error! model stream-state consume-fn options url
-                         (or (get-in event [:response :error :message])
-                             "Codex response failed")
-                         nil)
+                         (codex-error-message event "Codex response failed")
+                         (codex-error-http-status event)
+                         (codex-error-headers event))
 
       (= "error" event-type)
       (emit-codex-error! model stream-state consume-fn options url
-                         (or (:message event)
-                             (:error event)
-                             "Codex stream error")
-                         nil)
+                         (codex-error-message event "Codex stream error")
+                         (codex-error-http-status event)
+                         (codex-error-headers event))
 
       :else nil)))
 

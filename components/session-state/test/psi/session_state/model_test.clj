@@ -193,6 +193,10 @@
   (testing "retry-error? true for rate limit"
     (is (session/retry-error? :error "rate limit exceeded")))
 
+  (testing "retry-error? true for OpenAI usage limit wording"
+    (is (session/retry-error? :error "The usage limit has been reached (status 429) [request-id req_123]"))
+    (is (session/retry-error? :error "The usage limit has been reached")))
+
   (testing "retry-error? true for overloaded"
     (is (session/retry-error? :error "Service Overloaded")))
 
@@ -227,7 +231,9 @@
     (is (= :auth (session/provider-error-kind :error "forbidden" 403))))
 
   (testing "provider-error-kind classifies rate limits"
-    (is (= :rate-limit (session/provider-error-kind :error "rate limit exceeded" 429))))
+    (is (= :rate-limit (session/provider-error-kind :error "rate limit exceeded" 429)))
+    (is (= :rate-limit
+           (session/provider-error-kind :error "The usage limit has been reached" nil))))
 
   (testing "provider-error-kind classifies timeout"
     (is (= :timeout (session/provider-error-kind :error "Timeout waiting for LLM response" nil))))

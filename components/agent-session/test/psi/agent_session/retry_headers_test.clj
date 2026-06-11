@@ -51,6 +51,19 @@
                                    4000
                                    10000))))
 
+  (testing "accepts keyword header names from parsed SSE metadata"
+    (is (= {:active? true
+            :attempt 1
+            :delay-ms 8000
+            :delay-source :retry-after
+            :resume-at 18000
+            :rate-limit {:remaining 0}}
+           (session/retry-metadata {:Retry-After "8"
+                                    :RateLimit-Remaining "0"}
+                                   1
+                                   4000
+                                   10000))))
+
   (testing "falls back to exponential backoff when retry-after is invalid"
     (is (= {:active? true
             :attempt 2
