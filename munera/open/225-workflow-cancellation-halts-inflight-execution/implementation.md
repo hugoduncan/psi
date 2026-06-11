@@ -3208,19 +3208,19 @@ No tests run (review-only pass).
 
 ## Implementation review (ψ pass 25, 2026-06-11)
 
-Reviewed the current task state after pass 24. No implementation commits have landed
-since the pass-24 review. The working tree contains a partial uncommitted change in
-`turn.handlers/synthetic-user-prompt-effects` that can carry a workflow guard when
-one is supplied, but `:session/submit-synthetic-user-prompt` still does not derive
-or pass a `:workflow-run-id`, and there is no synthetic-follow-up stale-effect
-regression in the reviewed tree. This is the same actionable blocker already
-recorded as the unchecked pass-24 follow-up in `steps.md`; no additional distinct
-issue found, and no duplicate follow-up item added.
+Reviewed the current working-tree implementation for the pass-24 synthetic
+follow-up cancellation guard. The diff now carries `:workflow-run-id` through
+`prompt-finish` follow-up dispatch, `:session/submit-synthetic-user-prompt`, the
+synthetic prompt lifecycle effects, and `:session/prompt-submit` journal-append
+effects; the stale synthetic-follow-up regression covers cancellation after the
+nested handler builds its pure result and before its effects execute. No new
+distinct actionable issue found; no duplicate follow-up item added.
 
 Verification during review:
 
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 9 tests / 53 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` → 24 tests / 117 assertions green.
-- `clj-kondo --lint components/agent-session/src/psi/agent_session/turn/handlers.clj` → errors 0, warnings 0.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj components/agent-session/src/psi/agent_session/turn/handlers.clj components/agent-session/test/psi/agent_session/prompt_lifecycle_workflow_cancellation_test.clj munera/open/225-workflow-cancellation-halts-inflight-execution` → errors 0, warnings 0.
 
 ## Follow-up implementation pass 24 (ψ, 2026-06-11)
 
