@@ -1000,16 +1000,38 @@ already-completed run's (possibly reused) `:execution-session-id`.
 
 **Decision — gate effect emission in two complementary layers:**
 
-1. **Handler-before terminal-precondition gate (primary).** The cancel/remove handler
-   computes its pure result from the current `:state*` read in the handler `:before`;
-   if the target run is **already terminal (or absent)** at that read, it returns a
-   no-op pure-result with **empty `:effects`** (`{:root-state-update identity
-   :effects []}`). This emits **no** cancellation effects for every *sequentially*
-   later terminal request — a second `cancel`, a `remove` after the run is already
-   terminal/removed, or a `cancel` arriving after natural completion — the dominant
-   idempotency case. This realizes "a no-op'd terminal request emits no effects"
-   within the pure-result shape: effects are conditioned on the same terminal
-   precondition that D20 guards inside the `swap!` fn.
+1. **Handler-before terminal-precondition gate (primary) — gates the
+   cancellation/terminal-transition only, never the record drop.** The
+   *cancellation/terminal-transition* computation — the `:cancelled` `:state*`
+   commit plus the cancellation effect set (worker `future-cancel`,
+   `:runtime/agent-abort`, `:runtime/mark-workflow-jobs-terminal`, and the
+   cancel-then-remove re-entrant `:runtime/dispatch-event` remove-trigger) — is
+   conditioned on the handler-`:before` `:state*` read: if the target run is
+   **already terminal (or absent)** at that read, this portion contributes
+   `identity` to the state update and an **empty** cancellation-effect set. This
+   emits **no** cancellation effects for every *sequentially* later terminal request
+   — a second `cancel`, the `cancel`-half of a `remove`-of-already-terminal, or a
+   `cancel` arriving after natural completion — the dominant idempotency case,
+   realizing "a no-op'd terminal request emits no effects" within the pure-result
+   shape (effects conditioned on the same terminal precondition D20 guards inside the
+   `swap!` fn).
+
+   **The `remove-run` record-drop is *not* gated by this terminal precondition.**
+   The gate suppresses only the cancellation/terminal-transition effects above; the
+   record-removal `remove-run` dissoc (`workflow-runtime/core.clj`) **still applies**
+   to an already-terminal run. This is required because (a) `remove` of an
+   already-terminal run is **plain record removal** (D5) — the record must be dropped
+   — and (b) the cancel-then-remove **remove dispatch** (D17/D18 dispatch 2) by
+   construction runs *after* the cancel dispatch already applied `:cancelled`, so its
+   handler-`:before` **always** reads the run as terminal. Conflating the two —
+   applying the no-op `identity` gate to the record drop as well — would make
+   `remove-run` a no-op for any terminal run, so cancel-then-remove (D5/D17) would
+   never drop the record and plain remove-of-terminal (D5) would leave the record
+   lingering, re-orphaning exactly the case this task fixes. Concretely: the *cancel*
+   transition + its cancellation effects carry the gated terminal-precondition; the
+   *remove* record-drop is an **unconditional dissoc independent of run `:status`**
+   (and is itself idempotent on an absent record — D22.2), so both the sequenced
+   remove dispatch and the plain remove-of-terminal case drop the record.
 
 2. **Effect-level idempotency (covers the residual true-concurrent CAS race).** Two
    cancels racing on two threads can **both** read non-terminal in their respective
@@ -1043,6 +1065,15 @@ cancellation side effect.
 reads: the **state** no-op is the in-`swap!`-fn guard (D20); the **effect** no-op is
 the handler-before gate (D22.1) for sequential requests plus effect-level idempotency
 (D22.2) for the concurrent-CAS race.
+
+**Cross-reference (D5/D17/D18) — scope of the D22.1 gate.** The D22.1
+terminal-precondition gate is scoped to the **cancellation/terminal-transition** (the
+`:cancelled` commit + cancellation effect set). It does **not** gate the `remove-run`
+record drop, which still applies to an already-terminal run (D5 plain
+remove-of-terminal; D17/D18 cancel-then-remove dispatch 2, whose handler always reads
+the run as already `:cancelled`). The record drop is an unconditional, status-independent
+dissoc — only the cancellation effects are suppressed when the run is already terminal —
+so the gate never re-orphans a terminal run.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

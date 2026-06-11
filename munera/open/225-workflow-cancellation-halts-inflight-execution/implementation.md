@@ -904,3 +904,36 @@ but D14/D19/D21 establish a nested-sub-run remove emits **no** worker
 `future-cancel` — the sub-run owns no future. The criterion is correct only for a
 top-level run; it is consistent for its intended top-level scenario, so it is a
 coverage/phrasing nuance rather than a contradiction.)
+
+## Inconsistency follow-up resolution (ψ pass 4, 2026-06-10)
+
+Executed the single pass-4 inconsistency follow-up design-step (a design-decision
+step: reconcile D22.1's terminal-precondition gate with D5/D17/D18 so it does not
+suppress the `remove-run` record drop). Completable now — no blocker. Code premise
+re-confirmed: `remove-run` is the pure `:state*` dissoc
+(`workflow-runtime/core.clj`), distinct from the `cancel`/terminal-transition path.
+
+Resolution written to design.md, rewording D22.1 and adding a cross-reference:
+
+- D22.1 split into two explicit concerns. The **terminal-precondition gate is
+  scoped to the cancellation/terminal-transition only** — the `:cancelled` `:state*`
+  commit + the cancellation effect set (worker `future-cancel`,
+  `:runtime/agent-abort`, `:runtime/mark-workflow-jobs-terminal`, the re-entrant
+  `:runtime/dispatch-event` remove-trigger). When the run is already terminal/absent
+  at the handler-`:before` read, that portion contributes `identity` + empty effects.
+- The **`remove-run` record-drop dissoc is NOT gated** by the terminal precondition.
+  It is an unconditional, status-independent dissoc (itself idempotent on an absent
+  record — D22.2). Required because (a) plain remove-of-terminal (D5) must drop the
+  record, and (b) the cancel-then-remove remove dispatch (D17/D18 dispatch 2) always
+  runs after `:cancelled` is applied, so its handler always reads the run as terminal
+  — gating the record drop would no-op it and re-orphan the record.
+- Added "Cross-reference (D5/D17/D18) — scope of the D22.1 gate" paragraph at the end
+  of D22 stating only cancellation effects are suppressed for an already-terminal
+  run; the record drop always applies, so the gate never re-orphans a terminal run.
+
+Consistency check: the reworded D22.1 is consistent with D5 (cancel-then-remove +
+plain remove-of-terminal both drop the record), D17/D18 (the remove dispatch reads a
+terminal run yet still applies `remove-run`), and D22.2 (record drop idempotent on an
+absent record). The conflated "cancel/remove handler … no-op for already-terminal"
+wording was the rejected option; the cancellation-transition vs record-drop split is
+chosen. No new contradictions; no step-machine redesign.

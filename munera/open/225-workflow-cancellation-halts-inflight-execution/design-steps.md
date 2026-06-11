@@ -341,7 +341,7 @@
 
 ## Inconsistency follow-ups (ψ pass 4, 2026-06-10)
 
-- [ ] Reconcile D22.1's "already-terminal ⇒ `{:root-state-update identity
+- [x] Reconcile D22.1's "already-terminal ⇒ `{:root-state-update identity
       :effects []}`" handler-before gate with D5 (remove of an already-terminal
       run = **plain record removal**) and D17/D18 (the cancel-then-remove **remove
       dispatch** runs *after* the cancel dispatch already applied `:cancelled`, so
@@ -357,3 +357,10 @@
       cancel-then-remove sequenced remove dispatch and the plain remove-of-terminal
       case). Update D22 (and D5/D17 cross-refs) so the gate does not suppress the
       record drop.
+      → design.md D22.1 rewritten: the terminal-precondition gate is scoped to the
+      cancellation/terminal-transition (the `:cancelled` commit + cancellation effect
+      set); the `remove-run` record-drop dissoc is an unconditional, status-independent
+      dissoc that **still applies** to an already-terminal run (both cancel-then-remove
+      dispatch 2 and plain remove-of-terminal). Added a "Cross-reference (D5/D17/D18) —
+      scope of the D22.1 gate" paragraph stating the gate never re-orphans a terminal
+      run. Conflation explicitly called out as the rejected wording.
