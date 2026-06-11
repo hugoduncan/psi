@@ -147,3 +147,7 @@
 ## Implementation review follow-ups (ψ pass 6, 2026-06-11)
 
 - [ ] Make initial ordinary execution starts cancellation-safe: actor session steps, initial judge turns, and invoke deterministic operations must not start after a D31 cancel CAS that lands after the final pre-start stop check; either guard the start through a cancellation-safe protocol or make the guarded abort leave a durable per-session stop marker consumed by turn/operation start. Add regressions for cancellation between the final pre-start stop check and each of: initial actor turn start, initial judge turn start, and invoke-operation start.
+
+## Implementation review follow-ups (ψ pass 7, 2026-06-11)
+
+- [ ] Update `doc/workflows.md` to reflect the new `delegate remove` / workflow removal contract: live top-level remove is canonical cancel-then-remove with dispatch-owned background-job terminalization and cancel-before-drop worker cleanup; live nested-sub-run remove aborts the child turn and lets the parent continue via cancelled/removed delegate failure semantics; terminal/absent remove is idempotent canonical-record cleanup (with stale-handle cleanup where applicable), not the old command-layer pre-cleanup/fail-if-cleanup-fails model.

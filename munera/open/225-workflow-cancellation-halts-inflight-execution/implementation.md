@@ -2584,3 +2584,23 @@ judge turn, and invoke-operation start gates cancellation-safe (or make the abor
 leave a durable per-session stop marker consumed by turn start) and add regressions
 for cancellation between the final pre-start stop check and each ordinary execution
 start.
+
+## Implementation review (ψ pass 7, 2026-06-11)
+
+Reviewed the current implementation against `task-implementation-review`, task
+artifacts, changed cancellation code/tests, `CHANGELOG.md`, `doc/architecture.md`,
+and `doc/workflows.md`. The retry/fallback follow-ups are implemented and focused
+cancellation/judge suites remain green.
+
+New actionable issue: user-facing workflow docs are stale for the changed
+`delegate remove` semantics. `doc/workflows.md` still describes `delegate remove` as
+pre-cleaning/terminalizing an active delegate/background job and failing if that
+cleanup cannot complete; the implemented task contract is canonical
+`:psi.workflow/remove-run` cancel-then-remove with dispatch-owned terminalization,
+worker cancel-before-drop cleanup, nested-run parent continuation, and idempotent
+terminal/absent remove semantics. Update the workflow docs so users are not guided
+by the old command-layer cleanup/failure model.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test` → 45 tests / 236 assertions green.
