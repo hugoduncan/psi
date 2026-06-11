@@ -1285,3 +1285,72 @@ handle), D24 (the `:runtime/drop-inflight-run` cleanup effect), and `λ parity`
 (parity with every other ctx-injected `:runtime/*` handler). No new contradictions;
 no step-machine redesign; the cancellation/cleanup effect set is unchanged (only its
 handle reach-path is committed).
+
+## Ambiguity review (ψ pass 8, 2026-06-10)
+
+Fresh ambiguity pass over design.md (D1–D25 + Scope/Desired/Acceptance). The
+design is mature; three new actionable ambiguities found, none covered by the
+existing pass-1..7 follow-ups.
+
+1. **D17 "same worker thread" conflicts with D20/D21 on which thread runs the
+   cancel/remove dispatches.** D17 says the two-dispatch ordering holds because the
+   re-entrant remove dispatch is "executed synchronously on the **same worker
+   thread**, in the cancel dispatch's `:effects` phase." But D20 says "the same
+   thread" (neutral) and D21 says "the remove dispatch runs on the
+   **operator/command thread**, concurrently with the parent worker thread parked
+   in the sub-run's `send-and-drain` deref." Code-confirmed: the operator-initiated
+   cancel/remove path runs on the command/tool-execution thread —
+   `delegate-remove` (`workflow/core.clj:474`) and `cancel-run`
+   (`psi_tool_workflow.clj:227` / `canonical_workflows.clj:220`) are invoked from
+   the agent tool dispatcher, **not** the workflow worker (the
+   `clojure-agent-send-off-pool` thread parked on `send-and-drain`). So D17's
+   "worker thread" qualifier is wrong/ambiguous: the in-thread sequencing holds on
+   the **dispatch-invoking (command/operator) thread**, which is generally **not**
+   the workflow worker. An implementer reading D17 literally could try to run the
+   remove dispatch on the worker thread (which is parked/being interrupted —
+   impossible). Actionable: correct D17 to say "the same dispatch-invoking
+   (command/operator) thread" and align with D20/D21.
+
+2. **Entry-event taxonomy for cancel vs cancel-then-remove vs plain-remove is
+   unspecified.** The design pins the *effect set* precisely (cancel dispatch emits
+   effect (3) the re-entrant remove only for a remove; plain cancel omits it —
+   D18) but never states the *event/handler entry structure*: code-confirmed two
+   distinct existing mutations, `psi.workflow/cancel-run`
+   (`canonical_workflows.clj:220`) and `psi.workflow/remove-run` (via
+   `delegate-remove`). For a `remove` of a **live** run (D5 cancel-then-remove), the
+   design does not say whether (a) the `remove-run` handler itself produces the
+   `:cancelled` transition + cancellation effects + the chained re-entrant
+   `remove-run` dispatch (liveness branch in the `remove-run` handler-before, the
+   bare dissoc on the re-entrant/terminal pass), or (b) the `remove` command
+   dispatches the existing `cancel-run` event first and chains a `remove-run`
+   dispatch — and where the live-vs-terminal branch lives (handler-before vs
+   command layer, the latter in tension with D18's rejection of command-layer
+   orchestration). This determines dispatch count, event-log shape, and whether the
+   cancel-transition+cancellation-effect logic is shared (one helper) or duplicated
+   across the `cancel-run` and `remove-run` handlers. Actionable: pin the
+   entry-event taxonomy and the owner of the shared cancel-transition logic.
+
+3. **D23 enumeration-race bound is argued only for top-level cancel; the
+   no-worker-interrupt direct sub-run cancel case is unaddressed.** D23's
+   enumeration-race bound ("a descendant spawned after enumeration is bounded by
+   D6/D2/D10: once the parent run is `:cancelled`, the cooperative pull checkpoint
+   refuses to advance/spawn") relies on the **cancelled run's own** checkpoint
+   stopping further spawns, and for a top-level cancel the single
+   `future-cancel(true)` (D14) additionally interrupts the whole synchronous stack.
+   For a **direct sub-run cancel** (D19) **no** worker `future-cancel` is emitted.
+   So a deeper descendant turn/child-session spawned in the window between the D23
+   handler-before enumeration and the worker reaching its next checkpoint is
+   neither in the cascade set (so not D15-aborted) **nor** interrupted (no worker
+   future-cancel) — the worker parks on its `send-and-drain` and the just-spawned
+   child turn runs to natural completion. D6's stated **guarantee** "no further
+   child session spawns after the cancel checkpoint" is stronger than D6's "physics"
+   exception (which is scoped to a single in-syscall-flight tool call, not a whole
+   spawned child session). The design does not say whether this direct-sub-run-cancel
+   spawn race upholds the D6 no-new-child-session guarantee or is an accepted
+   true-concurrency exception (like D22.2/criterion #9). Actionable: state whether
+   the D23 enumeration-race bound holds for the direct sub-run cancel (no worker
+   interrupt) case — and if it is an accepted true-concurrency race, classify it
+   explicitly (analogous to D22.2/#9) rather than implying the D6 guarantee.
+
+No other new actionable ambiguity found; D1–D25 + Scope/Acceptance otherwise pin a
+single contract per behaviour.
