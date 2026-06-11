@@ -1934,3 +1934,16 @@ pure multi-run apply-phase update; cancel-then-remove uses re-entrant dispatch o
 for the apply-before-effects ordering case; and guarded abort / stale-handle cleanup
 reuse existing runtime-effect mechanisms without command-layer reach-in. No new
 `design-steps.md` follow-up item added.
+
+## Ambiguity review (ψ pass 23, 2026-06-11)
+
+Reviewed current `design.md` for ambiguities after D37 and the pass-21 D1 owner
+alignment. Consulted the relevant dispatch/effect code paths (`dispatch_schema.clj`,
+`dispatch_effects.clj`, `state-kernel/dispatch.clj`, current workflow
+cancel/remove mutations, and `delegate remove`) to check whether the design leaves
+multiple implementation interpretations. Did not review `plan.md` or `steps.md`.
+
+No new actionable ambiguity found. D1–D37 now pin the entry events, public routing,
+effect payloads, ctx handle reachability, cascade semantics, cancel/remove result
+contracts, idempotency gates, and acceptance-test surface sufficiently for planning
+and implementation. No new `design-steps.md` follow-up item added.
