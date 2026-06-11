@@ -2125,3 +2125,19 @@ Both were design-contract reconciliation items and were completable now; no bloc
   and may only exact-key drop. D24/D26/D29/D34/D36b and Acceptance #8/#10 were
   aligned to distinguish canonical cancellation/cascade effects from idempotent
   runtime-handle cleanup.
+
+## Architecture-fit review (ψ pass 31, 2026-06-11)
+
+Reviewed current `design.md` for architectural fit only after the pass-30 D23/D38
+reconciliations. Consulted AGENTS.md VSM/principles, META.md, and
+`doc/architecture.md` state-boundary, dispatch sequencing, replay-trim,
+dispatch-trace, ctx-managed-service, and adapter/public-surface guidance. Did not
+review `plan.md` or `steps.md`.
+
+No new actionable architectural-fit feedback found. The D38 terminal-top-level
+cancel-before-drop cleanup preserves the no-orphan runtime-handle invariant while
+staying inside canonical `:runtime/*` effects, and the nested/absent cleanup cases
+avoid parent-worker inference or command-layer reach-in. D23's cascade-set abort
+wording now includes the directly-cancelled run while retaining the pure multi-run
+apply-phase cascade plus guarded effect execution. No new `design-steps.md`
+follow-up item added.
