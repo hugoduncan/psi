@@ -943,3 +943,17 @@
       effects. Terminal **nested** remove emits no worker cancel effect and does not
       infer/interrupt the parent/top-level worker; it may only exact-key drop. D24,
       D26, D29, D34, D36b, Acceptance #8/#10 aligned.
+
+## Inconsistency follow-ups (ψ pass 33, 2026-06-11)
+
+- [ ] Reconcile D35's worker-future-cancel emitter/test wording with D38 terminal
+      top-level remove cleanup. D38 requires already-terminal **top-level**
+      `remove-run` cleanup to emit the ordered runtime-handle pair
+      `:runtime/cancel-inflight-run` before `:runtime/drop-inflight-run`, but D35
+      still says `:runtime/cancel-inflight-run` is emitted only for top-level cancel
+      / **live** top-level remove and that the only exception is D36b absent-remove
+      stale-handle cleanup; its test implication likewise omits terminal top-level
+      remove. Update D35 to distinguish canonical cancellation emissions from
+      runtime-handle cleanup emissions, include D38 terminal top-level remove as an
+      allowed cleanup emitter, and keep the direct/terminal nested-sub-run rule that
+      no parent/top-level worker is inferred or interrupted.

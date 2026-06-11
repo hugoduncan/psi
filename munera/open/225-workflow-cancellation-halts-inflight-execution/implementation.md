@@ -2156,3 +2156,26 @@ ordering, cascade-set abort coverage, terminal/absent runtime-handle cleanup,
 top-level vs nested remove behaviour, public result semantics, idempotency, and the
 D23/D31/D27 cancellation guarantee/exception boundary. No new `design-steps.md`
 follow-up item added.
+
+## Inconsistency review (ψ pass 33, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-artifact inconsistency after
+pass-32 ambiguity review. Consulted D24/D26/D35/D36b/D38 and Acceptance #10; did
+not review `plan.md` or `steps.md`.
+
+One new actionable inconsistency found:
+
+1. **D35's worker-cancel emitter rule omits/appears to exclude D38 terminal
+   top-level remove cleanup.** D38 requires already-terminal **top-level**
+   `remove-run` cleanup to emit the ordered runtime-handle pair
+   `:runtime/cancel-inflight-run` before `:runtime/drop-inflight-run`, so a
+   still-unwinding/stale worker is not orphaned. But D35's emitter-responsibility
+   bullet still says emitters produce `:runtime/cancel-inflight-run` only for
+   top-level cancel / **live** top-level remove, never for direct nested sub-run
+   cancel/remove, and that the "only exception" is D36b absent-remove stale-handle
+   cleanup. Read literally, D35 leaves terminal top-level remove outside the allowed
+   emitter cases (and its test implication says tests assert the effect only for
+   top-level cancel / live top-level remove), contradicting D38 and Acceptance #10.
+   D35 should distinguish canonical cancellation emissions from runtime-handle
+   cleanup emissions and include D38 terminal top-level remove as an allowed cleanup
+   emitter, while preserving the nested-sub-run no-parent-inference rule.
