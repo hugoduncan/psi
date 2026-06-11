@@ -247,4 +247,5 @@
 
 ## Test review follow-ups (ψ pass 2, 2026-06-11)
 
-- [ ] Replace the `with-redefs` of `memory-runtime/recover-for-query!` in `prompt_lifecycle_workflow_cancellation_test.clj` with mock-free/injectable/nullable coverage for the post-prepare cancellation regression, preserving the assertion that workflow-guarded memory recovery performs no ordinary work after D31.
+- [x] Replace the `with-redefs` of `memory-runtime/recover-for-query!` in `prompt_lifecycle_workflow_cancellation_test.clj` with mock-free/injectable/nullable coverage for the post-prepare cancellation regression, preserving the assertion that workflow-guarded memory recovery performs no ordinary work after D31.
+  - Covered 2026-06-11: `dispatch-effects` now uses an injectable `:memory-recover-query-fn` ctx seam with production default; the post-prepare cancellation regression injects a nullable recorder and asserts guarded memory recovery/provider execution do no ordinary work after D31.

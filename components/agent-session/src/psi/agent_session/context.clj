@@ -42,6 +42,7 @@
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
+   [psi.memory.runtime :as memory-runtime]
    [psi.query.core :as query]
    [psi.ui.state :as ui-state])
   (:import
@@ -210,6 +211,7 @@
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
    :build-prepared-request-fn #'prompt-request/build-prepared-request
    :execute-prepared-request-fn #'turn/execute-prepared-request!
+   :memory-recover-query-fn #'memory-runtime/recover-for-query!
    :workflow-prompt-execution-result-fn #'turn/prompt-execution-result-in!
    :build-record-response-fn #'prompt-recording/build-record-response
    :continue-prompt-chain-fn #'prompt-chain/run-prompt-tools!

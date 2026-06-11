@@ -77,6 +77,11 @@
     (when (:workflow-owned? session-data)
       (workflow-run-stop-signal ctx (:workflow-run-id session-data)))))
 
+(defn- memory-recover-for-query!
+  [ctx query-text]
+  (when query-text
+    ((or (:memory-recover-query-fn ctx) memory-runtime/recover-for-query!) query-text)))
+
 (defn- workflow-effect-stop-signal
   [ctx effect]
   (or (when-let [run-id (:workflow-run-id effect)]
@@ -293,8 +298,7 @@
     (if-let [reason (workflow-effect-stop-signal ctx effect)]
       (stopped-workflow-execution-result session-id reason)
       (do
-        (when-let [query-text (:query-text effect)]
-          (memory-runtime/recover-for-query! query-text))
+        (memory-recover-for-query! ctx (:query-text effect))
         (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record))))))
 
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
@@ -445,7 +449,7 @@
   (memory/remember-in! (:memory-ctx effect) {:content-type :note :content (:text effect) :tags [:remember :manual] :provenance (:provenance effect)}))
 (defmethod execute-effect! :memory/recover-query [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
-    (when-let [query-text (:query-text effect)] (memory-runtime/recover-for-query! query-text))))
+    (memory-recover-for-query! ctx (:query-text effect))))
 
 (defmethod execute-effect! :background-job/cancel [ctx effect]
   (let [job (:job effect)]

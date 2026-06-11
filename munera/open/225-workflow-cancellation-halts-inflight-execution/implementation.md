@@ -3297,3 +3297,13 @@ Reviewed the current task test net against `task-test-review` after the live top
 New actionable issue: `prompt_lifecycle_workflow_cancellation_test.clj` still uses `with-redefs` to replace `memory-runtime/recover-for-query!` in the post-prepare cancellation regression. That is a global mock of an infrastructure dependency, which violates the task-test-review constraint that infra deps be injectable/nullable and not mocked/stubbed. Replace that assertion path with a mock-free seam or real nullable observable while preserving the guarantee that workflow-guarded memory recovery does not execute after D31.
 
 No tests run (review-only pass).
+
+## Test review follow-up pass 2 (ψ, 2026-06-11)
+
+Replaced the remaining `with-redefs` of `memory-runtime/recover-for-query!` in
+`prompt_lifecycle_workflow_cancellation_test.clj` with a production ctx seam:
+`dispatch-effects` now calls `:memory-recover-query-fn` when present, defaulting to
+`memory-runtime/recover-for-query!` from context construction. The post-prepare
+cancellation regression injects a nullable recorder through that seam and keeps the
+state-based assertion that guarded memory recovery performs no ordinary work after
+D31. Focused prompt lifecycle cancellation tests and focused clj-kondo are green.

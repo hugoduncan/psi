@@ -6,7 +6,6 @@
    [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn.handlers :as turn-handlers]
-   [psi.memory.runtime :as memory-runtime]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -147,6 +146,9 @@
         memory-calls* (atom [])
         execute-calls* (atom 0)
         ctx (assoc ctx0
+                   :memory-recover-query-fn
+                   (fn [query-text]
+                     (swap! memory-calls* conj query-text))
                    :execute-prepared-request-fn
                    (fn [& _]
                      (swap! execute-calls* inc)
@@ -171,14 +173,16 @@
         "workflow-guarded post-prepare effects must remain valid dispatch effects")
     (install-workflow-run! ctx run-id)
     (workflow-attempt-session! ctx session-id run-id)
+    (dispatch-effects/execute-effect! ctx (first effects))
+    (is (= ["recover this"] @memory-calls*)
+        "nullable memory recovery seam represents ordinary memory work while the workflow run is live")
+    (reset! memory-calls* [])
     (session/dispatch-in! ctx :psi.workflow/cancel-run
                           {:run-id run-id
                            :reason "prepare effects race"}
                           {:origin :core})
-    (with-redefs [memory-runtime/recover-for-query! (fn [query-text]
-                                                      (swap! memory-calls* conj query-text))]
-      (doseq [effect effects]
-        (dispatch-effects/execute-effect! ctx effect)))
+    (doseq [effect effects]
+      (dispatch-effects/execute-effect! ctx effect))
     (is (= [] @memory-calls*)
         "standalone memory recovery must not execute after workflow cancellation")
     (is (= 0 @execute-calls*)
