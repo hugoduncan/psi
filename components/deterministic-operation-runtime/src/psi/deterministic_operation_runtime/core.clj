@@ -16,6 +16,26 @@
             :result result
             :explanation (defs/explain-operation-result result)}))
 
+(defn- workflow-stop-signal
+  [invocation]
+  (let [state* (get-in invocation [:ctx :state*])
+        run-id (:workflow-run-id invocation)]
+    (when (and state* run-id)
+      (let [run (get-in @state* [:workflows :runs run-id])]
+        (cond
+          (nil? run) :removed
+          (= :cancelled (:status run)) :cancelled)))))
+
+(defn- workflow-stopped-result
+  [operation invocation reason]
+  {:status :error
+   :reason :workflow-stopped
+   :message "Workflow execution stopped before deterministic operation start"
+   :details {:operation-id (:id operation)
+             :workflow-run-id (:workflow-run-id invocation)
+             :step-id (:step-id invocation)
+             :stop-reason reason}})
+
 (defn invoke-operation
   "Invoke a normalized deterministic operation.
 
@@ -35,13 +55,15 @@
    Thrown exceptions are canonicalized into tagged `:error` results.
    Malformed returned values are rejected with ex-info."
   [operation invocation]
-  (let [result (try
-                 ((:handler operation) (assoc invocation :operation-id (:id operation)))
-                 (catch Throwable t
-                   {:status :error
-                    :reason :operation-threw
-                    :message (or (ex-message t) (str t))
-                    :details {:operation-id (:id operation)}}))]
+  (let [result (if-let [reason (workflow-stop-signal invocation)]
+                 (workflow-stopped-result operation invocation reason)
+                 (try
+                   ((:handler operation) (assoc invocation :operation-id (:id operation)))
+                   (catch Throwable t
+                     {:status :error
+                      :reason :operation-threw
+                      :message (or (ex-message t) (str t))
+                      :details {:operation-id (:id operation)}})))]
     (when-not (defs/valid-operation-result? result)
       (throw (malformed-operation-result-ex operation invocation result)))
     result))

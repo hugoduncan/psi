@@ -74,6 +74,15 @@
   (when-let [session-id (:session-id execution-session)]
     (execution-adapter/abort-session! ctx session-id)))
 
+(defn- ensure-workflow-turn-can-start!
+  [ctx run-id session-id]
+  (when (state/workflow-stopped? ctx run-id)
+    (execution-adapter/abort-session! ctx session-id)
+    (throw (ex-info "Workflow execution stopped before child turn start"
+                    {:reason (state/workflow-stop-signal ctx run-id)
+                     :run-id run-id
+                     :session-id session-id}))))
+
 (defn- record-started-attempt-working-memory!
   [working-memory* step-id attempt-id execution-session]
   (swap! working-memory*
@@ -253,8 +262,10 @@
                     :else
                     (if (state/workflow-stopped? ctx run-id)
                       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-                      (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
-                                                            #(state/workflow-stopped? ctx run-id)))))))
+                      (do
+                        (ensure-workflow-turn-can-start! ctx run-id (:session-id execution-session))
+                        (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
+                                                              #(state/workflow-stopped? ctx run-id))))))))
             (catch Exception e
               (if (state/workflow-stopped? ctx run-id)
                 (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})

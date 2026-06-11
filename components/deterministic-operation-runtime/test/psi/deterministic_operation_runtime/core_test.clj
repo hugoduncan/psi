@@ -59,3 +59,29 @@
                :type :malli.core/invalid-dispatch-value}]
              (mapv #(select-keys % [:path :in :type])
                    (:errors (:explanation (ex-data ex)))))))))
+
+(deftest invoke-operation-honors-workflow-cancellation-test
+  ;; Regression for task 225 implementation review pass 6: the deterministic
+  ;; operation runtime boundary consumes the durable workflow stop marker, so an
+  ;; operation cannot start after the canonical cancel CAS wins.
+  (testing "cancelled workflow run prevents handler invocation"
+    (let [handler-calls* (atom 0)
+          result (runtime/invoke-operation
+                  {:id "workflow/op"
+                   :handler (fn [_]
+                              (swap! handler-calls* inc)
+                              {:status :ok :data {:started? true}})}
+                  {:ctx {:state* (atom {:workflows {:runs {"run-cancelled" {:run-id "run-cancelled"
+                                                                            :status :cancelled}}}})}
+                   :workflow-run-id "run-cancelled"
+                   :step-id "invoke"})]
+      (is (= 0 @handler-calls*)
+          "the operation handler must not be invoked after cancellation")
+      (is (= {:status :error
+              :reason :workflow-stopped
+              :message "Workflow execution stopped before deterministic operation start"
+              :details {:operation-id "workflow/op"
+                        :workflow-run-id "run-cancelled"
+                        :step-id "invoke"
+                        :stop-reason :cancelled}}
+             result)))))

@@ -145,7 +145,7 @@
   (let [{:keys [current-step-id step-order step-runs workflow-run-id workflow-attempt-id stopped?]} routing-context
         stopped? (or stopped? (constantly false))]
     (assert-workflow-live! stopped?
-                           "Workflow execution stopped before judge session creation"
+                           "Workflow execution stopped before judge start"
                            {:workflow-run-id workflow-run-id
                             :workflow-step-id current-step-id})
     (if (= :invoke (:type judge-spec))

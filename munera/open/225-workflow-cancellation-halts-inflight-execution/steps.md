@@ -146,7 +146,8 @@
 
 ## Implementation review follow-ups (ψ pass 6, 2026-06-11)
 
-- [ ] Make initial ordinary execution starts cancellation-safe: actor session steps, initial judge turns, and invoke deterministic operations must not start after a D31 cancel CAS that lands after the final pre-start stop check; either guard the start through a cancellation-safe protocol or make the guarded abort leave a durable per-session stop marker consumed by turn/operation start. Add regressions for cancellation between the final pre-start stop check and each of: initial actor turn start, initial judge turn start, and invoke-operation start.
+- [x] Make initial ordinary execution starts cancellation-safe: actor session steps, initial judge turns, and invoke deterministic operations must not start after a D31 cancel CAS that lands after the final pre-start stop check; either guard the start through a cancellation-safe protocol or make the guarded abort leave a durable per-session stop marker consumed by turn/operation start. Add regressions for cancellation between the final pre-start stop check and each of: initial actor turn start, initial judge turn start, and invoke-operation start.
+  - Covered 2026-06-11: workflow-owned turn execution now checks canonical run cancellation/removal before invoking the prompt adapter; deterministic-operation runtime checks the invocation workflow run before calling the handler; the statechart ordinary-session path aborts a just-attached child session if the final pre-turn check trips. Added actor-turn, judge-turn, and invoke-operation start regressions.
 
 ## Implementation review follow-ups (ψ pass 7, 2026-06-11)
 

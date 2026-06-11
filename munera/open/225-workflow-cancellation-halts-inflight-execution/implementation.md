@@ -2604,3 +2604,27 @@ by the old command-layer cleanup/failure model.
 Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test` → 45 tests / 236 assertions green.
+
+## Implementation follow-up pass 6 (ψ, 2026-06-11)
+
+Executed the newly added pass-6 cancellation follow-up. Initial ordinary start
+windows are now guarded at the lower execution boundaries in addition to the
+workflow lifecycle pre-checks:
+
+- ordinary actor/judge turn execution checks canonical workflow-owned session
+  linkage immediately before calling the prompt adapter; cancelled/removed runs
+  return a stopped turn result and do not invoke the prompt path;
+- deterministic operation runtime checks `:workflow-run-id` in the invocation's
+  ctx immediately before invoking the operation handler; cancelled/removed runs
+  return a tagged `:workflow-stopped` operation error and do not call the handler;
+- the statechart ordinary-session path aborts a just-attached child session if a
+  final pre-turn cancellation check trips.
+
+Added regressions for cancelled actor turn start, cancelled judge turn start, and
+cancelled deterministic operation start. Focused lint and focused suites passed:
+`psi.deterministic-operation-runtime.core-test`,
+`psi.workflow-runtime.turn-execution-contract-test`,
+`psi.agent-session.workflow-statechart-runtime-cancellation-test`,
+`psi.agent-session.workflow-judge-test`,
+`psi.agent-session.workflow-execution-cancellation-test`, plus workflow execution
+smoke suites.

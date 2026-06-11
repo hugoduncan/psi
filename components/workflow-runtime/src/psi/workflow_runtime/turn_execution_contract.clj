@@ -74,9 +74,37 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (when-let [state* (:state* ctx)]
+    (let [session-data (when-let [get-session-data (:get-session-data (execution-adapter/adapter ctx))]
+                         (get-session-data ctx session-id))
+          run-id (:workflow-run-id session-data)
+          run (when run-id (get-in @state* [:workflows :runs run-id]))]
+      (when (and (:workflow-owned? session-data) run-id)
+        (cond
+          (nil? run) :removed
+          (= :cancelled (:status run)) :cancelled)))))
+
+(defn- stopped-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before turn start"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before turn start"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before turn start"
+   :execution-result/stop-reason :error})
+
 (defn- prompt-execution-result
   [ctx session-id text images opts]
-  (execution-adapter/prompt-execution-result! ctx session-id text images opts))
+  (if-let [reason (workflow-session-stop-signal ctx session-id)]
+    (stopped-execution-result session-id reason)
+    (execution-adapter/prompt-execution-result! ctx session-id text images opts)))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt
