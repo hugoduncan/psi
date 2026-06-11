@@ -1098,3 +1098,41 @@ future), D19/D21 (parent continues on failed delegate step / run-absence), D22
 (sequential gate vs concurrent execute-time idempotency), and D23 (multi-run
 apply-phase cascade). No new contract introduced; only the test/definition-of-done
 surface made unambiguous. No step-machine redesign.
+
+## Inconsistency review (ψ pass 6, 2026-06-10)
+
+Fresh internal-consistency pass over design.md after D21–D23, checking the
+cancel-then-remove record-drop wording against the actual `remove-run` /
+`inflight-runs` code. D1–D23 reconciliations stand. One **new** actionable
+contradiction around the `inflight-runs` runtime-handle entry drop:
+
+1. **D17 step 2 (+ Acceptance #2) attribute the `inflight-runs` entry drop to the
+   pure `remove-run` dissoc, contradicting D1/D2 + code.** D17 step 2 says the
+   remove dispatch "applies the pure `remove-run` dissoc, dropping the canonical
+   run record **and its `inflight-runs` entry**"; Acceptance #2 likewise requires
+   "its `inflight-runs` entry is cleared … (cancel-then-remove, D5/D17)." But
+   code-confirmed: pure `remove-run` (`workflow-runtime/core.clj:217`) dissocs
+   **only** canonical `:state*` (`runs-path` + `run-order-path`) — it never touches
+   `inflight-runs`. `inflight-runs` is a separate `defonce` runtime-handle atom
+   (`runtime_state.clj:11`) whose entry is dropped by a **distinct command-layer
+   side effect** `(swap! inflight-runs dissoc run-id)` (`workflow/core.clj:493`),
+   after the mutation. This contradicts (a) D2 ("`inflight-runs` and the worker
+   future stay a **pure runtime handle**" — not the canonical `:state*` a pure
+   transition mutates) and (b) D1 (pure transitions perform **no** side effects;
+   runtime-handle mutations flow as effects-as-data executed at the boundary). A
+   pure apply-phase `remove-run` cannot drop a runtime-handle entry, yet the
+   design's cancellation effect set (D12/D23: worker `future-cancel`,
+   `:runtime/agent-abort`, `:runtime/mark-workflow-jobs-terminal`, the re-entrant
+   `:runtime/dispatch-event`) defines **no** effect to clear the `inflight-runs`
+   entry. So the remove flow's required `inflight-runs` entry-drop is an unmodeled
+   runtime-handle side effect: either it needs its own canonical `:runtime/*`
+   cleanup effect in the remove dispatch's effect set (parity with the
+   `future-cancel` effect that already reaches `inflight-runs` via `ctx`), or
+   D17/Acceptance #2 must stop folding it into the pure `remove-run` `:state*`
+   dissoc. As written the design both (i) misstates what `remove-run` does and
+   (ii) leaves the handle entry-drop without an effects-as-data mechanism — an
+   implementer cannot tell where/how the `inflight-runs` entry is cleared.
+
+This is a design-vs-artifact + internal (D17/Acceptance-#2 ⟷ D1/D2) inconsistency;
+the fix is to assign the `inflight-runs` entry-drop an explicit
+effects-as-data mechanism (or correct the wording), not a step-machine redesign.

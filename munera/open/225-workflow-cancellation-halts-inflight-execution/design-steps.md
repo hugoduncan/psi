@@ -443,3 +443,30 @@
       #8 sequential terminal idempotency → no cancellation effects + record-drop
       still applies [guaranteed] (D22.1); #9 concurrent-CAS execute-time idempotency
       [out-of-test-scope] (D22.2).
+
+## Inconsistency follow-ups (ψ pass 6, 2026-06-10)
+
+- [ ] Reconcile the `inflight-runs` runtime-handle entry-drop with D1/D2 and the
+      code. D17 step 2 says the remove dispatch "applies the pure `remove-run`
+      dissoc, dropping the canonical run record **and its `inflight-runs` entry**,"
+      and Acceptance #2 requires "its `inflight-runs` entry is cleared … (D5/D17)."
+      But code-confirmed: pure `remove-run` (`workflow-runtime/core.clj:217`)
+      dissocs only canonical `:state*` (`runs-path`/`run-order-path`) and never
+      touches `inflight-runs`; the `inflight-runs` entry is a separate `defonce`
+      runtime-handle atom (`runtime_state.clj:11`) dropped by a distinct
+      command-layer side effect `(swap! inflight-runs dissoc run-id)`
+      (`workflow/core.clj:493`). This contradicts D2 (`inflight-runs` ∈ pure
+      runtime handle, not the canonical `:state*` a pure transition mutates) and D1
+      (pure transitions perform no side effects; handle mutations flow as
+      effects-as-data), and the D12/D23 cancellation effect set defines **no**
+      effect to clear the `inflight-runs` entry. State explicitly either (a) the
+      `inflight-runs` entry-drop is its own canonical `:runtime/*` cleanup
+      effect emitted in the remove dispatch's effect set (parity with the
+      `future-cancel` effect that already reaches `inflight-runs` via `ctx`,
+      executed by the `:effects` interceptor — D1/D12), or (b) correct D17 step 2 /
+      Acceptance #2 to stop attributing the `inflight-runs` drop to the pure
+      `remove-run` `:state*` dissoc and name the actual handle-mutation mechanism.
+      Update D17, D5 step 3, and Acceptance #2 so the remove flow's
+      `inflight-runs` entry-drop has a defined effects-as-data mechanism consistent
+      with D1/D2. (AGENTS.md S1 effects / S3 dispatch, `λ(state)`, `λ parity`;
+      design.md D1/D2/D12/D17/D23)
