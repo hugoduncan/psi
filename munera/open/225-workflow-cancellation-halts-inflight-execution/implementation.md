@@ -1465,3 +1465,34 @@ D20; D17's "two serialized dispatches" (686/711/727/809) names in-thread
 *sequencing/ordering* (the cancel-then-remove split), reconciled by D20's
 in-thread-sequencing note, not the race-safety single-writer claim; 917/928/960/985
 are D20's own reconciliation prose. No step-machine or mechanism change. No blocker.
+
+## Architecture-fit review (ψ pass 10, 2026-06-10)
+
+Fresh architecture-fit pass over design.md after D26/D27, consulting AGENTS.md VSM
+(S1 effects / S3 dispatch, effects-as-data, replay, `λ parity`, `λ extend`,
+`λ shims_adapters`), META.md (managed services on ctx, no hidden process-global
+reach-in), and doc/architecture.md (State boundary, dispatch sequencing,
+replay-trim, dispatch trace).
+
+No new actionable architectural-fit misfit found.
+
+The current design fits the project architecture:
+
+- cancellation/cleanup side effects are canonical dispatch `:runtime/*` effects with
+  schema/executor parity, replay trimming, and trace visibility (D1/D12/D24);
+- the cancellation signal stays in canonical `:state*`, while futures and
+  `inflight-runs` remain runtime handles reached through ctx injection (D2/D25);
+- the cascade is owned by the agent-session dispatch boundary, avoids command-layer
+  loops/reach-in shims, and uses one multi-run apply-phase update with D20 atom-CAS
+  guards (D3/D20/D23);
+- cancel-then-remove uses effects-as-data re-entrant dispatch only where the
+  apply-before-effects ordering requires it, with terminalization before record drop
+  and handle cleanup after future cancel (D17/D18/D24/D26);
+- direct nested sub-run cancel/remove preserves parent authority and reuses existing
+  delegate failure semantics rather than introducing a result-delivery shim
+  (D19/D21/D26);
+- D27's direct-sub-run spawn-race treatment is explicitly bounded and classified as
+  the same true-concurrency construction-review class as D22.2, without changing the
+  effects boundary or introducing hidden state.
+
+No new design-steps.md follow-up item added.
