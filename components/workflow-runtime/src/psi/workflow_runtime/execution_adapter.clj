@@ -14,14 +14,16 @@
            list-context-sessions
            find-skill
            set-session-model!
-           execute-judge!]}]
+           execute-judge!
+           abort-session!]}]
   {:create-child-session! create-child-session!
    :prompt-execution-result! prompt-execution-result!
    :get-session-data get-session-data
    :list-context-sessions list-context-sessions
    :find-skill find-skill
    :set-session-model! set-session-model!
-   :execute-judge! execute-judge!})
+   :execute-judge! execute-judge!
+   :abort-session! abort-session!})
 
 (defn adapter
   [ctx]
@@ -74,3 +76,7 @@
   [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]
   ((required-op ctx :execute-judge!)
    ctx parent-session-id actor-session-id judge-spec routing-table routing-context))
+
+(defn abort-session!
+  [ctx session-id]
+  ((required-op ctx :abort-session!) ctx session-id))

@@ -2517,3 +2517,17 @@ Verification during review:
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 21 tests / 96 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test` → 17 tests / 83 assertions green.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_execution_cancellation_test.clj components/agent-session/test/psi/agent_session/workflow_execution_test.clj` → clean.
+
+## Review follow-up implementation — abort unattached actor/judge child sessions (ψ, 2026-06-11)
+
+Executed both newly-added implementation-review pass-4 follow-ups.
+
+- Added an explicit `:abort-session!` operation to the workflow execution adapter so lower workflow-runtime code can request session-owned cancellation cleanup without depending directly on agent-session internals. The production adapter aborts any active turn and drives the agent-core abort state for the target session.
+- Made actor child-session creation cancellation-safe: when `:step/enter` creates an ordinary workflow child session but the guarded attempt-start CAS loses to cancellation/removal, the just-created execution session is immediately aborted before workflow cancellation is queued. The existing step-entry race regression now also asserts the unattached child session is aborted.
+- Made judge child-session creation cancellation-safe: when `execute-judge!` creates a judge child session but `attach-judge-session-if-live!` loses to cancellation/removal, the just-created judge session is immediately aborted before the workflow-stopped exception is thrown. Added a regression covering cancellation between judge child-session creation and judge-session attachment.
+
+Verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.workflow-runtime.execution-adapter-test` → 32 tests / 143 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 27 tests / 135 assertions green.
+- `clj-kondo --lint components/workflow-runtime/src/psi/workflow_runtime/execution_adapter.clj components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/workflow_judge.clj components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj components/agent-session/test/psi/agent_session/workflow_judge_test.clj components/agent-session/test/psi/agent_session/workflow_statechart_runtime_cancellation_test.clj` → clean.

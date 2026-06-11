@@ -194,7 +194,11 @@
                                               (cond-> {:session-id session-id :model model}
                                                 scope (assoc :scope scope))
                                               {:origin :core}))
-    :execute-judge! (:execute-workflow-judge-fn ctx)}))
+    :execute-judge! (:execute-workflow-judge-fn ctx)
+    :abort-session! (fn [ctx session-id]
+                      (turn-runtime/abort-active-turn-in! ctx session-id)
+                      (when-let [agent-ctx (ss/agent-ctx-in ctx session-id)]
+                        (agent-core/abort-in! agent-ctx)))}))
 
 (defn- callback-fns [mutations projection-listeners*]
   {:apply-root-state-update-fn ss/apply-root-state-update-in!

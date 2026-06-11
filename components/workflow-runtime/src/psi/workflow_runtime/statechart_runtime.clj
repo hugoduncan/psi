@@ -69,6 +69,11 @@
   [ctx run-id step-id attempt]
   (update-state-if-live! ctx run-id #(append-and-start-attempt-if-live % run-id step-id attempt)))
 
+(defn- abort-unattached-session!
+  [ctx execution-session]
+  (when-let [session-id (:session-id execution-session)]
+    (execution-adapter/abort-session! ctx session-id)))
+
 (defn- record-started-attempt-working-memory!
   [working-memory* step-id attempt-id execution-session]
   (swap! working-memory*
@@ -193,7 +198,9 @@
                                :execution-session-id nil}
                      :execution-session nil})]
               (if-not (append-and-start-attempt-if-live! ctx run-id step-id attempt)
-                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                (do
+                  (abort-unattached-session! ctx execution-session)
+                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
                 (do
                   (record-started-attempt-working-memory! working-memory* step-id attempt-id execution-session)
                   (cond

@@ -93,7 +93,12 @@
   ;; Regression for task 225 implementation review: cancellation racing after the
   ;; pre-check but before the attempt-start swap! must not let :step/enter
   ;; resurrect the run to :running or record a post-cancel attempt.
-  (let [[ctx session-id] (create-session-context)
+  (let [[ctx0 session-id] (create-session-context)
+        aborted* (atom [])
+        ctx (test-support/with-workflow-execution-adapter-overrides
+              ctx0
+              {:abort-session! (fn [_ctx session-id]
+                                 (swap! aborted* conj session-id))})
         _ (install-run! ctx linear-definition "run-step-entry-cancel-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-step-entry-cancel-race")
         created* (atom [])]
@@ -123,6 +128,8 @@
       (is (= :cancelled (:status run)))
       (is (empty? (get-in run [:step-runs "plan" :attempts]))
           "the guarded attempt-start write must not append an attempt after cancellation")
+      (is (= ["plan-child"] @aborted*)
+          "the child session created before failed live-run attachment must be aborted")
       (is (not (contains? #{"build" nil} (:current-step-id run)))
           "ordinary advancement must not proceed after the cancel checkpoint"))))
 

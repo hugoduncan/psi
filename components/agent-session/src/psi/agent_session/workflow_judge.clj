@@ -150,6 +150,7 @@
             (child-session-contract/assert-valid-result!
              :psi.agent-session.workflow-judge/execute-judge!))
         (when-not (attach-judge-session-if-live! ctx workflow-run-id current-step-id workflow-attempt-id judge-sid)
+          (execution-adapter/abort-session! ctx judge-sid)
           (throw (ex-info "Workflow execution stopped before judge session attachment"
                           {:reason :workflow-stopped
                            :workflow-run-id workflow-run-id
