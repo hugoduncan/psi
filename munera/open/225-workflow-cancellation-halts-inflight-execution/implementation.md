@@ -2474,3 +2474,17 @@ Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 47 tests / 236 assertions green.
 - Focused `clj-kondo --lint` over changed workflow cancellation source files → clean.
+
+## Review follow-up implementation — invoke attempt-data cancellation-safe write (ψ, 2026-06-11)
+
+Executed the newly-added implementation-review pass-3 follow-up.
+
+- Routed the invoke branch's post-`invoke-step-runtime-result` `merge-latest-attempt-data` write through the existing `update-state-if-live!` CAS helper. The canonical write now re-checks run presence / `:cancelled` inside the compare-and-set loop; if cancellation wins after invoke returns but before attempt metadata commits, the write is skipped and workflow cancellation is queued instead of recording ordinary `:effective-args` metadata or downstream actor output.
+- Added regression coverage in `workflow_execution_test.clj` that forces cancellation during the attempt-data write window and asserts `:effective-args` / accepted result are absent, the run remains `:cancelled`, and no downstream session is spawned.
+
+Verification:
+
+- `bb clojure:test:scry --var psi.agent-session.workflow-execution-test/invoke-step-attempt-data-write-is-cancellation-safe-test` → 1 test / 6 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test` → 17 tests / 83 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 48 tests / 242 assertions green.
+- `clj-kondo --lint components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj components/agent-session/test/psi/agent_session/workflow_execution_test.clj` → clean.

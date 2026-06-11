@@ -201,22 +201,26 @@
                     (if (state/workflow-stopped? ctx run-id)
                       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
                       (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
-                            {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)]
-                        (when-not (state/workflow-stopped? ctx run-id)
-                          (swap! (:state* ctx)
-                                 workflow-progression-recording/merge-latest-attempt-data run-id step-id attempt-data)
-                          (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
-                                                                              :payload payload
-                                                                              :step-id step-id
-                                                                              :attempt-id attempt-id
-                                                                              :updated-at (state/now)})
-                          (queue/enqueue-event! event-queue* working-memory*
-                                                (case pending-kind
-                                                  :success :actor/done
-                                                  :blocked :actor/blocked
-                                                  :failure :actor/failed
-                                                  :actor/failed)
-                                                {}))))
+                            {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)
+                            recorded? (update-state-if-live!
+                                       ctx
+                                       run-id
+                                       #(workflow-progression-recording/merge-latest-attempt-data % run-id step-id attempt-data))]
+                        (if recorded?
+                          (do
+                            (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
+                                                                                :payload payload
+                                                                                :step-id step-id
+                                                                                :attempt-id attempt-id
+                                                                                :updated-at (state/now)})
+                            (queue/enqueue-event! event-queue* working-memory*
+                                                  (case pending-kind
+                                                    :success :actor/done
+                                                    :blocked :actor/blocked
+                                                    :failure :actor/failed
+                                                    :actor/failed)
+                                                  {}))
+                          (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))))
 
                     delegate-step?
                     (if (state/workflow-stopped? ctx run-id)

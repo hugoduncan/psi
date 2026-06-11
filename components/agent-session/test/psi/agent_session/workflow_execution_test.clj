@@ -15,6 +15,7 @@
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.statechart-runtime]
    [psi.workflow-runtime.statechart-runtime.delegate :as workflow-delegate]
    [psi.workflow-runtime.statechart-runtime.lifecycle :as workflow-lifecycle]
@@ -164,6 +165,62 @@
           (is (nil? (get-in run [:step-runs "discover" :accepted-result])))
           (is (= [] @created*)
               "the session step after the cancelled invoke must not spawn"))))))
+
+(deftest invoke-step-attempt-data-write-is-cancellation-safe-test
+  ;; Tests the post-invoke attempt-data CAS guard: cancellation between the
+  ;; post-invoke stop check and the write must not record ordinary metadata.
+  (testing "invoke effective args are not recorded when cancellation wins the write race"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          definition {:steps [{:name "discover"
+                               :type :invoke
+                               :operation "demo/cancel-at-attempt-data-write"
+                               :args {:repo {:from :workflow-input :path [:repo]}}
+                               :outputs {:data {:source :invoke/data}}}
+                              {:name "report"
+                               :type :session
+                               :contributions [{:type :template
+                                                :text "Report {{data}}"
+                                                :vars {"data" {:from {:step "discover" :output :data}}}}]}]}
+          merge-called? (atom false)
+          created* (atom [])
+          original-merge workflow-progression-recording/merge-latest-attempt-data]
+      (psi.deterministic-operation-registry.registry/register-operation-in!
+       (:deterministic-operation-registry ctx)
+       {:id "demo/cancel-at-attempt-data-write"
+        :handler (fn [_invocation]
+                   {:status :ok
+                    :data {:late? true}})})
+      (swap! (:state* ctx)
+             (fn [state]
+               (let [[s _ _] (workflow-runtime/create-run state {:definition definition
+                                                                 :run-id "run-cancel-at-attempt-data-write"
+                                                                 :workflow-input {:repo "psi"}})]
+                 s)))
+      (with-redefs [workflow-progression-recording/merge-latest-attempt-data
+                    (fn [state run-id step-id attempt-data]
+                      (reset! merge-called? true)
+                      (swap! (:state* ctx) assoc-in [:workflows :runs run-id :status] :cancelled)
+                      (original-merge state run-id step-id attempt-data))
+                    psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (swap! created* conj (:workflow-step-id opts))
+                      (let [sid (str (:workflow-step-id opts) "-child")]
+                        {:attempt {:attempt-id (str sid "-attempt")
+                                   :status :pending
+                                   :execution-session-id sid}
+                         :execution-session (support/valid-child-session sid)}))]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-cancel-at-attempt-data-write")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-cancel-at-attempt-data-write")]
+          (is (= :cancelled (:status result)))
+          (is (= :cancelled (:status run)))
+          (is (true? @merge-called?)
+              "the regression must exercise the attempt-data write path")
+          (is (nil? (get-in run [:step-runs "discover" :attempts 0 :effective-args]))
+              "effective args must not be recorded after the cancellation checkpoint")
+          (is (nil? (get-in run [:step-runs "discover" :accepted-result]))
+              "the invoke result must not advance as ordinary workflow output")
+          (is (= [] @created*)
+              "the workflow must not spawn downstream sessions after the cancelled write race"))))))
 
 (deftest delegate-step-stops-before-creating-sub-run-when-parent-is-cancelled-test
   ;; Tests the pre-sub-run stop checkpoint directly with real registry and state:

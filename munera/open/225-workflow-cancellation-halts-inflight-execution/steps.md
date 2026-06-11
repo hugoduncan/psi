@@ -127,4 +127,5 @@
 
 ## Implementation review follow-ups (ψ pass 3, 2026-06-11)
 
-- [ ] Make invoke-step attempt-data recording cancellation-safe: the post-`invoke-step-runtime-result` `merge-latest-attempt-data` write must re-check run presence/`:cancelled` inside the state update (or equivalent CAS-safe helper) so a cancel racing after the post-invoke stop check cannot record ordinary `:effective-args`/attempt metadata after the D31 checkpoint; add a regression test for cancel between the post-invoke stop check and the attempt-data write.
+- [x] Make invoke-step attempt-data recording cancellation-safe: the post-`invoke-step-runtime-result` `merge-latest-attempt-data` write must re-check run presence/`:cancelled` inside the state update (or equivalent CAS-safe helper) so a cancel racing after the post-invoke stop check cannot record ordinary `:effective-args`/attempt metadata after the D31 checkpoint; add a regression test for cancel between the post-invoke stop check and the attempt-data write.
+  - Covered 2026-06-11: invoke attempt-data now uses the existing CAS live-run helper; regression cancels during the metadata write window and asserts no `:effective-args`, ordinary result, or downstream session spawn after cancellation.
