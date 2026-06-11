@@ -72,7 +72,7 @@ loop:
   (D14/D15).
 - **In-flight child turn:** when cancel arrives with a child agent turn already
   mid-execution, the workflow does not advance past that step **and** the child
-  turn is interrupted (guaranteed, via the `:session/abort` path) so it initiates
+  turn is interrupted (guaranteed, via the guarded `:runtime/agent-abort` executor path) so it initiates
   no further tool calls / commits — only a single already-in-syscall-flight effect
   may complete (D6).
 - **Idempotent / race-safe:** cancel during a step boundary, during a blocking
@@ -178,7 +178,7 @@ All four resolved — see "Design Questions — Resolution status" below for poi
 
 Resolves the four architecture-fit follow-ups raised by the design review. These
 state how cancellation maps onto the project's State boundary, effects-as-data,
-session-dispatch authority, and dispatch-serialization invariants — they do not
+agent-session dispatch/effects authority, and dispatch-serialization invariants — they do not
 redesign the step machine (still out of scope).
 
 ### D1. Side effects as data at the runtime boundary (¬inline mutation side effects)
@@ -197,7 +197,7 @@ that already owns `inflight-runs` (`psi.agent-session.workflow.orchestration` /
 1. commits the pure canonical-state transition (signal → `:cancelled`), then
 2. emits a cancellation effect (e.g. `{:cancel-inflight-run {:run-id …}}` plus,
    transitively, child-session abort effects) that the runtime boundary executes
-   against the future handle and the session-dispatch authority.
+   against the future handle and the agent-session abort machinery.
 
 This keeps side effects out of the pure transition and out of silent inline
 mutation bodies, satisfying AGENTS.md S1/S3 + `λ(state)` (effects flow as data,
@@ -233,12 +233,11 @@ queryable domain state; only its observable status is projected. Split:
 The step loop is driven by the **signal** (pull via read path), not by reaching
 into the handle.
 
-### D3. Transitive cascade owned by the agent-session session-dispatch authority
+### D3. Transitive cascade owned by the agent-session dispatch/effects authority
 
 The cancellation cascade (nested delegate sub-runs + child agent sessions) is
-owned by a coordinated dispatch path routed through the agent-session
-session-dispatch authority — not ad-hoc cross-handle reach-in and **not** a
-propagation shim (AGENTS.md authority + `λ shims_adapters`).
+owned by a coordinated agent-session dispatch/effects path — not ad-hoc
+cross-handle reach-in and **not** a propagation shim (AGENTS.md authority + `λ shims_adapters`).
 
 - **Nested sub-runs:** the parent cancel enumerates in-flight nested sub-runs from
   the canonical run-tree state (`:state*`) — by `:delegating-run-id` parentage,
@@ -252,14 +251,18 @@ propagation shim (AGENTS.md authority + `λ shims_adapters`).
   run; sub-runs wind down via cooperative signals) and D15 (child-session abort
   targets each in-flight attempt's `:execution-session-id`), all emitted as the
   cancel dispatch's effect set through the `:effects` interceptor (D23).
-- **Child agent sessions:** child-turn abort reuses the **existing** session
-  interrupt/abort pathway (`turn/abort-active-turn-in!` → `:session/abort`
-  dispatch → `agent-core/abort-in!` → context thread interrupt), which already
-  aborts an in-flight turn. This is `λ extend` compose-over-new-mechanism; no new
-  abort mechanism is introduced.
+- **Child agent sessions:** child-turn abort reuses the **existing** abort
+  side-effect executor already used by `:session/abort`: workflow cancellation emits
+  a guarded `:runtime/agent-abort` effect, and its `execute-effect!` method directly
+  performs the abort side effects (`turn` stream future cancel/error signalling +
+  `agent-core/abort-in!` → context thread interrupt). `:session/abort` remains the
+  public/session-statechart abort entry event that emits `:runtime/agent-abort`; the
+  workflow-cancellation effect does **not** dispatch a follow-on `:session/abort`
+  event (D36). This is `λ extend` compose-over-new-mechanism; no new abort
+  mechanism is introduced.
 
-agent-session remains the authoritative owner of session-dispatch invocation;
-workflow-runtime exposes pure domain APIs (run-tree reads, pure transitions) that
+agent-session remains the authoritative owner of session abort effects and dispatch
+effect execution; workflow-runtime exposes pure domain APIs (run-tree reads, pure transitions) that
 the agent-session cascade composes.
 
 ### D4. Terminal transitions route through dispatch; atomicity from the apply-phase atom CAS with the guard inside the update fn (refined by D20)
@@ -345,7 +348,7 @@ live" / "(or rejects)" alternative.
 ### D6. In-flight child turn: guaranteed interrupt action; "no new side effects initiated" contract (resolves Q1)
 
 The directly-cancelled run's in-flight child turn is **always interrupted** (a
-guaranteed action, via the D3/D9 `:session/abort` path), not best-effort. The
+guaranteed action, via the D3/D9/D36 guarded `:runtime/agent-abort` executor path), not best-effort. The
 guarantee is stated over side effects that have **not yet started**, and over the
 **cancel checkpoint** defined precisely by D31: the apply-phase CAS that first
 commits `:status :cancelled` for the directly-cancelled run (and, for a cascade,
@@ -414,24 +417,24 @@ wait must propagate/handle `InterruptedException` so control returns to the
 cooperative checkpoint for a clean terminal exit rather than leaking the interrupt
 or dying uncleanly.
 
-### D9. Single child-session-abort path: effect handler invokes the dispatch authority (reconciles D1 and D3)
+### D9. Single child-session-abort path: guarded `:runtime/agent-abort` direct executor (reconciles D1 and D3)
 
 D1 and D3 describe **one path, not two owners**. Child-session abort is a
-cancellation effect-as-data emitted at the cancel/remove boundary (D1) whose
-**effect handler invokes the agent-session session-dispatch authority's
-`:session/abort`** (D3) — i.e. `emit effect → runtime-boundary effect handler →
-:session/abort dispatch → agent-core/abort-in! → context thread interrupt`. D1
-names *where the effect is emitted and executed* (the runtime boundary that owns
-`inflight-runs`); D3 names *what that handler invokes* (the session-dispatch
-authority). There is a single owner of the invocation (agent-session) reached
-through a single effect path.
+cancellation effect-as-data emitted at the cancel/remove boundary (D1): the cancel
+dispatch emits a guarded `:runtime/agent-abort` effect, and the dispatch
+**`:effects` interceptor** invokes that effect's `execute-effect!` method. That
+executor directly performs the existing abort side effects for the target child
+session (turn stream future cancellation/error signalling plus `agent-core/abort-in!`
+→ context thread interrupt). It does **not** dispatch a follow-on `:session/abort`
+event (D36).
 
-**Executor (refined by D12):** the "runtime-boundary effect handler" is the
-`execute-effect!` method for the canonical `:runtime/*` cancellation effect,
-invoked by the dispatch **`:effects` interceptor** (not an orchestration-layer
-handler). Concretely the child-session-abort effect reuses the existing
-`:runtime/agent-abort` effect type (whose `execute-effect!` already drives the
-`:session/abort` path), per D12.
+`:session/abort` remains the session-statechart/public abort entry event; that
+entry event emits the same `:runtime/agent-abort` effect. Workflow cancellation
+therefore reuses the existing abort side-effect mechanism by entering at the effect
+level with the D28/D33 guard metadata, not by recursively invoking the abort event.
+D1 names where the effect is emitted/executed; D3 names the owning agent-session
+abort/effects boundary. There is a single owner (agent-session) reached through a
+single effect path.
 
 ## Consistency Reconciliations (ψ, 2026-06-10)
 
@@ -505,11 +508,12 @@ as a namespace global — with parity to every other `:runtime/*` handler.
 Mapping:
 
 - **Child-session abort** reuses the **existing** `:runtime/agent-abort` effect
-  (already present with an `execute-effect!` method driving the `:session/abort` /
-  `agent-core/abort-in!` path) — `λ extend` compose > new mechanism (consistent
-  with D3/D9). Workflow-cancellation emissions add the guarded metadata defined by
-  D28 so D22.2's execute-time liveness re-check can be performed without changing
-  existing non-workflow abort callers.
+  (already present with an `execute-effect!` method that directly performs the abort
+  side effects also emitted by `:session/abort`: turn stream future cancellation /
+  turn error signalling / `agent-core/abort-in!`) — `λ extend` compose > new
+  mechanism (consistent with D3/D9/D36). Workflow-cancellation emissions add the
+  guarded metadata defined by D28 so D22.2's execute-time liveness re-check can be
+  performed without changing existing non-workflow abort callers.
 - **Worker `future-cancel(true)` / interrupt** is emitted as the canonical
   `:runtime/cancel-inflight-run` effect (D35), with required payload
   `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}`. Its
@@ -694,9 +698,10 @@ every descendant run's historically-recorded session, and never the
 `:parent-session-id` of any run. In the common synchronous single-chain case this
 is the one deepest in-flight child turn plus any ancestor turns still mid-flight.
 
-This makes the D9/D12 reuse of `:runtime/agent-abort` well-defined: its keyed
+This makes the D9/D12/D36 reuse of `:runtime/agent-abort` well-defined: its keyed
 `session-id` (`effect-session-id`) is supplied from the canonical in-flight
-attempt's `:execution-session-id`.
+attempt's `:execution-session-id`, and the existing executor directly aborts that
+session rather than dispatching `:session/abort`.
 
 **Workflow-cancellation guard payload/read rule (D28/D33).** A workflow-cancellation
 abort effect carries both the existing `:session-id` and the canonical **flat**
@@ -1468,22 +1473,24 @@ no command-layer orchestration; the cancel-transition logic is a shared helper.*
     `:cancelled` and emits the effect tail.
   - **`remove-run` (terminal/absent run — the re-entrant second pass, plain
     remove-of-terminal, and absent-remove cleanup):** the **bare unconditional
-    `remove-run` dissoc** (D22.1 record-drop, status-independent) + the D24
-    `:runtime/drop-inflight-run` cleanup effect; **no** cancellation effects (the
-    run is already terminal or absent at the handler-`:before` read, so the D22.1
-    gate contributes none). For an absent run, the pure dissoc is an identity/no
-    canonical record removal, but the D24 cleanup still runs to clear a possible
-    orphaned handle (D34).
+    `remove-run` dissoc** (D22.1 record-drop, status-independent) + runtime-handle
+    cleanup; **no canonical cancellation/cascade effects** (the run is already
+    terminal or absent at the handler-`:before` read, so the D22.1 gate contributes
+    none). For a terminal canonical record, cleanup is the D24
+    `:runtime/drop-inflight-run` effect (the live-run first pass already cancelled a
+    top-level future if needed). For an absent run, the pure dissoc is an identity/no
+    canonical record removal, and the D36b cleanup pair runs to cancel any possible
+    stale live handle before dropping it (D34/D36b).
 
 - **(c) Where the live-vs-terminal branch lives.** Inside the `remove-run`
   **handler-`:before`** (the canonical-state read), **not** the command layer — it
   is exactly the **D22.1 terminal-precondition gate** read, reused as the
   live-vs-terminal selector: a non-terminal run takes the first-pass branch (cancel
   transition + effects + chained remove dispatch, no dissoc); a terminal/absent run
-  takes the record-drop/cleanup branch (bare dissoc + drop-inflight-run, no
-  cancellation effects). For an absent run the dissoc is a no-op over canonical
-  `:state*`, but the drop-inflight-run cleanup still emits (D34). No new branching
-  mechanism is introduced; it is the D22.1 read already
+  takes the record-drop/cleanup branch (bare dissoc + runtime-handle cleanup, no
+  canonical cancellation/cascade effects). For an absent run the dissoc is a no-op
+  over canonical `:state*`, but the absent-handle cleanup pair still emits
+  (D34/D36b). No new branching mechanism is introduced; it is the D22.1 read already
   required. Putting the branch in the handler-`:before` keeps it out of the command
   layer (D18) and rides the D20 in-`swap!`-fn guard for atomicity.
 
@@ -1690,9 +1697,10 @@ transition applied; it is not a promise that no idempotent cleanup effect emitte
 - **Absent run:** returns success/idempotent no-op removal:
   `:psi.workflow/removed? false`, `:psi.workflow/found? false`,
   `:psi.workflow/noop? true`, `:psi.workflow/error nil`. No canonical record was
-  removed and no cancel transition/cancellation effects emit; the D24
-  `:runtime/drop-inflight-run` cleanup **does** still emit to clear any orphaned
-  handle for that run-id (D34).
+  removed and no cancel transition/cascade effects emit; the D36b ordered handle
+  cleanup pair **does** still emit (`:runtime/cancel-inflight-run` before
+  `:runtime/drop-inflight-run`) to stop and clear any orphaned top-level handle for
+  that run-id (D34/D36b).
 
 This intentionally changes the current "not found" / "already terminal" exception
 shape for cancel/remove. Unexpected validation/schema failures may still return
@@ -1841,27 +1849,30 @@ D26's terminal/absent `remove-run` branch emits the bare record-drop plus the D2
 `:runtime/drop-inflight-run` cleanup effect, while D29 describes absent remove as
 `success/idempotent no-op`. The single contract is:
 
-- **Absent `remove-run` emits no cancellation effects and applies no canonical
-  record removal** (the pure dissoc is identity because the run record is already
-  absent). Public result: `:psi.workflow/removed? false`,
-  `:psi.workflow/found? false`, `:psi.workflow/noop? true`,
-  `:psi.workflow/error nil` (D29).
-- **Absent `remove-run` still emits `:runtime/drop-inflight-run`** for the requested
-  `run-id`. This cleanup is an idempotent handle-side effect (D24), not a
-  cancellation effect and not evidence that a canonical record was removed. It
-  intentionally clears any orphaned `inflight-runs` handle left by an earlier crash,
-  legacy bug, or cancel/remove race; `(dissoc absent-run-id)` is harmless when no
-  handle exists.
+- **Absent `remove-run` emits no canonical cancel transition, no cascade aborts, no
+  job terminalization, and applies no canonical record removal** (the pure dissoc is
+  identity because the run record is already absent). Public result:
+  `:psi.workflow/removed? false`, `:psi.workflow/found? false`,
+  `:psi.workflow/noop? true`, `:psi.workflow/error nil` (D29).
+- **Absent `remove-run` still emits an ordered handle-cleanup pair** for the
+  requested `run-id`: first `{:effect/type :runtime/cancel-inflight-run :run-id
+  run-id}`, then `{:effect/type :runtime/drop-inflight-run :run-id run-id}`
+  (D36b). This is idempotent runtime-handle cleanup, not evidence that a canonical
+  record was removed. It intentionally stops **and then clears** any orphaned
+  top-level `inflight-runs` handle left by an earlier crash, legacy bug, or
+  cancel/remove race; both effects are harmless when no handle exists.
 - Therefore `:psi.workflow/noop? true` means **no canonical workflow record was
   found/removed and no cancel transition was applied**. It does **not** mean
   literally no effects were emitted. Tests should assert both: absent remove returns
-  the D29 no-op public shape and may/should emit only the D24
-  `:runtime/drop-inflight-run` cleanup, with no cancellation effects
-  (`future-cancel`, guarded `:runtime/agent-abort`, job terminalization, or
-  re-entrant remove).
+  the D29 no-op public shape and may/should emit only the D36b ordered handle
+  cleanup pair, with no canonical cancellation/cascade effects (no guarded
+  `:runtime/agent-abort`, no job terminalization, and no re-entrant remove). The
+  `:runtime/cancel-inflight-run` member of the pair is permitted only as stale
+  top-level-handle cleanup and must precede `:runtime/drop-inflight-run`.
 
 This reconciles D26/D29/Acceptance #10 and preserves the fix for the Evidence-step-3
-class: a record may be absent while a stale runtime handle still needs cleanup.
+class without recreating it: a record may be absent while a stale runtime handle still
+needs cancellation before cleanup.
 
 ## Ambiguity Reconciliation (ψ pass 17, 2026-06-11)
 
@@ -1881,10 +1892,14 @@ The canonical worker-future-cancel effect shape is exactly:
 - **Required payload keys:** `:effect/type` and `:run-id` only. `:run-id` is the
   string workflow run id of the **top-level run that owns the `inflight-runs`
   entry**.
-- **Emitter responsibility:** emitters compute whether the directly-cancelled run
-  is top-level. If it is top-level, they emit this effect with that top-level run id;
-  if it is a nested sub-run directly cancelled/removed, they emit **no** worker
-  cancel effect (D14/D19/D21). The effect payload never carries a nested sub-run id.
+- **Emitter responsibility:** for canonical cancellation of an existing run, emitters
+  compute whether the directly-cancelled run is top-level. If it is top-level, they
+  emit this effect with that top-level run id; if it is a nested sub-run directly
+  cancelled/removed, they emit **no** worker cancel effect (D14/D19/D21). The effect
+  payload never carries a nested sub-run id for an existing nested run. The only
+  exception is the D36b absent-remove stale-handle cleanup: with no canonical run
+  record to classify, it may emit this effect for the requested run id as a direct
+  possible `inflight-runs` handle key before dropping that handle.
 - **Executor target semantics:** `execute-effect!` reads the D25 ctx-injected
   `:workflow-inflight-runs-handle`, looks up exactly `(:run-id effect)`, and, when a
   `:future` exists, calls Clojure `future-cancel` on it (interrupting the worker,
@@ -1911,6 +1926,88 @@ canonical `:runtime/*` effect, aligns D14's target semantics, gives D18/D23 a
 single effect value to order in the cancel dispatch, and keeps D25's ctx-injected
 handle reachability intact.
 
+
+## Consistency Reconciliations (ψ pass 18, 2026-06-11)
+
+Resolves the pass-18 inconsistency follow-ups. These are still design-only
+reconciliations: they align the intended implementation with code-confirmed effect
+ownership and prevent absent-run cleanup from recreating the orphaned-worker failure.
+
+### D36. Workflow child-session abort uses guarded `:runtime/agent-abort` as the direct abort-side-effect executor
+
+**Premise (code-confirmed).** The existing abort flow is the inverse of the earlier
+D3/D9 wording: `:session/abort` is a public/statechart event that emits
+`{:effect/type :runtime/agent-abort}`; the `execute-effect! :runtime/agent-abort`
+method then directly performs the abort side effects (turn stream future cancel,
+turn error signalling, and `agent-core/abort-in!`). The executor does not dispatch a
+second `:session/abort` event.
+
+**Decision — option (a): guarded direct executor.** Workflow cancellation emits the
+D28/D33 guarded `:runtime/agent-abort` effect and relies on that effect's executor
+as the direct abort-side-effect owner. It does **not** emit a guarded follow-on
+`:session/abort` dispatch and does not introduce recursive abort-event handling.
+This preserves the effects-as-data boundary (D12), keeps replay trimming and trace
+around the real abort side effect, and avoids a new dispatch-recursion shape.
+
+**Executor rule.** `execute-effect! :runtime/agent-abort` branches on the D33 flat
+workflow guard keys:
+
+- **Guarded workflow-cancellation abort:** before performing any abort side effects,
+  re-read canonical run state and verify the D28 live-attempt predicate: the latest
+  attempt for `:workflow-run-id`/`:workflow-step-id` still has
+  `:workflow-attempt-id`, `:execution-session-id = :expected-session-id =
+  :session-id`, and live status (`#{:running :validating}`). Only then perform the
+  existing direct abort side effects for `:session-id`. If the guard fails, no-op.
+- **Unguarded non-workflow abort:** preserve existing behaviour. Resolve the session
+  id through `effect-session-id` (payload `:session-id` or dispatching session id,
+  per D32) and directly perform the abort side effects. No workflow-state guard is
+  required.
+
+**Reconciliation.** D3, D9, D12, D15, D28, and D33 now all describe one path:
+`cancel/remove handler emits guarded :runtime/agent-abort` → dispatch `:effects`
+interceptor → guarded `execute-effect!` → existing direct abort side effects. The
+phrase "reuse `:session/abort`" means reuse the same abort side-effect mechanism
+that `:session/abort` emits, not dispatch a nested `:session/abort` event.
+
+### D36b. Absent `remove-run` cleanup cancels a possible stale handle before dropping it
+
+**Premise.** D34 allowed absent `remove-run` to emit `:runtime/drop-inflight-run` so
+that an absent canonical run could still clear a stale `inflight-runs` handle. But a
+stale handle might still contain a live worker future. Dropping that handle without
+first cancelling the future is the original Evidence-step-3 failure: handle gone,
+worker still running, no remaining way to stop it.
+
+**Decision.** Absent `remove-run` emits an **ordered handle-cleanup pair**:
+
+```clojure
+[{:effect/type :runtime/cancel-inflight-run :run-id requested-run-id}
+ {:effect/type :runtime/drop-inflight-run   :run-id requested-run-id}]
+```
+
+Within the terminal/absent cleanup branch where no canonical cancel transition
+applies, this pair is emitted for the **absent** case. (A terminal canonical record
+keeps the existing D24 drop-only cleanup: the live-run first pass is the path that
+cancels a top-level future before record removal.) The absent pair is not a cascade,
+emits no guarded `:runtime/agent-abort`, emits no job terminalization, and emits no
+re-entrant remove. It is runtime-handle cleanup for a possible stale **top-level**
+handle key. Because there is no canonical run record, the emitter cannot classify
+nested-vs-top-level by run tree; it simply treats the requested id as a possible
+direct `inflight-runs` key.
+`execute-effect! :runtime/cancel-inflight-run` already looks up exactly that key and
+no-ops when absent, so no nested parent worker is inferred or interrupted.
+
+**Ordering.** The pair order is mandatory: `:runtime/cancel-inflight-run` precedes
+`:runtime/drop-inflight-run` in the same dispatch effect vector. Thus a live stale
+future is interrupted before the handle entry is removed. If no handle exists, both
+effects no-op idempotently; if the handle exists but the future is already done or
+cancelled, cancellation is harmless and drop performs cleanup.
+
+**Public/result semantics.** The D29 absent-remove public result remains
+`success/idempotent no-op` (`:removed? false`, `:found? false`, `:noop? true`) because
+no canonical record was found/removed and no cancel transition was applied. `:noop?`
+does not mean no runtime cleanup effects emitted. Acceptance #10 targets this
+ordered pair so absent cleanup cannot orphan a live worker.
+
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
 The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
@@ -1920,7 +2017,8 @@ The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as
   in-flight child turn; contract is "no new side effects initiated after the cancel
   checkpoint."
 - **Q2 (child-session stop mechanism):** RESOLVED by D3 + D9 — reuse the existing
-  `:session/abort` session interrupt/abort pathway (compose > new mechanism).
+  guarded `:runtime/agent-abort` direct executor, reusing the same abort side-effect
+  mechanism that `:session/abort` emits (compose > new mechanism; D36).
 - **Q3 (`remove` semantics on a live run):** RESOLVED by D5 — cancel-then-remove.
 - **Q4 (synchronous `execute-run` boundary, pull vs push):** RESOLVED by D2 + D7 +
   D8 — both: read-path status poll at each step boundary (pull) *plus*
@@ -2026,8 +2124,10 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
     success/no-op without cancellation effects; live remove returns successful
     cancel-then-remove; terminal remove drops the record without cancellation
     effects; absent remove returns success/idempotent no-op (`:removed? false`,
-    `:found? false`, `:noop? true`) while still emitting only the idempotent D24
-    `:runtime/drop-inflight-run` cleanup to clear a possible orphaned handle (D34).
+    `:found? false`, `:noop? true`) while still emitting only the idempotent D36b
+    ordered handle-cleanup pair (`:runtime/cancel-inflight-run` before
+    `:runtime/drop-inflight-run`) to stop and clear a possible orphaned top-level
+    handle (D34/D36b).
 
 ### Build gates
 

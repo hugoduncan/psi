@@ -1809,3 +1809,21 @@ Two new actionable contradictions found; neither duplicates existing
    clean), the design currently drops the only handle without first emitting D35
    `:runtime/cancel-inflight-run`, recreating the Evidence-step-3 orphaning failure.
 
+
+## Inconsistency follow-up resolution (ψ pass 18, 2026-06-11)
+
+Executed both newly added pass-18 design follow-ups; no blockers.
+
+- Resolved child-session abort ownership as D36: workflow cancellation reuses the
+  existing `:runtime/agent-abort` effect as the **direct** abort-side-effect
+  executor with the D28/D33 guarded payload. It does not dispatch a follow-on
+  `:session/abort`; `:session/abort` remains the public/statechart event that emits
+  the same effect. Updated D3/D9/D12/D15/D28/D33 wording and Q2 resolution.
+- Resolved absent `remove-run` stale-handle cleanup as D36b: absent remove emits an
+  ordered handle-cleanup pair (`:runtime/cancel-inflight-run` before
+  `:runtime/drop-inflight-run`) for the requested run id, so a stale live
+  `inflight-runs` future is interrupted before the handle is dropped. Public D29
+  no-op semantics remain canonical-record semantics (`:noop?` ≠ no effects).
+
+Acceptance #10 and related D24/D26/D29/D34/D35 wording now reflect the no-orphan
+cleanup ordering.

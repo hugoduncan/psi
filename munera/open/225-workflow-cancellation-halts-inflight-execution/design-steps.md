@@ -784,7 +784,7 @@
 
 ## Inconsistency follow-ups (ψ pass 18, 2026-06-11)
 
-- [ ] Reconcile the child-session abort path with the existing `:runtime/agent-abort`
+- [x] Reconcile the child-session abort path with the existing `:runtime/agent-abort`
       executor. D3/D9 say the workflow-cancellation abort effect handler invokes the
       agent-session `:session/abort` dispatch authority, and D9 claims the existing
       `:runtime/agent-abort` effect already drives that path. Code shows the inverse:
@@ -795,7 +795,14 @@
       (updating D3/D9 to stop claiming a `:session/abort` dispatch), or (b) a guarded
       follow-on `:session/abort` dispatch path with explicit recursion/guard handling.
       Align D3/D9/D12/D15/D28/D33 and the effect-schema/executor/test implications.
-- [ ] Reconcile absent `remove-run` cleanup with the drop-after-cancel / no-orphan
+      → design.md D36: option (a). Workflow cancellation emits the D28/D33 guarded
+      `:runtime/agent-abort` effect and its `execute-effect!` directly performs the
+      existing abort side effects after the guarded live-attempt re-read. It does not
+      dispatch a follow-on `:session/abort`; `:session/abort` remains the public /
+      statechart abort entry event that emits the same effect. D3/D9/D12/D15/D28/D33
+      aligned; "reuse `:session/abort`" now means reuse the abort side-effect
+      mechanism that event emits, not recursively dispatch it.
+- [x] Reconcile absent `remove-run` cleanup with the drop-after-cancel / no-orphan
       guarantee. D34 says absent `remove-run` emits `:runtime/drop-inflight-run` to
       clear a possible orphaned handle, while D29/D34 say absent remove emits no
       cancellation effects and D24 says handle drop happens after future cancel.
@@ -806,3 +813,11 @@
       atomically when a live future is present, or only drop when the handle is known
       absent/done/cancelled. Align D24/D26/D29/D34/D35 and Acceptance #10 so absent
       cleanup cannot orphan a live worker.
+      → design.md D36b: absent remove emits an ordered handle-cleanup pair —
+      `{:effect/type :runtime/cancel-inflight-run :run-id requested-run-id}` before
+      `{:effect/type :runtime/drop-inflight-run :run-id requested-run-id}`. This is
+      stale top-level-handle cleanup, not a canonical cancel/cascade; no guarded
+      `:runtime/agent-abort`, job terminalization, or re-entrant remove emits. The
+      public D29 no-op result is unchanged because no canonical record was removed
+      and no cancel transition applied. D24/D26/D29/D34/D35 and Acceptance #10 aligned
+      so a stale live handle is interrupted before being dropped.
