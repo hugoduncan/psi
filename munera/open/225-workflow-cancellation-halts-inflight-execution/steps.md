@@ -244,3 +244,7 @@
 
 - [x] Add a canonical live top-level remove regression that seeds `:workflow-inflight-runs-handle` with a real parked future, dispatches `:psi.workflow/remove-run`, and asserts the future is cancelled/interrupted and the inflight entry is dropped after the re-entrant remove; this should cover acceptance criterion #2 as an end-to-end remove-path behaviour, not only separate effect-vector/executor units.
   - Covered 2026-06-11: `workflow-cancellation-dispatch-test` parks a real future in the inflight handle, dispatches canonical live top-level remove, and asserts worker interruption/future cancellation plus re-entrant handle drop and canonical record removal.
+
+## Test review follow-ups (ψ pass 2, 2026-06-11)
+
+- [ ] Replace the `with-redefs` of `memory-runtime/recover-for-query!` in `prompt_lifecycle_workflow_cancellation_test.clj` with mock-free/injectable/nullable coverage for the post-prepare cancellation regression, preserving the assertion that workflow-guarded memory recovery performs no ordinary work after D31.

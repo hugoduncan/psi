@@ -3289,3 +3289,11 @@ Completed the newly added follow-ups from the preceding review pass.
 Verification: focused cancellation namespaces green (19 tests / 125 assertions),
 adjacent journal/prompt lifecycle namespaces green (30 tests / 132 assertions), focused
 clj-kondo clean.
+
+## Test review (ψ pass 2, 2026-06-11)
+
+Reviewed the current task test net against `task-test-review` after the live top-level remove regression was added. Behaviour coverage is now broad, including the original orphaned-worker composition path and stale nested-dispatch pure-result windows.
+
+New actionable issue: `prompt_lifecycle_workflow_cancellation_test.clj` still uses `with-redefs` to replace `memory-runtime/recover-for-query!` in the post-prepare cancellation regression. That is a global mock of an infrastructure dependency, which violates the task-test-review constraint that infra deps be injectable/nullable and not mocked/stubbed. Replace that assertion path with a mock-free seam or real nullable observable while preserving the guarantee that workflow-guarded memory recovery does not execute after D31.
+
+No tests run (review-only pass).
