@@ -2773,3 +2773,25 @@ Validation:
 - `bb clojure:test:scry --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-cancellation-test --namespace psi.agent-session.workflow-judge-test` → 37 tests / 165 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-invoke-runtime-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.terminal-contract-execution-test` → 31 tests / 166 assertions green.
 - Focused `clj-kondo --lint` over changed cancellation source/test files → clean.
+
+## Implementation review (ψ pass 12, 2026-06-11)
+
+Reviewed the pass-11 start protocol against `task-implementation-review`, D6/D30/D31,
+`turn_execution_contract.clj`, `deterministic_operation_runtime/core.clj`, and the
+workflow-cancellation regressions. The reservation→start CAS split prevents a cancel
+that lands before the second CAS from starting ordinary work, but one race remains.
+
+New actionable issue: the second CAS marks `:turn-start-state` / `:operation-start-state`
+`:started`, then the code calls the prompt adapter / operation handler outside that CAS.
+If the D31 cancel CAS lands after the start-commit CAS but before the adapter/handler
+call, the ordinary work can still be initiated after cancellation. For actor/judge
+turns the guarded abort effect may execute while the child session is still idle, so it
+leaves no durable stop marker; the later `prompt-dispatch!` call can still start the
+turn. For deterministic operations there is no abort path at all, so the handler can
+run after the cancel checkpoint. Follow-up should close the start-commit→ordinary-call
+window by making cancellation observe and durably block/abort a committed-but-not-yet-
+called start, or by moving the actual call under a cancellation-safe runtime boundary
+that re-checks after any concurrent cancel effects. Add regressions for cancel after a
+successful `:started` commit but before actor, judge, and invoke calls.
+
+No tests run (review-only pass).
