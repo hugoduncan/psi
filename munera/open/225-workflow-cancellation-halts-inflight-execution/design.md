@@ -1942,14 +1942,23 @@ The canonical worker-future-cancel effect shape is exactly:
 - **Required payload keys:** `:effect/type` and `:run-id` only. `:run-id` is the
   string workflow run id of the **top-level run that owns the `inflight-runs`
   entry**.
-- **Emitter responsibility:** for canonical cancellation of an existing run, emitters
-  compute whether the directly-cancelled run is top-level. If it is top-level, they
-  emit this effect with that top-level run id; if it is a nested sub-run directly
-  cancelled/removed, they emit **no** worker cancel effect (D14/D19/D21). The effect
-  payload never carries a nested sub-run id for an existing nested run. The only
-  exception is the D36b absent-remove stale-handle cleanup: with no canonical run
-  record to classify, it may emit this effect for the requested run id as a direct
-  possible `inflight-runs` handle key before dropping that handle.
+- **Emitter responsibility:** distinguish **canonical cancellation emissions** from
+  **runtime-handle cleanup emissions**:
+  - **Canonical cancellation/cascade emissions** (top-level cancel or the first,
+    live-cancel half of top-level `remove-run`) compute whether the directly
+    cancelled existing run is top-level. If it is top-level, they emit this effect
+    with that top-level run id; if it is a nested sub-run directly
+    cancelled/removed, they emit **no** worker cancel effect (D14/D19/D21). The
+    canonical-cancellation payload never carries a nested sub-run id.
+  - **Runtime-handle cleanup emissions** do **not** apply a canonical cancel
+    transition, do **not** cascade, and do **not** infer a parent/top-level worker
+    from a nested canonical record. They may emit this effect before
+    `:runtime/drop-inflight-run` only for the no-orphan cleanup cases: D38
+    already-terminal **top-level** `remove-run`, and D36b absent-remove stale-handle
+    cleanup. Terminal **nested** remove emits no worker cancel effect and may only
+    exact-key drop; absent remove has no canonical record to classify, so it treats
+    the requested id only as a possible direct `inflight-runs` key and relies on the
+    executor's exact-key no-op when no such handle exists.
 - **Executor target semantics:** `execute-effect!` reads the D25 ctx-injected
   `:workflow-inflight-runs-handle`, looks up exactly `(:run-id effect)`, and, when a
   `:future` exists, calls Clojure `future-cancel` on it (interrupting the worker,
@@ -1968,8 +1977,10 @@ The canonical worker-future-cancel effect shape is exactly:
   should not depend on more than `:found?`/`:cancelled?` unless the implementation
   chooses to expose more.
 - **Test implication:** tests assert this exact effect shape for top-level cancel /
-  live top-level remove and assert it is absent for direct nested sub-run
-  cancel/remove.
+  live top-level remove, for terminal top-level remove cleanup (D38), and for absent
+  remove stale-handle cleanup (D36b). Tests assert it is absent for direct nested
+  sub-run cancel/remove and for terminal nested-sub-run remove (which must not infer
+  or interrupt a parent/top-level worker).
 
 This pins the representation that D12 previously described only generically as a
 canonical `:runtime/*` effect, aligns D14's target semantics, gives D18/D23 a

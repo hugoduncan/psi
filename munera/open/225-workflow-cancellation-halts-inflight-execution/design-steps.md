@@ -946,7 +946,7 @@
 
 ## Inconsistency follow-ups (ψ pass 33, 2026-06-11)
 
-- [ ] Reconcile D35's worker-future-cancel emitter/test wording with D38 terminal
+- [x] Reconcile D35's worker-future-cancel emitter/test wording with D38 terminal
       top-level remove cleanup. D38 requires already-terminal **top-level**
       `remove-run` cleanup to emit the ordered runtime-handle pair
       `:runtime/cancel-inflight-run` before `:runtime/drop-inflight-run`, but D35
@@ -957,3 +957,9 @@
       runtime-handle cleanup emissions, include D38 terminal top-level remove as an
       allowed cleanup emitter, and keep the direct/terminal nested-sub-run rule that
       no parent/top-level worker is inferred or interrupted.
+      → design.md D35 now splits canonical cancellation/cascade emissions from
+      runtime-handle cleanup emissions. Canonical cancellation emits
+      `:runtime/cancel-inflight-run` only for top-level cancel/live top-level remove;
+      cleanup may also emit it for D38 terminal top-level remove and D36b absent
+      remove before `:runtime/drop-inflight-run`. Direct/terminal nested-sub-run
+      remove remains no-worker-cancel / no parent inference (exact-key drop only).
