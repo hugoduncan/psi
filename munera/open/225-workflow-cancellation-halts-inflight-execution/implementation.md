@@ -2868,3 +2868,11 @@ scry run for the call-start, broader statechart cancellation, judge cancellation
 deterministic-operation runtime, and turn-execution-contract namespaces passed (29
 tests / 122 assertions). Focused clj-kondo over touched source/test files passed
 with 0 warnings.
+
+## Implementation review (ψ pass 15, 2026-06-11)
+
+Reviewed the pass-14 post-call-commit changes against `task-implementation-review`, D6/D30/D31, `turn_execution_contract.clj`, `deterministic_operation_runtime/core.clj`, and the call-start cancellation regressions. The added post-hook stop read improves the tested window but does not provide a cancellation-safe boundary.
+
+New actionable issue: actor/judge turn starts and deterministic-operation starts still end with a check-then-call race. After `workflow-session-stop-signal-for` / `workflow-stop-signal` returns nil, a D31 cancel CAS can still land before `execution-adapter/prompt-execution-result!` or the operation handler is entered, initiating ordinary prompt-submit/journal/tool-capable work or operation work after the cancel checkpoint. This repeats the same TOCTOU pattern at the final read → call edge; without a durable mutual-exclusion/linearization protocol consumed by cancellation, another stop read cannot prove the D31 guarantee. Follow-up should make the final ordinary-call entry itself cancellation-safe (or explicitly weaken the design contract) and add a deterministic race regression for cancellation between the final stop read and actor, judge, and invoke handler entry.
+
+No tests run (review-only pass).
