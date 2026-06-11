@@ -1713,3 +1713,23 @@ were completable now; no blockers.
   `:expected-session-id`). The stale bare `{:effect/type :runtime/agent-abort
   :session-id sid}` workflow-cancel example is removed; session-id-only aborts are
   explicitly reserved for unguarded non-workflow emissions.
+
+## Architecture-fit review (ψ pass 16, 2026-06-11)
+
+Reviewed `design.md` for architectural fit only, against AGENTS.md VSM/principles,
+META.md managed-service/ctx guidance, and doc/architecture.md state-boundary,
+dispatch sequencing, replay-trim, and dispatch-trace contracts. Did not review
+`plan.md` or `steps.md`.
+
+No new actionable architectural-fit misfit found.
+
+The current D1–D34 design remains aligned: cancellation and cleanup side effects
+are canonical dispatch `:runtime/*` effects with schema/executor parity and replay
+trimming; cancellation signal vs runtime handles stay split across `:state*` and
+ctx-reached handles; the cascade is a dispatch-owned multi-run root-state update
+rather than command-layer recursion/reach-in; cancel-then-remove uses the existing
+effects-as-data/re-entrant-dispatch boundary only for the apply-before-effects
+ordering case; guarded workflow aborts reuse `:runtime/agent-abort` without
+breaking unguarded aborts; direct nested sub-run cancel/remove preserves parent
+continuation via existing delegate failure semantics. No new `design-steps.md`
+follow-up item added.
