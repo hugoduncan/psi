@@ -2277,3 +2277,15 @@ Executed the newly added plan/steps inconsistency follow-up. Updated `plan.md` k
 - Absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`) per D29/D34/D36b.
 
 Marked the follow-up complete in `steps.md`. No code/tests/docs changes were required because the item was a planning-artifact reconciliation.
+
+## Plan/steps ambiguity review (ψ pass 2, 2026-06-11)
+
+Reviewed current `plan.md` and `steps.md` against `design.md` D1–D38, prior
+plan/steps review notes, acceptance criteria, and referenced workflow dispatch /
+effect / runtime-handle code. No new actionable plan/steps ambiguity found.
+
+The current plan/steps now give single-interpretation implementation guidance for
+canonical cancel/remove event routing, effect payloads and ordering, top-level vs
+nested runtime-handle cleanup, guarded child aborts, cooperative stop checkpoints,
+public result contracts, and acceptance-test coverage. No new unchecked follow-up
+items were added to `steps.md`.
