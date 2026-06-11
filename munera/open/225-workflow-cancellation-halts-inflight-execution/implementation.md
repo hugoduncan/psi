@@ -2231,3 +2231,9 @@ limited to top-level cancel/live top-level remove; runtime-handle cleanup may em
 cleanup before drop; terminal nested-sub-run cleanup remains no-worker-cancel / no
 parent inference. Existing Scope, D24/D26/D29/D36b/D38, and Acceptance #8/#10 are
 aligned with that split. No new `design-steps.md` follow-up item added.
+
+## Inconsistency review (ψ pass 36, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-referenced-artifact inconsistency after the pass-35 ambiguity review. Consulted Scope, Intent, D1–D38, Acceptance Criteria, and referenced dispatch/effect/runtime code where needed. Did not review task `plan.md` or `steps.md`.
+
+No new actionable inconsistency found. The current design is internally aligned on state-kernel event ownership, effect payloads and ordering, top-level vs nested run cleanup, guarded abort semantics, terminal/absent result semantics, idempotency, and the D23/D31 cascade-set guarantee with the D27 bounded exception. No new `design-steps.md` follow-up item added.
