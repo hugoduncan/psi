@@ -79,17 +79,17 @@
   (when (stopped?)
     (throw (workflow-stopped-ex message data))))
 
-(defn- maybe-call-judge-start-hook!
-  [ctx judge-sid stop-data]
+(defn- call-judge-start-hook!
+  [ctx judge-sid stop-data phase]
   (when-let [f (:before-workflow-judge-start-fn ctx)]
-    (f ctx judge-sid stop-data)))
+    (f ctx judge-sid (assoc stop-data :phase phase))))
 
 (defn- execute-judge-turn-if-live!
   [ctx judge-sid prompt opts stopped? stop-data]
   (assert-workflow-live! stopped?
                          "Workflow execution stopped before judge turn"
                          stop-data)
-  (maybe-call-judge-start-hook! ctx judge-sid stop-data)
+  (call-judge-start-hook! ctx judge-sid stop-data :before-turn)
   (assert-workflow-live! stopped?
                          "Workflow execution stopped before judge turn"
                          stop-data)

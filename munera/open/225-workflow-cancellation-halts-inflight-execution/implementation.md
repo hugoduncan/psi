@@ -2744,3 +2744,32 @@ Reviewed the pass-10 start-reservation implementation against `task-implementati
 New actionable issue: `:turn-started-at` / `:operation-started-at` reservation is still not atomic with the ordinary side-effecting call. Actor/judge turn execution and deterministic operation invocation CAS-mark the latest attempt, then call the prompt adapter / operation handler. A D31 cancel CAS can still land after the reservation CAS but before that call, so the prompt adapter or operation handler can initiate ordinary work after the cancel checkpoint. The current regressions force cancellation before reservation, not in the post-reservation→call window. Follow-up should make reservation and crossing into ordinary work mutually ordered with cancellation (or otherwise make cancel observe/close the reservation as an already-started in-flight unit) and add actor, judge, and invoke regressions for cancellation after a successful start reservation but before the adapter/handler call.
 
 No tests run (review-only pass).
+
+## Implementation follow-up pass 11 (ψ, 2026-06-11)
+
+Executed the pass-11 post-reservation cancellation follow-up. Actor/judge turn
+starts and deterministic-operation starts now split "reserved" from "started":
+
+- the first CAS marks the latest live attempt `:turn-start-state :reserved` or
+  `:operation-start-state :reserved` with a reservation timestamp;
+- the review/test hook can force cancellation in the post-reservation window;
+- a second CAS is the actual ordinary-start linearization point. It re-reads the
+  canonical run and attempt, refuses `:cancelled`/removed/mismatched attempts, and
+  only then marks `:turn-start-state :started` / `:operation-start-state :started`
+  plus the started timestamp/count before crossing into the prompt adapter or
+  operation handler.
+
+If cancellation wins after reservation but before this start-commit CAS, the
+adapter/handler is not called and callers receive the existing workflow-stopped
+result/exception path. Judge coverage uses the real turn-execution boundary (not a
+redefined `execute-judge-turn!`) so it exercises the same actor/judge reservation
+and start-commit protocol.
+
+Added regressions for actor, judge, and invoke cancellation after a successful
+start reservation but before adapter/handler call.
+
+Validation:
+
+- `bb clojure:test:scry --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-cancellation-test --namespace psi.agent-session.workflow-judge-test` → 37 tests / 165 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-invoke-runtime-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.terminal-contract-execution-test` → 31 tests / 166 assertions green.
+- Focused `clj-kondo --lint` over changed cancellation source/test files → clean.
