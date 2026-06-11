@@ -112,3 +112,8 @@
 ## Plan/steps inconsistency follow-ups (ψ, 2026-06-11)
 
 - [x] Reconcile `plan.md`'s `remove-run` terminal/absent wording with D29/D34/D36b and Slice 3 steps: terminal remove drops an existing canonical record, while absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`).
+
+## Implementation review follow-ups (ψ, 2026-06-11)
+
+- [ ] Make workflow step-entry advancement writes cancellation-safe: the `:step/enter` attempt append/start update must re-check run presence/`:cancelled` inside the `swap!` update fn (or equivalent CAS-safe helper) so a cancel racing after the pre-check cannot resurrect the run to `:running` or record a post-D31 attempt; add a regression test for cancel between the pre-check and attempt-start write.
+- [ ] Make delegate sub-run creation cancellation-safe: replace `delegate-step-runtime-result`'s parent pre-check + stale-state `create-run` + `reset!` with a guarded update that re-checks the parent run inside the state update before adding the child run, preserving the parent `:cancelled` state and creating no delegated sub-run after the D31 checkpoint; add a regression test for cancel racing between delegate pre-check and child-run creation.

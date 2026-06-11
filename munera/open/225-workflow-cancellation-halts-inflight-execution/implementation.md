@@ -2391,3 +2391,14 @@ Verification this pass:
 - `bb test` → green.
 
 All checklist items in `steps.md` are now complete. Implementation appears ready for review; no further concrete implementation work is known from the task artifacts.
+
+## Implementation review (ψ, 2026-06-11)
+
+Reviewed implementation against `task-implementation-review` skill, task design/plan/steps, changed workflow cancellation code/tests/docs, and focused verification. The dispatch/effect boundary, guarded abort payloads, top-level vs nested cleanup split, delegate removed-run mapping, and background-job terminalization generally match D1–D38.
+
+New actionable issue: ordinary workflow advancement still has unguarded stale-state writes that can race a D31 cancel checkpoint. In `statechart_runtime.clj`, `:step/enter` checks `workflow-stopped?` before attempt setup, but then unconditionally appends/starts the attempt in a later `swap!`; if cancel commits between the pre-check and that `swap!`, `start-latest-attempt` can rewrite a `:cancelled` run back to `:running` and record a post-checkpoint attempt. In `delegate.clj`, delegated sub-run creation has the same shape: parent stop pre-check, `create-run` on a stale `@state*`, then `reset!`, which can overwrite a concurrent parent cancel and create a sub-run after the checkpoint. These are implementation-level no-resurrection / no-post-checkpoint-advancement gaps; focused scry and lint run during review stayed green, so follow-up is required rather than immediate test failure.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-async-path-test` → 29 tests / 155 assertions green.
+- Focused `clj-kondo --lint` over changed workflow cancellation source files → clean.
