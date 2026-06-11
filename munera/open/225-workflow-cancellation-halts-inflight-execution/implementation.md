@@ -2363,3 +2363,31 @@ Verification:
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/dispatch_handlers/workflows.clj components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/delegate.clj components/agent-session/test/psi/agent_session/workflow_cancellation_dispatch_test.clj` → clean.
 
 Remaining concrete work: cooperative execution checkpoints / interrupt-aware waits and full direct nested cancel/remove parent-continuation acceptance coverage remain unchecked in `steps.md`.
+
+## Implementation pass — cancellation acceptance coverage closure (ψ, 2026-06-11)
+
+Closed the remaining cancellation acceptance-test gaps without changing production
+code. Added state-based, mock-free coverage for: direct nested sub-run cancel
+(no worker cancel, guarded child abort, child `:cancelled`, parent remains
+`:running`, delegate result maps to failed-step semantics); direct live nested
+sub-run remove (guarded child abort, re-entrant record drop, no worker cancel,
+parent remains `:running`, run-absence already maps to cancelled/removed failure);
+cancel-without-remove and live remove background-job terminalization as
+`:cancelled`; and a real-future top-level worker wake-up check showing
+`:runtime/cancel-inflight-run` interrupts a parked worker future before cancelled
+job terminalization.
+
+Out-of-test-scope criteria 9/9a remain intentionally covered by construction notes:
+D22.2's true-concurrent duplicate-effect race relies on execute-time idempotency
+(guarded abort liveness re-check, idempotent future cancel / terminalize / cleanup),
+and D27's direct-sub-run post-enumeration spawn window is the explicitly bounded
+true-concurrency exception. No deterministic test was added for those races.
+
+Verification this pass:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-async-path-test --namespace psi.agent-session.workflow-execution-terminal-contract-test` → 14 tests / 82 assertions green.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_cancellation_dispatch_test.clj components/agent-session/test/psi/agent_session/workflow_async_path_test.clj` → clean.
+- `clj-kondo --lint components` → errors 0 / warnings 0; existing info-level findings outside this pass remain.
+- `bb test` → green.
+
+All checklist items in `steps.md` are now complete. Implementation appears ready for review; no further concrete implementation work is known from the task artifacts.

@@ -54,45 +54,55 @@
   - Covered 2026-06-11: top-level `execute-run!`/resume catches `InterruptedException`, clears interrupted status, and reports the current canonical run result; lifecycle checkpoints also stop on canonical `:cancelled`/absence.
 - [x] Ensure a stopped run exits without starting further ordinary workflow advancement while leaving cancellation-control effects/writes allowed.
 - [x] Add controlled tests that record the D31 cancel checkpoint and assert no step attempt/session/sub-run starts after it for a cancelled top-level run.
-- [ ] Add a test showing a top-level worker parked in a wait is woken by `future-cancel(true)` and terminates cleanly.
+- [x] Add a test showing a top-level worker parked in a wait is woken by `future-cancel(true)` and terminates cleanly.
+  - Covered 2026-06-11: `workflow-async-path-test` uses a real parked future plus the canonical `:runtime/cancel-inflight-run` effect and asserts interruption/cancellation plus cancelled job terminalization.
 
 ## Slice 5 — Delegate result and nested-run semantics
 
 - [x] Update `delegate-step-runtime-result` so a missing delegate run maps to the same failed-step result as `:cancelled` (message may say cancelled or removed).
 - [x] Keep present non-terminal delegate statuses on the existing anomaly/default path; only run absence is folded into cancelled semantics.
-- [ ] Add a direct nested sub-run cancel test proving no `:runtime/cancel-inflight-run` worker effect is emitted, the child attempt is aborted, the sub-run reaches `:cancelled`, and the parent continues via a failed delegate step.
-- [ ] Add a direct live nested sub-run remove test proving cancel-then-remove drops the sub-run record, run absence maps to cancelled failure, and the parent continues.
+- [x] Add a direct nested sub-run cancel test proving no `:runtime/cancel-inflight-run` worker effect is emitted, the child attempt is aborted, the sub-run reaches `:cancelled`, and the parent continues via a failed delegate step.
+  - Covered 2026-06-11: dispatch test asserts no worker cancel + guarded child abort + parent still `:running`; delegate-result test asserts a directly cancelled child maps to failed delegate-step semantics while the parent remains running.
+- [x] Add a direct live nested sub-run remove test proving cancel-then-remove drops the sub-run record, run absence maps to cancelled failure, and the parent continues.
+  - Covered 2026-06-11: dispatch test asserts live nested remove emits guarded child abort and re-entrant record-drop with no worker cancel, leaves parent `:running`, and existing removed-run delegate-result test covers run-absence ⇒ cancelled/removed failure.
 - [x] Add a top-down parent cancel test proving descendant cascade-set runs reach `:cancelled`, guarded child aborts target `:execution-session-id`, and only the single top-level worker cancel effect is emitted.
 
 ## Slice 6 — Background job terminalization and public-surface cleanup
 
 - [x] Extend `maybe-mark-workflow-jobs-terminal!` (or its workflow status predicate) so `:cancelled` runs terminalize background jobs with `:outcome :cancelled`.
-- [ ] Add tests proving cancel-without-remove terminalizes the job as cancelled while the run record remains present.
-- [ ] Add tests proving live remove terminalizes the job before the re-entrant remove drops the run record.
+- [x] Add tests proving cancel-without-remove terminalizes the job as cancelled while the run record remains present.
+  - Covered 2026-06-11: cancellation dispatch test seeds a workflow background job, dispatches cancel, and asserts job `:cancelled` + canonical run still present as `:cancelled`.
+- [x] Add tests proving live remove terminalizes the job before the re-entrant remove drops the run record.
+  - Covered 2026-06-11: live remove dispatch test asserts the job is `:cancelled` even though the re-entrant remove has dropped the canonical run record.
 - [x] Remove or reroute any remaining command-layer or mutation-layer cancel/remove side effects: direct `inflight-runs` cleanup and the current `delegate remove` active-background-job cleanup (`cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!`) must be removed/routed through canonical `:psi.workflow/remove-run` dispatch/effects, or any retained pre-remove cleanup must be explicitly documented as not being a cancellation/remove side effect.
 - [x] Document the existing re-entrant `:runtime/dispatch-event` sequencing in `doc/architecture.md` dispatch sequencing/runtime effects guidance.
 - [x] Add a CHANGELOG `[Unreleased]` entry for the user-visible fix: cancelling/removing delegated workflows now stops in-flight execution and avoids orphaned workflow workers.
 
 ## Slice 7 — Acceptance test net and gates
 
-- [ ] Add or update tests for acceptance criterion 1: top-level cancel stops post-checkpoint attempts and reaches cancelled terminal state with terminal job.
-  - Partial 2026-06-11: controlled top-level execution test proves post-checkpoint step attempts/results stop and the run remains `:cancelled`; terminal-job assertion still remains for Slice 6/acceptance closure.
+- [x] Add or update tests for acceptance criterion 1: top-level cancel stops post-checkpoint attempts and reaches cancelled terminal state with terminal job.
+  - Covered 2026-06-11: controlled top-level execution test proves post-checkpoint step attempts/results stop and the run remains `:cancelled`; cancellation dispatch/async-path tests assert cancelled background-job terminalization.
 - [x] Add or update tests for acceptance criterion 2: live top-level remove cancels the top-level future and drops the handle via effects.
 - [x] Add or update tests for acceptance criterion 3: no forbidden ordinary workflow side effects are initiated after the D31 checkpoint in a nullable/controlled harness.
   - Covered 2026-06-11: a nullable workflow execution harness cancels during the first child turn and asserts no second child session/attempt starts and no late actor result is recorded after the checkpoint.
 - [x] Add or update tests for acceptance criterion 4: top-down nested propagation uses guarded child aborts and one top-level future cancel only.
   - Covered 2026-06-11: parent cancel cascades `:cancelled` to live descendants, emits guarded aborts for cascade-set live attempts, skips terminal descendants, and emits exactly one top-level worker cancel.
-- [ ] Add or update tests for acceptance criterion 5: live nested remove aborts child turn, emits no worker cancel, and parent continues.
-- [ ] Add or update tests for acceptance criterion 6: direct nested cancel produces failed delegate-step semantics and parent continuation.
+- [x] Add or update tests for acceptance criterion 5: live nested remove aborts child turn, emits no worker cancel, and parent continues.
+  - Covered 2026-06-11: direct live nested remove dispatch test asserts guarded abort, no worker cancel, record drop, and parent `:running`; removed-run delegate result covers the parent failed-step continuation input.
+- [x] Add or update tests for acceptance criterion 6: direct nested cancel produces failed delegate-step semantics and parent continuation.
+  - Covered 2026-06-11: direct nested cancel dispatch test asserts parent survives and child is `:cancelled`; delegate result test asserts cancelled child ⇒ failed delegate-step semantics.
 - [x] Add or update tests for acceptance criterion 7: removed/absent delegate run maps to cancelled failed-step result.
 - [x] Add or update tests for acceptance criterion 8: sequential terminal requests emit no canonical cancellation/cascade effects while terminal remove still removes records/cleans handles.
 - [x] Add or update tests for acceptance criterion 10: D29 public result contracts and ordered handle cleanup for terminal/absent remove.
-- [ ] Add comments or review notes covering out-of-test-scope criteria 9 and 9a, tying the code to D22.2 and D27.
+- [x] Add comments or review notes covering out-of-test-scope criteria 9 and 9a, tying the code to D22.2 and D27.
+  - Covered 2026-06-11 in `implementation.md`: D22.2 concurrent duplicate-effect idempotency and D27 direct-sub-run post-enumeration spawn race remain construction-review items rather than deterministic tests.
 - [x] Run focused workflow-runtime tests affected by cooperative checkpoints and delegate result semantics.
 - [x] Run focused agent-session dispatch/effect/mutation/workflow tests affected by cancel/remove routing and effects.
-- [ ] Run `bb test`.
+- [x] Run `bb test`.
+  - Passed 2026-06-11 after focused cancellation/async-path additions.
 - [x] Run `clj-kondo --lint components` (or the project-standard lint target if narrower/faster lint tasks are available).
-- [ ] Fix any failing tests or lint findings without weakening the cancellation contract.
+- [x] Fix any failing tests or lint findings without weakening the cancellation contract.
+  - No failing focused/full tests or focused lint findings remained in this pass.
 
 ## Plan/steps ambiguity follow-ups (ψ, 2026-06-11)
 
