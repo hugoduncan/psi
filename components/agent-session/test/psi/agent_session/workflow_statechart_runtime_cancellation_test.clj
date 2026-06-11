@@ -346,6 +346,70 @@
       (is (nil? (:judge-session-id review-attempt)))
       (is (not= :iteration-limit-reached (get-in run [:terminal-outcome :reason]))))))
 
+(deftest ranked-model-fallback-rechecks-cancellation-before-next-candidate-test
+  ;; Regression for task 225 implementation review pass 5: cancellation after a
+  ;; fallback-worthy actor failure must not start another ordinary actor turn for
+  ;; the next ranked model candidate.
+  (let [[ctx session-id] (create-session-context)
+        definition {:definition-id "ranked-fallback-cancel"
+                    :steps [{:name "plan"
+                             :type :session
+                             :model {:type :model-query
+                                     :require [{:criterion :supports-text :match :true}]}
+                             :contributions [{:type :template
+                                              :text "Plan {{input}}"
+                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+        _ (install-run! ctx definition "run-ranked-fallback-cancel")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-ranked-fallback-cancel")
+        turn-count* (atom 0)
+        model-calls* (atom [])]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id opts]
+                    {:attempt {:attempt-id (:attempt-id opts)
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"
+                                         :model (:model opts)
+                                         :model-fallback {:type :ranked-model-candidates
+                                                          :candidates [{:provider "local" :id "first"}
+                                                                       {:provider "openai" :id "second"}]}}})
+                  psi.workflow-runtime.execution-adapter/set-session-model!
+                  (fn [_ctx _sid model scope]
+                    (swap! model-calls* conj {:model model :scope scope})
+                    {:ok true})
+                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
+                  (fn [& _]
+                    (swap! turn-count* inc)
+                    (swap! (:state* ctx)
+                           (fn [state]
+                             (-> state
+                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :status] :cancelled)
+                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :finished-at] (java.time.Instant/now))
+                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :terminal-outcome]
+                                           {:outcome :cancelled
+                                            :reason "fallback race"
+                                            :step-id "plan"}))))
+                    {:status :error
+                     :session-id "plan-child"
+                     :assistant-message {:role "assistant"
+                                         :error-message "Connection refused"
+                                         :content [{:type :error :text "Connection refused"}]}
+                     :assistant-text ""
+                     :execution-result {}
+                     :failure {:reason :provider-unavailable
+                               :message "Connection refused"
+                               :fallback-worthy? true}})]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ranked-fallback-cancel")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 1 @turn-count*)
+          "cancellation between ranked candidates must prevent the fallback turn")
+      (is (= [] @model-calls*)
+          "the next candidate model must not be selected after cancellation")
+      (is (= :running (:status attempt))
+          "late fallback failure must not be recorded after cancellation"))))
+
 (deftest cancel-during-judged-step-judge-turn-does-not-record-judge-output-test
   ;; Regression for task 225 implementation review pass 2: cancellation during a
   ;; judged step's judge turn must stop before ordinary judge output is queued or

@@ -89,9 +89,20 @@
    :message "Workflow model-query candidates exhausted"
    :candidate-failures candidate-failures})
 
+(defn- stopped-execution-result
+  [execution-session]
+  {:status :error
+   :session-id (:session-id execution-session)
+   :assistant-message nil
+   :assistant-text ""
+   :execution-result nil
+   :failure {:reason :workflow-stopped
+             :message "Workflow execution stopped before model fallback turn"}})
+
 (defn- execute-with-ranked-fallback!
-  [ctx execution-session prompt opts]
-  (let [initial-candidates (vec (fallback-candidates execution-session))]
+  [ctx execution-session prompt opts stopped?]
+  (let [initial-candidates (vec (fallback-candidates execution-session))
+        stopped? (or stopped? (constantly false))]
     (if-not (seq initial-candidates)
       {:status :error
        :session-id (:session-id execution-session)
@@ -103,35 +114,37 @@
              candidate-failures []
              current-session execution-session
              first-candidate? true]
-        (let [model (first remaining)
-              current-session (if first-candidate?
-                                (assoc current-session :model model)
-                                (attempts/set-execution-session-model! ctx current-session model))
-              result (if opts
-                       (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt opts)
-                       (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt))]
-          (cond
-            (= :ok (:status result))
-            result
+        (if (and (not first-candidate?) (stopped?))
+          (stopped-execution-result current-session)
+          (let [model (first remaining)
+                current-session (if first-candidate?
+                                  (assoc current-session :model model)
+                                  (attempts/set-execution-session-model! ctx current-session model))
+                result (if opts
+                         (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt opts)
+                         (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt))]
+            (cond
+              (= :ok (:status result))
+              result
 
-            (and (next remaining)
-                 (get-in result [:failure :fallback-worthy?]))
-            (recur (next remaining)
-                   (conj candidate-failures (candidate-failure model (:failure result)))
-                   current-session
-                   false)
+              (and (next remaining)
+                   (get-in result [:failure :fallback-worthy?]))
+              (recur (next remaining)
+                     (conj candidate-failures (candidate-failure model (:failure result)))
+                     current-session
+                     false)
 
-            :else
-            (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
-              {:status :error
-               :session-id (:session-id current-session)
-               :assistant-message (:assistant-message result)
-               :assistant-text (:assistant-text result)
-               :execution-result (:execution-result result)
-               :structured-output (:structured-output result)
-               :failure (if (get-in result [:failure :fallback-worthy?])
-                          (exhaustion-failure all-failures)
-                          (:failure result))})))))))
+              :else
+              (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
+                {:status :error
+                 :session-id (:session-id current-session)
+                 :assistant-message (:assistant-message result)
+                 :assistant-text (:assistant-text result)
+                 :execution-result (:execution-result result)
+                 :structured-output (:structured-output result)
+                 :failure (if (get-in result [:failure :fallback-worthy?])
+                            (exhaustion-failure all-failures)
+                            (:failure result))}))))))))
 
 (defn- structured-output-blocked-payload
   [reason message details outputs]
@@ -175,7 +188,7 @@
        (let [turn-opts (:opts request-result)
              {:keys [status assistant-text failure execution-result assistant-message structured-output]}
              (if (fallback-enabled? execution-session)
-               (execute-with-ranked-fallback! ctx execution-session prompt turn-opts)
+               (execute-with-ranked-fallback! ctx execution-session prompt turn-opts stopped?)
                (if turn-opts
                  (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt turn-opts)
                  (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)))]

@@ -2555,3 +2555,9 @@ structured-output judge retries and no-match judge retries can call
 check. These paths can initiate a new ordinary actor/judge turn after cancellation;
 follow-up should thread/check the stop predicate immediately before every fallback
 or judge retry turn and add regressions.
+
+## Implementation review follow-up pass 5 (ψ, 2026-06-11)
+
+Executed the two new pass-5 follow-ups. Ranked actor fallback now carries the workflow stop predicate into `execute-with-ranked-fallback!` and checks it before every non-initial candidate turn, so cancellation after a fallback-worthy failure returns control to `execute-session-step!`'s existing stopped path instead of installing the next candidate model or starting another actor turn. Judge execution now funnels initial and retry judge turns through a live-check helper; structured-output retry and no-match retry branches re-check immediately before invoking the retry turn and throw the existing `:workflow-stopped` exception on cancellation.
+
+Regression coverage added for cancellation between ranked fallback candidates, no-match judge retry attempts, and structured-output judge retry attempts. Focused Scry runs over the changed workflow cancellation/judge/statechart namespaces pass (27 tests / 122 assertions and 24 tests / 127 assertions), the three new regression vars pass (3 tests / 9 assertions), and focused clj-kondo over changed source/tests is clean.

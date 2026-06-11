@@ -9,6 +9,11 @@
 
 (def step-order ["step-1-plan" "step-2-build" "step-3-review"])
 
+(declare structured-judge-test-ctx
+         structured-review-judge-spec
+         structured-review-routing-table
+         structured-review-step-runs)
+
 (deftest execute-judge-aborts-created-session-when-attachment-loses-cancellation-race-test
   ;; Regression for task 225 implementation review pass 4: cancellation after
   ;; judge child-session creation but before guarded attachment must abort the
@@ -113,6 +118,70 @@
                  (first @created-sessions*)))
           (is (= 1 (count @prompts*)))
           (is (= "APPROVED or REVISE?" (:text (first @prompts*)))))))))
+
+(deftest execute-judge-rechecks-cancellation-before-no-match-retry-test
+  ;; Regression for task 225 implementation review pass 5: cancellation after a
+  ;; no-match judge response must not start another ordinary judge turn for the
+  ;; retry prompt.
+  (let [prompt-count* (atom 0)
+        stopped-calls* (atom 0)
+        ctx {workflow-execution-adapter/adapter-key
+             (workflow-execution-adapter/create
+              {:create-child-session! (fn [_ctx _parent opts]
+                                        {:psi.agent-session/session-id (:child-session-id opts)})})}
+        judge-spec {:prompt "APPROVED or REVISE?"
+                    :projection :none}
+        routing-table {"APPROVED" {:goto :next}}
+        step-runs {"step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx _sid _text]
+                    (swap! prompt-count* inc)
+                    {:status :ok
+                     :session-id "judge"
+                     :assistant-message {:role "assistant" :content [{:type :text :text "MAYBE"}]}
+                     :assistant-text "MAYBE"
+                     :execution-result {}})]
+      (let [ex (try
+                 (workflow-judge/execute-judge!
+                  ctx "parent-1" "actor-1" judge-spec routing-table
+                  {:current-step-id "step-3-review"
+                   :step-order step-order
+                   :step-runs step-runs
+                   :stopped? #(>= (swap! stopped-calls* inc) 5)})
+                 nil
+                 (catch clojure.lang.ExceptionInfo e e))]
+        (is (= :workflow-stopped (:reason (ex-data ex))))
+        (is (= 1 @prompt-count*)
+            "cancellation between no-match judge attempts must prevent the retry turn")))))
+
+(deftest execute-judge-rechecks-cancellation-before-structured-output-retry-test
+  ;; Regression for task 225 implementation review pass 5: cancellation after an
+  ;; invalid structured judge response must not start another ordinary judge turn
+  ;; for the structured-output retry prompt.
+  (let [prompt-count* (atom 0)
+        stopped-calls* (atom 0)]
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx _sid _text opts]
+                    (is (some? opts))
+                    (swap! prompt-count* inc)
+                    {:status :ok
+                     :session-id "judge"
+                     :assistant-text "APPROVED"})]
+      (let [ex (try
+                 (workflow-judge/execute-judge!
+                  (structured-judge-test-ctx) "parent-1" "actor-1"
+                  structured-review-judge-spec structured-review-routing-table
+                  {:current-step-id "step-3-review"
+                   :step-order step-order
+                   :step-runs structured-review-step-runs
+                   :stopped? #(>= (swap! stopped-calls* inc) 5)})
+                 nil
+                 (catch clojure.lang.ExceptionInfo e e))]
+        (is (= :workflow-stopped (:reason (ex-data ex))))
+        (is (= 1 @prompt-count*)
+            "cancellation between structured judge attempts must prevent the retry turn")))))
 
 (deftest execute-judge-retry-then-match-test
   (testing "judge retries on no-match then matches"
