@@ -2049,3 +2049,21 @@ wording:
   as D27.
 
 Marked the follow-up complete in `design-steps.md`. No blockers.
+
+## Architecture-fit review (ψ pass 28, 2026-06-11)
+
+Reviewed current `design.md` for architectural fit only after the pass-27 Intent
+reconciliation. Consulted AGENTS.md VSM/principles, META.md, and
+`doc/architecture.md` state-boundary, dispatch sequencing, replay-trim,
+dispatch-trace, and ctx-managed-service guidance. Did not review `plan.md` or
+`steps.md`.
+
+No new actionable architectural-fit feedback found. The design still fits the
+project architecture: canonical workflow cancellation/removal is owned by
+state-kernel events, public surfaces are adapters, cancellation state lives in
+`:state*`, runtime handles remain ctx-reached effect dependencies,
+cancellation/cleanup are canonical `:runtime/*` effects with schema/executor
+parity, replay/trace coverage is preserved, child abort reuses the existing guarded
+`:runtime/agent-abort` executor, and the D23 cascade-set/D31 checkpoint/D30
+control-effect boundary now aligns the top-level Intent with the refined
+cancellation contract. No new `design-steps.md` follow-up item added.
