@@ -3307,3 +3307,9 @@ Replaced the remaining `with-redefs` of `memory-runtime/recover-for-query!` in
 cancellation regression injects a nullable recorder through that seam and keeps the
 state-based assertion that guarded memory recovery performs no ordinary work after
 D31. Focused prompt lifecycle cancellation tests and focused clj-kondo are green.
+
+## Test review (ψ pass 3, 2026-06-11)
+
+Reviewed the cancellation test net after the memory-recovery seam follow-up. One test-quality issue remains: several task-specific cancellation regression namespaces still use global `with-redefs`/stub helpers for infrastructure or boundary operations (`create-step-attempt-session!`, prompt/turn execution, judge message persistence, delegate/run creation hooks). Those tests prove useful race windows, but the task-test-review contract requires infrastructure dependencies to be injectable/nullable rather than mocked/stubbed; the remaining global redefs should be replaced with existing adapter/context seams or explicit nullable test hooks.
+
+No tests run (review-only pass).
