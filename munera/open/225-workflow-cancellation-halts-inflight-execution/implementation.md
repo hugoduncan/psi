@@ -2067,3 +2067,9 @@ parity, replay/trace coverage is preserved, child abort reuses the existing guar
 `:runtime/agent-abort` executor, and the D23 cascade-set/D31 checkpoint/D30
 control-effect boundary now aligns the top-level Intent with the refined
 cancellation contract. No new `design-steps.md` follow-up item added.
+
+## Ambiguity review (ψ pass 29, 2026-06-11)
+
+Reviewed current `design.md` for ambiguity only after the pass-27 Intent reconciliation and pass-28 architecture-fit review. Consulted referenced dispatch/effect/runtime code and `doc/architecture.md` where needed; did not review task `plan.md` or `steps.md`.
+
+No new actionable ambiguity found. D1–D37 plus Scope/Intent/Acceptance now pin a single contract for cancel/remove entry events, effect payloads and ordering, nested sub-run direct cancel/remove behaviour, absent/terminal public results, idempotency, stale-handle cleanup, cancellation-control side effects, and the D23/D31 cascade-set boundary with the D27 bounded exception. No new `design-steps.md` follow-up item added.
