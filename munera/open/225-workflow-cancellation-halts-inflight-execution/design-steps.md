@@ -846,7 +846,7 @@
 
 ## Inconsistency follow-ups (ψ pass 21, 2026-06-11)
 
-- [ ] Align D1's owner wording with the D26/D37 state-kernel entry-event taxonomy.
+- [x] Align D1's owner wording with the D26/D37 state-kernel entry-event taxonomy.
       D1 still says the "agent-session cancel/remove mutation" commits the
       canonical `:cancelled` transition and emits cancellation effects, and that the
       mutation's only canonical-state write is the pure status transition. D26/D37
@@ -859,3 +859,12 @@
       transition and return the canonical effects-as-data, while Pathom mutations
       are public adapters only. This avoids two owners for the same transition/effect
       boundary and prevents reintroducing direct Pathom mutation writes.
+      → design.md D1 now assigns the transition/effect boundary to the registered
+      state-kernel keyword handlers `:psi.workflow/cancel-run` and
+      `:psi.workflow/remove-run` (D37). Pathom mutations, psi-tool cancel, and
+      `delegate remove` are explicitly adapters only: they route to those events and
+      do not call workflow-runtime pure functions, `reset!` canonical state, or
+      mutate `inflight-runs` / background-job handles inline. D1's concrete flow now
+      names the shared cancel-transition helper (D26), the live-remove first pass,
+      the terminal/absent record-drop branch, and the dispatch `:effects` interceptor
+      as executor. No blocker.

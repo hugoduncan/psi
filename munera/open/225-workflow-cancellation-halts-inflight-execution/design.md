@@ -188,25 +188,37 @@ The pure workflow-runtime transition functions stay pure. `cancel-run` /
 perform **no** side effects: no `future-cancel`, no thread interrupt, no
 child-session abort inline.
 
-The three cancellation side effects (`future-cancel`/interrupt of the worker
-future, child-session abort) are modeled as **effects-as-data** returned from the
-cancel/remove path and executed at the orchestration runtime boundary — the layer
-that already owns `inflight-runs` (`psi.agent-session.workflow.orchestration` /
-`runtime_state`). Concretely the agent-session cancel/remove mutation:
+The cancellation side effects (`future-cancel`/interrupt of the worker future,
+child-session abort, and cancellation/remove cleanup) are modeled as
+**effects-as-data** returned by the canonical state-kernel workflow terminal event
+handlers — `:psi.workflow/cancel-run` and `:psi.workflow/remove-run` (D37) — and
+executed at the dispatch/runtime boundary. The public Pathom mutation symbols
+`'psi.workflow/cancel-run` and `'psi.workflow/remove-run`, `psi-tool` cancel, and
+`delegate remove` are adapters only: they route into the keyword events and do not
+call workflow-runtime pure functions directly, `reset!` canonical state, or mutate
+`inflight-runs` / background-job handles inline (D26/D37).
 
-1. commits the pure canonical-state transition (signal → `:cancelled`), then
-2. emits a cancellation effect (e.g. `{:cancel-inflight-run {:run-id …}}` plus,
-   transitively, child-session abort effects) that the runtime boundary executes
-   against the future handle and the agent-session abort machinery.
+Concretely, the registered state-kernel handlers own the transition/effect
+boundary:
 
-This keeps side effects out of the pure transition and out of silent inline
-mutation bodies, satisfying AGENTS.md S1/S3 + `λ(state)` (effects flow as data,
-executed at the boundary). No legacy-mutation exception is taken; the only
-canonical-state write in the mutation is the pure status transition (see D4 for
-its serialization).
+1. `:psi.workflow/cancel-run` invokes the shared cancel-transition helper (D26) to
+   commit the pure canonical-state transition (signal → `:cancelled`) through the
+   apply-phase `:root-state-update` (D4/D20), then returns the canonical
+   cancellation/terminalization effects-as-data.
+2. `:psi.workflow/remove-run` owns the D26 live-vs-terminal branch: a live first
+   pass invokes the same shared cancel-transition helper and appends the D18
+   re-entrant `:psi.workflow/remove-run` dispatch effect; the terminal/absent pass
+   applies the bare record-drop branch and returns only the D24/D36b runtime-handle
+   cleanup effects.
 
-**Executor (refined by D12):** the "orchestration runtime boundary" wording above
-is made precise by D12 — these cancellation effects are canonical dispatch
+This keeps side effects out of the pure workflow-runtime transitions and out of
+silent inline public-adapter mutation bodies, satisfying AGENTS.md S1/S3 +
+`λ(state)` (effects flow as data through dispatch, executed at the boundary). No
+legacy-mutation exception is taken; the canonical owner of the write/effect set is
+the state-kernel keyword handler, not the Pathom adapter.
+
+**Executor (refined by D12):** the "dispatch/runtime boundary" wording above is
+made precise by D12 — these cancellation effects are canonical dispatch
 `:runtime/*` effect types executed by the dispatch **`:effects` interceptor**, not
 by an out-of-dispatch orchestration-layer execution path. The runtime boundary
 that owns `inflight-runs` supplies the handle the `execute-effect!` method acts on

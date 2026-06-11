@@ -1902,3 +1902,18 @@ One new actionable inconsistency found:
    functions or mutate handles directly. Leaving D1's mutation-owned wording gives
    two different owners for the same transition/effect boundary and could lead an
    implementer to keep direct Pathom mutation writes that D37 explicitly forbids.
+
+## Inconsistency follow-up resolution (ψ pass 21, 2026-06-11)
+
+Executed the newly added pass-21 design follow-up; no blockers.
+
+- Reworded D1 so the canonical transition/effect owner is the registered
+  state-kernel keyword handlers `:psi.workflow/cancel-run` and
+  `:psi.workflow/remove-run`, aligning D1 with D26/D37.
+- Made Pathom mutations, psi-tool cancel, and `delegate remove` explicit public
+  adapters only: they route into the keyword events and do not call
+  workflow-runtime pure functions directly, `reset!` canonical state, or mutate
+  `inflight-runs` / background-job handles inline.
+- D1 now names the shared cancel-transition helper, live-remove first pass,
+  terminal/absent record-drop branch, and dispatch `:effects` interceptor as the
+  executor boundary.
