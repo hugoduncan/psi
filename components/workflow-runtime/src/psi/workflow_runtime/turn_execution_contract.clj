@@ -8,7 +8,6 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.recording :as turn-recording]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn assistant-message-text
@@ -312,14 +311,11 @@
                               (commit-workflow-turn-call! ctx session-data)]
                           (if-not call-committed?
                             (stopped-execution-result session-id reason)
-                            (cancellation-entry/with-run-read-lock
-                              ctx
-                              (:workflow-run-id session-data)
-                              (fn []
-                                (call-workflow-turn-start-hook! ctx session-id session-data :after-call-commit)
-                                (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
-                                  (stopped-execution-result session-id reason)
-                                  (execution-adapter/prompt-execution-result! ctx session-id text images opts))))))))))))))))))
+                            (do
+                              (call-workflow-turn-start-hook! ctx session-id session-data :after-call-commit)
+                              (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
+                                (stopped-execution-result session-id reason)
+                                (execution-adapter/prompt-execution-result! ctx session-id text images opts)))))))))))))))))
 
 (defn- prompt-execution-result
   [ctx session-id text images opts]

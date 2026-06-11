@@ -5,8 +5,7 @@
    Formal deterministic-operation contracts live in
    `psi.deterministic-operation-registry.defs`."
   (:require
-   [psi.deterministic-operation-registry.defs :as defs]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]))
+   [psi.deterministic-operation-registry.defs :as defs]))
 
 (defn malformed-operation-result-ex
   [operation invocation result]
@@ -272,10 +271,7 @@
 
 (defn- invoke-operation*
   [operation invocation]
-  (cancellation-entry/with-run-read-lock
-    (:ctx invocation)
-    (:workflow-run-id invocation)
-    #(invoke-operation-result operation invocation)))
+  (invoke-operation-result operation invocation))
 
 (defn invoke-operation
   "Invoke a normalized deterministic operation.

@@ -496,3 +496,79 @@
     (is (= 1 @prompt-calls*)
         "the judge prompt entry is ordered before the D31 cancel checkpoint, not after it")
     (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))
+
+(deftest judge-turn-cancel-dispatch-does-not-wait-for-blocked-prompt-execution-test
+  ;; Regression for task 225 implementation review pass 16: the judge prompt
+  ;; entry lock must not be held for the full judge turn. Cancellation after a
+  ;; judge turn has entered ordinary prompt execution must still commit promptly.
+  (let [entered (promise)
+        release (promise)
+        run-id "run-judge-blocked-cancel"
+        ctx {workflow-execution-adapter/adapter-key
+             (workflow-execution-adapter/create
+              {:create-child-session! (fn [_ctx _parent opts]
+                                        {:psi.agent-session/session-id (:child-session-id opts)})
+               :get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id run-id
+                                    :workflow-step-id "review"
+                                    :workflow-attempt-id "attempt-review"})
+               :prompt-execution-result! (fn [& _]
+                                           (deliver entered :entered)
+                                           @release
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "APPROVED"}]
+                                             :stop-reason :stop}})})
+             :state* (atom {})
+             :workflow-cancellation-entry-locks-handle (atom {})
+             :validate-result-fn (constantly true)
+             :execute-effect-fn (constantly nil)}
+        initial-state (let [[s _ _] (workflow-runtime/create-run
+                                     {}
+                                     {:definition {:steps [{:name "review"
+                                                            :type :session}]}
+                                      :run-id run-id})]
+                        (-> s
+                            (assoc-in [:workflows :runs run-id :current-step-id] "review")
+                            (assoc-in [:workflows :runs run-id :step-runs "review" :attempts]
+                                      [{:attempt-id "attempt-review"
+                                        :status :succeeded
+                                        :execution-session-id "actor-review"}])))
+        stopped? #(let [run (get-in @(:state* ctx) [:workflows :runs run-id])]
+                    (or (nil? run) (= :cancelled (:status run))))]
+    (reset! (:state* ctx) initial-state)
+    (workflow-handlers/register! ctx)
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [& _] [])]
+      (let [judge-future (future
+                           (try
+                             (workflow-judge/execute-judge!
+                              ctx
+                              "parent"
+                              "actor-review"
+                              {:prompt "APPROVED?" :projection :none}
+                              {"APPROVED" {:goto :next}}
+                              {:current-step-id "review"
+                               :step-order ["review"]
+                               :step-runs {}
+                               :workflow-run-id run-id
+                               :workflow-attempt-id "attempt-review"
+                               :stopped? stopped?})
+                             (catch clojure.lang.ExceptionInfo e e)))]
+        (try
+          (is (= :entered (deref entered 1000 ::timeout))
+              "the judge prompt execution is blocked in ordinary work before cancel")
+          (let [cancel-future (future
+                                (dispatch/dispatch! ctx :psi.workflow/cancel-run
+                                                    {:run-id run-id
+                                                     :reason "blocked judge cancel"}))
+                cancel-result (deref cancel-future 1000 ::timeout)]
+            (is (not= ::timeout cancel-result)
+                "cancel dispatch must not wait for the blocked judge turn to finish")
+            (when (not= ::timeout cancel-result)
+              (is (= :cancelled (:psi.workflow/status cancel-result)))
+              (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))
+          (finally
+            (deliver release :release)
+            (deref judge-future 1000 nil)))))))
