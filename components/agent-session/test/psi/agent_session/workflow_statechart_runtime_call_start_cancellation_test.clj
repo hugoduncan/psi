@@ -3,7 +3,8 @@
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
-   [psi.deterministic-operation-registry.registry]
+   [psi.deterministic-operation-registry.registry :as operation-registry]
+   [psi.deterministic-operation-runtime.core :as operation-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
    [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -163,7 +164,7 @@
   (let [[ctx0 session-id] (create-session-context)
         operation-calls* (atom 0)
         op-reg (:deterministic-operation-registry ctx0)
-        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+        _ (operation-registry/register-operation-in!
            op-reg
            {:id "workflow/final-start-race"
             :handler (fn [_]
@@ -260,7 +261,7 @@
   (let [[ctx0 session-id] (create-session-context)
         operation-calls* (atom 0)
         op-reg (:deterministic-operation-registry ctx0)
-        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+        _ (operation-registry/register-operation-in!
            op-reg
            {:id "workflow/post-reservation-race"
             :handler (fn [_]
@@ -411,7 +412,7 @@
   (let [[ctx0 session-id] (create-session-context)
         operation-calls* (atom 0)
         op-reg (:deterministic-operation-registry ctx0)
-        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+        _ (operation-registry/register-operation-in!
            op-reg
            {:id "workflow/start-commit-race"
             :handler (fn [_]
@@ -460,7 +461,7 @@
   (let [[ctx0 session-id] (create-session-context)
         operation-calls* (atom 0)
         op-reg (:deterministic-operation-registry ctx0)
-        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+        _ (operation-registry/register-operation-in!
            op-reg
            {:id "workflow/call-begin-race"
             :handler (fn [_]
@@ -560,7 +561,7 @@
   (let [[ctx0 session-id] (create-session-context)
         operation-calls* (atom 0)
         op-reg (:deterministic-operation-registry ctx0)
-        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+        _ (operation-registry/register-operation-in!
            op-reg
            {:id "workflow/call-commit-race"
             :handler (fn [_]
@@ -601,3 +602,100 @@
           "the race is after successful operation call commit")
       (is (:operation-call-committed-at attempt))
       (is (empty? (get-in run [:step-runs "next" :attempts]))))))
+
+(deftest actor-turn-dispatch-cancel-cannot-land-between-final-read-and-prompt-submit-test
+  ;; Regression for task 225 implementation review pass 15: canonical cancel
+  ;; dispatch must be mutually ordered with actor prompt-submit entry, so a cancel
+  ;; racing in the final read->call window cannot land D31 before the ordinary call.
+  (let [[ctx0 _session-id] (create-session-context)
+        prompt-calls* (atom 0)
+        cancel-future* (atom nil)
+        run-id "run-actor-final-entry-lock-race"
+        ctx (test-support/with-workflow-execution-adapter-overrides
+              (assoc ctx0
+                     :before-workflow-turn-start-fn
+                     (fn [ctx _session-id {:keys [phase]}]
+                       (when (= :after-call-commit phase)
+                         (reset! cancel-future*
+                                 (future
+                                   (session/dispatch-in! ctx :psi.workflow/cancel-run
+                                                         {:run-id run-id
+                                                          :reason "actor final entry race"}))))))
+              {:get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id run-id
+                                    :workflow-step-id "plan"
+                                    :workflow-attempt-id "attempt-plan"})
+               :prompt-execution-result! (fn [& _]
+                                           (swap! prompt-calls* inc)
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "started before D31"}]
+                                             :stop-reason :stop}})})]
+    (install-run! ctx linear-definition run-id)
+    (swap! (:state* ctx)
+           assoc-in [:workflows :runs run-id :current-step-id] "plan")
+    (swap! (:state* ctx)
+           assoc-in [:workflows :runs run-id :step-runs "plan" :attempts]
+           [{:attempt-id "attempt-plan"
+             :status :running
+             :execution-session-id "plan-child"}])
+    (psi.workflow-runtime.turn-execution-contract/execute-actor-turn! ctx "plan-child" "Plan")
+    (is (some? @cancel-future*)
+        "the regression forces a canonical cancel dispatch in the final entry window")
+    (deref @cancel-future* 5000 ::timeout)
+    (is (= 1 @prompt-calls*)
+        "the actor prompt entry is ordered before the D31 cancel checkpoint, not after it")
+    (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))
+
+(deftest invoke-operation-dispatch-cancel-cannot-land-between-final-read-and-handler-entry-test
+  ;; Regression for task 225 implementation review pass 15: canonical cancel
+  ;; dispatch must be mutually ordered with deterministic-operation handler entry.
+  (let [[ctx0 _session-id] (create-session-context)
+        operation-calls* (atom 0)
+        cancel-future* (atom nil)
+        run-id "run-invoke-final-entry-lock-race"
+        op-reg (:deterministic-operation-registry ctx0)
+        _ (operation-registry/register-operation-in!
+           op-reg
+           {:id "workflow/final-entry-lock-race"
+            :handler (fn [_]
+                       (swap! operation-calls* inc)
+                       {:status :ok :data {:started-before-d31? true}})})
+        operation (operation-registry/get-operation-in
+                   op-reg "workflow/final-entry-lock-race")
+        ctx (assoc ctx0
+                   :before-workflow-operation-start-fn
+                   (fn [ctx {:keys [phase]}]
+                     (when (= :after-call-commit phase)
+                       (reset! cancel-future*
+                               (future
+                                 (session/dispatch-in! ctx :psi.workflow/cancel-run
+                                                       {:run-id run-id
+                                                        :reason "invoke final entry race"}))))))]
+    (install-run! ctx {:definition-id "invoke-final-entry-lock-race"
+                       :steps [{:name "invoke"
+                                :type :invoke
+                                :operation "workflow/final-entry-lock-race"
+                                :args {}}]}
+                  run-id)
+    (swap! (:state* ctx)
+           assoc-in [:workflows :runs run-id :current-step-id] "invoke")
+    (swap! (:state* ctx)
+           assoc-in [:workflows :runs run-id :step-runs "invoke" :attempts]
+           [{:attempt-id "attempt-invoke"
+             :status :running}])
+    (operation-runtime/invoke-operation
+     operation
+     {:ctx ctx
+      :workflow-run-id run-id
+      :workflow-attempt-id "attempt-invoke"
+      :step-id "invoke"
+      :args {}})
+    (is (some? @cancel-future*)
+        "the regression forces a canonical cancel dispatch in the final entry window")
+    (deref @cancel-future* 5000 ::timeout)
+    (is (= 1 @operation-calls*)
+        "the operation handler entry is ordered before the D31 cancel checkpoint, not after it")
+    (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))

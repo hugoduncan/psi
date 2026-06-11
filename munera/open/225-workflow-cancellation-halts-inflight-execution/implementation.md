@@ -2876,3 +2876,35 @@ Reviewed the pass-14 post-call-commit changes against `task-implementation-revie
 New actionable issue: actor/judge turn starts and deterministic-operation starts still end with a check-then-call race. After `workflow-session-stop-signal-for` / `workflow-stop-signal` returns nil, a D31 cancel CAS can still land before `execution-adapter/prompt-execution-result!` or the operation handler is entered, initiating ordinary prompt-submit/journal/tool-capable work or operation work after the cancel checkpoint. This repeats the same TOCTOU pattern at the final read → call edge; without a durable mutual-exclusion/linearization protocol consumed by cancellation, another stop read cannot prove the D31 guarantee. Follow-up should make the final ordinary-call entry itself cancellation-safe (or explicitly weaken the design contract) and add a deterministic race regression for cancellation between the final stop read and actor, judge, and invoke handler entry.
 
 No tests run (review-only pass).
+
+## Implementation review follow-up pass 15 (ψ, 2026-06-11)
+
+Closed the remaining final read→ordinary-call race with a cancellation/entry
+linearization lock. Added `psi.workflow-runtime.cancellation-entry`, a runtime-only
+per-run `ReentrantReadWriteLock` handle injected into agent-session contexts. The
+canonical workflow cancel/remove apply phase now takes the write lock for the
+requested run and its currently-known descendants before the D31 state CAS, while
+workflow-owned ordinary entry takes the read lock around the final side-effecting
+entry boundary:
+
+- actor/judge turn execution takes the read lock after `:turn-call-state
+  :committed`, re-runs the after-call-commit hook and final stop read inside that
+  boundary, then enters the prompt adapter;
+- workflow-owned `prompt-dispatch!` takes the same read lock around the actual
+  `:session/prompt-submit` dispatch, so prompt-submit/journal entry cannot start
+  after a waiting cancel has acquired the write side;
+- deterministic-operation invocation takes the read lock around the invocation
+  protocol through handler entry, so its handler is ordered before or after D31,
+  never in the final check-then-call gap.
+
+Added deterministic regressions for actor, judge, and invoke races where a
+canonical cancel dispatch is launched from the final entry window. The assertions
+prove the ordinary entry is ordered before the D31 cancel checkpoint (the cancel
+future cannot commit `:cancelled` until the read-locked entry boundary exits), so
+no ordinary work is initiated after D31.
+
+Validation:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test --namespace psi.agent-session.workflow-judge-cancellation-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 32 tests / 157 assertions green.
+- Focused `clj-kondo --lint` over changed source/test files → clean.
+- `bb test` → green.

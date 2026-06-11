@@ -320,6 +320,7 @@
                        :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
                        :workflow-inflight-runs-handle workflow-runtime-state/inflight-runs
+                       :workflow-cancellation-entry-locks-handle (atom {})
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
                        :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
                        :now-fn                       java.time.Instant/now

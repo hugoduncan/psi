@@ -1,6 +1,8 @@
 (ns psi.agent-session.workflow-judge-cancellation-test
   (:require
    [clojure.test :refer [deftest is]]
+   [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.dispatch-handlers.workflows :as workflow-handlers]
    [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.session-persistence.core]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -35,6 +37,7 @@
                                         :status :succeeded
                                         :execution-session-id "actor-review"}])))]
     (reset! (:state* ctx) initial-state)
+    (workflow-handlers/register! ctx)
     (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [& _] [])]
       (let [ex (try
                  (workflow-judge/execute-judge!
@@ -422,3 +425,74 @@
         (is (= :committed (:turn-call-state attempt))
             "the race is after successful judge turn call commit")
         (is (:turn-call-committed-at attempt))))))
+
+(deftest judge-turn-dispatch-cancel-cannot-land-between-final-read-and-prompt-submit-test
+  ;; Regression for task 225 implementation review pass 15: judge prompt-submit
+  ;; entry uses the same workflow turn-entry lock as actor turns, so canonical
+  ;; cancellation cannot land D31 in the final read->call window.
+  (let [prompt-calls* (atom 0)
+        cancel-future* (atom nil)
+        run-id "run-judge-final-entry-lock-race"
+        ctx {workflow-execution-adapter/adapter-key
+             (workflow-execution-adapter/create
+              {:create-child-session! (fn [_ctx _parent opts]
+                                        {:psi.agent-session/session-id (:child-session-id opts)})
+               :get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id run-id
+                                    :workflow-step-id "review"
+                                    :workflow-attempt-id "attempt-review"})
+               :prompt-execution-result! (fn [& _]
+                                           (swap! prompt-calls* inc)
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "APPROVED"}]
+                                             :stop-reason :stop}})})
+             :state* (atom {})
+             :workflow-cancellation-entry-locks-handle (atom {})
+             :validate-result-fn (constantly true)
+             :execute-effect-fn (constantly nil)
+             :before-workflow-turn-start-fn
+             (fn [ctx _judge-sid {:keys [phase]}]
+               (when (= :after-call-commit phase)
+                 (reset! cancel-future*
+                         (future
+                           (dispatch/dispatch! ctx :psi.workflow/cancel-run
+                                               {:run-id run-id
+                                                :reason "judge final entry race"})))))}
+        initial-state (let [[s _ _] (workflow-runtime/create-run
+                                     {}
+                                     {:definition {:steps [{:name "review"
+                                                            :type :session}]}
+                                      :run-id run-id})]
+                        (-> s
+                            (assoc-in [:workflows :runs run-id :current-step-id] "review")
+                            (assoc-in [:workflows :runs run-id :step-runs "review" :attempts]
+                                      [{:attempt-id "attempt-review"
+                                        :status :succeeded
+                                        :execution-session-id "actor-review"}])))
+        stopped? #(let [run (get-in @(:state* ctx) [:workflows :runs run-id])]
+                    (or (nil? run) (= :cancelled (:status run))))]
+    (reset! (:state* ctx) initial-state)
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in (fn [& _] [])]
+      (try
+        (psi.agent-session.workflow-judge/execute-judge!
+         ctx
+         "parent"
+         "actor-review"
+         {:prompt "APPROVED?" :projection :none}
+         {"APPROVED" {:goto :next}}
+         {:current-step-id "review"
+          :step-order ["review"]
+          :step-runs {}
+          :workflow-run-id run-id
+          :workflow-attempt-id "attempt-review"
+          :stopped? stopped?})
+        (catch clojure.lang.ExceptionInfo _)))
+    (is (some? @cancel-future*)
+        "the regression forces a canonical cancel dispatch in the judge final entry window")
+    (deref @cancel-future* 5000 ::timeout)
+    (is (= 1 @prompt-calls*)
+        "the judge prompt entry is ordered before the D31 cancel checkpoint, not after it")
+    (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))

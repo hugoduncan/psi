@@ -8,6 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.recording :as turn-recording]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn assistant-message-text
@@ -286,37 +287,44 @@
    :execution-result/error-message "Workflow execution stopped before turn start"
    :execution-result/stop-reason :error})
 
-(defn- prompt-execution-result
-  [ctx session-id text images opts]
-  (let [session-data (workflow-session-data ctx session-id)]
-    (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
-      (stopped-execution-result session-id reason)
-      (do
-        (call-workflow-turn-start-hook! ctx session-id session-data :before-reserve)
-        (let [{:keys [reserved? reason]} (reserve-workflow-turn-start! ctx session-data)]
-          (if-not reserved?
-            (stopped-execution-result session-id reason)
-            (do
-              (call-workflow-turn-start-hook! ctx session-id session-data :after-reserve)
-              (let [{:keys [committed? reason]} (commit-workflow-turn-start! ctx session-data)]
-                (if-not committed?
-                  (stopped-execution-result session-id reason)
-                  (do
-                    (call-workflow-turn-start-hook! ctx session-id session-data :after-commit)
-                    (let [{:keys [begun? reason]} (begin-workflow-turn-call! ctx session-data)]
-                      (if-not begun?
-                        (stopped-execution-result session-id reason)
-                        (do
-                          (call-workflow-turn-start-hook! ctx session-id session-data :after-call-begin)
-                          (let [{call-committed? :committed? reason :reason}
-                                (commit-workflow-turn-call! ctx session-data)]
-                            (if-not call-committed?
-                              (stopped-execution-result session-id reason)
-                              (do
+(defn- prompt-execution-result*
+  [ctx session-id text images opts session-data]
+  (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
+    (stopped-execution-result session-id reason)
+    (do
+      (call-workflow-turn-start-hook! ctx session-id session-data :before-reserve)
+      (let [{:keys [reserved? reason]} (reserve-workflow-turn-start! ctx session-data)]
+        (if-not reserved?
+          (stopped-execution-result session-id reason)
+          (do
+            (call-workflow-turn-start-hook! ctx session-id session-data :after-reserve)
+            (let [{:keys [committed? reason]} (commit-workflow-turn-start! ctx session-data)]
+              (if-not committed?
+                (stopped-execution-result session-id reason)
+                (do
+                  (call-workflow-turn-start-hook! ctx session-id session-data :after-commit)
+                  (let [{:keys [begun? reason]} (begin-workflow-turn-call! ctx session-data)]
+                    (if-not begun?
+                      (stopped-execution-result session-id reason)
+                      (do
+                        (call-workflow-turn-start-hook! ctx session-id session-data :after-call-begin)
+                        (let [{call-committed? :committed? reason :reason}
+                              (commit-workflow-turn-call! ctx session-data)]
+                          (if-not call-committed?
+                            (stopped-execution-result session-id reason)
+                            (cancellation-entry/with-run-read-lock
+                              ctx
+                              (:workflow-run-id session-data)
+                              (fn []
                                 (call-workflow-turn-start-hook! ctx session-id session-data :after-call-commit)
                                 (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
                                   (stopped-execution-result session-id reason)
                                   (execution-adapter/prompt-execution-result! ctx session-id text images opts))))))))))))))))))
+
+(defn- prompt-execution-result
+  [ctx session-id text images opts]
+  (let [session-data (workflow-session-data ctx session-id)]
+    (prompt-execution-result* ctx session-id text images opts session-data)))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

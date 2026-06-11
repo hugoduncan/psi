@@ -5,7 +5,8 @@
    Formal deterministic-operation contracts live in
    `psi.deterministic-operation-registry.defs`."
   (:require
-   [psi.deterministic-operation-registry.defs :as defs]))
+   [psi.deterministic-operation-registry.defs :as defs]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]))
 
 (defn malformed-operation-result-ex
   [operation invocation result]
@@ -233,6 +234,49 @@
              :step-id (:step-id invocation)
              :stop-reason reason}})
 
+(defn- invoke-operation-result
+  [operation invocation]
+  (if-let [reason (workflow-stop-signal invocation)]
+    (workflow-stopped-result operation invocation reason)
+    (try
+      (call-workflow-operation-start-hook! operation invocation :before-reserve)
+      (let [{:keys [reserved? reason]} (reserve-workflow-operation-start! invocation)]
+        (if-not reserved?
+          (workflow-stopped-result operation invocation reason)
+          (do
+            (call-workflow-operation-start-hook! operation invocation :after-reserve)
+            (let [{:keys [committed? reason]} (commit-workflow-operation-start! invocation)]
+              (if-not committed?
+                (workflow-stopped-result operation invocation reason)
+                (do
+                  (call-workflow-operation-start-hook! operation invocation :after-commit)
+                  (let [{:keys [begun? reason]} (begin-workflow-operation-call! invocation)]
+                    (if-not begun?
+                      (workflow-stopped-result operation invocation reason)
+                      (do
+                        (call-workflow-operation-start-hook! operation invocation :after-call-begin)
+                        (let [{call-committed? :committed? reason :reason}
+                              (commit-workflow-operation-call! invocation)]
+                          (if-not call-committed?
+                            (workflow-stopped-result operation invocation reason)
+                            (do
+                              (call-workflow-operation-start-hook! operation invocation :after-call-commit)
+                              (if-let [reason (workflow-stop-signal invocation)]
+                                (workflow-stopped-result operation invocation reason)
+                                ((:handler operation) (assoc invocation :operation-id (:id operation))))))))))))))))
+      (catch Throwable t
+        {:status :error
+         :reason :operation-threw
+         :message (or (ex-message t) (str t))
+         :details {:operation-id (:id operation)}}))))
+
+(defn- invoke-operation*
+  [operation invocation]
+  (cancellation-entry/with-run-read-lock
+    (:ctx invocation)
+    (:workflow-run-id invocation)
+    #(invoke-operation-result operation invocation)))
+
 (defn invoke-operation
   "Invoke a normalized deterministic operation.
 
@@ -252,39 +296,7 @@
    Thrown exceptions are canonicalized into tagged `:error` results.
    Malformed returned values are rejected with ex-info."
   [operation invocation]
-  (let [result (if-let [reason (workflow-stop-signal invocation)]
-                 (workflow-stopped-result operation invocation reason)
-                 (try
-                   (call-workflow-operation-start-hook! operation invocation :before-reserve)
-                   (let [{:keys [reserved? reason]} (reserve-workflow-operation-start! invocation)]
-                     (if-not reserved?
-                       (workflow-stopped-result operation invocation reason)
-                       (do
-                         (call-workflow-operation-start-hook! operation invocation :after-reserve)
-                         (let [{:keys [committed? reason]} (commit-workflow-operation-start! invocation)]
-                           (if-not committed?
-                             (workflow-stopped-result operation invocation reason)
-                             (do
-                               (call-workflow-operation-start-hook! operation invocation :after-commit)
-                               (let [{:keys [begun? reason]} (begin-workflow-operation-call! invocation)]
-                                 (if-not begun?
-                                   (workflow-stopped-result operation invocation reason)
-                                   (do
-                                     (call-workflow-operation-start-hook! operation invocation :after-call-begin)
-                                     (let [{call-committed? :committed? reason :reason}
-                                           (commit-workflow-operation-call! invocation)]
-                                       (if-not call-committed?
-                                         (workflow-stopped-result operation invocation reason)
-                                         (do
-                                           (call-workflow-operation-start-hook! operation invocation :after-call-commit)
-                                           (if-let [reason (workflow-stop-signal invocation)]
-                                             (workflow-stopped-result operation invocation reason)
-                                             ((:handler operation) (assoc invocation :operation-id (:id operation))))))))))))))))
-                   (catch Throwable t
-                     {:status :error
-                      :reason :operation-threw
-                      :message (or (ex-message t) (str t))
-                      :details {:operation-id (:id operation)}})))]
+  (let [result (invoke-operation* operation invocation)]
     (when-not (defs/valid-operation-result? result)
       (throw (malformed-operation-result-ex operation invocation result)))
     result))
