@@ -531,7 +531,7 @@
 
 ## Ambiguity follow-ups (ψ pass 8, 2026-06-10)
 
-- [ ] Correct D17's "the same **worker thread**" claim: the cancel/remove
+- [x] Correct D17's "the same **worker thread**" claim: the cancel/remove
       dispatches and the re-entrant `:runtime/dispatch-event` remove run on the
       **dispatch-invoking (command/operator) thread**, not the workflow worker
       thread. Code-confirmed the operator-initiated cancel/remove path runs on the
@@ -543,8 +543,16 @@
       thread" qualifier so the in-thread sequencing claim names the correct thread
       and an implementer does not try to run the remove dispatch on the
       parked/interrupted worker.
+      → design.md D17 "in-thread sequencing" paragraph corrected: re-entrant remove
+      dispatch runs on the **dispatch-invoking (operator/command) thread** (the agent
+      tool-dispatch thread running `cancel-run`/`remove-run`/`delegate-remove`), not
+      the workflow worker (`clojure-agent-send-off-pool`) thread — which is the
+      *target* of the `future-cancel(true)` interrupt, never the *runner* of the
+      cancel/remove dispatches; aligned with D20 "the same thread" / D21
+      "operator/command thread". Code citations verified
+      (`canonical_workflows.clj:217/244`, `workflow/core.clj:474/493`).
 
-- [ ] Pin the **entry-event taxonomy** for cancel vs cancel-then-remove vs
+- [x] Pin the **entry-event taxonomy** for cancel vs cancel-then-remove vs
       plain-remove-of-terminal and the owner of the shared cancel-transition logic.
       The design pins the effect set (D18: cancel dispatch emits the re-entrant
       remove effect only for a remove) but not the event/handler structure, given
@@ -561,8 +569,21 @@
       cancel-transition+cancellation-effect logic is shared (one helper across the
       `cancel-run` and `remove-run` handlers) or duplicated. Update D5/D17/D18 so
       the entry-event structure is expressible.
+      → design.md D26 (new "Entry-Event Taxonomy Reconciliation"): option (a) — the
+      **`remove-run` handler itself** owns cancel-then-remove (option (b) rejected:
+      command-layer orchestration / a cancel-run "then-remove" flag both contradict
+      D18). Two entry events: `cancel-run` = shared cancel-transition helper (no
+      re-entrant remove); `remove-run` live first-pass = same shared helper +
+      re-entrant `:runtime/dispatch-event` (no dissoc), re-entrant/terminal
+      second-pass = bare unconditional dissoc + `:runtime/drop-inflight-run` (no
+      cancellation effects). (c) live-vs-terminal branch lives in the `remove-run`
+      handler-`:before` = the reused D22.1 terminal-precondition gate (not command
+      layer). (d) one **shared** cancel-transition+effect helper across both handlers
+      (not duplicated). D5/D17/D18 annotated with D26 pointers; code-confirmed both
+      mutations (`canonical_workflows.clj:217/244`) + `delegate-remove`
+      (`workflow/core.clj:474/493`).
 
-- [ ] State whether the D23 enumeration-race bound holds for a **direct sub-run
+- [x] State whether the D23 enumeration-race bound holds for a **direct sub-run
       cancel** (no worker `future-cancel`, D19), or classify the residual spawn race
       as an accepted true-concurrency exception. D23 argues the enumeration-race
       bound from the cancelled run's own cooperative checkpoint refusing further
@@ -578,3 +599,18 @@
       upholds the D6 no-new-child-session guarantee (and how, absent a worker
       interrupt) or is an accepted true-concurrency exception analogous to
       D22.2/criterion #9 — and reconcile D6/D14/D19/D23 accordingly.
+      → design.md D27 (new "Direct-Sub-Run-Cancel Spawn-Race Reconciliation"): the
+      D6 guarantee **holds** for the cascade set via per-run cooperative checkpoints
+      (D2/D10) + per-attempt aborts (D15) — child-abort, not a worker interrupt, is
+      the sub-run wake mechanism (D19), so no `future-cancel` is required for subtree
+      correctness (and emitting it would violate D14/D19 parent-survival). The
+      residual post-enumeration spawn (a child spawned in the window between the D23
+      handler-`:before` enumeration and the abort-driven checkpoint) is **one bounded,
+      accepted true-concurrency exception** of the same class as D22.2 / criterion #9:
+      bounded because the spawn's own cooperative checkpoint already reads the
+      pre-effect-committed `:cancelled` signal (apply-before-effects, D20/D23) and
+      refuses, the window closes when the abort returns control, and any momentary
+      turn is itself self-terminating — never an unbounded runaway. D6 restated for
+      the sub-run case; D14's `future-cancel` reframed as the top-level promptness
+      mechanism (not a subtree-bound prerequisite); added Acceptance #9a
+      [out-of-test-scope].

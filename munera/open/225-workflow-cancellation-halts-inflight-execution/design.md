@@ -297,7 +297,11 @@ remaining "(or …)" / "/" alternatives. They do not redesign the step machine.
 ### D5. `remove` of a live run = cancel-then-remove (resolves Q3)
 
 `remove` of a live (non-terminal) run is **cancel-then-remove**, not
-reject-while-live. A `remove` request on a live run:
+reject-while-live. A `remove` request on a live run is handled by the **`remove-run`
+handler itself** (the entry-event taxonomy is pinned in D26: `cancel-run` and
+`remove-run` are the two entry events, sharing one cancel-transition helper, with the
+live-vs-terminal branch in the handler-`:before` D22.1 gate — not command-layer
+orchestration). On a live run the `remove-run` handler's first pass:
 
 1. commits the `:cancelled` terminal transition (D4: apply-phase atom CAS with the
    guard inside the update fn — D20),
@@ -734,11 +738,19 @@ over carrying run identity + outcome in the effect payload):
 The two-dispatch ordering holds **not** via dispatch serialization (which does not
 exist — D20) but via **in-thread sequencing** (D20): the remove dispatch is the
 re-entrant `:runtime/dispatch-event` effect (D18) executed synchronously on the
-same worker thread, in the cancel dispatch's `:effects` phase, **after** the
-terminalize effect — so dispatch 2 runs strictly after dispatch 1's apply+effects
-on one thread and observes dispatch 1's applied `:state*`. The ordering
-(terminalize → then remove) thus holds across the two dispatches even though it is
-impossible within one.
+**same dispatch-invoking (operator/command) thread** — the agent tool-dispatch
+thread that runs the `cancel-run` / `remove-run` mutation (`canonical_workflows.clj`
+`cancel-workflow-run`/`remove-workflow-run`; `delegate-remove`
+`workflow/core.clj:474`), **not** the workflow worker thread (the separate
+`clojure-agent-send-off-pool` thread parked on `send-and-drain`, which the cancel's
+`future-cancel(true)` interrupts) — in the cancel dispatch's `:effects` phase,
+**after** the terminalize effect — so dispatch 2 runs strictly after dispatch 1's
+apply+effects on one thread and observes dispatch 1's applied `:state*`. The
+ordering (terminalize → then remove) thus holds across the two dispatches even
+though it is impossible within one. (This matches D20's "the same thread" and D21's
+"the operator/command thread"; the earlier "same worker thread" qualifier was a
+misnomer — the worker thread is the *target* of the interrupt, never the *runner*
+of the cancel/remove dispatches.)
 
 **Trigger/chaining mechanism (D18).** Dispatch 2 is issued by dispatch 1 as
 **effects-as-data**: the cancel dispatch's effect set ends with a re-entrant
@@ -768,6 +780,16 @@ ordering mechanism. D16(2)'s `:cancelled` reconcile branch remains required (it 
 what terminalizes the still-present cancelled run in the cancel dispatch);
 together D16(2) + D17 satisfy the "no lingering job" guarantee under
 apply-before-effects.
+
+**Entry event (D26).** Both dispatches of the cancel-then-remove split are issued
+under the **`remove-run` handler** (D26): the cancel dispatch is the `remove-run`
+handler's live-run first pass (shared cancel-transition helper + the re-entrant
+remove dispatch-event in its effect tail, no dissoc), and the remove dispatch is the
+re-entrant `remove-run` re-entry whose handler-`:before` now reads the run as
+`:cancelled`/terminal and takes the bare-dissoc branch. The re-entrant remove
+dispatch runs on the **dispatch-invoking operator/command thread** (the same thread
+as the cancel dispatch, per the corrected in-thread-sequencing wording above), never
+the workflow worker thread.
 
 ## Ambiguity Reconciliations (ψ pass 3, 2026-06-10)
 
@@ -820,6 +842,15 @@ dispatch serialization (D20). Plain
 `cancel` (no remove) simply omits effect (3); a direct `remove` of a live run is
 the only flow that emits (3). This keeps the chaining as effects-as-data at the
 dispatch boundary (consistent with D1/D12) rather than command-layer orchestration.
+
+**Entry-event placement (D26).** Effect (3) (the re-entrant `:runtime/dispatch-event`
+remove follow-on) is appended **only by the `remove-run` handler's live-run first
+pass** — that is precisely why "a direct `remove` of a live run is the only flow that
+emits (3)": the `cancel-run` handler invokes the *same* shared cancel-transition
+helper *without* appending effect (3). The live-vs-(`remove`)-flow distinction is
+therefore the entry event (`cancel-run` vs `remove-run`), not a runtime flag on a
+shared event — see D26 for the full taxonomy and the shared-helper / handler-`:before`
+branch placement.
 
 ### D19. Direct cancellation of a nested sub-run: in scope; parent observes a failed delegate step and continues (does not halt the parent)
 
@@ -1313,6 +1344,168 @@ change to the handle's identity or to the out-of-scope natural-completion cleanu
 D12 and D24's "reached via `ctx`" / "supplies the handle through `ctx`" wording is
 made true by this injection; both are annotated with the D25 pointer.
 
+## Entry-Event Taxonomy Reconciliation (ψ pass 8, 2026-06-10)
+
+Resolves the pass-8 ambiguity follow-up: the design pins the cancel-then-remove
+*effect set* (D17/D18) and the *atomicity shape* (D20/D22/D23) but never states the
+**event/handler structure** — which entry event(s) own the cancel transition, where
+the live-vs-terminal branch lives, and whether the cancel-transition logic is shared
+or duplicated across the two existing mutations `psi.workflow/cancel-run`
+(`canonical_workflows.clj:217`, op-name `'psi.workflow/cancel-run`) and
+`psi.workflow/remove-run` (`canonical_workflows.clj:244` + the `delegate-remove`
+tool flow `workflow/core.clj:474`). States the entry-event taxonomy. No
+step-machine redesign; the effect set is unchanged.
+
+### D26. Entry-event taxonomy: `cancel-run` and `remove-run` are the two entry events; both reuse one shared cancel-transition helper; the live-vs-terminal branch lives in the handler-`:before` (D22.1 gate)
+
+**Premise (code-confirmed).** Two distinct mutations exist today, both performing the
+TOCTOU `reset!`-after-guard that D4/D20 supersede: `cancel-workflow-run`
+(`canonical_workflows.clj:217`, status-guard then `(reset! :state* …)`) and
+`remove-workflow-run` (`canonical_workflows.clj:244`, pure `remove-run` dissoc then
+`reset!`); the `delegate-remove` tool flow (`workflow/core.clj:474`) additionally
+drops the `inflight-runs` entry by a command-layer `(swap! inflight-runs dissoc
+run-id)` (`:493`, superseded by D24). Both mutations move under dispatch (D1/D4/D20).
+
+**Decision — option (a): the `remove-run` handler owns the cancel-then-remove flow;
+no command-layer orchestration; the cancel-transition logic is a shared helper.**
+
+- **(a) Owner of the remove-of-live cancel transition.** The **`remove-run`
+  handler itself** produces the cancel-then-remove on a live run — it is **not**
+  the remove command dispatching a `cancel-run` event first (rejected option (b)).
+  Option (b) would require either command-layer sequencing of two dispatches (in
+  tension with D18's rejection of command-layer orchestration) or parameterizing
+  `cancel-run` with a "then-remove" flag so its effect set conditionally chains the
+  remove — which contradicts D18's "plain `cancel` (no remove) simply omits effect
+  (3); a direct `remove` of a live run is the only flow that emits (3)." Keeping the
+  remove flow inside the `remove-run` handler keeps the chaining as effects-as-data
+  (D18) with no orchestration leaking into the command/mutation layer.
+
+- **Two entry events, distinguished by their effect tails.** `cancel-run` and
+  `remove-run` remain the two distinct entry events:
+  - **`cancel-run` (live run):** the shared cancel transition (the D23 multi-run
+    `:cancelled` apply-phase `:root-state-update`) + the D12/D14/D15 cancellation
+    effect set + the D13 `:runtime/mark-workflow-jobs-terminal` terminalize. It does
+    **not** chain a re-entrant remove dispatch and never drops the record.
+  - **`remove-run` (live run, first pass):** the **same** shared cancel transition +
+    cancellation effects + terminalize, **plus** the D18 re-entrant
+    `:runtime/dispatch-event` follow-on effect targeting `remove-run` (dispatch 2).
+    This first pass **does not** apply the `remove-run` dissoc (apply-before-effects
+    would drop the record before the terminalize effect — D17); it only commits
+    `:cancelled` and emits the effect tail.
+  - **`remove-run` (terminal/absent run — the re-entrant second pass, and plain
+    remove-of-terminal):** the **bare unconditional `remove-run` dissoc** (D22.1
+    record-drop, status-independent) + the D24 `:runtime/drop-inflight-run` cleanup
+    effect; **no** cancellation effects (the run is already terminal at the
+    handler-`:before` read, so the D22.1 gate contributes none).
+
+- **(c) Where the live-vs-terminal branch lives.** Inside the `remove-run`
+  **handler-`:before`** (the canonical-state read), **not** the command layer — it
+  is exactly the **D22.1 terminal-precondition gate** read, reused as the
+  live-vs-terminal selector: a non-terminal run takes the first-pass branch (cancel
+  transition + effects + chained remove dispatch, no dissoc); a terminal/absent run
+  takes the record-drop branch (bare dissoc + drop-inflight-run, no cancellation
+  effects). No new branching mechanism is introduced; it is the D22.1 read already
+  required. Putting the branch in the handler-`:before` keeps it out of the command
+  layer (D18) and rides the D20 in-`swap!`-fn guard for atomicity.
+
+- **(d) Shared, not duplicated.** The cancel-transition + cancellation-effect-set
+  construction (the D23 multi-run `:cancelled` `:root-state-update` builder + the
+  D12/D14/D15 cancellation effect set + the D13 terminalize effect, all gated by the
+  D22.1 terminal-precondition) is **one shared helper** invoked by both the
+  `cancel-run` handler and the `remove-run` first-pass branch. `remove-run`'s
+  first pass = `(shared-cancel-transition …)` **with** the re-entrant remove
+  dispatch-event appended to its effect set; `cancel-run` = the same helper
+  **without** that appended effect. This avoids duplicating the cascade-enumeration
+  / guard / effect-emission logic across the two handlers (`λ build` compose;
+  `consistent(idioms)`), and guarantees `cancel`-then-`remove` and direct `remove`
+  reach the identical terminal transition.
+
+So the taxonomy is: **`cancel`** = shared-cancel-transition (no re-entrant remove);
+**`remove`-of-live** = `remove-run` handler → first pass = shared-cancel-transition +
+re-entrant `remove-run` dispatch (no dissoc) → second (re-entrant) pass = bare dissoc
++ drop-inflight-run; **`remove`-of-terminal** = `remove-run` handler → directly the
+bare-dissoc branch. D5/D17/D18 are updated to name `remove-run` as the owner of the
+cancel-then-remove flow, the shared helper, and the handler-`:before` live-vs-terminal
+branch (the D22.1 gate read).
+
+## Direct-Sub-Run-Cancel Spawn-Race Reconciliation (ψ pass 8, 2026-06-10)
+
+Resolves the pass-8 ambiguity follow-up: whether the D23 enumeration-race bound
+holds for a **direct sub-run cancel** — which emits **no** worker `future-cancel`
+(D19) — or is an accepted true-concurrency exception. Reconciles D6/D14/D19/D23. No
+step-machine redesign; the effect set is unchanged.
+
+### D27. Direct sub-run cancel: the D6 "no new child session after the checkpoint" guarantee holds via the cascade-set's own per-run cooperative checkpoints; one accepted, bounded true-concurrency spawn-race exception (analogous to D22.2 / criterion #9)
+
+**The gap.** D23's enumeration-race bound leans on two stops: (i) the cancelled
+run's cooperative pull checkpoint refusing to advance/spawn further once it reads
+`:cancelled` (D6/D2/D10), and (ii) — for a **top-level** cancel — the single
+`future-cancel(true)` (D14) interrupting the whole synchronous worker stack so a
+parked deeper frame wakes to its checkpoint promptly. A **direct sub-run cancel**
+emits **no** worker interrupt (D19), so (ii) is absent: a deeper descendant child
+turn/session spawned in the window between the D23 handler-`:before` enumeration and
+the worker reaching its next checkpoint is neither in the cascade set (not
+D15-aborted) nor interrupted.
+
+**Decision — the guarantee holds, with one bounded exception.** Resolve in two
+parts:
+
+1. **The cascade *set* is fully covered (no exception there).** Every run in the
+   cascade set (the cancelled sub-run ∪ its non-terminal `:delegating-run-id`
+   descendants enumerated at handler-`:before`, D23) receives the `:cancelled`
+   signal in the single multi-run apply CAS (D23) **and** a per-in-flight-attempt
+   `:runtime/agent-abort` (D15). Each such run therefore stops at **its own**
+   cooperative pull checkpoint (D2/D10) — the synchronous worker, unblocked frame by
+   frame as each in-flight child turn is aborted, returns up the stack and at every
+   level reads that level's `:cancelled` signal and refuses to spawn the next
+   step/sub-run/child-session. So D6's "no new child session spawns after the cancel
+   checkpoint" is upheld **across the whole enumerated subtree** by the per-run
+   cooperative checkpoints (pull) + the per-attempt aborts (push wake), **without**
+   needing the worker `future-cancel` — child-abort, not a worker interrupt, is the
+   wake mechanism in the sub-run case (D19). The parent run (above the cancelled
+   sub-run) is **not** in the cascade and legitimately continues (D19); D6's
+   guarantee is scoped to the cancelled subtree, not the parent's own ongoing work.
+
+2. **One bounded true-concurrency exception (accepted, not a defect).** A descendant
+   **spawned after** the handler-`:before` enumeration snapshot but **before** the
+   already-aborting frame reaches the checkpoint that would refuse it is, narrowly,
+   neither enumerated (so not D15-aborted) nor interrupted (no D19 worker
+   `future-cancel`). This is the **same** class of residual race already accepted at
+   D22.2 / acceptance criterion #9 (the true-concurrent CAS race whose harmlessness
+   is asserted by construction, not a deterministic test) — here a spawn racing the
+   abort-driven checkpoint rather than a CAS racing a second cancel. It is **bounded**:
+   (a) it requires the cancelled-subtree worker to spawn a *new* child session in the
+   sub-millisecond window between enumeration and the abort unblocking its current
+   frame — and the spawn itself goes through a cooperative checkpoint that reads the
+   already-committed `:cancelled` signal (the CAS applied before any effect runs,
+   D20/D23 apply-before-effects), so in practice the checkpoint that *would* spawn the
+   new child already sees `:cancelled` and refuses; (b) the window closes the instant
+   the per-attempt abort returns control to the checkpoint; (c) a child session that
+   does momentarily start is itself a cancellable run that the *parent's* eventual
+   handling does not adopt, and any further descent re-reads `:cancelled`. So the
+   residual is a single momentarily-spawned turn at most, never an unbounded runaway —
+   the exact harm class (a bounded, self-terminating extra turn) D22.2 already accepts.
+
+**Why not require a worker interrupt for the sub-run case.** Emitting
+`future-cancel(true)` on a direct sub-run cancel would interrupt the **shared
+top-level worker** and thereby the **still-`:running` parent** (and sibling sub-runs)
+— exactly the D14/D19 prohibition ("a child cancel must not kill a running parent").
+The cooperative per-run checkpoints already bound the subtree; adding the interrupt to
+close a sub-millisecond spawn window would violate the larger parent-survival
+invariant. The cost/benefit favors the cooperative bound + the accepted narrow
+exception (`λ build` simple > complex).
+
+**Reconciliation (D6/D14/D19/D23).** D6's guarantee is restated for the direct
+sub-run case as: *no new child session spawns after each cascade-set run's own cancel
+checkpoint*, upheld by the per-run cooperative checkpoints (D2/D10) + per-attempt
+aborts (D15) — the worker `future-cancel` (D14) is the **top-level** case's promptness
+mechanism, not a correctness prerequisite for the subtree bound. D19's no-worker-
+interrupt-on-sub-run-cancel stands. D23's enumeration-snapshot sufficiency stands for
+the cascade set; the post-enumeration spawn is the one bounded true-concurrency
+exception (D22.2 / criterion #9 class), now made explicit. A new acceptance note marks
+this exception **[out-of-test-scope]** (a bounded true-concurrency race, asserted by
+construction, not a deterministic test).
+
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
 The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
@@ -1398,6 +1591,15 @@ the motivating Evidence cases.
    the re-entrant remove are inherently idempotent (D22.2). Harmlessness is established
    by construction/code review (the narrow concurrent race is not deterministically
    reproducible), not a deterministic test.
+9a. **[out-of-test-scope]** The **direct-sub-run-cancel spawn race** (D27): a
+    descendant child session spawned in the sub-millisecond window between the D23
+    handler-`:before` enumeration and the abort-driven checkpoint refusing it — absent
+    a worker `future-cancel` on a sub-run cancel (D19). The cascade *set* is fully
+    covered by per-run cooperative checkpoints (D2/D10) + per-attempt aborts (D15), so
+    D6's "no new child session after each cascade-set run's checkpoint" holds; the
+    post-enumeration spawn is one bounded, self-terminating exception of the same class
+    as criterion #9, asserted by construction (a spawn checkpoint reads the
+    already-committed `:cancelled` signal), not a deterministic test (D27).
 
 ### Build gates
 

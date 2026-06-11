@@ -1354,3 +1354,61 @@ existing pass-1..7 follow-ups.
 
 No other new actionable ambiguity found; D1–D25 + Scope/Acceptance otherwise pin a
 single contract per behaviour.
+
+## Ambiguity follow-up resolution (ψ pass 8, 2026-06-10)
+
+Executed all three pass-8 ambiguity follow-up design-steps. All were
+design-decision/correction steps (correct a thread-attribution misnomer; pin the
+entry-event taxonomy; reconcile the direct-sub-run-cancel spawn race); all
+completable now — no blockers. Code premises re-verified before deciding:
+
+- Both cancel/remove mutations are operator-initiated Pathom mutations that
+  `reset!` `:state*` after a guard (`canonical_workflows.clj:217`
+  `cancel-workflow-run`, `:244` `remove-workflow-run`), and `delegate-remove`
+  (`workflow/core.clj:474`) additionally does the command-layer
+  `(swap! inflight-runs dissoc run-id)` (`:493`). These run on the agent
+  tool-dispatch (operator/command) thread, distinct from the workflow worker
+  (`clojure-agent-send-off-pool`) thread parked on `send-and-drain`.
+
+Resolutions:
+
+- **Item 1 (D17 thread misnomer)** — fixed inline in D17's in-thread-sequencing
+  paragraph: the re-entrant `:runtime/dispatch-event` remove dispatch runs on the
+  **dispatch-invoking (operator/command) thread**, not the workflow worker thread
+  (the worker is the *target* of the `future-cancel(true)` interrupt, never the
+  *runner* of the cancel/remove dispatches). Aligned with D20 ("the same thread")
+  and D21 ("the operator/command thread"). Prevents an implementer running the
+  remove dispatch on the parked/interrupted worker.
+
+- **Item 2 (entry-event taxonomy)** — new D26. Option (a): the **`remove-run`
+  handler itself** owns cancel-then-remove (option (b) — command dispatches
+  `cancel-run` first / a cancel-run "then-remove" flag — rejected as command-layer
+  orchestration / flag both contradicting D18). Two entry events: `cancel-run` =
+  shared cancel-transition helper (no re-entrant remove); `remove-run` live
+  first-pass = same helper + re-entrant `:runtime/dispatch-event` (no dissoc),
+  re-entrant/terminal second-pass = bare unconditional dissoc +
+  `:runtime/drop-inflight-run` (no cancellation effects). (c) live-vs-terminal
+  branch = the `remove-run` handler-`:before` D22.1 terminal-precondition gate
+  (not command layer). (d) **one shared** cancel-transition+effect helper across
+  both handlers (not duplicated). D5/D17/D18 annotated with D26 pointers.
+
+- **Item 3 (direct-sub-run-cancel spawn race)** — new D27. The D6 "no new child
+  session after the checkpoint" guarantee **holds for the cascade set** via per-run
+  cooperative checkpoints (D2/D10) + per-attempt aborts (D15) — child-abort, not a
+  worker interrupt, is the sub-run wake mechanism (D19); emitting `future-cancel`
+  would violate the D14/D19 parent-survival invariant. The residual
+  post-enumeration spawn is **one bounded, accepted true-concurrency exception** of
+  the same class as D22.2 / criterion #9 (the spawn's own checkpoint reads the
+  pre-effect-committed `:cancelled` signal under apply-before-effects and refuses;
+  window closes when the abort returns control; momentary turn self-terminates —
+  never an unbounded runaway). D6 restated for the sub-run case; D14's
+  `future-cancel` reframed as the top-level promptness mechanism (not a subtree
+  prerequisite); Acceptance #9a [out-of-test-scope] added.
+
+Consistency check: D26 is consistent with D5/D17/D18 (cancel-then-remove two
+dispatches, re-entrant `:runtime/dispatch-event`, no command-layer orchestration),
+D22.1 (handler-before gate reused as the live-vs-terminal selector; record-drop
+unconditional), and D23 (shared multi-run cancel transition). D27 is consistent
+with D2/D6/D10/D14/D15/D19/D23 and reuses the D22.2 accepted-race classification.
+No new contradictions; no step-machine redesign; the cancellation effect set is
+unchanged.
