@@ -2001,3 +2001,15 @@ dispatch trace cover the side effects; abort/cleanup reuse existing runtime-effe
 mechanisms; and the cascade/exception scopes are now explicit enough to preserve
 the no-orphan/no-runaway invariant without introducing adapter shims or hidden
 mutation paths. No new `design-steps.md` follow-up item added.
+
+## Ambiguity review (ψ pass 26, 2026-06-11)
+
+Reviewed current `design.md` for ambiguity only after the pass-24 inconsistency
+resolution. Consulted the in-design contracts D1–D37, Scope, Design Questions, and
+Acceptance Criteria; did not review task `plan.md` or `steps.md`.
+
+No new actionable ambiguity found. The design now gives single-interpretation
+contracts for cancel/remove entry events, effect payloads, nested-sub-run direct
+cancel/remove behaviour, absent/terminal public results, idempotency, runtime-handle
+cleanup, and the D27 bounded exception vs D6/Acceptance #3 cascade-set guarantee.
+No new `design-steps.md` follow-up item added.
