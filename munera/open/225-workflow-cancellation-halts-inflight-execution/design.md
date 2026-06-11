@@ -227,12 +227,15 @@ propagation shim (AGENTS.md authority + `λ shims_adapters`).
 - **Nested sub-runs:** the parent cancel enumerates in-flight nested sub-runs from
   the canonical run-tree state (`:state*`) — by `:delegating-run-id` parentage,
   keeping only non-terminal (`#{:pending :running :blocked}`) runs (D14) — and
-  dispatches a cancel for each (recursively), reusing the same cancel mutation
-  path. Discovery is from canonical state via the read path; no cross-handle
-  reach-in. Per-sub-run *effect* targets are pinned by D14 (worker future-cancel
-  hits only the single top-level run; sub-runs wind down via cooperative signals)
-  and D15 (child-session abort targets each in-flight attempt's
-  `:execution-session-id`).
+  applies the `:cancelled` terminal transition to the cancelled run **and every
+  enumerated in-flight descendant in a single multi-run apply-phase
+  `:root-state-update` within the one parent-cancel dispatch** (D23), not N
+  re-entrant dispatches and not a command-layer recursion loop. Discovery is from
+  canonical state via the read path; no cross-handle reach-in. Per-sub-run *effect*
+  targets are pinned by D14 (worker future-cancel hits only the single top-level
+  run; sub-runs wind down via cooperative signals) and D15 (child-session abort
+  targets each in-flight attempt's `:execution-session-id`), all emitted as the
+  cancel dispatch's effect set through the `:effects` interceptor (D23).
 - **Child agent sessions:** child-turn abort reuses the **existing** session
   interrupt/abort pathway (`turn/abort-active-turn-in!` → `:session/abort`
   dispatch → `agent-core/abort-in!` → context thread interrupt), which already
@@ -563,15 +566,18 @@ run is itself the top-level run** that owns the `inflight-runs` entry; a direct
 sub-run cancel emits no worker interrupt and relies on the downward child-session
 abort to unblock the parked worker (D19).
 
-The recursive D3 sub-run cancel therefore emits, **per in-flight sub-run** (not a
-per-sub-run future-cancel — there is no target):
+The recursive D3 sub-run cancel therefore contributes, **per in-flight sub-run**
+(not a per-sub-run future-cancel — there is no target):
 
 - (a) the cooperative `:cancelled` **signal** — the canonical-state terminal
-  transition (D2/D4) — which is the **pull** stop the synchronous parent worker
+  transition (D2/D4), applied as **part of the single multi-run apply-phase
+  `:root-state-update` of the one parent-cancel dispatch** (D23), not a separate
+  per-sub-run dispatch — which is the **pull** stop the synchronous parent worker
   reads at its next checkpoint when it returns up from that sub-run's
   `send-and-drain`; and
 - (b) the **child-session-abort** effect for that sub-run's in-flight attempt's
-  `:execution-session-id` (D15).
+  `:execution-session-id` (D15), emitted in the **cancel dispatch's effect set**
+  through the `:effects` interceptor (D23).
 
 The single parent-thread `future-cancel(true)` interrupt (D7/D8 push) wakes the
 parent worker wherever it is parked in the synchronous sub-tree (a sub-run's
@@ -1074,6 +1080,88 @@ remove-of-terminal; D17/D18 cancel-then-remove dispatch 2, whose handler always 
 the run as already `:cancelled`). The record drop is an unconditional, status-independent
 dissoc — only the cancellation effects are suppressed when the run is already terminal —
 so the gate never re-orphans a terminal run.
+
+## Transitive-Cascade Re-Dispatch Reconciliation (ψ pass 5, 2026-06-10)
+
+Resolves the pass-5 architecture-fit follow-up: the transitive cascade's
+per-descendant terminal transitions had **no stated issue mechanism** (unlike the
+cancel-then-remove second dispatch, which D18 pins to a re-entrant
+`:runtime/dispatch-event` effect), leaving an implementer free to place the
+recursion in a command-layer loop / inline cross-handle reach-in (D1/D3/D18
+violation), and was unreconciled with the D4/D20 single-run atom-CAS atomicity
+basis. States the cascade's issue mechanism and atomicity shape. No step-machine
+redesign; the cancellation effect set is unchanged.
+
+### D23. Cascade = one multi-run apply-phase `:root-state-update` within the single parent-cancel dispatch (option (a); not N re-entrant dispatches)
+
+The follow-up's two candidates are: (a) a **single multi-run apply-phase
+`:root-state-update`** over the enumerated descendant set within the one
+parent-cancel dispatch, or (b) **N re-entrant `:runtime/dispatch-event` cancel
+dispatches**, one per descendant (reusing D18's mechanism). **Decision: option
+(a).**
+
+**Why (a), not (b).** The cancel-then-**remove** split needs a re-entrant
+`:runtime/dispatch-event` (D18) **only because** the record-removal is a pure
+`:state*` dissoc that must be sequenced **after** the terminalize *effect*, and
+apply-before-effects makes that intra-dispatch ordering impossible (D17) — so the
+removal is forced into a *subsequent* dispatch. The cascade has **no such
+after-effect ordering constraint**: every per-descendant `:cancelled` signal is a
+**pure `:state*` transition** with no dependency on any effect. Pure transitions
+**compose into one apply-phase update fn**; there is nothing to sequence after an
+effect, so re-dispatch buys nothing and option (b) would only multiply dispatches,
+event-log entries, and CASes while complicating the ordering of the parent's own
+terminal transition + the D14 single top-level `future-cancel` against N child
+dispatches. Option (a) is the simpler fit (`λ build` simple > complex; one-pass
+resonance) and keeps the recursion as a **pure canonical-state read + a single
+multi-run update fn**, never a command-layer loop or cross-handle reach-in
+(D1/D3/D18).
+
+**Mechanism.** The single parent-cancel dispatch:
+
+1. **Enumerate (handler-`:before`, pure read).** Read the transitive descendant set
+   from canonical `:state*` by `:delegating-run-id` parentage, keeping non-terminal
+   (`#{:pending :running :blocked}`) runs (D14). The cancelled run ∪ this descendant
+   set = the **cascade set**.
+2. **Apply (one `:root-state-update`, one CAS).** The update fn applies the
+   `:cancelled` terminal transition to **every** run in the cascade set, with each
+   run's terminal-status precondition guard evaluated **inside** the same
+   `:root-state-update` fn (D20) — so the whole subtree terminalization rides **one
+   atom CAS**. A descendant already terminal at apply time is a per-run no-op via its
+   in-fn guard.
+3. **Effects (cancel dispatch's effect set, `:effects` interceptor).** Emit, through
+   the dispatch `:effects` interceptor (D1/D12 — canonical `:runtime/*`, parity,
+   replay-trim, trace): the **single** top-level worker `future-cancel(true)` **iff
+   the directly-cancelled run is the top-level run** (D14/D19); one
+   `:runtime/agent-abort` per in-flight descendant attempt (D15 live-attempt
+   predicate); and the D13 `:runtime/mark-workflow-jobs-terminal` terminalization.
+   No per-descendant re-dispatch.
+
+**Reconciliation with D4/D20 (atomicity).** D20's single-run atomicity (terminal
+guard inside the `:root-state-update` fn riding one CAS) **generalises directly** to
+the multi-run cascade: the cascade's per-run guards all live inside the *one*
+`:root-state-update` fn applied by the *one* apply-phase `swap!` CAS, so the entire
+subtree transition is **a single atomic CAS** — strictly stronger than option (b)'s
+N independent CASes. Concurrency cases converge identically: a cancel racing a
+descendant's natural completion re-runs the multi-run update fn against the
+already-`:cancelled` descendant and no-ops that run's portion (no double-terminal, no
+resurrection), exactly as D20 for a single run.
+
+**Enumeration-race bound.** The cascade set is captured at handler-`:before`; a
+descendant that becomes terminal before the CAS is no-op'd by its in-fn guard
+(harmless), and its already-computed `:runtime/agent-abort` is no-op'd at execute
+time by the D22.2 live-attempt re-check. A descendant **spawned after** enumeration
+is bounded by D6/D2/D10: once the parent run is `:cancelled`, the cooperative pull
+checkpoint refuses to advance/spawn further sub-runs, so a late descendant cannot be
+driven past its checkpoint — the enumeration snapshot is sufficient and no
+re-enumeration loop is required.
+
+**Cross-reference (D18).** D18's re-entrant `:runtime/dispatch-event` is reserved for
+the cancel-then-**remove** record drop (a pure transition that must run *after* an
+effect — forced cross-dispatch). The **cascade** is *all* pure transitions with no
+after-effect ordering, so it stays **inside one dispatch's apply phase** (D23) — the
+two re-dispatch questions have different answers because their ordering constraints
+differ. D3/D14 updated to name the single multi-run apply-phase transition + the
+cancel-dispatch effect set as the cascade's issue mechanism.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

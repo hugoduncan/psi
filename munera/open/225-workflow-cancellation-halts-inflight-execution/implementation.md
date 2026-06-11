@@ -979,3 +979,54 @@ One **new** actionable misfit:
 
 No other new actionable architectural-fit misfit found; D1–D22 cover the remaining
 boundary commitments.
+
+## Architecture-fit follow-up resolution (ψ pass 5, 2026-06-10)
+
+Executed the single pass-5 architecture-fit follow-up design-step (a
+design-decision step: pin the transitive cascade's per-descendant
+terminal-transition issue mechanism to the canonical dispatch boundary and
+reconcile it with the D4/D20 atom-CAS atomicity basis). Completable now — no
+blocker. Premises re-confirmed from the established decisions before deciding:
+the cascade enumeration is a pure canonical-`:state*` read (D3/D14); each
+per-descendant `:cancelled` signal is a pure `:state*` transition (D2/D4); D18's
+re-entrant `:runtime/dispatch-event` exists only because the record-drop is a pure
+transition forced *after* an effect (D17 apply-before-effects); D20's atomicity is
+the apply-phase atom CAS with the terminal guard inside the `:root-state-update` fn.
+
+Resolution written to design.md as "Transitive-Cascade Re-Dispatch Reconciliation
+(ψ pass 5)" D23, with D3 and D14 updated:
+
+- D23 — chose option (a): the cascade is a **single multi-run apply-phase
+  `:root-state-update`** over the cascade set (cancelled run ∪ non-terminal
+  `:delegating-run-id` descendants, D14) within the **one parent-cancel dispatch**;
+  each run's terminal-status guard lives inside the one `:root-state-update` fn, so
+  the entire subtree terminalization rides **one atom CAS** — D20's single-run
+  atomicity generalised, strictly stronger than option (b)'s N independent CASes.
+  Cancellation effects (single top-level `future-cancel` iff top-level cancel —
+  D14/D19; one `:runtime/agent-abort` per in-flight descendant attempt — D15; D13
+  terminalize) are emitted as the cancel dispatch's effect set through the
+  `:effects` interceptor (D1/D12). No per-descendant re-dispatch; no command-layer
+  loop / cross-handle reach-in.
+- Rejected option (b) (N re-entrant `:runtime/dispatch-event` cancel dispatches):
+  the cascade's per-descendant signals are **pure `:state*` transitions with no
+  after-effect ordering constraint**, so they compose into one apply-phase update
+  fn — re-dispatch buys nothing and only multiplies dispatches/event-log
+  entries/CASes while complicating ordering vs the parent's own terminal transition
+  + the D14 single top-level `future-cancel`. The D18 re-entrant dispatch is needed
+  *only* for the record-drop, which (unlike the cascade signals) must be sequenced
+  *after* the terminalize effect (D17) — different ordering constraint, different
+  answer. Stated as the D18 cross-ref.
+- Enumeration-race bound stated: a descendant terminal-by-apply is a per-run in-fn
+  guard no-op + its already-computed `:runtime/agent-abort` is no-op'd at execute
+  time by the D22.2 live-attempt re-check; a descendant spawned after enumeration is
+  bounded by D6/D2/D10 (once the parent is `:cancelled` the cooperative checkpoint
+  refuses to advance/spawn), so the handler-before enumeration snapshot is
+  sufficient — no re-enumeration loop.
+
+Consistency check: D23 is consistent with D1/D12 (canonical `:runtime/*` effects
+through the `:effects` interceptor), D3/D14/D15 (downward cascade, single top-level
+future target, per-attempt abort), D4/D20 (atom-CAS atomicity, guard inside the
+update fn — now multi-run), D18 (re-entrant dispatch reserved for the
+ordering-forced record-drop), and D22.2 (execute-time idempotency for the
+concurrent-CAS race). No step-machine redesign; cancellation effect set unchanged;
+no new contradictions introduced.

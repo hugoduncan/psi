@@ -367,7 +367,7 @@
 
 ## Architecture-fit follow-ups (ψ pass 5, 2026-06-10)
 
-- [ ] Pin the transitive cascade re-dispatch mechanism to the effects-as-data
+- [x] Pin the transitive cascade re-dispatch mechanism to the effects-as-data
       dispatch boundary (consistent with D1/D12/D18) and reconcile it with the
       D4/D20 single-run apply-phase atom-CAS atomicity basis. D3 describes the
       cascade as "enumerates in-flight nested sub-runs from canonical run-tree
@@ -392,3 +392,25 @@
       pathway the design otherwise mandates. (AGENTS.md S1 effects / S3 dispatch,
       `λ(state)`, `λ shims_adapters`; doc/architecture.md dispatch sequencing +
       State boundary; design.md D1/D4/D12/D18/D20)
+      → design.md D23: option (a) — the cascade is a **single multi-run apply-phase
+      `:root-state-update`** over the enumerated descendant set (cancelled run ∪
+      non-terminal `:delegating-run-id` descendants, D14) within the **one
+      parent-cancel dispatch**; per-run terminal guards live inside the one
+      `:root-state-update` fn → the whole subtree terminalization rides **one atom
+      CAS** (D20 generalised; strictly stronger than option (b)'s N CASes). Effects
+      (single top-level `future-cancel` iff top-level cancel per D14/D19; one
+      `:runtime/agent-abort` per in-flight descendant attempt per D15; D13
+      terminalize) emitted as the cancel dispatch's effect set through the
+      `:effects` interceptor (D1/D12). Option (b) (N re-entrant
+      `:runtime/dispatch-event`) rejected: the cascade's per-descendant `:cancelled`
+      signals are **pure `:state*` transitions with no after-effect ordering
+      constraint** (unlike the D17/D18 record-drop, which must run *after* the
+      terminalize effect → forced cross-dispatch), so they compose into one
+      apply-phase update fn; re-dispatch buys nothing and only multiplies
+      dispatches/CASes. Enumeration-race bound stated (in-fn guard + D22.2 execute-time
+      no-op for terminal-by-apply descendants; D6/D2/D10 cooperative checkpoint bounds
+      late-spawned descendants). D3/D14 updated to name the single multi-run
+      apply-phase transition + cancel-dispatch effect set; D18 cross-ref added
+      distinguishing the cascade (intra-dispatch, all pure) from the remove
+      re-dispatch (cross-dispatch, ordering-forced). No command-layer loop / no
+      cross-handle reach-in. No blocker.
