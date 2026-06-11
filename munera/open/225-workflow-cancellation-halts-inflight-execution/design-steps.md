@@ -729,3 +729,8 @@
       D28/D15 schema implication updated; executor keeps existing session-id-only
       behaviour when no guard is present and applies the D28 liveness re-check only
       for guarded payloads.
+
+## Ambiguity follow-ups (ψ pass 14, 2026-06-11)
+
+- [ ] Pin one canonical workflow-cancellation `:runtime/agent-abort` guard payload shape. D28/D15 show flat top-level keys (`:workflow-run-id`, `:workflow-step-id`, `:workflow-attempt-id`, `:expected-session-id`) while D32 says the schema may instead use a required nested `:workflow-abort-guard` map. Choose flat or nested, update D28/D32/effect-schema implications, and make emitters/executor/tests target that single shape.
+- [ ] Clarify absent `remove-run` side effects and `:noop?` meaning. D26's terminal/absent branch emits the bare record-drop plus `:runtime/drop-inflight-run`, but D29/Acceptance #10 call absent remove a success/idempotent no-op (`:removed? false`, `:found? false`, `:noop? true`). State whether an absent remove still emits `:runtime/drop-inflight-run` to clear any orphaned handle, and whether `:noop?` means "no canonical record removed" rather than "no effects emitted".

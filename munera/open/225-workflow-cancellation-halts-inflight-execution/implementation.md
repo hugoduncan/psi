@@ -1643,3 +1643,13 @@ results, cancellation-control effects, and the apply-phase CAS checkpoint withou
 moving state/side effects outside dispatch.
 
 No new design-steps.md follow-up item added.
+
+## Ambiguity review (ψ pass 14, 2026-06-11)
+
+Fresh ambiguity pass over design.md after D32, consulting the dispatch effect schema/order and existing `:runtime/dispatch-event` / `:runtime/agent-abort` shapes. Two new actionable ambiguities found:
+
+1. **Workflow-cancel `:runtime/agent-abort` guard payload shape is reopened.** D28 defines a concrete flat payload (`:workflow-run-id`, `:workflow-step-id`, `:workflow-attempt-id`, `:expected-session-id`) and D15 cross-references that flat shape, but D32 says the schema may instead use a required nested `:workflow-abort-guard` map. Emitters, schema, executor, and tests need one canonical payload shape; otherwise flat and nested guarded aborts are both plausible interpretations.
+
+2. **Absent `remove-run`: public no-op vs cleanup effect is not explicit.** D26 groups terminal/absent `remove-run` into the bare-dissoc + `:runtime/drop-inflight-run` cleanup branch, while D29/Acceptance #10 describe absent remove as success/idempotent no-op (`:removed? false`, `:found? false`, `:noop? true`). The design should state whether absent remove still emits `:runtime/drop-inflight-run` to clean a possible orphaned handle, and whether `:noop?` means no canonical record removed vs no effects at all.
+
+No other new actionable ambiguity found; the remaining D1–D32 contracts otherwise choose single behaviours.
