@@ -3046,3 +3046,23 @@ and a stop check to the memory recovery effect. Add a regression that forces can
 after prepare handler/effect-vector construction but before effects execution.
 
 No tests run (review-only pass).
+
+## Implementation review follow-up pass 20 (ψ, 2026-06-11)
+
+Made post-prepare prompt-lifecycle effects workflow-cancellation-safe. The prepare
+handler now tags workflow-owned ordinary effects emitted after request preparation
+with `:workflow-run-id`: standalone `:memory/recover-query`,
+`:runtime/prompt-execute-and-record`, the combined
+`:runtime/recover-query-prompt-execute-and-record`, and adjacent steering-queue
+cleanup. The effect schema permits those optional guards, and the effect executor
+re-reads the canonical run stop signal from `:workflow-run-id` before running
+memory recovery, provider execution, or guarded steering cleanup. This closes the
+window where D31 cancellation lands after the prepare handler constructed the
+effect vector but before the effects interceptor executes it.
+
+Regression coverage in `prompt_lifecycle_workflow_cancellation_test` now builds the
+real normal-path prepare effects, cancels the workflow before executing them, and
+asserts neither standalone memory recovery nor provider execution starts. Focused
+prompt-lifecycle cancellation tests, focused prompt-lifecycle tests, focused
+workflow call-start cancellation tests, focused workflow-cancellation dispatch
+tests, and focused clj-kondo passed.

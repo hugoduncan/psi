@@ -61,17 +61,28 @@
 (defn- effect-agent-ctx [ctx effect] (ss/agent-ctx-in ctx (effect-session-id ctx effect)))
 (defn- effect-sc-session-id [ctx effect] (ss/sc-session-id-in ctx (effect-session-id ctx effect)))
 
-(defn- workflow-session-stop-signal
-  [ctx session-id]
-  (let [session-data (ss/get-session-data-in ctx session-id)
-        run-id (:workflow-run-id session-data)
-        state* (:state* ctx)
+(defn- workflow-run-stop-signal
+  [ctx run-id]
+  (let [state* (:state* ctx)
         run (when (and state* run-id)
               (get-in @state* [:workflows :runs run-id]))]
-    (when (and (:workflow-owned? session-data) state* run-id)
+    (when (and state* run-id)
       (cond
         (nil? run) :removed
         (= :cancelled (:status run)) :cancelled))))
+
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (let [session-data (ss/get-session-data-in ctx session-id)]
+    (when (:workflow-owned? session-data)
+      (workflow-run-stop-signal ctx (:workflow-run-id session-data)))))
+
+(defn- workflow-effect-stop-signal
+  [ctx effect]
+  (or (when-let [run-id (:workflow-run-id effect)]
+        (workflow-run-stop-signal ctx run-id))
+      (when-let [session-id (effect-session-id ctx effect)]
+        (workflow-session-stop-signal ctx session-id))))
 
 (defn- stopped-workflow-execution-result
   [session-id reason]
@@ -177,7 +188,8 @@
 (defmethod execute-effect! :runtime/agent-queue-follow-up [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/queue-follow-up-in! ac (:message effect))))
 (defmethod execute-effect! :runtime/agent-clear-steering-queue [ctx effect]
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-steering-queue-in! ac)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-steering-queue-in! ac))))
 (defmethod execute-effect! :runtime/agent-clear-follow-up-queue [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-follow-up-queue-in! ac)))
 (defmethod execute-effect! :runtime/agent-drain-follow-up-queue [ctx effect]
@@ -249,10 +261,10 @@
   (let [session-id (effect-session-id ctx effect)
         prepared-request (:prepared-request effect)
         progress-queue (:progress-queue effect)]
-    (if-let [reason (workflow-session-stop-signal ctx session-id)]
+    (if-let [reason (workflow-effect-stop-signal ctx effect)]
       (stopped-workflow-execution-result session-id reason)
       (let [execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)]
-        (if-let [reason (workflow-session-stop-signal ctx session-id)]
+        (if-let [reason (workflow-effect-stop-signal ctx effect)]
           (stopped-workflow-execution-result session-id reason)
           (let [_ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
                 latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
@@ -273,7 +285,7 @@
 
 (defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
   (let [session-id (effect-session-id ctx effect)]
-    (if-let [reason (workflow-session-stop-signal ctx session-id)]
+    (if-let [reason (workflow-effect-stop-signal ctx effect)]
       (stopped-workflow-execution-result session-id reason)
       (do
         (when-let [query-text (:query-text effect)]
@@ -408,8 +420,9 @@
 
 (defmethod execute-effect! :memory/capture [_ctx effect]
   (memory/remember-in! (:memory-ctx effect) {:content-type :note :content (:text effect) :tags [:remember :manual] :provenance (:provenance effect)}))
-(defmethod execute-effect! :memory/recover-query [_ctx effect]
-  (when-let [query-text (:query-text effect)] (memory-runtime/recover-for-query! query-text)))
+(defmethod execute-effect! :memory/recover-query [ctx effect]
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (when-let [query-text (:query-text effect)] (memory-runtime/recover-for-query! query-text))))
 
 (defmethod execute-effect! :background-job/cancel [ctx effect]
   (let [job (:job effect)]

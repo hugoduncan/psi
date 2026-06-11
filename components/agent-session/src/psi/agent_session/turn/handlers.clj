@@ -76,22 +76,28 @@
   [prepared-request]
   (turn-request/prepared-request-query-text prepared-request))
 
+(defn- with-workflow-guard
+  [effect workflow-run-id]
+  (cond-> effect
+    workflow-run-id (assoc :workflow-run-id workflow-run-id)))
+
 (defn prompt-prepare-request-effects
-  [prepared-request progress-queue steering-consumed? return-execution-result?]
-  (cond-> (vec (remove nil?
-                       [(if return-execution-result?
-                          {:effect/type      :runtime/recover-query-prompt-execute-and-record
-                           :query-text       (prepared-request-query-text prepared-request)
-                           :prepared-request prepared-request
-                           :progress-queue   progress-queue}
-                          {:effect/type :memory/recover-query
-                           :query-text (prepared-request-query-text prepared-request)})
-                        (when-not return-execution-result?
-                          {:effect/type      :runtime/prompt-execute-and-record
-                           :prepared-request prepared-request
-                           :progress-queue   progress-queue})]))
-    steering-consumed?
-    (conj {:effect/type :runtime/agent-clear-steering-queue})))
+  [prepared-request progress-queue steering-consumed? return-execution-result? workflow-run-id]
+  (let [guard #(with-workflow-guard % workflow-run-id)]
+    (cond-> (vec (remove nil?
+                         [(if return-execution-result?
+                            (guard {:effect/type      :runtime/recover-query-prompt-execute-and-record
+                                    :query-text       (prepared-request-query-text prepared-request)
+                                    :prepared-request prepared-request
+                                    :progress-queue   progress-queue})
+                            (guard {:effect/type :memory/recover-query
+                                    :query-text (prepared-request-query-text prepared-request)}))
+                          (when-not return-execution-result?
+                            (guard {:effect/type      :runtime/prompt-execute-and-record
+                                    :prepared-request prepared-request
+                                    :progress-queue   progress-queue}))]))
+      steering-consumed?
+      (conj (guard {:effect/type :runtime/agent-clear-steering-queue})))))
 
 (defn- workflow-session-stop-signal
   [ctx session-id]
@@ -152,7 +158,7 @@
                                       (prepared-request-state-summary turn-id prepared-request))
                          api-key            (assoc :runtime-api-key api-key)
                          steering-consumed? (assoc :steering-messages [])))
-                     :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result?)
+                     :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
                      :return-effect-result? true}
               (not return-execution-result?)
               (assoc :return {:prepared-request prepared-request}))))))))

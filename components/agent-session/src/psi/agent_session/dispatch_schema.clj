@@ -35,7 +35,8 @@
     [:map [:effect/type [:= :runtime/drop-workflow-cancellation-entry-lock]]
      [:run-id :string]]]
    [:runtime/agent-clear-steering-queue
-    [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]]]
+    [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/agent-clear-follow-up-queue
     [:map [:effect/type [:= :runtime/agent-clear-follow-up-queue]]]]
    [:runtime/agent-drain-follow-up-queue
@@ -97,7 +98,8 @@
    [:runtime/prompt-execute-and-record
     [:map [:effect/type [:= :runtime/prompt-execute-and-record]]
      [:prepared-request :map]
-     [:progress-queue {:optional true} :any]]]
+     [:progress-queue {:optional true} :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/prompt-continue-chain
     [:map [:effect/type [:= :runtime/prompt-continue-chain]]
      [:execution-result :map]
@@ -165,12 +167,14 @@
      [:provenance :map]]]
    [:memory/recover-query
     [:map [:effect/type [:= :memory/recover-query]]
-     [:query-text [:maybe :string]]]]
+     [:query-text [:maybe :string]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/recover-query-prompt-execute-and-record
     [:map [:effect/type [:= :runtime/recover-query-prompt-execute-and-record]]
      [:prepared-request :map]
      [:progress-queue {:optional true} :any]
-     [:query-text [:maybe :string]]]]
+     [:query-text [:maybe :string]]
+     [:workflow-run-id {:optional true} :string]]]
    [:oauth/begin-login
     [:map [:effect/type [:= :oauth/begin-login]]
      [:provider-id :keyword]

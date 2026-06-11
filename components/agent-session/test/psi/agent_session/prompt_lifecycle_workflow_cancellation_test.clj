@@ -2,7 +2,11 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch-effects :as dispatch-effects]
+   [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.turn.handlers :as turn-handlers]
+   [psi.memory.runtime :as memory-runtime]
    [psi.session-state.state :as ss]
    [psi.workflow-registry.registry :as workflow-registry]
    [psi.workflow-runtime.core :as workflow-runtime]))
@@ -119,3 +123,55 @@
         (is (nil? (:last-prepared-request-summary (ss/get-session-data-in ctx session-id)))
             "cancelled prepare must not record ordinary prompt lifecycle state")))))
 
+(deftest workflow-cancel-after-prepare-before-effects-blocks-memory-and-provider-effects-test
+  ;; Regression for task 225 pass 20: prompt-prepare may already have built an
+  ;; effect vector when cancellation lands before the effects interceptor runs.
+  ;; Workflow-guarded post-prepare effects must re-read the canonical stop signal
+  ;; and no-op rather than starting memory recovery or provider execution.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-prepare-effects-cancel"
+        memory-calls* (atom [])
+        execute-calls* (atom 0)
+        ctx (assoc ctx0
+                   :execute-prepared-request-fn
+                   (fn [& _]
+                     (swap! execute-calls* inc)
+                     {:execution-result/turn-id "turn-1"
+                      :execution-result/session-id session-id
+                      :execution-result/assistant-message {:role "assistant"
+                                                           :content [{:type :text :text "must not execute"}]
+                                                           :stop-reason :stop}
+                      :execution-result/turn-outcome :turn.outcome/stop}))
+        prepared-request {:prepared-request/id "turn-1"
+                          :prepared-request/user-message {:role "user"
+                                                          :content [{:type :text :text "recover this"}]}}
+        effects (mapv #(assoc % :session-id session-id)
+                      (turn-handlers/prompt-prepare-request-effects
+                       prepared-request nil false false run-id))]
+    (is (= [:memory/recover-query :runtime/prompt-execute-and-record]
+           (mapv :effect/type effects))
+        "regression must exercise the normal non-returning prepare effect vector")
+    (is (every? #(= run-id (:workflow-run-id %)) effects)
+        "workflow-owned post-prepare effects carry a canonical run guard")
+    (is (every? dispatch-schema/valid-effect? effects)
+        "workflow-guarded post-prepare effects must remain valid dispatch effects")
+    (install-workflow-run! ctx run-id)
+    (swap! (:state* ctx)
+           update-in (ss/session-data-path session-id)
+           assoc
+           :workflow-owned? true
+           :workflow-run-id run-id
+           :workflow-step-id "plan"
+           :workflow-attempt-id "attempt-plan")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "prepare effects race"}
+                          {:origin :core})
+    (with-redefs [memory-runtime/recover-for-query! (fn [query-text]
+                                                      (swap! memory-calls* conj query-text))]
+      (doseq [effect effects]
+        (dispatch-effects/execute-effect! ctx effect)))
+    (is (= [] @memory-calls*)
+        "standalone memory recovery must not execute after workflow cancellation")
+    (is (= 0 @execute-calls*)
+        "provider execution must not execute after workflow cancellation")))
