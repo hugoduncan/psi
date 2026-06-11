@@ -2531,3 +2531,8 @@ Verification:
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.workflow-runtime.execution-adapter-test` → 32 tests / 143 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 27 tests / 135 assertions green.
 - `clj-kondo --lint components/workflow-runtime/src/psi/workflow_runtime/execution_adapter.clj components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/workflow_judge.clj components/workflow-runtime/test/psi/workflow_runtime/execution_adapter_test.clj components/agent-session/test/psi/agent_session/workflow_judge_test.clj components/agent-session/test/psi/agent_session/workflow_statechart_runtime_cancellation_test.clj` → clean.
+
+Additional gate verification after pass-4 follow-ups:
+
+- `bb test` → green.
+- `clj-kondo --lint components` → errors 0 / warnings 0; existing info-level suggestions outside this pass remain.
