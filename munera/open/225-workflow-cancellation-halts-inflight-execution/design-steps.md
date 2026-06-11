@@ -821,3 +821,15 @@
       public D29 no-op result is unchanged because no canonical record was removed
       and no cancel transition applied. D24/D26/D29/D34/D35 and Acceptance #10 aligned
       so a stale live handle is interrupted before being dropped.
+
+## Ambiguity follow-ups (ψ pass 20, 2026-06-11)
+
+- [ ] Pin the canonical state-kernel dispatch event types for workflow
+      `cancel-run` and `remove-run`. D18's re-entrant `:runtime/dispatch-event`
+      requires a keyword `:event-type`, but the current public operations are
+      Pathom mutation symbols (`'psi.workflow/cancel-run`,
+      `'psi.workflow/remove-run`) and D18 still uses a placeholder
+      (`<remove-run dispatch>`). Choose exact event keywords, state the event-data
+      shape, and state how the Pathom mutations / delegate tool route into those
+      events so emitters, schema/tests, and the re-entrant remove dispatch have one
+      representation.

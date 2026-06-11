@@ -1846,3 +1846,25 @@ absent-remove stale-handle cleanup cancels before dropping the handle, preservin
 no-orphan invariant. Existing D18 doc-gap note for documenting `:runtime/dispatch-event`
 re-entrancy remains an implementation/doc follow-through item, not a new design
 architecture misfit.
+
+## Ambiguity review (ψ pass 20, 2026-06-11)
+
+Reviewed current `design.md` for ambiguity only after D36/D36b, consulting the
+state-kernel dispatch schema and existing Pathom workflow mutation names. Did not
+review `plan.md` or `steps.md`.
+
+One new actionable ambiguity found:
+
+1. **Canonical dispatch event types for workflow cancel/remove are not pinned.**
+   D18 requires a re-entrant `:runtime/dispatch-event` for the remove second pass,
+   whose schema requires a keyword `:event-type`, and D26 defines `cancel-run` /
+   `remove-run` as the two dispatch entry events. But the current public operations
+   are Pathom mutation symbols (`'psi.workflow/cancel-run`, `'psi.workflow/remove-run`),
+   while D18 still uses a placeholder (`<remove-run dispatch>`) and the design never
+   names the actual state-kernel event keywords. Builders/tests could choose
+   different event types (`:psi.workflow/remove-run`, `:workflow/remove-run`,
+   `:session/workflow-remove-run`, etc.) or try to feed the Pathom symbol through a
+   keyword-only effect. Pin the canonical dispatch event keywords and how the public
+   Pathom mutations/delegate tool route into them.
+
+No other new actionable ambiguity found in the current D1–D36b design.
