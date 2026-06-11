@@ -314,7 +314,9 @@
                               (stopped-execution-result session-id reason)
                               (do
                                 (call-workflow-turn-start-hook! ctx session-id session-data :after-call-commit)
-                                (execution-adapter/prompt-execution-result! ctx session-id text images opts)))))))))))))))))
+                                (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
+                                  (stopped-execution-result session-id reason)
+                                  (execution-adapter/prompt-execution-result! ctx session-id text images opts))))))))))))))))))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

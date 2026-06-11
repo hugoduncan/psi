@@ -277,7 +277,9 @@
                                          (workflow-stopped-result operation invocation reason)
                                          (do
                                            (call-workflow-operation-start-hook! operation invocation :after-call-commit)
-                                           ((:handler operation) (assoc invocation :operation-id (:id operation)))))))))))))))
+                                           (if-let [reason (workflow-stop-signal invocation)]
+                                             (workflow-stopped-result operation invocation reason)
+                                             ((:handler operation) (assoc invocation :operation-id (:id operation))))))))))))))))
                    (catch Throwable t
                      {:status :error
                       :reason :operation-threw

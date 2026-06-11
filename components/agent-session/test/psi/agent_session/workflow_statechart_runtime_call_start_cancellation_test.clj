@@ -501,3 +501,103 @@
           "the race is after successful operation call-begin")
       (is (nil? (:operation-call-committed-at attempt)))
       (is (empty? (get-in run [:step-runs "next" :attempts]))))))
+
+(deftest actor-turn-call-commit-to-call-race-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 14: cancellation after
+  ;; successful actor call commit but before prompt adapter entry must still
+  ;; prevent ordinary actor work from starting.
+  (let [[ctx0 session-id] (create-session-context)
+        prompt-calls* (atom 0)
+        ctx (test-support/with-workflow-execution-adapter-overrides
+              (assoc ctx0
+                     :before-workflow-turn-start-fn
+                     (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id phase]}]
+                       (when (= :after-call-commit phase)
+                         (swap! (:state* ctx)
+                                (fn [state]
+                                  (-> state
+                                      (assoc-in [:workflows :runs workflow-run-id :status] :cancelled)
+                                      (assoc-in [:workflows :runs workflow-run-id :finished-at] (java.time.Instant/now))
+                                      (assoc-in [:workflows :runs workflow-run-id :terminal-outcome]
+                                                {:outcome :cancelled
+                                                 :reason "actor call-commit race"
+                                                 :step-id workflow-step-id})))))))
+              {:get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id "run-actor-call-commit-race"
+                                    :workflow-step-id "plan"
+                                    :workflow-attempt-id "attempt-plan"})
+               :prompt-execution-result! (fn [& _]
+                                           (swap! prompt-calls* inc)
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "must not start"}]
+                                             :stop-reason :stop}})})
+        _ (install-run! ctx linear-definition "run-actor-call-commit-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-call-commit-race")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id _opts]
+                    {:attempt {:attempt-id "attempt-plan"
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"}})]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-call-commit-race")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 0 @prompt-calls*)
+          "the prompt adapter must not be called after cancellation wins the call-commit window")
+      (is (= :committed (:turn-call-state attempt))
+          "the race is after successful actor call commit")
+      (is (:turn-call-committed-at attempt))
+      (is (= :running (:status attempt))))))
+
+(deftest invoke-operation-call-commit-to-call-race-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 14: cancellation after
+  ;; successful deterministic-operation call commit but before handler entry must
+  ;; still prevent ordinary operation work from starting.
+  (let [[ctx0 session-id] (create-session-context)
+        operation-calls* (atom 0)
+        op-reg (:deterministic-operation-registry ctx0)
+        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+           op-reg
+           {:id "workflow/call-commit-race"
+            :handler (fn [_]
+                       (swap! operation-calls* inc)
+                       {:status :ok :data {:started? true}})})
+        ctx (assoc ctx0
+                   :before-workflow-operation-start-fn
+                   (fn [ctx {:keys [workflow-run-id step-id phase]}]
+                     (when (= :after-call-commit phase)
+                       (swap! (:state* ctx)
+                              (fn [state]
+                                (-> state
+                                    (assoc-in [:workflows :runs workflow-run-id :status] :cancelled)
+                                    (assoc-in [:workflows :runs workflow-run-id :finished-at] (java.time.Instant/now))
+                                    (assoc-in [:workflows :runs workflow-run-id :terminal-outcome]
+                                              {:outcome :cancelled
+                                               :reason "invoke call-commit race"
+                                               :step-id step-id})))))))
+        definition {:definition-id "invoke-call-commit-race"
+                    :steps [{:name "invoke"
+                             :type :invoke
+                             :operation "workflow/call-commit-race"
+                             :args {}}
+                            {:name "next"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "Next"
+                                              :vars {}}]}]}
+        _ (install-run! ctx definition "run-invoke-call-commit-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-invoke-call-commit-race")]
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-invoke-call-commit-race")
+          attempt (get-in run [:step-runs "invoke" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 0 @operation-calls*)
+          "the operation handler must not be called after cancellation wins the call-commit window")
+      (is (= :committed (:operation-call-state attempt))
+          "the race is after successful operation call commit")
+      (is (:operation-call-committed-at attempt))
+      (is (empty? (get-in run [:step-runs "next" :attempts]))))))

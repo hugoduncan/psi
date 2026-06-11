@@ -2852,3 +2852,19 @@ Reviewed the pass-13 call-begin/call-commit changes against `task-implementation
 New actionable issue: the ordinary work still happens after a final committed marker outside a cancellation-safe boundary. For actor/judge turns, `:turn-call-state :committed` is written and then `prompt-dispatch!` performs only a check-then-submit; a D31 cancel CAS can land after `prompt-dispatch!`'s stop read but before `:session/prompt-submit`, allowing ordinary prompt/journal work after cancellation. For deterministic operations, `:operation-call-state :committed` is written and the `after-call-commit` hook/handler are called with no further stop gate, so a cancel in that window can still invoke the operation handler. Follow-up should make the call-commit→ordinary-call boundary cancellation-safe (or make cancellation durably close/abort committed-not-called starts) and add regressions for actor, judge, and invoke cancellation after call commit before actual prompt-submit/handler entry.
 
 Validation during review: `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-cancellation-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.workflow-runtime.turn-execution-contract-test` → 26 tests / 107 assertions green.
+
+## Implementation review follow-up pass 14 (ψ, 2026-06-11)
+
+Closed the post-call-commit cancellation window. After actor/judge turn start or
+invoke-operation start commits `:turn-call-state` / `:operation-call-state` to
+`:committed`, the runtime now re-reads the canonical workflow stop signal before
+entering the prompt adapter or deterministic-operation handler. If cancellation or
+removal won during the `:after-call-commit` window, the start returns the existing
+workflow-stopped result instead of initiating ordinary work.
+
+Added regressions for actor turn, judge turn, and deterministic-operation invoke
+cancellation after successful call commit and before adapter/handler entry. Focused
+scry run for the call-start, broader statechart cancellation, judge cancellation,
+deterministic-operation runtime, and turn-execution-contract namespaces passed (29
+tests / 122 assertions). Focused clj-kondo over touched source/test files passed
+with 0 warnings.
