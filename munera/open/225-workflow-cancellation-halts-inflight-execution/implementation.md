@@ -2417,3 +2417,14 @@ Verification:
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 7 tests / 49 assertions green.
 - `bb clojure:test:scry --namespace psi.workflow-runtime.statechart-runtime.state-test` → 2 tests / 7 assertions green.
 - Focused `clj-kondo --lint` over changed workflow runtime source and test files → clean.
+
+## Implementation review (ψ pass 2, 2026-06-11)
+
+Reviewed the post-follow-up implementation against `task-implementation-review`, the D1–D38 design, current steps, and changed workflow cancellation code/tests/docs. The prior advancement-race follow-ups for step-entry attempt start and delegate sub-run creation are implemented and covered.
+
+New actionable issues remain in later statechart actions. Cancellation safety is not yet applied to ordinary result/judge writes after an event has entered `process-event!`: `:step/record-result`, `:step/record-failure`, `:judge/record`, and `:iteration/exhausted` can still mutate a run after a D31 cancel checkpoint if cancel races after the lifecycle stop-checkpoint but before their `swap!`; `:judge/record`/`:iteration/exhausted` can also overwrite `:cancelled` with `:running`, `:completed`, or `:failed`. Separately, judge execution is not part of the cooperative stop/abort path: `:judge/enter` has no stop check before/after `execute-judge!`, and the guarded cancel abort targets `:execution-session-id` but not an in-flight judge session, so a judge child turn can continue and write ordinary journal/session state after cancellation.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 40 tests / 198 assertions green.
+- Focused `clj-kondo --lint` over changed workflow-runtime cancellation source files → clean.
