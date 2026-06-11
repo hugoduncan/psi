@@ -3205,3 +3205,38 @@ Reviewed pass-23 `:on-agent-done` cancellation guards against `task-implementati
 New actionable issue: workflow-owned follow-up prompt dispatch can still build unguarded synthetic prompt effects. `prompt-finish` guards the outer `:runtime/dispatch-event-with-effect-result` to `:session/submit-synthetic-user-prompt`, but if D31 cancellation lands after that guarded dispatch effect's stop check admits the nested dispatch and before the nested handler's effects execute, `:session/submit-synthetic-user-prompt` returns unguarded `synthetic-user-prompt-effects`. The first unguarded `:session/prompt-submit` can append an ordinary follow-up user journal entry after cancellation; the later prompt/prepare dispatches rely on downstream guards but are still emitted without the workflow guard. Follow-up should derive/carry `:workflow-run-id` into `:session/submit-synthetic-user-prompt` and its synthetic lifecycle effects (or guard the handler/root effect vector equivalently), with a regression for cancellation between synthetic-follow-up handler-result construction and effect execution.
 
 No tests run (review-only pass).
+
+## Implementation review (ψ pass 25, 2026-06-11)
+
+Reviewed the current task state after pass 24. No implementation commits have landed
+since the pass-24 review. The working tree contains a partial uncommitted change in
+`turn.handlers/synthetic-user-prompt-effects` that can carry a workflow guard when
+one is supplied, but `:session/submit-synthetic-user-prompt` still does not derive
+or pass a `:workflow-run-id`, and there is no synthetic-follow-up stale-effect
+regression in the reviewed tree. This is the same actionable blocker already
+recorded as the unchecked pass-24 follow-up in `steps.md`; no additional distinct
+issue found, and no duplicate follow-up item added.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` → 24 tests / 117 assertions green.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/turn/handlers.clj` → errors 0, warnings 0.
+
+## Follow-up implementation pass 24 (ψ, 2026-06-11)
+
+Completed the pass-24 synthetic follow-up cancellation-safety item. `prompt-finish`
+now includes the workflow guard in the nested `:session/submit-synthetic-user-prompt`
+event data, and the synthetic prompt handler derives/passes that guard into
+`synthetic-user-prompt-effects`. The synthetic prompt-submit effect now carries the
+run id into its event data so `:session/prompt-submit` can tag follow-up user-journal
+append/repair effects with `:workflow-run-id`; stale guarded dispatch effects then
+no-op after D31 rather than appending a follow-up user message or starting prompt /
+prepare lifecycle work.
+
+Regression added in `prompt_lifecycle_workflow_cancellation_test.clj` for cancellation
+between synthetic-follow-up handler-result construction and effect execution. Focused
+verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 9 tests / 53 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` → 24 tests / 117 assertions green.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/turn/handlers.clj components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj components/agent-session/test/psi/agent_session/prompt_lifecycle_workflow_cancellation_test.clj` → errors 0, warnings 0.

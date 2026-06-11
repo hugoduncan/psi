@@ -29,8 +29,10 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [ctx {:keys [session-id user-msg]}]
-     (let [journal  (persist/all-entries-in ctx session-id)
+   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+     (let [run-id   (or workflow-run-id
+                        (:workflow-run-id (ss/get-session-data-in ctx session-id)))
+           journal  (persist/all-entries-in ctx session-id)
            messages (into []
                           (keep (fn [entry]
                                   (when (= :message (:kind entry))
@@ -39,8 +41,8 @@
            repairs  (prompt-request/tail-dangling-tool-result-repairs messages)
            effects  (into []
                           (concat
-                           (map #(journal-append-effect/append-message-effect session-id %) repairs)
-                           [(journal-append-effect/append-message-effect session-id user-msg)]))]
+                           (map #(journal-append-effect/append-message-effect session-id % run-id) repairs)
+                           [(journal-append-effect/append-message-effect session-id user-msg run-id)]))]
        {:effects effects
         :return {:submitted? true
                  :turn-id (str (java.util.UUID/randomUUID))
@@ -49,10 +51,12 @@
 
   (register-core-handler!
    :session/submit-synthetic-user-prompt
-   (fn [_ctx {:keys [session-id user-msg]}]
-     {:effects (turn.handlers/synthetic-user-prompt-effects session-id user-msg)
-      :return {:submitted? true
-               :user-msg user-msg}}))
+   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+     (let [run-id (or workflow-run-id
+                      (:workflow-run-id (ss/get-session-data-in ctx session-id)))]
+       {:effects (turn.handlers/synthetic-user-prompt-effects session-id user-msg run-id)
+        :return {:submitted? true
+                 :user-msg user-msg}})))
 
   (register-core-handler!
    :session/append-journal-entry

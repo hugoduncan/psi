@@ -467,3 +467,53 @@
         "stale on-agent-done must not emit background-job terminal messages after cancellation")
     (is (empty? (kernel/event-log-entries))
         "stale on-agent-done must not drain the scheduler after cancellation")))
+
+(deftest workflow-cancel-after-synthetic-follow-up-build-before-effects-blocks-stale-prompt-dispatch-test
+  ;; Regression for task 225 pass 24: prompt-finish's follow-up dispatch may have
+  ;; admitted :session/submit-synthetic-user-prompt and built that handler's pure
+  ;; result before D31 cancellation lands. The stale synthetic follow-up effects
+  ;; must not append the follow-up user message or start the next prompt lifecycle.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        run-id "run-synthetic-follow-up-built-then-cancelled"
+        user-msg {:role "user"
+                  :content [{:type :text :text "follow up"}]
+                  :timestamp (java.time.Instant/now)}
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)
+        handler-result ((:fn (kernel/handler-entry :session/submit-synthetic-user-prompt))
+                        ctx
+                        {:session-id session-id
+                         :workflow-run-id run-id
+                         :user-msg user-msg})]
+    (is (= [:runtime/dispatch-event-with-effect-result
+            :runtime/dispatch-event
+            :runtime/dispatch-event-with-effect-result]
+           (mapv :effect/type (:effects handler-result)))
+        "regression must exercise the synthetic follow-up prompt lifecycle effects")
+    (is (= [:session/prompt-submit
+            :session/prompt
+            :session/prompt-prepare-request]
+           (mapv :event-type (:effects handler-result)))
+        "synthetic follow-up handler starts with prompt-submit, prompt, and prepare effects")
+    (is (every? #(= run-id (:workflow-run-id %)) (:effects handler-result))
+        "workflow-owned synthetic follow-up effects carry the workflow guard")
+    (is (every? #(= run-id (get-in % [:event-data :workflow-run-id]))
+                (filter #(= :session/prompt-submit (:event-type %)) (:effects handler-result)))
+        "prompt-submit receives the workflow guard so stale user-journal append effects are guarded too")
+    (is (every? dispatch-schema/valid-effect? (:effects handler-result))
+        "workflow-guarded synthetic follow-up effects must remain valid")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "synthetic follow-up built before cancel"}
+                          {:origin :core})
+    (kernel/clear-event-log!)
+    (doseq [effect (:effects handler-result)]
+      (dispatch-effects/execute-effect! ctx (assoc effect :session-id session-id)))
+    (is (= [] (journal-messages ctx session-id))
+        "stale synthetic follow-up prompt-submit must not append a user journal entry after cancellation")
+    (is (= :idle (ss/sc-phase-in ctx session-id))
+        "stale synthetic follow-up prompt must not transition the session into streaming after cancellation")
+    (is (nil? (:last-prepared-request-summary (ss/get-session-data-in ctx session-id)))
+        "stale synthetic follow-up prepare must not record ordinary request state after cancellation")
+    (is (empty? (kernel/event-log-entries))
+        "stale synthetic follow-up effects must not re-enter ordinary prompt lifecycle events")))

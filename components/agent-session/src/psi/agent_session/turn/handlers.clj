@@ -44,23 +44,32 @@
        :consume-count (count messages)
        :follow-mode   follow-mode})))
 
+(defn- with-workflow-guard
+  [effect workflow-run-id]
+  (cond-> effect
+    workflow-run-id (assoc :workflow-run-id workflow-run-id)))
+
 (defn synthetic-user-prompt-effects
-  [session-id user-msg]
-  [{:effect/type :runtime/dispatch-event-with-effect-result
-    :event-type :session/prompt-submit
-    :event-data {:session-id session-id
-                 :user-msg user-msg}
-    :origin :core}
-   {:effect/type :runtime/dispatch-event
-    :event-type :session/prompt
-    :event-data {:session-id session-id}
-    :origin :core}
-   {:effect/type :runtime/dispatch-event-with-effect-result
-    :event-type :session/prompt-prepare-request
-    :event-data {:session-id session-id
-                 :turn-id (str (java.util.UUID/randomUUID))
-                 :user-msg user-msg}
-    :origin :core}])
+  ([session-id user-msg]
+   (synthetic-user-prompt-effects session-id user-msg nil))
+  ([session-id user-msg workflow-run-id]
+   (let [guard #(with-workflow-guard % workflow-run-id)]
+     [(guard {:effect/type :runtime/dispatch-event-with-effect-result
+              :event-type :session/prompt-submit
+              :event-data (cond-> {:session-id session-id
+                                   :user-msg user-msg}
+                            workflow-run-id (assoc :workflow-run-id workflow-run-id))
+              :origin :core})
+      (guard {:effect/type :runtime/dispatch-event
+              :event-type :session/prompt
+              :event-data {:session-id session-id}
+              :origin :core})
+      (guard {:effect/type :runtime/dispatch-event-with-effect-result
+              :event-type :session/prompt-prepare-request
+              :event-data {:session-id session-id
+                           :turn-id (str (java.util.UUID/randomUUID))
+                           :user-msg user-msg}
+              :origin :core})])))
 
 (defn prepared-request-state-summary
   [turn-id prepared-request]
@@ -75,11 +84,6 @@
 (defn prepared-request-query-text
   [prepared-request]
   (turn-request/prepared-request-query-text prepared-request))
-
-(defn- with-workflow-guard
-  [effect workflow-run-id]
-  (cond-> effect
-    workflow-run-id (assoc :workflow-run-id workflow-run-id)))
 
 (defn prompt-prepare-request-effects
   [prepared-request progress-queue steering-consumed? return-execution-result? workflow-run-id]
@@ -315,8 +319,9 @@
               :messages (:messages follow-up-batch)})
       (guard {:effect/type :runtime/dispatch-event-with-effect-result
               :event-type :session/submit-synthetic-user-prompt
-              :event-data {:session-id session-id
-                           :user-msg follow-up-msg}
+              :event-data (cond-> {:session-id session-id
+                                   :user-msg follow-up-msg}
+                            workflow-run-id (assoc :workflow-run-id workflow-run-id))
               :origin :core})])))
 
 (defn prompt-finish-handler
