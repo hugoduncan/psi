@@ -1,0 +1,166 @@
+(ns psi.agent-session.dispatch-handlers.workflows
+  "Dispatch handlers for canonical workflow run terminal requests."
+  (:require
+   [psi.state-kernel.dispatch :as kernel]
+   [psi.workflow-runtime.core :as workflow-runtime]))
+
+(def ^:private terminal-statuses #{:completed :failed :cancelled})
+(def ^:private live-statuses #{:pending :running :blocked})
+
+(defn- register-core-handler! [event handler]
+  (kernel/register-handler! event handler))
+
+(defn- terminal-status? [status]
+  (contains? terminal-statuses status))
+
+(defn- live-status? [status]
+  (contains? live-statuses status))
+
+(defn- top-level-run? [run]
+  (nil? (:delegating-run-id run)))
+
+(defn- workflow-run [state run-id]
+  (workflow-runtime/workflow-run-in state run-id))
+
+(defn- cancel-state-update
+  [run-id reason]
+  (fn [state]
+    (let [run (workflow-run state run-id)]
+      (if (live-status? (:status run))
+        (first (workflow-runtime/cancel-run state run-id reason))
+        state))))
+
+(defn- remove-state-update
+  [run-id]
+  (fn [state]
+    (if (workflow-run state run-id)
+      (first (workflow-runtime/remove-run state run-id))
+      state)))
+
+(defn- cancel-inflight-run-effect [run-id]
+  {:effect/type :runtime/cancel-inflight-run
+   :run-id run-id})
+
+(defn- drop-inflight-run-effect [run-id]
+  {:effect/type :runtime/drop-inflight-run
+   :run-id run-id})
+
+(defn- handle-cleanup-effects
+  [run-id run]
+  (cond
+    (nil? run)
+    [(cancel-inflight-run-effect run-id)
+     (drop-inflight-run-effect run-id)]
+
+    (top-level-run? run)
+    [(cancel-inflight-run-effect run-id)
+     (drop-inflight-run-effect run-id)]
+
+    :else
+    [(drop-inflight-run-effect run-id)]))
+
+(defn- live-attempt-abort-effect
+  [run]
+  (let [step-id (:current-step-id run)
+        attempt (last (get-in run [:step-runs step-id :attempts]))
+        session-id (:execution-session-id attempt)
+        attempt-id (:attempt-id attempt)]
+    (when (and step-id
+               attempt-id
+               session-id
+               (contains? #{:running :validating} (:status attempt)))
+      {:effect/type :runtime/agent-abort
+       :session-id session-id
+       :workflow-run-id (:run-id run)
+       :workflow-step-id step-id
+       :workflow-attempt-id attempt-id
+       :expected-session-id session-id})))
+
+(defn- cancellation-effects
+  [run-id run]
+  (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}]
+    (top-level-run? run)
+    (conj (cancel-inflight-run-effect run-id))
+    (live-attempt-abort-effect run)
+    (conj (live-attempt-abort-effect run))))
+
+(defn- remove-dispatch-effect
+  [run-id reason session-id]
+  {:effect/type :runtime/dispatch-event
+   :event-type :psi.workflow/remove-run
+   :event-data (cond-> {:run-id run-id}
+                 reason (assoc :reason reason)
+                 session-id (assoc :session-id session-id))
+   :origin :core})
+
+(defn- cancel-result
+  [run-id run status noop?]
+  (cond-> {:psi.workflow/run-id run-id
+           :psi.workflow/status status
+           :psi.workflow/cancelled? (= :cancelled status)
+           :psi.workflow/noop? noop?
+           :psi.workflow/error nil}
+    (nil? run) (assoc :psi.workflow/found? false)))
+
+(defn- remove-result
+  [run-id {:keys [found? removed? cancelled? noop?]}]
+  (cond-> {:psi.workflow/run-id run-id
+           :psi.workflow/removed? removed?
+           :psi.workflow/noop? noop?
+           :psi.workflow/error nil}
+    (some? found?) (assoc :psi.workflow/found? found?)
+    (some? cancelled?) (assoc :psi.workflow/cancelled? cancelled?)))
+
+(defn- cancel-run-handler
+  [ctx {:keys [run-id reason]}]
+  (let [reason' (or reason "cancelled")
+        run (workflow-run @(:state* ctx) run-id)
+        status (:status run)]
+    (cond
+      (nil? run)
+      {:return (cancel-result run-id nil nil true)}
+
+      (terminal-status? status)
+      {:root-state-update identity
+       :effects []
+       :return (cancel-result run-id run status true)}
+
+      :else
+      {:root-state-update (cancel-state-update run-id reason')
+       :effects (cancellation-effects run-id run)
+       :return (cancel-result run-id run :cancelled false)})))
+
+(defn- remove-run-handler
+  [ctx {:keys [run-id reason session-id]}]
+  (let [reason' (or reason "cancelled by remove")
+        run (workflow-run @(:state* ctx) run-id)
+        status (:status run)]
+    (cond
+      (nil? run)
+      {:root-state-update identity
+       :effects (handle-cleanup-effects run-id nil)
+       :return (remove-result run-id {:found? false
+                                      :removed? false
+                                      :noop? true})}
+
+      (terminal-status? status)
+      {:root-state-update (remove-state-update run-id)
+       :effects (handle-cleanup-effects run-id run)
+       :return (remove-result run-id {:found? true
+                                      :removed? true
+                                      :noop? false})}
+
+      :else
+      {:root-state-update (cancel-state-update run-id reason')
+       :effects (conj (cancellation-effects run-id run)
+                      (remove-dispatch-effect run-id reason' session-id))
+       :return (remove-result run-id {:found? true
+                                      :removed? true
+                                      :cancelled? true
+                                      :noop? false})})))
+
+(defn register!
+  "Register canonical workflow terminal event handlers."
+  [_ctx]
+  (register-core-handler! :psi.workflow/cancel-run cancel-run-handler)
+  (register-core-handler! :psi.workflow/remove-run remove-run-handler))

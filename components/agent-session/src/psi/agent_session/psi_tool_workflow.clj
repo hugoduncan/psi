@@ -2,6 +2,7 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.session-state.state :as session-state]
    [psi.shared-config.session-profiles :as session-profiles]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -225,23 +226,20 @@
                                              :run            (workflow-run-summary final-run)}}))
 
               "cancel-run"
-              (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-                (when-not workflow-run
-                  (throw (ex-info "Workflow run not found"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id})))
-                (when (contains? #{:completed :failed :cancelled} (:status workflow-run))
-                  (throw (ex-info "Workflow run is already terminal"
-                                  {:phase :validate :action "workflow" :op op :run-id run-id
-                                   :status (:status workflow-run)})))
-                (let [[new-state cancelled-run]
-                      (workflow-runtime/cancel-run @(:state* ctx) run-id
-                                                   (or reason "cancelled by psi-tool"))]
-                  ((:apply-root-state-update-fn ctx) ctx (constantly new-state))
-                  {:psi-tool/action         :workflow
-                   :psi-tool/workflow-op    :cancel-run
-                   :psi-tool/overall-status :ok
-                   :psi-tool/workflow       {:run-id run-id
-                                             :run    (workflow-run-summary cancelled-run)}})))]
+              (let [cancel-result (dispatch/dispatch!
+                                   ctx
+                                   :psi.workflow/cancel-run
+                                   {:run-id run-id
+                                    :reason (or reason "cancelled by psi-tool")
+                                    :session-id session-id}
+                                   {:origin :core})
+                    cancelled-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+                {:psi-tool/action         :workflow
+                 :psi-tool/workflow-op    :cancel-run
+                 :psi-tool/overall-status (if (:psi.workflow/error cancel-result) :error :ok)
+                 :psi-tool/workflow       {:run-id run-id
+                                           :status (:psi.workflow/status cancel-result)
+                                           :run    (workflow-run-summary cancelled-run)}}))]
         (assoc result :psi-tool/duration-ms (long (/ (- (System/nanoTime) started-at) 1000000))))
       (catch Exception e
         {:psi-tool/action         :workflow

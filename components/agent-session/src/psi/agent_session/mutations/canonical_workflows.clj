@@ -7,6 +7,7 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.session-state.state :as session-state]
    [psi.shared-config.session-profiles :as session-profiles]
@@ -48,7 +49,7 @@
 
 (defn- session-profile-snapshot
   [agent-session-ctx session-id]
-  (when session-id
+  (when (and session-id (session-state/get-session-data-in agent-session-ctx session-id))
     (session-profiles/profile-snapshot
      (session-state/session-worktree-path-in agent-session-ctx session-id))))
 
@@ -216,49 +217,53 @@
 
 (pco/defmutation cancel-workflow-run
   "Cancel an active canonical workflow run."
-  [_ {:keys [psi/agent-session-ctx run-id reason]}]
+  [_ {:keys [psi/agent-session-ctx run-id reason session-id]}]
   {::pco/op-name 'psi.workflow/cancel-run
    ::pco/params  [:psi/agent-session-ctx :run-id]
    ::pco/output  [:psi.workflow/run-id
                   :psi.workflow/status
+                  :psi.workflow/cancelled?
+                  :psi.workflow/found?
+                  :psi.workflow/noop?
                   :psi.workflow/error]}
   (try
-    (let [workflow-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)]
-      (when-not workflow-run
-        (throw (ex-info "Workflow run not found" {:run-id run-id})))
-      (when (contains? #{:completed :failed :cancelled} (:status workflow-run))
-        (throw (ex-info "Workflow run is already terminal" {:run-id run-id :status (:status workflow-run)})))
-      (let [[new-state cancelled-run]
-            (workflow-runtime/cancel-run @(:state* agent-session-ctx) run-id
-                                         (or reason "cancelled"))]
-        (reset! (:state* agent-session-ctx) new-state)
-        (workflow-run-retention/apply-retention-cleanup! agent-session-ctx run-id)
-        {:psi.workflow/run-id run-id
-         :psi.workflow/status (:status cancelled-run)
-         :psi.workflow/error nil}))
+    (let [result (dispatch/dispatch! agent-session-ctx
+                                     :psi.workflow/cancel-run
+                                     (cond-> {:run-id run-id}
+                                       reason (assoc :reason reason)
+                                       session-id (assoc :session-id session-id))
+                                     {:origin :core})]
+      (workflow-run-retention/apply-retention-cleanup! agent-session-ctx run-id)
+      result)
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/status nil
+       :psi.workflow/cancelled? false
+       :psi.workflow/noop? false
        :psi.workflow/error (ex-message e)})))
 
 (pco/defmutation remove-workflow-run
   "Remove a canonical workflow run from root state."
-  [_ {:keys [psi/agent-session-ctx run-id]}]
+  [_ {:keys [psi/agent-session-ctx run-id reason session-id]}]
   {::pco/op-name 'psi.workflow/remove-run
    ::pco/params  [:psi/agent-session-ctx :run-id]
    ::pco/output  [:psi.workflow/run-id
                   :psi.workflow/removed?
+                  :psi.workflow/found?
+                  :psi.workflow/noop?
+                  :psi.workflow/cancelled?
                   :psi.workflow/error]}
   (try
-    (let [[new-state _removed-run]
-          (workflow-runtime/remove-run @(:state* agent-session-ctx) run-id)]
-      (reset! (:state* agent-session-ctx) new-state)
-      {:psi.workflow/run-id run-id
-       :psi.workflow/removed? true
-       :psi.workflow/error nil})
+    (dispatch/dispatch! agent-session-ctx
+                        :psi.workflow/remove-run
+                        (cond-> {:run-id run-id}
+                          reason (assoc :reason reason)
+                          session-id (assoc :session-id session-id))
+                        {:origin :core})
     (catch Exception e
       {:psi.workflow/run-id run-id
        :psi.workflow/removed? false
+       :psi.workflow/noop? false
        :psi.workflow/error (ex-message e)})))
 
 (pco/defmutation list-workflow-definitions

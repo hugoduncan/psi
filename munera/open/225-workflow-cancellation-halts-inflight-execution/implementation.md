@@ -2303,3 +2303,22 @@ terminal vs absent remove semantics, top-level vs nested worker-cancel rules,
 ordered runtime-handle cleanup, guarded child aborts, cooperative checkpoints,
 public result fields, background-job terminalization, docs/changelog updates, and
 test/gate coverage. No new unchecked follow-up items were added to `steps.md`.
+
+## Implementation pass — dispatch-owned cancel/remove foundation (ψ, 2026-06-11)
+
+Implemented the first concrete cancellation slice across dispatch routing and runtime cleanup effects:
+
+- Added canonical state-kernel handlers `:psi.workflow/cancel-run` and `:psi.workflow/remove-run` in `dispatch_handlers/workflows.clj` and registered them in the agent-session handler surface.
+- Routed Pathom `psi.workflow/cancel-run` / `psi.workflow/remove-run`, `psi-tool workflow op=cancel-run`, and `delegate remove` through those canonical events instead of direct workflow-runtime mutation / handle cleanup. `delegate remove` no longer performs command-layer background-job terminalization or `inflight-runs` dissoc.
+- Added ctx injection for `:workflow-inflight-runs-handle` and canonical effects `:runtime/cancel-inflight-run` / `:runtime/drop-inflight-run` with schema + executors.
+- Extended `:runtime/agent-abort` to accept the guarded flat workflow-cancellation payload while preserving unguarded abort behaviour.
+- Implemented D29 idempotent result shapes and D36b/D38 ordered handle cleanup for absent and terminal top-level remove.
+- Extended background-job terminal reconciliation so canonical `:cancelled` workflow runs terminalize jobs as `:cancelled`.
+- Documented `:runtime/dispatch-event` re-entrant sequencing in `doc/architecture.md`; added CHANGELOG entry.
+
+Deviation / scope note: this pass implements direct-run cancel/remove semantics and guarded abort for the directly-cancelled run's live attempt. The full D23 descendant cascade, cooperative execution checkpoints, interrupt-aware waits, and delegate-result run-absence mapping remain unchecked follow-up work in `steps.md`.
+
+Verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.mutations.canonical-workflows-test --namespace psi.agent-session.workflow-tools-test --namespace psi.agent-session.workflow-delegate-list-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.dispatch-test --namespace psi.agent-session.statechart-actions-test` → 60 tests / 479 assertions green.
+- Focused `clj-kondo --lint` over changed source/test files → clean.

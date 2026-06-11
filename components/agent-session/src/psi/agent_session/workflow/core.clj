@@ -431,68 +431,23 @@
           :else
           {:error (str "Run '" run-id "' is not stopped; current status is " (name (or status :unknown)))})))))
 
-(defn- active-delegate-background-jobs
-  [session-id run-id jobs]
-  (->> jobs
-       (map delegate-list-projection/normalize-query-job)
-       (filter #(and (= (str session-id) (:thread-id %))
-                     (= "delegate" (:tool-name %))
-                     (= :workflow (:job-kind %))
-                     (= delegate-list-projection/workflow-provenance-id (:workflow-ext-path %))
-                     (= run-id (:workflow-id %))
-                     (contains? #{:running :pending-cancel} (:status %))))
-       vec))
-
-(defn- terminalize-active-delegate-background-jobs!
-  [jobs]
-  (try
-    (doseq [job jobs]
-      (mark-background-job-terminal!
-       (:job-id job)
-       :cancelled
-       {:workflow-id (:workflow-id job)
-        :status :cancelled
-        :delegate-status :cancelled
-        :reason :delegate-remove}
-       {:suppress-terminal-message? true}))
-    {:status :ok}
-    (catch Exception e
-      {:status :error
-       :message "delegate remove could not clean up active delegate background jobs"
-       :details {:exception-message (ex-message e)
-                 :exception-data (ex-data e)
-                 :job-ids (mapv :job-id jobs)}})))
-
-(defn- cleanup-active-delegate-background-jobs-before-remove!
-  [session-id run-id]
-  (let [jobs-result (query-background-jobs "delegate remove")]
-    (if (= :error (:status jobs-result))
-      jobs-result
-      (terminalize-active-delegate-background-jobs!
-       (active-delegate-background-jobs session-id run-id (:jobs jobs-result))))))
-
 (defn- delegate-remove
   "Handle action=remove: remove a run by id.
 
-   Removal clears the canonical workflow run only after any same-session active
-   delegate background jobs for the target have been resolved to terminal
-   history, so later list calls cannot observe non-terminal missing-canonical
-   corruption."
+   Removal is delegated to the canonical workflow remove mutation; cancellation,
+   background-job terminalization, and in-flight handle cleanup are owned by the
+   dispatch/effects path behind that mutation."
   [args]
   (let [run-id (some-> (arg-value args :id) str str/trim not-empty)]
     (if (nil? run-id)
       {:error "id is required for remove"}
-      (let [session-id (current-session-id)
-            cleanup-result (cleanup-active-delegate-background-jobs-before-remove! session-id run-id)]
-        (if (= :error (:status cleanup-result))
-          {:error (:message cleanup-result)}
-          (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id})]
-            (if (:psi.workflow/error result)
-              {:error (:psi.workflow/error result)}
-              (do
-                (swap! inflight-runs dissoc run-id)
-                (refresh-widgets!)
-                {:ok true :run-id run-id}))))))))
+      (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id
+                                                      :session-id (current-session-id)})]
+        (if (:psi.workflow/error result)
+          {:error (:psi.workflow/error result)}
+          (do
+            (refresh-widgets!)
+            {:ok true :run-id run-id}))))))
 
 (defn- execute-delegate-tool
   "Main delegate tool execution dispatcher.

@@ -8,7 +8,27 @@
    effect catalog and effect payload validation."
   [:multi {:dispatch :effect/type}
    [:runtime/agent-abort
-    [:map [:effect/type [:= :runtime/agent-abort]]]]
+    [:and
+     [:map
+      [:effect/type [:= :runtime/agent-abort]]
+      [:session-id {:optional true} :string]
+      [:workflow-run-id {:optional true} :string]
+      [:workflow-step-id {:optional true} :string]
+      [:workflow-attempt-id {:optional true} :string]
+      [:expected-session-id {:optional true} :string]]
+     [:fn {:error/message "workflow abort guard keys must be all present or all absent, with explicit session-id"}
+      (fn [effect]
+        (let [guard-keys [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]
+              present-count (count (filter #(contains? effect %) guard-keys))]
+          (or (zero? present-count)
+              (and (= present-count (count guard-keys))
+                   (contains? effect :session-id)))))]]]
+   [:runtime/cancel-inflight-run
+    [:map [:effect/type [:= :runtime/cancel-inflight-run]]
+     [:run-id :string]]]
+   [:runtime/drop-inflight-run
+    [:map [:effect/type [:= :runtime/drop-inflight-run]]
+     [:run-id :string]]]
    [:runtime/agent-clear-steering-queue
     [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]]]
    [:runtime/agent-clear-follow-up-queue

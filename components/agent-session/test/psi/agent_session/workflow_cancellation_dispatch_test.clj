@@ -1,0 +1,151 @@
+(ns psi.agent-session.workflow-cancellation-dispatch-test
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.dispatch-schema :as dispatch-schema]
+   [psi.agent-session.test-support :as test-support]
+   [psi.workflow-runtime.model :as workflow-model]
+   [psi.state-kernel.dispatch :as kernel]))
+
+(defn- make-ctx []
+  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))]
+    (swap! (:state* ctx) assoc :workflows (workflow-model/initial-workflow-state))
+    ctx))
+
+(defn- install-run!
+  [ctx run]
+  (swap! (:state* ctx)
+         (fn [state]
+           (-> state
+               (assoc-in [:workflows :runs (:run-id run)] run)
+               (update-in [:workflows :run-order] (fnil conj []) (:run-id run))))))
+
+(defn- run
+  [run-id status & {:as extra}]
+  (merge {:run-id run-id
+          :status status
+          :current-step-id "step-1"
+          :step-runs {"step-1" {:attempts []}}
+          :history []}
+         extra))
+
+(defn- last-log-entry [event-type]
+  (->> (kernel/event-log-entries)
+       (filter #(= event-type (:event-type %)))
+       last))
+
+(deftest workflow-cancel-remove-effect-schema-test
+  ;; Tests the canonical cancellation/cleanup effect payloads and guarded abort
+  ;; schema without mocks; validation uses the real malli schema.
+  (testing "cancel/drop inflight-run effects require exact run ids"
+    (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/cancel-inflight-run
+                                               :run-id "run-1"})))
+    (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/drop-inflight-run
+                                               :run-id "run-1"})))
+    (is (false? (dispatch-schema/valid-effect? {:effect/type :runtime/cancel-inflight-run}))))
+
+  (testing "guarded workflow abort requires the complete flat guard"
+    (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/agent-abort
+                                               :session-id "child-session"
+                                               :workflow-run-id "run-1"
+                                               :workflow-step-id "step-1"
+                                               :workflow-attempt-id "attempt-1"
+                                               :expected-session-id "child-session"})))
+    (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/agent-abort})))
+    (is (false? (dispatch-schema/valid-effect? {:effect/type :runtime/agent-abort
+                                                :workflow-run-id "run-1"})))))
+
+(deftest cancel-run-dispatch-effects-test
+  ;; Tests top-level vs nested cancellation effect routing through the real
+  ;; dispatch pipeline and event log, asserting state/effect outcomes.
+  (testing "top-level cancel marks cancelled and emits terminalization plus worker cancel"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)]
+      (install-run! ctx (run "run-1" :running
+                             :step-runs {"step-1" {:attempts [{:attempt-id "attempt-1"
+                                                               :status :running
+                                                               :execution-session-id "child-session"}]}}))
+      (let [result (dispatch/dispatch! ctx :psi.workflow/cancel-run {:run-id "run-1"} {:origin :core})
+            entry (last-log-entry :psi.workflow/cancel-run)]
+        (is (= :cancelled (:psi.workflow/status result)))
+        (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-1" :status])))
+        (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}
+                {:effect/type :runtime/cancel-inflight-run :run-id "run-1"}
+                {:effect/type :runtime/agent-abort
+                 :session-id "child-session"
+                 :workflow-run-id "run-1"
+                 :workflow-step-id "step-1"
+                 :workflow-attempt-id "attempt-1"
+                 :expected-session-id "child-session"}]
+               (:declared-effects entry))))))
+
+  (testing "nested cancel emits no worker cancel"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)]
+      (install-run! ctx (run "parent" :running))
+      (install-run! ctx (run "child" :running :delegating-run-id "parent"))
+      (let [result (dispatch/dispatch! ctx :psi.workflow/cancel-run {:run-id "child"} {:origin :core})
+            entry (last-log-entry :psi.workflow/cancel-run)]
+        (is (= :cancelled (:psi.workflow/status result)))
+        (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}]
+               (:declared-effects entry)))))))
+
+(deftest remove-run-dispatch-cleanup-effects-test
+  ;; Tests remove cleanup ordering for terminal/absent and nested/top-level cases
+  ;; through state and dispatch-log effects, not interaction spies.
+  (testing "live top-level remove cancels then re-enters remove and drops canonical record"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)]
+      (install-run! ctx (run "run-1" :running))
+      (let [result (dispatch/dispatch! ctx :psi.workflow/remove-run {:run-id "run-1"} {:origin :core})
+            entries (filter #(= :psi.workflow/remove-run (:event-type %)) (kernel/event-log-entries))]
+        (is (true? (:psi.workflow/removed? result)))
+        (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+        (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}
+                {:effect/type :runtime/cancel-inflight-run :run-id "run-1"}
+                {:effect/type :runtime/dispatch-event
+                 :event-type :psi.workflow/remove-run
+                 :event-data {:run-id "run-1" :reason "cancelled by remove"}
+                 :origin :core}]
+               (:declared-effects (last entries))))
+        (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "run-1"}
+                {:effect/type :runtime/drop-inflight-run :run-id "run-1"}]
+               (:declared-effects (first entries)))))))
+
+  (testing "terminal nested remove does not infer or cancel a parent worker"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)]
+      (install-run! ctx (run "parent" :running))
+      (install-run! ctx (run "child" :cancelled :delegating-run-id "parent"))
+      (dispatch/dispatch! ctx :psi.workflow/remove-run {:run-id "child"} {:origin :core})
+      (is (= [{:effect/type :runtime/drop-inflight-run :run-id "child"}]
+             (:declared-effects (last-log-entry :psi.workflow/remove-run))))))
+
+  (testing "absent remove cancels a possible stale handle before dropping it"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)
+          result (dispatch/dispatch! ctx :psi.workflow/remove-run {:run-id "ghost"} {:origin :core})]
+      (is (false? (:psi.workflow/removed? result)))
+      (is (true? (:psi.workflow/noop? result)))
+      (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "ghost"}
+              {:effect/type :runtime/drop-inflight-run :run-id "ghost"}]
+             (:declared-effects (last-log-entry :psi.workflow/remove-run)))))))
+
+(deftest inflight-run-effect-execution-test
+  ;; Tests cancellation/cleanup effects against a real isolated inflight-runs atom.
+  (testing "cancel-inflight-run future-cancels exact run handle before drop removes it"
+    (let [ctx (assoc (make-ctx) :workflow-inflight-runs-handle (atom {}))
+          fut (future (Thread/sleep 10000))]
+      (swap! (:workflow-inflight-runs-handle ctx) assoc "run-1" {:future fut})
+      (try
+        (let [cancel-result ((:execute-effect-fn ctx) ctx {:effect/type :runtime/cancel-inflight-run
+                                                           :run-id "run-1"})
+              drop-result ((:execute-effect-fn ctx) ctx {:effect/type :runtime/drop-inflight-run
+                                                         :run-id "run-1"})]
+          (is (true? (:found? cancel-result)))
+          (is (true? (future-cancelled? fut)))
+          (is (true? (:found? drop-result)))
+          (is (nil? (get @(:workflow-inflight-runs-handle ctx) "run-1"))))
+        (finally
+          (future-cancel fut))))))

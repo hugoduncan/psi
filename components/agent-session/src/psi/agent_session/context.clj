@@ -32,6 +32,7 @@
    [psi.agent-session.tools]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
    [psi.workflow-runtime.child-session-contract :as workflow-child-session-contract]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
@@ -246,6 +247,7 @@
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
+   :workflow-inflight-runs-handle workflow-runtime-state/inflight-runs
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
    :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
    :effective-cwd-fn (fn

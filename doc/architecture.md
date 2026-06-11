@@ -228,6 +228,14 @@ Current default interceptor ids:
 Because after fns run in reverse order, the effective after-order is:
 - `:apply -> :validate -> :trim-effects-on-replay -> :effects`
 
+A dispatch effect may deliberately issue a follow-on dispatch through
+`:runtime/dispatch-event`. The follow-on dispatch runs synchronously from the
+`:effects` interceptor after the current dispatch has applied state and after all
+earlier effects in the current effect vector have run. Replay trims the triggering
+effect, while the follow-on dispatch is replayed from its own event-log entry.
+This is used only when an effect must be ordered before a later pure state change;
+ordinary related state changes should compose into one root-state update.
+
 ## Dispatch event-log observability
 
 The retained dispatch log now exposes more architectural debugging signal than

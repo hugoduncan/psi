@@ -12,6 +12,7 @@
    [psi.agent-session.dispatch-handlers.session-mutations :as mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as sc-actions]
    [psi.agent-session.dispatch-handlers.ui-handlers :as ui-handlers]
+   [psi.agent-session.dispatch-handlers.workflows :as workflows]
    [psi.session-state.state :as session]
    [psi.agent-session.statechart :as sc]))
 
@@ -53,4 +54,5 @@
   (prompt-lifecycle/register! ctx)
   (scheduler/register! ctx)
   (lifecycle/register! ctx)
+  (workflows/register! ctx)
   (mutations/register! ctx))

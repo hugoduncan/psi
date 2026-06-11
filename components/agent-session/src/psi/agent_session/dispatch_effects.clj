@@ -60,6 +60,33 @@
 (defn- effect-agent-ctx [ctx effect] (ss/agent-ctx-in ctx (effect-session-id ctx effect)))
 (defn- effect-sc-session-id [ctx effect] (ss/sc-session-id-in ctx (effect-session-id ctx effect)))
 
+(defn- workflow-abort-guarded? [effect]
+  (some #(contains? effect %)
+        [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]))
+
+(defn- latest-workflow-attempt-in [ctx run-id step-id]
+  (last (get-in @(:state* ctx) [:workflows :runs run-id :step-runs step-id :attempts])))
+
+(defn- live-workflow-attempt? [attempt]
+  (contains? #{:running :validating} (:status attempt)))
+
+(defn- workflow-abort-guard-matches? [ctx effect]
+  (let [attempt (latest-workflow-attempt-in ctx (:workflow-run-id effect) (:workflow-step-id effect))]
+    (and attempt
+         (= (:workflow-attempt-id effect) (:attempt-id attempt))
+         (= (:expected-session-id effect) (:execution-session-id attempt))
+         (= (:session-id effect) (:execution-session-id attempt))
+         (live-workflow-attempt? attempt))))
+
+(defn- abort-session! [ctx effect]
+  (when-let [turn-ctx (ss/get-state-value-in ctx (ss/state-path :turn-ctx (effect-session-id ctx effect)))]
+    (when-let [stream-handle (:stream-handle @(:turn-data turn-ctx))]
+      (when-let [f (:future stream-handle)] (future-cancel f))
+      (swap! (:turn-data turn-ctx) assoc :stream-handle (assoc stream-handle :cancelled? true)))
+    (when-not (:final-message @(:turn-data turn-ctx))
+      (turn-sc/send-event! turn-ctx :turn/error {:stop-reason :aborted :error-message "Aborted"})))
+  (when-let [ac (effect-agent-ctx ctx effect)] (agent/abort-in! ac)))
+
 (defn drop-trailing-overflow-error! [ctx session-id]
   (let [ac (ss/agent-ctx-in ctx session-id)
         messages (:messages (agent/get-data-in ac))
@@ -72,13 +99,28 @@
       (agent/replace-messages-in! ac (vec (butlast messages))))))
 
 (defmethod execute-effect! :runtime/agent-abort [ctx effect]
-  (when-let [turn-ctx (ss/get-state-value-in ctx (ss/state-path :turn-ctx (effect-session-id ctx effect)))]
-    (when-let [stream-handle (:stream-handle @(:turn-data turn-ctx))]
-      (when-let [f (:future stream-handle)] (future-cancel f))
-      (swap! (:turn-data turn-ctx) assoc :stream-handle (assoc stream-handle :cancelled? true)))
-    (when-not (:final-message @(:turn-data turn-ctx))
-      (turn-sc/send-event! turn-ctx :turn/error {:stop-reason :aborted :error-message "Aborted"})))
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/abort-in! ac)))
+  (if (workflow-abort-guarded? effect)
+    (when (workflow-abort-guard-matches? ctx effect)
+      (abort-session! ctx effect)
+      {:aborted? true :session-id (:session-id effect) :guarded? true})
+    (do
+      (abort-session! ctx effect)
+      {:aborted? true :session-id (effect-session-id ctx effect) :guarded? false})))
+
+(defmethod execute-effect! :runtime/cancel-inflight-run [ctx effect]
+  (let [run-id (:run-id effect)
+        inflight-runs (:workflow-inflight-runs-handle ctx)
+        entry (when inflight-runs (get @inflight-runs run-id))
+        fut (:future entry)]
+    (when fut (future-cancel fut))
+    {:run-id run-id :found? (boolean entry) :cancelled? (boolean fut)}))
+
+(defmethod execute-effect! :runtime/drop-inflight-run [ctx effect]
+  (let [run-id (:run-id effect)
+        inflight-runs (:workflow-inflight-runs-handle ctx)
+        found? (boolean (when inflight-runs (get @inflight-runs run-id)))]
+    (when inflight-runs (swap! inflight-runs dissoc run-id))
+    {:run-id run-id :found? found? :dropped? true}))
 
 (defmethod execute-effect! :runtime/agent-queue-steering [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/queue-steering-in! ac (:message effect))))
