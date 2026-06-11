@@ -781,3 +781,28 @@
       `:workflow-inflight-runs-handle`, looks up exactly `:run-id`, calls
       `future-cancel`, and treats missing handle/future as idempotent no-op.
       Schema/executor/test implications pinned; D12/D14/D18/D23/Acceptance updated.
+
+## Inconsistency follow-ups (ψ pass 18, 2026-06-11)
+
+- [ ] Reconcile the child-session abort path with the existing `:runtime/agent-abort`
+      executor. D3/D9 say the workflow-cancellation abort effect handler invokes the
+      agent-session `:session/abort` dispatch authority, and D9 claims the existing
+      `:runtime/agent-abort` effect already drives that path. Code shows the inverse:
+      `:session/abort` statechart handling emits `{:effect/type :runtime/agent-abort}`
+      and `execute-effect! :runtime/agent-abort` directly performs abort side effects
+      without dispatching `:session/abort`. Decide whether workflow cancellation uses
+      (a) guarded `:runtime/agent-abort` as the direct abort-side-effect executor
+      (updating D3/D9 to stop claiming a `:session/abort` dispatch), or (b) a guarded
+      follow-on `:session/abort` dispatch path with explicit recursion/guard handling.
+      Align D3/D9/D12/D15/D28/D33 and the effect-schema/executor/test implications.
+- [ ] Reconcile absent `remove-run` cleanup with the drop-after-cancel / no-orphan
+      guarantee. D34 says absent `remove-run` emits `:runtime/drop-inflight-run` to
+      clear a possible orphaned handle, while D29/D34 say absent remove emits no
+      cancellation effects and D24 says handle drop happens after future cancel.
+      For an absent canonical run with a live `inflight-runs` future, dropping the
+      handle without first cancelling it recreates the original orphaned-worker
+      failure. Decide whether absent-remove cleanup must emit D35
+      `:runtime/cancel-inflight-run` before D24 drop, make the drop effect cancel+drop
+      atomically when a live future is present, or only drop when the handle is known
+      absent/done/cancelled. Align D24/D26/D29/D34/D35 and Acceptance #10 so absent
+      cleanup cannot orphan a live worker.

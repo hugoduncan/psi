@@ -1778,3 +1778,34 @@ Acceptance #2/#4/#5/#6:
 This removes the previous representational ambiguity (`:runtime/*` prose without a
 keyword/payload), while preserving D14/D19 parent-survival for direct nested
 sub-run cancellation and D25 ctx-based handle reachability.
+
+## Inconsistency review (ψ pass 18, 2026-06-11)
+
+Reviewed `design.md` for internal/design-vs-artifact inconsistency after D35,
+consulting the current dispatch abort/effect code (`dispatch_effects.clj`,
+`dispatch_schema.clj`, `turn.clj`) and workflow runtime handle state. Did not
+review `plan.md` or `steps.md`.
+
+Two new actionable contradictions found; neither duplicates existing
+`design-steps.md` items:
+
+1. **D9/D3 child abort path contradicts the existing `:runtime/agent-abort`
+   executor.** The design says the workflow-cancellation abort effect handler
+   invokes the agent-session `:session/abort` dispatch authority, and D9 says the
+   existing `:runtime/agent-abort` effect already drives that path. Code shows the
+   opposite layering: `:session/abort` statechart action emits
+   `{:effect/type :runtime/agent-abort}`, and `execute-effect! :runtime/agent-abort`
+   directly performs abort side effects (`turn` stream cancellation / turn error /
+   `agent/abort-in!`) without dispatching `:session/abort`. Implementing D9
+   literally would either recurse/double-abort or require a different effect path;
+   keeping the existing effect means D3/D9's `:session/abort` wording is false.
+
+2. **Absent `remove-run` cleanup can drop a live orphaned handle without cancelling
+   it.** D24 promises drop-after-cancel / never drop-then-orphan for
+   `inflight-runs`; D34 says absent `remove-run` still emits
+   `:runtime/drop-inflight-run` to clear a possible orphaned handle; D29/D34 also
+   say absent remove emits no cancellation effects. For an absent canonical run that
+   still has a live `inflight-runs` future (the exact orphan class D34 wants to
+   clean), the design currently drops the only handle without first emitting D35
+   `:runtime/cancel-inflight-run`, recreating the Evidence-step-3 orphaning failure.
+
