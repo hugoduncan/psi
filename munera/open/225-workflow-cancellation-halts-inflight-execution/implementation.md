@@ -2961,3 +2961,11 @@ Regression coverage updates:
 - Added `invoke-operation-cancel-between-prepared-entry-and-handler-entry-stops-handler-test`, which commits cancellation in the prepared-entry → handler-entry window and asserts the operation handler is not called after D31.
 
 Verification: `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test --namespace psi.deterministic-operation-runtime.core-test` passed (18 tests / 80 assertions). Focused lint passed for deterministic-operation runtime src/tests and the updated agent-session cancellation test.
+
+## Implementation review (ψ pass 18, 2026-06-11)
+
+Reviewed the pass-17 deterministic-operation entry linearization against `task-implementation-review`, D31, `cancellation_entry.clj`, dispatch apply locking, actor/judge turn entry, deterministic-operation entry, and the related cancellation regressions. The handler-entry race identified in pass 17 is addressed without holding the lock across handler execution.
+
+New actionable issue: the new per-run cancellation-entry lock handle is never cleaned up. `cancellation-entry/lock-for` creates a `ReentrantReadWriteLock` entry in `:workflow-cancellation-entry-locks-handle` for ordinary entry and cancel/remove apply, but no remove/terminal/retention/natural-completion path dissocs it. Over a long-lived runtime with many delegated workflow runs this grows an unbounded runtime-handle map even after runs are removed, which is an unnecessary resource leak introduced by the cancellation linearization mechanism. Follow-up should add canonical cleanup for cancellation-entry locks when a workflow run is removed/forgotten (and any existing retention cleanup path), keeping natural terminal runs only if intentionally tied to retained canonical run records; add a regression that removal/cleanup drops the lock entry while preserving cancellation safety.
+
+No tests run (review-only pass).

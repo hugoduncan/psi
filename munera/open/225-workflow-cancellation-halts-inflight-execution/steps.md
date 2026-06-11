@@ -198,3 +198,8 @@
 
 - [x] Restore deterministic-operation entry linearization without blocking cancellation on full handler completion: after pass 16, `invoke-operation-result` has a final `workflow-stop-signal` read followed by an unlocked handler call, so a D31 cancel CAS can land before handler entry and the handler can still start ordinary work after the checkpoint. Narrow the cancellation-entry read lock to only the deterministic-operation handler entry point, or add an equivalent durable marker that cancellation observes/closes before handler entry; add a regression for cancel after the final stop read but before handler entry proving the handler is either already entered before D31 or not entered after D31.
   - Covered 2026-06-11: deterministic-operation invoke now prepares a durable `:operation-handler-entry-state :pending` marker, then takes the workflow cancellation-entry read lock only around the handler-entry linearization CAS to `:entered`; the lock is released before running the handler so cancellation does not wait for handler completion. Regression covers cancel in the prepared-entry → handler-entry window and asserts the handler does not run after D31.
+
+
+## Implementation review follow-ups (ψ pass 18, 2026-06-11)
+
+- [ ] Add lifecycle cleanup for per-run cancellation-entry locks: `:workflow-cancellation-entry-locks-handle` entries created by `cancellation-entry/lock-for` must be removed when workflow runs are removed/forgotten (and any retention cleanup path), or explicitly bounded to retained canonical run records; add a regression proving remove/cleanup drops the lock entry without weakening cancellation-entry ordering.
