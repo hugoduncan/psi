@@ -2215,3 +2215,19 @@ side effects; top-level/terminal/absent handle cleanup preserves the no-orphan
 invariant without inferring parent workers for nested sub-runs; and the cascade is
 a pure multi-run apply-phase transition with guarded abort effects. No new
 `design-steps.md` follow-up item added.
+
+## Ambiguity review (ψ pass 35, 2026-06-11)
+
+Reviewed current `design.md` for ambiguity only after the pass-33 D35 runtime-handle
+cleanup reconciliation and pass-34 architecture-fit review. Consulted Scope,
+D1–D38, Acceptance Criteria, referenced dispatch/effect/runtime code, and
+`doc/architecture.md` state-boundary / dispatch sequencing where needed. Did not
+review task `plan.md` or `steps.md`.
+
+No new actionable ambiguity found. The D35 cleanup-emitter split introduced by the
+latest follow-up is single-interpretation: canonical cancellation emissions remain
+limited to top-level cancel/live top-level remove; runtime-handle cleanup may emit
+`cancel-inflight-run` only for terminal top-level remove and absent stale-handle
+cleanup before drop; terminal nested-sub-run cleanup remains no-worker-cancel / no
+parent inference. Existing Scope, D24/D26/D29/D36b/D38, and Acceptance #8/#10 are
+aligned with that split. No new `design-steps.md` follow-up item added.
