@@ -41,7 +41,8 @@
     [:map [:effect/type [:= :runtime/agent-clear-follow-up-queue]]]]
    [:runtime/agent-drain-follow-up-queue
     [:map [:effect/type [:= :runtime/agent-drain-follow-up-queue]]
-     [:messages [:vector :map]]]]
+     [:messages [:vector :map]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/agent-start-loop
     [:map [:effect/type [:= :runtime/agent-start-loop]]]]
    [:runtime/agent-reset
@@ -51,7 +52,8 @@
    [:runtime/emit-background-job-terminal-messages
     [:map [:effect/type [:= :runtime/emit-background-job-terminal-messages]]]]
    [:runtime/reconcile-and-emit-background-job-terminals
-    [:map [:effect/type [:= :runtime/reconcile-and-emit-background-job-terminals]]]]
+    [:map [:effect/type [:= :runtime/reconcile-and-emit-background-job-terminals]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/refresh-system-prompt
     [:map [:effect/type [:= :runtime/refresh-system-prompt]]]]
    [:runtime/agent-queue-steering
@@ -103,7 +105,8 @@
    [:runtime/prompt-continue-chain
     [:map [:effect/type [:= :runtime/prompt-continue-chain]]
      [:execution-result :map]
-     [:progress-queue {:optional true} :any]]]
+     [:progress-queue {:optional true} :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/dispatch-event
     [:map [:effect/type [:= :runtime/dispatch-event]]
      [:event-type :keyword]
@@ -119,7 +122,9 @@
    [:runtime/event-queue-offer
     [:map [:effect/type [:= :runtime/event-queue-offer]] [:event :any]]]
    [:statechart/send-event
-    [:map [:effect/type [:= :statechart/send-event]] [:event :any]]]
+    [:map [:effect/type [:= :statechart/send-event]]
+     [:event :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-thread-sleep-send-event
     [:map [:effect/type [:= :runtime/schedule-thread-sleep-send-event]]
      [:delay-ms pos-int?] [:event :any]]]
@@ -149,7 +154,8 @@
     [:map [:effect/type [:= :persist/user-config-update]] [:prefs :map]]]
    [:notify/extension-dispatch
     [:map [:effect/type [:= :notify/extension-dispatch]]
-     [:event-name :string] [:payload :any]]]
+     [:event-name :string] [:payload :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-extension-dispatch
     [:map [:effect/type [:= :runtime/schedule-extension-dispatch]]
      [:delay-ms pos-int?] [:event-name :string] [:payload :any]]]

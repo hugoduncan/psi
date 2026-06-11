@@ -290,3 +290,112 @@
         "stale response append effect must no-op after cancellation")
     (is (empty? (kernel/event-log-entries))
         "stale guarded advancement effects must not dispatch after cancellation")))
+
+(deftest workflow-cancel-after-prompt-continue-build-before-effects-blocks-stale-continuation-test
+  ;; Regression for task 225 pass 22: if prompt-continue has already built its
+  ;; pure result, cancellation before effects must prevent continuation-chain
+  ;; work and the follow-on prepare dispatch.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-continue-built-then-cancelled"
+        continue-calls* (atom [])
+        ctx (assoc ctx0
+                   :continue-prompt-chain-fn
+                   (fn [_ctx sid execution-result progress-queue]
+                     (swap! continue-calls* conj {:session-id sid
+                                                  :execution-result execution-result
+                                                  :progress-queue progress-queue})))
+        execution-result {:execution-result/turn-id "turn-continue-race"
+                          :execution-result/session-id session-id
+                          :execution-result/assistant-message {:role "assistant"
+                                                               :content [{:type :text :text "continue"}]
+                                                               :stop-reason :tool_use}
+                          :execution-result/turn-outcome :turn.outcome/tool-use}
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)
+        handler-result ((:fn (kernel/handler-entry :session/prompt-continue))
+                        ctx
+                        {:session-id session-id
+                         :execution-result execution-result
+                         :progress-queue :progress})]
+    (is (= [:runtime/prompt-continue-chain
+            :runtime/dispatch-event-with-effect-result
+            :runtime/reconcile-and-emit-background-job-terminals]
+           (mapv :effect/type (:effects handler-result)))
+        "regression must exercise prompt-continue's ordinary effect vector")
+    (is (every? #(= run-id (:workflow-run-id %)) (:effects handler-result))
+        "workflow-owned prompt-continue effects carry the workflow guard")
+    (is (every? dispatch-schema/valid-effect? (:effects handler-result))
+        "workflow-guarded prompt-continue effects must remain valid")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "continue built before cancel"}
+                          {:origin :core})
+    (kernel/clear-event-log!)
+    (doseq [effect (:effects handler-result)]
+      (dispatch-effects/execute-effect! ctx (assoc effect :session-id session-id)))
+    (is (= [] @continue-calls*)
+        "stale prompt-continue-chain effect must no-op after cancellation")
+    (is (empty? (kernel/event-log-entries))
+        "stale prompt-continue follow-on dispatch effects must not re-enter ordinary lifecycle events")))
+
+(deftest workflow-cancel-after-prompt-finish-build-before-apply-blocks-stale-finish-effects-test
+  ;; Regression for task 225 pass 22: if prompt-finish has already built its pure
+  ;; result, cancellation before apply/effects must prevent terminal UI/extension
+  ;; effects, session reset, follow-up draining, and follow-up prompt dispatch.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-finish-built-then-cancelled"
+        extension-events* (atom [])
+        reconcile-calls* (atom 0)
+        ctx (assoc ctx0
+                   :reconcile-and-emit-background-job-terminals-fn
+                   (fn [& _] (swap! reconcile-calls* inc))
+                   :extension-registry {:dispatch-fn (fn [& args]
+                                                       (swap! extension-events* conj args))})
+        terminal-result {:execution-result/turn-id "turn-finish-race"
+                         :execution-result/session-id session-id
+                         :execution-result/assistant-message {:role "assistant"
+                                                              :content [{:type :text :text "done"}]
+                                                              :stop-reason :stop}
+                         :execution-result/turn-outcome :turn.outcome/stop}
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)
+        _ (swap! (:state* ctx) assoc-in (conj (ss/session-data-path session-id) :follow-up-messages)
+                 ["follow up" "later"])
+        handler-result ((:fn (kernel/handler-entry :session/prompt-finish))
+                        ctx
+                        {:session-id session-id
+                         :turn-id (:execution-result/turn-id terminal-result)
+                         :terminal-result terminal-result})]
+    (is (= [:runtime/dispatch-event
+            :notify/extension-dispatch
+            :runtime/reconcile-and-emit-background-job-terminals
+            :statechart/send-event
+            :runtime/agent-drain-follow-up-queue
+            :runtime/dispatch-event-with-effect-result]
+           (mapv :effect/type (:effects handler-result)))
+        "regression must exercise prompt-finish terminal and follow-up effects")
+    (is (fn? (:root-state-update handler-result))
+        "live prompt-finish with follow-up builds a follow-up consumption root update")
+    (is (every? #(= run-id (:workflow-run-id %)) (:effects handler-result))
+        "workflow-owned prompt-finish effects carry the workflow guard")
+    (is (every? dispatch-schema/valid-effect? (:effects handler-result))
+        "workflow-guarded prompt-finish effects must remain valid")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "finish built before cancel"}
+                          {:origin :core})
+    (kernel/clear-event-log!)
+    (ss/apply-root-state-update-in! ctx (:root-state-update handler-result))
+    (doseq [effect (:effects handler-result)]
+      (dispatch-effects/execute-effect! ctx (assoc effect :session-id session-id)))
+    (is (= ["follow up" "later"]
+           (:follow-up-messages (ss/get-session-data-in ctx session-id)))
+        "stale prompt-finish root update must not consume follow-up state after cancellation")
+    (is (= 0 @reconcile-calls*)
+        "stale terminal reconciliation effect must no-op after cancellation")
+    (is (= [] @extension-events*)
+        "stale extension turn-finished notification must no-op after cancellation")
+    (is (= :idle (ss/sc-phase-in ctx session-id))
+        "stale finish reset must not mutate the session statechart after cancellation")
+    (is (empty? (kernel/event-log-entries))
+        "stale prompt-finish dispatch effects must not emit terminal notifications or follow-up prompts")))

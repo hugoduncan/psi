@@ -3134,3 +3134,35 @@ D31.
 Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test --namespace psi.agent-session.prompt-lifecycle-test` → 29 tests / 139 assertions green.
+
+## Implementation review follow-up pass 22 execution (ψ, 2026-06-11)
+
+Closed the stale pure-result window for prompt continuation/finish. Workflow-owned
+`:session/prompt-continue` now tags continuation-chain, follow-on prepare dispatch,
+and terminal reconciliation effects with `:workflow-run-id`; the effect executors
+for continuation-chain and reconciliation re-check the canonical workflow stop
+signal before ordinary work. Workflow-owned `:session/prompt-finish` now tags
+terminal notification, extension turn-finished, statechart reset, terminal
+reconciliation, follow-up-drain, and follow-up prompt-dispatch effects with
+`:workflow-run-id`; dispatch/effect executors for extension notification,
+statechart reset, follow-up-drain, and dispatch already/no-longer bypass the stop
+signal. The follow-up consumption root update is guarded with the same live-run
+CAS-safe helper used by response recording, so stale pure results cannot consume
+follow-up state after D31 cancellation.
+
+Added regressions in `prompt_lifecycle_workflow_cancellation_test`: stale
+prompt-continue pure results no-op continuation-chain and follow-on dispatch after
+cancel; stale prompt-finish pure results no-op terminal/follow-up effects and keep
+follow-up state intact after cancel. Focused prompt lifecycle cancellation,
+prompt lifecycle, turn handler, workflow cancellation dispatch, and runtime tests
+passed; focused clj-kondo on touched files is clean.
+
+Verification after pass 22 follow-up execution:
+
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 7 tests / 36 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.turn.handlers-test` → 4 tests / 11 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` → 24 tests / 117 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 8 tests / 58 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.runtime-test` → 6 tests / 42 assertions green.
+- `bb clojure:test:unit` → passed.
+- `clj-kondo --lint components` → errors 0, warnings 0 (pre-existing info-level notes only).

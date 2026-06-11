@@ -193,7 +193,8 @@
 (defmethod execute-effect! :runtime/agent-clear-follow-up-queue [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-follow-up-queue-in! ac)))
 (defmethod execute-effect! :runtime/agent-drain-follow-up-queue [ctx effect]
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/drain-follow-up-in! ac (:messages effect))))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (when-let [ac (effect-agent-ctx ctx effect)] (agent/drain-follow-up-in! ac (:messages effect)))))
 (defmethod execute-effect! :runtime/agent-start-loop [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/start-loop-in! ac [])))
 (defmethod execute-effect! :runtime/agent-start-loop-with-messages [ctx effect]
@@ -296,7 +297,8 @@
         (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record))))))
 
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
-  ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect))))
 
 (defmethod execute-effect! :runtime/dispatch-event [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
@@ -310,7 +312,8 @@
 (defmethod execute-effect! :runtime/emit-background-job-terminal-messages [ctx effect]
   ((:emit-background-job-terminal-messages-fn ctx) ctx (effect-session-id ctx effect)))
 (defmethod execute-effect! :runtime/reconcile-and-emit-background-job-terminals [ctx effect]
-  ((:reconcile-and-emit-background-job-terminals-fn ctx) ctx (effect-session-id ctx effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:reconcile-and-emit-background-job-terminals-fn ctx) ctx (effect-session-id ctx effect))))
 
 (defmethod execute-effect! :runtime/event-queue-offer [ctx effect]
   (when-let [q (:event-queue ctx)] (.offer ^java.util.concurrent.LinkedBlockingQueue q (:event effect))))
@@ -377,7 +380,8 @@
   (dispatch/dispatch! ctx :scheduler/drain-queue {:session-id (effect-session-id ctx effect)} {:origin :core}))
 
 (defmethod execute-effect! :statechart/send-event [ctx effect]
-  (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect))))
 
 (defn- execute-session-journal-io!
   [_ctx {:keys [request]}]
@@ -410,7 +414,8 @@
   (try (user-cfg/update-agent-session! (:prefs effect)) (catch Exception _ nil)))
 
 (defmethod execute-effect! :notify/extension-dispatch [ctx effect]
-  (ext/dispatch-in (:extension-registry ctx) (:event-name effect) (:payload effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (ext/dispatch-in (:extension-registry ctx) (:event-name effect) (:payload effect))))
 (defmethod execute-effect! :runtime/schedule-extension-dispatch [ctx effect]
   ((:daemon-thread-fn ctx)
    (fn []

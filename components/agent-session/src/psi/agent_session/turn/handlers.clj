@@ -209,7 +209,7 @@
   (let [run (get-in state-map [:workflows :runs run-id])]
     (and run (not= :cancelled (:status run)))))
 
-(defn- guard-record-response-root-update
+(defn- guard-workflow-root-update
   [root-state-update run-id]
   (if-not (and root-state-update run-id)
     root-state-update
@@ -237,7 +237,7 @@
                                  (when sd (:context-window sd)))]
             (cond-> result
               (:root-state-update result)
-              (update :root-state-update guard-record-response-root-update run-id)
+              (update :root-state-update guard-workflow-root-update run-id)
 
               next-event
               (update :effects (fnil conj []) (prompt-record-next-event-effect next-event next-payload run-id))
@@ -245,52 +245,57 @@
               (update :effects (fnil conj []) (prompt-record-context-usage-effect session-id tokens window run-id)))))))))
 
 (defn prompt-continue-handler
-  [_ctx {:keys [session-id execution-result progress-queue]}]
-  (let [turn-id (str (java.util.UUID/randomUUID))]
-    {:effects [{:effect/type :runtime/prompt-continue-chain
-                :execution-result execution-result
-                :progress-queue progress-queue}
-               {:effect/type :runtime/dispatch-event-with-effect-result
-                :event-type :session/prompt-prepare-request
-                :event-data {:session-id session-id
-                             :turn-id turn-id
-                             :user-msg nil
-                             :progress-queue progress-queue}
-                :origin :core}
-               {:effect/type :runtime/reconcile-and-emit-background-job-terminals}]
+  [ctx {:keys [session-id execution-result progress-queue]}]
+  (let [turn-id (str (java.util.UUID/randomUUID))
+        run-id  (:workflow-run-id (session/get-session-data-in ctx session-id))
+        guard   #(with-workflow-guard % run-id)]
+    {:effects [(guard {:effect/type :runtime/prompt-continue-chain
+                       :execution-result execution-result
+                       :progress-queue progress-queue})
+               (guard {:effect/type :runtime/dispatch-event-with-effect-result
+                       :event-type :session/prompt-prepare-request
+                       :event-data {:session-id session-id
+                                    :turn-id turn-id
+                                    :user-msg nil
+                                    :progress-queue progress-queue}
+                       :origin :core})
+               (guard {:effect/type :runtime/reconcile-and-emit-background-job-terminals})]
      :return-effect-result? true
      :return {:continued? true
               :next-turn-id turn-id
               :turn-outcome (:execution-result/turn-outcome execution-result)}}))
 
 (defn prompt-finish-base-result
-  [session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch]
-  {:effects [{:effect/type :runtime/dispatch-event
-              :event-type :on-agent-done
-              :event-data {:session-id session-id
-                           :pending-agent-event {:type :agent-end
-                                                 :messages [(:execution-result/assistant-message terminal-result)]
-                                                 :turn-id turn-id
-                                                 :provider-error/headers (get-in terminal-result [:execution-result/assistant-message :provider-error/headers])}}
-              :origin :core}
-             {:effect/type :notify/extension-dispatch
-              :event-name "session_turn_finished"
-              :payload (cond-> {:session-id session-id
-                                :turn-id turn-id}
-                         (seq (:execution-result/logprobs terminal-result))
-                         (assoc :logprobs (:execution-result/logprobs terminal-result))
+  ([session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch]
+   (prompt-finish-base-result session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch nil))
+  ([session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch workflow-run-id]
+   (let [guard #(with-workflow-guard % workflow-run-id)]
+     {:effects [(guard {:effect/type :runtime/dispatch-event
+                        :event-type :on-agent-done
+                        :event-data {:session-id session-id
+                                     :pending-agent-event {:type :agent-end
+                                                           :messages [(:execution-result/assistant-message terminal-result)]
+                                                           :turn-id turn-id
+                                                           :provider-error/headers (get-in terminal-result [:execution-result/assistant-message :provider-error/headers])}}
+                        :origin :core})
+                (guard {:effect/type :notify/extension-dispatch
+                        :event-name "session_turn_finished"
+                        :payload (cond-> {:session-id session-id
+                                          :turn-id turn-id}
+                                   (seq (:execution-result/logprobs terminal-result))
+                                   (assoc :logprobs (:execution-result/logprobs terminal-result))
 
-                         (:execution-result/assistant-message terminal-result)
-                         (assoc :assistant-message (:execution-result/assistant-message terminal-result)))}
-             {:effect/type :runtime/reconcile-and-emit-background-job-terminals}
-             {:effect/type :statechart/send-event
-              :event :session/reset}]
-   :return {:finished? true
-            :turn-id turn-id
-            :next-turn-id next-turn-id
-            :turn-outcome (:execution-result/turn-outcome terminal-result)
-            :follow-up-triggered? (boolean follow-up-msg)
-            :follow-up-count (or (:consume-count follow-up-batch) 0)}})
+                                   (:execution-result/assistant-message terminal-result)
+                                   (assoc :assistant-message (:execution-result/assistant-message terminal-result)))})
+                (guard {:effect/type :runtime/reconcile-and-emit-background-job-terminals})
+                (guard {:effect/type :statechart/send-event
+                        :event :session/reset})]
+      :return {:finished? true
+               :turn-id turn-id
+               :next-turn-id next-turn-id
+               :turn-outcome (:execution-result/turn-outcome terminal-result)
+               :follow-up-triggered? (boolean follow-up-msg)
+               :follow-up-count (or (:consume-count follow-up-batch) 0)}})))
 
 (defn consume-follow-up-state-update
   [session-id follow-up-batch]
@@ -301,25 +306,31 @@
               (vec (drop (:consume-count follow-up-batch) (or xs [])))))))
 
 (defn prompt-finish-follow-up-effects
-  [session-id follow-up-batch follow-up-msg]
-  [{:effect/type :runtime/agent-drain-follow-up-queue
-    :messages (:messages follow-up-batch)}
-   {:effect/type :runtime/dispatch-event-with-effect-result
-    :event-type :session/submit-synthetic-user-prompt
-    :event-data {:session-id session-id
-                 :user-msg follow-up-msg}
-    :origin :core}])
+  ([session-id follow-up-batch follow-up-msg]
+   (prompt-finish-follow-up-effects session-id follow-up-batch follow-up-msg nil))
+  ([session-id follow-up-batch follow-up-msg workflow-run-id]
+   (let [guard #(with-workflow-guard % workflow-run-id)]
+     [(guard {:effect/type :runtime/agent-drain-follow-up-queue
+              :messages (:messages follow-up-batch)})
+      (guard {:effect/type :runtime/dispatch-event-with-effect-result
+              :event-type :session/submit-synthetic-user-prompt
+              :event-data {:session-id session-id
+                           :user-msg follow-up-msg}
+              :origin :core})])))
 
 (defn prompt-finish-handler
   [ctx {:keys [session-id turn-id terminal-result]}]
-  (let [follow-up-batch (queued-follow-up-batch ctx session-id)
+  (let [run-id          (:workflow-run-id (session/get-session-data-in ctx session-id))
+        follow-up-batch (queued-follow-up-batch ctx session-id)
         follow-up-msg   (first (:messages follow-up-batch))
         next-turn-id    (when follow-up-msg (str (java.util.UUID/randomUUID)))]
-    (cond-> (prompt-finish-base-result session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch)
+    (cond-> (prompt-finish-base-result session-id turn-id terminal-result next-turn-id follow-up-msg follow-up-batch run-id)
       follow-up-batch
-      (assoc :root-state-update (consume-follow-up-state-update session-id follow-up-batch))
+      (assoc :root-state-update (guard-workflow-root-update
+                                 (consume-follow-up-state-update session-id follow-up-batch)
+                                 run-id))
       follow-up-msg
-      (update :effects into (prompt-finish-follow-up-effects session-id follow-up-batch follow-up-msg)))))
+      (update :effects into (prompt-finish-follow-up-effects session-id follow-up-batch follow-up-msg run-id)))))
 
 (defn prompt-execute-handler
   [_ctx {:keys [user-msg]}]
