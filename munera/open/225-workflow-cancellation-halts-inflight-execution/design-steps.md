@@ -769,7 +769,15 @@
 
 ## Ambiguity follow-ups (ψ pass 17, 2026-06-11)
 
-- [ ] Pin the canonical worker-future-cancel effect representation: exact
+- [x] Pin the canonical worker-future-cancel effect representation: exact
       `:effect/type` keyword, required payload keys, and target semantics for the
       top-level workflow run's `inflight-runs` future. Update D12/D14/D18/D23,
       effect-schema/executor implications, and tests to use that single shape.
+      → design.md D35: canonical effect is
+      `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}`.
+      `:run-id` is the top-level run that owns the `inflight-runs` entry; emitters
+      emit it only for top-level cancel/live top-level remove, never for direct
+      nested sub-run cancel/remove. Executor reads the D25 ctx-injected
+      `:workflow-inflight-runs-handle`, looks up exactly `:run-id`, calls
+      `future-cancel`, and treats missing handle/future as idempotent no-op.
+      Schema/executor/test implications pinned; D12/D14/D18/D23/Acceptance updated.

@@ -510,16 +510,17 @@ Mapping:
   with D3/D9). Workflow-cancellation emissions add the guarded metadata defined by
   D28 so D22.2's execute-time liveness re-check can be performed without changing
   existing non-workflow abort callers.
-- **Worker `future-cancel(true)` / interrupt** is emitted as a canonical
-  `:runtime/*` cancellation effect carrying the `run-id`; its `execute-effect!`
-  method cancels the future held in the `inflight-runs` runtime handle (reached via
-  `ctx`). A new effect type is added only where no existing one matches, and it is
-  registered in `effect-schema` with a parity `execute-effect!` method. **Target
-  (D14):** this effect targets only the **single top-level run's** future (the
-  run-tree root that owns the `inflight-runs` entry); nested sub-runs run
-  synchronously on that one worker thread and carry no future of their own, so the
-  `run-id` resolves to (or is walked up to) the top-level run. The child-session
-  abort target session-id is pinned by D15 (the in-flight attempt's
+- **Worker `future-cancel(true)` / interrupt** is emitted as the canonical
+  `:runtime/cancel-inflight-run` effect (D35), with required payload
+  `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}`. Its
+  `execute-effect!` method reads the `inflight-runs` runtime handle from `ctx`
+  (D25), looks up the **top-level** run entry by exactly that `:run-id`, and calls
+  `future-cancel` on the stored future (Clojure `future-cancel`, i.e.
+  `mayInterruptIfRunning=true`). **Target (D14/D35):** the payload `:run-id` is the
+  run-tree root that owns the `inflight-runs` entry; the executor does not accept a
+  nested sub-run id and does not walk `:delegating-run-id`. Nested sub-runs run
+  synchronously on that one worker thread and carry no future of their own. The
+  child-session abort target session-id is pinned by D15 (the in-flight attempt's
   `:execution-session-id`).
 
 Routing through the dispatch `:effects` interceptor is required so the cancellation
@@ -600,9 +601,12 @@ Code premises confirmed:
 A nested delegate sub-run has **no `inflight-runs` entry and no cancellable worker
 future of its own** — it executes synchronously on the one top-level worker
 thread. Therefore the D12 worker `future-cancel(true)` effect targets **only the
-single top-level run's future**: the run-tree root, i.e. the ancestor reached by
-walking `:delegating-run-id` upward until the run that owns the `inflight-runs`
-entry. There is exactly **one** such future for the whole synchronous sub-tree.
+single top-level run's future**. D35 pins the effect representation: emit
+`{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}`, where
+`:run-id` is the run-tree root that owns the `inflight-runs` entry. The executor
+performs no run-tree traversal; it looks up exactly that top-level `:run-id` in the
+ctx-injected `inflight-runs` handle. There is exactly **one** such future for the
+whole synchronous sub-tree.
 
 **Emission rule (refined by D19).** The walk-up framing here describes how the
 single worker interrupt is *targeted* during a **top-level** run's top-down
@@ -890,7 +894,9 @@ handled by the change-chain doc step when implemented.
 
 1. the D13 `:runtime/mark-workflow-jobs-terminal` effect (terminalize the job with
    the run still present), then
-2. the D12 cancellation effects (worker `future-cancel`/interrupt + D3/D14/D15
+2. the D12 cancellation effects (the D35
+   `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}` worker
+   interrupt effect when the directly-cancelled run is top-level, plus the D3/D14/D15
    cascade), then
 3. a `:runtime/dispatch-event` effect targeting the remove event
    (`{:effect/type :runtime/dispatch-event :event-type <remove-run dispatch>
@@ -1238,11 +1244,12 @@ multi-run update fn**, never a command-layer loop or cross-handle reach-in
    in-fn guard.
 3. **Effects (cancel dispatch's effect set, `:effects` interceptor).** Emit, through
    the dispatch `:effects` interceptor (D1/D12 — canonical `:runtime/*`, parity,
-   replay-trim, trace): the **single** top-level worker `future-cancel(true)` **iff
-   the directly-cancelled run is the top-level run** (D14/D19); one
-   `:runtime/agent-abort` per in-flight descendant attempt (D15 live-attempt
-   predicate); and the D13 `:runtime/mark-workflow-jobs-terminal` terminalization.
-   No per-descendant re-dispatch.
+   replay-trim, trace): the D35 **single** top-level worker interrupt effect
+   `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}` **iff the
+   directly-cancelled run is the top-level run** (D14/D19); one guarded
+   `:runtime/agent-abort` per in-flight descendant attempt (D15/D28/D33
+   live-attempt predicate); and the D13 `:runtime/mark-workflow-jobs-terminal`
+   terminalization. No per-descendant re-dispatch.
 
 **Reconciliation with D4/D20 (atomicity).** D20's single-run atomicity (terminal
 guard inside the `:root-state-update` fn riding one CAS) **generalises directly** to
@@ -1856,6 +1863,54 @@ D26's terminal/absent `remove-run` branch emits the bare record-drop plus the D2
 This reconciles D26/D29/Acceptance #10 and preserves the fix for the Evidence-step-3
 class: a record may be absent while a stale runtime handle still needs cleanup.
 
+## Ambiguity Reconciliation (ψ pass 17, 2026-06-11)
+
+Resolves the pass-17 ambiguity follow-up by pinning the worker-future-cancel effect
+representation. No implementation work is performed here.
+
+### D35. Worker future cancellation uses `:runtime/cancel-inflight-run` with top-level `:run-id`
+
+The canonical worker-future-cancel effect shape is exactly:
+
+```clojure
+{:effect/type :runtime/cancel-inflight-run
+ :run-id top-level-run-id}
+```
+
+- **Effect type:** `:runtime/cancel-inflight-run`.
+- **Required payload keys:** `:effect/type` and `:run-id` only. `:run-id` is the
+  string workflow run id of the **top-level run that owns the `inflight-runs`
+  entry**.
+- **Emitter responsibility:** emitters compute whether the directly-cancelled run
+  is top-level. If it is top-level, they emit this effect with that top-level run id;
+  if it is a nested sub-run directly cancelled/removed, they emit **no** worker
+  cancel effect (D14/D19/D21). The effect payload never carries a nested sub-run id.
+- **Executor target semantics:** `execute-effect!` reads the D25 ctx-injected
+  `:workflow-inflight-runs-handle`, looks up exactly `(:run-id effect)`, and, when a
+  `:future` exists, calls Clojure `future-cancel` on it (interrupting the worker,
+  equivalent to Java `Future.cancel(true)`). It does **not** traverse
+  `:delegating-run-id`, does **not** infer a top-level ancestor at execution time,
+  and does **not** mutate canonical `:state*`. Missing handle/future is an
+  idempotent no-op.
+- **Schema implication:** `dispatch_schema.clj` registers
+  `[:runtime/cancel-inflight-run [:map [:effect/type [:= :runtime/cancel-inflight-run]] [:run-id :string]]]`.
+  No alternate keyword (`:runtime/workflow-future-cancel`,
+  `:runtime/cancel-workflow-future`, etc.) and no alternate payload aliases are in
+  scope.
+- **Executor implication:** `dispatch_effects.clj` defines the matching parity
+  `execute-effect!` method and returns/records a small result shape suitable for
+  tests/tracing, e.g. `{:run-id run-id :cancelled? boolean :found? boolean}`; tests
+  should not depend on more than `:found?`/`:cancelled?` unless the implementation
+  chooses to expose more.
+- **Test implication:** tests assert this exact effect shape for top-level cancel /
+  live top-level remove and assert it is absent for direct nested sub-run
+  cancel/remove.
+
+This pins the representation that D12 previously described only generically as a
+canonical `:runtime/*` effect, aligns D14's target semantics, gives D18/D23 a
+single effect value to order in the cancel dispatch, and keeps D25's ctx-injected
+handle reachability intact.
+
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
 The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
@@ -1889,7 +1944,8 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
    reaches a clean `:cancelled` terminal state with its background job terminal.
 2. **[guaranteed]** A test asserts `remove` of a live **top-level** run does not leave
    a running worker future / orphaned thread: the single top-level run's future is
-   `future-cancel`'d (D14) and its `inflight-runs` entry is cleared by the
+   cancelled by the D35 `:runtime/cancel-inflight-run` effect carrying exactly the
+   top-level `:run-id`, and its `inflight-runs` entry is cleared by the
    `:runtime/drop-inflight-run` cleanup effect (D24) — emitted in the remove dispatch
    after the cancel dispatch has `future-cancel`'d the future and terminalized the job
    (cancel-then-remove, D5/D17). The entry-drop is the cleanup effect, **not** the pure
@@ -1912,13 +1968,14 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
    D28 guarded `:runtime/agent-abort` payload/read rule so its turn does not advance,
    and the cancelled run plus its in-flight descendants reach `:cancelled` terminal
    via the single multi-run apply-phase transition (D23). **No** per-sub-run worker
-   `future-cancel` is emitted (sub-runs are synchronous, carry no own future — D14);
-   only the single top-level future is interrupted.
+   `:runtime/cancel-inflight-run` effect is emitted (sub-runs are synchronous, carry
+   no own future — D14/D35); only the single top-level future is interrupted by the
+   effect whose `:run-id` is the top-level run id.
 5. **[guaranteed]** A test asserts `remove` of a live **nested sub-run** (the nested
    variant of criterion #2): its guarantee is child-turn abort + the parent observing
-   **run-absence ≡ `:cancelled`** and **continuing** (not halted) — and **no** worker
-   `future-cancel` is emitted (D14/D19/D21). (Distinct from criterion #2's top-level
-   future cancellation.)
+   **run-absence ≡ `:cancelled`** and **continuing** (not halted) — and **no**
+   `:runtime/cancel-inflight-run` worker effect is emitted (D14/D19/D21/D35).
+   (Distinct from criterion #2's top-level future cancellation.)
 
 ### Evidence-step-2 direct cases
 
@@ -1926,7 +1983,8 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
    step 2): the downward child abort unblocks the shared parent worker, the sub-run
    reaches `:cancelled`, and the parent observes a **failed delegate step** via the
    existing `delegate-step-runtime-result` `:cancelled` case and **continues, not
-   halted** (D19). No worker `future-cancel` is emitted for the sub-run.
+   halted** (D19). No `:runtime/cancel-inflight-run` worker effect is emitted for
+   the sub-run.
 7. **[guaranteed]** A test asserts **direct `remove` of a live sub-run**: after the
    record is dropped, the parent reading **run-absence** (`nil` delegate-run) maps to
    the **same** failed-delegate-step result as `:cancelled` (D21), so the parent's

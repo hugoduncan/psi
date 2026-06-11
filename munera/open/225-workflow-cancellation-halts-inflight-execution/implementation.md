@@ -1753,3 +1753,28 @@ One new actionable ambiguity found:
    still satisfying the prose. Pin one keyword and required keys.
 
 No other new actionable ambiguity found in the current D1–D34 design.
+
+
+## Ambiguity follow-up resolution (ψ pass 17, 2026-06-11)
+
+Executed the newly added pass-17 ambiguity follow-up design-step. It was a
+representation-pinning design step, completable now — no blocker.
+
+Resolution written to `design.md` as D35 and threaded through D12/D14/D18/D23 plus
+Acceptance #2/#4/#5/#6:
+
+- canonical worker future-cancel effect is
+  `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}`;
+- required keys are exactly `:effect/type` and `:run-id`; `:run-id` is the
+  top-level run id owning the `inflight-runs` entry;
+- emitters emit it only for top-level cancel / live top-level remove; direct nested
+  sub-run cancel/remove emits no worker cancel effect;
+- executor reads the D25 ctx-injected `:workflow-inflight-runs-handle`, looks up
+  exactly `:run-id`, calls `future-cancel`, does no run-tree traversal, and no-ops
+  idempotently on missing handle/future;
+- schema/executor/test implications now name `:runtime/cancel-inflight-run` as the
+  single accepted shape.
+
+This removes the previous representational ambiguity (`:runtime/*` prose without a
+keyword/payload), while preserving D14/D19 parent-survival for direct nested
+sub-run cancellation and D25 ctx-based handle reachability.
