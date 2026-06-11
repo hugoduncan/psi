@@ -3176,3 +3176,24 @@ New actionable issue: `prompt-finish` still dispatches `:on-agent-done` as an or
 Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 7 tests / 36 assertions green.
+
+## Implementation review follow-up pass 23 (ψ, 2026-06-11)
+
+Closed the stale `:on-agent-done` window after workflow cancellation. `prompt-finish`
+now carries `:workflow-run-id` into the nested `:on-agent-done` event data as well
+as the dispatch effect guard. The `:on-agent-done` handler derives the run guard
+from event data or workflow-owned session data, returns a stopped result if the run
+is already cancelled/removed, guards its root-state update against stale apply, and
+tags terminal/background/scheduler effects with the workflow run id. The effect
+executors for workflow job terminalization, background-job terminal messages,
+scheduler drain, and pending-tool-call interrupt recording now re-check the same
+workflow stop signal before ordinary side effects.
+
+Added a regression in `prompt_lifecycle_workflow_cancellation_test` that builds a
+live `:on-agent-done` pure result, cancels before apply/effects, then proves stale
+apply does not clear terminal session state and stale effects do not terminalize
+background jobs, emit terminal messages, or drain the scheduler.
+
+Verification: focused Scry suites for prompt lifecycle workflow cancellation,
+statechart actions, scheduler handlers, and turn handlers passed; focused
+clj-kondo over touched agent-session code/tests passed.

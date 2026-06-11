@@ -399,3 +399,71 @@
         "stale finish reset must not mutate the session statechart after cancellation")
     (is (empty? (kernel/event-log-entries))
         "stale prompt-finish dispatch effects must not emit terminal notifications or follow-up prompts")))
+
+(deftest workflow-cancel-after-on-agent-done-build-before-apply-blocks-stale-terminal-effects-test
+  ;; Regression for task 225 pass 23: prompt-finish's guarded dispatch effect may
+  ;; have already admitted :on-agent-done and built that handler's pure result
+  ;; before D31 cancellation lands. The stale result must not clear terminal
+  ;; session state or run ordinary terminal side effects after cancellation.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-on-agent-done-built-then-cancelled"
+        terminal-calls* (atom 0)
+        terminal-messages* (atom 0)
+        ctx (assoc ctx0
+                   :mark-workflow-jobs-terminal-fn (fn [& _] (swap! terminal-calls* inc))
+                   :emit-background-job-terminal-messages-fn (fn [& _] (swap! terminal-messages* inc))
+                   :scheduler-timers* (atom {}))
+        pending-event {:type :agent-end
+                       :messages [{:role "assistant"
+                                   :content [{:type :text :text "done"}]
+                                   :stop-reason :stop}]
+                       :turn-id "turn-on-agent-done-race"}
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)
+        _ (swap! (:state* ctx)
+                 update-in
+                 (ss/session-data-path session-id)
+                 assoc
+                 :is-streaming true
+                 :retry-attempt 2
+                 :retry {:delay-ms 1000}
+                 :interrupt-pending true)
+        handler-result ((:fn (kernel/handler-entry :on-agent-done))
+                        ctx
+                        {:session-id session-id
+                         :workflow-run-id run-id
+                         :pending-agent-event pending-event})]
+    (is (fn? (:root-state-update handler-result))
+        "live on-agent-done builds the ordinary terminal root update")
+    (is (= [:runtime/mark-workflow-jobs-terminal
+            :runtime/emit-background-job-terminal-messages
+            :scheduler/drain-queue]
+           (mapv :effect/type (:effects handler-result)))
+        "regression must exercise on-agent-done terminal effects")
+    (is (every? #(= run-id (:workflow-run-id %)) (:effects handler-result))
+        "workflow-owned on-agent-done effects carry the workflow guard")
+    (is (every? dispatch-schema/valid-effect? (:effects handler-result))
+        "workflow-guarded on-agent-done effects must remain valid")
+    (session/dispatch-in! ctx :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "on-agent-done built before cancel"}
+                          {:origin :core})
+    (reset! terminal-calls* 0)
+    (reset! terminal-messages* 0)
+    (kernel/clear-event-log!)
+    (ss/apply-root-state-update-in! ctx (:root-state-update handler-result))
+    (doseq [effect (:effects handler-result)]
+      (dispatch-effects/execute-effect! ctx (assoc effect :session-id session-id)))
+    (is (= {:is-streaming true
+            :retry-attempt 2
+            :retry {:delay-ms 1000}
+            :interrupt-pending true}
+           (select-keys (ss/get-session-data-in ctx session-id)
+                        [:is-streaming :retry-attempt :retry :interrupt-pending]))
+        "stale on-agent-done root update must not clear ordinary terminal session state after cancellation")
+    (is (= 0 @terminal-calls*)
+        "stale on-agent-done must not terminalize background jobs after cancellation")
+    (is (= 0 @terminal-messages*)
+        "stale on-agent-done must not emit background-job terminal messages after cancellation")
+    (is (empty? (kernel/event-log-entries))
+        "stale on-agent-done must not drain the scheduler after cancellation")))

@@ -230,26 +230,27 @@
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/record-tool-result-in! ac (:tool-result-msg effect))))
 
 (defmethod execute-effect! :runtime/record-pending-tool-call-interrupts [ctx effect]
-  (let [session-id (:session-id effect)
-        reason     (:reason effect)
-        agent-ctx  (effect-agent-ctx ctx effect)
-        pending    (vec (or (some-> agent-ctx agent/get-data-in :pending-tool-calls) #{}))]
-    (doseq [tool-call-id pending]
-      (dispatch/dispatch! ctx
-                          :session/tool-agent-record-result
-                          {:session-id session-id
-                           :tool-result-msg {:role "toolResult"
-                                             :tool-call-id tool-call-id
-                                             :tool-name "interrupted"
-                                             :content [{:type :text
-                                                        :text (str "Tool execution interrupted before completion."
-                                                                   (when reason
-                                                                     (str " Reason: " (name reason) ".")))}]
-                                             :is-error true
-                                             :details {:interruption {:reason reason}}
-                                             :timestamp (java.time.Instant/now)}}
-                          {:origin :core}))
-    {:recorded-count (count pending) :reason reason}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (let [session-id (:session-id effect)
+          reason     (:reason effect)
+          agent-ctx  (effect-agent-ctx ctx effect)
+          pending    (vec (or (some-> agent-ctx agent/get-data-in :pending-tool-calls) #{}))]
+      (doseq [tool-call-id pending]
+        (dispatch/dispatch! ctx
+                            :session/tool-agent-record-result
+                            {:session-id session-id
+                             :tool-result-msg {:role "toolResult"
+                                               :tool-call-id tool-call-id
+                                               :tool-name "interrupted"
+                                               :content [{:type :text
+                                                          :text (str "Tool execution interrupted before completion."
+                                                                     (when reason
+                                                                       (str " Reason: " (name reason) ".")))}]
+                                               :is-error true
+                                               :details {:interruption {:reason reason}}
+                                               :timestamp (java.time.Instant/now)}}
+                            {:origin :core}))
+      {:recorded-count (count pending) :reason reason})))
 
 (defmethod execute-effect! :runtime/tool-execute [ctx effect]
   (try
@@ -307,10 +308,12 @@
   (when-not (workflow-effect-stop-signal ctx effect)
     (dispatch/dispatch! ctx (:event-type effect) (or (:event-data effect) {}) {:origin (or (:origin effect) :core)})))
 
-(defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx _effect]
-  ((:mark-workflow-jobs-terminal-fn ctx) ctx))
+(defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx effect]
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:mark-workflow-jobs-terminal-fn ctx) ctx)))
 (defmethod execute-effect! :runtime/emit-background-job-terminal-messages [ctx effect]
-  ((:emit-background-job-terminal-messages-fn ctx) ctx (effect-session-id ctx effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:emit-background-job-terminal-messages-fn ctx) ctx (effect-session-id ctx effect))))
 (defmethod execute-effect! :runtime/reconcile-and-emit-background-job-terminals [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
     ((:reconcile-and-emit-background-job-terminals-fn ctx) ctx (effect-session-id ctx effect))))
@@ -377,7 +380,8 @@
     {:schedule-id schedule-id :cancelled? true}))
 
 (defmethod execute-effect! :scheduler/drain-queue [ctx effect]
-  (dispatch/dispatch! ctx :scheduler/drain-queue {:session-id (effect-session-id ctx effect)} {:origin :core}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (dispatch/dispatch! ctx :scheduler/drain-queue {:session-id (effect-session-id ctx effect)} {:origin :core})))
 
 (defmethod execute-effect! :statechart/send-event [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)

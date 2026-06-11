@@ -272,11 +272,12 @@
    (let [guard #(with-workflow-guard % workflow-run-id)]
      {:effects [(guard {:effect/type :runtime/dispatch-event
                         :event-type :on-agent-done
-                        :event-data {:session-id session-id
-                                     :pending-agent-event {:type :agent-end
-                                                           :messages [(:execution-result/assistant-message terminal-result)]
-                                                           :turn-id turn-id
-                                                           :provider-error/headers (get-in terminal-result [:execution-result/assistant-message :provider-error/headers])}}
+                        :event-data (cond-> {:session-id session-id
+                                             :pending-agent-event {:type :agent-end
+                                                                   :messages [(:execution-result/assistant-message terminal-result)]
+                                                                   :turn-id turn-id
+                                                                   :provider-error/headers (get-in terminal-result [:execution-result/assistant-message :provider-error/headers])}}
+                                      workflow-run-id (assoc :workflow-run-id workflow-run-id))
                         :origin :core})
                 (guard {:effect/type :notify/extension-dispatch
                         :event-name "session_turn_finished"

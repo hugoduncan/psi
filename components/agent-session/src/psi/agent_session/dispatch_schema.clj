@@ -48,9 +48,11 @@
    [:runtime/agent-reset
     [:map [:effect/type [:= :runtime/agent-reset]]]]
    [:runtime/mark-workflow-jobs-terminal
-    [:map [:effect/type [:= :runtime/mark-workflow-jobs-terminal]]]]
+    [:map [:effect/type [:= :runtime/mark-workflow-jobs-terminal]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/emit-background-job-terminal-messages
-    [:map [:effect/type [:= :runtime/emit-background-job-terminal-messages]]]]
+    [:map [:effect/type [:= :runtime/emit-background-job-terminal-messages]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/reconcile-and-emit-background-job-terminals
     [:map [:effect/type [:= :runtime/reconcile-and-emit-background-job-terminals]]
      [:workflow-run-id {:optional true} :string]]]
@@ -93,7 +95,8 @@
    [:runtime/record-pending-tool-call-interrupts
     [:map [:effect/type [:= :runtime/record-pending-tool-call-interrupts]]
      [:session-id :string]
-     [:reason :keyword]]]
+     [:reason :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/tool-execute
     [:map [:effect/type [:= :runtime/tool-execute]]
      [:tool-name :string] [:args :map] [:opts {:optional true} [:maybe :map]]]]
@@ -136,7 +139,8 @@
     [:map [:effect/type [:= :scheduler/cancel-timer]]
      [:schedule-id :string]]]
    [:scheduler/drain-queue
-    [:map [:effect/type [:= :scheduler/drain-queue]]]]
+    [:map [:effect/type [:= :scheduler/drain-queue]]
+     [:workflow-run-id {:optional true} :string]]]
    [:persist/session-journal-io
     [:map [:effect/type [:= :persist/session-journal-io]]
      [:request [:map
