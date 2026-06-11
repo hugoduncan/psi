@@ -2815,3 +2815,26 @@ cancellation after the start commit and before call-begin. Focused Scry suites p
 `psi.agent-session.workflow-statechart-runtime-cancellation-test`, and
 `psi.agent-session.workflow-judge-cancellation-test` (21 tests / 82 assertions).
 Focused clj-kondo over touched code/tests passed with 0 warnings.
+
+## Implementation review (ψ pass 13, 2026-06-11)
+
+Reviewed the pass-12 call-begin implementation against `task-implementation-review`,
+D30/D31, `turn_execution_contract.clj`, `deterministic_operation_runtime/core.clj`,
+and the actor/judge/invoke cancellation regressions. The new call-begin CAS plus
+final stop read closes cancellation that lands before the final read, but it still
+leaves one ordinary-start race.
+
+New actionable issue: `:turn-call-state` / `:operation-call-state` is marked
+`:started`, then the code performs a final stop read and calls the prompt adapter /
+operation handler outside any cancellation-safe boundary. If the D31 cancel CAS lands
+after that final read but before `prompt-execution-result!` or the deterministic
+operation handler call, ordinary work can still be initiated after cancellation. The
+guarded abort effect can also run while the child session is still idle and leave no
+durable stop marker; deterministic operations have no abort path. Follow-up should
+make call-begin itself the start linearization point that cancellation observes and
+blocks/aborts durably, or move the final ordinary call under a boundary that consumes
+a durable cancel marker after concurrent cancel effects. Add actor, judge, and invoke
+regressions for cancellation after successful call-begin/final stop read but before
+the adapter/handler call.
+
+No tests run (review-only pass).
