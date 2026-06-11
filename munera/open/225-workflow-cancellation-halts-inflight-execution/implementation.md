@@ -1653,3 +1653,21 @@ Fresh ambiguity pass over design.md after D32, consulting the dispatch effect sc
 2. **Absent `remove-run`: public no-op vs cleanup effect is not explicit.** D26 groups terminal/absent `remove-run` into the bare-dissoc + `:runtime/drop-inflight-run` cleanup branch, while D29/Acceptance #10 describe absent remove as success/idempotent no-op (`:removed? false`, `:found? false`, `:noop? true`). The design should state whether absent remove still emits `:runtime/drop-inflight-run` to clean a possible orphaned handle, and whether `:noop?` means no canonical record removed vs no effects at all.
 
 No other new actionable ambiguity found; the remaining D1–D32 contracts otherwise choose single behaviours.
+
+## Ambiguity follow-up resolution (ψ pass 14, 2026-06-11)
+
+Executed both newly added pass-14 ambiguity follow-up design-steps. Both were
+contract-clarification steps in design.md; both completable now — no blockers.
+Resolutions:
+
+- D33 — pinned workflow-cancellation `:runtime/agent-abort` guard payload to one
+  canonical flat top-level key shape: `:session-id`, `:workflow-run-id`,
+  `:workflow-step-id`, `:workflow-attempt-id`, and `:expected-session-id`.
+  Rejected nested `:workflow-abort-guard`; D28/D32 schema/executor implications now
+  require all-or-none flat guard keys for guarded workflow-cancel aborts while
+  preserving optional `:session-id` for unguarded aborts.
+- D34 — clarified absent `remove-run`: it returns the D29 success/no-op public
+  shape and applies no canonical record removal / no cancel transition, but still
+  emits only the idempotent D24 `:runtime/drop-inflight-run` cleanup to clear a
+  possible orphaned handle. `:noop? true` means no canonical record was found or
+  removed, not literal absence of effects. Acceptance #10 updated.

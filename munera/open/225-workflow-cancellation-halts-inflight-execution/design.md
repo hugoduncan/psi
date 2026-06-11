@@ -666,8 +666,9 @@ This makes the D9/D12 reuse of `:runtime/agent-abort` well-defined: its keyed
 `session-id` (`effect-session-id`) is supplied from the canonical in-flight
 attempt's `:execution-session-id`.
 
-**Workflow-cancellation guard payload/read rule (D28).** A workflow-cancellation
-abort effect carries both the existing `:session-id` and workflow guard metadata:
+**Workflow-cancellation guard payload/read rule (D28/D33).** A workflow-cancellation
+abort effect carries both the existing `:session-id` and the canonical **flat**
+workflow guard metadata:
 `{:workflow-run-id run-id :workflow-step-id step-id :workflow-attempt-id attempt-id}`
 plus `:expected-session-id sid` (equal to `:session-id`). At execute time the
 `:runtime/agent-abort` handler uses this metadata to re-read canonical `:state*`,
@@ -1430,19 +1431,24 @@ no command-layer orchestration; the cancel-transition logic is a shared helper.*
     This first pass **does not** apply the `remove-run` dissoc (apply-before-effects
     would drop the record before the terminalize effect — D17); it only commits
     `:cancelled` and emits the effect tail.
-  - **`remove-run` (terminal/absent run — the re-entrant second pass, and plain
-    remove-of-terminal):** the **bare unconditional `remove-run` dissoc** (D22.1
-    record-drop, status-independent) + the D24 `:runtime/drop-inflight-run` cleanup
-    effect; **no** cancellation effects (the run is already terminal at the
-    handler-`:before` read, so the D22.1 gate contributes none).
+  - **`remove-run` (terminal/absent run — the re-entrant second pass, plain
+    remove-of-terminal, and absent-remove cleanup):** the **bare unconditional
+    `remove-run` dissoc** (D22.1 record-drop, status-independent) + the D24
+    `:runtime/drop-inflight-run` cleanup effect; **no** cancellation effects (the
+    run is already terminal or absent at the handler-`:before` read, so the D22.1
+    gate contributes none). For an absent run, the pure dissoc is an identity/no
+    canonical record removal, but the D24 cleanup still runs to clear a possible
+    orphaned handle (D34).
 
 - **(c) Where the live-vs-terminal branch lives.** Inside the `remove-run`
   **handler-`:before`** (the canonical-state read), **not** the command layer — it
   is exactly the **D22.1 terminal-precondition gate** read, reused as the
   live-vs-terminal selector: a non-terminal run takes the first-pass branch (cancel
   transition + effects + chained remove dispatch, no dissoc); a terminal/absent run
-  takes the record-drop branch (bare dissoc + drop-inflight-run, no cancellation
-  effects). No new branching mechanism is introduced; it is the D22.1 read already
+  takes the record-drop/cleanup branch (bare dissoc + drop-inflight-run, no
+  cancellation effects). For an absent run the dissoc is a no-op over canonical
+  `:state*`, but the drop-inflight-run cleanup still emits (D34). No new branching
+  mechanism is introduced; it is the D22.1 read already
   required. Putting the branch in the handler-`:before` keeps it out of the command
   layer (D18) and rides the D20 in-`swap!`-fn guard for atomicity.
 
@@ -1551,7 +1557,7 @@ terminal/absent result semantics, cancellation-control side-effect boundaries, a
 the testable meaning of "cancel checkpoint". No implementation work is performed
 here.
 
-### D28. Workflow-cancellation `:runtime/agent-abort` uses guarded metadata; non-workflow aborts remain session-id-only
+### D28. Workflow-cancellation `:runtime/agent-abort` uses flat guarded metadata; non-workflow aborts remain session-id-only
 
 D15 identifies the child session to abort as the in-flight attempt's
 `:execution-session-id`, while D22.2 requires the executor to re-read liveness from
@@ -1560,7 +1566,8 @@ canonical run state at execute time. The missing piece is how the existing
 workflow attempt to validate.
 
 **Decision.** Workflow-cancellation emissions of `:runtime/agent-abort` carry
-workflow guard metadata in addition to the existing `:session-id`:
+a canonical **flat top-level** workflow guard payload in addition to the existing
+`:session-id`:
 
 ```clojure
 {:effect/type :runtime/agent-abort
@@ -1570,6 +1577,10 @@ workflow guard metadata in addition to the existing `:session-id`:
  :workflow-attempt-id attempt-id
  :expected-session-id sid}
 ```
+
+This flat top-level shape is canonical (D33). There is no nested
+`:workflow-abort-guard` map; emitters, the effect schema, executor, and tests all
+target the same flat key set.
 
 At execute time the effect handler branches on presence of the workflow guard:
 
@@ -1593,10 +1604,11 @@ existing `:runtime/agent-abort` shape as a two-variant contract:
   dispatch `:effects` interceptor to inject the dispatching event's `:session-id`
   after validation.
 - **Guarded workflow-cancellation variant:** workflow guard keys are present and
-  validation requires the complete guard plus an explicit `:session-id` and
-  `:expected-session-id` before effects execute. This is the D15 child
-  `:execution-session-id`; the executor does not rely on post-validation session-id
-  injection for workflow-cancel aborts.
+  validation requires the complete **flat** guard key set plus an explicit
+  `:session-id` and `:expected-session-id` before effects execute. This is the D15
+  child `:execution-session-id`; the executor does not rely on post-validation
+  session-id injection for workflow-cancel aborts. The schema enforces all-or-none
+  presence of the flat guard keys named in D33.
 
 No new abort effect type is introduced; this is a guarded workflow-cancellation
 variant of the existing effect. D12/D15/D22.2 are aligned to this rule.
@@ -1626,6 +1638,10 @@ They return stable success/no-op shapes that make operator retries safe.
 
 **`remove-run` result contract.**
 
+`remove-run` distinguishes the public canonical-record result from handle cleanup
+(D34): `:noop?` is about whether a canonical record was found/removed or a cancel
+transition applied; it is not a promise that no idempotent cleanup effect emitted.
+
 - **Live run:** first pass returns/remains a successful remove request while the
   handler performs cancel-then-remove (D26):
   `{:psi.workflow/run-id run-id :psi.workflow/removed? true
@@ -1638,7 +1654,10 @@ They return stable success/no-op shapes that make operator retries safe.
   record-drop and `:runtime/drop-inflight-run` cleanup run.
 - **Absent run:** returns success/idempotent no-op removal:
   `:psi.workflow/removed? false`, `:psi.workflow/found? false`,
-  `:psi.workflow/noop? true`, `:psi.workflow/error nil`.
+  `:psi.workflow/noop? true`, `:psi.workflow/error nil`. No canonical record was
+  removed and no cancel transition/cancellation effects emit; the D24
+  `:runtime/drop-inflight-run` cleanup **does** still emit to clear any orphaned
+  handle for that run-id (D34).
 
 This intentionally changes the current "not found" / "already terminal" exception
 shape for cancel/remove. Unexpected validation/schema failures may still return
@@ -1723,24 +1742,91 @@ it for guarded workflow-cancellation aborts.** The effect schema represents
    `execute-effect!`; if present, the explicit value is used. This preserves
    current `:on-abort` and other session-dispatch-local abort behaviour.
 2. **Guarded workflow-cancel abort.** Any workflow-cancel guard key implies the
-   full guarded variant is required before validation succeeds:
-   `:session-id`, `:workflow-run-id`, `:workflow-step-id`,
-   `:workflow-attempt-id`, and `:expected-session-id`. The schema should enforce
-   all-or-none guard keys (or use a required nested `:workflow-abort-guard` map).
-   Workflow-cancel emitters always know the child `:execution-session-id` from D15,
-   so they must provide it explicitly; relying on the dispatching operator
-   session's injected `:session-id` would target the wrong session.
+   full guarded variant is required before validation succeeds. The canonical
+   payload is flat top-level keys only (D33): `:session-id`, `:workflow-run-id`,
+   `:workflow-step-id`, `:workflow-attempt-id`, and `:expected-session-id`. The
+   schema enforces all-or-none presence of those flat guard keys; no nested
+   `:workflow-abort-guard` map is in scope. Workflow-cancel emitters always know
+   the child `:execution-session-id` from D15, so they must provide it explicitly;
+   relying on the dispatching operator session's injected `:session-id` would target
+   the wrong session.
 
 **Executor rule.** After the interceptor's possible injection, `execute-effect!`
 continues to resolve the effective session id with `(effect-session-id ctx effect)`.
 When workflow guard metadata is absent it performs the existing session-id-only
-abort. When workflow guard metadata is present it first applies D28's canonical
-run/step/attempt liveness re-check and aborts only if the guarded latest attempt
-still matches the explicit session id; otherwise it no-ops.
+abort. When any canonical flat workflow guard key is present, all flat guard keys
+must be present (schema); execution first applies D28's canonical run/step/attempt
+liveness re-check and aborts only if the guarded latest attempt still matches the
+explicit session id; otherwise it no-ops.
 
 This reconciles D12/D28 with validation order: unguarded aborts remain valid before
 injection, guarded workflow-cancel aborts are fully validated before execution, and
 no new abort effect type or command-layer exception is introduced.
+
+## Ambiguity Reconciliations (ψ pass 14, 2026-06-11)
+
+Resolves the pass-14 ambiguity follow-ups. These pin one canonical guard payload
+shape for workflow-cancellation aborts and clarify absent `remove-run` cleanup /
+`:noop?` semantics. No implementation work is performed here.
+
+### D33. Workflow-cancellation `:runtime/agent-abort` guard payload is flat top-level keys
+
+D28 already showed a flat `:runtime/agent-abort` workflow guard payload, while D32
+left open a nested `:workflow-abort-guard` map as a schema alternative. That
+alternative is rejected: the canonical shape is the **flat top-level key set**
+already shown in D28/D15:
+
+```clojure
+{:effect/type :runtime/agent-abort
+ :session-id sid
+ :workflow-run-id run-id
+ :workflow-step-id step-id
+ :workflow-attempt-id attempt-id
+ :expected-session-id sid}
+```
+
+Effect schema implication: `:runtime/agent-abort` remains one effect type with the
+D32 two-variant contract. Unguarded aborts have no workflow guard keys and keep
+optional `:session-id`; guarded workflow-cancel aborts require `:session-id` plus
+all four flat guard keys (`:workflow-run-id`, `:workflow-step-id`,
+`:workflow-attempt-id`, `:expected-session-id`) before validation succeeds. The
+schema enforces all-or-none flat guard keys; a nested `:workflow-abort-guard` map
+is not accepted. The executor detects guarded workflow-cancel aborts by the
+presence of any flat guard key, validates that the complete flat set is present
+(via schema), and applies D28's run/step/attempt liveness re-check against those
+flat values. Emitters and tests target this single flat shape.
+
+Rationale: flat keys match the existing effect-schema style in this project (effect
+payloads expose their domain arguments at top level), keep D15/D28 unchanged in
+substance, and avoid a second equivalent representation. One way, no aliases.
+
+### D34. Absent `remove-run` still emits idempotent handle cleanup; `:noop?` means no canonical record was removed
+
+D26's terminal/absent `remove-run` branch emits the bare record-drop plus the D24
+`:runtime/drop-inflight-run` cleanup effect, while D29 describes absent remove as
+`success/idempotent no-op`. The single contract is:
+
+- **Absent `remove-run` emits no cancellation effects and applies no canonical
+  record removal** (the pure dissoc is identity because the run record is already
+  absent). Public result: `:psi.workflow/removed? false`,
+  `:psi.workflow/found? false`, `:psi.workflow/noop? true`,
+  `:psi.workflow/error nil` (D29).
+- **Absent `remove-run` still emits `:runtime/drop-inflight-run`** for the requested
+  `run-id`. This cleanup is an idempotent handle-side effect (D24), not a
+  cancellation effect and not evidence that a canonical record was removed. It
+  intentionally clears any orphaned `inflight-runs` handle left by an earlier crash,
+  legacy bug, or cancel/remove race; `(dissoc absent-run-id)` is harmless when no
+  handle exists.
+- Therefore `:psi.workflow/noop? true` means **no canonical workflow record was
+  found/removed and no cancel transition was applied**. It does **not** mean
+  literally no effects were emitted. Tests should assert both: absent remove returns
+  the D29 no-op public shape and may/should emit only the D24
+  `:runtime/drop-inflight-run` cleanup, with no cancellation effects
+  (`future-cancel`, guarded `:runtime/agent-abort`, job terminalization, or
+  re-entrant remove).
+
+This reconciles D26/D29/Acceptance #10 and preserves the fix for the Evidence-step-3
+class: a record may be absent while a stale runtime handle still needs cleanup.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
@@ -1854,7 +1940,8 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
     success/no-op without cancellation effects; live remove returns successful
     cancel-then-remove; terminal remove drops the record without cancellation
     effects; absent remove returns success/idempotent no-op (`:removed? false`,
-    `:found? false`, `:noop? true`).
+    `:found? false`, `:noop? true`) while still emitting only the idempotent D24
+    `:runtime/drop-inflight-run` cleanup to clear a possible orphaned handle (D34).
 
 ### Build gates
 
