@@ -617,7 +617,7 @@
 
 ## Inconsistency follow-ups (ψ pass 9, 2026-06-10)
 
-- [ ] Strip/correct the residual "serialized" qualifier in the three run-`:status`
+- [x] Strip/correct the residual "serialized" qualifier in the three run-`:status`
       writer-identity sentences that survived D20's "dispatch is not serialized
       (no global lock)" reconciliation, so they no longer describe the D4 terminal
       transition as *serialized*: Desired Behaviour (line ~82, "the run's own
@@ -631,3 +631,19 @@
       serialization). D20's pass-3 resolution claimed to align D13 but the literal
       qualifiers remain, and Desired Behaviour was outside that scope. (design.md
       Desired Behaviour, D13, D20)
+      → design.md all three writer-identity sentences corrected to D20's atom-CAS
+      basis. Desired Behaviour: "D4 serialized dispatch transition" → "D4 dispatch
+      terminal transition, the single *logical* writer of run `:status` (atomicity
+      from the apply-phase atom CAS with the guard inside the `:root-state-update`
+      fn, D20 — not dispatch serialization)". D13 "Two distinct writers": "D4
+      serialized dispatch terminal transition (the single writer of *run* status)" →
+      "D4 dispatch terminal transition (the single *logical* writer of *run* status —
+      atomicity from the apply-phase atom CAS with the guard inside the
+      `:root-state-update` fn, D20, not dispatch serialization)". D13 "Concretely":
+      "(D4, serialized single-writer)" → "(D4 — single *logical* writer, atomicity
+      from the apply-phase atom CAS with the guard inside the `:root-state-update`
+      fn per D20, not dispatch serialization)". Remaining "serialized" occurrences
+      are out of scope: line 269 already quotes the phrase as superseded-by-D20;
+      D17's "two serialized dispatches" (686/711/727/809) describes in-thread
+      *sequencing/ordering* (reconciled by D20, not the race-safety single-writer
+      claim); 917/928/960/985 are D20's own reconciliation text. No blocker.

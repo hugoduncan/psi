@@ -1445,3 +1445,23 @@ D1–D27 reconciliations hold. One **new** actionable contradiction — a residu
 
 No other new actionable internal contradiction found; D1–D27 + the code premises
 (re-confirmed accurate in prior passes) otherwise hold a single consistent contract.
+
+## Inconsistency follow-up execution (ψ pass 9 step, 2026-06-10)
+
+Executed the single unchecked design-step from the ψ pass 9 inconsistency review:
+stripped the residual "serialized" qualifier from the three run-`:status`
+writer-identity sentences, replacing each with D20's atom-CAS basis (single
+*logical* writer of run `:status`; atomicity from the apply-phase atom CAS with the
+guard inside the `:root-state-update` fn — not dispatch serialization).
+
+- Desired Behaviour (~line 82): "D4 serialized dispatch transition" → D20 phrasing.
+- D13 "Two distinct writers" (~line 522): "D4 serialized dispatch terminal
+  transition (the single writer of *run* status)" → D20 phrasing.
+- D13 "Concretely" (~line 529): "(D4, serialized single-writer)" → D20 phrasing.
+
+Verified remaining "serialized" occurrences are out of scope (and not
+writer-identity contradictions): line 269 already marks the phrase superseded by
+D20; D17's "two serialized dispatches" (686/711/727/809) names in-thread
+*sequencing/ordering* (the cancel-then-remove split), reconciled by D20's
+in-thread-sequencing note, not the race-safety single-writer claim; 917/928/960/985
+are D20's own reconciliation prose. No step-machine or mechanism change. No blocker.

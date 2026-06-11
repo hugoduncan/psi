@@ -79,7 +79,10 @@ loop:
   terminalization is emitted by the D2/D4 terminal transition reusing the existing
   `:runtime/mark-workflow-jobs-terminal` effect, the single writer for the
   background-job (projected) terminal status (D13) — the run's own `:status` is
-  written by the D4 serialized dispatch transition — not a separate registry write.
+  written by the D4 dispatch terminal transition, the single *logical* writer of
+  run `:status` (atomicity from the apply-phase atom CAS with the guard inside the
+  `:root-state-update` fn, D20 — not dispatch serialization) — not a separate
+  registry write.
 
 ## Scope
 
@@ -519,15 +522,19 @@ table), so terminalizing it must go through the one existing writer for the
 would re-introduce a double-writer for the same projected status.
 
 **Two distinct writers (not conflated):** the run's own `:status :cancelled` is
-written by the D4 serialized dispatch terminal transition (the single writer of
-*run* status); `:runtime/mark-workflow-jobs-terminal` is the single writer of the
+written by the D4 dispatch terminal transition (the single *logical* writer of
+*run* status — atomicity from the apply-phase atom CAS with the guard inside the
+`:root-state-update` fn, D20, not dispatch serialization);
+`:runtime/mark-workflow-jobs-terminal` is the single writer of the
 *background-job* terminal status, which it **reconciles from** that run status.
 D13 governs only the latter; it does not (and must not) write run `:status`. The
 earlier "single writer for run-terminal status" label conflated the two — corrected
 here, in Desired Behaviour, and in Scope.
 
-Concretely: the **cancel dispatch** terminal transition (D4, serialized
-single-writer) emits `:runtime/mark-workflow-jobs-terminal` as part of its effect
+Concretely: the **cancel dispatch** terminal transition (D4 — single *logical*
+writer, atomicity from the apply-phase atom CAS with the guard inside the
+`:root-state-update` fn per D20, not dispatch serialization) emits
+`:runtime/mark-workflow-jobs-terminal` as part of its effect
 set (alongside the D12 cancellation effects), and the job reaches terminal via the
 existing handler **while the run record is still present** — subject to the D16
 cancelled-path constraint + the D17 two-dispatch ordering (the current handler
