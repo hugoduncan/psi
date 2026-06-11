@@ -214,3 +214,7 @@
 
 - [x] Make post-prepare memory recovery effects cancellation-safe: the normal `:session/prompt-prepare-request` path (`return-execution-result?` false) must not execute standalone `:memory/recover-query` or other ordinary prompt-lifecycle effects after D31 when cancellation lands after prepare handler/effect-vector construction but before the effects interceptor runs; add workflow guard metadata / a guarded combined effect and a regression for that window.
   - Covered 2026-06-11: workflow-owned prepare effects now carry `:workflow-run-id`, and memory recovery/provider execution/steering cleanup effect executors re-check canonical run cancellation before ordinary work; regression executes the real prepared effect vector after cancellation and asserts no memory recovery or provider execution starts.
+
+## Implementation review follow-ups (ψ pass 21, 2026-06-11)
+
+- [ ] Make prompt response recording cancellation-safe: after provider execution returns, a D31 cancel landing after the post-provider stop read but before `:session/prompt-record-response` entry must not record ordinary assistant summaries/journal entries or emit `:session/prompt-continue` / `:session/prompt-finish` advancement effects; carry `:workflow-run-id`/session metadata into response recording and guard its root-state update/effect vector (or route record-response under cancellation-entry ordering). Add a regression for cancellation in that window.

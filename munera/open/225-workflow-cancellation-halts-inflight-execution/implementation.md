@@ -3066,3 +3066,26 @@ asserts neither standalone memory recovery nor provider execution starts. Focuse
 prompt-lifecycle cancellation tests, focused prompt-lifecycle tests, focused
 workflow call-start cancellation tests, focused workflow-cancellation dispatch
 tests, and focused clj-kondo passed.
+
+## Implementation review (ψ pass 21, 2026-06-11)
+
+Reviewed the pass-20 prompt-effect guards against D6/D30/D31 and
+`dispatch_effects.clj` / `turn.handlers/prompt-record-response-handler`. The
+post-prepare memory/provider effects now no-op when cancellation is already
+visible, but one response-recording entry race remains.
+
+New actionable issue: `:runtime/prompt-execute-and-record` checks
+`workflow-effect-stop-signal` after provider execution returns, then performs an
+unguarded `dispatch/dispatch!` to `:session/prompt-record-response`. A D31 cancel
+CAS can land after that final stop read but before the record-response dispatch
+enters; the guarded abort can complete, then `prompt-record-response-handler` can
+still record ordinary `:last-execution-result-summary`, append the assistant
+journal entry, and emit `:session/prompt-continue` / `:session/prompt-finish`
+advancement effects after cancellation. That violates the ordinary child-turn
+journal-write / further-advancement prohibition for work that has not yet entered
+before the checkpoint. Follow-up should carry workflow metadata into response
+recording and guard the record-response root-state update/effect vector (or route
+record-response under cancellation-entry ordering), with a regression for cancel
+between the post-provider stop read and record-response entry.
+
+No tests run (review-only pass).
