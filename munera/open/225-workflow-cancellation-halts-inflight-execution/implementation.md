@@ -2922,3 +2922,31 @@ No tests run (review-only pass).
 Resolved the review finding that the pass-15 cancellation-entry read locks were too broad. Actor/judge prompt execution and deterministic-operation handler invocation no longer hold the per-run read lock across ordinary work; the existing guarded call-state CAS sequence remains the entry linearization marker, and cancellation/remove can now acquire the write lock and commit D31 promptly while already-entered ordinary work is blocked. Added regressions for cancellation during a blocked actor turn, blocked judge turn, and blocked deterministic operation; each asserts the cancel dispatch returns within the bounded timeout and canonical run status becomes `:cancelled` before ordinary work is released.
 
 Focused verification: `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test` (15 tests / 64 assertions) and `bb clojure:test:scry --namespace psi.agent-session.workflow-judge-cancellation-test` (8 tests / 34 assertions) pass.
+
+## Implementation review (ψ pass 17, 2026-06-11)
+
+Reviewed the pass-16 lock narrowing against `task-implementation-review`, D6/D31,
+`turn_execution_contract.clj`, `turn.clj`, and
+`deterministic_operation_runtime/core.clj`. The blocked-turn cancellation latency
+regression is fixed for actor/judge prompt execution and deterministic-operation
+handlers, but the deterministic-operation start boundary lost its cancellation
+linearization.
+
+New actionable issue: `invoke-operation-result` now performs the final
+`workflow-stop-signal` read and then calls the operation handler without any
+cancellation-entry read lock or equivalent entry CAS consumed by cancel. A D31
+cancel CAS can land after that final read and before handler entry, so the handler
+can initiate ordinary deterministic-operation work after the cancel checkpoint.
+The committed `:operation-call-state` marker alone is not enough because
+cancellation has no deterministic-operation abort/close path. Follow-up should
+narrow the read lock to just deterministic-operation handler entry (or add a
+cancel-observed durable entry marker that prevents/aborts not-yet-entered handlers)
+and add a regression that forces cancel after the final stop read but before
+handler entry and proves the handler is either already entered before D31 or not
+entered at all after D31.
+
+Validation during review: focused Scry namespaces
+`psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test`,
+`psi.agent-session.workflow-judge-cancellation-test`,
+`psi.deterministic-operation-runtime.core-test`, and
+`psi.workflow-runtime.turn-execution-contract-test` passed (27 tests / 117 assertions).
