@@ -2628,3 +2628,21 @@ cancelled deterministic operation start. Focused lint and focused suites passed:
 `psi.agent-session.workflow-judge-test`,
 `psi.agent-session.workflow-execution-cancellation-test`, plus workflow execution
 smoke suites.
+
+## Implementation review (ψ pass 8, 2026-06-11)
+
+Reviewed the post-pass-6 implementation against `task-implementation-review`, the
+D30/D31 no-post-checkpoint ordinary-work contract, changed cancellation code/tests,
+`CHANGELOG.md`, `doc/architecture.md`, and `doc/workflows.md`. The actor/judge
+turn-start and deterministic-operation start gates are now guarded at the lower
+execution boundary and focused cancellation suites remain green.
+
+No new code/test implementation issue found in this pass. The existing unchecked
+pass-7 follow-up remains actionable: `doc/workflows.md` still documents the old
+`delegate remove` command-layer cleanup/fail-if-cleanup-fails semantics instead of
+the implemented canonical cancel-then-remove / dispatch-owned cleanup contract. No
+new follow-up item was added to `steps.md` to avoid duplicating that existing step.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 49 tests / 255 assertions green.
