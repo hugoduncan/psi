@@ -366,10 +366,15 @@ guarantee is stated over side effects that have **not yet started**, and over th
 commits `:status :cancelled` for the directly-cancelled run (and, for a cascade,
 for each enumerated descendant).
 
-- **Guaranteed after that checkpoint:** no further workflow step attempt starts, no
-  further delegate sub-run is created by the cancelled subtree, no further ordinary
-  child agent session spawns, and the in-flight child turn is interrupted so it
-  initiates **no new tool calls / commits**.
+- **Guaranteed after that checkpoint (scoped to the D23 cascade set):** no further
+  workflow step attempt starts, no further delegate sub-run is created by any run
+  already in the cancelled cascade set, no further ordinary child agent session
+  spawns from those cascade-set runs, and the in-flight child turn is interrupted so
+  it initiates **no new tool calls / commits**. This guarantee is qualified by the
+  D27 accepted true-concurrency exception: for direct sub-run cancellation, a
+  descendant spawned after the handler-`:before` enumeration but before the
+  abort-driven checkpoint refuses it is out-of-test-scope and bounded by D27, not a
+  violation of the cascade-set guarantee.
 - **Allowed cancellation-control work:** the `:cancelled` state write itself,
   background-job terminalization, abort/interruption records or events,
   dispatch-trace/effect bookkeeping, the re-entrant remove dispatch, and
@@ -383,11 +388,14 @@ for each enumerated descendant).
 
 So the absolute Intent/Acceptance "no further side effects after cancel" is
 restated precisely as "**no new ordinary workflow/child-turn side effects are
-initiated after the cancel checkpoint**" (D30/D31). The interrupt itself is the
-guaranteed requirement; the residual in-flight effect is the only permitted
-physics exception. The nullable/controlled acceptance harness asserts the
-guaranteed property (no *new* ordinary tool call / commit / child session initiated
-after the checkpoint), which is deterministic.
+initiated by the enumerated cascade-set runs after their cancel checkpoint**"
+(D23/D30/D31), plus the D27 bounded, out-of-test-scope direct-sub-run spawn
+exception. The interrupt itself is the guaranteed requirement; the residual
+in-flight effect is the permitted physics exception, and D27 names the only
+accepted post-checkpoint child-session spawn exception. The nullable/controlled
+acceptance harness asserts the deterministic guaranteed property for the cascade
+set (no *new* ordinary tool call / commit / child session initiated after the
+checkpoint by a run in that set).
 
 ### D7. Cancel during a blocking `send-and-drain` wait: actively interrupted (resolves part of Q4)
 
@@ -2157,12 +2165,15 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
    `future-cancel` target is the single top-level run, never a sub-run, per D14.)
 3. **[guaranteed]** No **new forbidden ordinary workflow side effects** (new step
    attempts, delegate sub-runs, ordinary child sessions, tool calls, commits, or
-   ordinary child-turn journal writes) are initiated after the D31 cancel checkpoint
-   — the in-flight turn is interrupted and at most one already-in-flight tool call
-   may complete (D6). Required cancellation-control writes/effects (cancelled state,
-   job terminalization, guarded aborts, dispatch trace, re-entrant remove,
+   ordinary child-turn journal writes) are initiated **by runs in the D23 enumerated
+   cascade set** after their D31 cancel checkpoint — the in-flight turn is
+   interrupted and at most one already-in-flight tool call may complete (D6).
+   Required cancellation-control writes/effects (cancelled state, job
+   terminalization, guarded aborts, dispatch trace, re-entrant remove,
    `inflight-runs` cleanup) are allowed and should not fail this assertion (D30).
-   Verified in a nullable/controlled harness.
+   The direct-sub-run post-enumeration spawn race remains the separate bounded
+   **[out-of-test-scope]** exception in criterion #9a/D27, not part of this
+   deterministic guarantee. Verified in a nullable/controlled harness.
 
 ### Transitive / nested sub-run propagation
 

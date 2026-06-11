@@ -871,7 +871,7 @@
 
 ## Inconsistency follow-ups (ψ pass 24, 2026-06-11)
 
-- [ ] Reconcile the residual D6 / Acceptance #3 absolute no-new-child-session
+- [x] Reconcile the residual D6 / Acceptance #3 absolute no-new-child-session
       guarantee with D27 / Acceptance #9a's accepted direct-sub-run-cancel
       post-enumeration spawn exception. D6 says that after the D31 cancel
       checkpoint no further delegate sub-run is created by the cancelled subtree and
@@ -882,3 +882,8 @@
       Acceptance #3 (or restate the guarantee as applying only to the enumerated
       cascade set) so the guaranteed contract and accepted exception have one
       consistent scope.
+      → design.md D6 + Acceptance #3 now scope the guaranteed no-new ordinary
+      workflow/child-turn side effects to runs in the D23 enumerated cascade set
+      after their D31 cancel checkpoint. D27 / Acceptance #9a remains the explicit
+      bounded, out-of-test-scope exception for a descendant spawned after enumeration
+      but before the abort-driven checkpoint refuses it. No blocker.

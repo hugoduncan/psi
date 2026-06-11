@@ -1969,3 +1969,17 @@ One new actionable inconsistency found:
    Acceptance #3 with the D27 exception (or restate the guarantee as applying only
    to the enumerated cascade set), so the guaranteed contract and accepted exception
    have one scope.
+
+## Inconsistency follow-up resolution (ψ pass 24, 2026-06-11)
+
+Executed the newly added pass-24 design follow-up from `design-steps.md`; no blocker.
+
+- Reconciled D6 / Acceptance #3 with D27 / Acceptance #9a by scoping the guaranteed
+  "no new ordinary workflow/child-turn side effects" contract to runs in the D23
+  enumerated cascade set after their D31 cancel checkpoint.
+- D6 now explicitly points at the D27 bounded true-concurrency exception for direct
+  sub-run cancellation: a descendant spawned after handler-before enumeration but
+  before the abort-driven checkpoint refuses it is out-of-test-scope and not a
+  violation of the cascade-set guarantee.
+- Acceptance #3 now asserts the deterministic guarantee only for cascade-set runs,
+  and leaves the post-enumeration spawn race solely under criterion #9a / D27.
