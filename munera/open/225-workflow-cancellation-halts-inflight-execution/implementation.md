@@ -2073,3 +2073,37 @@ cancellation contract. No new `design-steps.md` follow-up item added.
 Reviewed current `design.md` for ambiguity only after the pass-27 Intent reconciliation and pass-28 architecture-fit review. Consulted referenced dispatch/effect/runtime code and `doc/architecture.md` where needed; did not review task `plan.md` or `steps.md`.
 
 No new actionable ambiguity found. D1–D37 plus Scope/Intent/Acceptance now pin a single contract for cancel/remove entry events, effect payloads and ordering, nested sub-run direct cancel/remove behaviour, absent/terminal public results, idempotency, stale-handle cleanup, cancellation-control side effects, and the D23/D31 cascade-set boundary with the D27 bounded exception. No new `design-steps.md` follow-up item added.
+
+## Inconsistency review (ψ pass 30, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-artifact inconsistency after
+pass-29 ambiguity review. Consulted D3/D6/D15/D23, D24/D26/D29/D36b, Acceptance
+#3/#10, and referenced dispatch/effect/runtime-handle code. Did not review
+`plan.md` or `steps.md`.
+
+Two new actionable inconsistencies found:
+
+1. **D23 omits the directly-cancelled run from the child-abort effect set.** D6
+   guarantees the directly-cancelled run's in-flight child turn is interrupted, D15
+   says aborted sessions are the directly-cancelled run plus each in-flight
+   descendant, and D3 defines the cascade set as cancelled run ∪ descendants. But
+   D23's effect list says to emit one guarded `:runtime/agent-abort` per
+   "in-flight descendant attempt", omitting the directly-cancelled run itself.
+   For a top-level run with an active step and no descendant, that wording would
+   emit no abort, contradicting D6/D15. D23 should say the abort effect is emitted
+   for each cascade-set run (directly-cancelled run included) that has a live
+   attempt.
+
+2. **Terminal `remove-run` drop-only cleanup can orphan a still-live terminal
+   handle, contradicting the no-orphan/drop-before-cancel invariant.** D26/D29 say
+   already-terminal remove performs bare record-drop plus D24
+   `:runtime/drop-inflight-run` cleanup only; D36b adds cancel-before-drop only for
+   absent remove. But a top-level run may already be terminal in canonical state
+   (e.g. cancelled by a prior cancel request) while its `inflight-runs` future is
+   still unwinding or stale. Dropping that handle without first emitting D35
+   `:runtime/cancel-inflight-run` recreates the Evidence-step-3 failure D36b was
+   written to avoid. The design should either prove terminal canonical records
+   cannot have live/stale handles, or require terminal-remove cleanup to cancel a
+   possible top-level handle before dropping it (likely the same ordered cleanup
+   pair as absent remove, scoped so nested sub-run removes still do not infer/kill
+   a parent worker).

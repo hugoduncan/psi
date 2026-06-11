@@ -905,3 +905,30 @@
       forbidden-vs-allowed boundary, names the D27 bounded direct-sub-run
       post-enumeration spawn exception, and no longer presents the refined contract
       as an absolute no-new-child-session/no-new-side-effect guarantee.
+
+## Inconsistency follow-ups (ψ pass 30, 2026-06-11)
+
+- [ ] Reconcile D23's child-abort effect-set wording with D6/D15/D3. D6 guarantees
+      the directly-cancelled run's in-flight child turn is interrupted; D15 states
+      the aborted-session set is the directly-cancelled run plus each in-flight
+      descendant with a live attempt; D3 defines the cascade set as cancelled run ∪
+      descendants. But D23's effect list emits one guarded `:runtime/agent-abort`
+      only per "in-flight descendant attempt", omitting the directly-cancelled run
+      itself. Update D23 (and any acceptance/test wording if needed) so the abort
+      effect is emitted for each **cascade-set** run with a live attempt — including
+      the directly-cancelled run — while preserving D15's guarded payload/read rule.
+
+- [ ] Reconcile already-terminal `remove-run` cleanup with the no-orphan
+      runtime-handle invariant. D26/D29 currently make terminal remove a bare
+      record drop plus D24 `:runtime/drop-inflight-run` only, while D36b's
+      cancel-before-drop ordered cleanup pair applies only to absent remove. A
+      top-level run can be terminal in canonical state (for example after a prior
+      cancel request) while its `inflight-runs` future is still unwinding or stale;
+      dropping that handle without first emitting D35 `:runtime/cancel-inflight-run`
+      can recreate the Evidence-step-3 orphaned-worker failure. Decide and state
+      either (a) terminal canonical records cannot have live/stale handles by
+      construction, or (b) terminal-remove cleanup also emits the ordered
+      `:runtime/cancel-inflight-run` → `:runtime/drop-inflight-run` pair for the
+      requested run id (with clear top-level/stale-handle semantics so nested
+      sub-run removes still do not infer or interrupt a parent worker). Align
+      D24/D26/D29/D34/D36b and Acceptance #10.
