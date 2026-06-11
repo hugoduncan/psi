@@ -45,14 +45,15 @@
 
 ## Slice 4 — Cooperative execution stop points
 
-- [ ] Add a read-path stop predicate equivalent to `(or (nil? run) (= :cancelled (:status run)))` for workflow execution checkpoints.
-- [ ] Insert the stop predicate before starting each workflow step attempt.
-- [ ] Insert the stop predicate before creating/delegating a sub-run.
-- [ ] Insert the stop predicate before spawning an ordinary child agent session for a workflow step.
-- [ ] Insert the stop predicate after child-turn or delegate waits return, before advancing to the next workflow state.
-- [ ] Make the `send-and-drain`/blocking wait path interrupt-aware so `InterruptedException` or interrupted status returns control to the cooperative checkpoint cleanly.
-- [ ] Ensure a stopped run exits without starting further ordinary workflow advancement while leaving cancellation-control effects/writes allowed.
-- [ ] Add controlled tests that record the D31 cancel checkpoint and assert no step attempt/session/sub-run starts after it for a cancelled top-level run.
+- [x] Add a read-path stop predicate equivalent to `(or (nil? run) (= :cancelled (:status run)))` for workflow execution checkpoints.
+- [x] Insert the stop predicate before starting each workflow step attempt.
+- [x] Insert the stop predicate before creating/delegating a sub-run.
+- [x] Insert the stop predicate before spawning an ordinary child agent session for a workflow step.
+- [x] Insert the stop predicate after child-turn or delegate waits return, before advancing to the next workflow state.
+- [x] Make the `send-and-drain`/blocking wait path interrupt-aware so `InterruptedException` or interrupted status returns control to the cooperative checkpoint cleanly.
+  - Covered 2026-06-11: top-level `execute-run!`/resume catches `InterruptedException`, clears interrupted status, and reports the current canonical run result; lifecycle checkpoints also stop on canonical `:cancelled`/absence.
+- [x] Ensure a stopped run exits without starting further ordinary workflow advancement while leaving cancellation-control effects/writes allowed.
+- [x] Add controlled tests that record the D31 cancel checkpoint and assert no step attempt/session/sub-run starts after it for a cancelled top-level run.
 - [ ] Add a test showing a top-level worker parked in a wait is woken by `future-cancel(true)` and terminates cleanly.
 
 ## Slice 5 — Delegate result and nested-run semantics
@@ -75,8 +76,10 @@
 ## Slice 7 — Acceptance test net and gates
 
 - [ ] Add or update tests for acceptance criterion 1: top-level cancel stops post-checkpoint attempts and reaches cancelled terminal state with terminal job.
+  - Partial 2026-06-11: controlled top-level execution test proves post-checkpoint step attempts/results stop and the run remains `:cancelled`; terminal-job assertion still remains for Slice 6/acceptance closure.
 - [x] Add or update tests for acceptance criterion 2: live top-level remove cancels the top-level future and drops the handle via effects.
-- [ ] Add or update tests for acceptance criterion 3: no forbidden ordinary workflow side effects are initiated after the D31 checkpoint in a nullable/controlled harness.
+- [x] Add or update tests for acceptance criterion 3: no forbidden ordinary workflow side effects are initiated after the D31 checkpoint in a nullable/controlled harness.
+  - Covered 2026-06-11: a nullable workflow execution harness cancels during the first child turn and asserts no second child session/attempt starts and no late actor result is recorded after the checkpoint.
 - [x] Add or update tests for acceptance criterion 4: top-down nested propagation uses guarded child aborts and one top-level future cancel only.
   - Covered 2026-06-11: parent cancel cascades `:cancelled` to live descendants, emits guarded aborts for cascade-set live attempts, skips terminal descendants, and emits exactly one top-level worker cancel.
 - [ ] Add or update tests for acceptance criterion 5: live nested remove aborts child turn, emits no worker cancel, and parent continues.

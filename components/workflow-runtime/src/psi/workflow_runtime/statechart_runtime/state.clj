@@ -53,6 +53,23 @@
                   [step-id execution-session-id])))
         (:step-runs workflow-run)))
 
+(defn workflow-stop-signal
+  "Return the cooperative workflow stop signal for run-id, if any.
+
+   Cancellation is authoritative in canonical workflow state. A missing run record
+   is also a stop signal for workers that were woken after remove-run dropped the
+   canonical record. Runtime handles/futures are intentionally not consulted here."
+  [ctx run-id]
+  (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+    (cond
+      (nil? workflow-run) :removed
+      (= :cancelled (:status workflow-run)) :cancelled
+      :else nil)))
+
+(defn workflow-stopped?
+  [ctx run-id]
+  (boolean (workflow-stop-signal ctx run-id)))
+
 (defn create-working-memory
   [ctx parent-session-id run-id]
   (let [workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
@@ -108,23 +125,28 @@
         step-id (or (step-id-from-configuration configuration)
                     (:current-step-id @working-memory*))]
     (swap! (:state* ctx)
-           update-in
-           [:workflows :runs run-id]
-           (fn [workflow-run]
-             (cond-> (assoc workflow-run
-                            :status status
-                            :current-step-id (case status
-                                               :completed nil
-                                               step-id)
-                            :updated-at (now))
-               (= status :blocked)
-               (assoc :blocked {:step-id (:blocked-step-id @working-memory*)})
+           (fn [state-map]
+             (if-let [workflow-run (workflow-runtime/workflow-run-in state-map run-id)]
+               (assoc-in state-map
+                         (workflow-runtime/run-path run-id)
+                         (if (and (= :cancelled (:status workflow-run))
+                                  (not= :cancelled status))
+                           workflow-run
+                           (cond-> (assoc workflow-run
+                                          :status status
+                                          :current-step-id (case status
+                                                             :completed nil
+                                                             step-id)
+                                          :updated-at (now))
+                             (= status :blocked)
+                             (assoc :blocked {:step-id (:blocked-step-id @working-memory*)})
 
-               (not= status :blocked)
-               (assoc :blocked nil)
+                             (not= status :blocked)
+                             (assoc :blocked nil)
 
-               (contains? #{:completed :failed :cancelled} status)
-               (assoc :finished-at (or (:finished-at workflow-run) (now))))))))
+                             (contains? #{:completed :failed :cancelled} status)
+                             (assoc :finished-at (or (:finished-at workflow-run) (now))))))
+               state-map)))))
 
 (def max-drain-events 1000)
 

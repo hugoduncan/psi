@@ -97,26 +97,33 @@
         {:keys [target-name]} (resolve-delegate-target-definition ctx workflow-run target)
         prompt-string (workflow-source-resolution/render-delegate-prompt-string workflow-run (:prompt-string delegate-spec))
         context (workflow-source-resolution/resolve-delegate-context workflow-run (:context delegate-spec))
+        parent-run-id (:run-id workflow-run)
         inherited-defaults (when resolve-inherited-defaults-fn
-                             (resolve-inherited-defaults-fn ctx parent-session-id workflow-run step-id))
-        [state' delegate-run-id _]
-        (workflow-runtime/create-run @(:state* ctx)
-                                     (cond-> {:definition-id target-name
-                                              :parent-session-id parent-session-id
-                                              :delegating-run-id (:run-id workflow-run)
-                                              :workflow-input prompt-string
-                                              :workflow-original context}
-                                       (contains? workflow-run :session-profile-snapshot)
-                                       (assoc :session-profile-snapshot (:session-profile-snapshot workflow-run))
-                                       inherited-defaults (assoc :inherited-defaults inherited-defaults)))
-        _ (reset! (:state* ctx) state')
-        delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)
-        _ (send-and-drain-fn delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)
-        delegate-run (workflow-runtime/workflow-run-in @(:state* ctx) delegate-run-id)
-        boundary {:delegate {:target target-name
-                             :resolved-target target-name
-                             :run-id delegate-run-id
-                             :step-id step-id
-                             :prompt-string prompt-string
-                             :context context}}]
-    (delegate-run-runtime-result delegate-run delegate-run-id target-name boundary)))
+                             (resolve-inherited-defaults-fn ctx parent-session-id workflow-run step-id))]
+    (if (or (nil? (workflow-runtime/workflow-run-in @(:state* ctx) parent-run-id))
+            (= :cancelled (:status (workflow-runtime/workflow-run-in @(:state* ctx) parent-run-id))))
+      {:pending-kind :failure
+       :payload {:message "Delegating workflow cancelled or removed before child workflow start"
+                 :target target-name
+                 :details {:status :cancelled}}}
+      (let [[state' delegate-run-id _]
+            (workflow-runtime/create-run @(:state* ctx)
+                                         (cond-> {:definition-id target-name
+                                                  :parent-session-id parent-session-id
+                                                  :delegating-run-id parent-run-id
+                                                  :workflow-input prompt-string
+                                                  :workflow-original context}
+                                           (contains? workflow-run :session-profile-snapshot)
+                                           (assoc :session-profile-snapshot (:session-profile-snapshot workflow-run))
+                                           inherited-defaults (assoc :inherited-defaults inherited-defaults)))
+            _ (reset! (:state* ctx) state')
+            delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)
+            _ (send-and-drain-fn delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)
+            delegate-run (workflow-runtime/workflow-run-in @(:state* ctx) delegate-run-id)
+            boundary {:delegate {:target target-name
+                                 :resolved-target target-name
+                                 :run-id delegate-run-id
+                                 :step-id step-id
+                                 :prompt-string prompt-string
+                                 :context context}}]
+        (delegate-run-runtime-result delegate-run delegate-run-id target-name boundary)))))

@@ -14,9 +14,43 @@
     (state/sync-run-projection! ctx run-id working-memory* (::sc/configuration wm''))
     wm''))
 
+(defn- cancelled-wm?
+  [wm]
+  (boolean (some #{:cancelled} (::sc/configuration wm))))
+
+(defn- mark-cancelled!
+  [{:keys [ctx run-id env sc-session-id working-memory*]} wm]
+  (swap! working-memory* assoc :updated-at (state/now))
+  (when-not (= :removed (state/workflow-stop-signal ctx run-id))
+    (state/sync-run-projection! ctx run-id working-memory* #{:cancelled}))
+  (let [wm' (assoc wm ::sc/configuration #{:cancelled})]
+    (when (and env sc-session-id)
+      (sp/save-working-memory! (::sc/working-memory-store env) env sc-session-id wm'))
+    wm'))
+
+(defn- clear-queue-and-cancel!
+  [{:keys [event-queue*] :as wf-ctx} wm]
+  (reset! event-queue* [])
+  (if (cancelled-wm? wm)
+    wm
+    (mark-cancelled! wf-ctx wm)))
+
+(defn stop-checkpoint
+  "Return wm unchanged or transition it to :cancelled when canonical run state
+   carries a cooperative stop signal.
+
+   The checkpoint treats both :cancelled status and run absence as stop signals.
+   It is safe to call repeatedly; once the chart is terminal no further ordinary
+   workflow advancement is processed."
+  [{:keys [ctx run-id] :as wf-ctx} wm]
+  (if (and (not (state/terminal-configuration? (::sc/configuration wm)))
+           (state/workflow-stopped? ctx run-id))
+    (clear-queue-and-cancel! wf-ctx wm)
+    wm))
+
 (defn drain-events!
   [{:keys [event-queue* run-id] :as wf-ctx} wm]
-  (loop [wm wm
+  (loop [wm (stop-checkpoint wf-ctx wm)
          processed 0]
     (cond
       (state/terminal-configuration? (::sc/configuration wm))
@@ -39,14 +73,19 @@
           (do
             (reset! event-queue* [])
             (let [wm' (reduce (fn [wm {:keys [event data]}]
-                                (if (state/terminal-configuration? (::sc/configuration wm))
-                                  wm
-                                  (process-event! wf-ctx wm event data)))
+                                (let [wm* (stop-checkpoint wf-ctx wm)]
+                                  (if (state/terminal-configuration? (::sc/configuration wm*))
+                                    wm*
+                                    (stop-checkpoint wf-ctx (process-event! wf-ctx wm* event data)))))
                               wm
                               events)]
               (recur wm' (+ processed (count events))))))))))
 
 (defn send-and-drain!
   [wf-ctx wm event data]
-  (->> (process-event! wf-ctx wm event data)
-       (drain-events! wf-ctx)))
+  (let [wm* (stop-checkpoint wf-ctx wm)]
+    (if (state/terminal-configuration? (::sc/configuration wm*))
+      wm*
+      (->> (process-event! wf-ctx wm* event data)
+           (stop-checkpoint wf-ctx)
+           (drain-events! wf-ctx)))))

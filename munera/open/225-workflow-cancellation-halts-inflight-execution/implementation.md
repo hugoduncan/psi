@@ -1,5 +1,29 @@
 # Implementation notes
 
+## Implementation pass — cooperative workflow stop checkpoints (ψ, 2026-06-11)
+
+Implemented Slice 4's cooperative stop path in the workflow statechart runtime.
+`statechart-runtime.state` now exposes the canonical read-path predicate:
+missing run record ⇒ `:removed`, `:status :cancelled` ⇒ `:cancelled`. The lifecycle
+`send-and-drain!`/`drain-events!` path calls a stop checkpoint before event
+processing, during queue drain, and after event processing; a stopped run clears
+ordinary queued events and marks the working-memory chart cancelled without
+resurrecting removed run records. Step entry now checks before ordinary work,
+before delegate/session execution, after delegate/session/turn return, and the
+session-step helper accepts a stop predicate so a late child-turn result is not
+recorded after the cancel checkpoint. Top-level execute/resume catches
+`InterruptedException`, clears interrupt state, and reports the current canonical
+run.
+
+Added state-based controlled-harness tests covering: cancelled top-level execution
+does not start the next attempt and does not record a late returned actor result;
+invoke results returned after cancellation are likewise not recorded and do not
+advance to the following session step; a cancelled parent does not create a delegate
+sub-run; run absence is a pull stop signal that discards queued ordinary events.
+Focused scry suites and focused clj-kondo are green. Remaining concrete work:
+parked-worker `future-cancel(true)` wake-up test plus nested direct cancel/remove
+and background job terminalization assertions.
+
 ## Architecture-fit review (ψ, 2026-06-10)
 
 Reviewed design.md for fit with project architecture/principles (AGENTS.md VSM,

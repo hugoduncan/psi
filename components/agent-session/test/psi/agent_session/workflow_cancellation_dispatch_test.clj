@@ -195,6 +195,7 @@
       (let [parent-run {:run-id "parent"
                         :status :running
                         :effective-definition {:definition-id "parent-flow"}}
+            _ (swap! state* assoc-in [:workflows :runs "parent"] parent-run)
             step-def {:delegate {:target definition-id
                                  :prompt-string "go"}}
             result (delegate/delegate-step-runtime-result

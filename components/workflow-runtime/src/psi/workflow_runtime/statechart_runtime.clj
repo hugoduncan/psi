@@ -34,6 +34,8 @@
 (def operation-result->invoke-step-result step-execution/operation-result->invoke-step-result)
 (def queue-event! queue/queue-event!)
 (def terminal-configuration? state/terminal-configuration?)
+(def workflow-stop-signal state/workflow-stop-signal)
+(def workflow-stopped? state/workflow-stopped?)
 
 (defn- clear-pending-judge-state!
   "Clear pending judge/routing fields from working memory after a judge cycle
@@ -63,11 +65,16 @@
         :step/enter
         (let [attempt-id (str (java.util.UUID/randomUUID))
               workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
-              step-def (state/runtime-step-def workflow-run step-id)
+              step-def (when workflow-run (state/runtime-step-def workflow-run step-id))
               invoke-step? (= :invoke (:type step-def))
               delegate-step? (= :delegate (:type step-def))
               session-step? (= :session (:type step-def))]
           (try
+            (when (state/workflow-stopped? ctx run-id)
+              (throw (ex-info "Workflow execution stopped before step attempt start"
+                              {:reason (state/workflow-stop-signal ctx run-id)
+                               :run-id run-id
+                               :step-id step-id})))
             (let [step-config (when session-step?
                                 ((:resolve-workflow-step-session-config-fn ctx)
                                  ctx parent-session-id workflow-run step-id))
@@ -80,54 +87,60 @@
                     {})
                   {:keys [attempt execution-session]}
                   (if session-step?
-                    (workflow-attempts/create-step-attempt-session!
-                     ctx
-                     parent-session-id
-                     (cond-> {:workflow-run-id run-id
-                              :workflow-step-id step-id
-                              :attempt-id attempt-id
-                              :session-name (str "workflow " step-id " attempt")
-                              :tool-defs (:tool-defs step-config)
-                              :thinking-level (:thinking-level step-config)}
-                       (:developer-prompt step-config)
-                       (assoc :developer-prompt (:developer-prompt step-config)
-                              :developer-prompt-source :explicit)
+                    (do
+                      (when (state/workflow-stopped? ctx run-id)
+                        (throw (ex-info "Workflow execution stopped before child session spawn"
+                                        {:reason (state/workflow-stop-signal ctx run-id)
+                                         :run-id run-id
+                                         :step-id step-id})))
+                      (workflow-attempts/create-step-attempt-session!
+                       ctx
+                       parent-session-id
+                       (cond-> {:workflow-run-id run-id
+                                :workflow-step-id step-id
+                                :attempt-id attempt-id
+                                :session-name (str "workflow " step-id " attempt")
+                                :tool-defs (:tool-defs step-config)
+                                :thinking-level (:thinking-level step-config)}
+                         (:developer-prompt step-config)
+                         (assoc :developer-prompt (:developer-prompt step-config)
+                                :developer-prompt-source :explicit)
 
-                       (:prompt-mode step-config)
-                       (assoc :prompt-mode (:prompt-mode step-config))
+                         (:prompt-mode step-config)
+                         (assoc :prompt-mode (:prompt-mode step-config))
 
-                       (:response-mode step-config)
-                       (assoc :response-mode (:response-mode step-config))
+                         (:response-mode step-config)
+                         (assoc :response-mode (:response-mode step-config))
 
-                       (:skills step-config)
-                       (assoc :skills (:skills step-config))
+                         (:skills step-config)
+                         (assoc :skills (:skills step-config))
 
-                       (contains? step-config :logprobs)
-                       (assoc :logprobs (:logprobs step-config))
+                         (contains? step-config :logprobs)
+                         (assoc :logprobs (:logprobs step-config))
 
-                       (contains? step-config :top-logprobs)
-                       (assoc :top-logprobs (:top-logprobs step-config))
+                         (contains? step-config :top-logprobs)
+                         (assoc :top-logprobs (:top-logprobs step-config))
 
-                       (contains? step-config :temperature)
-                       (assoc :temperature (:temperature step-config))
+                         (contains? step-config :temperature)
+                         (assoc :temperature (:temperature step-config))
 
-                       (:model step-config)
-                       (assoc :model (:model step-config))
+                         (:model step-config)
+                         (assoc :model (:model step-config))
 
-                       (contains? step-config :speed-mode)
-                       (assoc :speed-mode (:speed-mode step-config))
+                         (contains? step-config :speed-mode)
+                         (assoc :speed-mode (:speed-mode step-config))
 
-                       (contains? step-config :effort-override)
-                       (assoc :effort-override (:effort-override step-config))
+                         (contains? step-config :effort-override)
+                         (assoc :effort-override (:effort-override step-config))
 
-                       (:model-fallback step-config)
-                       (assoc :model-fallback (:model-fallback step-config))
+                         (:model-fallback step-config)
+                         (assoc :model-fallback (:model-fallback step-config))
 
-                       (contains? step-config :prompt-component-selection)
-                       (assoc :prompt-component-selection (:prompt-component-selection step-config))
+                         (contains? step-config :prompt-component-selection)
+                         (assoc :prompt-component-selection (:prompt-component-selection step-config))
 
-                       preloaded-messages
-                       (assoc :preloaded-messages preloaded-messages)))
+                         preloaded-messages
+                         (assoc :preloaded-messages preloaded-messages))))
                     {:attempt {:attempt-id attempt-id
                                :status :pending
                                :execution-session-id nil}
@@ -153,73 +166,84 @@
                            (workflow-progression-recording/increment-iteration-count run-id step-id))))
               (cond
                 invoke-step?
-                (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
-                      {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)]
-                  (swap! (:state* ctx)
-                         workflow-progression-recording/merge-latest-attempt-data run-id step-id attempt-data)
-                  (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
-                                                                      :payload payload
-                                                                      :step-id step-id
-                                                                      :attempt-id attempt-id
-                                                                      :updated-at (state/now)})
-                  (queue/enqueue-event! event-queue* working-memory*
-                                        (case pending-kind
-                                          :success :actor/done
-                                          :blocked :actor/blocked
-                                          :failure :actor/failed
-                                          :actor/failed)
-                                        {}))
+                (if (state/workflow-stopped? ctx run-id)
+                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                  (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                        {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)]
+                    (when-not (state/workflow-stopped? ctx run-id)
+                      (swap! (:state* ctx)
+                             workflow-progression-recording/merge-latest-attempt-data run-id step-id attempt-data)
+                      (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
+                                                                          :payload payload
+                                                                          :step-id step-id
+                                                                          :attempt-id attempt-id
+                                                                          :updated-at (state/now)})
+                      (queue/enqueue-event! event-queue* working-memory*
+                                            (case pending-kind
+                                              :success :actor/done
+                                              :blocked :actor/blocked
+                                              :failure :actor/failed
+                                              :actor/failed)
+                                            {}))))
 
                 delegate-step?
-                (let [{:keys [pending-kind payload]}
-                      (delegate/delegate-step-runtime-result create-workflow-context send-and-drain!
-                                                             (:resolve-inherited-defaults-fn ctx)
-                                                             ctx parent-session-id step-id step-def workflow-run)]
-                  (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
-                                                                      :payload payload
-                                                                      :step-id step-id
-                                                                      :attempt-id attempt-id
-                                                                      :updated-at (state/now)})
-                  (queue/enqueue-event! event-queue* working-memory*
-                                        (case pending-kind
-                                          :success :actor/done
-                                          :blocked :actor/blocked
-                                          :failure :actor/failed
-                                          :actor/failed)
-                                        {}))
+                (if (state/workflow-stopped? ctx run-id)
+                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                  (let [{:keys [pending-kind payload]}
+                        (delegate/delegate-step-runtime-result create-workflow-context send-and-drain!
+                                                               (:resolve-inherited-defaults-fn ctx)
+                                                               ctx parent-session-id step-id step-def workflow-run)]
+                    (when-not (state/workflow-stopped? ctx run-id)
+                      (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
+                                                                          :payload payload
+                                                                          :step-id step-id
+                                                                          :attempt-id attempt-id
+                                                                          :updated-at (state/now)})
+                      (queue/enqueue-event! event-queue* working-memory*
+                                            (case pending-kind
+                                              :success :actor/done
+                                              :blocked :actor/blocked
+                                              :failure :actor/failed
+                                              :actor/failed)
+                                            {}))))
 
                 :else
-                (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt)))
+                (if (state/workflow-stopped? ctx run-id)
+                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                  (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
+                                                        #(state/workflow-stopped? ctx run-id)))))
             (catch Exception e
-              (let [failure-payload (merge (ex-data e)
-                                           {:message (ex-message e)})
-                    attempt-present? (= attempt-id (get-in @working-memory* [:attempt-ids step-id]))]
-                (when-not attempt-present?
-                  (swap! (:state* ctx)
-                         (fn [state-map]
-                           (-> state-map
-                               (update-in [:workflows :runs run-id]
-                                          #(workflow-attempts/append-attempt-to-run % step-id {:attempt-id attempt-id
-                                                                                               :status :pending
-                                                                                               :execution-session-id nil}))
-                               (workflow-progression-recording/start-latest-attempt run-id step-id)
-                               (workflow-progression-recording/increment-iteration-count run-id step-id)))))
-                (swap! working-memory*
-                       (fn [wm]
-                         (cond-> (-> wm
-                                     (assoc :current-step-id step-id
-                                            :blocked-step-id nil
-                                            :pending-actor-result {:kind :failure
-                                                                   :payload failure-payload
-                                                                   :step-id step-id
-                                                                   :attempt-id attempt-id
-                                                                   :updated-at (state/now)}
-                                            :updated-at (state/now)))
-                           (not attempt-present?)
-                           (-> (assoc-in [:attempt-ids step-id] attempt-id)
-                               (update-in [:attempt-counts step-id] (fnil inc 0))
-                               (update-in [:iteration-counts step-id] (fnil inc 0))))))
-                (queue/enqueue-event! event-queue* working-memory* :actor/failed {}))))
+              (if (state/workflow-stopped? ctx run-id)
+                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                (let [failure-payload (merge (ex-data e)
+                                             {:message (ex-message e)})
+                      attempt-present? (= attempt-id (get-in @working-memory* [:attempt-ids step-id]))]
+                  (when-not attempt-present?
+                    (swap! (:state* ctx)
+                           (fn [state-map]
+                             (-> state-map
+                                 (update-in [:workflows :runs run-id]
+                                            #(workflow-attempts/append-attempt-to-run % step-id {:attempt-id attempt-id
+                                                                                                 :status :pending
+                                                                                                 :execution-session-id nil}))
+                                 (workflow-progression-recording/start-latest-attempt run-id step-id)
+                                 (workflow-progression-recording/increment-iteration-count run-id step-id)))))
+                  (swap! working-memory*
+                         (fn [wm]
+                           (cond-> (-> wm
+                                       (assoc :current-step-id step-id
+                                              :blocked-step-id nil
+                                              :pending-actor-result {:kind :failure
+                                                                     :payload failure-payload
+                                                                     :step-id step-id
+                                                                     :attempt-id attempt-id
+                                                                     :updated-at (state/now)}
+                                              :updated-at (state/now)))
+                             (not attempt-present?)
+                             (-> (assoc-in [:attempt-ids step-id] attempt-id)
+                                 (update-in [:attempt-counts step-id] (fnil inc 0))
+                                 (update-in [:iteration-counts step-id] (fnil inc 0))))))
+                  (queue/enqueue-event! event-queue* working-memory* :actor/failed {})))))
           nil)
 
         :step/record-result
