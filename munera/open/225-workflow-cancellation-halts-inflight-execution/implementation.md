@@ -1671,3 +1671,27 @@ Resolutions:
   emits only the idempotent D24 `:runtime/drop-inflight-run` cleanup to clear a
   possible orphaned handle. `:noop? true` means no canonical record was found or
   removed, not literal absence of effects. Acceptance #10 updated.
+
+## Inconsistency review (ψ pass 15, 2026-06-11)
+
+Fresh internal-consistency pass over design.md after D33/D34, focused on stale early
+contract wording against the later nested-run and guarded-abort decisions. Two new
+actionable contradictions found; neither duplicates existing design-steps:
+
+1. **Generic live-remove wording still promises worker/future stop for nested
+   sub-run removes.** D5 says "remove of a live run" and then "the
+   `future-cancel` interrupt guarantees the worker stops," while Scope's test
+   bullet says "`remove` of a live run does not leave a running future." But
+   D19/D21 and Acceptance #5/#7 explicitly put direct live nested-sub-run remove in
+   scope, emit **no** worker `future-cancel`, and require the shared parent worker
+   to continue. The generic D5/Scope wording is only true for top-level runs and
+   contradicts the nested-run contract unless qualified/split.
+
+2. **D15's abort emission example is bare, contradicting D28/D33 guarded payload
+   requirement.** D15 still says to emit `{:effect/type :runtime/agent-abort
+   :session-id sid}` for workflow-cancellation aborts. Later D28/D33 require every
+   workflow-cancellation abort to carry the complete flat guard payload
+   (`:workflow-run-id`, `:workflow-step-id`, `:workflow-attempt-id`,
+   `:expected-session-id`) in addition to `:session-id`; only non-workflow aborts
+   may remain unguarded/session-id-only. The D15 emit rule must show or reference
+   the guarded shape, not a bare abort effect.

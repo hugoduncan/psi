@@ -736,3 +736,23 @@
       → design.md D33: chose the flat top-level key shape (`:session-id`, `:workflow-run-id`, `:workflow-step-id`, `:workflow-attempt-id`, `:expected-session-id`) as canonical; nested `:workflow-abort-guard` rejected. D28/D32/effect-schema implications updated: guarded workflow-cancel aborts require all-or-none flat guard keys; unguarded aborts retain optional `:session-id`; emitters/executor/tests target the flat shape only.
 - [x] Clarify absent `remove-run` side effects and `:noop?` meaning. D26's terminal/absent branch emits the bare record-drop plus `:runtime/drop-inflight-run`, but D29/Acceptance #10 call absent remove a success/idempotent no-op (`:removed? false`, `:found? false`, `:noop? true`). State whether an absent remove still emits `:runtime/drop-inflight-run` to clear any orphaned handle, and whether `:noop?` means "no canonical record removed" rather than "no effects emitted".
       → design.md D34: absent remove still emits only the idempotent D24 `:runtime/drop-inflight-run` cleanup to clear possible orphaned handles; it emits no cancellation effects and removes no canonical record. `:noop? true` means no canonical record was found/removed and no cancel transition applied, not "no effects emitted". Acceptance #10 updated.
+
+## Inconsistency follow-ups (ψ pass 15, 2026-06-11)
+
+- [ ] Qualify the generic live-`remove` worker/future-stop wording so it does not
+      contradict the direct nested-sub-run remove contract. D5 currently states
+      "remove of a live run" and then says the `future-cancel` interrupt guarantees
+      the worker stops, and Scope's test bullet says "`remove` of a live run does
+      not leave a running future." But D19/D21 and Acceptance #5/#7 put direct live
+      nested-sub-run remove in scope, require **no** worker `future-cancel`, and
+      require the shared parent worker to continue. Update D5 and the Scope tests
+      bullet to either qualify the future/worker-stop guarantee to **top-level**
+      runs or split top-level vs nested-sub-run remove behaviour explicitly.
+- [ ] Align D15's workflow-cancellation abort emit rule with D28/D33. D15 still
+      says to emit a bare `{:effect/type :runtime/agent-abort :session-id sid}`
+      for workflow-cancellation aborts, while D28/D33 require the complete flat
+      guarded payload (`:session-id`, `:workflow-run-id`, `:workflow-step-id`,
+      `:workflow-attempt-id`, `:expected-session-id`) and reserve unguarded
+      session-id-only aborts for non-workflow effects. Update the D15 emission
+      example/read rule to show the guarded shape or explicitly point to D28/D33,
+      so emitters/tests do not implement the stale bare workflow abort.
