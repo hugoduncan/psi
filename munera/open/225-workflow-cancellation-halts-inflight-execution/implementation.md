@@ -1621,3 +1621,25 @@ completable schema/validation-order design clarification; no blockers.
 - D15 and D28 were updated so the explicit `:session-id` requirement applies only
   to workflow-cancellation abort emissions; existing `:on-abort`-style emissions
   remain valid before effect-time session-id injection.
+
+## Architecture-fit review (ψ pass 13, 2026-06-11)
+
+Fresh architecture-fit pass over design.md after D28–D32, consulting AGENTS.md VSM
+(S1 effects / S3 dispatch, effects-as-data, replay, `λ parity`, `λ extend`,
+`λ(state)`, `λ shims_adapters`), META.md (ctx-managed services / no hidden
+process-global reach-in), and doc/architecture.md (State boundary, dispatch
+sequencing, validation-before-effects, replay-trim, dispatch trace).
+
+No new actionable architectural-fit misfit found.
+
+The D28–D32 refinements fit the established project boundaries: guarded workflow
+`agent-abort` payloads keep the reused canonical `:runtime/agent-abort` effect
+rather than introducing a parallel abort path; the liveness re-check is scoped to
+workflow-cancellation metadata while unguarded aborts preserve existing
+session-dispatch-local behaviour; D32 reconciles schema parity with the actual
+validation-before-effects order by keeping unguarded `:session-id` optional and
+requiring it only for guarded workflow-cancel aborts; D29/D30/D31 clarify public
+results, cancellation-control effects, and the apply-phase CAS checkpoint without
+moving state/side effects outside dispatch.
+
+No new design-steps.md follow-up item added.
