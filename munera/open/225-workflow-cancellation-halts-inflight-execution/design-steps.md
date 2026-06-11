@@ -446,7 +446,7 @@
 
 ## Inconsistency follow-ups (ψ pass 6, 2026-06-10)
 
-- [ ] Reconcile the `inflight-runs` runtime-handle entry-drop with D1/D2 and the
+- [x] Reconcile the `inflight-runs` runtime-handle entry-drop with D1/D2 and the
       code. D17 step 2 says the remove dispatch "applies the pure `remove-run`
       dissoc, dropping the canonical run record **and its `inflight-runs` entry**,"
       and Acceptance #2 requires "its `inflight-runs` entry is cleared … (D5/D17)."
@@ -470,3 +470,19 @@
       `inflight-runs` entry-drop has a defined effects-as-data mechanism consistent
       with D1/D2. (AGENTS.md S1 effects / S3 dispatch, `λ(state)`, `λ parity`;
       design.md D1/D2/D12/D17/D23)
+      → design.md D24: option (a). The `inflight-runs` entry-drop is its own
+      canonical `:runtime/drop-inflight-run` cleanup effect (parity: `effect-schema`
+      + `execute-effect!`, dissoc via `ctx` handle) emitted in the remove dispatch's
+      (D17 dispatch 2) effect set and run by the `:effects` interceptor — parity with
+      the D12 worker `future-cancel` effect that already reaches `inflight-runs` via
+      `ctx`. Ordering: handle-drop (dispatch 2) runs after the cancel dispatch's
+      future-cancel (dispatch 1) → drop-after-cancel, never drop-then-orphan
+      (Evidence-step-3). Idempotent dissoc (D22.2) tolerates the worker's own
+      natural-completion cleanup. Option (b) (re-label the command-layer `swap!`)
+      rejected: perpetuates an off-dispatch handle side effect (un-trimmed on replay,
+      trace-invisible) — the exact boundary the task moves away from. Code-confirmed:
+      pure `remove-run` (`workflow-runtime/core.clj:217`) dissocs only canonical
+      `:state*`; `inflight-runs` is a `defonce` atom (`runtime_state.clj:11`) dropped
+      by `(swap! inflight-runs dissoc run-id)` (`workflow/core.clj:493`). Scope's
+      natural-completion `orchestration.clj` cleanups stay out of scope. D17 step 2,
+      D5 step 3, Acceptance #2, and the Scope effects bullet updated.

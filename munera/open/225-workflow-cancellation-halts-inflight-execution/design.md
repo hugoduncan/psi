@@ -111,7 +111,11 @@ In scope:
 - Modelling the cancellation side effects as canonical dispatch `:runtime/*`
   effects (parity: `effect-schema` + `execute-effect!`) executed by the dispatch
   `:effects` interceptor — child-session abort reusing the existing
-  `:runtime/agent-abort` effect (D12); not an out-of-dispatch execution path.
+  `:runtime/agent-abort` effect (D12); not an out-of-dispatch execution path. The
+  remove flow's `inflight-runs` handle entry-drop is likewise its own canonical
+  `:runtime/drop-inflight-run` cleanup effect in the remove dispatch's effect set
+  (D24), not the pure `remove-run` `:state*` dissoc and not a command-layer
+  `swap!`.
 - Ensuring the background job for a cancelled run is marked terminal by reusing the
   existing `:runtime/mark-workflow-jobs-terminal` effect from the D2/D4 terminal
   transition (single writer for the background-job (projected) terminal status, D13;
@@ -300,12 +304,14 @@ reject-while-live. A `remove` request on a live run:
 2. emits the cancellation effects (D1: `future-cancel`/interrupt + transitive
    cascade per D3) **and** the job-terminalization effect (D13), all in the same
    **cancel dispatch** while the run record is still present,
-3. removes the run record from the registry/`inflight-runs` in a **distinct,
-   subsequent remove dispatch** (D17), chained from the cancel dispatch via a
-   re-entrant `:runtime/dispatch-event` effect ordered after the
-   terminalization/cancellation effects (D18) — not within the cancel dispatch's
-   own apply phase — so the job is terminalized (step 2) before the canonical
-   record is dropped.
+3. removes the run in a **distinct, subsequent remove dispatch** (D17), chained
+   from the cancel dispatch via a re-entrant `:runtime/dispatch-event` effect
+   ordered after the terminalization/cancellation effects (D18) — not within the
+   cancel dispatch's own apply phase — so the job is terminalized (step 2) before
+   the record is dropped. The remove dispatch drops two distinct stores (D2/D24):
+   the pure `remove-run` dissoc removes the **canonical run record**, and a
+   `:runtime/drop-inflight-run` cleanup effect removes the **`inflight-runs` handle
+   entry** (the pure transition does not mutate the handle — D24).
 
 The `future-cancel` interrupt (D8) guarantees the worker stops even though its run
 record and canonical signal are gone after removal — so removal cannot re-orphan
@@ -715,11 +721,13 @@ over carrying run identity + outcome in the effect payload):
    is still resolvable via `workflow-in` during this dispatch's `:effects` phase,
    the D16(2) `:cancelled` reconcile branch terminalizes the background job with
    `:outcome :cancelled`.
-2. **Remove dispatch.** A **distinct, subsequent** dispatch applies the
-   pure `remove-run` dissoc, dropping the canonical run record and its
-   `inflight-runs` entry. The job is already terminal from dispatch 1, so this
-   dispatch performs no terminalization and the dropped record cannot leave a
-   lingering job.
+2. **Remove dispatch.** A **distinct, subsequent** dispatch drops the run on **two
+   distinct stores** (D2/D24): its apply phase applies the pure `remove-run` dissoc,
+   dropping the **canonical run record**; its effect set emits the
+   `:runtime/drop-inflight-run` cleanup effect (D24) that drops the **`inflight-runs`
+   handle entry** (the pure `remove-run` dissoc does **not** touch `inflight-runs` —
+   D24). The job is already terminal from dispatch 1, so this dispatch performs no
+   terminalization and the dropped record cannot leave a lingering job.
 
 The two-dispatch ordering holds **not** via dispatch serialization (which does not
 exist — D20) but via **in-thread sequencing** (D20): the remove dispatch is the
@@ -1163,6 +1171,83 @@ two re-dispatch questions have different answers because their ordering constrai
 differ. D3/D14 updated to name the single multi-run apply-phase transition + the
 cancel-dispatch effect set as the cascade's issue mechanism.
 
+## Runtime-Handle Cleanup Reconciliation (ψ pass 6, 2026-06-10)
+
+Resolves the pass-6 inconsistency follow-up: D17 step 2 and Acceptance #2 attribute
+the `inflight-runs` entry-drop to the pure `remove-run` `:state*` dissoc, but the
+code-confirmed mechanism is a separate command-layer handle mutation — contradicting
+D1/D2 and leaving the cancellation effect set with no effect to clear the entry.
+States the effects-as-data mechanism. No step-machine redesign; one new cleanup
+effect added to the existing dispatch-effect pathway.
+
+### D24. `inflight-runs` entry-drop = a canonical `:runtime/*` cleanup effect in the remove dispatch's effect set (not the pure `remove-run` dissoc)
+
+**Premise (code-confirmed).** Pure `remove-run` (`workflow-runtime/core.clj:217`,
+`state → [state', run]`) dissocs **only** canonical `:state*` (`runs-path` /
+`run-order-path`); it never touches `inflight-runs`. `inflight-runs` is a separate
+`defonce` runtime-handle atom (`agent-session/workflow/runtime_state.clj:11`);
+today its remove-flow entry is dropped by a **command-layer side effect**
+`(swap! inflight-runs dissoc run-id)` (`agent-session/workflow/core.clj:493`,
+`delegate-remove`). So attributing the `inflight-runs` drop to the pure
+`remove-run` `:state*` dissoc (D17 step 2 / Acceptance #2 wording) is code-
+inaccurate, and it contradicts **D2** (`inflight-runs` ∈ pure runtime handle, **not**
+the canonical `:state*` a pure transition mutates) and **D1** (pure transitions
+perform no side effects; handle mutations flow as effects-as-data). The D12/D23
+cancellation effect set defines no effect to clear the entry.
+
+**Decision — option (a): a dedicated canonical `:runtime/*` cleanup effect.** The
+`inflight-runs` entry-drop is its **own canonical `:runtime/*` effect** (e.g.
+`:runtime/drop-inflight-run`, carrying `run-id`), registered in the agent-session
+`effect-schema` with a **parity** `execute-effect!` method that dissocs the entry
+from the `inflight-runs` handle reached via `ctx` — exactly the parity shape of the
+D12 worker `future-cancel` effect, which already reaches `inflight-runs` via `ctx`.
+It is emitted in the **remove dispatch's** (D17 dispatch 2) effect set and executed
+by the dispatch **`:effects` interceptor** (D1/D12), so it passes the
+validate-interceptor `effect-schema` check, is suppressed by
+`:trim-effects-on-replay` (preserving the S5 replay closure for the real handle
+mutation), and emits dispatch-trace `:dispatch/effect-start`/`-finish`.
+
+**Mechanism within the remove dispatch (D17 dispatch 2).** The pure `remove-run`
+dissoc (apply phase) drops the **canonical run record**; the
+`:runtime/drop-inflight-run` cleanup effect (effects phase) drops the **handle
+entry** — two distinct mechanisms for the two distinct stores, consistent with D2's
+signal(canonical)/handle(`inflight-runs`) split. There is no apply-vs-effect
+ordering hazard between them (the canonical record removal does not depend on the
+handle entry, and vice versa).
+
+**Cross-dispatch ordering vs the worker `future-cancel` (D12/D14).** The handle
+entry-drop runs in the **remove dispatch** (dispatch 2), strictly after the **cancel
+dispatch's** (dispatch 1) worker `future-cancel(true)` effect — which reads the
+future *from* `inflight-runs` via `ctx`. So the future is cancelled **before** its
+handle entry is dropped (drop-after-cancel; never drop-then-orphan — the exact
+Evidence-step-3 orphaning this task fixes). The two-dispatch split (D17/D18)
+sequences them via in-thread re-entrancy (D20), so dispatch 2's drop observes
+dispatch 1's future-cancel.
+
+**Idempotency.** `(swap! inflight-runs dissoc run-id)` is a no-op on an absent
+entry, so the cleanup effect is execution-time idempotent (D22.2): if the
+interrupted worker's own natural-completion cleanup
+(`orchestration.clj` on-async-completion) already dropped the entry, the
+`:runtime/drop-inflight-run` effect is harmless, and vice versa.
+
+**Why option (a), not option (b).** Option (b) — keep the command-layer
+`(swap! inflight-runs dissoc …)` and merely re-label D17/Acceptance to name it —
+is rejected: it perpetuates a **command-layer side effect on the handle outside the
+dispatch effects pathway**, exactly the boundary this task moves
+cancellation/cleanup away from (D1/D12/D23), and would leave the remove-flow handle
+mutation un-trimmed on replay and trace-invisible. Option (a) keeps the entry-drop
+on the canonical effects-as-data pathway, parity with the D12 future-cancel effect.
+
+**Scope.** D24 covers only the **remove-flow** `inflight-runs` entry-drop (the
+removal path this task owns). The existing **natural-completion** `inflight-runs`
+cleanups in `orchestration.clj` (the handle owner's own bookkeeping on the worker
+thread, at run completion) are **out of scope** — not part of the cancellation
+effect set; migrating those handle mutations is not this task's concern.
+
+D17 step 2, D5 step 3, and Acceptance #2 are updated to attribute the
+`inflight-runs` entry-drop to the `:runtime/drop-inflight-run` cleanup effect rather
+than the pure `remove-run` dissoc.
+
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
 The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
@@ -1195,10 +1280,13 @@ the motivating Evidence cases.
    run reaches a clean `:cancelled` terminal state with its background job terminal.
 2. **[guaranteed]** A test asserts `remove` of a live **top-level** run does not leave
    a running worker future / orphaned thread: the single top-level run's future is
-   `future-cancel`'d (D14) and its `inflight-runs` entry is cleared only after the
-   cancel dispatch terminalizes the job (cancel-then-remove, D5/D17). (Criterion #2 is
-   explicitly **qualified to a top-level run** — the worker `future-cancel` target is
-   the single top-level run, never a sub-run, per D14.)
+   `future-cancel`'d (D14) and its `inflight-runs` entry is cleared by the
+   `:runtime/drop-inflight-run` cleanup effect (D24) — emitted in the remove dispatch
+   after the cancel dispatch has `future-cancel`'d the future and terminalized the job
+   (cancel-then-remove, D5/D17). The entry-drop is the cleanup effect, **not** the pure
+   `remove-run` `:state*` dissoc (which clears only the canonical record — D24).
+   (Criterion #2 is explicitly **qualified to a top-level run** — the worker
+   `future-cancel` target is the single top-level run, never a sub-run, per D14.)
 3. **[guaranteed]** No **new** side effects (commits, journal writes, new child
    sessions) are initiated after the cancel checkpoint — the in-flight turn is
    interrupted and at most one already-in-flight tool call may complete (D6) —

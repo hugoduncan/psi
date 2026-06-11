@@ -1136,3 +1136,55 @@ contradiction around the `inflight-runs` runtime-handle entry drop:
 This is a design-vs-artifact + internal (D17/Acceptance-#2 ⟷ D1/D2) inconsistency;
 the fix is to assign the `inflight-runs` entry-drop an explicit
 effects-as-data mechanism (or correct the wording), not a step-machine redesign.
+
+## Inconsistency follow-up resolution (ψ pass 6, 2026-06-10)
+
+Executed the single pass-6 inconsistency follow-up design-step (a design-decision
+step: assign the remove-flow `inflight-runs` entry-drop an effects-as-data
+mechanism, or correct the wording). Completable now — no blocker. Code premises
+re-confirmed before deciding:
+
+- Pure `remove-run` (`components/workflow-runtime/.../core.clj:217`,
+  `state → [state', run]`) dissocs **only** canonical `:state*` (`runs-path` +
+  `run-order-path`); it never touches `inflight-runs`.
+- `inflight-runs` is a separate `defonce` runtime-handle atom
+  (`agent-session/workflow/runtime_state.clj:11`); its remove-flow entry is dropped
+  by a command-layer `(swap! inflight-runs dissoc run-id)`
+  (`agent-session/workflow/core.clj:493`, `delegate-remove`).
+- No existing dispatch effect drops `inflight-runs` entries
+  (`dispatch_effects.clj` has no such `:runtime/*`); the natural-completion handle
+  cleanups live in `orchestration.clj` (lines 153/191/248/272) as worker-thread
+  `swap!`s — the handle owner's own bookkeeping.
+
+Resolution written to design.md as "Runtime-Handle Cleanup Reconciliation (ψ pass
+6)" D24, with D17 step 2, D5 step 3, Acceptance #2, and the Scope effects bullet
+updated:
+
+- D24 — chose **option (a)**: the `inflight-runs` entry-drop is its own canonical
+  `:runtime/drop-inflight-run` cleanup effect (parity: `effect-schema` +
+  `execute-effect!`, dissoc via the `ctx` handle), emitted in the remove dispatch's
+  (D17 dispatch 2) effect set and run by the `:effects` interceptor — parity with
+  the D12 worker `future-cancel` effect that already reaches `inflight-runs` via
+  `ctx`. Within the remove dispatch the pure `remove-run` dissoc (apply phase)
+  drops the **canonical record** and the cleanup effect (effects phase) drops the
+  **handle entry** — two distinct stores per the D2 signal/handle split. Cross-
+  dispatch ordering: the handle-drop (dispatch 2) runs strictly after the cancel
+  dispatch's (dispatch 1) `future-cancel` (which reads the future from
+  `inflight-runs` via `ctx`) → drop-after-cancel, never drop-then-orphan (the exact
+  Evidence-step-3 orphaning). Idempotent dissoc (D22.2) tolerates a prior worker
+  natural-completion cleanup.
+- Option (b) (re-label D17/Acceptance to the command-layer `swap!`) rejected: it
+  perpetuates an off-dispatch handle side effect (un-trimmed on replay,
+  trace-invisible) — the very boundary the task moves cancellation/cleanup away
+  from (D1/D12/D23).
+- Scope precision: only the **remove-flow** entry-drop is in scope; the existing
+  natural-completion `orchestration.clj` handle cleanups are out of scope (not part
+  of the cancellation effect set).
+
+Consistency check: D24 is consistent with D1 (effects-as-data, no inline handle
+side effects), D2 (`inflight-runs` ∈ runtime handle, distinct store from canonical
+`:state*`), D12 (canonical `:runtime/*` effects, parity, executed by the `:effects`
+interceptor, replay-trimmed/traced), and D17/D18 (two-dispatch ordering;
+future-cancel in dispatch 1, handle-drop in dispatch 2). No new contradictions; no
+step-machine redesign; the cancellation effect set gains one cleanup effect on the
+existing dispatch-effect pathway.
