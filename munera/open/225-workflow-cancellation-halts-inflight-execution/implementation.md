@@ -2289,3 +2289,17 @@ canonical cancel/remove event routing, effect payloads and ordering, top-level v
 nested runtime-handle cleanup, guarded child aborts, cooperative stop checkpoints,
 public result contracts, and acceptance-test coverage. No new unchecked follow-up
 items were added to `steps.md`.
+
+## Plan/steps inconsistency review (ψ pass 2, 2026-06-11)
+
+Reviewed current `plan.md` and `steps.md` against `design.md` D1–D38,
+Acceptance Criteria, prior plan/steps review notes, and the referenced
+cancel/remove dispatch/effect/runtime code (`canonical_workflows.clj`,
+`workflow/core.clj`, `background_job_runtime.clj`, and delegate result handling).
+
+No new actionable plan/steps inconsistency found. The plan and steps are aligned on
+canonical `:psi.workflow/cancel-run` / `:psi.workflow/remove-run` ownership,
+terminal vs absent remove semantics, top-level vs nested worker-cancel rules,
+ordered runtime-handle cleanup, guarded child aborts, cooperative checkpoints,
+public result fields, background-job terminalization, docs/changelog updates, and
+test/gate coverage. No new unchecked follow-up items were added to `steps.md`.
