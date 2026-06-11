@@ -272,30 +272,34 @@
         (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))))))
 
 (deftest guarded-judge-abort-effect-test
-  ;; Tests task 225 pass-2 judge cancellation extension: guarded abort can target
-  ;; a judge session recorded on the live workflow attempt, and stale judge guards
-  ;; remain no-ops.
-  (let [ctx (make-ctx)]
+  ;; Tests task 225 judge cancellation: guarded abort can target a judge session
+  ;; recorded on a live workflow attempt, but stale/completed judge guards no-op.
+  (let [effect {:effect/type :runtime/agent-abort
+                :session-id "judge-session"
+                :workflow-run-id "run-judge"
+                :workflow-step-id "step-1"
+                :workflow-attempt-id "attempt-1"
+                :expected-session-id "judge-session"
+                :workflow-session-kind :judge}
+        ctx (make-ctx)]
     (install-run! ctx (run "run-judge" :running
                            :step-runs {"step-1" {:attempts [{:attempt-id "attempt-1"
-                                                             :status :running
+                                                             :status :succeeded
                                                              :execution-session-id "actor-session"
                                                              :judge-session-id "judge-session"}]}}))
-    (is (= {:aborted? true :session-id "judge-session" :guarded? true}
-           ((:execute-effect-fn ctx) ctx {:effect/type :runtime/agent-abort
-                                          :session-id "judge-session"
-                                          :workflow-run-id "run-judge"
-                                          :workflow-step-id "step-1"
-                                          :workflow-attempt-id "attempt-1"
-                                          :expected-session-id "judge-session"
-                                          :workflow-session-kind :judge})))
-    (is (nil? ((:execute-effect-fn ctx) ctx {:effect/type :runtime/agent-abort
-                                             :session-id "judge-session"
-                                             :workflow-run-id "run-judge"
-                                             :workflow-step-id "step-1"
-                                             :workflow-attempt-id "attempt-1"
-                                             :expected-session-id "stale-judge-session"
-                                             :workflow-session-kind :judge})))))
+    (testing "in-flight judge sessions remain abortable on judged succeeded actor attempts"
+      (is (= {:aborted? true :session-id "judge-session" :guarded? true}
+             ((:execute-effect-fn ctx) ctx effect))))
+    (testing "stale judge session guard remains a no-op"
+      (is (nil? ((:execute-effect-fn ctx) ctx (assoc effect :expected-session-id "stale-judge-session")))))
+    (testing "completed judge sessions are no longer abortable"
+      (swap! (:state* ctx) assoc-in
+             [:workflows :runs "run-judge" :step-runs "step-1" :attempts 0 :judge-output]
+             "APPROVED")
+      (swap! (:state* ctx) assoc-in
+             [:workflows :runs "run-judge" :step-runs "step-1" :attempts 0 :judge-event]
+             "APPROVED")
+      (is (nil? ((:execute-effect-fn ctx) ctx effect))))))
 
 (deftest delegate-cancelled-run-result-test
   ;; Tests direct nested-run cancellation through the existing delegate result

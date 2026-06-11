@@ -67,11 +67,24 @@
 (defn- latest-workflow-attempt-in [ctx run-id step-id]
   (last (get-in @(:state* ctx) [:workflows :runs run-id :step-runs step-id :attempts])))
 
+(defn- judge-attempt-active?
+  "A judge session is abortable only until its result is recorded.
+
+   Judged actor attempts remain `:succeeded` while judge routing is processed, so
+   attempt status alone cannot distinguish an in-flight judge turn from an
+   already-completed judge session. `record-judge-result` always records the
+   `:judge-output` key, including nil outputs, making key presence the durable
+   completion marker for stale/duplicate guarded abort effects."
+  [attempt]
+  (not (contains? attempt :judge-output)))
+
 (defn- live-workflow-attempt? [attempt session-kind]
-  (contains? (case session-kind
-               :judge #{:running :validating :succeeded}
-               #{:running :validating})
-             (:status attempt)))
+  (and (contains? (case session-kind
+                    :judge #{:running :validating :succeeded}
+                    #{:running :validating})
+                  (:status attempt))
+       (or (not= :judge session-kind)
+           (judge-attempt-active? attempt))))
 
 (defn- workflow-abort-guard-matches? [ctx effect]
   (let [attempt (latest-workflow-attempt-in ctx (:workflow-run-id effect) (:workflow-step-id effect))

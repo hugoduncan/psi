@@ -2669,3 +2669,14 @@ Verification during review:
 
 - `git diff --check` passed.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 21 tests / 100 assertions green.
+
+## Implementation follow-up pass 8 (ψ, 2026-06-11)
+
+Executed the pass-8 guarded judge abort follow-up. Guarded workflow `:runtime/agent-abort` now treats judge sessions as abortable only until the judge result has been recorded. The executor no longer uses `:status :succeeded` alone as judge liveness proof; for judge abort guards it also requires absence of the durable `:judge-output` completion marker. This preserves in-flight judge aborts on judged actor attempts (which can be `:succeeded` while judging) while making stale/duplicate guarded abort effects no-op after judge output/result recording.
+
+Added regression coverage in `workflow-cancellation-dispatch-test`: an in-flight judge session on a `:succeeded` actor attempt remains abortable, stale expected-session guards no-op, and the same guarded judge abort effect no-ops after `:judge-output`/`:judge-event` are recorded.
+
+Validation:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 8 tests / 52 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 21 tests / 101 assertions green.
