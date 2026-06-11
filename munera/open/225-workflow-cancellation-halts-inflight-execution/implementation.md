@@ -3089,3 +3089,22 @@ record-response under cancellation-entry ordering), with a regression for cancel
 between the post-provider stop read and record-response entry.
 
 No tests run (review-only pass).
+
+## Implementation review follow-up pass 21 — prompt response recording guard (ψ, 2026-06-11)
+
+Closed the post-provider → record-response cancellation window. Workflow-owned
+`:session/prompt-record-response` now runs under the per-run cancellation-entry read
+lock and checks the canonical workflow stop signal before building recording state
+or effects. Its root-state update is also guarded against a cancelled/removed run
+inside the update fn, and assistant-journal/logprobs append effects plus
+record-response follow-on dispatches (`:session/prompt-continue`,
+`:session/prompt-finish`, context-usage) carry `:workflow-run-id` so stale guarded
+dispatch effects no-op if cancellation wins before effect execution.
+
+Regressions added in `prompt_lifecycle_workflow_cancellation_test`: cancellation
+after provider execution returns but before `:session/prompt-record-response` leaves
+no execution summary, no assistant journal entry, and no prompt advancement; a
+stale already-built record-response pure result also leaves no summary/journal
+write and does not re-enter ordinary lifecycle events after cancellation. Focused
+prompt-lifecycle cancellation + prompt-lifecycle/dispatch suites pass; focused lint
+is clean.

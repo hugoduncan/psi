@@ -108,12 +108,14 @@
     [:map [:effect/type [:= :runtime/dispatch-event]]
      [:event-type :keyword]
      [:event-data [:maybe :map]]
-     [:origin {:optional true} :keyword]]]
+     [:origin {:optional true} :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/dispatch-event-with-effect-result
     [:map [:effect/type [:= :runtime/dispatch-event-with-effect-result]]
      [:event-type :keyword]
      [:event-data [:maybe :map]]
-     [:origin {:optional true} :keyword]]]
+     [:origin {:optional true} :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/event-queue-offer
     [:map [:effect/type [:= :runtime/event-queue-offer]] [:event :any]]]
    [:statechart/send-event
