@@ -868,3 +868,17 @@
       names the shared cancel-transition helper (D26), the live-remove first pass,
       the terminal/absent record-drop branch, and the dispatch `:effects` interceptor
       as executor. No blocker.
+
+## Inconsistency follow-ups (ψ pass 24, 2026-06-11)
+
+- [ ] Reconcile the residual D6 / Acceptance #3 absolute no-new-child-session
+      guarantee with D27 / Acceptance #9a's accepted direct-sub-run-cancel
+      post-enumeration spawn exception. D6 says that after the D31 cancel
+      checkpoint no further delegate sub-run is created by the cancelled subtree and
+      no further ordinary child agent session spawns; Acceptance #3 marks the same
+      no-new-child-session claim as [guaranteed]. But D27 and Acceptance #9a accept
+      a descendant child session spawned after the D23 handler-before enumeration /
+      D31 CAS checkpoint as a bounded, out-of-test-scope exception. Qualify D6 and
+      Acceptance #3 (or restate the guarantee as applying only to the enumerated
+      cascade set) so the guaranteed contract and accepted exception have one
+      consistent scope.

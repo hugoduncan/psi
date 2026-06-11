@@ -1947,3 +1947,25 @@ No new actionable ambiguity found. D1–D37 now pin the entry events, public rou
 effect payloads, ctx handle reachability, cascade semantics, cancel/remove result
 contracts, idempotency gates, and acceptance-test surface sufficiently for planning
 and implementation. No new `design-steps.md` follow-up item added.
+
+## Inconsistency review (ψ pass 24, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-artifact inconsistency after
+D37 and the pass-23 ambiguity review. Consulted the relevant cancellation-contract
+sections in `design.md` (D6, D27, D31, Acceptance #3/#9a). Did not review
+`plan.md` or `steps.md`.
+
+One new actionable inconsistency found:
+
+1. **D6 / Acceptance #3 still state an absolute guaranteed no-new-child-session
+   contract, while D27 / Acceptance #9a accept a post-checkpoint direct-sub-run
+   spawn exception.** D6 says that after the D31 cancel checkpoint, no further
+   delegate sub-run is created by the cancelled subtree and no further ordinary
+   child agent session spawns; Acceptance #3 repeats that no new ordinary child
+   sessions are initiated after the checkpoint as a guaranteed criterion. But D27
+   and Acceptance #9a explicitly accept a direct-sub-run-cancel descendant spawned
+   after the D23 enumeration / D31 CAS checkpoint as a bounded, out-of-test-scope
+   exception. These cannot both be absolute. The design should qualify D6 and
+   Acceptance #3 with the D27 exception (or restate the guarantee as applying only
+   to the enumerated cascade set), so the guaranteed contract and accepted exception
+   have one scope.
