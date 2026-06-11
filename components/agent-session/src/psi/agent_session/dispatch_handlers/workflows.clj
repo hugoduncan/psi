@@ -79,19 +79,27 @@
   {:effect/type :runtime/drop-inflight-run
    :run-id run-id})
 
+(defn- drop-cancellation-entry-lock-effect [run-id]
+  {:effect/type :runtime/drop-workflow-cancellation-entry-lock
+   :run-id run-id})
+
 (defn- handle-cleanup-effects
   [run-id run]
-  (cond
-    (nil? run)
-    [(cancel-inflight-run-effect run-id)
-     (drop-inflight-run-effect run-id)]
+  (let [drop-lock (drop-cancellation-entry-lock-effect run-id)]
+    (cond
+      (nil? run)
+      [(cancel-inflight-run-effect run-id)
+       (drop-inflight-run-effect run-id)
+       drop-lock]
 
-    (top-level-run? run)
-    [(cancel-inflight-run-effect run-id)
-     (drop-inflight-run-effect run-id)]
+      (top-level-run? run)
+      [(cancel-inflight-run-effect run-id)
+       (drop-inflight-run-effect run-id)
+       drop-lock]
 
-    :else
-    [(drop-inflight-run-effect run-id)]))
+      :else
+      [(drop-inflight-run-effect run-id)
+       drop-lock])))
 
 (defn- live-attempt-abort-effects
   [run]

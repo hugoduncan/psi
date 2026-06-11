@@ -13,6 +13,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.session-state.state :as ss]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.model :as workflow-model]))
 
 (defn- make-test-ctx
@@ -111,3 +112,41 @@
           "the older run's nested sub-run session is removed")
       (is (some? (ss/get-session-data-in ctx new-top-child-id))
           "the newest top-level run's session survives"))))
+
+(deftest workflow-run-retention-drops-cancellation-entry-locks-test
+  ;; Retention cleanup forgets removed workflow runs; it must also forget the
+  ;; corresponding runtime-only cancellation-entry locks so the lock handle is
+  ;; bounded to retained canonical run records.
+  (let [ctx (make-test-ctx)
+        parent (session/new-session-in! ctx nil {})
+        parent-id (:session-id parent)
+        t0 (java.time.Instant/parse "2026-05-29T12:00:00Z")
+        t1 (java.time.Instant/parse "2026-05-29T12:01:00Z")]
+    (swap! (:state* ctx) assoc-in [:workflows :runs]
+           {"old-top" {:run-id "old-top"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at t0
+                       :step-runs {}}
+            "old-nested" {:run-id "old-nested"
+                          :parent-session-id parent-id
+                          :delegating-run-id "old-top"
+                          :status :completed
+                          :finished-at t0
+                          :step-runs {}}
+            "new-top" {:run-id "new-top"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at t1
+                       :step-runs {}}})
+    (swap! (:state* ctx) assoc-in [:workflows :run-order] ["old-top" "old-nested" "new-top"])
+    (cancellation-entry/lock-for ctx "old-top")
+    (cancellation-entry/lock-for ctx "old-nested")
+    (cancellation-entry/lock-for ctx "new-top")
+    (workflow-run-retention/apply-retention-cleanup! ctx "new-top")
+    (is (nil? (get @(:workflow-cancellation-entry-locks-handle ctx) "old-top"))
+        "retention cleanup drops the removed top-level run lock")
+    (is (nil? (get @(:workflow-cancellation-entry-locks-handle ctx) "old-nested"))
+        "retention cleanup drops the removed nested run lock")
+    (is (some? (get @(:workflow-cancellation-entry-locks-handle ctx) "new-top"))
+        "retained canonical run lock remains available")))

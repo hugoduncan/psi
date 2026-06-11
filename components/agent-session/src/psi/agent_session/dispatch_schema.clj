@@ -31,6 +31,9 @@
    [:runtime/drop-inflight-run
     [:map [:effect/type [:= :runtime/drop-inflight-run]]
      [:run-id :string]]]
+   [:runtime/drop-workflow-cancellation-entry-lock
+    [:map [:effect/type [:= :runtime/drop-workflow-cancellation-entry-lock]]
+     [:run-id :string]]]
    [:runtime/agent-clear-steering-queue
     [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]]]
    [:runtime/agent-clear-follow-up-queue

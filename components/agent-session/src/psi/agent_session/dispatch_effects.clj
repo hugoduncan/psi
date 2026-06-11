@@ -7,6 +7,7 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.agent-session.extensions :as ext]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.ai.model-registry :as model-registry]
@@ -141,6 +142,9 @@
         found? (boolean (when inflight-runs (get @inflight-runs run-id)))]
     (when inflight-runs (swap! inflight-runs dissoc run-id))
     {:run-id run-id :found? found? :dropped? true}))
+
+(defmethod execute-effect! :runtime/drop-workflow-cancellation-entry-lock [ctx effect]
+  (cancellation-entry/drop-lock! ctx (:run-id effect)))
 
 (defmethod execute-effect! :runtime/agent-queue-steering [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/queue-steering-in! ac (:message effect))))

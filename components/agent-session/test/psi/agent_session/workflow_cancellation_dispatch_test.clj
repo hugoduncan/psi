@@ -7,6 +7,7 @@
    [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
    [psi.workflow-registry.registry :as registry]
@@ -46,6 +47,8 @@
     (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/cancel-inflight-run
                                                :run-id "run-1"})))
     (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/drop-inflight-run
+                                               :run-id "run-1"})))
+    (is (true? (dispatch-schema/valid-effect? {:effect/type :runtime/drop-workflow-cancellation-entry-lock
                                                :run-id "run-1"})))
     (is (false? (dispatch-schema/valid-effect? {:effect/type :runtime/cancel-inflight-run}))))
 
@@ -168,7 +171,8 @@
                  :origin :core}]
                (:declared-effects (last entries))))
         (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "run-1"}
-                {:effect/type :runtime/drop-inflight-run :run-id "run-1"}]
+                {:effect/type :runtime/drop-inflight-run :run-id "run-1"}
+                {:effect/type :runtime/drop-workflow-cancellation-entry-lock :run-id "run-1"}]
                (:declared-effects (first entries)))))))
 
   (testing "live nested remove cancels then removes without cancelling the parent worker"
@@ -198,7 +202,8 @@
                  :event-data {:run-id "child" :reason "cancelled by remove"}
                  :origin :core}]
                (:declared-effects (last entries))))
-        (is (= [{:effect/type :runtime/drop-inflight-run :run-id "child"}]
+        (is (= [{:effect/type :runtime/drop-inflight-run :run-id "child"}
+                {:effect/type :runtime/drop-workflow-cancellation-entry-lock :run-id "child"}]
                (:declared-effects (first entries)))))))
 
   (testing "terminal nested remove does not infer or cancel a parent worker"
@@ -207,7 +212,8 @@
       (install-run! ctx (run "parent" :running))
       (install-run! ctx (run "child" :cancelled :delegating-run-id "parent"))
       (dispatch/dispatch! ctx :psi.workflow/remove-run {:run-id "child"} {:origin :core})
-      (is (= [{:effect/type :runtime/drop-inflight-run :run-id "child"}]
+      (is (= [{:effect/type :runtime/drop-inflight-run :run-id "child"}
+              {:effect/type :runtime/drop-workflow-cancellation-entry-lock :run-id "child"}]
              (:declared-effects (last-log-entry :psi.workflow/remove-run))))))
 
   (testing "absent remove cancels a possible stale handle before dropping it"
@@ -217,7 +223,8 @@
       (is (false? (:psi.workflow/removed? result)))
       (is (true? (:psi.workflow/noop? result)))
       (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "ghost"}
-              {:effect/type :runtime/drop-inflight-run :run-id "ghost"}]
+              {:effect/type :runtime/drop-inflight-run :run-id "ghost"}
+              {:effect/type :runtime/drop-workflow-cancellation-entry-lock :run-id "ghost"}]
              (:declared-effects (last-log-entry :psi.workflow/remove-run)))))))
 
 (deftest workflow-cancel-remove-background-job-terminalization-test
@@ -383,7 +390,7 @@
         (is (= {:status :removed} (get-in result [:payload :details])))))))
 
 (deftest inflight-run-effect-execution-test
-  ;; Tests cancellation/cleanup effects against a real isolated inflight-runs atom.
+  ;; Tests cancellation/cleanup effects against real isolated runtime-handle atoms.
   (testing "cancel-inflight-run future-cancels exact run handle before drop removes it"
     (let [ctx (assoc (make-ctx) :workflow-inflight-runs-handle (atom {}))
           fut (future (Thread/sleep 10000))]
@@ -398,4 +405,16 @@
           (is (true? (:found? drop-result)))
           (is (nil? (get @(:workflow-inflight-runs-handle ctx) "run-1"))))
         (finally
-          (future-cancel fut))))))
+          (future-cancel fut)))))
+
+  (testing "drop-workflow-cancellation-entry-lock removes exact lock entries"
+    (let [ctx (make-ctx)
+          lock-1 (cancellation-entry/lock-for ctx "run-1")
+          lock-2 (cancellation-entry/lock-for ctx "run-2")]
+      (is (some? lock-1))
+      (is (some? lock-2))
+      (is (= {:run-id "run-1" :found? true :dropped? true}
+             ((:execute-effect-fn ctx) ctx {:effect/type :runtime/drop-workflow-cancellation-entry-lock
+                                            :run-id "run-1"})))
+      (is (nil? (get @(:workflow-cancellation-entry-locks-handle ctx) "run-1")))
+      (is (identical? lock-2 (get @(:workflow-cancellation-entry-locks-handle ctx) "run-2"))))))

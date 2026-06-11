@@ -16,6 +16,7 @@
   (:require
    [psi.agent-session.session-close :as session-close]
    [psi.session-state.state :as ss]
+   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (def ^:private retained-terminal-statuses
@@ -119,4 +120,5 @@
                      (fn [root-state]
                        (if (workflow-runtime/workflow-run-in root-state run-id)
                          (first (workflow-runtime/remove-run root-state run-id))
-                         root-state))))))))))
+                         root-state)))
+              (cancellation-entry/drop-lock! ctx run-id))))))))

@@ -56,3 +56,18 @@
       (finally
         (doseq [lock (reverse write-locks)]
           (.unlock lock))))))
+
+(defn drop-lock!
+  "Drop the runtime cancellation-entry lock for run-id.
+
+   This is lifecycle cleanup for removed/forgotten workflow runs. Callers must
+   only invoke it after the canonical run record is no longer retained, so a
+   future ordinary entry cannot rely on the removed run's lock for ordering."
+  [ctx run-id]
+  (let [locks* (when (and ctx run-id) (get ctx lock-handle-key))
+        found? (boolean (and locks* (contains? @locks* run-id)))]
+    (when locks*
+      (swap! locks* dissoc run-id))
+    {:run-id run-id
+     :found? found?
+     :dropped? (boolean locks*)}))

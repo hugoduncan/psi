@@ -202,4 +202,5 @@
 
 ## Implementation review follow-ups (ψ pass 18, 2026-06-11)
 
-- [ ] Add lifecycle cleanup for per-run cancellation-entry locks: `:workflow-cancellation-entry-locks-handle` entries created by `cancellation-entry/lock-for` must be removed when workflow runs are removed/forgotten (and any retention cleanup path), or explicitly bounded to retained canonical run records; add a regression proving remove/cleanup drops the lock entry without weakening cancellation-entry ordering.
+- [x] Add lifecycle cleanup for per-run cancellation-entry locks: `:workflow-cancellation-entry-locks-handle` entries created by `cancellation-entry/lock-for` must be removed when workflow runs are removed/forgotten (and any retention cleanup path), or explicitly bounded to retained canonical run records; add a regression proving remove/cleanup drops the lock entry without weakening cancellation-entry ordering.
+  - Covered 2026-06-11: canonical remove cleanup now emits `:runtime/drop-workflow-cancellation-entry-lock` after inflight-handle cleanup, the executor drops the exact runtime lock entry, and retention cleanup drops locks for evicted top-level/nested runs while retaining locks for retained canonical runs. Focused cancellation-dispatch + retention tests and focused lint are green.
