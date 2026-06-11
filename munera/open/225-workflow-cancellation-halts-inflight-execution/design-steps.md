@@ -650,7 +650,7 @@
 
 ## Ambiguity follow-ups (ψ pass 11, 2026-06-11)
 
-- [ ] Pin the execution-time idempotency payload/read rule for workflow-cancellation
+- [x] Pin the execution-time idempotency payload/read rule for workflow-cancellation
       `:runtime/agent-abort`. D15 emits the existing effect with `:session-id` = the
       in-flight attempt's `:execution-session-id`, while D22.2 requires the executor
       to re-read the D15 live-attempt predicate from canonical run state at execute
@@ -659,15 +659,26 @@
       executor locates the attempt by `:execution-session-id`; also state how existing
       non-workflow `:runtime/agent-abort` emissions remain unguarded (or are otherwise
       handled). Update D12/D15/D22.2 and any effect-schema/executor implications.
+      → design.md D28: workflow-cancel aborts carry guard metadata (`run-id`,
+      `step-id`, `attempt-id`, expected `execution-session-id`) plus `:session-id`;
+      executor re-reads canonical run state and aborts only when the guarded latest
+      attempt remains live with matching session. Existing non-workflow
+      `:runtime/agent-abort` emissions omit the guard and keep session-id-only
+      behaviour; effect schema gains optional guard keys/nested guard map.
 
-- [ ] Define public result/error semantics for idempotent terminal/absent
+- [x] Define public result/error semantics for idempotent terminal/absent
       `cancel-run` and `remove-run`. When the target run is already terminal,
       absent, or naturally completes before cancel applies, state whether the API
       returns success with the current/removed status, `:removed? true`, or an error,
       while still emitting no cancellation effects. Align D4/D20/D22/D26, the
       mutation output fields, and the acceptance tests.
+      → design.md D29: terminal/absent cancel/remove are success/no-op public
+      results, not `already terminal` / `not found` errors; live cancel returns
+      `:status :cancelled`; live remove reports successful cancel-then-remove;
+      terminal remove performs bare record drop; absent remove returns
+      `:removed? false`, `:found? false`, `:noop? true`. Acceptance criteria updated.
 
-- [ ] Scope Acceptance #3's "no new side effects (commits, journal writes, new child
+- [x] Scope Acceptance #3's "no new side effects (commits, journal writes, new child
       sessions)" against required cancellation bookkeeping. Explicitly distinguish
       forbidden child workflow/turn side effects after cancellation (new tool calls,
       commits, ordinary child-turn journal writes, new child sessions) from
@@ -675,10 +686,22 @@
       background-job terminalization, abort/interruption records if any, and
       `inflight-runs` cleanup). Update D6 and Acceptance #3 so tests assert the
       intended boundary.
+      → design.md D30: forbidden effects = ordinary workflow/child-turn advancement
+      after the checkpoint (new steps, sub-runs, ordinary child sessions, tool calls,
+      commits, ordinary child-turn journal writes); allowed/required cancellation
+      control = `:cancelled`, terminalization, guarded aborts, future-cancel,
+      abort/interruption records, dispatch trace, re-entrant remove, record drop, and
+      `inflight-runs` cleanup. D6 and Acceptance #3 updated.
 
-- [ ] Define the testable meaning of "cancel checkpoint" used by D6/D7/D27 and
+- [x] Define the testable meaning of "cancel checkpoint" used by D6/D7/D27 and
       Acceptance #1/#3. Choose whether it denotes the cancel request, the apply-phase
       CAS that writes `:cancelled`, interrupt delivery, the worker's cooperative read
       observing `:cancelled`/run-absence, or another event; state what work may
       legally start in the request→CAS→interrupt→read window. Apply the same term
       consistently to top-level and nested-run acceptance criteria.
+      → design.md D31: cancel checkpoint = the apply-phase CAS that commits
+      `:status :cancelled` (the D23 multi-run CAS for cascades), not request arrival,
+      interrupt delivery, or worker read. Work started before the CAS is not a
+      post-checkpoint violation; ordinary advancement after the CAS is forbidden;
+      interrupt/abort only wake blocked work to observe the signal. Acceptance
+      criteria updated; D27's bounded spawn race remains out-of-test-scope.

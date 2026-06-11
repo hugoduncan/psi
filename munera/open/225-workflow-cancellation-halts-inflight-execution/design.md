@@ -332,20 +332,32 @@ while live" / "(or rejects)" alternative.
 
 The directly-cancelled run's in-flight child turn is **always interrupted** (a
 guaranteed action, via the D3/D9 `:session/abort` path), not best-effort. The
-guarantee is stated over side effects that have **not yet started**:
+guarantee is stated over side effects that have **not yet started**, and over the
+**cancel checkpoint** defined precisely by D31: the apply-phase CAS that first
+commits `:status :cancelled` for the directly-cancelled run (and, for a cascade,
+for each enumerated descendant).
 
-- **Guaranteed:** after the cancel checkpoint no further step executes, no further
-  sub-run is created, no further child session spawns, and the in-flight child
-  turn is interrupted so it initiates **no new tool calls / commits**.
+- **Guaranteed after that checkpoint:** no further workflow step attempt starts, no
+  further delegate sub-run is created by the cancelled subtree, no further ordinary
+  child agent session spawns, and the in-flight child turn is interrupted so it
+  initiates **no new tool calls / commits**.
+- **Allowed cancellation-control work:** the `:cancelled` state write itself,
+  background-job terminalization, abort/interruption records or events,
+  dispatch-trace/effect bookkeeping, the re-entrant remove dispatch, and
+  `inflight-runs` cleanup are required control effects, not forbidden workflow
+  advancement (D30).
 - **Not guaranteed (physics):** a single tool call already in syscall flight at the
   instant of interrupt (e.g. a `git commit` already issued) may complete; it cannot
-  be recalled.
+  be recalled. Work that starts before the D31 checkpoint is likewise outside the
+  post-checkpoint prohibition, though later advancement is stopped once the signal
+  is visible.
 
 So the absolute Intent/Acceptance "no further side effects after cancel" is
-restated precisely as "**no new side effects are initiated** after the cancel
-checkpoint." The interrupt itself is the guaranteed requirement; the residual
-in-flight effect is the only permitted exception. The nullable/controlled
-acceptance harness asserts the guaranteed property (no *new* tool call initiated
+restated precisely as "**no new ordinary workflow/child-turn side effects are
+initiated after the cancel checkpoint**" (D30/D31). The interrupt itself is the
+guaranteed requirement; the residual in-flight effect is the only permitted
+physics exception. The nullable/controlled acceptance harness asserts the
+guaranteed property (no *new* ordinary tool call / commit / child session initiated
 after the checkpoint), which is deterministic.
 
 ### D7. Cancel during a blocking `send-and-drain` wait: actively interrupted (resolves part of Q4)
@@ -481,7 +493,9 @@ Mapping:
 - **Child-session abort** reuses the **existing** `:runtime/agent-abort` effect
   (already present with an `execute-effect!` method driving the `:session/abort` /
   `agent-core/abort-in!` path) — `λ extend` compose > new mechanism (consistent
-  with D3/D9).
+  with D3/D9). Workflow-cancellation emissions add the guarded metadata defined by
+  D28 so D22.2's execute-time liveness re-check can be performed without changing
+  existing non-workflow abort callers.
 - **Worker `future-cancel(true)` / interrupt** is emitted as a canonical
   `:runtime/*` cancellation effect carrying the `run-id`; its `execute-effect!`
   method cancels the future held in the `inflight-runs` runtime handle (reached via
@@ -648,6 +662,16 @@ is the one deepest in-flight child turn plus any ancestor turns still mid-flight
 This makes the D9/D12 reuse of `:runtime/agent-abort` well-defined: its keyed
 `session-id` (`effect-session-id`) is supplied from the canonical in-flight
 attempt's `:execution-session-id`.
+
+**Workflow-cancellation guard payload/read rule (D28).** A workflow-cancellation
+abort effect carries both the existing `:session-id` and workflow guard metadata:
+`{:workflow-run-id run-id :workflow-step-id step-id :workflow-attempt-id attempt-id}`
+plus `:expected-session-id sid` (equal to `:session-id`). At execute time the
+`:runtime/agent-abort` handler uses this metadata to re-read canonical `:state*`,
+locate the same run/step/latest attempt, and abort only if the latest attempt still
+has the same `:attempt-id`, live status, and the same `:execution-session-id`.
+Existing non-workflow `:runtime/agent-abort` emissions omit the metadata and keep
+the current unguarded session-id-only behaviour.
 
 ## Consistency Reconciliations (ψ pass 2, 2026-06-10)
 
@@ -1094,11 +1118,13 @@ already-completed run's (possibly reused) `:execution-session-id`.
    pure-result shape cannot retract the loser's already-computed effects, so the
    cancellation effects must be **execution-time idempotent / liveness-rechecking** so
    a redundant emission is harmless:
-   - `:runtime/agent-abort` re-reads the **D15 live-attempt predicate** (attempt
-     status ∈ `#{:running :validating}` for the run's `:current-step-id`) from
-     canonical `:state*` **at execute time** and **no-ops** when the attempt is no
-     longer live — so it cannot abort an already-completed/superseded turn or a reused
-     `:execution-session-id`;
+   - workflow-cancellation `:runtime/agent-abort` re-reads the **D15 live-attempt
+     predicate** using the D28 guard metadata (`run-id`, `step-id`, `attempt-id`,
+     expected `execution-session-id`) from canonical `:state*` **at execute time**
+     and **no-ops** when the guarded attempt is no longer the latest live attempt —
+     so it cannot abort an already-completed/superseded turn or a reused
+     `:execution-session-id`; non-workflow abort emissions that omit the guard keep
+     the existing session-id-only behaviour;
    - worker `future-cancel(true)` of an already-cancelled / completed / absent future
      is a JVM no-op;
    - `:runtime/mark-workflow-jobs-terminal` reconciles idempotently from canonical
@@ -1513,6 +1539,152 @@ exception (D22.2 / criterion #9 class), now made explicit. A new acceptance note
 this exception **[out-of-test-scope]** (a bounded true-concurrency race, asserted by
 construction, not a deterministic test).
 
+## Ambiguity Reconciliations (ψ pass 11, 2026-06-11)
+
+Resolves the pass-11 ambiguity follow-ups. These pin effect guard payloads, public
+terminal/absent result semantics, cancellation-control side-effect boundaries, and
+the testable meaning of "cancel checkpoint". No implementation work is performed
+here.
+
+### D28. Workflow-cancellation `:runtime/agent-abort` uses guarded metadata; non-workflow aborts remain session-id-only
+
+D15 identifies the child session to abort as the in-flight attempt's
+`:execution-session-id`, while D22.2 requires the executor to re-read liveness from
+canonical run state at execute time. The missing piece is how the existing
+`:runtime/agent-abort` effect, historically keyed only by `:session-id`, knows which
+workflow attempt to validate.
+
+**Decision.** Workflow-cancellation emissions of `:runtime/agent-abort` carry
+workflow guard metadata in addition to the existing `:session-id`:
+
+```clojure
+{:effect/type :runtime/agent-abort
+ :session-id sid
+ :workflow-run-id run-id
+ :workflow-step-id step-id
+ :workflow-attempt-id attempt-id
+ :expected-session-id sid}
+```
+
+At execute time the effect handler branches on presence of the workflow guard:
+
+- **Guarded workflow-cancel abort:** re-read canonical `:state*`, locate
+  `:workflow-run-id`, then `:workflow-step-id`, then the **latest** attempt. Abort
+  only if the latest attempt's `:attempt-id` equals `:workflow-attempt-id`, its
+  `:execution-session-id` equals `:expected-session-id`/`:session-id`, and its
+  status remains live (`#{:running :validating}`, D15). Otherwise no-op. This is
+  D22.2's execution-time idempotency rule and prevents aborting a completed,
+  superseded, or unrelated/reused session.
+- **Unguarded non-workflow abort:** effects that omit the workflow guard retain the
+  existing session-id-only behaviour. They are not forced to invent workflow state
+  they do not have, and their schemas remain valid.
+
+**Schema/executor implication.** `effect-schema` extends the existing
+`:runtime/agent-abort` shape with optional workflow guard keys (or a nested optional
+`:workflow-abort-guard` map) while keeping `:session-id` required. No new abort
+effect type is introduced; this is a guarded workflow-cancellation variant of the
+existing effect. D12/D15/D22.2 are aligned to this rule.
+
+### D29. Public result semantics for terminal/absent `cancel-run` and `remove-run`
+
+The public API must be idempotent in the same way the state/effect model is
+idempotent: terminal/absent requests are not runaway errors that re-fire effects.
+They return stable success/no-op shapes that make operator retries safe.
+
+**`cancel-run` result contract.**
+
+- **Live run:** applies the shared cancel transition and returns success:
+  `{:psi.workflow/run-id run-id :psi.workflow/status :cancelled
+    :psi.workflow/cancelled? true :psi.workflow/noop? false
+    :psi.workflow/error nil}`.
+- **Already terminal run (`:completed`, `:failed`, or `:cancelled`):** returns
+  success/no-op with the current status and emits no cancellation effects:
+  `:psi.workflow/cancelled?` is true only when the current status is already
+  `:cancelled`; `:psi.workflow/noop? true`; `:psi.workflow/error nil`. This covers
+  a repeated cancel and a cancel racing natural completion after the terminal state
+  is visible at handler read time (D22.1).
+- **Absent run:** returns success/no-op absent, not an exception:
+  `{:psi.workflow/run-id run-id :psi.workflow/status nil
+    :psi.workflow/found? false :psi.workflow/noop? true
+    :psi.workflow/error nil}`. No cancellation effects are emitted.
+
+**`remove-run` result contract.**
+
+- **Live run:** first pass returns/remains a successful remove request while the
+  handler performs cancel-then-remove (D26):
+  `{:psi.workflow/run-id run-id :psi.workflow/removed? true
+    :psi.workflow/cancelled? true :psi.workflow/noop? false
+    :psi.workflow/error nil}`. The canonical record is removed by the re-entrant
+  second pass; the public command reports the requested remove as accepted/successful.
+- **Already terminal run:** performs the bare record-drop branch (D22.1/D26) and
+  returns `:psi.workflow/removed? true`, `:psi.workflow/noop? false`,
+  `:psi.workflow/error nil`. The cancellation-effect set is empty; only the
+  record-drop and `:runtime/drop-inflight-run` cleanup run.
+- **Absent run:** returns success/idempotent no-op removal:
+  `:psi.workflow/removed? false`, `:psi.workflow/found? false`,
+  `:psi.workflow/noop? true`, `:psi.workflow/error nil`.
+
+This intentionally changes the current "not found" / "already terminal" exception
+shape for cancel/remove. Unexpected validation/schema failures may still return
+`:psi.workflow/error`; idempotent terminal/absent states do not. Tests should assert
+these public result fields along with the D22 effect-emission rules.
+
+### D30. Forbidden workflow side effects vs allowed cancellation-control effects
+
+Acceptance #3's "no new side effects" refers to **ordinary workflow/child-turn
+advancement**, not to the cancellation machinery required to stop that advancement.
+The boundary is:
+
+- **Forbidden after the cancel checkpoint (D31):** new workflow step attempts, new
+  delegate sub-runs, new ordinary child agent sessions for workflow steps, new tool
+  calls, commits, ordinary child-turn journal writes, and other user/worktree
+  effects initiated by the cancelled subtree.
+- **Allowed/required cancellation-control effects:** the `:cancelled` canonical
+  state transition, background-job terminalization, guarded `:runtime/agent-abort`,
+  worker `future-cancel(true)` wait wake-up, abort/interruption records/events if
+  the existing abort path writes them, dispatch trace (`:dispatch/effect-start` /
+  `:dispatch/effect-finish`), the re-entrant `remove-run` dispatch for
+  cancel-then-remove, the pure canonical record drop, and
+  `:runtime/drop-inflight-run` handle cleanup.
+
+Tests must therefore assert absence of **forbidden advancement effects**, not a
+literal absence of all writes/effects after cancellation. Cancellation bookkeeping is
+expected evidence that cancellation executed. D6 and Acceptance #3 use this boundary.
+
+### D31. "Cancel checkpoint" = the apply-phase CAS that commits `:cancelled`
+
+The term "cancel checkpoint" is now testable and consistent. It denotes the moment
+the apply-phase `swap!` CAS first commits `:status :cancelled` for the directly
+cancelled run; in a cascade, each enumerated descendant's checkpoint is the same
+multi-run D23 CAS committing that descendant's `:cancelled` status. It is **not**
+the operator request arrival, handler-before read, interrupt delivery, or the
+worker's later cooperative read.
+
+Consequences:
+
+- **Request → CAS window:** work that starts before the CAS commits is not a
+  post-checkpoint violation. The implementation should make this window small, but
+  the guarantee begins when the canonical cancellation signal exists.
+- **CAS → interrupt/effect execution window:** cancellation-control effects run
+  after apply (D20/D23). Ordinary advancement that starts after the CAS is
+  forbidden; the cooperative checkpoint reads `:cancelled`/run-absence and refuses
+  it.
+- **Interrupt delivery / child abort:** these are promptness mechanisms that wake
+  blocked work so it can reach the cooperative read; they do not define the
+  checkpoint.
+- **Worker cooperative read:** this observes/enforces the signal; it is not the
+  start of the guarantee. If a worker attempts to start a next step after the CAS
+  but before reading, that is a bug in the required checkpoint placement.
+- **Nested runs:** for top-down cancellation the D23 multi-run CAS is the checkpoint
+  for the whole cascade set. For a direct sub-run cancel, the checkpoint applies to
+  the cancelled subtree; the still-running parent above it may continue by design
+  (D19). The bounded post-enumeration spawn race remains the explicit
+  out-of-test-scope exception in D27/Acceptance #9a.
+
+Acceptance #1/#3/#4/#6 now use this definition: tests should record/observe the
+canonical `:cancelled` commit (or a controlled hook immediately after the apply
+phase) and assert no forbidden advancement begins after that point.
+
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
 The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
@@ -1535,14 +1707,15 @@ No Design Questions remain live.
 Each criterion is tagged **[guaranteed]** (a definition-of-done requirement an
 implementer must cover with a test) or **[out-of-test-scope]** (a true-concurrency
 race whose harmlessness is asserted by construction/code review, not a deterministic
-test). The criteria are reconciled with D14/D19/D21/D22 so the test surface covers
-the motivating Evidence cases.
+test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refinements
+(D28–D31) so the test surface covers the motivating Evidence cases.
 
 ### Top-level run cancellation
 
 1. **[guaranteed]** A test cancels a multi-step **top-level** workflow run mid-flight
-   and asserts that **no step attempt is started after the cancel checkpoint** and the
-   run reaches a clean `:cancelled` terminal state with its background job terminal.
+   and asserts that **no step attempt is started after the cancel checkpoint**
+   (defined by D31 as the apply-phase CAS that commits `:cancelled`) and the run
+   reaches a clean `:cancelled` terminal state with its background job terminal.
 2. **[guaranteed]** A test asserts `remove` of a live **top-level** run does not leave
    a running worker future / orphaned thread: the single top-level run's future is
    `future-cancel`'d (D14) and its `inflight-runs` entry is cleared by the
@@ -1552,19 +1725,24 @@ the motivating Evidence cases.
    `remove-run` `:state*` dissoc (which clears only the canonical record — D24).
    (Criterion #2 is explicitly **qualified to a top-level run** — the worker
    `future-cancel` target is the single top-level run, never a sub-run, per D14.)
-3. **[guaranteed]** No **new** side effects (commits, journal writes, new child
-   sessions) are initiated after the cancel checkpoint — the in-flight turn is
-   interrupted and at most one already-in-flight tool call may complete (D6) —
-   verified in a nullable/controlled harness.
+3. **[guaranteed]** No **new forbidden ordinary workflow side effects** (new step
+   attempts, delegate sub-runs, ordinary child sessions, tool calls, commits, or
+   ordinary child-turn journal writes) are initiated after the D31 cancel checkpoint
+   — the in-flight turn is interrupted and at most one already-in-flight tool call
+   may complete (D6). Required cancellation-control writes/effects (cancelled state,
+   job terminalization, guarded aborts, dispatch trace, re-entrant remove,
+   `inflight-runs` cleanup) are allowed and should not fail this assertion (D30).
+   Verified in a nullable/controlled harness.
 
 ### Transitive / nested sub-run propagation
 
 4. **[guaranteed]** A test asserts top-down cancellation propagates to a nested
-   delegate sub-run: each in-flight descendant's child session is aborted (D15) so its
-   turn does not advance, and the cancelled run plus its in-flight descendants reach
-   `:cancelled` terminal via the single multi-run apply-phase transition (D23). **No**
-   per-sub-run worker `future-cancel` is emitted (sub-runs are synchronous, carry no
-   own future — D14); only the single top-level future is interrupted.
+   delegate sub-run: each in-flight descendant's child session is aborted using the
+   D28 guarded `:runtime/agent-abort` payload/read rule so its turn does not advance,
+   and the cancelled run plus its in-flight descendants reach `:cancelled` terminal
+   via the single multi-run apply-phase transition (D23). **No** per-sub-run worker
+   `future-cancel` is emitted (sub-runs are synchronous, carry no own future — D14);
+   only the single top-level future is interrupted.
 5. **[guaranteed]** A test asserts `remove` of a live **nested sub-run** (the nested
    variant of criterion #2): its guarantee is child-turn abort + the parent observing
    **run-absence ≡ `:cancelled`** and **continuing** (not halted) — and **no** worker
@@ -1590,14 +1768,18 @@ the motivating Evidence cases.
    after natural completion) is a no-op that **emits no cancellation effects** — the
    handler-before terminal-precondition gate contributes `identity` + empty effect set
    when the run is already terminal/absent (D22.1) — while the `remove-run` record-drop
-   **still applies** to an already-terminal run (D22.1; not re-orphaned).
+   **still applies** to an already-terminal run (D22.1; not re-orphaned). Public
+   result fields follow D29: terminal/absent cancel/remove are success/no-op shapes,
+   not "already terminal" / "not found" errors.
 9. **[out-of-test-scope]** Execute-time idempotency on the **true-concurrent** CAS
    race (two cancels racing on two threads both emitting effects, D20 applying
-   `:cancelled` once): `:runtime/agent-abort` re-checks the D15 live-attempt predicate
-   at execute time and no-ops a non-live attempt; `future-cancel`, terminalize, and
-   the re-entrant remove are inherently idempotent (D22.2). Harmlessness is established
-   by construction/code review (the narrow concurrent race is not deterministically
-   reproducible), not a deterministic test.
+   `:cancelled` once): workflow-cancellation `:runtime/agent-abort` re-checks the D15
+   live-attempt predicate using D28 guard metadata (`run-id`, `step-id`, `attempt-id`,
+   expected `execution-session-id`) at execute time and no-ops a non-live/superseded
+   attempt; unguarded non-workflow aborts remain session-id-only; `future-cancel`,
+   terminalize, and the re-entrant remove are inherently idempotent (D22.2).
+   Harmlessness is established by construction/code review (the narrow concurrent
+   race is not deterministically reproducible), not a deterministic test.
 9a. **[out-of-test-scope]** The **direct-sub-run-cancel spawn race** (D27): a
     descendant child session spawned in the sub-millisecond window between the D23
     handler-`:before` enumeration and the abort-driven checkpoint refusing it — absent
@@ -1608,7 +1790,16 @@ the motivating Evidence cases.
     as criterion #9, asserted by construction (a spawn checkpoint reads the
     already-committed `:cancelled` signal), not a deterministic test (D27).
 
+### Public result semantics
+
+10. **[guaranteed]** Tests assert the D29 public result contract: live cancel returns
+    success with `:status :cancelled`; terminal cancel and absent cancel return
+    success/no-op without cancellation effects; live remove returns successful
+    cancel-then-remove; terminal remove drops the record without cancellation
+    effects; absent remove returns success/idempotent no-op (`:removed? false`,
+    `:found? false`, `:noop? true`).
+
 ### Build gates
 
-10. **[guaranteed]** `bb test` green; clj-kondo clean; CHANGELOG updated
+11. **[guaranteed]** `bb test` green; clj-kondo clean; CHANGELOG updated
     (user-visible: cancelling a delegated workflow now actually stops it).

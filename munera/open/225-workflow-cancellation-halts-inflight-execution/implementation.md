@@ -1547,3 +1547,30 @@ ambiguities found; none duplicate existing design-steps.
 
 No other new actionable ambiguity found; the remaining D1–D27 contracts otherwise
 choose single behaviours.
+
+## Ambiguity follow-up resolution (ψ pass 11, 2026-06-11)
+
+Executed all four newly-added unchecked pass-11 design follow-ups. Each was a
+completable design-clarification item; no blockers.
+
+- D28 pins workflow-cancellation `:runtime/agent-abort` execute-time idempotency:
+  workflow-cancel abort effects carry guard metadata (`run-id`, `step-id`,
+  `attempt-id`, expected `execution-session-id`) in addition to `:session-id`; the
+  executor re-reads canonical run state and aborts only if the guarded latest
+  attempt is still live. Existing non-workflow abort emissions omit the guard and
+  keep session-id-only behaviour. D12/D15/D22.2 updated.
+- D29 defines public result semantics for terminal/absent `cancel-run` and
+  `remove-run`: terminal/absent idempotency is reported as success/no-op rather
+  than `already terminal` / `not found` errors; live remove reports successful
+  cancel-then-remove; terminal remove still performs bare record drop without
+  cancellation effects. Acceptance criteria updated.
+- D30 scopes "no new side effects" to forbidden ordinary workflow/child-turn
+  advancement (new step attempts, sub-runs, child sessions, tool calls, commits,
+  ordinary child-turn journal writes), while allowing required cancellation-control
+  writes/effects (`:cancelled`, job terminalization, abort/interruption records,
+  dispatch trace, re-entrant remove, handle cleanup). D6 and Acceptance #3 updated.
+- D31 defines "cancel checkpoint" as the apply-phase CAS that commits
+  `:status :cancelled` (the D23 multi-run CAS for cascades), not request arrival,
+  interrupt delivery, or the worker's later read. Acceptance #1/#3/#4/#6 updated to
+  use this testable boundary; D27's bounded direct-sub-run spawn race remains the
+  explicit out-of-test-scope exception.
