@@ -33,6 +33,9 @@ Architecture follows a Viable System Model (see `AGENTS.md` → Architecture):
   `workflow/constant-routing`, `workflow/exact-marker-routing`,
   `workflow/munera-open-task-path-routing`); workflow-specific labels/topology
   live in the authored workflow definitions, not in runtime code.
+- Workflow cancellation/removal stop signals and ordinary-work entry locks are
+  shared in `components/workflow-coordination`; workflow-runtime,
+  agent-session, and deterministic-operation-runtime reuse those primitives.
 - Registered deterministic operations are directly invokable via `/operations`,
   `/operation`, and the psi-tool `operation` action.
 - Built-in slash-command surface is single-sourced in the backend and projected

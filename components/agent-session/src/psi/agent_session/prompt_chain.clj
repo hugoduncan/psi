@@ -5,19 +5,14 @@
    continuation. Higher-level next-turn orchestration is expressed through
    dispatch-visible continuation events."
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.dispatch :as dispatch]
    [psi.session-state.state :as session]
    [psi.tool-runtime.args :as tool-args]))
 
 (defn- workflow-run-stop-signal
   [ctx run-id]
-  (let [state* (:state* ctx)
-        run (when (and state* run-id)
-              (get-in @state* [:workflows :runs run-id]))]
-    (when (and state* run-id)
-      (cond
-        (nil? run) :removed
-        (= :cancelled (:status run)) :cancelled))))
+  (stop-signal/workflow-stop-signal ctx run-id))
 
 (defn- workflow-session-run-id
   [ctx session-id]

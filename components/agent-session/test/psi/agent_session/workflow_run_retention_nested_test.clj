@@ -13,7 +13,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.session-state.state :as ss]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.model :as workflow-model]))
 
 (defn- make-test-ctx

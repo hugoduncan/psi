@@ -4,6 +4,7 @@
    steering/follow-up messages, compaction, runtime projections, interrupt,
    tool execution, skills, context usage, etc."
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
@@ -25,13 +26,7 @@
 
 (defn- workflow-run-stop-signal
   [ctx run-id]
-  (let [state* (:state* ctx)
-        run (when (and state* run-id)
-              (get-in @state* [:workflows :runs run-id]))]
-    (when (and state* run-id)
-      (cond
-        (nil? run) :removed
-        (= :cancelled (:status run)) :cancelled))))
+  (stop-signal/workflow-stop-signal ctx run-id))
 
 (defn- stopped-workflow-tool-result
   [run-id reason]

@@ -2,7 +2,7 @@
   "Compatibility wrapper over the extracted state-kernel dispatch pipeline."
   (:require
    [psi.state-kernel.dispatch :as kernel]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]))
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]))
 
 (declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 

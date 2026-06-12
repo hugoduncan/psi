@@ -16,7 +16,7 @@
   (:require
    [psi.agent-session.session-close :as session-close]
    [psi.session-state.state :as ss]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (def ^:private retained-terminal-statuses

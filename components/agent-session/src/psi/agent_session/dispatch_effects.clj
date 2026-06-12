@@ -7,7 +7,8 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.extensions :as ext]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.ai.model-registry :as model-registry]
@@ -63,13 +64,7 @@
 
 (defn- workflow-run-stop-signal
   [ctx run-id]
-  (let [state* (:state* ctx)
-        run (when (and state* run-id)
-              (get-in @state* [:workflows :runs run-id]))]
-    (when (and state* run-id)
-      (cond
-        (nil? run) :removed
-        (= :cancelled (:status run)) :cancelled))))
+  (stop-signal/workflow-stop-signal ctx run-id))
 
 (defn- workflow-session-stop-signal
   [ctx session-id]

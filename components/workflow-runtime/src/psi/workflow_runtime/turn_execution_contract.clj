@@ -8,6 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.recording :as turn-recording]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn assistant-message-text
@@ -81,13 +82,8 @@
 
 (defn- workflow-session-stop-signal-for
   [ctx session-data]
-  (when-let [state* (:state* ctx)]
-    (let [run-id (:workflow-run-id session-data)
-          run (when run-id (get-in @state* [:workflows :runs run-id]))]
-      (when (and (:workflow-owned? session-data) run-id)
-        (cond
-          (nil? run) :removed
-          (= :cancelled (:status run)) :cancelled)))))
+  (when (:workflow-owned? session-data)
+    (stop-signal/workflow-stop-signal ctx (:workflow-run-id session-data))))
 
 (defn- latest-attempt-index
   [attempts]

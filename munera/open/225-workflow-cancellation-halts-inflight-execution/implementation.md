@@ -3505,3 +3505,9 @@ helper instead of reusing `psi.workflow-runtime.cancellation-entry`. This raises
 mutation burden and risks divergent cancellation semantics. Follow-up added.
 
 No tests run (code-shaper review only).
+
+## Code-shaper follow-up execution (ψ, 2026-06-12)
+
+Consolidated the workflow cancellation stop/entry primitives raised by the code-shaper review. Added `psi.workflow-coordination.stop-signal` as the canonical stop predicate (`nil` run ⇒ `:removed`, `:status :cancelled` ⇒ `:cancelled`) and `psi.workflow-coordination.cancellation-entry` as the shared runtime entry-lock primitive. Rewired workflow-runtime, agent-session prompt/effect/tool-continuation call sites, and deterministic-operation-runtime to use the shared component. Removed deterministic-operation-runtime's private ReentrantReadWriteLock duplicate and the old workflow-runtime-local cancellation-entry namespace.
+
+Added deterministic-operation regressions for removed-run stop semantics and for reuse of the shared cancellation-entry lock entry. Verification: focused scry for deterministic-operation, workflow step-execution, workflow call-start cancellation, cancellation dispatch, and retention nested tests passed (38 tests / 219 assertions). Focused clj-kondo over changed source/test/deps paths reported 0 errors and 0 warnings; pre-existing info-level assertion-message notices remain outside this change.

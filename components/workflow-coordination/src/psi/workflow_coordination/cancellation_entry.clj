@@ -1,10 +1,11 @@
-(ns psi.workflow-runtime.cancellation-entry
+(ns psi.workflow-coordination.cancellation-entry
   "Runtime coordination for workflow cancellation and ordinary-work entry.
 
    A D31 cancellation transition and the first ordinary side-effecting entry for
    a workflow run must be mutually ordered. The lock handle is runtime state: it
    is not queryable domain state and exists only to linearize cancel CAS updates
-   against prompt-submit / deterministic-operation entry boundaries."
+   against prompt-submit / deterministic-operation entry boundaries. The lock is
+   held only for the entry linearization point, not for full ordinary work."
   (:import
    (java.util.concurrent.locks ReentrantReadWriteLock)))
 

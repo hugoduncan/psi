@@ -6,6 +6,7 @@
    compatibility no-ops so stale or historical statechart events cannot replay
    the whole agent loop."
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
    [psi.state-kernel.dispatch :as kernel]
@@ -118,13 +119,7 @@
 
 (defn- workflow-run-stop-signal
   [ctx run-id]
-  (let [state* (:state* ctx)
-        run (when (and state* run-id)
-              (get-in @state* [:workflows :runs run-id]))]
-    (when (and state* run-id)
-      (cond
-        (nil? run) :removed
-        (= :cancelled (:status run)) :cancelled))))
+  (stop-signal/workflow-stop-signal ctx run-id))
 
 (defn- workflow-session-run-id
   [session-data event-data]

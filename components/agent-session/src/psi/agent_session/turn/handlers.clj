@@ -11,7 +11,8 @@
    [psi.session-state.state :as session]
    [psi.turn-runtime.recording :as turn-recording]
    [psi.turn-runtime.request :as turn-request]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
 
 (defn- now-inst []
@@ -106,15 +107,9 @@
 
 (defn- workflow-session-stop-signal
   [ctx session-id]
-  (let [session-data (session/get-session-data-in ctx session-id)
-        run-id (:workflow-run-id session-data)
-        state* (:state* ctx)
-        run (when (and state* run-id)
-              (get-in @state* [:workflows :runs run-id]))]
-    (when (and (:workflow-owned? session-data) state* run-id)
-      (cond
-        (nil? run) :removed
-        (= :cancelled (:status run)) :cancelled))))
+  (let [session-data (session/get-session-data-in ctx session-id)]
+    (when (:workflow-owned? session-data)
+      (stop-signal/workflow-stop-signal ctx (:workflow-run-id session-data)))))
 
 (defn- stopped-workflow-execution-result
   ([session-id reason]

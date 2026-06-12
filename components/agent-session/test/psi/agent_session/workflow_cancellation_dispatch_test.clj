@@ -7,7 +7,7 @@
    [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
-   [psi.workflow-runtime.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
    [psi.workflow-registry.registry :as registry]

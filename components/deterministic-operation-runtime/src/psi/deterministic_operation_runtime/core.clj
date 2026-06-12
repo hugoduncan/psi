@@ -5,37 +5,9 @@
    Formal deterministic-operation contracts live in
    `psi.deterministic-operation-registry.defs`."
   (:require
-   [psi.deterministic-operation-registry.defs :as defs])
-  (:import
-   (java.util.concurrent.locks ReentrantReadWriteLock)))
-
-(def ^:private cancellation-entry-lock-handle-key :workflow-cancellation-entry-locks-handle)
-
-(defn- new-cancellation-entry-lock []
-  (ReentrantReadWriteLock. true))
-
-(defn- cancellation-entry-lock-for
-  [ctx run-id]
-  (when (and ctx run-id)
-    (let [locks* (get ctx cancellation-entry-lock-handle-key)]
-      (when locks*
-        (get (swap! locks*
-                    (fn [locks]
-                      (if (contains? locks run-id)
-                        locks
-                        (assoc locks run-id (new-cancellation-entry-lock)))))
-             run-id)))))
-
-(defn- with-cancellation-entry-read-lock
-  [ctx run-id f]
-  (if-let [lock (cancellation-entry-lock-for ctx run-id)]
-    (let [read-lock (.readLock ^ReentrantReadWriteLock lock)]
-      (.lock read-lock)
-      (try
-        (f)
-        (finally
-          (.unlock read-lock))))
-    (f)))
+   [psi.deterministic-operation-registry.defs :as defs]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]))
 
 (defn malformed-operation-result-ex
   [operation invocation result]
@@ -48,13 +20,7 @@
 
 (defn- workflow-stop-signal
   [invocation]
-  (let [state* (get-in invocation [:ctx :state*])
-        run-id (:workflow-run-id invocation)]
-    (when (and state* run-id)
-      (let [run (get-in @state* [:workflows :runs run-id])]
-        (cond
-          (nil? run) :removed
-          (= :cancelled (:status run)) :cancelled)))))
+  (stop-signal/workflow-stop-signal (:ctx invocation) (:workflow-run-id invocation)))
 
 (defn- latest-attempt-index
   [attempts]
@@ -363,7 +329,7 @@
 (defn- workflow-operation-entry-lock
   [invocation f]
   (if (workflow-operation-start-required? invocation)
-    (with-cancellation-entry-read-lock (:ctx invocation) (:workflow-run-id invocation) f)
+    (cancellation-entry/with-run-read-lock (:ctx invocation) (:workflow-run-id invocation) f)
     (f)))
 
 (defn- enter-workflow-operation-handler-call!

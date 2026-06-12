@@ -43,6 +43,7 @@
         psi/root-registry                             {:local/root "components/root-registry"}
         psi/deterministic-operation-registry          {:local/root "components/deterministic-operation-registry"}
         psi/deterministic-operation-runtime           {:local/root "components/deterministic-operation-runtime"}
+        psi/workflow-coordination                     {:local/root "components/workflow-coordination"}
         psi/workflow-registry                         {:local/root "components/workflow-registry"}
         psi/workflow-judge                            {:local/root "components/workflow-judge"}
         psi/workflow-runtime                          {:local/root "components/workflow-runtime"}
@@ -130,6 +131,7 @@
                         "components/root-registry/src"
                         "components/deterministic-operation-registry/src"
                         "components/deterministic-operation-runtime/src"
+                        "components/workflow-coordination/src"
                         "components/workflow-registry/src"
                         "components/workflow-judge/src"
                         "components/workflow-runtime/src"
@@ -344,6 +346,7 @@
                         "components/workflow-registry/src"
                         "components/workflow-judge/src"
                         "components/workflow-runtime/src"
+                        "components/workflow-coordination/src"
                         "components/workflow-loader/src"
                         "components/workflow-step-materialization/src"
                         "components/workflow-step-session-config/src"
@@ -361,6 +364,7 @@
                         "components/command-registry/src"
                         "components/deterministic-operation-registry/src"
                         "components/deterministic-operation-runtime/src"
+                        "components/workflow-coordination/src"
                         "components/ui-state/src"
                         "components/system-bootstrap/src"
                         "components/system-bootstrap/test"
