@@ -53,21 +53,29 @@
    The stop check is inside the compare-and-set loop: if cancellation/removal wins
    the root-state race after an action has been admitted but before its write
    commits, the CAS fails, the latest state is re-read, and the ordinary action
-   write is skipped instead of resurrecting or advancing the cancelled run."
-  [ctx run-id f]
-  (loop []
-    (let [state* (:state* ctx)
-          state-map @state*]
-      (if (state/workflow-stopped-in-state? state-map run-id)
-        false
-        (let [state' (f state-map)]
-          (if (compare-and-set! state* state-map state')
-            true
-            (recur)))))))
+   write is skipped instead of resurrecting or advancing the cancelled run.
+
+   `kind` is a nullable test seam marker for deterministic race-window coverage;
+   production callers that do not need it use the 3-arity."
+  ([ctx run-id f]
+   (update-state-if-live! ctx run-id nil f))
+  ([ctx run-id kind f]
+   (loop []
+     (let [state* (:state* ctx)
+           state-map @state*]
+       (if (state/workflow-stopped-in-state? state-map run-id)
+         false
+         (do
+           (when-let [hook (:before-workflow-live-state-update-fn ctx)]
+             (hook ctx {:run-id run-id :kind kind}))
+           (let [state' (f state-map)]
+             (if (compare-and-set! state* state-map state')
+               true
+               (recur)))))))))
 
 (defn- append-and-start-attempt-if-live!
   [ctx run-id step-id attempt]
-  (update-state-if-live! ctx run-id #(append-and-start-attempt-if-live % run-id step-id attempt)))
+  (update-state-if-live! ctx run-id :step-attempt-start #(append-and-start-attempt-if-live % run-id step-id attempt)))
 
 (defn- abort-unattached-session!
   [ctx execution-session]
@@ -221,6 +229,7 @@
                             recorded? (update-state-if-live!
                                        ctx
                                        run-id
+                                       :invoke-attempt-data
                                        #(workflow-progression-recording/merge-latest-attempt-data % run-id step-id attempt-data))]
                         (if recorded?
                           (do
@@ -304,6 +313,7 @@
               recorded? (update-state-if-live!
                          ctx
                          run-id
+                         :step-record-result
                          (if judged-step?
                            #(workflow-progression-recording/record-actor-result % run-id step-id payload)
                            #(workflow-progression-recording/record-step-result % run-id step-id payload)))]
@@ -322,6 +332,7 @@
               recorded? (update-state-if-live!
                          ctx
                          run-id
+                         :step-record-failure
                          #(workflow-progression-recording/record-attempt-execution-failure % run-id step-id payload))]
           (if recorded?
             (swap! working-memory*
@@ -381,6 +392,7 @@
               recorded? (update-state-if-live!
                          ctx
                          run-id
+                         :judge-record
                          (fn [state-map]
                            (-> state-map
                                (workflow-progression-recording/record-judge-result run-id step-id judge-result)
@@ -435,6 +447,7 @@
               recorded? (update-state-if-live!
                          ctx
                          run-id
+                         :iteration-exhausted
                          (fn [state-map]
                            (cond-> state-map
                              last-judge-result

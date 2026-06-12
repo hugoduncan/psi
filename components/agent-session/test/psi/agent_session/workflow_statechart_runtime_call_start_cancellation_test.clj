@@ -6,9 +6,7 @@
    [psi.deterministic-operation-registry.registry :as operation-registry]
    [psi.deterministic-operation-runtime.core :as operation-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
-   [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.statechart-runtime :as runtime]
    [psi.workflow-runtime.turn-execution-contract]))
 
@@ -30,6 +28,13 @@
             :contributions [{:type :template
                              :text "Build {{plan}}"
                              :vars {"plan" {:from {:step "plan" :yield :text}}}}]}]})
+
+(defn- plan-attempt-session
+  [_ctx _parent-session-id _opts]
+  {:attempt {:attempt-id "attempt-plan"
+             :status :pending
+             :execution-session-id "plan-child"}
+   :execution-session {:session-id "plan-child"}})
 
 (defn- install-run!
   ([ctx definition run-id]
@@ -55,47 +60,48 @@
                              :contributions [{:type :template
                                               :text "Plan {{input}}"
                                               :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
-        _ (install-run! ctx definition "run-ranked-fallback-cancel")
-        wf-ctx (runtime/create-workflow-context ctx session-id "run-ranked-fallback-cancel")
         turn-count* (atom 0)
-        model-calls* (atom [])]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id opts]
-                    {:attempt {:attempt-id (:attempt-id opts)
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"
-                                         :model (:model opts)
-                                         :model-fallback {:type :ranked-model-candidates
-                                                          :candidates [{:provider "local" :id "first"}
-                                                                       {:provider "openai" :id "second"}]}}})
-                  psi.workflow-runtime.execution-adapter/set-session-model!
-                  (fn [_ctx _sid model scope]
-                    (swap! model-calls* conj {:model model :scope scope})
-                    {:ok true})
-                  psi.workflow-runtime.turn-execution-contract/execute-actor-turn!
-                  (fn [& _]
-                    (swap! turn-count* inc)
-                    (swap! (:state* ctx)
-                           (fn [state]
-                             (-> state
-                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :status] :cancelled)
-                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :finished-at] (java.time.Instant/now))
-                                 (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :terminal-outcome]
-                                           {:outcome :cancelled
-                                            :reason "fallback race"
-                                            :step-id "plan"}))))
-                    {:status :error
-                     :session-id "plan-child"
-                     :assistant-message {:role "assistant"
-                                         :error-message "Connection refused"
-                                         :content [{:type :error :text "Connection refused"}]}
-                     :assistant-text ""
-                     :execution-result {}
-                     :failure {:reason :provider-unavailable
-                               :message "Connection refused"
-                               :fallback-worthy? true}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+        model-calls* (atom [])
+        ctx (test-support/with-workflow-execution-adapter-overrides
+              (assoc ctx
+                     :workflow-create-step-attempt-session-fn
+                     (fn [_ctx _parent-session-id opts]
+                       {:attempt {:attempt-id (:attempt-id opts)
+                                  :status :pending
+                                  :execution-session-id "plan-child"}
+                        :execution-session {:session-id "plan-child"
+                                            :model (:model opts)
+                                            :model-fallback {:type :ranked-model-candidates
+                                                             :candidates [{:provider "local" :id "first"}
+                                                                          {:provider "openai" :id "second"}]}}})
+                     :workflow-execute-actor-turn-fn
+                     (fn [ctx & _]
+                       (swap! turn-count* inc)
+                       (swap! (:state* ctx)
+                              (fn [state]
+                                (-> state
+                                    (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :status] :cancelled)
+                                    (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :finished-at] (java.time.Instant/now))
+                                    (assoc-in [:workflows :runs "run-ranked-fallback-cancel" :terminal-outcome]
+                                              {:outcome :cancelled
+                                               :reason "fallback race"
+                                               :step-id "plan"}))))
+                       {:status :error
+                        :session-id "plan-child"
+                        :assistant-message {:role "assistant"
+                                            :error-message "Connection refused"
+                                            :content [{:type :error :text "Connection refused"}]}
+                        :assistant-text ""
+                        :execution-result {}
+                        :failure {:reason :provider-unavailable
+                                  :message "Connection refused"
+                                  :fallback-worthy? true}}))
+              {:set-session-model! (fn [_ctx _sid model scope]
+                                     (swap! model-calls* conj {:model model :scope scope})
+                                     {:ok true})})
+        _ (install-run! ctx definition "run-ranked-fallback-cancel")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-ranked-fallback-cancel")]
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ranked-fallback-cancel")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -114,6 +120,7 @@
         prompt-calls* (atom 0)
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id]}]
                        (swap! (:state* ctx)
@@ -139,13 +146,7 @@
                                              :stop-reason :stop}})})
         _ (install-run! ctx linear-definition "run-actor-final-start-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-final-start-race")]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id _opts]
-                    {:attempt {:attempt-id "attempt-plan"
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-final-start-race")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -209,6 +210,7 @@
         prompt-calls* (atom 0)
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id phase]}]
                        (when (= :after-reserve phase)
@@ -235,13 +237,7 @@
                                              :stop-reason :stop}})})
         _ (install-run! ctx linear-definition "run-actor-post-reservation-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-post-reservation-race")]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id _opts]
-                    {:attempt {:attempt-id "attempt-plan"
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-post-reservation-race")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -308,6 +304,7 @@
         prompt-calls* (atom 0)
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id phase]}]
                        (when (= :after-commit phase)
@@ -334,13 +331,7 @@
                                              :stop-reason :stop}})})
         _ (install-run! ctx linear-definition "run-actor-start-commit-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-start-commit-race")]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id _opts]
-                    {:attempt {:attempt-id "attempt-plan"
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-start-commit-race")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -359,6 +350,7 @@
         prompt-calls* (atom 0)
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id phase]}]
                        (when (= :after-call-begin phase)
@@ -385,13 +377,7 @@
                                              :stop-reason :stop}})})
         _ (install-run! ctx linear-definition "run-actor-call-begin-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-call-begin-race")]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id _opts]
-                    {:attempt {:attempt-id "attempt-plan"
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-call-begin-race")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -508,6 +494,7 @@
         prompt-calls* (atom 0)
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id phase]}]
                        (when (= :after-call-commit phase)
@@ -534,13 +521,7 @@
                                              :stop-reason :stop}})})
         _ (install-run! ctx linear-definition "run-actor-call-commit-race")
         wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-call-commit-race")]
-    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
-                  (fn [_ctx _parent-session-id _opts]
-                    {:attempt {:attempt-id "attempt-plan"
-                               :status :pending
-                               :execution-session-id "plan-child"}
-                     :execution-session {:session-id "plan-child"}})]
-      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
     (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-call-commit-race")
           attempt (get-in run [:step-runs "plan" :attempts 0])]
       (is (= :cancelled (:status run)))
@@ -610,6 +591,7 @@
         run-id "run-actor-final-entry-lock-race"
         ctx (test-support/with-workflow-execution-adapter-overrides
               (assoc ctx0
+                     :workflow-create-step-attempt-session-fn plan-attempt-session
                      :before-workflow-turn-start-fn
                      (fn [ctx _session-id {:keys [phase]}]
                        (when (= :after-call-commit phase)

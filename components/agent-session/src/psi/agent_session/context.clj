@@ -21,6 +21,7 @@
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.session-state.model :as session]
@@ -252,6 +253,7 @@
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
+   :workflow-judge-messages-fn #'persist/messages-from-entries-in
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
    :workflow-inflight-runs-handle workflow-runtime-state/inflight-runs
    :workflow-cancellation-entry-locks-handle (atom {})

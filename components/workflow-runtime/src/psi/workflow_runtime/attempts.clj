@@ -50,12 +50,7 @@
   (execution-adapter/set-session-model! ctx (:session-id execution-session) model :session)
   (assoc execution-session :model model))
 
-(defn create-step-attempt-session!
-  "Create one canonical execution child session for a workflow step attempt.
-
-   Returns {:attempt attempt-map :execution-session session-data}.
-
-   The created session is marked as workflow-owned and linked by run/step/attempt ids."
+(defn- create-step-attempt-session-default!
   [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection model-fallback]
                           :as opts}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
@@ -110,3 +105,16 @@
     {:attempt attempt
      :execution-session (cond-> child-sd
                           model-fallback (assoc :model-fallback model-fallback))}))
+
+(defn create-step-attempt-session!
+  "Create one canonical execution child session for a workflow step attempt.
+
+   Returns {:attempt attempt-map :execution-session session-data}.
+
+   The created session is marked as workflow-owned and linked by run/step/attempt ids.
+   Tests may supply `:workflow-create-step-attempt-session-fn` on ctx as a nullable
+   infrastructure seam for controlled child-session creation."
+  [ctx parent-session-id opts]
+  ((or (:workflow-create-step-attempt-session-fn ctx)
+       create-step-attempt-session-default!)
+   ctx parent-session-id opts))

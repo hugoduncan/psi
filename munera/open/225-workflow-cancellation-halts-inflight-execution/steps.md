@@ -252,7 +252,8 @@
 
 ## Test review follow-ups (ψ pass 3, 2026-06-11)
 
-- [ ] Replace remaining task-specific cancellation-test `with-redefs`/stub helpers for infrastructure or boundary operations with injectable/nullable seams (for example workflow execution adapter/context hooks for child-session creation and prompt/judge execution, and a persistence/message-history seam for judge message loading), preserving the race-window assertions without global mocks.
+- [x] Replace remaining task-specific cancellation-test `with-redefs`/stub helpers for infrastructure or boundary operations with injectable/nullable seams (for example workflow execution adapter/context hooks for child-session creation and prompt/judge execution, and a persistence/message-history seam for judge message loading), preserving the race-window assertions without global mocks.
+  - Covered 2026-06-12: added nullable seams for workflow attempt-session creation, actor/judge turn execution, judge message loading, delegate child-run creation, lifecycle event processing, and guarded live-state-update race hooks; removed `with-redefs` from task-specific cancellation tests while preserving race-window assertions.
 
 ## Implementation review follow-ups (ψ pass 27, 2026-06-11)
 

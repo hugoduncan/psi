@@ -3347,3 +3347,28 @@ Reviewed the current cancellation test net after the prompt-continuation/tool-di
 The prior test-quality issue remains unresolved: task-specific cancellation regression namespaces still contain global `with-redefs` for boundary/infrastructure operations such as child-session creation, workflow lifecycle/progression hooks, judge message persistence, and statechart runtime helpers. This is already captured by the unchecked "Test review follow-ups (ψ pass 3)" step, so I did not add a duplicate follow-up item.
 
 No tests run (review-only pass; static grep/review of cancellation test namespaces and prompt continuation coverage).
+
+## Test review follow-up pass 3 (ψ, 2026-06-12)
+
+Replaced the remaining task-specific cancellation-test global `with-redefs` with
+ctx/adapter nullable seams while keeping the same race-window assertions:
+
+- `workflow_judge.clj` now reads actor messages through `:workflow-judge-messages-fn`
+  (production default in context = `persist/messages-from-entries-in`), so judge
+  cancellation tests no longer redefine persistence.
+- `workflow_runtime.attempts/create-step-attempt-session!` delegates to optional
+  `:workflow-create-step-attempt-session-fn`, used by cancellation tests to create
+  deterministic nullable child sessions.
+- `turn_execution_contract` actor/judge aliases accept optional
+  `:workflow-execute-actor-turn-fn` / `:workflow-execute-judge-turn-fn` seams for
+  controlled turn results.
+- `statechart_runtime` live-state CAS helper accepts a test-only kinded hook
+  `:before-workflow-live-state-update-fn` so result/failure/judge/iteration write
+  races are exercised without redefining progression functions.
+- Delegate child-run creation and lifecycle event processing now have nullable
+  seams (`:workflow-create-run-fn`, `:process-event-fn`) used only by the tests that
+  need those exact race windows.
+
+Removed `with-redefs` from all `*cancellation*test.clj` files. Verification:
+focused cancellation namespaces green (59 tests / 290 assertions), plus targeted
+clj-kondo over changed source/test files clean.

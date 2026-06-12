@@ -76,7 +76,8 @@
                                 (let [wm* (stop-checkpoint wf-ctx wm)]
                                   (if (state/terminal-configuration? (::sc/configuration wm*))
                                     wm*
-                                    (stop-checkpoint wf-ctx (process-event! wf-ctx wm* event data)))))
+                                    (let [process-event-fn (or (:process-event-fn wf-ctx) process-event!)]
+                                      (stop-checkpoint wf-ctx (process-event-fn wf-ctx wm* event data))))))
                               wm
                               events)]
               (recur wm' (+ processed (count events))))))))))
@@ -86,6 +87,7 @@
   (let [wm* (stop-checkpoint wf-ctx wm)]
     (if (state/terminal-configuration? (::sc/configuration wm*))
       wm*
-      (->> (process-event! wf-ctx wm* event data)
-           (stop-checkpoint wf-ctx)
-           (drain-events! wf-ctx)))))
+      (let [process-event-fn (or (:process-event-fn wf-ctx) process-event!)]
+        (->> (process-event-fn wf-ctx wm* event data)
+             (stop-checkpoint wf-ctx)
+             (drain-events! wf-ctx))))))

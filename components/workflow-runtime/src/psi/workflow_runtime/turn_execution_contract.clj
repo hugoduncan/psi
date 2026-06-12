@@ -352,16 +352,30 @@
 
 (defn execute-actor-turn!
   "Intent-named semantic alias for workflow actor-step callers.
-   Accepts optional provider-neutral turn options as a fourth argument."
+   Accepts optional provider-neutral turn options as a fourth argument.
+
+   Tests may supply `:workflow-execute-actor-turn-fn` on ctx as a nullable
+   boundary seam for controlled actor turn execution."
   ([ctx session-id prompt]
-   (execute-session-turn! ctx session-id prompt))
+   (if-let [f (:workflow-execute-actor-turn-fn ctx)]
+     (f ctx session-id prompt)
+     (execute-session-turn! ctx session-id prompt)))
   ([ctx session-id prompt opts]
-   (execute-session-turn! ctx session-id prompt nil opts)))
+   (if-let [f (:workflow-execute-actor-turn-fn ctx)]
+     (f ctx session-id prompt opts)
+     (execute-session-turn! ctx session-id prompt nil opts))))
 
 (defn execute-judge-turn!
   "Intent-named semantic alias for workflow judge callers.
-   Accepts optional provider-neutral turn options as a fourth argument."
+   Accepts optional provider-neutral turn options as a fourth argument.
+
+   Tests may supply `:workflow-execute-judge-turn-fn` on ctx as a nullable
+   boundary seam for controlled judge turn execution."
   ([ctx session-id prompt]
-   (execute-session-turn! ctx session-id prompt))
+   (if-let [f (:workflow-execute-judge-turn-fn ctx)]
+     (f ctx session-id prompt)
+     (execute-session-turn! ctx session-id prompt)))
   ([ctx session-id prompt opts]
-   (execute-session-turn! ctx session-id prompt nil opts)))
+   (if-let [f (:workflow-execute-judge-turn-fn ctx)]
+     (f ctx session-id prompt opts)
+     (execute-session-turn! ctx session-id prompt nil opts))))

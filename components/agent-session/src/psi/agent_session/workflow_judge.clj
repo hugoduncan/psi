@@ -169,7 +169,9 @@
     (if (= :invoke (:type judge-spec))
       (execute-invoke-judge! ctx parent-session-id judge-spec routing-table routing-context)
       (let [projection    (or (:projection judge-spec) :full)
-            actor-msgs    (vec (persist/messages-from-entries-in ctx actor-session-id))
+            actor-msgs    (vec ((or (:workflow-judge-messages-fn ctx)
+                                    persist/messages-from-entries-in)
+                                ctx actor-session-id))
             projected     (workflow-judge/project-messages actor-msgs projection)
             judge-sid     (str (java.util.UUID/randomUUID))
             expected-sigs (keys routing-table)]

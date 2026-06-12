@@ -114,7 +114,9 @@
             (if (or (nil? (workflow-runtime/workflow-run-in state-map parent-run-id))
                     (= :cancelled (:status (workflow-runtime/workflow-run-in state-map parent-run-id))))
               nil
-              (let [[state' delegate-run-id _] (workflow-runtime/create-run state-map run-opts)]
+              (let [create-run-fn (or (:workflow-create-run-fn ctx)
+                                      workflow-runtime/create-run)
+                    [state' delegate-run-id _] (create-run-fn state-map run-opts)]
                 (if (compare-and-set! (:state* ctx) state-map state')
                   delegate-run-id
                   (recur))))))]
