@@ -274,3 +274,7 @@
 
 - [x] Document the workflow cancellation surface and contract in user-facing docs: cover `psi-tool workflow op=cancel-run` (or the canonical user-visible cancellation entry point), distinguish cancel from `delegate remove`, and state the implemented guarantees for live top-level cancellation, descendant cancellation, child-turn abort/worker interrupt, background-job terminalization, and idempotent terminal/absent cancellation.
   - Covered 2026-06-12: `doc/workflows.md` now has a “Cancelling and removing workflow runs” section documenting psi-tool `cancel-run`, cancel-vs-remove semantics, live top-level cancellation, descendant cancellation, child-turn abort/worker interrupt, background-job terminalization, and idempotent terminal/absent cancellation/removal.
+
+## Docs review follow-ups (ψ pass 2, 2026-06-12)
+
+- [ ] Add the missing `workflow` entry to `README.md`'s `psi-tool` action list, including the `cancel-run` operation or a pointer to `doc/workflows.md` for workflow cancellation/removal details.

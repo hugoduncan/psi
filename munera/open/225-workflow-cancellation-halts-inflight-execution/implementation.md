@@ -3438,3 +3438,11 @@ No tests run (docs review only).
 ## Docs follow-up pass — workflow cancellation surface (ψ, 2026-06-12)
 
 Completed the docs-review follow-up by expanding `doc/workflows.md` with a dedicated “Cancelling and removing workflow runs” section. It documents the current user-visible `psi-tool` cancellation entry point, distinguishes cancellation (stop and retain run record) from `delegate remove` (cancel-then-remove record cleanup), and states the implemented guarantees for live top-level cancellation, descendant cancellation, child-turn abort / top-level worker interrupt, background-job terminalization, and idempotent terminal/absent cancellation/removal.
+
+## Docs review (ψ pass 2, 2026-06-12)
+
+Reviewed with `review-task-docs` after the workflow-cancellation documentation follow-up: task artifacts, `README.md`, `CHANGELOG.md`, `doc/workflows.md`, `doc/architecture.md`, and the implemented/public workflow cancellation surfaces.
+
+New actionable issue: `README.md`'s `psi-tool` action list still omits the `workflow` action entirely, even though the documented cancellation surface is now `psi-tool {"action":"workflow","op":"cancel-run"...}` and workflow management is a user-facing tool capability. Add a README bullet for the `workflow` psi-tool action that points to deterministic workflow definition/run management and includes `cancel-run` in the listed operations or references `doc/workflows.md` for cancellation/removal details.
+
+No tests run (docs review only).
