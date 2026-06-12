@@ -3339,3 +3339,11 @@ returns a stopped result and dispatches no tool-run. The existing test-support
 nullable continuation seam was updated to the 5-arity callback.
 
 Validation: `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` (13 tests / 76 assertions), `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` (24 tests / 117 assertions), and focused clj-kondo over the changed prompt-chain/effect/handler/test files are green.
+
+## Test review (ψ pass 4, 2026-06-12)
+
+Reviewed the current cancellation test net after the prompt-continuation/tool-dispatch follow-up. The new prompt-continuation tests use ctx-level nullable seams (`:before-prompt-continue-tool-dispatch-fn`, `:execute-tool-runtime-fn`) and guarded dispatch assertions, and I found no new behaviour-coverage gap distinct from existing follow-ups.
+
+The prior test-quality issue remains unresolved: task-specific cancellation regression namespaces still contain global `with-redefs` for boundary/infrastructure operations such as child-session creation, workflow lifecycle/progression hooks, judge message persistence, and statechart runtime helpers. This is already captured by the unchecked "Test review follow-ups (ψ pass 3)" step, so I did not add a duplicate follow-up item.
+
+No tests run (review-only pass; static grep/review of cancellation test namespaces and prompt continuation coverage).
