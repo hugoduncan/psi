@@ -3487,3 +3487,9 @@ Corrected the task-225 CHANGELOG entry so it no longer documents a non-existent
 `/delegate remove` slash command. The user-visible fix remains documented, but
 the removal surface is now named as the delegate tool `action=remove` management
 action. Marked the docs review pass 4 follow-up complete in `steps.md`.
+
+## Docs review (ψ pass 5, 2026-06-12)
+
+Reviewed with `review-task-docs`: task artifacts, `README.md`, `CHANGELOG.md`, `doc/workflows.md`, `doc/extensions.md`, and `doc/architecture.md` against the implemented/public workflow cancellation and removal surfaces. The user-facing docs now cover `psi-tool workflow op=cancel-run`, cancel-vs-remove semantics, live top-level and nested removal behavior, background-job terminalization, worker/child-turn cancellation, idempotent terminal/absent cleanup, and dispatch re-entrant sequencing without stale `/delegate remove` or command-layer pre-cleanup claims.
+
+No new actionable documentation issues found; no follow-up steps added. No tests run (docs review only).
