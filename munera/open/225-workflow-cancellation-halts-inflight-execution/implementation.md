@@ -3461,3 +3461,14 @@ Reviewed with `review-task-docs` after the README workflow-action follow-up: tas
 New actionable issue: `doc/extensions.md`'s built-in workflow capability section still describes the old `delegate remove` contract as command-layer active-background-job pre-cleanup that can fail before deleting the canonical run. That now contradicts the implemented canonical dispatch/effects removal path and the updated `doc/workflows.md` contract. Update `doc/extensions.md` to either summarize the current cancellation/removal semantics (including `psi-tool workflow op=cancel-run` and canonical cancel-then-remove cleanup) or point directly to `doc/workflows.md` without stale details.
 
 No tests run (docs review only).
+
+## Docs review follow-up pass 3 (ψ, 2026-06-12)
+
+Updated `doc/extensions.md` built-in workflow capability docs to remove the stale
+`delegate remove` command-layer active-background-job pre-cleanup / fail-before-delete
+contract. The section now summarizes canonical dispatch-owned removal semantics:
+live top-level cancel-then-remove with terminalization/worker cleanup before handle
+drop, live nested sub-run removal without parent-worker interruption, idempotent
+terminal/absent cleanup, and `psi-tool workflow op=cancel-run` as the cancellation
+surface, with `doc/workflows.md` as the detailed reference. Marked the docs review
+follow-up complete in `steps.md`.
