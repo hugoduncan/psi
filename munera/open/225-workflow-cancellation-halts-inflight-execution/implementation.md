@@ -3313,3 +3313,11 @@ D31. Focused prompt lifecycle cancellation tests and focused clj-kondo are green
 Reviewed the cancellation test net after the memory-recovery seam follow-up. One test-quality issue remains: several task-specific cancellation regression namespaces still use global `with-redefs`/stub helpers for infrastructure or boundary operations (`create-step-attempt-session!`, prompt/turn execution, judge message persistence, delegate/run creation hooks). Those tests prove useful race windows, but the task-test-review contract requires infrastructure dependencies to be injectable/nullable rather than mocked/stubbed; the remaining global redefs should be replaced with existing adapter/context seams or explicit nullable test hooks.
 
 No tests run (review-only pass).
+
+## Implementation review (ψ pass 27, 2026-06-11)
+
+Reviewed the current implementation against `task-implementation-review`, focusing on the prompt-continuation/tool-call path after the pass-26 nested-dispatch guard. One new actionable issue found.
+
+New actionable issue: `:runtime/prompt-continue-chain` still has a final stop-check→ordinary-callback gap. Its executor checks `workflow-effect-stop-signal` once, then calls `continue-prompt-chain-fn`; the default `prompt-chain/run-prompt-tools!` immediately dispatches unguarded `:session/tool-run` events. If D31 cancellation lands after the executor's stop check but before/during the callback, the workflow can start ordinary tool execution after the cancel checkpoint. This is distinct from the already-fixed stale-effect case where cancellation is visible before the effect executes. Follow-up should make prompt-continuation tool dispatch cancellation-safe (e.g. carry `:workflow-run-id` into the continuation callback and check/linearize before each tool dispatch, or route the callback under an equivalent cancellation-entry protocol) and add a regression for cancellation in that final window.
+
+No tests run (review-only pass).

@@ -253,3 +253,7 @@
 ## Test review follow-ups (ψ pass 3, 2026-06-11)
 
 - [ ] Replace remaining task-specific cancellation-test `with-redefs`/stub helpers for infrastructure or boundary operations with injectable/nullable seams (for example workflow execution adapter/context hooks for child-session creation and prompt/judge execution, and a persistence/message-history seam for judge message loading), preserving the race-window assertions without global mocks.
+
+## Implementation review follow-ups (ψ pass 27, 2026-06-11)
+
+- [ ] Make `:runtime/prompt-continue-chain` tool dispatch cancellation-safe after its executor stop check: a D31 cancel landing after `workflow-effect-stop-signal` passes but before/during `continue-prompt-chain-fn` must not start ordinary `:session/tool-run` / tool execution after the checkpoint. Carry `:workflow-run-id` into the continuation callback and re-check/linearize before each tool dispatch (or use an equivalent cancellation-entry protocol), and add a regression for cancellation in that final stop-check→tool-dispatch window.
