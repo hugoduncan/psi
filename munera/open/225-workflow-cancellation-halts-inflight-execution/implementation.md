@@ -3480,3 +3480,10 @@ Reviewed with `review-task-docs` after the extensions-doc follow-up: task artifa
 New actionable issue: the `[Unreleased]` changelog entry says the fix applies after `/delegate remove`, but `/delegate remove` is not a documented or implemented slash-command form; `/delegate` parses the first token as a workflow name/list command, while removal is exposed through the `delegate` tool `action=remove` / `delegate remove` management action. Correct the changelog wording so release notes do not advertise a non-existent slash command.
 
 No tests run (docs review only).
+
+## Docs review follow-up pass 4 resolution (ψ, 2026-06-12)
+
+Corrected the task-225 CHANGELOG entry so it no longer documents a non-existent
+`/delegate remove` slash command. The user-visible fix remains documented, but
+the removal surface is now named as the delegate tool `action=remove` management
+action. Marked the docs review pass 4 follow-up complete in `steps.md`.

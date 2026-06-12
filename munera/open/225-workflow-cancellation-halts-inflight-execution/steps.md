@@ -287,4 +287,5 @@
 
 ## Docs review follow-ups (ψ pass 4, 2026-06-12)
 
-- [ ] Correct the task-225 CHANGELOG entry to avoid documenting a non-existent `/delegate remove` slash command; refer to the `delegate` tool `action=remove` / `delegate remove` management action (or another actually supported removal surface) while preserving the cancellation/removal fix description.
+- [x] Correct the task-225 CHANGELOG entry to avoid documenting a non-existent `/delegate remove` slash command; refer to the `delegate` tool `action=remove` / `delegate remove` management action (or another actually supported removal surface) while preserving the cancellation/removal fix description.
+  - Covered 2026-06-12: CHANGELOG now refers to the delegate tool `action=remove` management action instead of a non-existent `/delegate remove` slash command.
