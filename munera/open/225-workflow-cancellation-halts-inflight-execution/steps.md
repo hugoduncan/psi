@@ -257,7 +257,8 @@
 
 ## Test review follow-ups (ψ pass 5, 2026-06-12)
 
-- [ ] Replace remaining task-225 cancellation regression `with-redefs` in non-`*cancellation*test.clj` files with injectable/nullable seams: `workflow_judge_test.clj`'s judge retry cancellation regressions should use ctx/adapter seams for judge messages and judge turn execution, and `workflow_runtime/statechart_runtime/step_execution_test.clj`'s ranked fallback cancellation regression should use a nullable actor-turn seam instead of redefining `turn-execution/execute-actor-turn!`.
+- [x] Replace remaining task-225 cancellation regression `with-redefs` in non-`*cancellation*test.clj` files with injectable/nullable seams: `workflow_judge_test.clj`'s judge retry cancellation regressions should use ctx/adapter seams for judge messages and judge turn execution, and `workflow_runtime/statechart_runtime/step_execution_test.clj`'s ranked fallback cancellation regression should use a nullable actor-turn seam instead of redefining `turn-execution/execute-actor-turn!`.
+  - Covered 2026-06-12: the two judge retry cancellation regressions now inject `:workflow-judge-messages-fn` and `:workflow-execute-judge-turn-fn` through ctx; the ranked fallback cancellation regression now injects `:workflow-execute-actor-turn-fn` through ctx. Focused scry namespaces and focused clj-kondo are green.
 
 ## Implementation review follow-ups (ψ pass 27, 2026-06-11)
 
