@@ -3453,3 +3453,11 @@ Completed the newly added README follow-up: added the missing `workflow` action 
 README.md's `psi-tool` action list, explicitly naming `cancel-run` and linking to
 `doc/workflows.md` for the full workflow cancellation/removal contract. Marked the
 follow-up done in steps.md.
+
+## Docs review (ψ pass 3, 2026-06-12)
+
+Reviewed with `review-task-docs` after the README workflow-action follow-up: task artifacts, `README.md`, `CHANGELOG.md`, `doc/workflows.md`, `doc/extensions.md`, `doc/architecture.md`, and the implemented/public workflow cancellation and removal surfaces.
+
+New actionable issue: `doc/extensions.md`'s built-in workflow capability section still describes the old `delegate remove` contract as command-layer active-background-job pre-cleanup that can fail before deleting the canonical run. That now contradicts the implemented canonical dispatch/effects removal path and the updated `doc/workflows.md` contract. Update `doc/extensions.md` to either summarize the current cancellation/removal semantics (including `psi-tool workflow op=cancel-run` and canonical cancel-then-remove cleanup) or point directly to `doc/workflows.md` without stale details.
+
+No tests run (docs review only).

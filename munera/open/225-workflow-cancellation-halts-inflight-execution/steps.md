@@ -279,3 +279,7 @@
 
 - [x] Add the missing `workflow` entry to `README.md`'s `psi-tool` action list, including the `cancel-run` operation or a pointer to `doc/workflows.md` for workflow cancellation/removal details.
   - Covered 2026-06-12: README.md now lists `psi-tool` `workflow`, names `cancel-run`, and points to `doc/workflows.md` for cancellation/removal details.
+
+## Docs review follow-ups (ψ pass 3, 2026-06-12)
+
+- [ ] Update `doc/extensions.md`'s built-in workflow capability section so it no longer documents the old `delegate remove` command-layer active-background-job pre-cleanup / fail-before-delete model; summarize the current canonical workflow cancellation/removal contract (including `psi-tool workflow op=cancel-run` and dispatch-owned cancel-then-remove cleanup) or point to `doc/workflows.md` for those details.
