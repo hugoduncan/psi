@@ -115,8 +115,9 @@ retained workflow runs: `list`, `continue`, and `remove`. `delegate list` is
 scoped to the invoking session; it shows delegated workflow runs owned by that
 session and does not show runs from unrelated sessions. Listed ids are canonical
 workflow run ids, so the same id can be used with `delegate continue` when the
-workflow status supports continuation, or with `delegate remove` while the run
-still exists.
+workflow status supports continuation, with workflow cancellation when you want
+to stop execution but retain the run record, or with `delegate remove` when you
+want to remove the run record.
 
 List output reports the canonical workflow status as the primary status and, when
 available, the delegate/background attempt status separately. For example, a
@@ -124,13 +125,43 @@ blocked workflow may list as primary status `blocked` with a separate delegate
 attempt status of `completed`, and a retained timed-out delegate attempt may show
 the canonical workflow status plus a separate `delegate timed-out` status.
 
-`delegate remove` requests canonical workflow removal through the workflow
-runtime dispatch path. For a live top-level run, removal is cancel-then-remove:
-psi first marks the run and its live descendant sub-runs cancelled, terminalizes
-workflow background-job projections as cancelled, interrupts the top-level
-workflow worker before dropping its runtime handle, then removes the canonical run
-record. This prevents removed delegated workflows from continuing in the
-background.
+### Cancelling and removing workflow runs
+
+Use workflow cancellation when you want to stop a workflow but keep its canonical
+run record for inspection. The user-visible cancellation entry point today is the
+`psi-tool` workflow action:
+
+```json
+{"action":"workflow","op":"cancel-run","run-id":"<run-id>","reason":"operator request"}
+```
+
+`reason` is optional. Cancellation is idempotent: cancelling an already-terminal
+or absent run is a success/no-op rather than an error.
+
+For a live top-level delegated workflow, cancellation marks the run and all live
+descendant sub-runs cancelled, terminalizes workflow background-job projections as
+cancelled, interrupts the top-level workflow worker future, and aborts in-flight
+workflow-owned child turns. The worker interrupt is a wake-up mechanism for a
+parked workflow loop; the canonical stop signal is the run's cancelled or absent
+state. After that cancellation checkpoint, the cancelled run tree does not start
+new workflow steps, delegate sub-runs, child sessions, tool dispatches, or
+ordinary child-turn journal writes. Work that had already crossed into a syscall
+or provider/tool boundary may still finish once, but cancellation prevents new
+ordinary workflow advancement.
+
+Cancelling a parent cascades down the live delegate subtree. Each live descendant
+sub-run is marked cancelled, and each current in-flight child attempt is guarded
+and aborted using its recorded workflow-owned execution session. Only the single
+top-level worker future is interrupted; nested sub-runs do not own separate
+workers.
+
+`delegate remove` is different from cancellation: it requests canonical workflow
+removal through the workflow runtime dispatch path and removes the run record. For
+a live top-level run, removal is cancel-then-remove: psi first applies the same
+cancellation contract, terminalizes background-job projections as cancelled,
+interrupts the top-level workflow worker before dropping its runtime handle, and
+then removes the canonical run record. This prevents removed delegated workflows
+from continuing in the background.
 
 Direct removal of a live nested delegate sub-run does not interrupt the shared
 parent/top-level workflow worker. Instead, psi aborts that sub-run's in-flight
@@ -141,7 +172,8 @@ Removing an already-terminal run is idempotent canonical-record cleanup. Removin
 an absent run is a success/no-op for the canonical record and still performs
 stale runtime-handle cleanup when a leftover handle exists. Removal no longer uses
 command-layer active-job pre-cleanup or a fail-if-pre-cleanup-fails model; job
-terminalization and worker-handle cleanup are dispatch-owned runtime effects.
+terminalization, worker interrupt, child-turn abort, and worker-handle cleanup are
+dispatch-owned runtime effects.
 
 ## Reloading workflow definitions
 

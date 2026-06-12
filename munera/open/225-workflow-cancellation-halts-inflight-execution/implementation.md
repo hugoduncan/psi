@@ -3434,3 +3434,7 @@ Reviewed with `review-task-docs`: task artifacts, `CHANGELOG.md`, `README.md`, `
 New actionable issue: the user-facing docs mention cancelling delegated workflows in the changelog but do not document the actual cancellation surface/contract. `doc/workflows.md` documents `delegate remove` only, while `psi-tool workflow op=cancel-run` is a public workflow management operation and now has changed semantics (canonical dispatch cancellation, descendant cancellation, background-job terminalization, top-level worker interrupt, idempotent terminal/absent success). Add user-facing documentation for workflow cancellation so users can distinguish cancel-vs-remove and understand what cancellation guarantees.
 
 No tests run (docs review only).
+
+## Docs follow-up pass — workflow cancellation surface (ψ, 2026-06-12)
+
+Completed the docs-review follow-up by expanding `doc/workflows.md` with a dedicated “Cancelling and removing workflow runs” section. It documents the current user-visible `psi-tool` cancellation entry point, distinguishes cancellation (stop and retain run record) from `delegate remove` (cancel-then-remove record cleanup), and states the implemented guarantees for live top-level cancellation, descendant cancellation, child-turn abort / top-level worker interrupt, background-job terminalization, and idempotent terminal/absent cancellation/removal.
