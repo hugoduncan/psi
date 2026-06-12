@@ -272,7 +272,7 @@
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
                        :build-prepared-request-fn    #'psi.agent-session.prompt-request/build-prepared-request
                        :build-record-response-fn     #'psi.agent-session.prompt-recording/build-record-response
-                       :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue]
+                       :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue _opts]
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))

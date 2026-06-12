@@ -3321,3 +3321,21 @@ Reviewed the current implementation against `task-implementation-review`, focusi
 New actionable issue: `:runtime/prompt-continue-chain` still has a final stop-check→ordinary-callback gap. Its executor checks `workflow-effect-stop-signal` once, then calls `continue-prompt-chain-fn`; the default `prompt-chain/run-prompt-tools!` immediately dispatches unguarded `:session/tool-run` events. If D31 cancellation lands after the executor's stop check but before/during the callback, the workflow can start ordinary tool execution after the cancel checkpoint. This is distinct from the already-fixed stale-effect case where cancellation is visible before the effect executes. Follow-up should make prompt-continuation tool dispatch cancellation-safe (e.g. carry `:workflow-run-id` into the continuation callback and check/linearize before each tool dispatch, or route the callback under an equivalent cancellation-entry protocol) and add a regression for cancellation in that final window.
 
 No tests run (review-only pass).
+
+## Implementation review follow-up pass 27 (ψ, 2026-06-11)
+
+Closed the prompt-continuation tool-dispatch cancellation gap. The
+`:runtime/prompt-continue-chain` executor now passes the workflow guard into
+`continue-prompt-chain-fn`, and the default `prompt-chain/run-prompt-tools!` accepts
+that options map, derives the workflow run id (falling back to the workflow-owned
+session metadata for direct callers), and re-checks canonical cancellation/removal
+before each `:session/tool-run` dispatch. Guarded `:session/tool-run`,
+`:session/tool-execute-prepared`, and `:session/tool-record-result` handlers also
+no-op when their `:workflow-run-id` is already cancelled/removed, so stale guarded
+tool events cannot cross into ordinary tool execution/recording after D31. A
+dedicated pre-dispatch hook provides a nullable race window; if D31 lands after
+the executor's initial stop check but before the first tool dispatch, continuation
+returns a stopped result and dispatches no tool-run. The existing test-support
+nullable continuation seam was updated to the 5-arity callback.
+
+Validation: `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` (13 tests / 76 assertions), `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` (24 tests / 117 assertions), and focused clj-kondo over the changed prompt-chain/effect/handler/test files are green.

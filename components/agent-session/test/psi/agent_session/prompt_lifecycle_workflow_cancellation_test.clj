@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
    [psi.agent-session.dispatch-schema :as dispatch-schema]
+   [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn.handlers :as turn-handlers]
    [psi.session-persistence.core :as persist]
@@ -304,10 +305,11 @@
         continue-calls* (atom [])
         ctx (assoc ctx0
                    :continue-prompt-chain-fn
-                   (fn [_ctx sid execution-result progress-queue]
+                   (fn [_ctx sid execution-result progress-queue opts]
                      (swap! continue-calls* conj {:session-id sid
                                                   :execution-result execution-result
-                                                  :progress-queue progress-queue})))
+                                                  :progress-queue progress-queue
+                                                  :opts opts})))
         execution-result {:execution-result/turn-id "turn-continue-race"
                           :execution-result/session-id session-id
                           :execution-result/assistant-message {:role "assistant"
@@ -341,6 +343,177 @@
         "stale prompt-continue-chain effect must no-op after cancellation")
     (is (empty? (kernel/event-log-entries))
         "stale prompt-continue follow-on dispatch effects must not re-enter ordinary lifecycle events")))
+
+(deftest workflow-cancel-before-prompt-continue-tool-dispatch-blocks-first-tool-test
+  ;; Regression for task 225 pass 27: cancellation after the outer
+  ;; :runtime/prompt-continue-chain stop check but before the continuation
+  ;; callback dispatches its first tool must prevent that tool from starting.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-continue-before-tool-cancel"
+        tool-events (atom [])
+        execution-result {:execution-result/turn-id "turn-before-tool-race"
+                          :execution-result/session-id session-id
+                          :execution-result/assistant-message {:role "assistant"
+                                                               :content [{:type :tool-call
+                                                                          :id "tc-1"
+                                                                          :name "read"
+                                                                          :arguments "{}"}]
+                                                               :stop-reason :tool_use}
+                          :execution-result/turn-outcome :turn.outcome/tool-use
+                          :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
+                          :execution-result/stop-reason :tool_use}
+        cancel-once* (atom false)
+        ctx (assoc ctx0
+                   :before-prompt-continue-tool-dispatch-fn
+                   (fn [ctx* {:keys [workflow-run-id]}]
+                     (when (compare-and-set! cancel-once* false true)
+                       (session/dispatch-in! ctx*
+                                             :psi.workflow/cancel-run
+                                             {:run-id workflow-run-id
+                                              :reason "prompt continuation pre-tool race"}
+                                             {:origin :core})))
+                   :execute-tool-runtime-fn
+                   (fn [_ctx _session-id tool-name _args _opts]
+                     (swap! tool-events conj tool-name)
+                     {:content [{:type :text :text "must not run"}]
+                      :is-error false}))]
+    (install-workflow-run! ctx run-id)
+    (workflow-attempt-session! ctx session-id run-id)
+    (let [effect {:effect/type :runtime/prompt-continue-chain
+                  :session-id session-id
+                  :execution-result execution-result
+                  :workflow-run-id run-id}]
+      (is (dispatch-schema/valid-effect? effect)
+          "regression must exercise the canonical workflow-guarded continuation effect")
+      (let [result (dispatch-effects/execute-effect! ctx effect)]
+        (is (= [] @tool-events)
+            "no tool dispatch may start after cancellation wins the final continuation gap")
+        (is (= {:continued? false
+                :tool-call-count 0
+                :workflow-stopped? true
+                :reason :cancelled}
+               result)
+            "continuation reports the cancellation that won before the first tool")
+        (is (= :cancelled
+               (get-in @(:state* ctx) [:workflows :runs run-id :status]))
+            "regression must cancel the canonical workflow run before tool dispatch")))))
+
+(deftest workflow-cancel-during-prompt-continue-tool-dispatch-blocks-later-tools-test
+  ;; Regression for task 225 pass 27: continuation re-checks the workflow guard
+  ;; before each tool dispatch. If the first admitted tool cancels the workflow,
+  ;; later tool calls in the same continuation callback must not start.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        run-id "run-prompt-continue-during-tools-cancel"
+        tool-events (atom [])
+        execution-result {:execution-result/turn-id "turn-tools-race"
+                          :execution-result/session-id session-id
+                          :execution-result/assistant-message {:role "assistant"
+                                                               :content [{:type :tool-call
+                                                                          :id "tc-1"
+                                                                          :name "read"
+                                                                          :arguments "{}"}
+                                                                         {:type :tool-call
+                                                                          :id "tc-2"
+                                                                          :name "write"
+                                                                          :arguments "{}"}]
+                                                               :stop-reason :tool_use}
+                          :execution-result/turn-outcome :turn.outcome/tool-use
+                          :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}
+                                                        {:id "tc-2" :name "write" :arguments "{}"}]
+                          :execution-result/stop-reason :tool_use}
+        ctx (assoc ctx
+                   :execute-tool-runtime-fn
+                   (fn [ctx* _session-id tool-name _args _opts]
+                     (swap! tool-events conj tool-name)
+                     (when (= "read" tool-name)
+                       (session/dispatch-in! ctx*
+                                             :psi.workflow/cancel-run
+                                             {:run-id run-id
+                                              :reason "prompt continuation in-tool race"}
+                                             {:origin :core}))
+                     {:content [{:type :text :text (str tool-name " done")}]
+                      :is-error false}))]
+    (install-workflow-run! ctx run-id)
+    (workflow-attempt-session! ctx session-id run-id)
+    (kernel/clear-event-log!)
+    (let [result (prompt-chain/run-prompt-tools!
+                  ctx
+                  session-id
+                  execution-result
+                  nil
+                  {:workflow-run-id run-id})]
+      (is (= ["read"] @tool-events)
+          "later tools must not start after the first tool cancels the workflow")
+      (is (= {:continued? true
+              :tool-call-count 1
+              :workflow-stopped? true
+              :reason :cancelled}
+             result)
+          "continuation reports cancellation after the admitted tool")
+      (is (= :cancelled
+             (get-in @(:state* ctx) [:workflows :runs run-id :status]))
+          "regression cancels the canonical workflow run during continuation")
+      (is (= 1 (count (filter #(= :session/tool-run (:event-type %))
+                              (kernel/event-log-entries))))
+          "only the pre-D31 tool-run dispatch is admitted"))))
+
+(deftest workflow-cancel-before-guarded-tool-run-dispatch-blocks-tool-test
+  ;; Regression for task 225 pass 27 hardening: a workflow-guarded tool-run
+  ;; event that reaches the handler after D31 must not execute or record ordinary
+  ;; tool work.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        run-id "run-tool-run-after-cancel"
+        tool-events (atom [])
+        ctx (assoc ctx0
+                   :execute-tool-runtime-fn
+                   (fn [_ctx _session-id tool-name _args _opts]
+                     (swap! tool-events conj tool-name)
+                     {:content [{:type :text :text "must not run"}]
+                      :is-error false}))
+        tool-call {:id "tc-1" :name "read" :arguments "{}"}
+        _ (install-workflow-run! ctx run-id)
+        _ (workflow-attempt-session! ctx session-id run-id)]
+    (session/dispatch-in! ctx
+                          :psi.workflow/cancel-run
+                          {:run-id run-id
+                           :reason "tool-run after cancel"}
+                          {:origin :core})
+    (let [tool-run-result (session/dispatch-in! ctx
+                                                :session/tool-run
+                                                {:session-id session-id
+                                                 :tool-call tool-call
+                                                 :parsed-args {}
+                                                 :workflow-run-id run-id}
+                                                {:origin :core})
+          execute-result (session/dispatch-in! ctx
+                                               :session/tool-execute-prepared
+                                               {:session-id session-id
+                                                :tool-call tool-call
+                                                :parsed-args {}
+                                                :workflow-run-id run-id}
+                                               {:origin :core})
+          record-result (session/dispatch-in! ctx
+                                              :session/tool-record-result
+                                              {:session-id session-id
+                                               :shaped-result {:result-message {:role "toolResult"
+                                                                                :tool-call-id "tc-1"
+                                                                                :tool-name "read"
+                                                                                :content [{:type :text :text "stale"}]}}
+                                               :workflow-run-id run-id}
+                                              {:origin :core})]
+      (is (nil? tool-run-result)
+          "guarded tool-run no-ops after cancellation")
+      (is (= {:workflow-stopped? true
+              :workflow-run-id run-id
+              :reason :cancelled}
+             execute-result)
+          "guarded execute-prepared no-ops after cancellation")
+      (is (nil? record-result)
+          "guarded record-result no-ops after cancellation")
+      (is (= [] @tool-events)
+          "guarded tool-run path must not execute ordinary tool work after D31")
+      (is (= [] (journal-messages ctx session-id))
+          "guarded tool-run path must not record tool results after D31"))))
 
 (deftest workflow-cancel-after-prompt-finish-build-before-apply-blocks-stale-finish-effects-test
   ;; Regression for task 225 pass 22: if prompt-finish has already built its pure

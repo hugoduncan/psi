@@ -303,7 +303,12 @@
 
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)
-    ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect))))
+    ((:continue-prompt-chain-fn ctx)
+     ctx
+     (effect-session-id ctx effect)
+     (:execution-result effect)
+     (:progress-queue effect)
+     {:workflow-run-id (:workflow-run-id effect)})))
 
 (defn- workflow-guarded-event-data
   [effect]

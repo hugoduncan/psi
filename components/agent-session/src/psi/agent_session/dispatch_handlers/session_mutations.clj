@@ -23,6 +23,22 @@
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
 
+(defn- workflow-run-stop-signal
+  [ctx run-id]
+  (let [state* (:state* ctx)
+        run (when (and state* run-id)
+              (get-in @state* [:workflows :runs run-id]))]
+    (when (and state* run-id)
+      (cond
+        (nil? run) :removed
+        (= :cancelled (:status run)) :cancelled))))
+
+(defn- stopped-workflow-tool-result
+  [run-id reason]
+  {:workflow-stopped? true
+   :workflow-run-id run-id
+   :reason reason})
+
 (defn- schedule-record
   [session-data schedule-id]
   (get-in session-data [:scheduler :schedules schedule-id]))
@@ -579,28 +595,35 @@
 
   (register-core-handler!
    :session/tool-execute-prepared
-   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
+   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue workflow-run-id]}]
+     {:return (if-let [reason (workflow-run-stop-signal ctx workflow-run-id)]
+                (stopped-workflow-tool-result workflow-run-id reason)
+                (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue))}))
 
   (register-core-handler!
    :session/tool-record-result
-   (fn [ctx {:keys [session-id shaped-result progress-queue]}]
-     {:return (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
+   (fn [ctx {:keys [session-id shaped-result progress-queue workflow-run-id]}]
+     {:return (when-not (or (:workflow-stopped? shaped-result)
+                            (workflow-run-stop-signal ctx workflow-run-id))
+                (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue))}))
 
   (register-core-handler!
    :session/tool-run
-   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (let [shaped-result (dispatch/dispatch! ctx :session/tool-execute-prepared
-                                                      {:session-id     session-id
-                                                       :tool-call      tool-call
-                                                       :parsed-args    parsed-args
-                                                       :progress-queue progress-queue}
-                                                      {:origin :core})]
-                (dispatch/dispatch! ctx :session/tool-record-result
-                                    {:session-id     session-id
-                                     :shaped-result  shaped-result
-                                     :progress-queue progress-queue}
-                                    {:origin :core}))})))
+   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue workflow-run-id]}]
+     {:return (when-not (workflow-run-stop-signal ctx workflow-run-id)
+                (let [shaped-result (dispatch/dispatch! ctx :session/tool-execute-prepared
+                                                        {:session-id     session-id
+                                                         :tool-call      tool-call
+                                                         :parsed-args    parsed-args
+                                                         :progress-queue progress-queue
+                                                         :workflow-run-id workflow-run-id}
+                                                        {:origin :core})]
+                  (dispatch/dispatch! ctx :session/tool-record-result
+                                      {:session-id     session-id
+                                       :shaped-result  shaped-result
+                                       :progress-queue progress-queue
+                                       :workflow-run-id workflow-run-id}
+                                      {:origin :core})))})))
 
 (defn- register-message-and-skill-handlers! []
   (register-core-handler!
