@@ -304,3 +304,7 @@
 
 - [x] Consolidate the duplicated multi-phase workflow ordinary-entry CAS protocol used by actor/judge turn starts and deterministic-operation starts: extract a shared helper or small reusable phase-update primitive for attempt lookup, stop-signal check, attempt-id guard, phase-state update/timestamps/counts, and stopped-result signalling, so future D31 entry-boundary changes do not require parallel edits in `turn_execution_contract.clj` and `deterministic_operation_runtime/core.clj`. Preserve focused regressions for actor, judge, and invoke cancellation windows.
   - Covered 2026-06-12: added shared `psi.workflow-coordination.ordinary-entry` CAS phase-transition helper; actor/judge turn starts and deterministic-operation starts now reuse it for attempt lookup, stop-signal checks, attempt-id guards, phase timestamps/counts, idempotent phases, and stopped-result signalling. Focused actor, judge, and invoke D31 regressions plus focused lint are green.
+
+## Code-shaper review follow-ups (ψ pass 4, 2026-06-12)
+
+- [ ] Flatten the duplicated ordinary-entry phase choreography in `prompt-execution-result*` and `invoke-operation-result`: extract a small linear phase runner or equivalent helper for the reserve → start → call-begin → call-commit hook/stopped-result flow, keeping deterministic-operation's handler-entry lock/handoff explicit. Preserve focused actor, judge, and invoke D31 cancellation-window regressions.

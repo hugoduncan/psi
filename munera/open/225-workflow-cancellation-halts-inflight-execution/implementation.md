@@ -3574,3 +3574,26 @@ Verification: `clj-paren-repair` on changed Clojure files; focused Scry namespac
 for actor call-start, judge cancellation, and deterministic-operation cancellation
 regressions passed (25 tests / 113 assertions); focused `clj-kondo` over changed
 source/test paths reported 0 errors and 0 warnings.
+
+## Code-shaper review (ψ pass 4, 2026-06-12)
+
+Reviewed the ordinary-entry CAS consolidation with `code-shaper`: task artifacts,
+`components/workflow-coordination/src/psi/workflow_coordination/ordinary_entry.clj`,
+`components/workflow-runtime/src/psi/workflow_runtime/turn_execution_contract.clj`,
+and `components/deterministic-operation-runtime/src/psi/deterministic_operation_runtime/core.clj`.
+The shared phase-transition primitive removes the duplicated CAS/write logic and
+focused D31 regressions remain green.
+
+New actionable issue: the caller-side ordinary-entry phase choreography is still
+split across two nested control-flow pyramids (`prompt-execution-result*` and
+`invoke-operation-result`). Both encode the same reserve → start → call-begin →
+call-commit pattern, hook windows, stopped-result branching, and final ordinary
+entry handoff in parallel. The computation has moved to a shared primitive, but
+flow control remains duplicated, so adding or reordering a D31 entry phase still
+requires parallel edits. Follow-up added to flatten/extract a small linear phase
+runner or equivalent local helper while preserving the existing actor, judge, and
+invoke cancellation-window regressions.
+
+Verification during review: focused Scry for deterministic-operation runtime and
+workflow call-start cancellation passed; focused clj-kondo over the changed
+ordinary-entry source paths reported 0 errors / 0 warnings.
