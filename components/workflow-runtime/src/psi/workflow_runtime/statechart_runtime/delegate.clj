@@ -1,5 +1,6 @@
 (ns psi.workflow-runtime.statechart-runtime.delegate
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.terminal-contract :as workflow-terminal-contract]
@@ -111,8 +112,7 @@
         delegate-run-id
         (loop []
           (let [state-map @(:state* ctx)]
-            (if (or (nil? (workflow-runtime/workflow-run-in state-map parent-run-id))
-                    (= :cancelled (:status (workflow-runtime/workflow-run-in state-map parent-run-id))))
+            (if (stop-signal/workflow-stop-signal-in-state state-map parent-run-id)
               nil
               (let [create-run-fn (or (:workflow-create-run-fn ctx)
                                       workflow-runtime/create-run)

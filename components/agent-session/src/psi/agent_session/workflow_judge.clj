@@ -12,6 +12,7 @@
    [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.structured-output :as structured-output]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]))
 
@@ -21,9 +22,7 @@
 
 (defn- workflow-stopped-in-state?
   [state workflow-run-id]
-  (let [run (get-in state [:workflows :runs workflow-run-id])]
-    (or (nil? run)
-        (= :cancelled (:status run)))))
+  (stop-signal/workflow-stopped-in-state? state workflow-run-id))
 
 (defn- attach-judge-session-if-live!
   [ctx workflow-run-id current-step-id workflow-attempt-id judge-sid]

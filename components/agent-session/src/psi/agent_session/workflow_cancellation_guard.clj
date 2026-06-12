@@ -1,13 +1,13 @@
 (ns psi.agent-session.workflow-cancellation-guard
   "Helpers for making workflow-owned stale pure results cancellation-safe."
   (:require
-   [psi.session-state.state :as session]))
+   [psi.session-state.state :as session]
+   [psi.workflow-coordination.stop-signal :as stop-signal]))
 
 (defn live-run-in-state?
   "True when run-id still names a non-cancelled canonical workflow run."
   [state-map run-id]
-  (let [run (get-in state-map [:workflows :runs run-id])]
-    (and run (not= :cancelled (:status run)))))
+  (stop-signal/workflow-live-in-state? state-map run-id))
 
 (defn guard-root-state-update
   "Wrap root-state-update so stale workflow-owned pure results no-op after cancel/remove."

@@ -24,6 +24,12 @@
   [state-map run-id]
   (boolean (workflow-stop-signal-in-state state-map run-id)))
 
+(defn workflow-live-in-state?
+  "True when run-id names a canonical workflow run with no stop signal."
+  [state-map run-id]
+  (and (some? run-id)
+       (nil? (workflow-stop-signal-in-state state-map run-id))))
+
 (defn workflow-stop-signal
   "Return the cooperative workflow stop signal for run-id from ctx's :state*, if any."
   [ctx run-id]

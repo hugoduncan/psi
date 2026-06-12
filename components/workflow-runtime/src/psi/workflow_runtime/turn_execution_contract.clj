@@ -96,17 +96,14 @@
 
 (defn- reserve-workflow-turn-start-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-turn-attempt-path session-data)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :reserved? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :reserved? false :reason :cancelled}
+      stop-reason
+      {:state state-map :reserved? false :reason stop-reason}
 
       (not= workflow-attempt-id (:attempt-id latest-attempt))
       {:state state-map :reserved? false :reason :attempt-mismatch}
@@ -121,17 +118,14 @@
 
 (defn- commit-workflow-turn-start-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-turn-attempt-path session-data)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :committed? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :committed? false :reason :cancelled}
+      stop-reason
+      {:state state-map :committed? false :reason stop-reason}
 
       (not= workflow-attempt-id (:attempt-id latest-attempt))
       {:state state-map :committed? false :reason :attempt-mismatch}
@@ -147,17 +141,14 @@
 
 (defn- begin-workflow-turn-call-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-turn-attempt-path session-data)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :begun? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :begun? false :reason :cancelled}
+      stop-reason
+      {:state state-map :begun? false :reason stop-reason}
 
       (not= workflow-attempt-id (:attempt-id latest-attempt))
       {:state state-map :begun? false :reason :attempt-mismatch}
@@ -172,17 +163,14 @@
 
 (defn- commit-workflow-turn-call-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-turn-attempt-path session-data)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :committed? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :committed? false :reason :cancelled}
+      stop-reason
+      {:state state-map :committed? false :reason stop-reason}
 
       (not= workflow-attempt-id (:attempt-id latest-attempt))
       {:state state-map :committed? false :reason :attempt-mismatch}

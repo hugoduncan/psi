@@ -3524,3 +3524,18 @@ future drift. Follow-up added to reuse the shared in-state stop predicate for th
 CAS/guard helpers.
 
 No tests run (code-shaper review only).
+
+## Code-shaper follow-up pass 2 — stop predicate consolidation (ψ, 2026-06-12)
+
+Completed the newly added code-shaper follow-up. Added `workflow-live-in-state?` to
+`psi.workflow-coordination.stop-signal` as the shared live-run wrapper over the
+canonical nil-run/`:cancelled` stop predicate. Replaced remaining local stop checks
+in deterministic-operation start/call/handler-entry CAS helpers, workflow
+turn-start/call CAS helpers, delegate child-run creation, judge-session attachment,
+and stale-result guards with `workflow-stop-signal-in-state` or
+`workflow-live-in-state?`.
+
+Verification: `clj-paren-repair` on changed Clojure files, focused `clj-kondo` on
+changed source roots/files, and focused Scry namespaces for deterministic-operation,
+turn-execution, judge, and D31 workflow cancellation suites are green (57 tests /
+258 assertions).

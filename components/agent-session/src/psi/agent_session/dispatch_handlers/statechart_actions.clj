@@ -134,8 +134,7 @@
 
 (defn- live-workflow-run-in-state?
   [state-map run-id]
-  (let [run (get-in state-map [:workflows :runs run-id])]
-    (and run (not= :cancelled (:status run)))))
+  (stop-signal/workflow-live-in-state? state-map run-id))
 
 (defn- guard-workflow-root-update
   [root-state-update run-id]

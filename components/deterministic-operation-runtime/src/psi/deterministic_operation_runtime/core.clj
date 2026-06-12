@@ -33,17 +33,14 @@
 
 (defn- reserve-workflow-operation-start-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :reserved? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :reserved? false :reason :cancelled}
+      stop-reason
+      {:state state-map :reserved? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :reserved? false :reason :attempt-missing}
@@ -62,17 +59,14 @@
 
 (defn- commit-workflow-operation-start-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :committed? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :committed? false :reason :cancelled}
+      stop-reason
+      {:state state-map :committed? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :committed? false :reason :attempt-missing}
@@ -92,17 +86,14 @@
 
 (defn- begin-workflow-operation-call-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :begun? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :begun? false :reason :cancelled}
+      stop-reason
+      {:state state-map :begun? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :begun? false :reason :attempt-missing}
@@ -121,17 +112,14 @@
 
 (defn- commit-workflow-operation-call-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :committed? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :committed? false :reason :cancelled}
+      stop-reason
+      {:state state-map :committed? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :committed? false :reason :attempt-missing}
@@ -153,17 +141,14 @@
 
 (defn- prepare-workflow-operation-handler-entry-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :prepared? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :prepared? false :reason :cancelled}
+      stop-reason
+      {:state state-map :prepared? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :prepared? false :reason :attempt-missing}
@@ -191,17 +176,14 @@
 
 (defn- enter-workflow-operation-handler-in-state
   [state-map {:keys [workflow-run-id workflow-attempt-id] :as invocation}]
-  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
         attempt-path (workflow-operation-attempt-path invocation)
         attempts (get-in state-map attempt-path)
         latest-idx (latest-attempt-index attempts)
         latest-attempt (when latest-idx (nth attempts latest-idx))]
     (cond
-      (nil? run)
-      {:state state-map :entered? false :reason :removed}
-
-      (= :cancelled (:status run))
-      {:state state-map :entered? false :reason :cancelled}
+      stop-reason
+      {:state state-map :entered? false :reason stop-reason}
 
       (nil? latest-idx)
       {:state state-map :entered? false :reason :attempt-missing}
