@@ -3511,3 +3511,16 @@ No tests run (code-shaper review only).
 Consolidated the workflow cancellation stop/entry primitives raised by the code-shaper review. Added `psi.workflow-coordination.stop-signal` as the canonical stop predicate (`nil` run ⇒ `:removed`, `:status :cancelled` ⇒ `:cancelled`) and `psi.workflow-coordination.cancellation-entry` as the shared runtime entry-lock primitive. Rewired workflow-runtime, agent-session prompt/effect/tool-continuation call sites, and deterministic-operation-runtime to use the shared component. Removed deterministic-operation-runtime's private ReentrantReadWriteLock duplicate and the old workflow-runtime-local cancellation-entry namespace.
 
 Added deterministic-operation regressions for removed-run stop semantics and for reuse of the shared cancellation-entry lock entry. Verification: focused scry for deterministic-operation, workflow step-execution, workflow call-start cancellation, cancellation dispatch, and retention nested tests passed (38 tests / 219 assertions). Focused clj-kondo over changed source/test/deps paths reported 0 errors and 0 warnings; pre-existing info-level assertion-message notices remain outside this change.
+
+## Code-shaper review (ψ pass 2, 2026-06-12)
+
+Reviewed the cancellation-primitive consolidation with `code-shaper`. The new
+`workflow-coordination.stop-signal` helper is used for ctx/read-path checks, but
+write-path and stale-result guard code still repeats the canonical nil-run /
+`:cancelled` predicate in local helpers (`deterministic_operation_runtime.core`,
+`turn_execution_contract`, `workflow_judge`, and `workflow_cancellation_guard`).
+That keeps the cancellation topology split across read and write paths and risks
+future drift. Follow-up added to reuse the shared in-state stop predicate for those
+CAS/guard helpers.
+
+No tests run (code-shaper review only).
