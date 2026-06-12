@@ -3405,3 +3405,24 @@ Verification: `bb clojure:test:scry --namespace psi.agent-session.mutations.cano
 Reviewed the task-225 test net after the adapter-boundary assertions were added. The Slice 1 public surfaces now have executable event-log/dispatch-boundary coverage, the original live-remove orphaned-worker composition path is covered with a real parked future, cancellation race windows are broadly covered, and task-specific cancellation regressions use ctx/adapter nullable seams rather than global mocks. No new actionable test-quality issues found.
 
 Verification: focused adapter-boundary scry suites passed (37 tests / 338 assertions). Static diff grep found no newly added task-specific global mocks beyond pre-existing adjacent prompt-lifecycle tests outside the cancellation regression scope.
+
+## Test-shaper review (ψ pass 8, 2026-06-12)
+
+Reviewed the task-225 test net using `test-shaper`: focused on clarity, signal,
+determinism, behaviour focus, economical coverage, and mock-free/nullable boundary
+control. Read the Munera artifacts plus the main cancellation regression clusters
+(`workflow_cancellation_dispatch_test`, `workflow_execution_cancellation_test`,
+`prompt_lifecycle_workflow_cancellation_test`, `workflow_statechart_runtime_*_cancellation_test`,
+`workflow_judge_cancellation_test`, and adjacent changed workflow-runtime tests).
+
+Assessment: the current tests are broad but still shaped around distinct behaviour
+partitions and race boundaries. The remaining concurrency tests use promises/futures
+with bounded waits to exercise real cancellation ordering; task-specific boundary
+operations are controlled through ctx/adapter nullable seams rather than global
+mocks; assertions are mostly state/effect outcomes at the cancellation boundary
+rather than incidental interaction counts. The larger race-window suites are verbose,
+but the repetition maps to separately reviewed D31 windows and is not currently
+hiding intent enough to justify another follow-up.
+
+No new actionable test-shaping issue found beyond the already completed test-review
+follow-ups.
