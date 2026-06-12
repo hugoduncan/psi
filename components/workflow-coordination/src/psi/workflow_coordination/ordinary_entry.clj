@@ -116,3 +116,42 @@
   (if (:ok? result)
     {success-key true}
     {success-key false :reason (:reason result)}))
+
+(defn- stopped-phase-result
+  [stopped-result-fn reason]
+  {:ok? false
+   :reason reason
+   :result (stopped-result-fn reason)})
+
+(defn run-linear-entry-phases!
+  "Run an ordered ordinary-entry phase sequence.
+
+   `stop-signal-fn` is checked before the first phase and after the final phase.
+   Each phase map has `:transition` (a zero-arg fn) and `:success-key`, plus
+   optional `:before-hook` and `:after-hook` values passed to `hook-fn`.
+
+   Returns `{:ok? true}` after all phases succeed, or
+   `{:ok? false :reason reason :result stopped-result}` when a stop signal or
+   phase guard prevents entry. The caller owns any domain-specific handoff after
+   the shared entry phases, such as deterministic-operation handler entry locks."
+  [{:keys [stop-signal-fn stopped-result-fn hook-fn phases]}]
+  (letfn [(stopped [reason]
+            (stopped-phase-result stopped-result-fn reason))
+          (check-stop []
+            (when-let [reason (stop-signal-fn)]
+              (stopped reason)))
+          (call-hook! [hook]
+            (when (and hook-fn hook)
+              (hook-fn hook)))]
+    (or (check-stop)
+        (loop [[{:keys [transition success-key before-hook after-hook]} & more] phases]
+          (if-not transition
+            (or (check-stop) {:ok? true})
+            (do
+              (call-hook! before-hook)
+              (let [phase-result (transition)]
+                (if-not (get phase-result success-key)
+                  (stopped (:reason phase-result))
+                  (do
+                    (call-hook! after-hook)
+                    (recur more))))))))))

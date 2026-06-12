@@ -3597,3 +3597,22 @@ invoke cancellation-window regressions.
 Verification during review: focused Scry for deterministic-operation runtime and
 workflow call-start cancellation passed; focused clj-kondo over the changed
 ordinary-entry source paths reported 0 errors / 0 warnings.
+
+## Code-shaper pass 4 follow-up execution (ψ, 2026-06-12)
+
+Flattened the duplicated ordinary-entry phase choreography shared by workflow
+actor/judge prompt entry and deterministic-operation invocation. Added
+`ordinary-entry/run-linear-entry-phases!` to run the common reserve → start →
+call-begin → call-commit sequence with pre/post hooks, stopped-result shaping,
+and stop checks before the sequence and after the final phase. Replaced the nested
+phase ladders in `prompt-execution-result*` and `invoke-operation-result` with the
+shared runner. Deterministic-operation's handler-entry preparation, cancellation
+entry lock, and handler handoff stay explicit after the shared phases as required.
+
+Verification: focused Scry namespaces
+`psi.workflow-runtime.turn-execution-contract-test`,
+`psi.deterministic-operation-runtime.core-test`,
+`psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test`,
+`psi.agent-session.workflow-judge-cancellation-test`, and
+`psi.workflow-runtime.statechart-runtime.step-execution-test` are green. Focused
+`clj-kondo` over the changed source files is clean.

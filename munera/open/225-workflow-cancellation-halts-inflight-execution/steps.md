@@ -307,4 +307,5 @@
 
 ## Code-shaper review follow-ups (ψ pass 4, 2026-06-12)
 
-- [ ] Flatten the duplicated ordinary-entry phase choreography in `prompt-execution-result*` and `invoke-operation-result`: extract a small linear phase runner or equivalent helper for the reserve → start → call-begin → call-commit hook/stopped-result flow, keeping deterministic-operation's handler-entry lock/handoff explicit. Preserve focused actor, judge, and invoke D31 cancellation-window regressions.
+- [x] Flatten the duplicated ordinary-entry phase choreography in `prompt-execution-result*` and `invoke-operation-result`: extract a small linear phase runner or equivalent helper for the reserve → start → call-begin → call-commit hook/stopped-result flow, keeping deterministic-operation's handler-entry lock/handoff explicit. Preserve focused actor, judge, and invoke D31 cancellation-window regressions.
+  - Covered 2026-06-12: added `ordinary-entry/run-linear-entry-phases!` for the shared reserve → start → call-begin → call-commit hook/stopped-result flow; actor/judge prompt entry and deterministic-operation invoke now reuse it, while deterministic-operation handler-entry prepare/lock/handoff remains explicit after the shared entry phases. Focused actor, judge, invoke, ranked-fallback, and lint checks are green.

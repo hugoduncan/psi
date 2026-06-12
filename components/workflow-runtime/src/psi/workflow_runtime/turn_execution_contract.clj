@@ -169,34 +169,27 @@
 
 (defn- prompt-execution-result*
   [ctx session-id text images opts session-data]
-  (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
-    (stopped-execution-result session-id reason)
-    (do
-      (call-workflow-turn-start-hook! ctx session-id session-data :before-reserve)
-      (let [{:keys [reserved? reason]} (reserve-workflow-turn-start! ctx session-data)]
-        (if-not reserved?
-          (stopped-execution-result session-id reason)
-          (do
-            (call-workflow-turn-start-hook! ctx session-id session-data :after-reserve)
-            (let [{:keys [committed? reason]} (commit-workflow-turn-start! ctx session-data)]
-              (if-not committed?
-                (stopped-execution-result session-id reason)
-                (do
-                  (call-workflow-turn-start-hook! ctx session-id session-data :after-commit)
-                  (let [{:keys [begun? reason]} (begin-workflow-turn-call! ctx session-data)]
-                    (if-not begun?
-                      (stopped-execution-result session-id reason)
-                      (do
-                        (call-workflow-turn-start-hook! ctx session-id session-data :after-call-begin)
-                        (let [{call-committed? :committed? reason :reason}
-                              (commit-workflow-turn-call! ctx session-data)]
-                          (if-not call-committed?
-                            (stopped-execution-result session-id reason)
-                            (do
-                              (call-workflow-turn-start-hook! ctx session-id session-data :after-call-commit)
-                              (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
-                                (stopped-execution-result session-id reason)
-                                (execution-adapter/prompt-execution-result! ctx session-id text images opts)))))))))))))))))
+  (let [{:keys [ok? result]}
+        (ordinary-entry/run-linear-entry-phases!
+         {:stop-signal-fn #(workflow-session-stop-signal-for ctx session-data)
+          :stopped-result-fn #(stopped-execution-result session-id %)
+          :hook-fn #(call-workflow-turn-start-hook! ctx session-id session-data %)
+          :phases [{:transition #(reserve-workflow-turn-start! ctx session-data)
+                    :success-key :reserved?
+                    :before-hook :before-reserve
+                    :after-hook :after-reserve}
+                   {:transition #(commit-workflow-turn-start! ctx session-data)
+                    :success-key :committed?
+                    :after-hook :after-commit}
+                   {:transition #(begin-workflow-turn-call! ctx session-data)
+                    :success-key :begun?
+                    :after-hook :after-call-begin}
+                   {:transition #(commit-workflow-turn-call! ctx session-data)
+                    :success-key :committed?
+                    :after-hook :after-call-commit}]})]
+    (if ok?
+      (execution-adapter/prompt-execution-result! ctx session-id text images opts)
+      result)))
 
 (defn- prompt-execution-result
   [ctx session-id text images opts]
