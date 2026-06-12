@@ -3372,3 +3372,11 @@ ctx/adapter nullable seams while keeping the same race-window assertions:
 Removed `with-redefs` from all `*cancellation*test.clj` files. Verification:
 focused cancellation namespaces green (59 tests / 290 assertions), plus targeted
 clj-kondo over changed source/test files clean.
+
+## Test review (ψ pass 5, 2026-06-12)
+
+Reviewed the current cancellation test net against `task-test-review` after the nullable-seam cleanup. Most task-specific cancellation regression namespaces now use ctx/adapter seams, and the `*cancellation*test.clj` files are mock-free.
+
+New actionable issue: task-specific cancellation regressions still remain in non-`*cancellation*test.clj` files with global `with-redefs`: `workflow_judge_test.clj`'s pass-5 judge retry regressions redefine judge message persistence and judge turn execution, and `statechart_runtime/step_execution_test.clj`'s ranked fallback regression redefines actor turn execution. These are still infrastructure/boundary mocks for cancellation behaviour, despite the pass-3 follow-up only removing redefs from `*cancellation*test.clj` files. Replace them with the existing ctx/adapter nullable seams (or equivalent injectable seams) so all task-225 cancellation tests satisfy the injectable/nullable, no-mock test contract.
+
+No tests run (review-only pass; static grep/review of task-225 regression tests).
