@@ -3539,3 +3539,18 @@ Verification: `clj-paren-repair` on changed Clojure files, focused `clj-kondo` o
 changed source roots/files, and focused Scry namespaces for deterministic-operation,
 turn-execution, judge, and D31 workflow cancellation suites are green (57 tests /
 258 assertions).
+
+## Code-shaper review (ψ pass 3, 2026-06-12)
+
+Reviewed the post-consolidation cancellation code with `code-shaper`. The shared
+stop predicate and entry lock are now consistent, but the multi-phase ordinary-entry
+CAS protocol is still duplicated in two local implementations: workflow actor/judge
+turn entry (`turn_execution_contract.clj`) and deterministic-operation entry
+(`deterministic_operation_runtime/core.clj`) each hand-roll reserve/start,
+call-begin/call-commit, attempt lookup, stop check, attempt-id guard, timestamps,
+and stopped-result shaping. This keeps the D31 entry topology split across two
+parallel state machines, so future changes to the cancellation entry contract must
+be made twice. Follow-up added to extract a shared entry-linearization helper (or a
+small reusable phase-update primitive) while preserving existing D31 regressions.
+
+No tests run (code-shaper review only).

@@ -299,3 +299,7 @@
 
 - [x] Finish consolidating the workflow stop predicate in write-path helpers: replace the remaining local nil-run / `:cancelled` checks in deterministic-operation start CAS helpers, workflow turn-start CAS helpers, judge attachment checks, and stale-result guard helpers with `psi.workflow-coordination.stop-signal/workflow-stop-signal-in-state` (or a small shared live-run wrapper over it), preserving the existing D31 cancellation guarantees with focused regression coverage or equivalent focused existing tests.
   - Covered 2026-06-12: deterministic-operation start/call/handler-entry CAS helpers, workflow turn-start/call CAS helpers, delegate child-run creation, judge-session attachment, and stale-result guard helpers now reuse the shared stop-signal predicate or `workflow-live-in-state?`. Focused D31 cancellation/turn/judge/deterministic-operation suites and focused lint are green.
+
+## Code-shaper review follow-ups (ψ pass 3, 2026-06-12)
+
+- [ ] Consolidate the duplicated multi-phase workflow ordinary-entry CAS protocol used by actor/judge turn starts and deterministic-operation starts: extract a shared helper or small reusable phase-update primitive for attempt lookup, stop-signal check, attempt-id guard, phase-state update/timestamps/counts, and stopped-result signalling, so future D31 entry-boundary changes do not require parallel edits in `turn_execution_contract.clj` and `deterministic_operation_runtime/core.clj`. Preserve focused regressions for actor, judge, and invoke cancellation windows.
