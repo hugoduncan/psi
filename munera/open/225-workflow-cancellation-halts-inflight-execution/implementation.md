@@ -3616,3 +3616,20 @@ Verification: focused Scry namespaces
 `psi.agent-session.workflow-judge-cancellation-test`, and
 `psi.workflow-runtime.statechart-runtime.step-execution-test` are green. Focused
 `clj-kondo` over the changed source files is clean.
+
+## Code-shaper review (ψ pass 5, 2026-06-12)
+
+Reviewed the post-pass-4 ordinary-entry shape with `code-shaper`: task artifacts,
+`components/workflow-coordination/src/psi/workflow_coordination/ordinary_entry.clj`,
+`components/workflow-runtime/src/psi/workflow_runtime/turn_execution_contract.clj`,
+and `components/deterministic-operation-runtime/src/psi/deterministic_operation_runtime/core.clj`.
+The shared phase runner keeps the reserve → start → call-begin → call-commit
+choreography single-sourced while preserving the domain-specific actor/judge
+handoff and deterministic-operation handler-entry lock. Local remaining helpers are
+small phase descriptors over different field names, not parallel control-flow
+machines. No new actionable code-shaper issues found; no follow-up steps added.
+
+Verification during review: focused Scry for turn-execution, deterministic-operation,
+and workflow call-start cancellation passed (19 tests / 90 assertions); focused
+clj-kondo over the changed ordinary-entry source paths reported 0 errors / 0
+warnings.
