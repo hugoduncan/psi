@@ -3554,3 +3554,23 @@ be made twice. Follow-up added to extract a shared entry-linearization helper (o
 small reusable phase-update primitive) while preserving existing D31 regressions.
 
 No tests run (code-shaper review only).
+
+## Code-shaper follow-up pass 3 — ordinary-entry CAS consolidation (ψ, 2026-06-12)
+
+Completed the newly added code-shaper follow-up. Added
+`psi.workflow-coordination.ordinary-entry`, a shared CAS phase-transition helper for
+workflow ordinary-work entry. The helper centralizes latest-attempt lookup,
+canonical stop-signal re-checking inside each CAS attempt, optional/required
+attempt-id guards, phase-state updates, timestamps/count increments, idempotent
+phase success, blocked phase states, and success-key result shaping.
+
+Rewired `psi.workflow-runtime.turn-execution-contract` actor/judge turn entry and
+`psi.deterministic-operation-runtime.core` deterministic-operation entry to use the
+shared primitive for reserve/start, call-begin/call-commit, and operation handler
+entry phases. This removes the parallel hand-rolled D31 entry state machines while
+preserving local stopped-result messages and hook sequencing.
+
+Verification: `clj-paren-repair` on changed Clojure files; focused Scry namespaces
+for actor call-start, judge cancellation, and deterministic-operation cancellation
+regressions passed (25 tests / 113 assertions); focused `clj-kondo` over changed
+source/test paths reported 0 errors and 0 warnings.

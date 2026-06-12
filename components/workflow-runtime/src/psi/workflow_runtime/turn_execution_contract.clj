@@ -8,6 +8,7 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.recording :as turn-recording]
+   [psi.workflow-coordination.ordinary-entry :as ordinary-entry]
    [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
@@ -85,107 +86,6 @@
   (when (:workflow-owned? session-data)
     (stop-signal/workflow-stop-signal ctx (:workflow-run-id session-data))))
 
-(defn- latest-attempt-index
-  [attempts]
-  (when (seq attempts)
-    (dec (count attempts))))
-
-(defn- workflow-turn-attempt-path
-  [{:keys [workflow-run-id workflow-step-id]}]
-  [:workflows :runs workflow-run-id :step-runs workflow-step-id :attempts])
-
-(defn- reserve-workflow-turn-start-in-state
-  [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
-        attempt-path (workflow-turn-attempt-path session-data)
-        attempts (get-in state-map attempt-path)
-        latest-idx (latest-attempt-index attempts)
-        latest-attempt (when latest-idx (nth attempts latest-idx))]
-    (cond
-      stop-reason
-      {:state state-map :reserved? false :reason stop-reason}
-
-      (not= workflow-attempt-id (:attempt-id latest-attempt))
-      {:state state-map :reserved? false :reason :attempt-mismatch}
-
-      :else
-      {:state (update-in state-map (conj attempt-path latest-idx)
-                         (fn [attempt]
-                           (assoc attempt
-                                  :turn-start-state :reserved
-                                  :turn-start-reserved-at (java.time.Instant/now))))
-       :reserved? true})))
-
-(defn- commit-workflow-turn-start-in-state
-  [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
-        attempt-path (workflow-turn-attempt-path session-data)
-        attempts (get-in state-map attempt-path)
-        latest-idx (latest-attempt-index attempts)
-        latest-attempt (when latest-idx (nth attempts latest-idx))]
-    (cond
-      stop-reason
-      {:state state-map :committed? false :reason stop-reason}
-
-      (not= workflow-attempt-id (:attempt-id latest-attempt))
-      {:state state-map :committed? false :reason :attempt-mismatch}
-
-      :else
-      {:state (update-in state-map (conj attempt-path latest-idx)
-                         (fn [attempt]
-                           (-> attempt
-                               (assoc :turn-start-state :started
-                                      :turn-started-at (java.time.Instant/now))
-                               (update :turn-start-count (fnil inc 0)))))
-       :committed? true})))
-
-(defn- begin-workflow-turn-call-in-state
-  [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
-        attempt-path (workflow-turn-attempt-path session-data)
-        attempts (get-in state-map attempt-path)
-        latest-idx (latest-attempt-index attempts)
-        latest-attempt (when latest-idx (nth attempts latest-idx))]
-    (cond
-      stop-reason
-      {:state state-map :begun? false :reason stop-reason}
-
-      (not= workflow-attempt-id (:attempt-id latest-attempt))
-      {:state state-map :begun? false :reason :attempt-mismatch}
-
-      :else
-      {:state (update-in state-map (conj attempt-path latest-idx)
-                         (fn [attempt]
-                           (assoc attempt
-                                  :turn-call-state :begun
-                                  :turn-call-begun-at (java.time.Instant/now))))
-       :begun? true})))
-
-(defn- commit-workflow-turn-call-in-state
-  [state-map {:keys [workflow-run-id workflow-attempt-id] :as session-data}]
-  (let [stop-reason (stop-signal/workflow-stop-signal-in-state state-map workflow-run-id)
-        attempt-path (workflow-turn-attempt-path session-data)
-        attempts (get-in state-map attempt-path)
-        latest-idx (latest-attempt-index attempts)
-        latest-attempt (when latest-idx (nth attempts latest-idx))]
-    (cond
-      stop-reason
-      {:state state-map :committed? false :reason stop-reason}
-
-      (not= workflow-attempt-id (:attempt-id latest-attempt))
-      {:state state-map :committed? false :reason :attempt-mismatch}
-
-      (not= :begun (:turn-call-state latest-attempt))
-      {:state state-map :committed? false :reason :call-state-mismatch}
-
-      :else
-      {:state (update-in state-map (conj attempt-path latest-idx)
-                         (fn [attempt]
-                           (assoc attempt
-                                  :turn-call-state :committed
-                                  :turn-call-committed-at (java.time.Instant/now))))
-       :committed? true})))
-
 (defn- workflow-turn-start-required?
   [ctx session-data]
   (and (:workflow-owned? session-data)
@@ -194,57 +94,54 @@
        (:workflow-attempt-id session-data)
        (:state* ctx)))
 
+(defn- transition-workflow-turn-phase!
+  [ctx session-data success-key phase-opts]
+  (if-not (workflow-turn-start-required? ctx session-data)
+    {success-key true}
+    (-> (ordinary-entry/transition-latest-attempt!
+         (:state* ctx)
+         (merge {:workflow-run-id (:workflow-run-id session-data)
+                 :workflow-step-id (:workflow-step-id session-data)
+                 :workflow-attempt-id (:workflow-attempt-id session-data)
+                 :missing-attempt-reason :attempt-mismatch}
+                phase-opts))
+        (ordinary-entry/keyed-result success-key))))
+
 (defn- reserve-workflow-turn-start!
   [ctx session-data]
-  (if-not (workflow-turn-start-required? ctx session-data)
-    {:reserved? true}
-    (loop []
-      (let [state* (:state* ctx)
-            state-map @state*
-            {:keys [state reserved? reason]} (reserve-workflow-turn-start-in-state state-map session-data)]
-        (cond
-          (not reserved?) {:reserved? false :reason reason}
-          (compare-and-set! state* state-map state) {:reserved? true}
-          :else (recur))))))
+  (transition-workflow-turn-phase!
+   ctx session-data :reserved?
+   {:phase-key :turn-start-state
+    :phase-value :reserved
+    :timestamp-key :turn-start-reserved-at}))
 
 (defn- commit-workflow-turn-start!
   [ctx session-data]
-  (if-not (workflow-turn-start-required? ctx session-data)
-    {:committed? true}
-    (loop []
-      (let [state* (:state* ctx)
-            state-map @state*
-            {:keys [state committed? reason]} (commit-workflow-turn-start-in-state state-map session-data)]
-        (cond
-          (not committed?) {:committed? false :reason reason}
-          (compare-and-set! state* state-map state) {:committed? true}
-          :else (recur))))))
+  (transition-workflow-turn-phase!
+   ctx session-data :committed?
+   {:phase-key :turn-start-state
+    :phase-value :started
+    :timestamp-key :turn-started-at
+    :count-key :turn-start-count}))
 
 (defn- begin-workflow-turn-call!
   [ctx session-data]
-  (if-not (workflow-turn-start-required? ctx session-data)
-    {:begun? true}
-    (loop []
-      (let [state* (:state* ctx)
-            state-map @state*
-            {:keys [state begun? reason]} (begin-workflow-turn-call-in-state state-map session-data)]
-        (cond
-          (not begun?) {:begun? false :reason reason}
-          (compare-and-set! state* state-map state) {:begun? true}
-          :else (recur))))))
+  (transition-workflow-turn-phase!
+   ctx session-data :begun?
+   {:phase-key :turn-call-state
+    :phase-value :begun
+    :timestamp-key :turn-call-begun-at}))
 
 (defn- commit-workflow-turn-call!
   [ctx session-data]
-  (if-not (workflow-turn-start-required? ctx session-data)
-    {:committed? true}
-    (loop []
-      (let [state* (:state* ctx)
-            state-map @state*
-            {:keys [state committed? reason]} (commit-workflow-turn-call-in-state state-map session-data)]
-        (cond
-          (not committed?) {:committed? false :reason reason}
-          (compare-and-set! state* state-map state) {:committed? true}
-          :else (recur))))))
+  (transition-workflow-turn-phase!
+   ctx session-data :committed?
+   {:required-phases [{:key :turn-call-state
+                       :value :begun
+                       :reason :call-state-mismatch}]
+    :phase-key :turn-call-state
+    :phase-value :committed
+    :timestamp-key :turn-call-committed-at}))
 
 (defn- call-workflow-turn-start-hook!
   [ctx session-id session-data phase]
