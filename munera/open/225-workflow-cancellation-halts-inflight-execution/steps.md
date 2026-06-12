@@ -264,3 +264,7 @@
 
 - [x] Make `:runtime/prompt-continue-chain` tool dispatch cancellation-safe after its executor stop check: a D31 cancel landing after `workflow-effect-stop-signal` passes but before/during `continue-prompt-chain-fn` must not start ordinary `:session/tool-run` / tool execution after the checkpoint. Carry `:workflow-run-id` into the continuation callback and re-check/linearize before each tool dispatch (or use an equivalent cancellation-entry protocol), and add a regression for cancellation in that final stop-check→tool-dispatch window.
   - Covered 2026-06-11: `:runtime/prompt-continue-chain` now passes `:workflow-run-id` into `prompt-chain/run-prompt-tools!`, which re-checks canonical run cancellation/removal before each tool dispatch and after the pre-dispatch hook window; guarded `:session/tool-run` / execute / record handlers also no-op for cancelled/removed workflow run ids; regressions cover cancellation before first continuation tool dispatch, during a continuation tool sequence, and stale guarded tool-run arrival after D31.
+
+## Test review follow-ups (ψ pass 6, 2026-06-12)
+
+- [ ] Add adapter-boundary tests proving the public cancellation/removal surfaces enter the canonical state-kernel events rather than mutating workflow-runtime state inline: Pathom `psi.workflow/cancel-run`, `psi-tool workflow op=cancel-run`, and `delegate remove` should assert `:psi.workflow/cancel-run` / `:psi.workflow/remove-run` dispatch/event-log (or equivalent dispatch seam) in addition to their returned state/result shapes.
