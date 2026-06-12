@@ -3426,3 +3426,11 @@ hiding intent enough to justify another follow-up.
 
 No new actionable test-shaping issue found beyond the already completed test-review
 follow-ups.
+
+## Docs review (ψ, 2026-06-12)
+
+Reviewed with `review-task-docs`: task artifacts, `CHANGELOG.md`, `README.md`, `doc/workflows.md`, `doc/architecture.md`, and the public workflow cancellation surfaces. Changelog and `delegate remove` docs cover the removal fix, and `doc/architecture.md` covers re-entrant dispatch sequencing.
+
+New actionable issue: the user-facing docs mention cancelling delegated workflows in the changelog but do not document the actual cancellation surface/contract. `doc/workflows.md` documents `delegate remove` only, while `psi-tool workflow op=cancel-run` is a public workflow management operation and now has changed semantics (canonical dispatch cancellation, descendant cancellation, background-job terminalization, top-level worker interrupt, idempotent terminal/absent success). Add user-facing documentation for workflow cancellation so users can distinguish cancel-vs-remove and understand what cancellation guarantees.
+
+No tests run (docs review only).
