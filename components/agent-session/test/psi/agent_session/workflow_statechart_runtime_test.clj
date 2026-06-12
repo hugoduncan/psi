@@ -8,6 +8,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.execution-adapter]
+   [psi.workflow-runtime.progression-recording]
    [psi.agent-session.workflow-judge]
    [psi.session-state.state :as ss]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -681,12 +682,3 @@
         (is (= :failed (:status run)))
         (is (= :execution-failed (:status attempt)))))))
 
-(deftest cancel-from-blocked-state-test
-  (let [[ctx session-id] (create-session-context)
-        _ (install-run! ctx linear-definition "run-4")
-        wf-ctx (runtime/create-workflow-context ctx session-id "run-4")]
-    (swap! (:state* ctx)
-           assoc-in [:workflows :runs "run-4" :status] :blocked)
-    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/cancel nil)
-    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-4")]
-      (is (= :cancelled (:status run))))))

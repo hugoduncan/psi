@@ -7,6 +7,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.session-state.state :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -207,6 +208,8 @@
              (:workflow-input @captured-run))))))
 
 (deftest cancel-workflow-run-test
+  ;; Tests that the public Pathom adapter routes cancellation through the
+  ;; canonical dispatch event and exposes idempotent no-op results.
   (testing "cancels a pending run"
     (let [ctx (make-test-ctx)
           _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
@@ -220,15 +223,43 @@
                                                         :reason "test cancel"})]
       (is (= "run-1" (:psi.workflow/run-id result)))
       (is (= :cancelled (:psi.workflow/status result)))
+      (is (true? (:psi.workflow/cancelled? result)))
+      (is (false? (:psi.workflow/noop? result)))
       (is (nil? (:psi.workflow/error result)))))
 
-  (testing "returns error for nonexistent run"
+  (testing "routes through the canonical cancellation dispatch event"
+    (kernel/clear-event-log!)
+    (let [ctx (make-test-ctx)
+          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                            :definition sample-definition})
+          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                   :definition-id "test-workflow"
+                                                   :workflow-input {:input "hello" :original "hello"}
+                                                   :run-id "run-1"})
+          result (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
+                                                        :run-id "run-1"
+                                                        :reason "adapter cancel"
+                                                        :session-id "session-1"})
+          entry (->> (kernel/event-log-entries)
+                     (filter #(= :psi.workflow/cancel-run (:event-type %)))
+                     last)]
+      (is (= :cancelled (:psi.workflow/status result)))
+      (is (= {:run-id "run-1"
+              :reason "adapter cancel"
+              :session-id "session-1"}
+             (:event-data entry)))
+      (is (seq (:declared-effects entry)))))
+
+  (testing "returns success no-op for nonexistent run"
     (let [ctx (make-test-ctx)
           result (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
                                                         :run-id "ghost"})]
-      (is (string? (:psi.workflow/error result)))))
+      (is (= "ghost" (:psi.workflow/run-id result)))
+      (is (false? (:psi.workflow/found? result)))
+      (is (true? (:psi.workflow/noop? result)))
+      (is (nil? (:psi.workflow/error result)))))
 
-  (testing "returns error for already-terminal run"
+  (testing "returns success no-op for already-terminal run"
     (let [ctx (make-test-ctx)
           _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
                                                             :definition sample-definition})
@@ -240,9 +271,14 @@
                                                    :run-id "run-1"})
           result (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
                                                         :run-id "run-1"})]
-      (is (string? (:psi.workflow/error result))))))
+      (is (= :cancelled (:psi.workflow/status result)))
+      (is (true? (:psi.workflow/cancelled? result)))
+      (is (true? (:psi.workflow/noop? result)))
+      (is (nil? (:psi.workflow/error result))))))
 
 (deftest remove-workflow-run-test
+  ;; Tests canonical remove semantics: live remove cancels then re-enters remove;
+  ;; terminal remove drops the record; absent remove is canonical no-op cleanup.
   (testing "removes an existing run from canonical state"
     (let [ctx (make-test-ctx)
           _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
@@ -255,16 +291,19 @@
                                                         :run-id "run-1"})]
       (is (= "run-1" (:psi.workflow/run-id result)))
       (is (true? (:psi.workflow/removed? result)))
+      (is (true? (:psi.workflow/cancelled? result)))
       (is (nil? (:psi.workflow/error result)))
       (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
       (is (= [] (get-in @(:state* ctx) [:workflows :run-order])))))
 
-  (testing "returns error for nonexistent run"
+  (testing "returns success no-op for nonexistent run"
     (let [ctx (make-test-ctx)
           result (cwf-mutations/remove-workflow-run {} {:psi/agent-session-ctx ctx
                                                         :run-id "ghost"})]
       (is (false? (:psi.workflow/removed? result)))
-      (is (string? (:psi.workflow/error result))))))
+      (is (false? (:psi.workflow/found? result)))
+      (is (true? (:psi.workflow/noop? result)))
+      (is (nil? (:psi.workflow/error result))))))
 
 (deftest list-workflow-definitions-test
   (testing "lists registered definitions"

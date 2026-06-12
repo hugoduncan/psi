@@ -8,6 +8,8 @@
   (:require
    [clojure.string :as str]
    [psi.turn-runtime.recording :as turn-recording]
+   [psi.workflow-coordination.ordinary-entry :as ordinary-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]))
 
 (defn assistant-message-text
@@ -74,9 +76,125 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
+(defn- workflow-session-data
+  [ctx session-id]
+  (when-let [get-session-data (:get-session-data (execution-adapter/adapter ctx))]
+    (get-session-data ctx session-id)))
+
+(defn- workflow-session-stop-signal-for
+  [ctx session-data]
+  (when (:workflow-owned? session-data)
+    (stop-signal/workflow-stop-signal ctx (:workflow-run-id session-data))))
+
+(defn- workflow-turn-start-required?
+  [ctx session-data]
+  (and (:workflow-owned? session-data)
+       (:workflow-run-id session-data)
+       (:workflow-step-id session-data)
+       (:workflow-attempt-id session-data)
+       (:state* ctx)))
+
+(defn- transition-workflow-turn-phase!
+  [ctx session-data success-key phase-opts]
+  (if-not (workflow-turn-start-required? ctx session-data)
+    {success-key true}
+    (-> (ordinary-entry/transition-latest-attempt!
+         (:state* ctx)
+         (merge {:workflow-run-id (:workflow-run-id session-data)
+                 :workflow-step-id (:workflow-step-id session-data)
+                 :workflow-attempt-id (:workflow-attempt-id session-data)
+                 :missing-attempt-reason :attempt-mismatch}
+                phase-opts))
+        (ordinary-entry/keyed-result success-key))))
+
+(defn- reserve-workflow-turn-start!
+  [ctx session-data]
+  (transition-workflow-turn-phase!
+   ctx session-data :reserved?
+   {:phase-key :turn-start-state
+    :phase-value :reserved
+    :timestamp-key :turn-start-reserved-at}))
+
+(defn- commit-workflow-turn-start!
+  [ctx session-data]
+  (transition-workflow-turn-phase!
+   ctx session-data :committed?
+   {:phase-key :turn-start-state
+    :phase-value :started
+    :timestamp-key :turn-started-at
+    :count-key :turn-start-count}))
+
+(defn- begin-workflow-turn-call!
+  [ctx session-data]
+  (transition-workflow-turn-phase!
+   ctx session-data :begun?
+   {:phase-key :turn-call-state
+    :phase-value :begun
+    :timestamp-key :turn-call-begun-at}))
+
+(defn- commit-workflow-turn-call!
+  [ctx session-data]
+  (transition-workflow-turn-phase!
+   ctx session-data :committed?
+   {:required-phases [{:key :turn-call-state
+                       :value :begun
+                       :reason :call-state-mismatch}]
+    :phase-key :turn-call-state
+    :phase-value :committed
+    :timestamp-key :turn-call-committed-at}))
+
+(defn- call-workflow-turn-start-hook!
+  [ctx session-id session-data phase]
+  (when (and (:workflow-owned? session-data)
+             (:workflow-run-id session-data))
+    (when-let [f (:before-workflow-turn-start-fn ctx)]
+      (f ctx session-id {:workflow-run-id (:workflow-run-id session-data)
+                         :workflow-step-id (:workflow-step-id session-data)
+                         :workflow-attempt-id (:workflow-attempt-id session-data)
+                         :phase phase}))))
+
+(defn- stopped-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before turn start"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before turn start"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before turn start"
+   :execution-result/stop-reason :error})
+
+(defn- prompt-execution-result*
+  [ctx session-id text images opts session-data]
+  (let [{:keys [ok? result]}
+        (ordinary-entry/run-linear-entry-phases!
+         {:stop-signal-fn #(workflow-session-stop-signal-for ctx session-data)
+          :stopped-result-fn #(stopped-execution-result session-id %)
+          :hook-fn #(call-workflow-turn-start-hook! ctx session-id session-data %)
+          :phases [{:transition #(reserve-workflow-turn-start! ctx session-data)
+                    :success-key :reserved?
+                    :before-hook :before-reserve
+                    :after-hook :after-reserve}
+                   {:transition #(commit-workflow-turn-start! ctx session-data)
+                    :success-key :committed?
+                    :after-hook :after-commit}
+                   {:transition #(begin-workflow-turn-call! ctx session-data)
+                    :success-key :begun?
+                    :after-hook :after-call-begin}
+                   {:transition #(commit-workflow-turn-call! ctx session-data)
+                    :success-key :committed?
+                    :after-hook :after-call-commit}]})]
+    (if ok?
+      (execution-adapter/prompt-execution-result! ctx session-id text images opts)
+      result)))
+
 (defn- prompt-execution-result
   [ctx session-id text images opts]
-  (execution-adapter/prompt-execution-result! ctx session-id text images opts))
+  (let [session-data (workflow-session-data ctx session-id)]
+    (prompt-execution-result* ctx session-id text images opts session-data)))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt
@@ -108,16 +226,30 @@
 
 (defn execute-actor-turn!
   "Intent-named semantic alias for workflow actor-step callers.
-   Accepts optional provider-neutral turn options as a fourth argument."
+   Accepts optional provider-neutral turn options as a fourth argument.
+
+   Tests may supply `:workflow-execute-actor-turn-fn` on ctx as a nullable
+   boundary seam for controlled actor turn execution."
   ([ctx session-id prompt]
-   (execute-session-turn! ctx session-id prompt))
+   (if-let [f (:workflow-execute-actor-turn-fn ctx)]
+     (f ctx session-id prompt)
+     (execute-session-turn! ctx session-id prompt)))
   ([ctx session-id prompt opts]
-   (execute-session-turn! ctx session-id prompt nil opts)))
+   (if-let [f (:workflow-execute-actor-turn-fn ctx)]
+     (f ctx session-id prompt opts)
+     (execute-session-turn! ctx session-id prompt nil opts))))
 
 (defn execute-judge-turn!
   "Intent-named semantic alias for workflow judge callers.
-   Accepts optional provider-neutral turn options as a fourth argument."
+   Accepts optional provider-neutral turn options as a fourth argument.
+
+   Tests may supply `:workflow-execute-judge-turn-fn` on ctx as a nullable
+   boundary seam for controlled judge turn execution."
   ([ctx session-id prompt]
-   (execute-session-turn! ctx session-id prompt))
+   (if-let [f (:workflow-execute-judge-turn-fn ctx)]
+     (f ctx session-id prompt)
+     (execute-session-turn! ctx session-id prompt)))
   ([ctx session-id prompt opts]
-   (execute-session-turn! ctx session-id prompt nil opts)))
+   (if-let [f (:workflow-execute-judge-turn-fn ctx)]
+     (f ctx session-id prompt opts)
+     (execute-session-turn! ctx session-id prompt nil opts))))

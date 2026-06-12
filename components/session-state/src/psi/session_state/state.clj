@@ -28,6 +28,8 @@
 
 (defn session-data-path [sid] [:agent-session :sessions sid :data])
 (defn session-telemetry-path [sid k] [:agent-session :sessions sid :telemetry k])
+(defn session-recorded-tool-result-ids-path [sid]
+  [:agent-session :sessions sid :recorded-tool-result-ids])
 (defn session-journal-path [sid] (session-persistence/session-journal-path sid))
 (defn session-flush-state-path [sid] (session-persistence/session-flush-state-path sid))
 (defn session-turn-ctx-path [sid] [:agent-session :sessions sid :turn :ctx])

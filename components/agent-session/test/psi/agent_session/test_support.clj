@@ -18,6 +18,7 @@
    [psi.agent-session.turn]
    [psi.agent-session.workflow-judge]
    [psi.agent-session.context :as session-context]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
    [psi.session-state.model :as session-data]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
@@ -271,7 +272,7 @@
                        :execute-tool-runtime-fn      #'tool-plan/execute-tool-runtime-in!
                        :build-prepared-request-fn    #'psi.agent-session.prompt-request/build-prepared-request
                        :build-record-response-fn     #'psi.agent-session.prompt-recording/build-record-response
-                       :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue]
+                       :continue-prompt-chain-fn     (fn [_ctx _session-id _execution-result _progress-queue _opts]
                                                        {:continued? true})
                        :refresh-system-prompt-fn     (fn
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))
@@ -318,6 +319,8 @@
                        :split-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/split-step-session-conversation
                        :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!
                        :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
+                       :workflow-inflight-runs-handle workflow-runtime-state/inflight-runs
+                       :workflow-cancellation-entry-locks-handle (atom {})
                        :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
                        :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
                        :now-fn                       java.time.Instant/now

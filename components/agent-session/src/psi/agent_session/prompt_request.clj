@@ -102,6 +102,26 @@
           (recur (next remaining) (conj repaired message))))
       repaired)))
 
+(defn- dedupe-tool-results
+  "Drop any toolResult message whose tool-call-id already appeared earlier
+   (first occurrence wins). Defensive projection guard so already-persisted
+   journals containing duplicate toolResult entries for one tool-call-id project
+   to at most one provider `tool_result` per id. Applied to
+   `repair-dangling-tool-uses`'s output (de-dup-after-repair) so synthetic
+   results repair adds for non-contiguous ids are also de-duped; ordering and
+   non-toolResult messages are preserved."
+  [messages]
+  (first
+   (reduce (fn [[acc seen] message]
+             (if (tool-result-message? message)
+               (let [id (tool-result-id message)]
+                 (if (contains? seen id)
+                   [acc seen]
+                   [(conj acc message) (conj seen id)]))
+               [(conj acc message) seen]))
+           [[] #{}]
+           messages)))
+
 (defn- mid-system-provider-message
   [entry]
   (let [text (get-in entry [:data :text])]
@@ -116,14 +136,15 @@
    Dangling assistant tool uses are repaired with synthetic error tool results
    in the provider-facing projection so interrupted sessions remain usable."
   [journal]
-  (repair-dangling-tool-uses
-   (into []
-         (keep (fn [entry]
-                 (case (:kind entry)
-                   :message (get-in entry [:data :message])
-                   :mid-system (mid-system-provider-message entry)
-                   nil)))
-         journal)))
+  (dedupe-tool-results
+   (repair-dangling-tool-uses
+    (into []
+          (keep (fn [entry]
+                  (case (:kind entry)
+                    :message (get-in entry [:data :message])
+                    :mid-system (mid-system-provider-message entry)
+                    nil)))
+          journal))))
 
 (defn session->provider-messages
   "Project the persisted journal for `session-id` into provider-visible messages."

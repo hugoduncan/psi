@@ -131,7 +131,7 @@
                           :execution-result/tool-calls [{:id "tc-1" :name "read" :arguments "{}"}]
                           :execution-result/stop-reason :stop}]
     (kernel/clear-event-log!)
-    (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq]
+    (with-redefs [psi.agent-session.prompt-chain/run-prompt-tools! (fn [_ctx _sid _res _pq & _]
                                                                      {:continued? true :tool-call-count 1})
                   psi.agent-session.prompt-request/build-prepared-request (fn [_ctx sid {:keys [turn-id]}]
                                                                             {:prepared-request/id turn-id
@@ -546,7 +546,7 @@
                         (is (nil? (:prepared-request/user-message prepared)))
                         terminal-result)))
                   psi.agent-session.prompt-chain/run-prompt-tools!
-                  (fn [ctx sid _execution-result _progress-queue]
+                  (fn [ctx sid _execution-result _progress-queue & _]
                     (session/dispatch-in! ctx :session/tool-record-result
                                           {:session-id sid
                                            :shaped-result {:result-message {:role "toolResult"
@@ -766,7 +766,7 @@
                                              :stop-reason :stop
                                              :timestamp (java.time.Instant/now)})}))
                   psi.agent-session.prompt-chain/run-prompt-tools!
-                  (fn [ctx sid _execution-result _progress-queue]
+                  (fn [ctx sid _execution-result _progress-queue & _]
                     (swap! tool-runs* inc)
                     (session/dispatch-in! ctx :session/tool-record-result
                                           {:session-id sid

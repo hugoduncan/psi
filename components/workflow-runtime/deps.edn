@@ -1,4 +1,5 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
+{:deps {psi/workflow-coordination {:local/root "../workflow-coordination"}
+        org.clojure/clojure {:mvn/version "1.12.0"}
         com.fulcrologic/statecharts {:mvn/version "1.2.25"}
         metosin/malli {:mvn/version "0.16.4"}
         psi/session-state {:local/root "../session-state"}

@@ -346,6 +346,63 @@
                @set-models*))
         (is (= :success (get-in @working-memory* [:pending-actor-result :kind])))))))
 
+(deftest execute-session-step-ranked-fallback-stops-between-candidates-test
+  ;; Regression for task 225 implementation review pass 5: a cancellation that
+  ;; lands after one fallback-worthy actor failure must not start the next ranked
+  ;; model candidate turn.
+  (testing "ranked fallback stop predicate is checked before each fallback candidate"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          calls* (atom [])
+          stopped* (atom false)
+          set-models* (atom [])
+          adapter (execution-adapter/create
+                   {:set-session-model! (fn [_ctx session-id model _scope]
+                                          (swap! set-models* conj {:session-id session-id
+                                                                   :model model}))})
+          ctx {execution-adapter/adapter-key adapter
+               :workflow-execute-actor-turn-fn
+               (fn
+                 ([_ctx session-id _prompt]
+                  (swap! calls* conj {:session-id session-id :opts nil})
+                  (reset! stopped* true)
+                  {:status :error
+                   :assistant-text ""
+                   :execution-result nil
+                   :failure {:reason :provider-unavailable
+                             :message "connection refused"
+                             :fallback-worthy? true}})
+                 ([_ctx session-id _prompt opts]
+                  (swap! calls* conj {:session-id session-id :opts opts})
+                  (reset! stopped* true)
+                  {:status :error
+                   :assistant-text ""
+                   :execution-result nil
+                   :failure {:reason :provider-unavailable
+                             :message "connection refused"
+                             :fallback-worthy? true}}))}]
+      (step-execution/execute-session-step!
+       ctx
+       {:session-id "child-session"
+        :model-fallback {:type :ranked-model-candidates
+                         :candidates [{:provider "local" :id "first"}
+                                      {:provider "local" :id "second"}]}}
+       {:name "classify"
+        :type :session}
+       "classify"
+       "attempt-1"
+       working-memory*
+       event-queue*
+       "Classify"
+       #(deref stopped*))
+      (is (= 1 (count @calls*))
+          "the second ranked candidate turn must not start after cancellation")
+      (is (= [] @set-models*)
+          "the stopped fallback candidate is not installed on the child session")
+      (is (nil? (:pending-actor-result @working-memory*))
+          "no ordinary actor result is recorded after the stop predicate trips")
+      (is (= :workflow/cancel (:event (first @event-queue*)))))))
+
 (deftest execute-session-step-text-output-remains-compatible-test
   (testing "session steps without structured outputs still accept text outputs unchanged"
     (let [working-memory* (atom {:current-step-id "summarize"})

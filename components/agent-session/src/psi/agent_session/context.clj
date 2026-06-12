@@ -21,6 +21,7 @@
    [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
+   [psi.session-persistence.core :as persist]
    [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.session-state.model :as session]
@@ -32,6 +33,7 @@
    [psi.agent-session.tools]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
    [psi.workflow-runtime.child-session-contract :as workflow-child-session-contract]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.model :as workflow-model]
@@ -41,6 +43,7 @@
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
+   [psi.memory.runtime :as memory-runtime]
    [psi.query.core :as query]
    [psi.ui.state :as ui-state])
   (:import
@@ -193,7 +196,11 @@
                                               (cond-> {:session-id session-id :model model}
                                                 scope (assoc :scope scope))
                                               {:origin :core}))
-    :execute-judge! (:execute-workflow-judge-fn ctx)}))
+    :execute-judge! (:execute-workflow-judge-fn ctx)
+    :abort-session! (fn [ctx session-id]
+                      (turn-runtime/abort-active-turn-in! ctx session-id)
+                      (when-let [agent-ctx (ss/agent-ctx-in ctx session-id)]
+                        (agent-core/abort-in! agent-ctx)))}))
 
 (defn- callback-fns [mutations projection-listeners*]
   {:apply-root-state-update-fn ss/apply-root-state-update-in!
@@ -205,6 +212,7 @@
    :execute-tool-runtime-fn #'tool-plan/execute-tool-runtime-in!
    :build-prepared-request-fn #'prompt-request/build-prepared-request
    :execute-prepared-request-fn #'turn/execute-prepared-request!
+   :memory-recover-query-fn #'memory-runtime/recover-for-query!
    :workflow-prompt-execution-result-fn #'turn/prompt-execution-result-in!
    :build-record-response-fn #'prompt-recording/build-record-response
    :continue-prompt-chain-fn #'prompt-chain/run-prompt-tools!
@@ -245,7 +253,10 @@
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
+   :workflow-judge-messages-fn #'persist/messages-from-entries-in
    :mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!
+   :workflow-inflight-runs-handle workflow-runtime-state/inflight-runs
+   :workflow-cancellation-entry-locks-handle (atom {})
    :emit-background-job-terminal-messages-fn bg-rt/maybe-emit-background-job-terminal-messages!
    :reconcile-and-emit-background-job-terminals-fn bg-rt/reconcile-and-emit-background-job-terminals-in!
    :effective-cwd-fn (fn

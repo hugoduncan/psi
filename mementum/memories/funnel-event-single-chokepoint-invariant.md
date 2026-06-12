@@ -1,0 +1,5 @@
+🔁 When an invariant must hold across *many* producers (e.g. "at most one toolResult per tool-call-id" — written by interrupt paths, abort, session-close, and the real-result path), don't enumerate/patch every producer. If they all converge on one dispatch event (`:session/tool-agent-record-result`), guard once at that **funnel**. The guarantee then rests on the funnel property — every producer dispatches the same event — not on the producer list being exhaustive, so new/forgotten producers are covered automatically.
+
+Implement as a pure both-or-neither handler: read a canonical predicate from `:state*` (e.g. `recorded-tool-result-ids`); if seen → return `{}` (suppress all effects); else → `:root-state-update` adds the id + emit all effects. Atomicity comes from dispatch serialization (single writer to `:state*`), NOT a test-and-set on a runtime atom. This keeps observable status canonical/queryable while runtime handles (`:pending-tool-calls`) stay external.
+
+First-writer-wins by dispatch order; the deterministic guarantee is at-most-once, not *which* writer wins.

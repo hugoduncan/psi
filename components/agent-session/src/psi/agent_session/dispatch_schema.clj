@@ -8,24 +8,54 @@
    effect catalog and effect payload validation."
   [:multi {:dispatch :effect/type}
    [:runtime/agent-abort
-    [:map [:effect/type [:= :runtime/agent-abort]]]]
+    [:and
+     [:map
+      [:effect/type [:= :runtime/agent-abort]]
+      [:session-id {:optional true} :string]
+      [:workflow-run-id {:optional true} :string]
+      [:workflow-step-id {:optional true} :string]
+      [:workflow-attempt-id {:optional true} :string]
+      [:expected-session-id {:optional true} :string]
+      [:workflow-session-kind {:optional true} [:enum :attempt :judge]]]
+     [:fn {:error/message "workflow abort guard keys must be all present or all absent, with explicit session-id"}
+      (fn [effect]
+        (let [guard-keys [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]
+              present-count (count (filter #(contains? effect %) guard-keys))]
+          (or (and (zero? present-count)
+                   (not (contains? effect :workflow-session-kind)))
+              (and (= present-count (count guard-keys))
+                   (contains? effect :session-id)))))]]]
+   [:runtime/cancel-inflight-run
+    [:map [:effect/type [:= :runtime/cancel-inflight-run]]
+     [:run-id :string]]]
+   [:runtime/drop-inflight-run
+    [:map [:effect/type [:= :runtime/drop-inflight-run]]
+     [:run-id :string]]]
+   [:runtime/drop-workflow-cancellation-entry-lock
+    [:map [:effect/type [:= :runtime/drop-workflow-cancellation-entry-lock]]
+     [:run-id :string]]]
    [:runtime/agent-clear-steering-queue
-    [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]]]
+    [:map [:effect/type [:= :runtime/agent-clear-steering-queue]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/agent-clear-follow-up-queue
     [:map [:effect/type [:= :runtime/agent-clear-follow-up-queue]]]]
    [:runtime/agent-drain-follow-up-queue
     [:map [:effect/type [:= :runtime/agent-drain-follow-up-queue]]
-     [:messages [:vector :map]]]]
+     [:messages [:vector :map]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/agent-start-loop
     [:map [:effect/type [:= :runtime/agent-start-loop]]]]
    [:runtime/agent-reset
     [:map [:effect/type [:= :runtime/agent-reset]]]]
    [:runtime/mark-workflow-jobs-terminal
-    [:map [:effect/type [:= :runtime/mark-workflow-jobs-terminal]]]]
+    [:map [:effect/type [:= :runtime/mark-workflow-jobs-terminal]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/emit-background-job-terminal-messages
-    [:map [:effect/type [:= :runtime/emit-background-job-terminal-messages]]]]
+    [:map [:effect/type [:= :runtime/emit-background-job-terminal-messages]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/reconcile-and-emit-background-job-terminals
-    [:map [:effect/type [:= :runtime/reconcile-and-emit-background-job-terminals]]]]
+    [:map [:effect/type [:= :runtime/reconcile-and-emit-background-job-terminals]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/refresh-system-prompt
     [:map [:effect/type [:= :runtime/refresh-system-prompt]]]]
    [:runtime/agent-queue-steering
@@ -65,32 +95,39 @@
    [:runtime/record-pending-tool-call-interrupts
     [:map [:effect/type [:= :runtime/record-pending-tool-call-interrupts]]
      [:session-id :string]
-     [:reason :keyword]]]
+     [:reason :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/tool-execute
     [:map [:effect/type [:= :runtime/tool-execute]]
      [:tool-name :string] [:args :map] [:opts {:optional true} [:maybe :map]]]]
    [:runtime/prompt-execute-and-record
     [:map [:effect/type [:= :runtime/prompt-execute-and-record]]
      [:prepared-request :map]
-     [:progress-queue {:optional true} :any]]]
+     [:progress-queue {:optional true} :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/prompt-continue-chain
     [:map [:effect/type [:= :runtime/prompt-continue-chain]]
      [:execution-result :map]
-     [:progress-queue {:optional true} :any]]]
+     [:progress-queue {:optional true} :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/dispatch-event
     [:map [:effect/type [:= :runtime/dispatch-event]]
      [:event-type :keyword]
      [:event-data [:maybe :map]]
-     [:origin {:optional true} :keyword]]]
+     [:origin {:optional true} :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/dispatch-event-with-effect-result
     [:map [:effect/type [:= :runtime/dispatch-event-with-effect-result]]
      [:event-type :keyword]
      [:event-data [:maybe :map]]
-     [:origin {:optional true} :keyword]]]
+     [:origin {:optional true} :keyword]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/event-queue-offer
     [:map [:effect/type [:= :runtime/event-queue-offer]] [:event :any]]]
    [:statechart/send-event
-    [:map [:effect/type [:= :statechart/send-event]] [:event :any]]]
+    [:map [:effect/type [:= :statechart/send-event]]
+     [:event :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-thread-sleep-send-event
     [:map [:effect/type [:= :runtime/schedule-thread-sleep-send-event]]
      [:delay-ms pos-int?] [:event :any]]]
@@ -102,9 +139,11 @@
     [:map [:effect/type [:= :scheduler/cancel-timer]]
      [:schedule-id :string]]]
    [:scheduler/drain-queue
-    [:map [:effect/type [:= :scheduler/drain-queue]]]]
+    [:map [:effect/type [:= :scheduler/drain-queue]]
+     [:workflow-run-id {:optional true} :string]]]
    [:persist/session-journal-io
     [:map [:effect/type [:= :persist/session-journal-io]]
+     [:workflow-run-id {:optional true} :string]
      [:request [:map
                 [:op [:enum :append-entry :flush-journal]]
                 [:session-id :string]
@@ -120,7 +159,8 @@
     [:map [:effect/type [:= :persist/user-config-update]] [:prefs :map]]]
    [:notify/extension-dispatch
     [:map [:effect/type [:= :notify/extension-dispatch]]
-     [:event-name :string] [:payload :any]]]
+     [:event-name :string] [:payload :any]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-extension-dispatch
     [:map [:effect/type [:= :runtime/schedule-extension-dispatch]]
      [:delay-ms pos-int?] [:event-name :string] [:payload :any]]]
@@ -140,12 +180,14 @@
      [:provenance :map]]]
    [:memory/recover-query
     [:map [:effect/type [:= :memory/recover-query]]
-     [:query-text [:maybe :string]]]]
+     [:query-text [:maybe :string]]
+     [:workflow-run-id {:optional true} :string]]]
    [:runtime/recover-query-prompt-execute-and-record
     [:map [:effect/type [:= :runtime/recover-query-prompt-execute-and-record]]
      [:prepared-request :map]
      [:progress-queue {:optional true} :any]
-     [:query-text [:maybe :string]]]]
+     [:query-text [:maybe :string]]
+     [:workflow-run-id {:optional true} :string]]]
    [:oauth/begin-login
     [:map [:effect/type [:= :oauth/begin-login]]
      [:provider-id :keyword]

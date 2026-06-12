@@ -12,12 +12,41 @@
    [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.structured-output :as structured-output]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]))
 
 ;;; Judge session execution — impure
 
 (def ^:private max-judge-retries 2)
+
+(defn- workflow-stopped-in-state?
+  [state workflow-run-id]
+  (stop-signal/workflow-stopped-in-state? state workflow-run-id))
+
+(defn- attach-judge-session-if-live!
+  [ctx workflow-run-id current-step-id workflow-attempt-id judge-sid]
+  (if-not (and workflow-run-id current-step-id workflow-attempt-id)
+    true
+    (loop []
+      (let [state* (:state* ctx)
+            state @state*
+            attempt-path [:workflows :runs workflow-run-id :step-runs current-step-id :attempts]
+            attempts (get-in state attempt-path)
+            latest-idx (when (seq attempts) (dec (count attempts)))
+            latest-attempt (when latest-idx (nth attempts latest-idx))]
+        (cond
+          (workflow-stopped-in-state? state workflow-run-id)
+          false
+
+          (not= workflow-attempt-id (:attempt-id latest-attempt))
+          false
+
+          (compare-and-set! state* state (assoc-in state (conj attempt-path latest-idx :judge-session-id) judge-sid))
+          true
+
+          :else
+          (recur))))))
 
 (defn- judge-prompt
   "Derive the judge prompt string from the compiled judge spec.
@@ -40,6 +69,37 @@
        "Expected exactly one of: " (str/join ", " (sort expected-signals)) ". "
        "Respond with exactly one of those words, nothing else."))
 
+(defn- workflow-stopped-ex
+  [message data]
+  (ex-info message (assoc data :reason :workflow-stopped)))
+
+(defn- assert-workflow-live!
+  [stopped? message data]
+  (when (stopped?)
+    (throw (workflow-stopped-ex message data))))
+
+(defn- call-judge-start-hook!
+  [ctx judge-sid stop-data phase]
+  (when-let [f (:before-workflow-judge-start-fn ctx)]
+    (f ctx judge-sid (assoc stop-data :phase phase))))
+
+(defn- execute-judge-turn-if-live!
+  [ctx judge-sid prompt opts stopped? stop-data]
+  (assert-workflow-live! stopped?
+                         "Workflow execution stopped before judge turn"
+                         stop-data)
+  (call-judge-start-hook! ctx judge-sid stop-data :before-turn)
+  (assert-workflow-live! stopped?
+                         "Workflow execution stopped before judge turn"
+                         stop-data)
+  (let [result (if opts
+                 (turn-execution/execute-judge-turn! ctx judge-sid prompt opts)
+                 (turn-execution/execute-judge-turn! ctx judge-sid prompt))]
+    (assert-workflow-live! stopped?
+                           "Workflow execution stopped after judge turn"
+                           (assoc stop-data :judge-session-id judge-sid))
+    result))
+
 (defn- invoke-judge-error-result
   [operation-id operation-result]
   {:judge-session-id nil
@@ -56,8 +116,9 @@
                               :operation-result operation-result}}})
 
 (defn- execute-invoke-judge!
-  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run]}]
-  (let [invoke-spec (or (:invoke judge-spec) judge-spec)
+  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run stopped?]}]
+  (let [stopped? (or stopped? (constantly false))
+        invoke-spec (or (:invoke judge-spec) judge-spec)
         args (workflow-source-resolution/resolve-invoke-args workflow-run current-step-id (:args invoke-spec))
         operation-result (op-reg/invoke-operation-in
                           (:deterministic-operation-registry ctx)
@@ -65,9 +126,17 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id workflow-run-id
+                           :workflow-attempt-id (some-> workflow-run
+                                                        (get-in [:step-runs current-step-id :attempts])
+                                                        last
+                                                        :attempt-id)
                            :step-id current-step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
+    (assert-workflow-live! stopped?
+                           "Workflow execution stopped after invoke judge"
+                           {:workflow-run-id workflow-run-id
+                            :workflow-step-id current-step-id})
     (if (= :ok (:status operation-result))
       (let [judge-event (:data operation-result)
             routing-result (workflow-judge/evaluate-routing judge-event routing-table
@@ -85,30 +154,52 @@
    prompts it, and matches the response against the routing table.
    Retries up to `max-judge-retries` times on no-match with feedback injection.
 
-   `routing-context` is {:current-step-id :step-order :step-runs}.
+   `routing-context` is {:current-step-id :step-order :step-runs} plus optional
+   :workflow-run-id, :workflow-attempt-id, and :stopped? cancellation guard.
 
    Returns {:judge-session-id :judge-output :judge-event :routing-result}."
   [ctx parent-session-id actor-session-id judge-spec routing-table routing-context]
-  (let [{:keys [current-step-id step-order step-runs]} routing-context]
+  (let [{:keys [current-step-id step-order step-runs workflow-run-id workflow-attempt-id stopped?]} routing-context
+        stopped? (or stopped? (constantly false))]
+    (assert-workflow-live! stopped?
+                           "Workflow execution stopped before judge start"
+                           {:workflow-run-id workflow-run-id
+                            :workflow-step-id current-step-id})
     (if (= :invoke (:type judge-spec))
       (execute-invoke-judge! ctx parent-session-id judge-spec routing-table routing-context)
       (let [projection    (or (:projection judge-spec) :full)
-            actor-msgs    (vec (persist/messages-from-entries-in ctx actor-session-id))
+            actor-msgs    (vec ((or (:workflow-judge-messages-fn ctx)
+                                    persist/messages-from-entries-in)
+                                ctx actor-session-id))
             projected     (workflow-judge/project-messages actor-msgs projection)
             judge-sid     (str (java.util.UUID/randomUUID))
             expected-sigs (keys routing-table)]
         (-> (child-session-contract/assert-valid-request!
-             {:child-session-id   judge-sid
-              :session-name       "workflow judge"
-              :system-prompt      (:system-prompt judge-spec)
-              :tool-ids           []
-              :thinking-level     :off
-              :preloaded-messages projected
-              :workflow-owned?    true}
+             (cond-> {:child-session-id   judge-sid
+                      :session-name       "workflow judge"
+                      :system-prompt      (:system-prompt judge-spec)
+                      :tool-ids           []
+                      :thinking-level     :off
+                      :preloaded-messages projected
+                      :workflow-owned?    true}
+               workflow-run-id (assoc :workflow-run-id workflow-run-id)
+               (and workflow-run-id current-step-id) (assoc :workflow-step-id current-step-id)
+               (and workflow-run-id workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id))
              :psi.agent-session.workflow-judge/execute-judge!)
             (#(execution-adapter/create-child-session! ctx parent-session-id %))
             (child-session-contract/assert-valid-result!
              :psi.agent-session.workflow-judge/execute-judge!))
+        (when-not (attach-judge-session-if-live! ctx workflow-run-id current-step-id workflow-attempt-id judge-sid)
+          (execution-adapter/abort-session! ctx judge-sid)
+          (throw (workflow-stopped-ex "Workflow execution stopped before judge session attachment"
+                                      {:workflow-run-id workflow-run-id
+                                       :workflow-step-id current-step-id
+                                       :judge-session-id judge-sid})))
+        (assert-workflow-live! stopped?
+                               "Workflow execution stopped after judge session creation"
+                               {:workflow-run-id workflow-run-id
+                                :workflow-step-id current-step-id
+                                :judge-session-id judge-sid})
         (let [structured-entry (structured-output/single-structured-output-entry (:outputs judge-spec))
               request-result (when-let [[output-key output-spec] structured-entry]
                                (structured-output/structured-output-request output-key output-spec))]
@@ -123,9 +214,12 @@
                               :reason (:reason request-result)
                               :output-key (get-in request-result [:details :output-key])
                               :details (:details request-result)}}
-            (let [initial-result (if-let [opts (:opts request-result)]
-                                   (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec) opts)
-                                   (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec)))]
+            (let [stop-data {:workflow-run-id workflow-run-id
+                             :workflow-step-id current-step-id
+                             :judge-session-id judge-sid}
+                  initial-result (execute-judge-turn-if-live!
+                                  ctx judge-sid (judge-prompt judge-spec) (:opts request-result)
+                                  stopped? stop-data)]
               (loop [attempt 0
                      last-output (str/trim (:assistant-text initial-result))
                      last-structured-output (:structured-output initial-result)]
@@ -150,14 +244,11 @@
                            :judge-event judge-event
                            :routing-result routing-result})
                         (if (< attempt max-judge-retries)
-                          (let [retry-result (if-let [opts (:opts request-result)]
-                                               (turn-execution/execute-judge-turn!
-                                                ctx judge-sid
-                                                (judge-retry-feedback last-output expected-sigs)
-                                                opts)
-                                               (turn-execution/execute-judge-turn!
-                                                ctx judge-sid
-                                                (judge-retry-feedback last-output expected-sigs)))]
+                          (let [retry-result (execute-judge-turn-if-live!
+                                              ctx judge-sid
+                                              (judge-retry-feedback last-output expected-sigs)
+                                              (:opts request-result)
+                                              stopped? stop-data)]
                             (recur (inc attempt)
                                    (str/trim (:assistant-text retry-result))
                                    (:structured-output retry-result)))
@@ -173,8 +264,11 @@
                                                                         current-step-id step-order step-runs)]
                     (if (and (= :no-match (:action routing-result))
                              (< attempt max-judge-retries))
-                      (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
-                                                                             (judge-retry-feedback last-output expected-sigs))]
+                      (let [retry-result (execute-judge-turn-if-live!
+                                          ctx judge-sid
+                                          (judge-retry-feedback last-output expected-sigs)
+                                          nil
+                                          stopped? stop-data)]
                         (recur (inc attempt)
                                (str/trim (:assistant-text retry-result))
                                (:structured-output retry-result)))

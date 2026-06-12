@@ -24,7 +24,8 @@
       :get-session-data (fn [_ctx _sid] :ok)
       :list-context-sessions (fn [_ctx] :ok)
       :find-skill (fn [_ctx _skills _skill-name] :ok)
-      :execute-judge! (fn [_ctx _parent _actor _judge-spec _routing-table _routing-context] :ok)})
+      :execute-judge! (fn [_ctx _parent _actor _judge-spec _routing-table _routing-context] :ok)
+      :abort-session! (fn [_ctx _session-id] :ok)})
     op-key)})
 
 (deftest create-child-session-missing-operation-test
@@ -107,3 +108,13 @@
       (is (re-find #"operation is required" (ex-message ex)))
       (is (= execution-adapter/adapter-key (:adapter-key (ex-data ex))))
       (is (= :execute-judge! (:operation (ex-data ex)))))))
+
+(deftest abort-session-missing-operation-test
+  (testing "missing abort-session operation fails clearly"
+    (let [ex (ex-for #(execution-adapter/abort-session!
+                       (missing-op-ctx :abort-session!)
+                       "sid"))]
+      (is (some? ex))
+      (is (re-find #"operation is required" (ex-message ex)))
+      (is (= execution-adapter/adapter-key (:adapter-key (ex-data ex))))
+      (is (= :abort-session! (:operation (ex-data ex)))))))

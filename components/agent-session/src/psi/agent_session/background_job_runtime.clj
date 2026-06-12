@@ -11,7 +11,8 @@
    [psi.agent-session.scheduler-runtime :as scheduler-runtime]
    [psi.session-state.state :as ss]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]))
+   [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn background-jobs-state-in
   "Return canonical background-jobs state."
@@ -85,29 +86,41 @@
           (let [wf (when (and (:workflow-ext-path job) (:workflow-id job))
                      (extension-workflow-runtime/workflow-in (:workflow-registry ctx)
                                                              (:workflow-ext-path job)
-                                                             (:workflow-id job)))]
-            (when wf
-              (cond
-                (:error? wf)
-                (let [state' (bg-jobs/mark-terminal
-                              store
-                              {:job-id (:job-id job)
-                               :outcome :failed
-                               :terminal-history-max-per-thread 20
-                               :payload {:workflow-id (:id wf)
-                                         :result (:result wf)
-                                         :error-message (:error-message wf)}})]
-                  (dispatch/dispatch! ctx :session/update-background-jobs-state {:update-fn (constantly state')} {:origin :core}))
+                                                             (:workflow-id job)))
+                canonical-run (when (:workflow-id job)
+                                (workflow-runtime/workflow-run-in @(:state* ctx) (:workflow-id job)))]
+            (cond
+              (= :cancelled (:status canonical-run))
+              (let [state' (bg-jobs/mark-terminal
+                            store
+                            {:job-id (:job-id job)
+                             :outcome :cancelled
+                             :terminal-history-max-per-thread 20
+                             :payload {:workflow-id (:workflow-id job)
+                                       :status :cancelled
+                                       :reason (get-in canonical-run [:terminal-outcome :reason])}})]
+                (dispatch/dispatch! ctx :session/update-background-jobs-state {:update-fn (constantly state')} {:origin :core}))
 
-                (:done? wf)
-                (let [state' (bg-jobs/mark-terminal
-                              store
-                              {:job-id (:job-id job)
-                               :outcome :completed
-                               :terminal-history-max-per-thread 20
-                               :payload {:workflow-id (:id wf)
-                                         :result (:result wf)}})]
-                  (dispatch/dispatch! ctx :session/update-background-jobs-state {:update-fn (constantly state')} {:origin :core}))))))))))
+              (:error? wf)
+              (let [state' (bg-jobs/mark-terminal
+                            store
+                            {:job-id (:job-id job)
+                             :outcome :failed
+                             :terminal-history-max-per-thread 20
+                             :payload {:workflow-id (:id wf)
+                                       :result (:result wf)
+                                       :error-message (:error-message wf)}})]
+                (dispatch/dispatch! ctx :session/update-background-jobs-state {:update-fn (constantly state')} {:origin :core}))
+
+              (:done? wf)
+              (let [state' (bg-jobs/mark-terminal
+                            store
+                            {:job-id (:job-id job)
+                             :outcome :completed
+                             :terminal-history-max-per-thread 20
+                             :payload {:workflow-id (:id wf)
+                                       :result (:result wf)}})]
+                (dispatch/dispatch! ctx :session/update-background-jobs-state {:update-fn (constantly state')} {:origin :core})))))))))
 
 (defn maybe-emit-background-job-terminal-messages!
   "Emit terminal job messages via the explicit ctx-provided notify callback."

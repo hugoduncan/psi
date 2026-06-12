@@ -12,8 +12,11 @@
    [psi.agent-session.dispatch-handlers.session-mutations :as mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as sc-actions]
    [psi.agent-session.dispatch-handlers.ui-handlers :as ui-handlers]
+   [psi.agent-session.dispatch-handlers.workflows :as workflows]
    [psi.session-state.state :as session]
-   [psi.agent-session.statechart :as sc]))
+   [psi.agent-session.statechart :as sc]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]))
 
 ;;; Re-exports expected by core.clj
 
@@ -21,6 +24,40 @@
   "Start a daemon thread running f. Returns the Thread."
   [f]
   (sc-actions/daemon-thread f))
+
+;;; Workflow-owned prompt lifecycle cancellation guard
+
+(defn- workflow-owned-session-stop-signal
+  [ctx session-id]
+  (let [session-data (session/get-session-data-in ctx session-id)]
+    (when (:workflow-owned? session-data)
+      (stop-signal/workflow-stop-signal ctx (:workflow-run-id session-data)))))
+
+(defn- stopped-workflow-prompt-result
+  [session-id reason]
+  {:workflow-stopped? true
+   :reason reason
+   :session-id session-id})
+
+(defn- workflow-prompt-entry-event?
+  [event-type]
+  (= :session/prompt event-type))
+
+(defn- guard-workflow-prompt-entry
+  [ctx event-type event-data enter!]
+  (if-not (workflow-prompt-entry-event? event-type)
+    (enter!)
+    (let [session-id (:session-id event-data)
+          run-id (:workflow-run-id (session/get-session-data-in ctx session-id))]
+      (cancellation-entry/with-run-read-lock
+        ctx
+        run-id
+        (fn []
+          (if-let [reason (workflow-owned-session-stop-signal ctx session-id)]
+            {:claimed? true
+             :blocked? true
+             :result (stopped-workflow-prompt-result session-id reason)}
+            (enter!)))))))
 
 ;;; Wiring
 
@@ -40,8 +77,13 @@
    preserving the existing statechart runtime and transition ownership."
   [ctx event-type event-data _ictx]
   (when (contains? #{:session/prompt :session/abort :session/compact-start :session/compact-done} event-type)
-    (sc/send-event! (:sc-env ctx) (session/sc-session-id-in ctx (:session-id event-data)) event-type event-data)
-    {:claimed? true}))
+    (guard-workflow-prompt-entry
+     ctx
+     event-type
+     event-data
+     (fn []
+       (sc/send-event! (:sc-env ctx) (session/sc-session-id-in ctx (:session-id event-data)) event-type event-data)
+       {:claimed? true}))))
 
 (defn register-all!
   "Register all dispatch handlers for the agent-session pipeline.
@@ -53,4 +95,5 @@
   (prompt-lifecycle/register! ctx)
   (scheduler/register! ctx)
   (lifecycle/register! ctx)
+  (workflows/register! ctx)
   (mutations/register! ctx))

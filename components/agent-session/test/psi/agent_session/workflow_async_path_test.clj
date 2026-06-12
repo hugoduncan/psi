@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.context :as context]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
@@ -9,6 +10,7 @@
    [psi.agent-session.workflow.orchestration :as orchestration]
    [psi.agent-session.workflow-test-support :as workflow-test-support]
    [psi.command-registry.registry :as command-registry]
+   [psi.session-state.state :as ss]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (deftest delegate-async-path-avoids-keyword-contains-error-test
@@ -95,6 +97,66 @@
       (is (= :blocked (get-in publication [:background-job :payload :status])))
       (is (= :completed (get-in publication [:background-job :payload :delegate-status])))
       (is (= :info (get-in publication [:notification :level]))))))
+
+(deftest top-level-worker-cancel-wakes-parked-wait-and-terminalizes-cleanly-test
+  ;; Tests the acceptance path with real futures and dispatch effects: cancelling
+  ;; a top-level run interrupts the parked worker future, then terminalizes the
+  ;; workflow background job while leaving the canonical run cancelled.
+  (testing "cancel effect wakes a parked top-level worker and terminalizes its job"
+    (let [ctx (context/create-context {:persist? false})
+          inflight* (atom {})
+          worker-started (promise)
+          worker-finished (promise)
+          fut (future
+                (try
+                  (deliver worker-started true)
+                  (Thread/sleep 10000)
+                  :unexpected-natural-return
+                  (catch InterruptedException _
+                    (deliver worker-finished :interrupted)
+                    :interrupted)))
+          run {:run-id "run-1"
+               :status :running
+               :current-step-id "step-1"
+               :effective-definition {:definition-id "flow"
+                                      :step-order []}
+               :step-runs {"step-1" {:attempts []}}
+               :history []}]
+      (swap! (:state* ctx)
+             (fn [state]
+               (-> state
+                   (assoc :workflows {:runs {"run-1" run}
+                                      :run-order ["run-1"]})
+                   (assoc-in (ss/state-path :background-jobs)
+                             (:state (background-jobs/start-background-job
+                                      (background-jobs/empty-state)
+                                      {:tool-call-id "tool-call-1"
+                                       :thread-id "session-1"
+                                       :tool-name "delegate"
+                                       :job-id "job-1"
+                                       :job-kind :workflow
+                                       :workflow-ext-path "built-in:workflow"
+                                       :workflow-id "run-1"}))))))
+      (is (true? (deref worker-started 1000 false)))
+      (swap! inflight* assoc "run-1" {:future fut :job-id "job-1"})
+      ((:execute-effect-fn ctx)
+       (assoc ctx :workflow-inflight-runs-handle inflight*)
+       {:effect/type :runtime/cancel-inflight-run :run-id "run-1"})
+      (workflow-test-support/poll-until #(realized? worker-finished))
+      (is (= :interrupted @worker-finished))
+      (is (true? (future-cancelled? fut)))
+      (try
+        @fut
+        (catch java.util.concurrent.CancellationException _ nil))
+      (swap! (:state* ctx) assoc-in [:workflows :runs "run-1" :status] :cancelled)
+      ((:execute-effect-fn ctx)
+       ctx
+       {:effect/type :runtime/mark-workflow-jobs-terminal})
+      (let [job (background-jobs/get-job-in
+                 (ss/get-state-value-in ctx (ss/state-path :background-jobs))
+                 "job-1")]
+        (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-1" :status])))
+        (is (= :cancelled (:status job)))))))
 
 (deftest blocked-run-continue-error-terminalizes-wrapper-and-cleans-inflight-test
   ;; resume-run may return an error map without throwing. That path must still

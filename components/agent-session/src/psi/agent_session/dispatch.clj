@@ -1,7 +1,8 @@
 (ns psi.agent-session.dispatch
   "Compatibility wrapper over the extracted state-kernel dispatch pipeline."
   (:require
-   [psi.state-kernel.dispatch :as kernel]))
+   [psi.state-kernel.dispatch :as kernel]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]))
 
 (declare dispatch! ->dispatch-env ->kernel-contract-env apply-interceptor)
 
@@ -77,17 +78,42 @@
   (reset! interceptor-chain-override interceptors)
   nil)
 
+(defn- workflow-terminal-event-run-ids
+  [ictx]
+  (when (contains? #{:psi.workflow/cancel-run :psi.workflow/remove-run}
+                   (or (:event-type ictx)
+                       (get-in ictx [:event :event/type])))
+    (let [ctx (:env ictx)
+          run-id (get-in ictx [:event :event/data :run-id])
+          state (when (:state* ctx) @(:state* ctx))
+          runs (when (and state run-id)
+                 (letfn [(children [parent-id]
+                           (->> (get-in state [:workflows :runs])
+                                vals
+                                (filter #(= parent-id (:delegating-run-id %)))
+                                (mapcat (fn [run]
+                                          (cons (:run-id run)
+                                                (children (:run-id run)))))))]
+                   (cons run-id (children run-id))))]
+      (vec runs))))
+
 (defn apply-root-state-update!
-  [ctx root-update-fn]
-  (cond
-    (and (fn? root-update-fn) (fn? (:apply-root-state-update-fn ctx)))
-    ((:apply-root-state-update-fn ctx) ctx root-update-fn)
+  ([ctx root-update-fn]
+   (apply-root-state-update! ctx root-update-fn nil))
+  ([ctx root-update-fn ictx]
+   (let [apply! (fn []
+                  (cond
+                    (and (fn? root-update-fn) (fn? (:apply-root-state-update-fn ctx)))
+                    ((:apply-root-state-update-fn ctx) ctx root-update-fn)
 
-    (and (fn? root-update-fn) (:state* ctx))
-    (swap! (:state* ctx) root-update-fn)
+                    (and (fn? root-update-fn) (:state* ctx))
+                    (swap! (:state* ctx) root-update-fn)
 
-    :else nil)
-  nil)
+                    :else nil))]
+     (if-let [run-ids (workflow-terminal-event-run-ids ictx)]
+       (cancellation-entry/with-run-write-locks ctx run-ids apply!)
+       (apply!)))
+   nil))
 
 (defn read-root-state-value
   [ctx return-key]
@@ -109,7 +135,7 @@
     (fn [ictx]
       (kernel/apply-pure-result
        ictx
-       {:apply-root-state-update-fn apply-root-state-update!
+       {:apply-root-state-update-fn (fn [ctx f] (apply-root-state-update! ctx f ictx))
         :read-root-state-value-fn read-root-state-value
         :session-id-fn (fn [ictx]
                          (or (:session-id ictx)

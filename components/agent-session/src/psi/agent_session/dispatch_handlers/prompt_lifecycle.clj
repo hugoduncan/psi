@@ -6,6 +6,7 @@
   (:require
    [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.agent-session.prompt-request :as prompt-request]
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -29,8 +30,10 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [ctx {:keys [session-id user-msg]}]
-     (let [journal  (persist/all-entries-in ctx session-id)
+   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+     (let [run-id   (or workflow-run-id
+                        (:workflow-run-id (ss/get-session-data-in ctx session-id)))
+           journal  (persist/all-entries-in ctx session-id)
            messages (into []
                           (keep (fn [entry]
                                   (when (= :message (:kind entry))
@@ -39,8 +42,8 @@
            repairs  (prompt-request/tail-dangling-tool-result-repairs messages)
            effects  (into []
                           (concat
-                           (map #(journal-append-effect/append-message-effect session-id %) repairs)
-                           [(journal-append-effect/append-message-effect session-id user-msg)]))]
+                           (map #(journal-append-effect/append-message-effect session-id % run-id) repairs)
+                           [(journal-append-effect/append-message-effect session-id user-msg run-id)]))]
        {:effects effects
         :return {:submitted? true
                  :turn-id (str (java.util.UUID/randomUUID))
@@ -49,29 +52,35 @@
 
   (register-core-handler!
    :session/submit-synthetic-user-prompt
-   (fn [_ctx {:keys [session-id user-msg]}]
-     {:effects (turn.handlers/synthetic-user-prompt-effects session-id user-msg)
-      :return {:submitted? true
-               :user-msg user-msg}}))
+   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+     (let [run-id (or workflow-run-id
+                      (:workflow-run-id (ss/get-session-data-in ctx session-id)))]
+       {:effects (turn.handlers/synthetic-user-prompt-effects session-id user-msg run-id)
+        :return {:submitted? true
+                 :user-msg user-msg}})))
 
   (register-core-handler!
    :session/append-journal-entry
-   (fn [ctx {:keys [session-id entry]}]
+   (fn [ctx {:keys [session-id entry] :as event-data}]
      (let [next-entries (conj (persist/all-entries-in ctx session-id) entry)
            flush-state  (ss/get-state-value-in ctx (ss/state-path :flush-state session-id))
            session-data (ss/get-session-data-in ctx session-id)
+           run-id       (workflow-guard/event-or-session-run-id ctx event-data)
            io-request   (persist/persistence-io-request {:entries next-entries
                                                          :flush-state flush-state
                                                          :session-id session-id
                                                          :worktree-path (:worktree-path session-data)
                                                          :parent-session-id (:parent-session-id session-data)
                                                          :parent-session-path (:parent-session-path session-data)})]
-       (cond-> {:root-state-update (persist/append-journal-entry-root-update session-id entry)
+       (cond-> {:root-state-update (workflow-guard/guard-root-state-update
+                                    (persist/append-journal-entry-root-update session-id entry)
+                                    run-id)
                 :return entry}
          io-request
-         (assoc :effects [{:effect/type :persist/session-journal-io
-                           :session-id session-id
-                           :request io-request}])))))
+         (assoc :effects [(workflow-guard/guarded-effect {:effect/type :persist/session-journal-io
+                                                          :session-id session-id
+                                                          :request io-request}
+                                                         run-id)])))))
 
   (register-core-handler! :session/prompt-prepare-request turn.handlers/prompt-prepare-request-handler)
   (register-core-handler! :session/prompt-record-response turn.handlers/prompt-record-response-handler)

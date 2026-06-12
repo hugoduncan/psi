@@ -4,6 +4,7 @@
    steering/follow-up messages, compaction, runtime projections, interrupt,
    tool execution, skills, context usage, etc."
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
@@ -17,10 +18,21 @@
    [psi.session-state.state :as session]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
-   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
 
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
+
+(defn- workflow-run-stop-signal
+  [ctx run-id]
+  (stop-signal/workflow-stop-signal ctx run-id))
+
+(defn- stopped-workflow-tool-result
+  [run-id reason]
+  {:workflow-stopped? true
+   :workflow-run-id run-id
+   :reason reason})
 
 (defn- schedule-record
   [session-data schedule-id]
@@ -412,8 +424,12 @@
 
   (register-core-handler!
    :session/update-context-usage
-   (fn [_ctx {:keys [session-id tokens window]}]
-     {:root-state-update (session/session-update session-id #(assoc % :context-tokens tokens :context-window window))}))
+   (fn [ctx {:keys [session-id tokens window] :as data}]
+     (let [run-id (workflow-guard/event-or-session-run-id ctx data)]
+       {:root-state-update
+        (workflow-guard/guard-root-state-update
+         (session/session-update session-id #(assoc % :context-tokens tokens :context-window window))
+         run-id)})))
 
   (register-core-handler!
    :session/record-extension-prompt
@@ -527,10 +543,26 @@
 
   (register-core-handler!
    :session/tool-agent-record-result
-   (fn [_ctx {:keys [session-id tool-result-msg]}]
-     {:effects [{:effect/type :runtime/agent-record-tool-result
-                 :tool-result-msg tool-result-msg}
-                (journal-append-effect/append-message-effect session-id tool-result-msg)]}))
+   (fn [ctx {:keys [session-id tool-result-msg]}]
+     ;; At-most-once toolResult per tool-call-id (first-writer-wins). The
+     ;; canonical recorded-tool-result-ids set in :state* is the single source
+     ;; of truth; every producer (interrupt paths + real-result re-dispatch)
+     ;; funnels through this event, so a pure guard here covers them all.
+     ;; Atomicity comes from dispatch serialization (single writer to :state*),
+     ;; not a runtime test-and-set.
+     (let [tool-call-id    (:tool-call-id tool-result-msg)
+           recorded-ids-path (session/session-recorded-tool-result-ids-path
+                              session-id)
+           recorded-ids    (or (session/get-state-value-in ctx recorded-ids-path)
+                               #{})]
+       (if (contains? recorded-ids tool-call-id)
+         {:effects []}
+         {:root-state-update
+          (fn [state]
+            (update-in state recorded-ids-path (fnil conj #{}) tool-call-id))
+          :effects [{:effect/type :runtime/agent-record-tool-result
+                     :tool-result-msg tool-result-msg}
+                    (journal-append-effect/append-message-effect session-id tool-result-msg)]}))))
 
   (register-core-handler!
    :session/tool-execute
@@ -558,28 +590,35 @@
 
   (register-core-handler!
    :session/tool-execute-prepared
-   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue)}))
+   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue workflow-run-id]}]
+     {:return (if-let [reason (workflow-run-stop-signal ctx workflow-run-id)]
+                (stopped-workflow-tool-result workflow-run-id reason)
+                (tool-runtime-adapter/execute-tool-call-prepared! ctx session-id tool-call parsed-args progress-queue))}))
 
   (register-core-handler!
    :session/tool-record-result
-   (fn [ctx {:keys [session-id shaped-result progress-queue]}]
-     {:return (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue)}))
+   (fn [ctx {:keys [session-id shaped-result progress-queue workflow-run-id]}]
+     {:return (when-not (or (:workflow-stopped? shaped-result)
+                            (workflow-run-stop-signal ctx workflow-run-id))
+                (tool-runtime-adapter/record-tool-call-prepared-result! ctx session-id shaped-result progress-queue))}))
 
   (register-core-handler!
    :session/tool-run
-   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue]}]
-     {:return (let [shaped-result (dispatch/dispatch! ctx :session/tool-execute-prepared
-                                                      {:session-id     session-id
-                                                       :tool-call      tool-call
-                                                       :parsed-args    parsed-args
-                                                       :progress-queue progress-queue}
-                                                      {:origin :core})]
-                (dispatch/dispatch! ctx :session/tool-record-result
-                                    {:session-id     session-id
-                                     :shaped-result  shaped-result
-                                     :progress-queue progress-queue}
-                                    {:origin :core}))})))
+   (fn [ctx {:keys [session-id tool-call parsed-args progress-queue workflow-run-id]}]
+     {:return (when-not (workflow-run-stop-signal ctx workflow-run-id)
+                (let [shaped-result (dispatch/dispatch! ctx :session/tool-execute-prepared
+                                                        {:session-id     session-id
+                                                         :tool-call      tool-call
+                                                         :parsed-args    parsed-args
+                                                         :progress-queue progress-queue
+                                                         :workflow-run-id workflow-run-id}
+                                                        {:origin :core})]
+                  (dispatch/dispatch! ctx :session/tool-record-result
+                                      {:session-id     session-id
+                                       :shaped-result  shaped-result
+                                       :progress-queue progress-queue
+                                       :workflow-run-id workflow-run-id}
+                                      {:origin :core})))})))
 
 (defn- register-message-and-skill-handlers! []
   (register-core-handler!

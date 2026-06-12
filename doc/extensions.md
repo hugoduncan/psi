@@ -106,8 +106,10 @@ Built-in workflow surface:
   - `list` is scoped to the invoking session and shows active or retained delegated workflow runs owned by that session, with canonical workflow status as the primary status and delegate/background attempt status shown separately when available
   - ids returned by `list` are canonical workflow run ids usable with `continue` when the workflow status supports continuation, and with `remove` while the run exists
   - `continue` pushes a stopped run forward with a new prompt
-  - `remove` deletes a run and cleans up/terminalizes any active same-session delegate background job for that run first, failing actionably without deleting the canonical run if that cleanup cannot be completed
+  - `remove` requests canonical workflow removal through dispatch. Live top-level removal is cancel-then-remove: psi cancels the run/subtree, terminalizes workflow background-job projections, interrupts the worker before dropping its runtime handle, then removes the canonical run record. Live nested sub-run removal aborts that sub-run's child turn without interrupting the shared parent worker, so the parent observes a cancelled/removed failed delegate step and continues. Terminal/absent removal is idempotent cleanup. Worker interrupt, child-turn abort, background-job terminalization, and handle cleanup are dispatch-owned runtime effects, not command-layer active-job pre-cleanup.
   - run options include `workflow`, `mode` (`sync|async`), `fork_session`, `timeout_ms`, `include_result_in_context`
+- Psi-tool:
+  - `workflow` with `op=cancel-run` stops an in-flight workflow while retaining its run record; see `doc/workflows.md` for cancellation/removal details and guarantees
 - Commands:
   - `/delegate <workflow> <prompt>`
   - `/delegate-reload` — reloads workflow definitions and retires removed definitions

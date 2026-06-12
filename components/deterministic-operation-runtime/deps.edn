@@ -1,2 +1,3 @@
-{:deps {org.clojure/clojure                {:mvn/version "1.12.0"}
+{:deps {psi/workflow-coordination {:local/root "../workflow-coordination"}
+        org.clojure/clojure                {:mvn/version "1.12.0"}
         psi/deterministic-operation-registry {:local/root "../deterministic-operation-registry"}}}

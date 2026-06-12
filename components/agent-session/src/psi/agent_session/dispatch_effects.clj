@@ -7,6 +7,8 @@
   (:require
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.extensions :as ext]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.ai.model-registry :as model-registry]
@@ -60,6 +62,89 @@
 (defn- effect-agent-ctx [ctx effect] (ss/agent-ctx-in ctx (effect-session-id ctx effect)))
 (defn- effect-sc-session-id [ctx effect] (ss/sc-session-id-in ctx (effect-session-id ctx effect)))
 
+(defn- workflow-run-stop-signal
+  [ctx run-id]
+  (stop-signal/workflow-stop-signal ctx run-id))
+
+(defn- workflow-session-stop-signal
+  [ctx session-id]
+  (let [session-data (ss/get-session-data-in ctx session-id)]
+    (when (:workflow-owned? session-data)
+      (workflow-run-stop-signal ctx (:workflow-run-id session-data)))))
+
+(defn- memory-recover-for-query!
+  [ctx query-text]
+  (when query-text
+    ((or (:memory-recover-query-fn ctx) memory-runtime/recover-for-query!) query-text)))
+
+(defn- workflow-effect-stop-signal
+  [ctx effect]
+  (or (when-let [run-id (:workflow-run-id effect)]
+        (workflow-run-stop-signal ctx run-id))
+      (when-let [session-id (effect-session-id ctx effect)]
+        (workflow-session-stop-signal ctx session-id))))
+
+(defn- stopped-workflow-execution-result
+  [session-id reason]
+  {:execution-result/session-id session-id
+   :execution-result/assistant-message {:role "assistant"
+                                        :content [{:type :error
+                                                   :text "Workflow execution stopped before provider request"}]
+                                        :stop-reason :error
+                                        :error-message "Workflow execution stopped before provider request"
+                                        :workflow-stop-reason reason}
+   :execution-result/turn-outcome :turn.outcome/error
+   :execution-result/tool-calls []
+   :execution-result/error-message "Workflow execution stopped before provider request"
+   :execution-result/stop-reason :error})
+
+(defn- workflow-abort-guarded? [effect]
+  (some #(contains? effect %)
+        [:workflow-run-id :workflow-step-id :workflow-attempt-id :expected-session-id]))
+
+(defn- latest-workflow-attempt-in [ctx run-id step-id]
+  (last (get-in @(:state* ctx) [:workflows :runs run-id :step-runs step-id :attempts])))
+
+(defn- judge-attempt-active?
+  "A judge session is abortable only until its result is recorded.
+
+   Judged actor attempts remain `:succeeded` while judge routing is processed, so
+   attempt status alone cannot distinguish an in-flight judge turn from an
+   already-completed judge session. `record-judge-result` always records the
+   `:judge-output` key, including nil outputs, making key presence the durable
+   completion marker for stale/duplicate guarded abort effects."
+  [attempt]
+  (not (contains? attempt :judge-output)))
+
+(defn- live-workflow-attempt? [attempt session-kind]
+  (and (contains? (case session-kind
+                    :judge #{:running :validating :succeeded}
+                    #{:running :validating})
+                  (:status attempt))
+       (or (not= :judge session-kind)
+           (judge-attempt-active? attempt))))
+
+(defn- workflow-abort-guard-matches? [ctx effect]
+  (let [attempt (latest-workflow-attempt-in ctx (:workflow-run-id effect) (:workflow-step-id effect))
+        session-kind (or (:workflow-session-kind effect) :attempt)
+        session-key (case session-kind
+                      :judge :judge-session-id
+                      :attempt :execution-session-id)]
+    (and attempt
+         (= (:workflow-attempt-id effect) (:attempt-id attempt))
+         (= (:expected-session-id effect) (get attempt session-key))
+         (= (:session-id effect) (get attempt session-key))
+         (live-workflow-attempt? attempt session-kind))))
+
+(defn- abort-session! [ctx effect]
+  (when-let [turn-ctx (ss/get-state-value-in ctx (ss/state-path :turn-ctx (effect-session-id ctx effect)))]
+    (when-let [stream-handle (:stream-handle @(:turn-data turn-ctx))]
+      (when-let [f (:future stream-handle)] (future-cancel f))
+      (swap! (:turn-data turn-ctx) assoc :stream-handle (assoc stream-handle :cancelled? true)))
+    (when-not (:final-message @(:turn-data turn-ctx))
+      (turn-sc/send-event! turn-ctx :turn/error {:stop-reason :aborted :error-message "Aborted"})))
+  (when-let [ac (effect-agent-ctx ctx effect)] (agent/abort-in! ac)))
+
 (defn drop-trailing-overflow-error! [ctx session-id]
   (let [ac (ss/agent-ctx-in ctx session-id)
         messages (:messages (agent/get-data-in ac))
@@ -72,24 +157,44 @@
       (agent/replace-messages-in! ac (vec (butlast messages))))))
 
 (defmethod execute-effect! :runtime/agent-abort [ctx effect]
-  (when-let [turn-ctx (ss/get-state-value-in ctx (ss/state-path :turn-ctx (effect-session-id ctx effect)))]
-    (when-let [stream-handle (:stream-handle @(:turn-data turn-ctx))]
-      (when-let [f (:future stream-handle)] (future-cancel f))
-      (swap! (:turn-data turn-ctx) assoc :stream-handle (assoc stream-handle :cancelled? true)))
-    (when-not (:final-message @(:turn-data turn-ctx))
-      (turn-sc/send-event! turn-ctx :turn/error {:stop-reason :aborted :error-message "Aborted"})))
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/abort-in! ac)))
+  (if (workflow-abort-guarded? effect)
+    (when (workflow-abort-guard-matches? ctx effect)
+      (abort-session! ctx effect)
+      {:aborted? true :session-id (:session-id effect) :guarded? true})
+    (do
+      (abort-session! ctx effect)
+      {:aborted? true :session-id (effect-session-id ctx effect) :guarded? false})))
+
+(defmethod execute-effect! :runtime/cancel-inflight-run [ctx effect]
+  (let [run-id (:run-id effect)
+        inflight-runs (:workflow-inflight-runs-handle ctx)
+        entry (when inflight-runs (get @inflight-runs run-id))
+        fut (:future entry)]
+    (when fut (future-cancel fut))
+    {:run-id run-id :found? (boolean entry) :cancelled? (boolean fut)}))
+
+(defmethod execute-effect! :runtime/drop-inflight-run [ctx effect]
+  (let [run-id (:run-id effect)
+        inflight-runs (:workflow-inflight-runs-handle ctx)
+        found? (boolean (when inflight-runs (get @inflight-runs run-id)))]
+    (when inflight-runs (swap! inflight-runs dissoc run-id))
+    {:run-id run-id :found? found? :dropped? true}))
+
+(defmethod execute-effect! :runtime/drop-workflow-cancellation-entry-lock [ctx effect]
+  (cancellation-entry/drop-lock! ctx (:run-id effect)))
 
 (defmethod execute-effect! :runtime/agent-queue-steering [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/queue-steering-in! ac (:message effect))))
 (defmethod execute-effect! :runtime/agent-queue-follow-up [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/queue-follow-up-in! ac (:message effect))))
 (defmethod execute-effect! :runtime/agent-clear-steering-queue [ctx effect]
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-steering-queue-in! ac)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-steering-queue-in! ac))))
 (defmethod execute-effect! :runtime/agent-clear-follow-up-queue [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/clear-follow-up-queue-in! ac)))
 (defmethod execute-effect! :runtime/agent-drain-follow-up-queue [ctx effect]
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/drain-follow-up-in! ac (:messages effect))))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (when-let [ac (effect-agent-ctx ctx effect)] (agent/drain-follow-up-in! ac (:messages effect)))))
 (defmethod execute-effect! :runtime/agent-start-loop [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/start-loop-in! ac [])))
 (defmethod execute-effect! :runtime/agent-start-loop-with-messages [ctx effect]
@@ -125,26 +230,27 @@
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/record-tool-result-in! ac (:tool-result-msg effect))))
 
 (defmethod execute-effect! :runtime/record-pending-tool-call-interrupts [ctx effect]
-  (let [session-id (:session-id effect)
-        reason     (:reason effect)
-        agent-ctx  (effect-agent-ctx ctx effect)
-        pending    (vec (or (some-> agent-ctx agent/get-data-in :pending-tool-calls) #{}))]
-    (doseq [tool-call-id pending]
-      (dispatch/dispatch! ctx
-                          :session/tool-agent-record-result
-                          {:session-id session-id
-                           :tool-result-msg {:role "toolResult"
-                                             :tool-call-id tool-call-id
-                                             :tool-name "interrupted"
-                                             :content [{:type :text
-                                                        :text (str "Tool execution interrupted before completion."
-                                                                   (when reason
-                                                                     (str " Reason: " (name reason) ".")))}]
-                                             :is-error true
-                                             :details {:interruption {:reason reason}}
-                                             :timestamp (java.time.Instant/now)}}
-                          {:origin :core}))
-    {:recorded-count (count pending) :reason reason}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (let [session-id (:session-id effect)
+          reason     (:reason effect)
+          agent-ctx  (effect-agent-ctx ctx effect)
+          pending    (vec (or (some-> agent-ctx agent/get-data-in :pending-tool-calls) #{}))]
+      (doseq [tool-call-id pending]
+        (dispatch/dispatch! ctx
+                            :session/tool-agent-record-result
+                            {:session-id session-id
+                             :tool-result-msg {:role "toolResult"
+                                               :tool-call-id tool-call-id
+                                               :tool-name "interrupted"
+                                               :content [{:type :text
+                                                          :text (str "Tool execution interrupted before completion."
+                                                                     (when reason
+                                                                       (str " Reason: " (name reason) ".")))}]
+                                               :is-error true
+                                               :details {:interruption {:reason reason}}
+                                               :timestamp (java.time.Instant/now)}}
+                            {:origin :core}))
+      {:recorded-count (count pending) :reason reason})))
 
 (defmethod execute-effect! :runtime/tool-execute [ctx effect]
   (try
@@ -156,44 +262,73 @@
 (defmethod execute-effect! :runtime/prompt-execute-and-record [ctx effect]
   (let [session-id (effect-session-id ctx effect)
         prepared-request (:prepared-request effect)
-        progress-queue (:progress-queue effect)
-        execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)
-        _ (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})
-        latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
-    (if (= (:execution-result/turn-id execution-result)
-           (:turn-id latest-summary))
-      execution-result
-      {:execution-result/turn-id (:turn-id latest-summary)
-       :execution-result/session-id session-id
-       :execution-result/assistant-message (or (some (fn [entry]
-                                                       (let [message (get-in entry [:data :message])]
-                                                         (when (= "assistant" (:role message))
-                                                           message)))
-                                                     (rseq (vec (persist/all-entries-in ctx session-id))))
-                                               (:execution-result/assistant-message execution-result))
-       :execution-result/turn-outcome (:turn-outcome latest-summary)
-       :execution-result/tool-calls []
-       :execution-result/stop-reason (:stop-reason latest-summary)})))
+        progress-queue (:progress-queue effect)]
+    (if-let [reason (workflow-effect-stop-signal ctx effect)]
+      (stopped-workflow-execution-result session-id reason)
+      (let [execution-result ((:execute-prepared-request-fn ctx) (:ai-ctx ctx) ctx session-id prepared-request progress-queue)]
+        (if-let [reason (workflow-effect-stop-signal ctx effect)]
+          (stopped-workflow-execution-result session-id reason)
+          (let [record-result (dispatch/dispatch! ctx :session/prompt-record-response {:session-id session-id :execution-result execution-result :progress-queue progress-queue} {:origin :core})]
+            (if-let [reason (or (:reason record-result)
+                                (workflow-effect-stop-signal ctx effect))]
+              (stopped-workflow-execution-result session-id reason)
+              (let [latest-summary (:last-execution-result-summary (ss/get-session-data-in ctx session-id))]
+                (if (= (:execution-result/turn-id execution-result)
+                       (:turn-id latest-summary))
+                  execution-result
+                  {:execution-result/turn-id (:turn-id latest-summary)
+                   :execution-result/session-id session-id
+                   :execution-result/assistant-message (or (some (fn [entry]
+                                                                   (let [message (get-in entry [:data :message])]
+                                                                     (when (= "assistant" (:role message))
+                                                                       message)))
+                                                                 (rseq (vec (persist/all-entries-in ctx session-id))))
+                                                           (:execution-result/assistant-message execution-result))
+                   :execution-result/turn-outcome (:turn-outcome latest-summary)
+                   :execution-result/tool-calls []
+                   :execution-result/stop-reason (:stop-reason latest-summary)})))))))))
 
 (defmethod execute-effect! :runtime/recover-query-prompt-execute-and-record [ctx effect]
-  (when-let [query-text (:query-text effect)]
-    (memory-runtime/recover-for-query! query-text))
-  (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record)))
+  (let [session-id (effect-session-id ctx effect)]
+    (if-let [reason (workflow-effect-stop-signal ctx effect)]
+      (stopped-workflow-execution-result session-id reason)
+      (do
+        (memory-recover-for-query! ctx (:query-text effect))
+        (execute-effect! ctx (assoc effect :effect/type :runtime/prompt-execute-and-record))))))
 
 (defmethod execute-effect! :runtime/prompt-continue-chain [ctx effect]
-  ((:continue-prompt-chain-fn ctx) ctx (effect-session-id ctx effect) (:execution-result effect) (:progress-queue effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:continue-prompt-chain-fn ctx)
+     ctx
+     (effect-session-id ctx effect)
+     (:execution-result effect)
+     (:progress-queue effect)
+     {:workflow-run-id (:workflow-run-id effect)})))
+
+(defn- workflow-guarded-event-data
+  [effect]
+  (let [event-data (or (:event-data effect) {})]
+    (cond-> event-data
+      (and (:workflow-run-id effect)
+           (not (contains? event-data :workflow-run-id)))
+      (assoc :workflow-run-id (:workflow-run-id effect)))))
 
 (defmethod execute-effect! :runtime/dispatch-event [ctx effect]
-  (dispatch/dispatch! ctx (:event-type effect) (or (:event-data effect) {}) {:origin (or (:origin effect) :core)}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
 (defmethod execute-effect! :runtime/dispatch-event-with-effect-result [ctx effect]
-  (dispatch/dispatch! ctx (:event-type effect) (or (:event-data effect) {}) {:origin (or (:origin effect) :core)}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
 
-(defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx _effect]
-  ((:mark-workflow-jobs-terminal-fn ctx) ctx))
+(defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx effect]
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:mark-workflow-jobs-terminal-fn ctx) ctx)))
 (defmethod execute-effect! :runtime/emit-background-job-terminal-messages [ctx effect]
-  ((:emit-background-job-terminal-messages-fn ctx) ctx (effect-session-id ctx effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:emit-background-job-terminal-messages-fn ctx) ctx (effect-session-id ctx effect))))
 (defmethod execute-effect! :runtime/reconcile-and-emit-background-job-terminals [ctx effect]
-  ((:reconcile-and-emit-background-job-terminals-fn ctx) ctx (effect-session-id ctx effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    ((:reconcile-and-emit-background-job-terminals-fn ctx) ctx (effect-session-id ctx effect))))
 
 (defmethod execute-effect! :runtime/event-queue-offer [ctx effect]
   (when-let [q (:event-queue ctx)] (.offer ^java.util.concurrent.LinkedBlockingQueue q (:event effect))))
@@ -257,10 +392,12 @@
     {:schedule-id schedule-id :cancelled? true}))
 
 (defmethod execute-effect! :scheduler/drain-queue [ctx effect]
-  (dispatch/dispatch! ctx :scheduler/drain-queue {:session-id (effect-session-id ctx effect)} {:origin :core}))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (dispatch/dispatch! ctx :scheduler/drain-queue {:session-id (effect-session-id ctx effect)} {:origin :core})))
 
 (defmethod execute-effect! :statechart/send-event [ctx effect]
-  (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (sc/send-event! (:sc-env ctx) (effect-sc-session-id ctx effect) (:event effect))))
 
 (defn- execute-session-journal-io!
   [_ctx {:keys [request]}]
@@ -278,11 +415,12 @@
       nil)))
 
 (defmethod execute-effect! :persist/session-journal-io [ctx effect]
-  (let [request (:request effect)
-        result  (execute-session-journal-io! ctx effect)]
-    (when (= :flush-journal (:op request))
-      (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
-    result))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (let [request (:request effect)
+          result  (execute-session-journal-io! ctx effect)]
+      (when (= :flush-journal (:op request))
+        (ss/apply-root-state-update-in! ctx (persist/mark-flushed-root-update (effect-session-id ctx effect))))
+      result)))
 
 (defmethod execute-effect! :persist/project-prefs-update [ctx effect]
   (try
@@ -293,7 +431,8 @@
   (try (user-cfg/update-agent-session! (:prefs effect)) (catch Exception _ nil)))
 
 (defmethod execute-effect! :notify/extension-dispatch [ctx effect]
-  (ext/dispatch-in (:extension-registry ctx) (:event-name effect) (:payload effect)))
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (ext/dispatch-in (:extension-registry ctx) (:event-name effect) (:payload effect))))
 (defmethod execute-effect! :runtime/schedule-extension-dispatch [ctx effect]
   ((:daemon-thread-fn ctx)
    (fn []
@@ -308,8 +447,9 @@
 
 (defmethod execute-effect! :memory/capture [_ctx effect]
   (memory/remember-in! (:memory-ctx effect) {:content-type :note :content (:text effect) :tags [:remember :manual] :provenance (:provenance effect)}))
-(defmethod execute-effect! :memory/recover-query [_ctx effect]
-  (when-let [query-text (:query-text effect)] (memory-runtime/recover-for-query! query-text)))
+(defmethod execute-effect! :memory/recover-query [ctx effect]
+  (when-not (workflow-effect-stop-signal ctx effect)
+    (memory-recover-for-query! ctx (:query-text effect))))
 
 (defmethod execute-effect! :background-job/cancel [ctx effect]
   (let [job (:job effect)]

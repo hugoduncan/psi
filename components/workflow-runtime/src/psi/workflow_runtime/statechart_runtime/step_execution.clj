@@ -52,9 +52,18 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id run-id
+                           :workflow-attempt-id (some-> workflow-run
+                                                        (get-in [:step-runs step-id :attempts])
+                                                        last
+                                                        :attempt-id)
                            :step-id step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
+    (when (state/workflow-stopped? ctx run-id)
+      (throw (ex-info "Workflow execution stopped after invoke operation"
+                      {:reason (state/workflow-stop-signal ctx run-id)
+                       :run-id run-id
+                       :step-id step-id})))
     {:effective-args args
      :operation-result operation-result}))
 
@@ -89,9 +98,20 @@
    :message "Workflow model-query candidates exhausted"
    :candidate-failures candidate-failures})
 
+(defn- stopped-execution-result
+  [execution-session]
+  {:status :error
+   :session-id (:session-id execution-session)
+   :assistant-message nil
+   :assistant-text ""
+   :execution-result nil
+   :failure {:reason :workflow-stopped
+             :message "Workflow execution stopped before model fallback turn"}})
+
 (defn- execute-with-ranked-fallback!
-  [ctx execution-session prompt opts]
-  (let [initial-candidates (vec (fallback-candidates execution-session))]
+  [ctx execution-session prompt opts stopped?]
+  (let [initial-candidates (vec (fallback-candidates execution-session))
+        stopped? (or stopped? (constantly false))]
     (if-not (seq initial-candidates)
       {:status :error
        :session-id (:session-id execution-session)
@@ -103,35 +123,37 @@
              candidate-failures []
              current-session execution-session
              first-candidate? true]
-        (let [model (first remaining)
-              current-session (if first-candidate?
-                                (assoc current-session :model model)
-                                (attempts/set-execution-session-model! ctx current-session model))
-              result (if opts
-                       (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt opts)
-                       (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt))]
-          (cond
-            (= :ok (:status result))
-            result
+        (if (and (not first-candidate?) (stopped?))
+          (stopped-execution-result current-session)
+          (let [model (first remaining)
+                current-session (if first-candidate?
+                                  (assoc current-session :model model)
+                                  (attempts/set-execution-session-model! ctx current-session model))
+                result (if opts
+                         (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt opts)
+                         (turn-execution/execute-actor-turn! ctx (:session-id current-session) prompt))]
+            (cond
+              (= :ok (:status result))
+              result
 
-            (and (next remaining)
-                 (get-in result [:failure :fallback-worthy?]))
-            (recur (next remaining)
-                   (conj candidate-failures (candidate-failure model (:failure result)))
-                   current-session
-                   false)
+              (and (next remaining)
+                   (get-in result [:failure :fallback-worthy?]))
+              (recur (next remaining)
+                     (conj candidate-failures (candidate-failure model (:failure result)))
+                     current-session
+                     false)
 
-            :else
-            (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
-              {:status :error
-               :session-id (:session-id current-session)
-               :assistant-message (:assistant-message result)
-               :assistant-text (:assistant-text result)
-               :execution-result (:execution-result result)
-               :structured-output (:structured-output result)
-               :failure (if (get-in result [:failure :fallback-worthy?])
-                          (exhaustion-failure all-failures)
-                          (:failure result))})))))))
+              :else
+              (let [all-failures (conj candidate-failures (candidate-failure model (:failure result)))]
+                {:status :error
+                 :session-id (:session-id current-session)
+                 :assistant-message (:assistant-message result)
+                 :assistant-text (:assistant-text result)
+                 :execution-result (:execution-result result)
+                 :structured-output (:structured-output result)
+                 :failure (if (get-in result [:failure :fallback-worthy?])
+                            (exhaustion-failure all-failures)
+                            (:failure result))}))))))))
 
 (defn- structured-output-blocked-payload
   [reason message details outputs]
@@ -151,75 +173,91 @@
   (queue/enqueue-event! event-queue* working-memory* event {}))
 
 (defn execute-session-step!
-  [ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
-  (let [structured-entry (structured-output/single-structured-output-entry (:outputs step-def))
-        request-result (when-let [[output-key output-spec] structured-entry]
-                         (structured-output/structured-output-request output-key output-spec))]
-    (if (false? (:ok? request-result))
-      (record-actor-pending!
-       working-memory* event-queue* step-id attempt-id :blocked
-       (structured-output-blocked-payload (:reason request-result)
-                                          (:message request-result)
-                                          (:details request-result)
-                                          {})
-       :actor/blocked)
-      (let [turn-opts (:opts request-result)
-            {:keys [status assistant-text failure execution-result assistant-message structured-output]}
-            (if (fallback-enabled? execution-session)
-              (execute-with-ranked-fallback! ctx execution-session prompt turn-opts)
-              (if turn-opts
-                (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt turn-opts)
-                (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)))]
-        (if (= :error status)
-          (if (= :unsupported-structured-output (or (get-in structured-output [:reason])
-                                                    (:reason failure)))
-            (record-actor-pending!
-             working-memory* event-queue* step-id attempt-id :blocked
-             (structured-output-blocked-payload :unsupported-structured-output
-                                                (or (:message failure)
-                                                    "Workflow structured output is not supported by the resolved model")
-                                                {:output-key (first structured-entry)
-                                                 :structured-output structured-output
-                                                 :failure failure}
-                                                {})
-             :actor/blocked)
-            (record-actor-pending!
-             working-memory* event-queue* step-id attempt-id :failure failure :actor/failed))
-          (let [logprobs (:execution-result/logprobs execution-result)
-                raw-outputs {:final-llm-reply assistant-text
-                             :text assistant-text
-                             :transcript (when assistant-message [assistant-message])
-                             :logprobs logprobs
-                             :session-id (:session-id execution-session)}
-                raw-outputs (if-let [[output-key output-spec] structured-entry]
-                              (assoc raw-outputs output-key
-                                     (if (some? structured-output)
-                                       (structured-output/output-result output-spec assistant-text structured-output)
-                                       (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
-                              raw-outputs)
-                structured-result (some-> structured-entry first raw-outputs)
-                invalid-structured-output? (and structured-entry
-                                                (not (structured-output/valid-output-result? structured-result)))
-                normalized-outputs (when-not invalid-structured-output?
-                                     (workflow-ir/step-output-surfaces
-                                      step-def
-                                      {:outcome :ok
-                                       :outputs raw-outputs}))
-                envelope (if invalid-structured-output?
-                           {:outcome :blocked
-                            :blocked {:reason :invalid-structured-output
-                                      :message "Workflow structured output failed validation"
-                                      :details {:output-key (first structured-entry)
-                                                :structured-output (:structured-output structured-result)}}
-                            :outputs raw-outputs}
-                           {:outcome :ok
-                            :outputs (merge normalized-outputs raw-outputs)})]
-            (record-actor-pending!
-             working-memory* event-queue* step-id attempt-id
-             (if (= :blocked (:outcome envelope)) :blocked :success)
-             envelope
-             (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done))))))))
+  ([ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
+   (execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt nil))
+  ([ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt stopped?]
+   (let [stopped? (or stopped? (constantly false))
+         structured-entry (structured-output/single-structured-output-entry (:outputs step-def))
+         request-result (when-let [[output-key output-spec] structured-entry]
+                          (structured-output/structured-output-request output-key output-spec))]
+     (cond
+       (stopped?)
+       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
 
+       (false? (:ok? request-result))
+       (record-actor-pending!
+        working-memory* event-queue* step-id attempt-id :blocked
+        (structured-output-blocked-payload (:reason request-result)
+                                           (:message request-result)
+                                           (:details request-result)
+                                           {})
+        :actor/blocked)
+
+       :else
+       (let [turn-opts (:opts request-result)
+             {:keys [status assistant-text failure execution-result assistant-message structured-output]}
+             (if (fallback-enabled? execution-session)
+               (execute-with-ranked-fallback! ctx execution-session prompt turn-opts stopped?)
+               (if turn-opts
+                 (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt turn-opts)
+                 (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)))]
+         (cond
+           (stopped?)
+           (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+
+           (= :error status)
+           (if (= :unsupported-structured-output (or (get-in structured-output [:reason])
+                                                     (:reason failure)))
+             (record-actor-pending!
+              working-memory* event-queue* step-id attempt-id :blocked
+              (structured-output-blocked-payload :unsupported-structured-output
+                                                 (or (:message failure)
+                                                     "Workflow structured output is not supported by the resolved model")
+                                                 {:output-key (first structured-entry)
+                                                  :structured-output structured-output
+                                                  :failure failure}
+                                                 {})
+              :actor/blocked)
+             (record-actor-pending!
+              working-memory* event-queue* step-id attempt-id :failure failure :actor/failed))
+
+           :else
+           (let [logprobs (:execution-result/logprobs execution-result)
+                 raw-outputs {:final-llm-reply assistant-text
+                              :text assistant-text
+                              :transcript (when assistant-message [assistant-message])
+                              :logprobs logprobs
+                              :session-id (:session-id execution-session)}
+                 raw-outputs (if-let [[output-key output-spec] structured-entry]
+                               (assoc raw-outputs output-key
+                                      (if (some? structured-output)
+                                        (structured-output/output-result output-spec assistant-text structured-output)
+                                        (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
+                               raw-outputs)
+                 structured-result (some-> structured-entry first raw-outputs)
+                 invalid-structured-output? (and structured-entry
+                                                 (not (structured-output/valid-output-result? structured-result)))
+                 normalized-outputs (when-not invalid-structured-output?
+                                      (workflow-ir/step-output-surfaces
+                                       step-def
+                                       {:outcome :ok
+                                        :outputs raw-outputs}))
+                 envelope (if invalid-structured-output?
+                            {:outcome :blocked
+                             :blocked {:reason :invalid-structured-output
+                                       :message "Workflow structured output failed validation"
+                                       :details {:output-key (first structured-entry)
+                                                 :structured-output (:structured-output structured-result)}}
+                             :outputs raw-outputs}
+                            {:outcome :ok
+                             :outputs (merge normalized-outputs raw-outputs)})]
+             (if (stopped?)
+               (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+               (record-actor-pending!
+                working-memory* event-queue* step-id attempt-id
+                (if (= :blocked (:outcome envelope)) :blocked :success)
+                envelope
+                (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done))))))))))
 (defn execute-actor-step!
   [ctx parent-session-id run-id step-id step-def workflow-run execution-session attempt-id working-memory* event-queue* prompt]
   (try

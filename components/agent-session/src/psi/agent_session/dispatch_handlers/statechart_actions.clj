@@ -6,6 +6,7 @@
    compatibility no-ops so stale or historical statechart events cannot replay
    the whole agent loop."
   (:require
+   [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
    [psi.state-kernel.dispatch :as kernel]
@@ -116,6 +117,40 @@
      :stop-reason stop-reason
      :error-message error-message}))
 
+(defn- workflow-run-stop-signal
+  [ctx run-id]
+  (stop-signal/workflow-stop-signal ctx run-id))
+
+(defn- workflow-session-run-id
+  [session-data event-data]
+  (or (:workflow-run-id event-data)
+      (when (:workflow-owned? session-data)
+        (:workflow-run-id session-data))))
+
+(defn- workflow-effect
+  [effect run-id]
+  (cond-> effect
+    run-id (assoc :workflow-run-id run-id)))
+
+(defn- live-workflow-run-in-state?
+  [state-map run-id]
+  (stop-signal/workflow-live-in-state? state-map run-id))
+
+(defn- guard-workflow-root-update
+  [root-state-update run-id]
+  (if-not (and root-state-update run-id)
+    root-state-update
+    (fn [state-map]
+      (if (live-workflow-run-in-state? state-map run-id)
+        (root-state-update state-map)
+        state-map))))
+
+(defn- workflow-stopped-result
+  [session-id reason]
+  {:return {:workflow-stopped? true
+            :reason reason
+            :session-id session-id}})
+
 (defn register!
   "Register all statechart action handlers.
    Called once during context creation. Handlers are context-independent."
@@ -129,26 +164,34 @@
    :on-agent-done
    (fn [ctx {:keys [session-id] :as data}]
      (let [sd                  (session/get-session-data-in ctx session-id)
+           run-id              (workflow-session-run-id sd data)
+           stop-reason         (workflow-run-stop-signal ctx run-id)
            interruption-reason (:interrupt-reason sd)
            pending-agent-event (:pending-agent-event data)]
-       (when (terminal-provider-error-event? pending-agent-event)
-         (dispatch-provider-event!
-          ctx
-          "provider_request_finished"
-          (failed-provider-event-payload ctx session-id pending-agent-event (:retry-attempt sd) true)))
-       {:root-state-update (session/session-update session-id #(assoc % :is-streaming false
-                                                                      :retry-attempt 0
-                                                                      :retry nil
-                                                                      :interrupt-pending false
-                                                                      :interrupt-requested-at nil
-                                                                      :interrupt-reason nil))
-        :effects (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}
-                          {:effect/type :runtime/emit-background-job-terminal-messages}
-                          {:effect/type :scheduler/drain-queue}]
-                   interruption-reason
-                   (into [{:effect/type :runtime/record-pending-tool-call-interrupts
-                           :session-id session-id
-                           :reason interruption-reason}]))})))
+       (if stop-reason
+         (workflow-stopped-result session-id stop-reason)
+         (do
+           (when (terminal-provider-error-event? pending-agent-event)
+             (dispatch-provider-event!
+              ctx
+              "provider_request_finished"
+              (failed-provider-event-payload ctx session-id pending-agent-event (:retry-attempt sd) true)))
+           {:root-state-update (guard-workflow-root-update
+                                (session/session-update session-id #(assoc % :is-streaming false
+                                                                           :retry-attempt 0
+                                                                           :retry nil
+                                                                           :interrupt-pending false
+                                                                           :interrupt-requested-at nil
+                                                                           :interrupt-reason nil))
+                                run-id)
+            :effects (cond-> [(workflow-effect {:effect/type :runtime/mark-workflow-jobs-terminal} run-id)
+                              (workflow-effect {:effect/type :runtime/emit-background-job-terminal-messages} run-id)
+                              (workflow-effect {:effect/type :scheduler/drain-queue} run-id)]
+                       interruption-reason
+                       (into [(workflow-effect {:effect/type :runtime/record-pending-tool-call-interrupts
+                                                :session-id session-id
+                                                :reason interruption-reason}
+                                               run-id)]))})))))
 
   (kernel/register-handler!
    :on-abort
