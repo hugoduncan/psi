@@ -289,3 +289,7 @@
 
 - [x] Correct the task-225 CHANGELOG entry to avoid documenting a non-existent `/delegate remove` slash command; refer to the `delegate` tool `action=remove` / `delegate remove` management action (or another actually supported removal surface) while preserving the cancellation/removal fix description.
   - Covered 2026-06-12: CHANGELOG now refers to the delegate tool `action=remove` management action instead of a non-existent `/delegate remove` slash command.
+
+## Code-shaper review follow-ups (ψ, 2026-06-12)
+
+- [ ] Consolidate the duplicated workflow cancellation stop/entry primitives: centralize the canonical run stop-signal predicate (`nil` run ⇒ `:removed`, `:cancelled` ⇒ `:cancelled`) for reuse by the agent-session/workflow/deterministic-operation call sites, and reuse `psi.workflow-runtime.cancellation-entry` for deterministic-operation entry locking (or document and test a deliberate boundary exception). Add focused regression coverage proving the refactor preserves the existing D31 no-post-cancel-ordinary-work guarantees.

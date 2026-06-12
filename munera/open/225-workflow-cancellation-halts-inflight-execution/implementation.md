@@ -3493,3 +3493,15 @@ action. Marked the docs review pass 4 follow-up complete in `steps.md`.
 Reviewed with `review-task-docs`: task artifacts, `README.md`, `CHANGELOG.md`, `doc/workflows.md`, `doc/extensions.md`, and `doc/architecture.md` against the implemented/public workflow cancellation and removal surfaces. The user-facing docs now cover `psi-tool workflow op=cancel-run`, cancel-vs-remove semantics, live top-level and nested removal behavior, background-job terminalization, worker/child-turn cancellation, idempotent terminal/absent cleanup, and dispatch re-entrant sequencing without stale `/delegate remove` or command-layer pre-cleanup claims.
 
 No new actionable documentation issues found; no follow-up steps added. No tests run (docs review only).
+
+## Code-shaper review (ψ, 2026-06-12)
+
+Reviewed with `code-shaper` for simplicity, consistency, and robustness.
+Actionable issue: cancellation stop/entry primitives are duplicated across local
+private helpers. The canonical run stop predicate (`nil` ⇒ `:removed`,
+`:cancelled` ⇒ `:cancelled`) is repeated across multiple namespaces, and
+`psi.deterministic-operation-runtime.core` duplicates the cancellation-entry lock
+helper instead of reusing `psi.workflow-runtime.cancellation-entry`. This raises
+mutation burden and risks divergent cancellation semantics. Follow-up added.
+
+No tests run (code-shaper review only).
