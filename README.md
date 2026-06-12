@@ -141,6 +141,7 @@ reference, runtime scoped setters, outbound model API proxy environment variable
 - `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
 - `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
+- `workflow` — inspect and manage workflow runs, including `cancel-run` to stop in-flight delegated workflows; see [`doc/workflows.md`](doc/workflows.md) for cancellation/removal details
 
 ### Project nREPL
 

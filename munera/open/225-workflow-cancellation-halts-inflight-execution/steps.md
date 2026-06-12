@@ -277,4 +277,5 @@
 
 ## Docs review follow-ups (ψ pass 2, 2026-06-12)
 
-- [ ] Add the missing `workflow` entry to `README.md`'s `psi-tool` action list, including the `cancel-run` operation or a pointer to `doc/workflows.md` for workflow cancellation/removal details.
+- [x] Add the missing `workflow` entry to `README.md`'s `psi-tool` action list, including the `cancel-run` operation or a pointer to `doc/workflows.md` for workflow cancellation/removal details.
+  - Covered 2026-06-12: README.md now lists `psi-tool` `workflow`, names `cancel-run`, and points to `doc/workflows.md` for cancellation/removal details.

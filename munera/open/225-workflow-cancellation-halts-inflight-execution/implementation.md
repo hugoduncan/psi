@@ -3446,3 +3446,10 @@ Reviewed with `review-task-docs` after the workflow-cancellation documentation f
 New actionable issue: `README.md`'s `psi-tool` action list still omits the `workflow` action entirely, even though the documented cancellation surface is now `psi-tool {"action":"workflow","op":"cancel-run"...}` and workflow management is a user-facing tool capability. Add a README bullet for the `workflow` psi-tool action that points to deterministic workflow definition/run management and includes `cancel-run` in the listed operations or references `doc/workflows.md` for cancellation/removal details.
 
 No tests run (docs review only).
+
+## Docs review follow-up pass 2 (ψ, 2026-06-12)
+
+Completed the newly added README follow-up: added the missing `workflow` action to
+README.md's `psi-tool` action list, explicitly naming `cancel-run` and linking to
+`doc/workflows.md` for the full workflow cancellation/removal contract. Marked the
+follow-up done in steps.md.
