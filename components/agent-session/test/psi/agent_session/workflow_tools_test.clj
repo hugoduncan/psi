@@ -6,6 +6,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
    [psi.session-state.state :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.workflow-runtime.core]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -267,7 +268,8 @@
       (is (= :completed (get-in parsed [:psi-tool/workflow :run :status])))
       (is (= :completed (get-in @(:state* ctx) [:workflows :runs "run-1" :status])))))
 
-  (testing "workflow cancel-run cancels non-terminal runs"
+  (testing "workflow cancel-run cancels non-terminal runs through canonical dispatch"
+    (kernel/clear-event-log!)
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx)
                    (fn [state]
@@ -276,9 +278,17 @@
                        state2)))
           tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow" "op" "cancel-run" "run-id" "run-1" "reason" "operator request"})
-          parsed (read-string (:content result))]
+          parsed (read-string (:content result))
+          entry  (->> (kernel/event-log-entries)
+                      (filter #(= :psi.workflow/cancel-run (:event-type %)))
+                      last)]
       (is (false? (:is-error result)))
       (is (= :cancel-run (:psi-tool/workflow-op parsed)))
       (is (= :cancelled (get-in parsed [:psi-tool/workflow :run :status])))
       (is (= "operator request" (get-in parsed [:psi-tool/workflow :run :terminal-outcome :reason])))
-      (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-1" :status]))))))
+      (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-1" :status])))
+      (is (= {:run-id "run-1"
+              :reason "operator request"
+              :session-id session-id}
+             (:event-data entry)))
+      (is (seq (:declared-effects entry))))))

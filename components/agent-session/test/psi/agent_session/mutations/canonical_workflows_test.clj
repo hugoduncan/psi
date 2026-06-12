@@ -7,6 +7,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.session-state.state :as ss]
+   [psi.state-kernel.dispatch :as kernel]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -225,6 +226,29 @@
       (is (true? (:psi.workflow/cancelled? result)))
       (is (false? (:psi.workflow/noop? result)))
       (is (nil? (:psi.workflow/error result)))))
+
+  (testing "routes through the canonical cancellation dispatch event"
+    (kernel/clear-event-log!)
+    (let [ctx (make-test-ctx)
+          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                            :definition sample-definition})
+          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                   :definition-id "test-workflow"
+                                                   :workflow-input {:input "hello" :original "hello"}
+                                                   :run-id "run-1"})
+          result (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
+                                                        :run-id "run-1"
+                                                        :reason "adapter cancel"
+                                                        :session-id "session-1"})
+          entry (->> (kernel/event-log-entries)
+                     (filter #(= :psi.workflow/cancel-run (:event-type %)))
+                     last)]
+      (is (= :cancelled (:psi.workflow/status result)))
+      (is (= {:run-id "run-1"
+              :reason "adapter cancel"
+              :session-id "session-1"}
+             (:event-data entry)))
+      (is (seq (:declared-effects entry)))))
 
   (testing "returns success no-op for nonexistent run"
     (let [ctx (make-test-ctx)

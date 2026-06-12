@@ -2,9 +2,14 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as background-jobs]
+   [psi.agent-session.core :as session]
+   [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
+   [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow.core :as workflow-core]
    [psi.agent-session.workflow.delegate-list :as delegate-list]
-   [psi.agent-session.workflow.runtime-state :as runtime-state]))
+   [psi.agent-session.workflow.runtime-state :as runtime-state]
+   [psi.state-kernel.dispatch :as kernel]
+   [psi.workflow-runtime.model :as workflow-model]))
 
 (def base-run
   {:run-id "run-1"
@@ -233,6 +238,12 @@
 (defn- eql-jobs
   [jobs]
   (mapv background-jobs/job->eql jobs))
+
+(defn- make-dispatch-backed-remove-ctx
+  []
+  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))]
+    (swap! (:state* ctx) assoc :workflows (workflow-model/initial-workflow-state))
+    ctx))
 
 (deftest delegate-list-tool-path-shows-active-same-session-run-test
   ;; The actual delegate list path must use the invoking session's background
@@ -602,26 +613,38 @@
   ;; Background-job terminalization is no longer a delegate command-layer side
   ;; effect; canonical remove dispatch/effects own cancellation terminalization.
   (testing "delegate remove calls only canonical workflow removal"
-    (let [removed* (atom false)
-          marked* (atom false)
+    (kernel/clear-event-log!)
+    (let [calls* (atom [])
+          ctx (make-dispatch-backed-remove-ctx)
           original-state @runtime-state/state
-          mutate-fn (fn [op _args]
+          mutate-fn (fn [op args]
+                      (swap! calls* conj [op args])
                       (case op
                         psi.extension/mark-background-job-terminal
-                        (do
-                          (reset! marked* true)
-                          {:psi.background-job/status :cancelled})
+                        {:psi.background-job/status :cancelled}
 
                         psi.workflow/remove-run
-                        (do
-                          (reset! removed* true)
-                          {:psi.workflow/removed? true})))]
+                        (cwf-mutations/remove-workflow-run {}
+                                                           {:psi/agent-session-ctx ctx
+                                                            :run-id (:run-id args)
+                                                            :session-id (:session-id args)})))]
       (try
         (reset! runtime-state/state {:current-session-id "session-1"
                                      :mutate-fn mutate-fn})
-        (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+        (let [result (#'workflow-core/delegate-remove {:id "run-1"})
+              entry (->> (kernel/event-log-entries)
+                         (filter #(= :psi.workflow/remove-run (:event-type %)))
+                         last)]
           (is (= {:ok true :run-id "run-1"} result))
-          (is (true? @removed*))
-          (is (false? @marked*)))
+          (is (= [['psi.workflow/remove-run {:run-id "run-1"
+                                             :session-id "session-1"}]]
+                 @calls*))
+          (is (= {:run-id "run-1"
+                  :session-id "session-1"}
+                 (:event-data entry)))
+          (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "run-1"}
+                  {:effect/type :runtime/drop-inflight-run :run-id "run-1"}
+                  {:effect/type :runtime/drop-workflow-cancellation-entry-lock :run-id "run-1"}]
+                 (:declared-effects entry))))
         (finally
           (reset! runtime-state/state original-state))))))

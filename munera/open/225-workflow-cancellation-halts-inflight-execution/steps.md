@@ -267,4 +267,5 @@
 
 ## Test review follow-ups (ψ pass 6, 2026-06-12)
 
-- [ ] Add adapter-boundary tests proving the public cancellation/removal surfaces enter the canonical state-kernel events rather than mutating workflow-runtime state inline: Pathom `psi.workflow/cancel-run`, `psi-tool workflow op=cancel-run`, and `delegate remove` should assert `:psi.workflow/cancel-run` / `:psi.workflow/remove-run` dispatch/event-log (or equivalent dispatch seam) in addition to their returned state/result shapes.
+- [x] Add adapter-boundary tests proving the public cancellation/removal surfaces enter the canonical state-kernel events rather than mutating workflow-runtime state inline: Pathom `psi.workflow/cancel-run`, `psi-tool workflow op=cancel-run`, and `delegate remove` should assert `:psi.workflow/cancel-run` / `:psi.workflow/remove-run` dispatch/event-log (or equivalent dispatch seam) in addition to their returned state/result shapes.
+  - Covered 2026-06-12: Pathom cancel and psi-tool cancel now assert the canonical `:psi.workflow/cancel-run` event-log entry and declared effects; delegate remove now asserts the adapter calls only the canonical `psi.workflow/remove-run` mutation with `run-id`/`session-id`, and that the mutation enters the canonical `:psi.workflow/remove-run` event-log path with cleanup effects, not command-layer cleanup side effects.
