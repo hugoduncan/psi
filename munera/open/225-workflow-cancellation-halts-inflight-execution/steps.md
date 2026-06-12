@@ -284,3 +284,7 @@
 
 - [x] Update `doc/extensions.md`'s built-in workflow capability section so it no longer documents the old `delegate remove` command-layer active-background-job pre-cleanup / fail-before-delete model; summarize the current canonical workflow cancellation/removal contract (including `psi-tool workflow op=cancel-run` and dispatch-owned cancel-then-remove cleanup) or point to `doc/workflows.md` for those details.
   - Covered 2026-06-12: `doc/extensions.md` now describes dispatch-owned workflow removal, live top-level cancel-then-remove cleanup, live nested sub-run parent-continuation semantics, idempotent terminal/absent cleanup, and `psi-tool workflow op=cancel-run` with a pointer to `doc/workflows.md`.
+
+## Docs review follow-ups (ψ pass 4, 2026-06-12)
+
+- [ ] Correct the task-225 CHANGELOG entry to avoid documenting a non-existent `/delegate remove` slash command; refer to the `delegate` tool `action=remove` / `delegate remove` management action (or another actually supported removal surface) while preserving the cancellation/removal fix description.

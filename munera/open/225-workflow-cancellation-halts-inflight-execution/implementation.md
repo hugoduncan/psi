@@ -3472,3 +3472,11 @@ drop, live nested sub-run removal without parent-worker interruption, idempotent
 terminal/absent cleanup, and `psi-tool workflow op=cancel-run` as the cancellation
 surface, with `doc/workflows.md` as the detailed reference. Marked the docs review
 follow-up complete in `steps.md`.
+
+## Docs review (ψ pass 4, 2026-06-12)
+
+Reviewed with `review-task-docs` after the extensions-doc follow-up: task artifacts, `README.md`, `CHANGELOG.md`, `doc/workflows.md`, `doc/extensions.md`, and the implemented/public workflow cancellation and removal surfaces.
+
+New actionable issue: the `[Unreleased]` changelog entry says the fix applies after `/delegate remove`, but `/delegate remove` is not a documented or implemented slash-command form; `/delegate` parses the first token as a workflow name/list command, while removal is exposed through the `delegate` tool `action=remove` / `delegate remove` management action. Correct the changelog wording so release notes do not advertise a non-existent slash command.
+
+No tests run (docs review only).
