@@ -551,3 +551,42 @@ Executed G1, G2 by updating design.md (both completed; neither blocked).
   Source-ref integration section carving the judge out of the same-step invalid
   rule. The remaining same-step prohibition continues to apply to assembly-time
   contributions/templates (the deferred cross-turn data flow, E3).
+
+## Inconsistency review (design, pass 3 — post-prune) — ψ
+
+Re-reviewed the pruned design.md for internal inconsistencies and against the
+referenced artifacts (`doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`,
+`step_execution.clj` raw-outputs, `materialize-/split-step-session-conversation`).
+A1–A3/B1–B5/C1–C2/D1–D2/E1–E3/F1/G1–G2 are resolved or moved to task 227. One
+**new** actionable inconsistency found (C3); recorded as an unchecked item in
+design-steps.md. Verified-consistent: per-prompt text surfaces
+(`:final-llm-reply`/`:transcript`) match `doc/workflow-grammar-concepts.md`'s
+session output surfaces (line 269; `:text` is a `:yield` field, not a step-local
+surface — correctly excluded); structured-output `:outputs` field name and the
+"at most one entry / final-turn granularity" claim match `doc/workflow-grammar.md`
+(219); the Problem-statement description of `split-step-session-conversation`
+(last user message → prompt, prior messages preload) matches the code;
+`execute-with-ranked-fallback!` and `execute-session-step!`/`execute-actor-turn!`/
+`execute-session-turn!` exist as named; F1's resume/suspend substrate references
+resolve.
+
+- **C3 — Architecture-alignment "per-prompt turn records keyed by `:name`"
+  contradicts the unnamed `:contributions` group for the N=1 degenerate.** The
+  Architecture-alignment bullet (design.md:202) states the single post-drain
+  `:pending-actor-result` "carries ordered per-prompt turn records (keyed by
+  `:name`, …) plus the step-level rollup," and presents this as a general
+  property of the **one unified queue path** (single-prompt = N=1 degenerate). But
+  Concepts (design.md:65, "named when authored under `:prompts`") and Grammar
+  Step-level precedence (design.md:136–137, "`:contributions` → one **unnamed**
+  group (step-level surfaces only); `:prompts` → **named** groups") establish that
+  the `:contributions` form yields an **unnamed** group with no `:name`. For the
+  N=1 `:contributions` case the keyed-by-`:name` per-prompt record therefore
+  cannot be keyed, yet the unified-path framing says the result *carries* per-prompt
+  records. The design never states whether the unnamed group produces **no**
+  addressable per-prompt record (only the step-level rollup) or appears in the
+  records map under some synthetic key — leaving the canonical result shape
+  contradictory for the degenerate path it foregrounds. Reconcile by stating in
+  the Architecture-alignment bullet that named (`:prompts`) groups contribute
+  per-prompt records keyed by `:name` while the unnamed (`:contributions`) group
+  contributes only the step-level rollup (no per-prompt addressable record), so
+  "keyed by `:name`" applies only where a name exists.
