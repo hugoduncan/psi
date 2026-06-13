@@ -65,3 +65,40 @@ Executed A1, A2, A3 by updating design.md (all completed; none blocked).
   no turn result lives only in an in-loop local.
 - Cross-referenced A2/A3 as resolved Q12 in the open-questions list for
   traceability.
+
+## Ambiguity review (design) — ψ
+
+Reviewed design.md for ambiguities (statements admitting >1 interpretation,
+undefined terms, unspecified edge behavior). Distinct from the architectural-fit
+pass (A1–A3). Five new actionable ambiguities found; recorded as unchecked items
+in design-steps.md.
+
+- **B1 — Yielded-value composition is unspecified for a multi-prompt step.**
+  `doc/workflow-grammar-concepts.md` distinguishes step-local `:output` surfaces
+  from the step's `:yield` tagged-union value and the downstream
+  `{:step s :yield k}` ref form. The design specifies per-prompt `:output`
+  addressing (`:final-llm-reply`/`:transcript`) but never states (a) what a
+  multi-prompt session step's yielded value as a whole is, nor (b) whether the
+  `:prompt` discriminator applies to `:yield` refs or only to `:output` refs.
+- **B2 — Per-prompt `:transcript` content is ambiguous.** AC-3 contrasts the
+  step-level `:transcript` ("accumulated conversation across all turns") with a
+  per-prompt `:transcript` ("its own"), but because all prompts share one live
+  session, "its own" can mean either just that prompt's turn slice or the
+  cumulative conversation up to and including that turn. Not disambiguated.
+- **B3 — One-element `:prompts` legality and execution path is unspecified.**
+  Q6 forbids empty `:prompts` and keeps single-prompt authoring as the
+  `:contributions` form (not internally rewritten to a one-element `:prompts`),
+  but does not state whether an author may write `:prompts` with exactly one
+  entry, and if so whether it runs the multi-prompt path (per-prompt addressing
+  available) or is rejected in favor of `:contributions`. AC-1 ("N ≥ 1")
+  implies it is valid; this is left implicit.
+- **B4 — Prompt-group `:name` uniqueness within a step is unspecified.** The
+  `:prompt p` selector and the per-prompt records ("keyed by prompt `:name`")
+  presuppose unique names, but no uniqueness rule or duplicate-name validation
+  error is stated.
+- **B5 — Step outcome under cancellation between prompts (AC-6) is
+  underspecified.** AC-5 states the intermediate-error path (surface failure,
+  stop queue, identify failing prompt by name). AC-6 says cancellation stops
+  submitting later prompts but does not state the resulting step outcome: whether
+  the judge/`:on` routing runs, what envelope/outcome is recorded, and whether
+  the partial per-prompt turn records already completed remain introspectable.
