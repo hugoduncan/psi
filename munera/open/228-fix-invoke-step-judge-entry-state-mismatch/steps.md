@@ -122,7 +122,7 @@
 
 ## Review follow-ups — task-test-review (ψ 2026-06-13)
 
-- [ ] Strengthen the namespacing characterization test
+- [x] Strengthen the namespacing characterization test
   (`invoke-step-operation-then-judge-operation-share-one-attempt-test` in
   `deterministic-operation-runtime/core_test.clj`) to cover the plan's top
   "key-derivation completeness" risk. It currently asserts only the
@@ -136,3 +136,15 @@
   would silently re-alias metadata across both operations on one attempt while
   every test stays green (the mismatch gate is the state key alone). Verify
   red-on-revert by removing those two rewrite lines.
+  - Done: captured the step-op attempt (`after-step`) before driving the judge,
+    then added assertions that the judge namespaces `:judge-operation-start-state`
+    (`:started`), `:judge-operation-call-state` (`:committed`),
+    `:judge-operation-start-count` (1, its own `:count-key`) and
+    `:judge-operation-handler-entered-at` (some?, a judge-scoped `:timestamp-key`),
+    **and** that the step op's `:operation-start-count` stays 1 and its
+    `:operation-started-at` / `:operation-handler-entered-at` timestamps are
+    byte-identical before/after the judge runs. Red-on-revert verified: removing
+    the `:timestamp-key`/`:count-key` rewrite lines from `role-phase-opts` fails 6
+    assertions (judge re-increments `:operation-start-count` to 2 and overwrites
+    the step's `*-at` timestamps); source restored. Suite: 5 tests / 32 assertions
+    green (was 5/24); clj-kondo clean.

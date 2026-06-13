@@ -156,6 +156,8 @@
                                    (swap! step-calls* inc)
                                    {:status :ok :data {:step? true}})}
                        base-invocation)
+          after-step (get-in @state* [:workflows :runs "run-1" :step-runs
+                                      "clarity-status" :attempts 0])
           judge-result (runtime/invoke-operation
                         {:id "workflow/pass-feedback-routing"
                          :handler (fn [_]
@@ -172,7 +174,30 @@
       (is (= :entered (:operation-handler-entry-state attempt))
           "the step operation's :operation-*-state keys are untouched by the judge")
       (is (= :entered (:judge-operation-handler-entry-state attempt))
-          "the judge operation drives its own :judge-operation-*-state namespace"))))
+          "the judge operation drives its own :judge-operation-*-state namespace")
+      (testing "the judge namespaces every phase-opts key field, not just :phase-key"
+        ;; Guards the plan's top "key-derivation completeness" risk: a regression
+        ;; dropping the :timestamp-key/:count-key rewrite in role-phase-opts would
+        ;; re-alias the judge's metadata onto the step op's :operation-* keys while
+        ;; the state-key mismatch gate (the only key the original assertions pin)
+        ;; stays green.
+        (is (= :started (:judge-operation-start-state attempt))
+            "the judge namespaces the :operation-start-state phase key")
+        (is (= :committed (:judge-operation-call-state attempt))
+            "the judge namespaces the :operation-call-state phase key")
+        (is (= 1 (:judge-operation-start-count attempt))
+            "the judge namespaces the :count-key (its own start count)")
+        (is (some? (:judge-operation-handler-entered-at attempt))
+            "the judge namespaces a :timestamp-key (judge-scoped handler-entered-at)")
+        (is (= 1 (:operation-start-count attempt))
+            "the judge does not re-increment the step op's :operation-start-count")
+        (is (= (:operation-start-count after-step) (:operation-start-count attempt))
+            "the step op's :operation-start-count is untouched by the judge")
+        (is (= (:operation-started-at after-step) (:operation-started-at attempt))
+            "the step op's :operation-started-at timestamp is untouched by the judge")
+        (is (= (:operation-handler-entered-at after-step)
+               (:operation-handler-entered-at attempt))
+            "the step op's :operation-handler-entered-at timestamp is untouched by the judge")))))
 
 (deftest judge-role-operation-honors-workflow-cancellation-test
   ;; Task 228 regression: per-operation phase-key namespacing must not weaken the

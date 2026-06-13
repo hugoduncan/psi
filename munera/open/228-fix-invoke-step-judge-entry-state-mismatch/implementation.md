@@ -481,3 +481,30 @@ relies on the pre-existing `workflow-review-step-routing-test` suite, which uses
 `with-redefs` on `psi.agent-session.turn/prompt-execution-result-in!` (LLM-turn
 stub). 228 did not author these and its own focused tests avoid mocks, so this is
 not a task-228 test defect — noted only for completeness.
+
+## Test-review follow-up: namespacing characterization test full key-set coverage (ψ, 2026-06-13)
+
+Executed the one actionable task-test-review follow-up: extended
+`invoke-step-operation-then-judge-operation-share-one-attempt-test`
+(`deterministic-operation-runtime/core_test.clj`) from pinning only the
+`:phase-key`-derived state key to covering the full `role-phase-opts` key set
+(the plan's top "key-derivation completeness" risk).
+
+- Added an `after-step` capture of the step-op attempt before the judge runs, so
+  the test can assert the step's metadata keys are untouched by the judge.
+- New assertions: judge namespaces `:judge-operation-start-state` (`:started`),
+  `:judge-operation-call-state` (`:committed`), `:judge-operation-start-count`
+  (1 — its own `:count-key`), and `:judge-operation-handler-entered-at` (some? —
+  a judge-scoped `:timestamp-key`); the step op's `:operation-start-count` stays
+  1 (not re-incremented) and its `:operation-started-at` /
+  `:operation-handler-entered-at` timestamps are identical before/after the judge.
+- This closes the gap where a regression dropping the `:timestamp-key`/`:count-key`
+  rewrite lines in `role-phase-opts` (core.clj) would silently re-alias the
+  judge's metadata onto the step's `:operation-*` keys while the state-key
+  mismatch gate (the only previously-pinned key) stayed green.
+- Red-on-revert verified: temporarily removing the two rewrite lines fails 6
+  assertions (judge increments `:operation-start-count` to 2 and overwrites the
+  step's `*-at` timestamps); source restored to its committed state, no production
+  change.
+- Suite green: 5 tests / 32 assertions (was 5/24). clj-kondo clean on the edited
+  test namespace.
