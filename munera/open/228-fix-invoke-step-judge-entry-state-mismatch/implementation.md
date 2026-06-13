@@ -537,3 +537,47 @@ No new actionable findings. The prior test-review pass-1 finding
 (key-derivation completeness) is resolved and runtime-verified. The pre-existing
 `workflow-review-step-routing-test` LLM-turn `with-redefs` stub is not
 228-authored (already noted non-actionable). Test quality is sufficient to close.
+
+## Test review — test-shaper skill (ψ, 2026-06-13)
+
+Shaped the four 228-authored tests for clarity ∧ signal ∧ robustness ∧ economy
+(`λtests. clarity ∧ signal ∧ robustness → shape`). Tests reviewed:
+`invoke-step-operation-then-judge-operation-share-one-attempt-test` +
+`judge-role-operation-honors-workflow-cancellation-test`
+(`deterministic-operation-runtime/core_test.clj`),
+`invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`
+(`workflow-runtime/.../step_execution_test.clj`),
+`execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test`
+(`agent-session/workflow_judge_test.clj`).
+
+Assessment (all satisfied):
+- **clarity / single-concern** ✓ — descriptive names + docstrings tie each test
+  to its specific defect; one invariant per test.
+- **deterministic** ✓ — no time/random/io coupling; wall-clock timestamps pinned
+  with `some?` (presence), not value equality.
+- **mock-free / state-based** ✓ — real `deterministic-operation-registry` + plain
+  `state*` atoms; observable state assertions, no `with-redefs`/interaction
+  assertions in any 228-authored test.
+- **meaningful-failures** ✓ — every `is` carries a contract-explaining message.
+- **economy / boundaries** ✓ — the cancellation "within-operation" partition is
+  covered for the default role by the 12 race tests in
+  `workflow_statechart_runtime_call_start_cancellation_test.clj`; the judge-role
+  namespacing is applied at a chokepoint structurally orthogonal to the
+  cancellation checkpoints (`with-run-read-lock`/stop-signal), so the judge-role
+  "before start" cancellation test + the default-role "within" race suite give
+  sufficient confidence without judge-role race-test duplication.
+
+Considered but NOT actionable (deliberate, already-deliberated tradeoffs):
+- The namespacing characterization test asserts internal phase-machine
+  bookkeeping keys (`:judge-operation-start-count`, `:judge-operation-handler-
+  entered-at`, step-op untouched-timestamps). Implementation-coupled, but added
+  in test-review pass-1 (red-on-revert verified) to guard the key-aliasing
+  invariant that has no observable proxy — defensible under
+  `robust → shaped_by(invariants) → enforceable(confidence)`; reversing it would
+  be churn.
+- Mild expected-map duplication between the default-role and judge-role
+  cancellation tests is acceptable parity coverage; extracting a helper risks
+  `helpers_that_hide(intent)` and would reduce local comprehensibility for only
+  two cases.
+
+No new actionable test-shaping findings. Test quality is sufficient to close.
