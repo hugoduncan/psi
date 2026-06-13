@@ -461,3 +461,32 @@ progression substrate (A3); generic queue mechanism vs authored prompts
   queue (and where the suspend/resume boundary sits relative to the single
   statechart step) or scope mid-queue resume out explicitly with its replay-fidelity
   consequences stated.
+
+## Architectural-fit follow-up execution (design, pass 3 — post-prune) — ψ
+
+Executed F1 by updating design.md (completed; not blocked). Grounded against
+`doc/workflow_statechart_canonical.md`: `psi.workflow-runtime.statechart-runtime`
+(resume/suspend runtime), `psi.workflow-runtime.core` run resume +
+`resume-and-execute-run!`, and `psi.workflow-runtime.progression-recording` (the
+canonical record/update substrate A3 already writes per-turn results into).
+
+- **F1 (done).** Committed to **resume-from-progression** for the internal queue
+  (rejected scoping mid-queue resume out — it would falsify the replay-faithful
+  claim). Stated: `ai/generate` is an async effect that suspends the run, so N
+  prompts = **N suspend points inside the one statechart step**; the
+  "synchronous drain" is logical ordering, not a blocking loop. On every resume
+  (async completion, process restart, replay) the queue-driving loop reads
+  recorded per-prompt progression and **continues at the next un-run prompt**,
+  never re-submitting a prompt with an existing turn record — so a completed
+  turn's non-deterministic `ai/generate` never re-fires (upholds VSM
+  `∀change → event → log → replayable`). Located the suspend/resume boundary
+  **inside** the single statechart step (resume re-enters the step, consults
+  progression, does not restart the queue); post-drain route (Q5) reached only
+  once every prompt has a recorded turn. Distinguished F1 from A3 (records) and
+  Q5 (one route) — F1 is the consume-to-resume rule tying them to the async
+  runtime.
+- Edits: Intent (added the logical-ordering / N-suspend-cycle clarification),
+  Architecture alignment (new "Resume/suspend contract (F1)" bullet), and
+  Acceptance criteria (new AC-7 resume-from-progression idempotency; docs/tests
+  bumped to AC-8 with a mid-queue-resume test added to the coverage list). No
+  existing AC-1..6 references renumbered.

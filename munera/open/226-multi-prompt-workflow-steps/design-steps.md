@@ -130,7 +130,7 @@
 
 ## Architectural-fit review (pass 3 — post-prune)
 
-- [ ] F1: Specify the resume/suspend contract for the internal N-prompt queue,
+- [x] F1: Specify the resume/suspend contract for the internal N-prompt queue,
   reconciling the design's synchronous-drain framing ("next prompt submitted only
   after the prior turn finishes; routing once after drain; one post-drain
   `:pending-actor-result`") with the resume/suspend-driven canonical runtime

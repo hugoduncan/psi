@@ -16,6 +16,12 @@ preserves context across turns** — impossible today without either cramming
 asks into one prompt (no turn boundary) or using separate steps (separate child
 sessions that lose prior context).
 
+"Submitted only after the prior turn finishes" is a **logical ordering**
+constraint, not a synchronous in-thread loop: each turn is an async
+`ai/generate` effect that suspends the run, so the drain is realized as N
+suspend/resume cycles within one statechart step, resuming from recorded
+progression (see Architecture alignment, F1).
+
 ## Problem
 
 A `:session` step today runs exactly one actor turn: `:contributions`
@@ -88,9 +94,15 @@ Out of scope (follow-ons):
 6. Cancellation between prompts ⇒ terminal `:cancelled` (distinct from `:failed`):
    queue stops, routing skipped, completed per-prompt turn records retained and
    introspectable.
-7. Docs describe the form; IR-validation + runtime tests cover ordering, drain,
+7. On resume (async turn completion, process restart, replay) the queue
+   continues at the next **un-run** prompt from recorded per-prompt progression;
+   a prompt whose turn record already exists is never re-submitted (no
+   re-fire of its `ai/generate` effect). Routing is reached only after every
+   prompt has a recorded turn.
+8. Docs describe the form; IR-validation + runtime tests cover ordering, drain,
    N=1 equivalence, per-prompt addressing + its validation, intermediate-failure
-   abort, and inter-prompt cancellation.
+   abort, inter-prompt cancellation, and resume-from-progression idempotency
+   (a mid-queue resume runs only the un-run prompts).
 
 ## Grammar
 
@@ -178,3 +190,25 @@ flow. All reported fail-fast at workflow-load / IR-normalization.
   internal loop, not N statechart steps).
 - **Model fallback is per turn** (`execute-with-ranked-fallback!`); a switch
   persists to later turns in the same session.
+- **Resume/suspend contract for the internal queue (F1).** The canonical runtime
+  is resume/suspend-driven (`psi.workflow-runtime.statechart-runtime`;
+  `psi.workflow-runtime.core` run resume; `resume-and-execute-run!`), and
+  `ai/generate` is an **async effect that suspends the run** and resumes on turn
+  completion. So N queued prompts mean **N suspend points inside the one
+  statechart step** — the "synchronous drain" is logical (route only after all
+  turns finish), not a single blocking loop. The queue commits to
+  **resume-from-progression**: on every resume (async turn completion, process
+  restart, replay) the queue-driving loop reads the recorded per-prompt
+  progression (the same `psi.workflow-runtime.progression-recording` substrate
+  that A3 writes each turn into) and **continues at the next un-run prompt**,
+  never re-submitting a prompt whose turn record already exists. This makes the
+  step idempotent under resume: a completed turn's side-effectful,
+  non-deterministic `ai/generate` effect never re-fires, upholding the VSM
+  `∀change → event → log → replayable` ethos and the design's replay-faithful
+  claim. The suspend/resume boundary sits **inside** the single statechart step
+  (one step, N internal turns), so resume re-enters the step and consults
+  progression rather than restarting the queue; the post-drain
+  `:pending-actor-result` / routing (Q5) is reached only once every prompt has a
+  recorded turn. (Distinct from A3, which only *records* results, and from Q5,
+  which is the single post-drain route; F1 is the *consume-to-resume* rule that
+  ties them to the async runtime.)
