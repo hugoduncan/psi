@@ -611,3 +611,26 @@ Considered but NOT actionable (deliberate, already-deliberated tradeoffs):
   two cases.
 
 No new actionable test-shaping findings. Test quality is sufficient to close.
+
+## Code-shaper review (ψ, 2026-06-13)
+
+Applied the code-shaper skill (simplicity ∧ consistency ∧ robustness) to the
+four changed source namespaces. Code is structurally sound: `role-phase-key` /
+`role-phase-opts` are single-responsibility and well-named; the single
+`transition-workflow-operation-phase!` chokepoint keeps the role rewrite in one
+place; both call-sites now thread the authoritative attempt-id consistently
+(step `invoke-step-runtime-result` + judge `execute-invoke-judge!`); no
+cross-component extraction is warranted (the shared resolve-args/invoke shape
+spans agent-session ↔ workflow-runtime by design).
+
+One actionable `consistent(idioms)` nit:
+
+- **`role-phase-opts` expresses the same partial application two ways**
+  (`core.clj:55-61`). The three scalar branches use `#(role-phase-key role %)`
+  (×3) while the `:required-phases` branch uses `(partial role-phase-key role)`
+  — identical operation, two idioms, plus the closure is textually triplicated.
+  Bind it once (e.g. `(let [namespace-key (partial role-phase-key role)] …)`)
+  and reuse for all four `update` sites. Unifies the idiom and removes the
+  duplication (`λ consistent(code)` → consistent idioms; `locally_comprehensible`).
+  Pure shaping; behaviour-preserving; the existing
+  `…share-one-attempt-test` full-key-set assertions guard it.
