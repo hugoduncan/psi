@@ -146,3 +146,19 @@
   statechart step), or explicitly scope mid-queue resume out and state its
   replay-fidelity consequences. Distinct from A3 (records results) and Q5 (one
   post-drain route).
+
+## Ambiguity review (pass 3 — post-prune)
+
+- [ ] G1: Specify, in AC-5 (intermediate-turn error), the fate of per-prompt turn
+  records for prompts completed **before** the failing one — whether they are
+  retained and introspectable (mirroring AC-6's explicit cancellation statement),
+  and whether the failing prompt leaves any partial record — so the `:failed` and
+  `:cancelled` abort paths are symmetric on S4 introspectability.
+- [ ] G2: Reconcile AC-4 ("the judge may reference per-prompt surfaces") with the
+  Source-ref integration validation rule that marks a `:prompt` selector invalid
+  when "it targets the same step being assembled (sibling-group ref, forward or
+  back)." State explicitly whether a step's own post-drain `:judge` may address
+  its prompt-groups via `{:step s :prompt p :output k}`, and if so carve the
+  post-drain judge out of the same-step invalid rule (e.g. the judge resolves
+  after every turn is recorded, unlike assembly-time contributions/templates) so
+  the validation enumeration and AC-4 are unambiguously consistent.

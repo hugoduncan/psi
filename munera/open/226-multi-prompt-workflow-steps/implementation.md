@@ -490,3 +490,41 @@ canonical record/update substrate A3 already writes per-turn results into).
   Acceptance criteria (new AC-7 resume-from-progression idempotency; docs/tests
   bumped to AC-8 with a mid-queue-resume test added to the coverage list). No
   existing AC-1..6 references renumbered.
+
+## Ambiguity review (design, pass 3 — post-prune) — ψ
+
+Re-reviewed the **pruned** capability-only design.md for ambiguities (statements
+admitting >1 interpretation, undefined terms, unspecified edge behaviour),
+distinct from the architectural-fit pass-3 (F1) and the earlier B1–B5/E1–E3
+ambiguity passes. A1–A3/B1–B5/C1–C2/D1–D2/E1–E3/F1 are resolved or moved to task
+227. Two **new** actionable ambiguities found (G1, G2); recorded as unchecked
+items in design-steps.md. Verified-clear: B5 (cancellation outcome) and AC-7
+(resume-from-progression) are now explicit; one-element `:prompts` legality (B3),
+per-prompt `:transcript` slicing (B2), and yielded-value composition (B1) are
+stated in the pruned design.
+
+- **G1 — AC-5 (intermediate-error path) is silent on already-completed
+  per-prompt turn records.** AC-6 explicitly states that on cancellation the
+  "completed per-prompt turn records [are] retained and introspectable." AC-5
+  (intermediate turn error) states only "queue stops, step `:failed` with payload
+  naming the failing prompt, routing skipped" — it does **not** state whether the
+  turn records of prompts that completed *before* the failing one are retained and
+  introspectable, nor whether the failing prompt has any partial record. The two
+  abort paths (AC-5 error / AC-6 cancellation) are asymmetric on a load-bearing
+  S4-introspection point: a reader cannot tell whether `:failed` discards prior
+  per-prompt records or keeps them like `:cancelled` does.
+- **G2 — Judge per-prompt references vs the "same step being assembled" invalid
+  rule.** AC-4 says routing runs once after the drain "over the post-drain step
+  result; the judge may reference per-prompt surfaces." But the Source-ref
+  integration validation list marks a `:prompt` selector **invalid** when "it
+  targets the **same step being assembled** (sibling-group ref, forward or back) —
+  the deferred cross-turn data flow." The step's own `:judge` is part of step `s`
+  and would address its prompt-groups via `{:step s :prompt p :output k}` — i.e. a
+  same-step `:prompt` ref. The design never states whether the post-drain judge is
+  the *permitted* post-drain case (all turns recorded; not an assembly-time
+  forward/back sibling ref) or is caught by the same-step invalid rule. AC-4
+  (judge may reference per-prompt surfaces) and the validation enumeration
+  (same-step `:prompt` refs invalid) are reconcilable but not reconciled: it is
+  ambiguous whether a step's judge may use `:prompt` refs to its own groups, and
+  if so why that escapes the same-step prohibition (e.g. judge resolves
+  post-drain, unlike assembly-time contributions/templates).
