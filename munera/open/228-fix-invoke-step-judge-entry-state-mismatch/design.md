@@ -146,12 +146,18 @@ never collide).
 
 Approach (to be finalized in plan):
 
-- Thread an explicit **operation role / phase namespace** through the invocation
-  (e.g. the judge invocation in `execute-invoke-judge!` carries a `:judge` role;
-  the step `:operation` invocation carries the default role).
+- Thread an explicit **operation role / phase namespace** through the invocation:
+  the judge invocation in `execute-invoke-judge!` carries `:operation-role
+  :judge`; the step `:operation` invocation omits the key and uses the default
+  (`:step`) role.
 - In `deterministic-operation-runtime/core`, derive the phase-opts key set from
-  that role (default keys unchanged for back-compat with single-operation steps;
-  judge role uses a `:judge`-scoped key set).
+  that role at the **single** `transition-workflow-operation-phase!` chokepoint
+  (every phase helper already routes through it), rewriting the supplied
+  `phase-opts` keys via a `role-phase-key` helper. The six phase helpers
+  (`reserve`, `commit-start`, `begin-call`, `commit-call`,
+  `prepare-handler-entry`, `enter-handler`) are left unchanged. Default/`:step`
+  keys are byte-identical for back-compat with single-operation steps; the judge
+  role uses a `:judge`-scoped key set.
 - Keep the 225 cancellation primitives (`ordinary-entry`,
   `cancellation-entry/with-run-read-lock`, stop-signal) unchanged — only the
   key namespace is parameterized, so cancellation guards still apply per

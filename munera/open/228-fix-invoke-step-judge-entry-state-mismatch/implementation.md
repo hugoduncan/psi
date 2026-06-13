@@ -77,3 +77,29 @@ Actionable ambiguities found:
   `:operation-role :step` "only if it improves clarity," so the final artifact
   state (key present vs absent at the step call-site) is non-determinate. Decide
   one way so the end state is fixed.
+
+## Plan/steps ambiguity resolutions (ψ, 2026-06-13)
+
+Resolved the four review follow-ups; design.md, plan.md, and steps.md updated to
+single, determinate descriptions.
+
+- **Injection point → single chokepoint.** `role-phase-key` is applied **once**
+  inside `transition-workflow-operation-phase!` (the one function every phase
+  helper already calls). It reads `(:operation-role invocation)` and rewrites the
+  supplied `phase-opts` keys — `:phase-key`, `:timestamp-key`, `:count-key`, and
+  each `:required-phases` entry's `:key` — via `role-phase-key`. Chosen over
+  per-helper rewriting (`λone_way`, fewer edit sites, no risk of missing
+  `enter-handler`). Verified against `core.clj`: the six helpers all funnel their
+  phase-opts through this single function, so the chokepoint covers every key.
+- **Helper count → six (moot under chokepoint).** Confirmed six helpers:
+  `reserve`, `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`,
+  `enter-handler`. Under the chokepoint strategy they are left unchanged, so the
+  count is informational only. Corrected wording in design.md + plan.md.
+- **Regression suite named.** `components/agent-session/test/.../
+  workflow_statechart_runtime_call_start_cancellation_test.clj` is the suite that
+  directly asserts the default-role `:operation-*-state` keys; named explicitly in
+  plan Slice 4/5 and steps Slice 4/5 green sets.
+- **Step-operation role → omit.** The step `:operation` invocation carries **no**
+  `:operation-role` key (absent ≡ `:step` at the chokepoint). Single rule: only
+  judge invocations annotate a role. "Only if it improves clarity" deferral
+  removed. Keeps every single-operation step's `:operation-*` keys byte-identical.

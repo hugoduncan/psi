@@ -26,18 +26,29 @@ invocation map and derive the entry phase-key namespace from it:
       base-key))
   ```
 
-  applied uniformly to **every** phase/timestamp/count key used by the five
-  transition helpers (`reserve` / `commit-start` / `begin-call` / `commit-call`
-  / `prepare-handler-entry` / `enter-handler`), so the judge operation drives
-  `:judge-operation-start-state` / `:judge-operation-call-state` /
-  `:judge-operation-handler-entry-state` (plus matching `*-at` / `*-count`),
-  never touching the residual `:entered` left by the step `:operation`.
+- **Injection point — single chokepoint (decided, `λone_way`).** The role is
+  applied **once** inside `transition-workflow-operation-phase!` (the one
+  function every phase helper already calls). It reads
+  `(:operation-role invocation)` and rewrites the supplied `phase-opts` keys —
+  `:phase-key`, `:timestamp-key`, `:count-key`, and each `:required-phases`
+  entry's `:key` — through `role-phase-key` before merging them into the
+  `ordinary-entry/transition-latest-attempt!` call. The **six** phase helpers
+  (`reserve` / `commit-start` / `begin-call` / `commit-call` /
+  `prepare-handler-entry` / `enter-handler`) are left **unchanged**; they keep
+  passing their existing `:operation-*` base keys. This is preferred over
+  rewriting keys inside each of the six helpers (more edit sites, risk of
+  missing one — notably `enter-handler`, which throws the mismatch).
 
-- The role is read once from the invocation (`(:operation-role invocation)`) and
-  woven into the `phase-opts` maps the helpers pass to
-  `ordinary-entry/transition-latest-attempt!`. `ordinary-entry` itself stays
-  **unchanged** — it is already fully parameterized on `:phase-key` /
-  `:timestamp-key` / `:count-key` / `:required-phases` / `:ok-states`.
+  Result: the judge operation drives `:judge-operation-start-state` /
+  `:judge-operation-call-state` / `:judge-operation-handler-entry-state` (plus
+  matching `*-at` / `*-count`), never touching the residual `:entered` left by
+  the step `:operation`.
+
+- `ordinary-entry` itself stays **unchanged** — it is already fully
+  parameterized on `:phase-key` / `:timestamp-key` / `:count-key` /
+  `:required-phases` / `:ok-states`. Because the role rewrite happens in the
+  chokepoint, the default/`:step` role produces byte-identical `:operation-*`
+  keys for every single-operation step.
 
 - The 225 cancellation primitives (`cancellation-entry/with-run-read-lock`,
   `stop-signal/workflow-stop-signal`, `run-linear-entry-phases!`) stay
@@ -50,8 +61,11 @@ invocation map and derive the entry phase-key namespace from it:
   `:operation-role :judge` to the invocation map passed to
   `invoke-operation-in`.
 - `workflow-runtime/.../step_execution/invoke-step-runtime-result` — the step
-  `:operation` keeps the default role (no `:operation-role`, i.e. `:step`); make
-  this explicit only if it improves clarity.
+  `:operation` invocation **omits** `:operation-role` and relies on the
+  absent/default role (the chokepoint treats absent ≡ `:step`). Decided: do
+  **not** add an explicit `:operation-role :step` (`λone_way` → a single rule:
+  only judge invocations annotate a role; every other operation omits the key,
+  keeping single-operation steps byte-identical).
 - `invoke-operation-in` passes the invocation through unchanged, so no registry
   change is needed.
 
@@ -68,8 +82,11 @@ judge (changes the attempt model); (c) dropping `:entered` from `prepare`'s
 
 - **Key-derivation completeness.** Every `:operation-*` key (state, `*-at`
   timestamps, `*-count`) must be routed through the role helper; a missed key
-  reintroduces cross-operation aliasing. Mitigate by deriving all keys from one
-  helper and asserting judge-namespaced keys in the characterization test.
+  reintroduces cross-operation aliasing. The single-chokepoint strategy mitigates
+  this structurally — all of `:phase-key` / `:timestamp-key` / `:count-key` /
+  `:required-phases` `:key` flow through `transition-workflow-operation-phase!`,
+  so rewriting them there covers every helper at once. Still assert
+  judge-namespaced keys in the characterization test.
 - **Cancellation regression.** The judge operation must still observe a stop
   signal before/within entry. Mitigate by adding role-aware cancellation
   coverage and keeping the existing 225 cancellation tests green.
@@ -88,18 +105,26 @@ judge (changes the attempt model); (c) dropping `:entered` from `prepare`'s
    and lands `:judge-operation-handler-entry-state :entered` while the step op's
    `:operation-handler-entry-state` stays `:entered`. Fails pre-fix with
    `:handler-entry-state-mismatch`.
-2. **Runtime phase-key namespacing.** Add the role helper and route all phase
-   helpers' keys through it in `deterministic-operation-runtime/core`; default
-   role unchanged. Slice 1 test goes green for the runtime in isolation.
+2. **Runtime phase-key namespacing.** Add the `role-phase-key` helper and apply
+   it at the single `transition-workflow-operation-phase!` chokepoint (rewriting
+   the supplied `phase-opts` keys after reading `(:operation-role invocation)`);
+   the six phase helpers stay unchanged. Default/`:step` role unchanged. Slice 1
+   test goes green for the runtime in isolation.
 3. **Judge call-site role.** Pass `:operation-role :judge` from
    `execute-invoke-judge!` (and make the step-operation default explicit if it
    aids clarity). End-to-end: an invoke step with operation + invoke judge runs
    both operations and routes on the judge outcome.
 4. **Cancellation regression coverage.** Add role-aware tests proving a real
    stop before/within either operation still yields a clean `:workflow-stopped`
-   terminal; confirm existing 225 cancellation tests
-   (`deterministic-operation-runtime`, `workflow-coordination`) stay green.
+   terminal; confirm existing 225 cancellation tests stay green —
+   `deterministic-operation-runtime`, `workflow-coordination`, and explicitly
+   `components/agent-session/test/.../workflow_statechart_runtime_call_start_cancellation_test.clj`
+   (the suite that directly asserts the default-role `:operation-*-state` keys
+   the namespacing must leave unchanged).
 5. **Workflow-level verification + close-out.** Verify `review-task-design`
    reaches `clarity-status` REPEAT/DONE routing without the abort (runtime/
    definition-level coverage); add a CHANGELOG `Fixed` entry; run clj-kondo and
-   the relevant Scry suites.
+   the relevant Scry suites (`deterministic-operation-runtime`,
+   `workflow-coordination`, the `agent-session`
+   `workflow_statechart_runtime_call_start_cancellation_test` and
+   `workflow-judge` suites, and `workflow-runtime` step-execution).
