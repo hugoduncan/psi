@@ -60,9 +60,10 @@ In scope:
   `{:step <s> :prompt <p> :output <k>}`.
 - **Step-level structured output** applied to the **final** prompt's turn (the
   existing single `:outputs` structured entry; unchanged granularity).
-- The exemplar rewrite of `review-task-design.edn` (merge architecture +
-  ambiguity reviews into one multi-prompt step). Its post-drain routing reuses
-  the **existing** `workflow/pass-feedback-routing` family over the merged
+- The exemplar rewrite of `review-task-design.edn` (merge **all three** review
+  phases — architecture, ambiguity, inconsistency — into one multi-prompt step,
+  matching the real workflow's three-phase topology). Its post-drain routing
+  reuses the **existing** `workflow/pass-feedback-routing` family over the merged
   step's per-prompt reply outputs — no new filesystem-state routing operation is
   introduced (Q8).
 
@@ -182,7 +183,9 @@ the shared child session, in author order. Shape (to be finalized as IR schema):
  [{:name "architecture"
    :prompt-workflow "review-task-design-architecture-review.md"} ; or :contributions [...]
   {:name "ambiguity"
-   :prompt-workflow "review-task-design-ambiguity-review.md"}]
+   :prompt-workflow "review-task-design-ambiguity-review.md"}
+  {:name "inconsistency"
+   :prompt-workflow "review-task-design-inconsistency-review.md"}]
  :outputs {...}?                             ; step-level; structured entry → final turn
  :judge {...}                                ; one judge, after drain
  :on {...}}
@@ -360,28 +363,39 @@ Resolved:
   N statechart sub-steps.
 - **Q6 — Degenerate cases.** ✅ Empty `:prompts` = IR-validation error;
   single-prompt authoring stays the existing form (unchanged behavior).
-- **Q7 — Exemplar.** ✅ Merge `architecture-review` + `ambiguity-review` of
-  `review-task-design.edn` into one multi-prompt `:session` step so the task
-  design + architecture sources are read once and reused for both reviews
-  (token efficiency). Routing for the merged step is over the **per-prompt reply
-  outputs** via the existing `pass-feedback-routing` family (Q8) — i.e. the
-  same workflow-data-flow routing the unmerged steps already use, not new
-  filesystem-state routing.
+- **Q7 — Exemplar.** ✅ (Revised — C1 inconsistency reconcile.) Merge **all
+  three** review phases of `review-task-design.edn` —
+  `architecture-review` + `ambiguity-review` + `inconsistency-review` — into one
+  multi-prompt `:session` step so the task design + architecture sources are read
+  once and reused for all three reviews (token efficiency). The real workflow has
+  three review phases (`architecture → ambiguity → inconsistency →
+  clarity-status`), so merging all three (a) keeps the exemplar faithful to the
+  live topology, (b) makes the post-drain routing the **exact** disjunction the
+  real `clarity-status` already computes (Q8), and (c) fully realizes the
+  token-efficiency rationale (no review re-reads the sources separately). Routing
+  for the merged step is over the **per-prompt reply outputs** via the existing
+  `pass-feedback-routing` family (Q8) — i.e. the same workflow-data-flow routing
+  the unmerged steps already use, not new filesystem-state routing.
 
 Resolved (continued):
 
 - **Q8 — Routing/follow-up for the exemplar.** ✅ (Revised — A1 architectural-fit
-  reconcile.) The merged step's judge routes on the **post-drain step result's
-  per-prompt reply outputs**, reusing the **existing**
-  `workflow/pass-feedback-routing` operation: each review prompt
-  (`architecture`, `ambiguity`) emits a `PASS_STATUS` token in its reply, and
-  the judge takes one `*-text` arg per prompt
+  reconcile, then C1 inconsistency reconcile.) The merged step's judge routes on
+  the **post-drain step result's per-prompt reply outputs**, reusing the
+  **existing** `workflow/pass-feedback-routing` operation: each of the **three**
+  review prompts (`architecture`, `ambiguity`, `inconsistency`) emits a
+  `PASS_STATUS` token in its reply, and the judge takes one `*-text` arg per
+  prompt
   (`{:architecture-text {:from {:step s :prompt "architecture" :output
   :final-llm-reply}} :ambiguity-text {:from {:step s :prompt "ambiguity" :output
-  :final-llm-reply}}}`), REPEAT-ing while any prompt returned
-  `ACTIONABLE_FEEDBACK`, DONE when all are `REVIEW_COMPLETE`. This is exactly the
-  disjunction `pass-feedback-routing` already computes across the unmerged
-  `review-task-design` phase outputs.
+  :final-llm-reply}} :inconsistency-text {:from {:step s :prompt "inconsistency"
+  :output :final-llm-reply}}}`), REPEAT-ing while any prompt returned
+  `ACTIONABLE_FEEDBACK`, DONE when all are `REVIEW_COMPLETE`. Because all three
+  review phases are merged (Q7, revised), this is **exactly** the three-key
+  disjunction the live `clarity-status` judge already computes via
+  `pass-feedback-routing` over the unmerged `review-task-design` phase outputs
+  (`:architecture-text`, `:ambiguity-text`, `:inconsistency-text`) — the
+  equivalence is now genuine, with no `*-text` key dropped.
 
   **Why not filesystem-state routing.** An earlier draft proposed routing on
   whether `design-steps.md` still has unchecked items via a new

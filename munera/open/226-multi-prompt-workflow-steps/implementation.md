@@ -165,3 +165,30 @@ terminal-status reference (both present in `doc/workflows.md`).
   judge, or (b) explicitly stating that inconsistency-review remains a separate
   step and correcting the Q8 "exactly the disjunction" claim to reflect a
   two-prompt-merge-plus-separate-inconsistency topology.
+
+## Inconsistency follow-up execution (design) — ψ
+
+Executed C1 by updating design.md (completed; not blocked). Chose **option (a)**:
+merge **all three** real review phases (architecture, ambiguity, inconsistency)
+into the multi-prompt exemplar step, rather than keeping inconsistency separate.
+
+Rationale for (a) over (b): the live `review-task-design.edn` has three review
+phases and its `clarity-status` judge calls `pass-feedback-routing` with three
+`*-text` args (`:architecture-text`, `:ambiguity-text`, `:inconsistency-text`).
+Merging all three makes the Q8 "exactly the disjunction" claim **genuinely
+true** (three prompts → three `*-text` args → exact key-for-key match, no
+dropped key), keeps the exemplar faithful to the real three-phase topology, and
+fully realizes the Q7 token-efficiency rationale (design + architecture sources
+read once and reused for all three reviews, none re-reading separately). Option
+(b) would have left inconsistency-review re-reading the sources separately,
+undercutting Q7, and required weakening the Q8 equivalence claim.
+
+- **C1 (done).** Updated: Scope bullet (merge all three phases), Q7 (revised
+  exemplar = three-phase merge, with the three-phase-topology + equivalence +
+  token-efficiency justification), Q8 (three review prompts, three-arg
+  `pass-feedback-routing` judge incl. `:inconsistency-text`, equivalence now
+  genuine), and the grammar-shape example (added the `inconsistency`
+  prompt-group). The merged step's post-drain REPEAT-while-any-`ACTIONABLE_FEEDBACK`
+  routing mirrors the live `clarity-status` REPEAT→architecture-review
+  (max-iterations) loop. Per-prompt reply addressing (Q11) remains load-bearing
+  and unchanged; now carries three prompt-groups instead of two.

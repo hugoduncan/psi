@@ -45,7 +45,7 @@
 
 ## Inconsistency review
 
-- [ ] C1: Reconcile the exemplar with the real `review-task-design.edn`. The
+- [x] C1: Reconcile the exemplar with the real `review-task-design.edn`. The
   referenced exemplar and `doc/workflows.md` define **three** review phases
   (`architecture → ambiguity → inconsistency → clarity-status`), and the live
   `clarity-status` judge passes **three** `*-text` args to
