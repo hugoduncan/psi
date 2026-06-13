@@ -132,3 +132,36 @@ Executed B1–B5 by updating design.md (all completed; none blocked). Added a ne
   skipped, completed per-prompt turn records retained + introspectable, in-flight
   turn aborted per existing cancellation contract (matches `:cancelled` terminal
   status in `doc/workflows.md`). Updated AC-6.
+
+## Inconsistency review (design) — ψ
+
+Reviewed design.md for internal inconsistencies and contradictions against the
+referenced artifacts (`review-task-design.edn`, `doc/workflows.md`,
+`doc/workflow-grammar-concepts.md`, `workflow/pass-feedback-routing`). One new
+actionable inconsistency found; recorded as an unchecked item in design-steps.md.
+Verified-consistent: B1 yield default vs grammar-concepts (`session ⇒ :final-llm-reply`),
+`:outputs` step-level structured-output field name, and B5's `:cancelled`
+terminal-status reference (both present in `doc/workflows.md`).
+
+- **C1 — Exemplar merges only 2 of the 3 real review phases; Q8 equivalence
+  claim is false.** The referenced exemplar `review-task-design.edn` and
+  `doc/workflows.md` both define **three** review phases (`architecture →
+  ambiguity → inconsistency → clarity-status`), and the actual `clarity-status`
+  judge calls `workflow/pass-feedback-routing` with **three** `*-text` args
+  (`:architecture-text`, `:ambiguity-text`, `:inconsistency-text`);
+  `pass-feedback-routing` computes its REPEAT/DONE disjunction over **all**
+  passed `*-text` keys. The design's exemplar (Scope bullet, Q7, Q8, and the
+  grammar-shape example at design.md:182–185) merges **only**
+  `architecture-review` + `ambiguity-review` into a two-prompt step with a
+  **two-arg** judge (`{:architecture-text … :ambiguity-text …}`), and Q8 asserts
+  this is "**exactly** the disjunction `pass-feedback-routing` already computes
+  across the unmerged `review-task-design` phase outputs." That equivalence is
+  false: dropping `:inconsistency-text` changes the disjunction. The design never
+  states what becomes of the `inconsistency-review` phase (kept as a separate
+  step? merged as a third prompt? dropped?), and the Q7 token-efficiency
+  rationale ("design + architecture sources read once and reused") is undercut if
+  inconsistency-review still re-reads the sources separately. Reconcile by either
+  (a) merging all three reviews into the multi-prompt step with a three-arg
+  judge, or (b) explicitly stating that inconsistency-review remains a separate
+  step and correcting the Q8 "exactly the disjunction" claim to reflect a
+  two-prompt-merge-plus-separate-inconsistency topology.

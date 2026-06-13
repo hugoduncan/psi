@@ -42,3 +42,21 @@
   (AC-6): whether the judge/`:on` routing runs, what outcome/envelope is
   recorded, and whether already-completed per-prompt turn records remain
   introspectable — mirror the explicitness of the AC-5 intermediate-error path.
+
+## Inconsistency review
+
+- [ ] C1: Reconcile the exemplar with the real `review-task-design.edn`. The
+  referenced exemplar and `doc/workflows.md` define **three** review phases
+  (`architecture → ambiguity → inconsistency → clarity-status`), and the live
+  `clarity-status` judge passes **three** `*-text` args to
+  `workflow/pass-feedback-routing` (which disjuncts over all of them). The design
+  (Scope, Q7, Q8, grammar-shape example at design.md:182–185) merges only
+  `architecture-review` + `ambiguity-review` with a **two-arg** judge and Q8
+  claims this is "exactly the disjunction `pass-feedback-routing` already
+  computes across the unmerged phase outputs" — which is false once
+  `:inconsistency-text` is dropped. Fix design.md to either (a) merge all three
+  reviews into the multi-prompt step with a three-arg judge, or (b) state
+  explicitly that `inconsistency-review` stays a separate step and correct the
+  Q8 "exactly the disjunction" claim accordingly; in either case state the fate
+  of the `inconsistency-review` phase and reconcile the Q7 token-efficiency
+  rationale.
