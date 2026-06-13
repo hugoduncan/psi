@@ -119,3 +119,20 @@
     and leaves `attempt-1` untouched. Verified red-on-revert: re-deriving from the
     stale snapshot fails 4 assertions with `:attempt-mismatch`; the threaded fix
     restores green. Suite: 18 tests / 93 assertions green; clj-kondo clean.
+
+## Review follow-ups — task-test-review (ψ 2026-06-13)
+
+- [ ] Strengthen the namespacing characterization test
+  (`invoke-step-operation-then-judge-operation-share-one-attempt-test` in
+  `deterministic-operation-runtime/core_test.clj`) to cover the plan's top
+  "key-derivation completeness" risk. It currently asserts only the
+  `:phase-key`-derived state key (`:judge-operation-handler-entry-state`). Add
+  assertions that the judge op also namespaces `:judge-operation-start-state` /
+  `:judge-operation-call-state` and at least one judge-scoped timestamp/count key
+  (e.g. `:judge-operation-handler-entered-at` / `:judge-operation-start-count`),
+  and that the step op's corresponding `:operation-*` `*-at` / `*-count` keys are
+  left untouched by the judge. Without this, a regression dropping the
+  `:timestamp-key` / `:count-key` rewrite in `role-phase-opts` (`core.clj:56-57`)
+  would silently re-alias metadata across both operations on one attempt while
+  every test stays green (the mismatch gate is the state key alone). Verify
+  red-on-revert by removing those two rewrite lines.

@@ -442,3 +442,42 @@ pass-1 missing focused test, pass-2 judge call-site authoritative attempt-id) ar
 committed and verified. Fix is structural, key coverage complete, tests
 state-based (no mocks), cancellation guard preserved and tightened.
 Implementation quality is sufficient to close.
+
+## Test review (task-test-review skill) (ψ, 2026-06-13)
+
+Reviewed against the three skill clauses: well-formed, every design behaviour
+covered, infra deps injectable/nullable (¬mock/¬stub).
+
+Strong: all 228-authored focused tests use real `deterministic-operation-registry`
++ plain `state*` atoms with state-based assertions — no mocks/stubs. AC mapping
+holds: #1 → `…share-one-attempt-test`; #2/#4 → end-to-end
+`workflow-review-step-routing-test` design/plan full-pass + iteration-limit;
+#3 → `judge-role-operation-honors-workflow-cancellation-test` (judge role) +
+`invoke-operation-honors-workflow-cancellation-test` (default role); second-defect
+parity → `…re-execution-uses-just-started-attempt…` (step) +
+`execute-invoke-judge-uses-authoritative-attempt…` (judge).
+
+Actionable finding (test coverage):
+- **Characterization test under-covers the plan's #1 risk (key-derivation
+  completeness).** `invoke-step-operation-then-judge-operation-share-one-attempt-test`
+  asserts only the `:phase-key`-derived state keys
+  (`:judge-operation-handler-entry-state` vs `:operation-handler-entry-state`). It
+  does **not** assert the judge namespaces the start-state/call-state phase keys
+  nor the `:timestamp-key`/`:count-key` fields (`*-at` / `*-count`) that
+  `role-phase-opts` also rewrites (`core.clj:55-61`). A regression dropping the
+  `:timestamp-key`/`:count-key` rewrite lines would silently re-alias those
+  metadata keys across both operations on one attempt yet leave **every test
+  green**, because the mismatch gate is the state key alone. The plan named
+  "Key-derivation completeness" as the top risk and its mitigation was "Still
+  assert judge-namespaced keys in the characterization test" — currently only one
+  of the four namespaced field types is pinned. Extend the test to assert the
+  judge drives `:judge-operation-start-state`/`:judge-operation-call-state` and at
+  least one judge-namespaced timestamp/count key, and that the step op's
+  corresponding `:operation-*` timestamp/count keys are untouched — giving the
+  chokepoint's full key set a regression guard.
+
+Observation (non-actionable, not 228-authored): AC#2/#4 end-to-end coverage
+relies on the pre-existing `workflow-review-step-routing-test` suite, which uses
+`with-redefs` on `psi.agent-session.turn/prompt-execution-result-in!` (LLM-turn
+stub). 228 did not author these and its own focused tests avoid mocks, so this is
+not a task-228 test defect — noted only for completeness.
