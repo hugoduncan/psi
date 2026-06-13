@@ -538,6 +538,36 @@ No new actionable findings. The prior test-review pass-1 finding
 `workflow-review-step-routing-test` LLM-turn `with-redefs` stub is not
 228-authored (already noted non-actionable). Test quality is sufficient to close.
 
+## Docs review (review-task-docs skill) (ψ, 2026-06-13)
+
+Reviewed user-facing docs against the skill checklist (README ∧ doc/ ∧ CHANGELOG;
+accuracy ∧ completeness ∧ consistency). Runtime-verified, not notes-trusting.
+
+- **CHANGELOG** ✓ — a single `### Fixed` entry under `[Unreleased]` covers both
+  faults: the `:handler-entry-state-mismatch` phase-key fix (judge now runs under
+  a distinct `:judge-operation-*-state` namespace) and the REPEAT
+  `:attempt-mismatch` stale-snapshot fix (step operation uses the just-started
+  attempt). Verified against code: namespace prefix matches `role-phase-key`
+  (`judge-` → `:judge-operation-*`); "such as the `clarity-status` step in
+  `review-task-design`" matches the affected step; user impact (review-task-design
+  REPEAT/DONE + task-lifecycle design-review unblocked) matches acceptance #4.
+  User-visible bug fix → correctly logged. Raw keyword internals
+  (`:handler-entry-state-mismatch` / `:attempt-mismatch`) are retained
+  deliberately so users who saw these in logs can search — acceptable for a
+  bug-fix entry.
+- **doc/** ✓ — `doc/workflows.md` (the only doc mentioning `clarity-status`,
+  lines 676–725) describes the step as "EDN invoke routing" that remembers
+  pass-feedback state; this is behaviour-as-documented and unchanged by the fix
+  (the bug merely prevented it from running). No `:operation-role` /
+  `:judge-operation-*` mention needed — those are internal mechanism, not a
+  user-facing surface. No stale references; no removed behaviours.
+- **README** ✓ — no references to the affected behaviours/error keywords.
+- **Examples** ✓ — none affected.
+
+No actionable docs findings. The change is an internal runtime bug fix whose
+only user-facing surface (the CHANGELOG entry) is present, accurate, complete,
+and consistent.
+
 ## Test review — test-shaper skill (ψ, 2026-06-13)
 
 Shaped the four 228-authored tests for clarity ∧ signal ∧ robustness ∧ economy
