@@ -10,12 +10,12 @@
 
 ## Slice 2 — Runtime phase-key namespacing
 
-- [ ] In `deterministic-operation-runtime/core`, add a private `role-phase-key` helper mapping `(role, base-key)` → namespaced keyword (`:judge` → `judge-`prefix; `:step`/nil → unchanged).
-- [ ] Apply the role at the **single** `transition-workflow-operation-phase!` chokepoint: read `(:operation-role invocation)` there once and rewrite the supplied `phase-opts` keys (`:phase-key`, `:timestamp-key`, `:count-key`, and each `:required-phases` entry's `:key`) via `role-phase-key` before merging into `ordinary-entry/transition-latest-attempt!`. Leave the six phase helpers (`reserve`, `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`, `enter-handler`) unchanged.
-- [ ] Confirm `ordinary-entry` needs no change (already parameterized on the supplied keys).
-- [ ] Verify the default-role path produces byte-identical `:operation-*` keys (no behaviour change for single-operation steps).
-- [ ] `clj-paren-repair` the edited file; re-read to confirm coherence.
-- [ ] Re-run the Slice 1 test driving both ops directly with `:operation-role`; confirm the judge op now succeeds at the runtime layer.
+- [x] In `deterministic-operation-runtime/core`, add a private `role-phase-key` helper mapping `(role, base-key)` → namespaced keyword (`:judge` → `judge-`prefix; `:step`/nil → unchanged).
+- [x] Apply the role at the **single** `transition-workflow-operation-phase!` chokepoint: read `(:operation-role invocation)` there once and rewrite the supplied `phase-opts` keys (`:phase-key`, `:timestamp-key`, `:count-key`, and each `:required-phases` entry's `:key`) via `role-phase-key` (extracted as `role-phase-opts`) before merging into `ordinary-entry/transition-latest-attempt!`. Six phase helpers unchanged.
+- [x] Confirm `ordinary-entry` needs no change (already parameterized on the supplied keys).
+- [x] Verify the default-role path produces byte-identical `:operation-*` keys (no behaviour change for single-operation steps).
+- [x] `clj-paren-repair` the edited file; re-read to confirm coherence.
+- [x] Re-run the Slice 1 test driving both ops directly with `:operation-role`; confirm the judge op now succeeds at the runtime layer.
 
 ## Slice 3 — Judge call-site role
 

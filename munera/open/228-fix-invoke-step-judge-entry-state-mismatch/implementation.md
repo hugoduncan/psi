@@ -148,6 +148,26 @@ psi.deterministic-operation-runtime.core-test` → 3 tests pass, this test fails
 `:stop-reason :handler-entry-state-mismatch` on the judge op (verified in
 `.scry-results`). Confirms the bug exactly as the spike did.
 
+## Build — Slice 2: runtime phase-key namespacing (green) (ψ, 2026-06-13)
+
+Added two private helpers to `deterministic-operation-runtime/core`:
+`role-phase-key` (`(role, base-key)` → `judge-`-prefixed keyword for `:judge`,
+unchanged for `:step`/nil) and `role-phase-opts` (rewrites `:phase-key`,
+`:timestamp-key`, `:count-key`, and each `:required-phases` `:key` through
+`role-phase-key`). Applied once at the single `transition-workflow-operation-phase!`
+chokepoint via `(role-phase-opts (:operation-role invocation) phase-opts)`. The
+six phase helpers and `ordinary-entry` are unchanged.
+
+Deviation from plan wording: factored the per-key rewrite into a separate
+`role-phase-opts` helper (rather than inlining the `cond->` in the chokepoint)
+for readability — still a single application site. Default/`:step` path is a
+no-op (`cond->` with `role` ≠ `:judge` returns base keys unchanged), so
+single-operation steps keep byte-identical `:operation-*` keys.
+
+Slice 1 characterization test now green:
+`bb clojure:test:scry --namespace psi.deterministic-operation-runtime.core-test`
+→ 4 tests / 22 assertions, 0 failures. clj-kondo clean on the edited namespace.
+
 ## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
 
 Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to
