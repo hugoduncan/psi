@@ -634,3 +634,20 @@ One actionable `consistent(idioms)` nit:
   duplication (`λ consistent(code)` → consistent idioms; `locally_comprehensible`).
   Pure shaping; behaviour-preserving; the existing
   `…share-one-attempt-test` full-key-set assertions guard it.
+
+## Code-shaper follow-up: unify role-phase-opts partial-application idiom (ψ, 2026-06-13)
+
+Executed the one actionable code-shaper follow-up: unified the partial-
+application idiom in `role-phase-opts` (`deterministic-operation-runtime/core.clj`).
+
+- The three scalar branches previously used `#(role-phase-key role %)` (closure
+  triplicated) while the `:required-phases` branch used
+  `(partial role-phase-key role)` — same operation, two idioms.
+- Bound it once: `(let [namespace-key (partial role-phase-key role)] (cond-> …))`
+  and reused `namespace-key` across all four `update` sites (`:phase-key`,
+  `:timestamp-key`, `:count-key`, and each `:required-phases` entry's `:key`).
+- `consistent(idioms)` + removed duplication; pure shaping, behaviour-preserving.
+- Verified: clj-kondo 0 errors / 0 warnings on the edited namespace;
+  `deterministic-operation-runtime.core` suite 5 tests / 32 assertions green
+  (full `role-phase-opts` key-set assertions in
+  `…share-one-attempt-test` guard the rewrite). No production behaviour change.

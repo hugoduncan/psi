@@ -151,7 +151,7 @@
 
 ## Review follow-ups — code-shaper (ψ 2026-06-13)
 
-- [ ] Unify the partial-application idiom in `role-phase-opts`
+- [x] Unify the partial-application idiom in `role-phase-opts`
   (`deterministic-operation-runtime/core.clj:54-61`): the three scalar branches
   use `#(role-phase-key role %)` while the `:required-phases` branch uses
   `(partial role-phase-key role)` for the same operation, and the closure is
@@ -160,3 +160,8 @@
   duplication, behaviour-preserving (guarded by the `…share-one-attempt-test`
   full-key-set assertions). Re-run `clj-kondo` and the
   `deterministic-operation-runtime.core` suite.
+  - Done: bound `namespace-key (partial role-phase-key role)` once in a wrapping
+    `let` and reused it across all four `update` sites (three scalar `:phase-key`/
+    `:timestamp-key`/`:count-key` branches + the `:required-phases` `mapv`).
+    Single idiom, no triplicated closure. Behaviour-preserving: clj-kondo clean,
+    `deterministic-operation-runtime.core` suite 5 tests / 32 assertions green.

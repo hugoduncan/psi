@@ -51,14 +51,15 @@
    This is the single chokepoint applying operation role to phase namespacing;
    the individual phase helpers keep passing their base `:operation-*` keys."
   [role phase-opts]
-  (cond-> phase-opts
-    (:phase-key phase-opts) (update :phase-key #(role-phase-key role %))
-    (:timestamp-key phase-opts) (update :timestamp-key #(role-phase-key role %))
-    (:count-key phase-opts) (update :count-key #(role-phase-key role %))
-    (:required-phases phase-opts)
-    (update :required-phases
-            (fn [phases]
-              (mapv #(update % :key (partial role-phase-key role)) phases)))))
+  (let [namespace-key (partial role-phase-key role)]
+    (cond-> phase-opts
+      (:phase-key phase-opts) (update :phase-key namespace-key)
+      (:timestamp-key phase-opts) (update :timestamp-key namespace-key)
+      (:count-key phase-opts) (update :count-key namespace-key)
+      (:required-phases phase-opts)
+      (update :required-phases
+              (fn [phases]
+                (mapv #(update % :key namespace-key) phases))))))
 
 (defn- transition-workflow-operation-phase!
   [invocation success-key phase-opts]
