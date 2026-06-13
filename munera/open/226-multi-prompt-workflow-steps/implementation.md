@@ -102,3 +102,33 @@ in design-steps.md.
   submitting later prompts but does not state the resulting step outcome: whether
   the judge/`:on` routing runs, what envelope/outcome is recorded, and whether
   the partial per-prompt turn records already completed remain introspectable.
+
+## Ambiguity follow-up execution (design) — ψ
+
+Executed B1–B5 by updating design.md (all completed; none blocked). Added a new
+"Ambiguity resolutions (B1–B5)" section and tightened the affected ACs/grammar.
+
+- **B1 (done).** Resolved against `doc/workflow-grammar-concepts.md`'s
+  output-surface vs yielded-value distinction. (a) A multi-prompt session step
+  yields one value as a whole via the unchanged session default — text from the
+  step-level `:final-llm-reply` (= last prompt). No per-prompt yielded value;
+  per-prompt data is output-surface-only. (b) The `:prompt` discriminator applies
+  to `:output` refs only; `{:step s :prompt p :yield k}` is an IR-validation
+  error. Updated AC-3.
+- **B2 (done).** Per-prompt `:transcript` = that prompt's own turn slice (mirrors
+  per-prompt `:final-llm-reply`); step-level `:transcript` = accumulated across
+  all turns. Live-session context sharing is independent of how the addressable
+  surface is sliced. Updated AC-3.
+- **B3 (done).** Empty `:prompts` ⇒ IR error; one-element `:prompts` ⇒ valid
+  (AC-1 N≥1), runs the multi-prompt path with per-prompt addressing, not rejected
+  in favour of `:contributions` and not rewritten. `:contributions` single-prompt
+  form and one-element `:prompts` are two distinct legal authorings. Updated
+  grammar precedence note.
+- **B4 (done).** Prompt-group `:name` unique within a step; duplicate ⇒ IR error.
+  Uniqueness is per-step ((step-name, prompt-name) is the handle); names may
+  repeat across steps. Updated grammar precedence note.
+- **B5 (done).** Cancellation between prompts is a run-level stop ⇒ terminal
+  `:cancelled` outcome (distinct from AC-5 `:failed`), judge/`:on` routing
+  skipped, completed per-prompt turn records retained + introspectable, in-flight
+  turn aborted per existing cancellation contract (matches `:cancelled` terminal
+  status in `doc/workflows.md`). Updated AC-6.

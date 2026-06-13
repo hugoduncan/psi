@@ -104,18 +104,26 @@ Out of scope (candidate follow-on tasks):
 2. A single-prompt step behaves exactly as today (the new form is a strict
    superset; the existing single-prompt authoring continues to work).
 3. Each prompt-group exposes its own text output surfaces (`:final-llm-reply`,
-   `:transcript`), addressable as `{:step <s> :prompt <p> :output <k>}`. The
-   step-level `:final-llm-reply` reflects the **last** prompt's reply and
-   `:transcript` the accumulated conversation across all turns (so
+   `:transcript`), addressable as `{:step <s> :prompt <p> :output <k>}`. A
+   prompt-group's `:final-llm-reply`/`:transcript` are **turn-local** (that
+   prompt's own reply / its own turn slice, B2). The step-level
+   `:final-llm-reply` reflects the **last** prompt's reply and the step-level
+   `:transcript` is the conversation accumulated across all turns (so
    `{:step <s> :output …}` without a `:prompt` selector stays single-prompt
-   back-compatible). A step-level structured output, if declared, applies to the
+   back-compatible). The step's **yielded** value as a whole is the unchanged
+   session-step default — text sourced from the step-level `:final-llm-reply`
+   (B1); the `:prompt` discriminator applies to `:output` refs only, never to
+   `:yield` refs. A step-level structured output, if declared, applies to the
    **final** prompt's turn.
 4. The judge/`:on` routing runs **once**, after the queue drains, against the
    post-drain step result; the judge may reference per-prompt output surfaces.
 5. If an intermediate turn errors, the queue stops at that point and the step
    surfaces the failure (no further queued prompts are submitted).
 6. Stop-signal/cancellation is honored between queued prompts (a cancelled run
-   does not keep submitting later queued prompts).
+   does not keep submitting later queued prompts). A cancellation between prompts
+   short-circuits to a terminal `:cancelled` step outcome (distinct from the
+   AC-5 `:failed` path), does **not** run the judge/`:on` routing, and retains
+   the already-completed per-prompt turn records as introspectable (B5).
 7. `doc/workflow-grammar.md` + concepts doc describe the multi-prompt form;
    grammar IR validation and runtime tests cover ordering, drain, single-prompt
    equivalence, intermediate-failure abort, and cancellation between prompts.
@@ -195,7 +203,12 @@ Rationale:
 **Precedence (single vs multi):** a `:session` step uses `:contributions`
 (/`:prompt-workflow`) **xor** `:prompts`. The single-prompt form is exactly
 today's behavior (it is *not* internally rewritten into a one-element
-`:prompts`, to guarantee byte-for-byte equivalence — Q6).
+`:prompts`, to guarantee byte-for-byte equivalence — Q6). A `:prompts` vector
+must be non-empty; a **one-element** `:prompts` is valid and runs the
+multi-prompt path with per-prompt addressing (B3). Prompt-group `:name`s must be
+**unique within the step** (duplicate names are an IR-validation error); the
+`(step-name, prompt-name)` pair is the addressing handle, so names may repeat
+across distinct steps (B4).
 
 ## Source-ref integration for `:prompt` (Q12)
 
@@ -233,6 +246,98 @@ selects an output not exposed by that step type is invalid" rule in
 These validation errors are reported at workflow-load / IR-normalization time
 with the same fail-fast shape as other source-ref validation errors, so authors
 catch a mis-targeted `:prompt` ref before runtime.
+
+## Ambiguity resolutions (B1–B5)
+
+These resolve ambiguities raised by the design ambiguity review. They refine,
+not revise, the acceptance criteria and grammar above.
+
+### B1 — Yielded value vs `:prompt` discriminator
+
+`doc/workflow-grammar-concepts.md` keeps **output surfaces** (`:output`, e.g.
+`:final-llm-reply`/`:transcript`) distinct from the **yielded value** (the step's
+value as a whole, addressed via `:yield` as a tagged union, default for a session
+step = text sourced from the `:final-llm-reply` surface).
+
+(a) **A multi-prompt session step yields exactly one value as a whole**, composed
+by the unchanged session-step default: `{:type :text :text <step-level
+:final-llm-reply>}`, where the step-level `:final-llm-reply` is the **last**
+prompt's reply (AC-3). There is no per-prompt yielded value; per-prompt data is an
+**output-surface** concept only. This keeps `{:step s :yield :text}` against a
+multi-prompt step byte-for-byte equivalent to the single-prompt case.
+
+(b) **The `:prompt` discriminator applies to `:output` refs only**, never to
+`:yield` refs. `{:step s :prompt p :output k}` is the per-prompt addressing form;
+`{:step s :prompt p :yield k}` is **invalid** (rejected at IR-validation time,
+same fail-fast shape as the other `:prompt` validation errors), because the
+yielded value is the step's value as a whole and has no per-prompt namespace.
+`{:step s :yield k}` (no `:prompt`) addresses the single step-level yielded
+tagged union.
+
+### B2 — Per-prompt `:transcript` is the prompt's own turn slice
+
+A prompt-group's per-prompt `:transcript` surface contains **only that prompt's
+own turn slice** (the messages submitted for that turn plus that turn's model
+reply and tool loop), **not** the cumulative conversation up to that turn. This
+mirrors per-prompt `:final-llm-reply` (that prompt's reply, not the last). The
+**step-level** `:transcript` remains the conversation **accumulated across all
+turns** (AC-3). So per-prompt surfaces are turn-local; step-level surfaces are the
+cross-turn rollup. (The model still *sees* cumulative context at runtime because
+all prompts share one live child session; that live-context sharing is independent
+of how the addressable `:transcript` surface is sliced.)
+
+### B3 — One-element `:prompts` is valid and runs the multi-prompt path
+
+`:prompts` legality by cardinality:
+
+- **empty `:prompts`** ⇒ IR-validation error (Q6).
+- **one-element `:prompts`** ⇒ **valid** (AC-1, N ≥ 1) and runs the
+  **multi-prompt path**, so its single prompt-group's per-prompt addressing
+  (`{:step s :prompt p :output …}`) is available. It is **not** rejected in favour
+  of `:contributions` and is **not** rewritten to/from the single-prompt form.
+- **single-prompt authoring** stays the `:contributions`/`:prompt-workflow` form
+  (Q6), which is *not* internally rewritten into a one-element `:prompts`.
+
+So a one-element `:prompts` and the `:contributions` single-prompt form are two
+distinct, both-legal authorings: choose `:prompts` (even with one entry) when you
+want named per-prompt addressing; choose `:contributions` for the exact existing
+single-prompt behaviour. `:contributions` xor `:prompts` (the precedence rule)
+still holds.
+
+### B4 — Prompt-group `:name` uniqueness within a step
+
+Each prompt-group's `:name` **must be unique within its step**. Duplicate
+prompt-group names in one step are an **IR-validation error** reported at
+workflow-load / IR-normalization time with the same fail-fast shape as the other
+grammar/source-ref validation errors. Uniqueness is **per step** only — the
+`(step-name, prompt-name)` pair is the addressing handle, so prompt-group names
+may repeat across different steps. This uniqueness is what makes the `:prompt p`
+selector and the per-prompt turn records (keyed by prompt `:name`) well-defined.
+
+### B5 — Step outcome on cancellation between prompts (AC-6)
+
+Cancellation between queued prompts is a **run-level stop**, distinct from the
+AC-5 intermediate-turn error:
+
+- **Queue stops**: no further queued prompts are submitted past the cancellation
+  checkpoint (AC-6).
+- **No judge/`:on` routing runs.** Unlike a normal drain, a cancelled step does
+  not produce a post-drain step result for routing; cancellation short-circuits
+  to a terminal **`:cancelled`** outcome (matching the `:cancelled` terminal
+  status in `doc/workflows.md`), separate from the `:failed` outcome an
+  intermediate turn error produces (AC-5).
+- **Partial per-prompt turn records are retained and introspectable.** The
+  prompt-groups whose turns completed before the cancellation checkpoint remain
+  recorded in the canonical step-result/progression substrate (S4
+  introspectable, replay-faithful); the recorded step result carries those
+  partial per-prompt records plus the `:cancelled` marker. The in-flight turn at
+  the checkpoint is aborted per the existing cancellation contract (a
+  provider/tool boundary already in flight may finish once, but no new queued
+  prompt is submitted).
+
+This makes the cancellation path as explicit as the AC-5 error path: error ⇒
+`:failed` + failing-prompt name, routing skipped; cancellation ⇒ `:cancelled`,
+routing skipped, partial records retained.
 
 ## Open questions
 
