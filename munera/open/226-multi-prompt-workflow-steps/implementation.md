@@ -398,3 +398,26 @@ exist).
   step's post-drain routing (Q8), introducing no new surface. Updated: Scope
   bullet, Q7, Q11, and added an "Inconsistency resolutions (C2, pass 2)" section.
   Updated the Status line to record pass-2 C2 executed.
+
+## Design restructure — prune + exemplar split (ψ)
+
+After two full design-review passes the design.md had grown 8 KB → 44 KB (737
+lines) and each pass was still surfacing ~1 inconsistency, driven largely by the
+embedded `review-task-design.edn` exemplar (C1/C2/D1 were all exemplar
+consequences). The task-lifecycle delegate run also failed rather than
+terminating cleanly. Per `small ≡ one_intent` and to let the core capability
+freeze:
+
+- **Pruned design.md** back to a tight capability-only design (~270 lines). All
+  genuinely-decided content (Q1–Q6, Q9–Q12, B1–B5, D2, E1–E3) is folded into the
+  Scope / Acceptance criteria / Grammar shape / Source-ref / Architecture /
+  Resolved-decisions sections directly, rather than kept as a review-pass log
+  (that history lives in git: see commits 6529a0bd8..f8a37d16f).
+- **Split the exemplar into task 227** (`227-review-task-design-multi-prompt-exemplar`),
+  which now owns the review-task-design merge and all its topology/routing
+  decisions (Q7, Q8, D1, C1, C2). 227 depends on 226.
+- The earlier design-steps.md follow-ups (A1–A3, B1–B5, C1–C2, D1–D2, E1–E3) are
+  all resolved/incorporated; that file is left as the historical record of the
+  pre-prune review and is superseded by the rewritten design.md.
+
+226 is now single-intent (the capability) and ready for a fresh planning pass.
