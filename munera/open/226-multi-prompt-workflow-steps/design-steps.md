@@ -113,7 +113,7 @@
 
 ## Inconsistency review (pass 2)
 
-- [ ] C2: Reconcile the merged exemplar with the surviving `final-summary` step
+- [x] C2: Reconcile the merged exemplar with the surviving `final-summary` step
   of the referenced `review-task-design.edn`. `final-summary` currently consumes
   the three review phases via three contributions
   `{:step "architecture-review" :yield :text}`,

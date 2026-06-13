@@ -4,7 +4,7 @@
 
 Design — complete. All open questions resolved (Q1–Q12 below) and all design
 review follow-ups executed (architectural-fit A1–A3 + pass-2 D1–D2, ambiguity
-B1–B5 + pass-2 E1–E3, inconsistency C1). Ready for planning.
+B1–B5 + pass-2 E1–E3, inconsistency C1 + pass-2 C2). Ready for planning.
 
 ## Intent
 
@@ -71,7 +71,12 @@ In scope:
   accumulated recorded items after the post-drain route. Its post-drain routing
   reuses the **existing** `workflow/pass-feedback-routing` family over the merged
   step's per-prompt reply outputs — no new filesystem-state routing operation is
-  introduced (Q8).
+  introduced (Q8). The surviving `final-summary` step's three per-phase
+  contributions migrate from `{:step "<phase>-review" :yield :text}` to per-prompt
+  `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}` refs — the
+  only legal per-phase text addressing once the three review steps are merged
+  (C2; per-prompt `:yield` is invalid under B1(b), and step-level `:yield :text`
+  resolves only to the last prompt's reply).
 
 Out of scope (candidate follow-on tasks):
 
@@ -546,6 +551,50 @@ available **at the model level** through the shared live session (E1); only
 workflow-level template injection of a sibling's reply is withheld. Lifting this
 restriction is the deferred cross-turn-data-flow follow-on.
 
+## Inconsistency resolutions (C2, pass 2)
+
+This resolves the pass-2 inconsistency review's finding. It refines, not
+revises, the in-scope exemplar rewrite (Scope / Q7 / Q11).
+
+### C2 — `final-summary` migrates to per-prompt `:output` refs after the merge
+
+The referenced `review-task-design.edn`'s surviving `final-summary` step
+currently consumes the three review phases via three contributions
+`{:step "architecture-review" :yield :text}`,
+`{:step "ambiguity-review" :yield :text}`, and
+`{:step "inconsistency-review" :yield :text}`. The exemplar merge (Q7/D1)
+collapses those three review **steps** into one multi-prompt `design-review`
+step, so those three step names cease to exist and `final-summary` can no longer
+address them.
+
+`:yield` cannot recover the per-phase text after the merge: B1(b) makes
+per-prompt `:yield` (`{:step s :prompt p :yield k}`) **invalid**, and the merged
+step's step-level `:yield :text` resolves to only the **last** prompt's reply
+(the unchanged session-step default, AC-3/B1). So the three reviews' text is no
+longer reachable through `:yield`.
+
+Resolution: as part of the in-scope exemplar rewrite, `final-summary`'s three
+per-phase contributions migrate from
+`{:step "<phase>-review" :yield :text}` to per-prompt **`:output`** refs against
+the merged step:
+
+```clojure
+{:step "design-review" :prompt "architecture"   :output :final-llm-reply}
+{:step "design-review" :prompt "ambiguity"      :output :final-llm-reply}
+{:step "design-review" :prompt "inconsistency"  :output :final-llm-reply}
+```
+
+This is the **only** legal per-phase text addressing once the three review steps
+merge: per-prompt `:final-llm-reply` is exactly the per-phase reply surface
+(AC-3), reached via the `:prompt` discriminator on the canonical source ref
+(Q12). It is the same per-prompt reply addressing already load-bearing for the
+merged step's post-drain routing (Q8), so `final-summary` reuses the addressing
+the merge already requires — no new surface is introduced. This makes the
+exemplar internally consistent: the merge eliminates the three review step names,
+and every downstream consumer (routing judge + `final-summary`) addresses the
+per-phase replies through `{:step "design-review" :prompt "<phase>" :output
+:final-llm-reply}`.
+
 ## Open questions
 
 Resolved:
@@ -603,7 +652,11 @@ Resolved:
   re-reads the sources separately). Routing for the merged step is over the
   **per-prompt reply outputs** via the existing `pass-feedback-routing` family
   (Q8) — the same workflow-data-flow routing the unmerged steps already use, not
-  new filesystem-state routing.
+  new filesystem-state routing. The surviving `final-summary` step likewise
+  migrates its three per-phase `{:step "<phase>-review" :yield :text}`
+  contributions to per-prompt `{:step "design-review" :prompt "<phase>" :output
+  :final-llm-reply}` refs, the only legal per-phase text addressing after the
+  merge (C2).
 
 Resolved (continued):
 
@@ -657,8 +710,12 @@ Resolved (continued):
   - the `:prompts` queue (Option A, named prompt-groups);
   - per-prompt **text** reply addressing (`{:step s :prompt p :output
     :final-llm-reply | :transcript}`), which falls out of named prompt-groups
-    and is now **load-bearing for the exemplar's routing** (Q8, revised) as well
-    as useful for `final-summary`;
+    and is now **load-bearing for the exemplar's routing** (Q8, revised) and for
+    the merged exemplar's `final-summary` step, whose three per-phase
+    contributions migrate from `{:step "<phase>-review" :yield :text}` to
+    per-prompt `{:step "design-review" :prompt "<phase>" :output
+    :final-llm-reply}` refs once the three review steps merge (C2 — the only
+    legal per-phase text addressing under B1(b));
   - **step-level** structured output bound to the **final** prompt's turn (no
     new structured-output machinery).
   Deferred to a follow-on task (until an exemplar needs it):

@@ -379,3 +379,22 @@ the `:final-llm-reply` output surface").
   per-prompt `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}`
   refs (the only legal way to address per-phase text under B1(b)), as part of the
   in-scope exemplar rewrite.
+
+## Inconsistency follow-up execution (design, pass 2) — ψ
+
+Executed C2 by updating design.md (completed; not blocked). Verified the live
+`final-summary` step in `.psi/workflows/review-task-design.edn`: it consumes the
+three review phases via three `{:step "<phase>-review" :yield :text}`
+contributions, which the exemplar merge eliminates (those step names cease to
+exist).
+
+- **C2 (done).** Stated that the merged exemplar's `final-summary` step migrates
+  its three per-phase contributions from `{:step "<phase>-review" :yield :text}`
+  to per-prompt `{:step "design-review" :prompt "<phase>" :output
+  :final-llm-reply}` refs — the only legal per-phase text addressing once the
+  three review steps merge (per-prompt `:yield` is invalid under B1(b); the
+  merged step-level `:yield :text` resolves only to the last prompt's reply).
+  This reuses the per-prompt reply addressing already load-bearing for the merged
+  step's post-drain routing (Q8), introducing no new surface. Updated: Scope
+  bullet, Q7, Q11, and added an "Inconsistency resolutions (C2, pass 2)" section.
+  Updated the Status line to record pass-2 C2 executed.
