@@ -651,3 +651,35 @@ application idiom in `role-phase-opts` (`deterministic-operation-runtime/core.cl
   `deterministic-operation-runtime.core` suite 5 tests / 32 assertions green
   (full `role-phase-opts` key-set assertions in
   `…share-one-attempt-test` guard the rewrite). No production behaviour change.
+
+## Code-shaper review — pass 2 (ψ, 2026-06-13)
+
+Re-applied the code-shaper skill (simplicity ∧ consistency ∧ robustness) to the
+four changed source namespaces, runtime-verified (clj-kondo 0/0 on all four).
+
+Verified clean:
+- `role-phase-key` / `role-phase-opts` (`deterministic-operation-runtime/core`)
+  are single-responsibility, well-named, and documented; the role rewrite is
+  applied once at the single `transition-workflow-operation-phase!` chokepoint;
+  the six phase helpers stay byte-identical (default/`:step` `cond->` no-op).
+- Pass-1's actionable idiom nit (triplicated `#(role-phase-key role %)` vs
+  `(partial …)` in `role-phase-opts`) is resolved — now one bound
+  `namespace-key` reused across all four `update` sites (commit b695fa0aa).
+- Both attempt-id call-sites are now consistent: step
+  `invoke-step-runtime-result` threads the just-started `attempt-id`; judge
+  `execute-invoke-judge!` threads `routing-context`'s authoritative
+  `workflow-attempt-id`. Snapshot retained only for `resolve-invoke-args` in
+  both — single idiom (`λ consistent(code)`).
+
+Considered, NOT flagged as actionable:
+- `role-phase-key` uses closed dispatch `(= role :judge)` rather than an open
+  slot for arbitrary non-`:step` roles. Generalizing
+  (`(if (#{nil :step} role) base-key (keyword (str (name role) "-" …)))`) would
+  follow `extend: open_slot > closed_dispatch`, but only two roles exist
+  (`:step`, `:judge`) and design fixes the single rule "only judge invocations
+  annotate a role"; generalizing now is speculative (`minimal > comprehensive`,
+  `simple > complex`). Defensible to keep closed until a third role appears.
+- No cross-component extraction of the shared resolve-args/invoke shape
+  (agent-session ↔ workflow-runtime) — correctly judged out of scope in pass 1.
+
+No new actionable code-shaping findings. Code quality is sufficient to close.
