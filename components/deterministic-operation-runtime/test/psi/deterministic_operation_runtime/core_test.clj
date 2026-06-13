@@ -173,3 +173,31 @@
           "the step operation's :operation-*-state keys are untouched by the judge")
       (is (= :entered (:judge-operation-handler-entry-state attempt))
           "the judge operation drives its own :judge-operation-*-state namespace"))))
+
+(deftest judge-role-operation-honors-workflow-cancellation-test
+  ;; Task 228 regression: per-operation phase-key namespacing must not weaken the
+  ;; task-225 cooperative cancellation guard. A judge-role operation against a
+  ;; cancelled run must still refuse to start and yield a clean :workflow-stopped
+  ;; terminal without invoking its handler.
+  (testing "cancelled run stops a judge-role operation before handler invocation"
+    (let [handler-calls* (atom 0)
+          result (runtime/invoke-operation
+                  {:id "workflow/pass-feedback-routing"
+                   :handler (fn [_]
+                              (swap! handler-calls* inc)
+                              {:status :ok :data {:started? true}})}
+                  {:ctx {:state* (atom {:workflows {:runs {"run-cancelled" {:run-id "run-cancelled"
+                                                                            :status :cancelled}}}})}
+                   :workflow-run-id "run-cancelled"
+                   :operation-role :judge
+                   :step-id "clarity-status"})]
+      (is (= 0 @handler-calls*)
+          "the judge operation handler must not run after cancellation")
+      (is (= {:status :error
+              :reason :workflow-stopped
+              :message "Workflow execution stopped before deterministic operation start"
+              :details {:operation-id "workflow/pass-feedback-routing"
+                        :workflow-run-id "run-cancelled"
+                        :step-id "clarity-status"
+                        :stop-reason :cancelled}}
+             result)))))

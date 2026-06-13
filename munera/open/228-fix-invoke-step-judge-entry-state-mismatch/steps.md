@@ -33,9 +33,9 @@
 
 ## Slice 4 — Cancellation regression coverage
 
-- [ ] Add a role-aware cancellation test: a stop signal arriving before/within the judge operation yields a clean `:workflow-stopped` terminal (judge handler not invoked).
-- [ ] Add/confirm a test that a stop before/within the step operation still stops cleanly (default role).
-- [ ] Run existing 225 cancellation suites (`deterministic-operation-runtime`, `workflow-coordination`, and explicitly `components/agent-session/test/.../workflow_statechart_runtime_call_start_cancellation_test.clj` — the suite asserting the default-role `:operation-*-state` keys the namespacing must leave unchanged) and confirm they stay green.
+- [x] Add a role-aware cancellation test: a stop signal arriving before/within the judge operation yields a clean `:workflow-stopped` terminal (judge handler not invoked). — `judge-role-operation-honors-workflow-cancellation-test`.
+- [x] Add/confirm a test that a stop before/within the step operation still stops cleanly (default role). — existing `invoke-operation-honors-workflow-cancellation-test` (default role) stays green.
+- [x] Run existing 225 cancellation suites (`deterministic-operation-runtime`, and explicitly `workflow_statechart_runtime_call_start_cancellation_test.clj` — the suite asserting the default-role `:operation-*-state` keys the namespacing must leave unchanged) and confirm they stay green. Call-start-cancellation 14 tests/63 assertions green; judge-cancellation 8/34; statechart-runtime-cancellation green. (No dedicated `workflow-coordination` test ns exists; `ordinary-entry` is exercised via these suites.)
 
 ## Slice 5 — Workflow-level verification + close-out
 
