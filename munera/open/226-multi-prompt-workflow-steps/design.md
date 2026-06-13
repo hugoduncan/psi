@@ -198,12 +198,16 @@ same-step prohibition on assembly-time refs.
   representation; single-prompt = N=1 degenerate (`λone_way`, no drift).
 - **Per-turn results are recorded in the canonical step-result/progression
   substrate**, not loop locals: the step emits **one** post-drain
-  `:pending-actor-result` (one routing decision), but it carries ordered
-  per-prompt turn records (keyed by `:name`, each exposing
-  `:final-llm-reply`/`:transcript`) plus the step-level rollup. This keeps every
-  intermediate turn introspectable (S4) and replay-faithful, reconciling "one
-  statechart step / one attempt / one route" (Q5) with N internal turns (an
-  internal loop, not N statechart steps).
+  `:pending-actor-result` (one routing decision), carrying the step-level rollup
+  plus — for **named** (`:prompts`) groups — ordered per-prompt turn records
+  keyed by `:name`, each exposing `:final-llm-reply`/`:transcript`. The **unnamed**
+  `:contributions` group (incl. the N=1 single-prompt degenerate) has no `:name`,
+  so it contributes **only** the step-level rollup and **no** addressable
+  per-prompt record; "keyed by `:name`" applies only where a name exists, so the
+  unified-path result shape stays consistent for the degenerate case. This keeps
+  every named intermediate turn introspectable (S4) and replay-faithful,
+  reconciling "one statechart step / one attempt / one route" (Q5) with N internal
+  turns (an internal loop, not N statechart steps).
 - **Model fallback is per turn** (`execute-with-ranked-fallback!`); a switch
   persists to later turns in the same session.
 - **Resume/suspend contract for the internal queue (F1).** The canonical runtime

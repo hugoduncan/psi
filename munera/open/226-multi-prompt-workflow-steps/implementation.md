@@ -590,3 +590,20 @@ resolve.
   per-prompt records keyed by `:name` while the unnamed (`:contributions`) group
   contributes only the step-level rollup (no per-prompt addressable record), so
   "keyed by `:name`" applies only where a name exists.
+
+## Inconsistency follow-up execution (design, pass 3 — post-prune) — ψ
+
+Executed C3 by updating design.md (completed; not blocked).
+
+- **C3 (done).** Reconciled the Architecture-alignment per-turn-records bullet
+  with the unnamed `:contributions` group. Restated the bullet so the single
+  post-drain `:pending-actor-result` carries the step-level rollup **plus**
+  per-prompt records keyed by `:name` **only for named (`:prompts`) groups**; the
+  unnamed `:contributions` group (incl. the N=1 single-prompt degenerate) has no
+  `:name`, so it contributes **only** the step-level rollup and **no** addressable
+  per-prompt record. "Keyed by `:name`" now explicitly applies only where a name
+  exists, so the unified-path result shape is consistent for the degenerate case —
+  resolving the contradiction with Concepts (named only under `:prompts`) and
+  Grammar Step-level precedence (`:contributions` → unnamed group, step-level
+  surfaces only). Edit: Architecture-alignment "Per-turn results are recorded"
+  bullet.

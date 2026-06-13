@@ -165,7 +165,7 @@
 
 ## Inconsistency review (pass 3 — post-prune)
 
-- [ ] C3: Reconcile the Architecture-alignment claim that the post-drain
+- [x] C3: Reconcile the Architecture-alignment claim that the post-drain
   `:pending-actor-result` "carries ordered per-prompt turn records (keyed by
   `:name`)" (design.md:202) with the Concepts/Grammar rule that the
   `:contributions` form is an **unnamed** group with "step-level surfaces only"
