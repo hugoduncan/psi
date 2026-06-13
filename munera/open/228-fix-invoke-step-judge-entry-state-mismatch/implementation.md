@@ -273,3 +273,41 @@ the verified code facts.
   ≡ `:step`; only judge invocations annotate a role), cross-referencing
   §"Call-site threading". The call-site decision is now determinate across plan
   §Slice-order, plan §Call-site-threading, and steps.md Slice 3.
+
+## Implementation review (ψ, 2026-06-13)
+
+Reviewed code, tests, design/plan/steps coherence, lint, CHANGELOG. Overall
+solid — fix is structural, key coverage complete, tests state-based (no mocks).
+
+Verified:
+- `role-phase-opts` rewrites every attempt-state key actually written by
+  `ordinary-entry/apply-phase-update` (`:phase-key`, `:timestamp-key`,
+  `:count-key`) plus each `:required-phases` `:key` guard. No un-namespaced key
+  leaks at the single `transition-workflow-operation-phase!` chokepoint. The six
+  helpers stay byte-identical for the default/`:step` role.
+- Second-defect fix is correct: `append-and-start-attempt-if-live!`
+  (statechart_runtime.clj) appends the new attempt to `state*` **before**
+  `invoke-step-runtime-result` runs, so the threaded just-started `attempt-id`
+  *is* the live latest attempt — the task-225 equality guard now matches on every
+  pass (and is tightened, not weakened, since the first-attempt id is no longer
+  nil). Both call sites (`statechart_runtime.clj`, `step_execution.clj`
+  `execute-actor-step!`) have `attempt-id` in scope.
+- clj-kondo clean on all changed namespaces; working tree clean; CHANGELOG
+  `Fixed` entry is user-facing and covers both faults.
+
+Actionable finding:
+- **No focused regression test for the second defect (`:attempt-mismatch` on
+  REPEAT).** The handler-entry-state-mismatch defect got a focused unit
+  characterization test (`…share-one-attempt-test`), but the stale-snapshot
+  `:attempt-mismatch` fix relies solely on the broad end-to-end
+  `workflow-review-step-routing-test` REPEAT-loop subtests. A focused test (at
+  `step_execution` / `deterministic-operation-runtime` level) pinning "a
+  re-executed invoke step's operation uses the just-started attempt-id, not the
+  stale `workflow-run` snapshot's latest attempt" would localize the regression
+  and give parity with the first defect's coverage. Lower diagnosability if it
+  ever regresses through only the end-to-end suite.
+
+Not flagged as actionable (handled): the second defect is a scope addition over
+the original handler-entry-state-mismatch design, but it is documented as a
+deviation (design.md Build-discovery, steps Slice 3b) and is required to satisfy
+acceptance criteria #2/#4 — defensible to keep in this task.

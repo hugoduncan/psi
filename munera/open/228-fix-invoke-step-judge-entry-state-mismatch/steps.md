@@ -57,6 +57,17 @@
 - [x] Decide and record whether the step `:operation` call-site carries an explicit `:operation-role :step` or relies on the absent/default; remove the "only if it improves clarity" deferral so the final artifact state is determinate (Slice 3 + plan call-site threading).
   - Decided: **omit** `:operation-role` at the step call-site (absent ≡ `:step`); only judge invocations annotate a role. Deferral removed in plan + Slice 3.
 
+## Review follow-ups — implementation review (ψ 2026-06-13)
+
+- [ ] Add a focused regression test for the second defect (`:attempt-mismatch`
+  on REPEAT): pin that a re-executed invoke step's step `:operation` uses the
+  just-started `attempt-id` (threaded from `:step/enter`) rather than the latest
+  attempt derived from the stale `workflow-run` snapshot. Place it at the
+  `step_execution` / `deterministic-operation-runtime` level so the fix has a
+  localized characterization test with parity to the first defect's
+  `…share-one-attempt-test`, instead of relying solely on the end-to-end
+  `workflow-review-step-routing-test` REPEAT loops.
+
 ## Review follow-ups — plan/steps inconsistency (ψ 2026-06-13)
 
 - [x] Correct design.md Problem §2: the judge invocation passes the **explicit** latest `:workflow-attempt-id` (`(… :attempts last :attempt-id)`), not `:workflow-attempt-id nil`. Align Problem §2 with design.md "Spike outcome (confirmed)", implementation.md "Confirmed facts", and the actual code (`execute-invoke-judge!` / `invoke-step-runtime-result`), and drop the nil-based "targets the same latest attempt" reasoning (with a real id + `:attempt-id-required? false`, `ordinary-entry` asserts equality with the latest attempt).
