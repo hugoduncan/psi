@@ -88,7 +88,7 @@
 
 ## Ambiguity review (pass 2)
 
-- [ ] E1: Specify the mechanism by which the merged exemplar reads its sources
+- [x] E1: Specify the mechanism by which the merged exemplar reads its sources
   "once and reused" across prompt-groups, given the step-level `:contributions`
   **xor** `:prompts` precedence leaves a `:prompts` step with no step-level
   shared preload. Decide and state in design.md whether shared context is carried
@@ -98,12 +98,12 @@
   Architecture-alignment "list of prompt strings layered over a shared preload"
   (currently an undecided "or") so the Q7/D1 token-efficiency rationale has a
   concrete realization.
-- [ ] E2: State the prompt-group **internal** authoring precedence: whether a
+- [x] E2: State the prompt-group **internal** authoring precedence: whether a
   prompt-group uses `:prompt-workflow` **xor** `:contributions` (mirroring the
   step-level xor), and the IR-validation error when both or neither are present.
   The grammar shape shows `:prompt-workflow "..."` "or `:contributions [...]`"
   without a rule.
-- [ ] E3: Reconcile the deferred "cross-turn workflow data flow" (Scope) with the
+- [x] E3: Reconcile the deferred "cross-turn workflow data flow" (Scope) with the
   uniform `:prompt` source-ref resolution (Q12). State explicitly whether a
   prompt-group's `:contributions`/template may reference an **earlier sibling
   prompt-group in the same step** via `{:step <self> :prompt p :output k}`, and

@@ -309,3 +309,38 @@ skipped on both the AC-5 error and AC-6 cancellation paths.
   contributions/template may reference an **earlier sibling prompt-group in the
   same step** via `{:step <self> :prompt p :output k}`. Scope implies invalid;
   uniform-resolution implies it resolves. Unreconciled.
+
+## Ambiguity follow-up execution (design, pass 2) — ψ
+
+Executed E1, E2, E3 by updating design.md (all completed; none blocked).
+Grounded E1 against `doc/workflow-grammar-concepts.md` ("Session construction":
+the grammar deliberately avoids a canonical `:preload` field and subsumes
+preload into ordered `:contributions`), which decided against adding a new
+step-level shared-preload field.
+
+- **E1 (done).** Shared sources are carried by the **live shared child session**,
+  not a step-level shared-preload field. Withdrew the undecided "list of prompt
+  strings layered over a shared preload" alternative (`:contributions` xor
+  `:prompts` already forbids step-level `:contributions` on a `:prompts` step;
+  grammar avoids `:preload`). Mechanism: the **first** prompt-group loads sources
+  once on turn 1; later prompt-groups run against the same live session and see
+  the loaded sources via conversation memory — the concrete realization of the
+  Q7/D1 "sources read once and reused" rationale. Updated the
+  Architecture-alignment materialization bullet (added a "Shared source material"
+  bullet) and added the E1 resolution subsection.
+- **E2 (done).** Prompt-group **internal** authoring precedence: `:prompt-workflow`
+  **xor** `:contributions` (mirrors the step-level xor); both ⇒ IR error,
+  neither ⇒ IR error (no prompt body). Reported fail-fast at load/IR-normalization
+  time. Updated the grammar-shape comment (`:prompt-workflow XOR :contributions`),
+  added a "Prompt-group internal authoring precedence (E2)" rule to the grammar
+  precedence note, and added the E2 resolution subsection.
+- **E3 (done).** Same-step / sibling-prompt-group `:prompt` refs
+  (`{:step <self> :prompt p :output k}`, forward or back) are **invalid in the
+  first cut** — that is exactly the cross-turn workflow data flow Scope defers.
+  Reconciled the Q12 "uniform resolution" wording: uniform across the substrate
+  means *for refs to prior steps*; a self/same-step `:prompt` ref has no value at
+  assembly time. Cross-turn context is still available to the model via the
+  shared live session (E1); only workflow-level template injection of a sibling's
+  reply is withheld. Added the case to the "Source-ref integration for `:prompt`"
+  validation enumeration and added the E3 resolution subsection.
+- Updated Status line to record pass-2 E1–E3 executed.

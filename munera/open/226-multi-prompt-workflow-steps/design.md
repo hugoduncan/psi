@@ -4,7 +4,7 @@
 
 Design — complete. All open questions resolved (Q1–Q12 below) and all design
 review follow-ups executed (architectural-fit A1–A3 + pass-2 D1–D2, ambiguity
-B1–B5, inconsistency C1). Ready for planning.
+B1–B5 + pass-2 E1–E3, inconsistency C1). Ready for planning.
 
 ## Intent
 
@@ -152,13 +152,30 @@ Out of scope (candidate follow-on tasks):
   authored content. No workflow-specific business rules enter runtime code.
 - Materialization (`workflow-step-materialization`) currently produces a single
   prompt + preloaded messages. The natural extension is to produce an ordered
-  list of "submission points," each itself a (preload?, prompt) shaping, or a
-  list of prompt strings layered over a shared preload. This must stay
-  data-shaped and introspectable. **Both authoring forms normalize into this one
-  queue representation (D2):** `:contributions` → a one-element unnamed
+  list of "submission points," each itself a (preload?, prompt) shaping. This
+  must stay data-shaped and introspectable. **Both authoring forms normalize into
+  this one queue representation (D2):** `:contributions` → a one-element unnamed
   prompt-group; `:prompts` → named prompt-groups. There is a single
   queue-driving runtime path; single-prompt is its N=1 degenerate, not a
   separate path.
+- **Shared source material is carried by the live shared session, not a
+  step-level shared-preload field (E1).** The earlier "or a list of prompt
+  strings layered over a shared preload" alternative is **withdrawn**: there is
+  no step-level shared `:contributions`/preamble distinct from the per-prompt
+  prompt-groups (the `:contributions` xor `:prompts` precedence already forbids
+  step-level `:contributions` on a `:prompts` step, and the grammar deliberately
+  avoids a canonical `:preload` field — `doc/workflow-grammar-concepts.md`,
+  "Session construction"). Instead, the **first** prompt-group's own
+  contributions/`:prompt-workflow` load the shared sources once into the child
+  session; every later prompt-group's turn runs against that **same live child
+  session**, so the model sees the already-loaded sources via conversation
+  memory without re-embedding them. This is the concrete realization of the
+  Q7/D1 "sources read once and reused" token-efficiency rationale: the sources
+  are assembled into the conversation exactly once (turn 1), not re-read and
+  re-embedded per review prompt. It also keeps the queue representation uniform —
+  each prompt-group is just one submission point — and is the same shared-context
+  mechanism that animates the whole feature (preserving conversational context
+  across turns).
 - Statechart execution currently records one pending actor result per attempt
   after the single turn. Multi-prompt must reconcile "one statechart step / one
   attempt / one routing decision" with "N internal turns." The intended model is
@@ -194,7 +211,7 @@ the shared child session, in author order. Shape (to be finalized as IR schema):
  :tools [...] :skills [...]                 ; per-step session config (shared)
  :prompts
  [{:name "architecture"
-   :prompt-workflow "review-task-design-architecture-review.md"} ; or :contributions [...]
+   :prompt-workflow "review-task-design-architecture-review.md"} ; :prompt-workflow XOR :contributions [...]
   {:name "ambiguity"
    :prompt-workflow "review-task-design-ambiguity-review.md"}
   {:name "inconsistency"
@@ -233,6 +250,25 @@ representation. A `:prompts` vector must be non-empty; a **one-element**
 IR-validation error); the `(step-name, prompt-name)` pair is the addressing
 handle, so names may repeat across distinct steps (B4).
 
+**Prompt-group internal authoring precedence (E2):** within a single
+prompt-group, the prompt body is authored by `:prompt-workflow` **xor**
+`:contributions` — mirroring the step-level `:contributions` xor `:prompts`
+rule one level down. Exactly one of the two **must** be present:
+
+- **both** `:prompt-workflow` and `:contributions` on one prompt-group ⇒
+  IR-validation error;
+- **neither** present ⇒ IR-validation error (a prompt-group with no prompt body
+  has nothing to submit).
+
+These errors are reported at workflow-load / IR-normalization time with the same
+fail-fast shape as the other grammar/source-ref validation errors. Both forms
+materialize to one submitted prompt for that group's turn: `:prompt-workflow`
+names a prompt markdown file rendered to the turn's prompt; `:contributions` is
+the ordered assembly material rendered to the turn's prompt (the same assembly
+the single-prompt `:contributions` step uses). The step-level session config
+(`:model`/`:tools`/`:skills`) is shared by all prompt-groups regardless of which
+internal form each group uses.
+
 ## Source-ref integration for `:prompt` (Q12)
 
 The per-prompt selector `{:step s :prompt p :output k}` is an **optional
@@ -265,6 +301,22 @@ selects an output not exposed by that step type is invalid" rule in
   `:prompt` selector against a **structured** `:output` key is invalid because
   per-prompt structured output is deferred (Q11). Structured output stays
   step-level / final-turn and is addressed by the no-`:prompt` form.
+- the ref targets the **same step that is currently being assembled** — i.e. a
+  prompt-group's `:contributions`/template references a sibling prompt-group in
+  **its own** step via `{:step <self> :prompt p :output k}` (including a forward
+  reference to a not-yet-run later group or a back reference to an earlier
+  sibling group). This is **invalid in the first cut (E3)** because injecting a
+  prior same-step turn's reply into a later prompt's workflow-rendered template
+  is exactly the **cross-turn workflow data flow** that Scope defers. The
+  `:prompt` selector resolves uniformly only against **prior steps'** recorded
+  per-prompt records; a self/same-step `:prompt` ref has no resolved value at
+  assembly time and is rejected at IR-validation time. (This is a
+  workflow-data-flow restriction only — earlier sibling prompt-groups' turns are
+  still **visible to the model** at runtime through the shared live child session
+  (E1), which is what carries cross-turn context in the first cut; what is
+  withheld is the ability to *template-inject* a sibling's reply text via a
+  source-ref. Lifting this restriction is the deferred cross-turn-data-flow
+  follow-on.)
 
 These validation errors are reported at workflow-load / IR-normalization time
 with the same fail-fast shape as other source-ref validation errors, so authors
@@ -437,6 +489,62 @@ Resolution — combine **both** reviewer options: **unify the runtime path** *an
   `context: minimal > comprehensive`).
 
 This revises Q6/B3/AC-2 and the grammar precedence note accordingly.
+
+## Ambiguity resolutions (E1–E3, pass 2)
+
+These resolve the pass-2 ambiguity review's three findings. They refine, not
+revise, the grammar and source-ref integration above.
+
+### E1 — Shared sources are carried by the live session, not a step-level preload
+
+The Q7/D1 "sources read once and reused" rationale is realized by the **live
+shared child session**, not a step-level shared-preload field. Because the
+`:contributions` **xor** `:prompts` precedence leaves a `:prompts` step with no
+step-level `:contributions`, and the grammar deliberately avoids a canonical
+`:preload` field (`doc/workflow-grammar-concepts.md`, "Session construction"),
+the design **does not** add a step-level shared-contribution/preamble field. The
+earlier undecided "list of prompt strings layered over a shared preload"
+alternative is withdrawn.
+
+Mechanism: the **first** prompt-group loads the shared source material (its own
+`:contributions`/`:prompt-workflow` read the design + architecture sources) into
+the child session on turn 1; every later prompt-group runs its turn against the
+**same live child session**, so the model sees the already-loaded sources via
+conversation memory rather than re-embedding them. The sources are therefore
+assembled into the conversation exactly once. This is the same shared-context
+mechanism that animates the feature (preserving conversational context across
+turns) and keeps the queue representation uniform (each prompt-group is one
+submission point). See the Architecture-alignment "Shared source material"
+bullet.
+
+### E2 — Prompt-group internal authoring precedence
+
+Within a single prompt-group the prompt body is authored by `:prompt-workflow`
+**xor** `:contributions`, mirroring the step-level xor one level down. Exactly
+one must be present: **both** ⇒ IR-validation error; **neither** ⇒
+IR-validation error (no prompt body to submit). Reported fail-fast at
+workflow-load / IR-normalization time like the other grammar/source-ref
+validation errors. Both forms materialize to one submitted prompt for that
+group's turn; the step-level session config (`:model`/`:tools`/`:skills`) is
+shared by all prompt-groups regardless of internal form. See the grammar
+precedence note.
+
+### E3 — Same-step / sibling-prompt-group `:prompt` refs are invalid (first cut)
+
+The uniform `:prompt` source-ref resolution (Q12) resolves only against **prior
+steps'** recorded per-prompt records. A `:prompt` ref whose `:step` is the
+**same step currently being assembled** — a prompt-group referencing a sibling
+prompt-group in its own step via `{:step <self> :prompt p :output k}` (forward
+or back) — is **invalid in the first cut**, because that is exactly the
+**cross-turn workflow data flow** Scope defers (template-injecting a prior
+same-step turn's reply into a later prompt). This reconciles the "uniform
+resolution" wording with the Scope deferral: uniform across the substrate means
+*for refs to prior steps*; a self/same-step `:prompt` ref has no value at
+assembly time and is rejected at IR-validation time (added to the "Source-ref
+integration for `:prompt`" validation enumeration). Cross-turn context is still
+available **at the model level** through the shared live session (E1); only
+workflow-level template injection of a sibling's reply is withheld. Lifting this
+restriction is the deferred cross-turn-data-flow follow-on.
 
 ## Open questions
 
