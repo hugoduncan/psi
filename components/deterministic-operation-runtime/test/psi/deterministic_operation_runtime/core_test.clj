@@ -129,3 +129,47 @@
       (is (= 1 @handler-calls*))
       (is (= :ok (:status result)))
       (is (= :entered (get-in @state* [:workflows :runs "run-1" :step-runs "invoke" :attempts 0 :operation-handler-entry-state]))))))
+
+(deftest invoke-step-operation-then-judge-operation-share-one-attempt-test
+  ;; Regression for task 228: an :invoke step that carries both an :operation and
+  ;; an invoke :judge runs TWO deterministic operations against the SAME step
+  ;; attempt. Without per-operation phase-key namespacing, the second (judge)
+  ;; operation sees the residual :operation-handler-entry-state :entered left by
+  ;; the first (step) operation and aborts with :handler-entry-state-mismatch.
+  ;; The judge operation must carry :operation-role :judge so it drives a
+  ;; distinct :judge-operation-*-state key namespace.
+  (testing "step operation then judge operation both enter against one attempt"
+    (let [state* (atom {:workflows {:runs {"run-1" {:run-id "run-1"
+                                                    :status :running
+                                                    :step-runs {"clarity-status"
+                                                                {:attempts [{:attempt-id "attempt-1"}]}}}}}})
+          ctx {:state* state*}
+          step-calls* (atom 0)
+          judge-calls* (atom 0)
+          base-invocation {:ctx ctx
+                           :workflow-run-id "run-1"
+                           :workflow-attempt-id "attempt-1"
+                           :step-id "clarity-status"}
+          step-result (runtime/invoke-operation
+                       {:id "workflow/clarity-status"
+                        :handler (fn [_]
+                                   (swap! step-calls* inc)
+                                   {:status :ok :data {:step? true}})}
+                       base-invocation)
+          judge-result (runtime/invoke-operation
+                        {:id "workflow/pass-feedback-routing"
+                         :handler (fn [_]
+                                    (swap! judge-calls* inc)
+                                    {:status :ok :data {:judge? true}})}
+                        (assoc base-invocation :operation-role :judge))
+          attempt (get-in @state* [:workflows :runs "run-1" :step-runs
+                                   "clarity-status" :attempts 0])]
+      (is (= 1 @step-calls*) "the step operation handler runs once")
+      (is (= :ok (:status step-result)))
+      (is (= 1 @judge-calls*) "the judge operation handler runs once")
+      (is (= :ok (:status judge-result))
+          "the judge operation must succeed, not abort with :handler-entry-state-mismatch")
+      (is (= :entered (:operation-handler-entry-state attempt))
+          "the step operation's :operation-*-state keys are untouched by the judge")
+      (is (= :entered (:judge-operation-handler-entry-state attempt))
+          "the judge operation drives its own :judge-operation-*-state namespace"))))

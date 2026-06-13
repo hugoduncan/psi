@@ -133,6 +133,21 @@ Actionable inconsistencies found (distinct from the resolved ambiguity pass):
   contradicts plan §Call-site-threading and steps.md Slice 3. Remove the
   parenthetical so the call-site decision is determinate everywhere.
 
+## Build — Slice 1: characterization test (red) (ψ, 2026-06-13)
+
+Added `invoke-step-operation-then-judge-operation-share-one-attempt-test` to
+`deterministic-operation-runtime/core_test.clj`. It drives `invoke-operation`
+twice against one attempt — step op (default role) then judge op
+(`:operation-role :judge`) — and asserts the judge op succeeds and lands
+`:judge-operation-handler-entry-state :entered` while the step op's
+`:operation-handler-entry-state` stays `:entered`.
+
+Red baseline captured: `bb clojure:test:scry --namespace
+psi.deterministic-operation-runtime.core-test` → 3 tests pass, this test fails
+(3 assertions) with `:reason :workflow-stopped` /
+`:stop-reason :handler-entry-state-mismatch` on the judge op (verified in
+`.scry-results`). Confirms the bug exactly as the spike did.
+
 ## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
 
 Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to

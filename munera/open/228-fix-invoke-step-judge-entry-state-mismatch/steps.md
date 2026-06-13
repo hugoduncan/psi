@@ -2,11 +2,11 @@
 
 ## Slice 1 — Characterization test (red)
 
-- [ ] In `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj`, add a `deftest` that builds a `state*` atom with one running run + one step-run + one attempt (`:attempt-id "attempt-1"`), mirroring the spike state shape.
-- [ ] Drive `runtime/invoke-operation` once for the step `:operation` (default role) against `attempt-1`; assert `:status :ok` and `:operation-handler-entry-state :entered`.
-- [ ] Drive `runtime/invoke-operation` a second time for the judge operation with `:operation-role :judge` against the **same** `attempt-1`; assert `:status :ok` (the post-fix behaviour).
-- [ ] Assert the judge op landed `:judge-operation-handler-entry-state :entered` and left the step op's `:operation-handler-entry-state :entered` untouched.
-- [ ] Run the suite and confirm the test **fails** pre-fix with `:reason :workflow-stopped` / `:stop-reason :handler-entry-state-mismatch` (red baseline captured in implementation.md).
+- [x] In `components/deterministic-operation-runtime/test/psi/deterministic_operation_runtime/core_test.clj`, add a `deftest` that builds a `state*` atom with one running run + one step-run + one attempt (`:attempt-id "attempt-1"`), mirroring the spike state shape.
+- [x] Drive `runtime/invoke-operation` once for the step `:operation` (default role) against `attempt-1`; assert `:status :ok` and `:operation-handler-entry-state :entered`.
+- [x] Drive `runtime/invoke-operation` a second time for the judge operation with `:operation-role :judge` against the **same** `attempt-1`; assert `:status :ok` (the post-fix behaviour).
+- [x] Assert the judge op landed `:judge-operation-handler-entry-state :entered` and left the step op's `:operation-handler-entry-state :entered` untouched.
+- [x] Run the suite and confirm the test **fails** pre-fix with `:reason :workflow-stopped` / `:stop-reason :handler-entry-state-mismatch` (red baseline captured in implementation.md).
 
 ## Slice 2 — Runtime phase-key namespacing
 
