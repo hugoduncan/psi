@@ -407,3 +407,38 @@ the step path's second-defect structural fix.
   `workflow-judge-cancellation` 8 / 34 green; `workflow-review-step-routing`
   11 / 82 green. clj-kondo clean on `workflow_judge.clj` and
   `workflow_judge_test.clj`.
+
+## Implementation review — pass 3 (ψ, 2026-06-13)
+
+Re-reviewed code, tests, and artifact coherence against the
+task-implementation-review skill, verifying claims against runtime (not just
+notes).
+
+Verified:
+- **Phase-key chokepoint correct.** `role-phase-opts` namespaces only the four
+  key fields (`:phase-key`/`:timestamp-key`/`:count-key` + each
+  `:required-phases` `:key`) and leaves phase *values* (`:phase-value`,
+  `:required-phases :value`, `:ok-states`, `:blocked-states`) untouched —
+  correct, since values are state markers not attempt-state map keys.
+  Default/`:step` path is a no-op `cond->`, so single-operation steps keep
+  byte-identical `:operation-*` keys.
+- **Judge attempt-id source is authoritative and live.** Confirmed the
+  `routing-context` `:workflow-attempt-id` threaded into `execute-invoke-judge!`
+  comes from `(get-in @working-memory* [:attempt-ids step-id])` at
+  `:judge/enter` (statechart_runtime.clj:365), the runtime's live latest attempt
+  for the step (populated when the attempt is appended) — not a pre-attempt
+  snapshot. The pass-2 fix is genuinely consistent with the step path, not
+  incidentally correct.
+- **Both defects have focused regression tests + end-to-end coverage**, each
+  shown red-on-revert in prior passes.
+- **Runtime checks (not trusting notes):** clj-kondo 0 errors / 0 warnings on
+  all four changed namespaces; `deterministic-operation-runtime.core` 5/24,
+  `workflow-judge` 18/93, `workflow-runtime step-execution` 11/67,
+  `workflow-review-step-routing` 11/82 all green; CHANGELOG `Fixed` entry
+  accurate and user-facing. Working tree clean.
+
+No new actionable findings. All prior-pass follow-ups (ambiguity, inconsistency,
+pass-1 missing focused test, pass-2 judge call-site authoritative attempt-id) are
+committed and verified. Fix is structural, key coverage complete, tests
+state-based (no mocks), cancellation guard preserved and tightened.
+Implementation quality is sufficient to close.
