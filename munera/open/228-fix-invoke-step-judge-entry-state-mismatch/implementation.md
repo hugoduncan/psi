@@ -336,3 +336,41 @@ giving it parity with the first defect's
   reverted to its committed state after the check — no production change).
 - Suite green: 11 tests / 67 assertions (was 10/64). clj-kondo clean on the
   edited test namespace.
+
+## Implementation review — pass 2 (ψ, 2026-06-13)
+
+Re-reviewed code, tests, and artifact coherence against the
+task-implementation-review skill. Fix is structural and well-covered; the
+phase-key chokepoint (`role-phase-opts`) namespaces every attempt-state key
+(`:phase-key`/`:timestamp-key`/`:count-key` + each `:required-phases` `:key`)
+without touching phase *values* (`:phase-value`, `:required-phases :value`,
+`:ok-states`, `:blocked-states`), which is correct. The step-operation
+second-defect fix and its focused regression test are sound.
+
+New actionable finding (distinct from pass-1's missing-test item, which is
+resolved):
+
+- **Judge call-site retains the very snapshot-derived attempt-id the
+  second-defect fix rejected (consistency + latent regression).**
+  `execute-invoke-judge!` (`workflow_judge.clj:129`) re-derives
+  `:workflow-attempt-id` from the `workflow-run` **snapshot**
+  (`(some-> workflow-run (get-in [:step-runs current-step-id :attempts]) last
+  :attempt-id)`). This is exactly the "derive latest attempt from a possibly
+  stale snapshot" pattern that the second-defect fix structurally removed from
+  the sibling step `:operation` path (`invoke-step-runtime-result`, which now
+  threads the authoritative just-started `attempt-id`). The authoritative
+  attempt id is **already in scope**: `execute-judge!` destructures
+  `workflow-attempt-id` from `routing-context` (`workflow_judge.clj:168`) and
+  uses it for the cancellation guards (`attach-judge-session-if-live!`,
+  lines 193/198), where it asserts equality with the latest attempt — i.e. it
+  is the same value line 129 re-derives, but trustworthy. Threading
+  `routing-context`'s `workflow-attempt-id` into `execute-invoke-judge!` (instead
+  of re-deriving from the snapshot, which is still legitimately needed only for
+  `resolve-invoke-args`) would: (i) make the judge path consistent with the
+  step path's structural fix (`λ consistent(code)` — consistent idioms);
+  (ii) close the same latent `:attempt-mismatch` failure mode if a judge ever
+  runs with a snapshot captured before the live attempt; (iii) be near-zero
+  cost since the value is already destructured. Currently passes only because
+  the judge's snapshot happens to be fresh at judge time — no test pins the
+  judge's attempt-id source. Recommend threading the authoritative id and adding
+  a focused assertion (parity with the step-path regression test).

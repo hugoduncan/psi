@@ -83,3 +83,25 @@
   - Problem §2 rewritten: judge passes the explicit latest `:workflow-attempt-id`; with a real id + `:attempt-id-required? false`, `ordinary-entry` line 77 (`(or attempt-id-required? workflow-attempt-id)`) still asserts equality with the latest attempt. Verified against `workflow_judge.clj:129` and `ordinary_entry.clj:77`. Now consistent with Spike-outcome / implementation.md / code.
 - [x] Remove the residual deferral in plan.md §"Slice order" Slice 3 — "(and make the step-operation default explicit if it aids clarity)" — so it matches the determinate decision in plan §"Call-site threading" and steps.md Slice 3 (omit `:operation-role` at the step call-site; only judge invocations annotate a role).
   - Parenthetical removed; Slice 3 now states the step call-site omits the key (absent ≡ `:step`), cross-referencing §Call-site threading. Determinate everywhere.
+
+## Review follow-ups — implementation review pass 2 (ψ 2026-06-13)
+
+- [ ] Make the judge call-site use the authoritative attempt id instead of
+  re-deriving it from the `workflow-run` snapshot. In
+  `agent_session/workflow_judge.clj` `execute-invoke-judge!`, replace
+  `:workflow-attempt-id (some-> workflow-run (get-in [:step-runs current-step-id
+  :attempts]) last :attempt-id)` (line ~129) with the `workflow-attempt-id`
+  already carried in `routing-context` (destructured in `execute-judge!`,
+  line ~168, and used by the cancellation guards). This aligns the judge path
+  with the second-defect structural fix applied to the step `:operation`
+  (`invoke-step-runtime-result` threads the authoritative just-started
+  `attempt-id`), removing the same latent `:attempt-mismatch` snapshot-staleness
+  failure mode (`λ consistent(code)`; `cause(structural) → redesign > patch`).
+  Keep the `workflow-run` snapshot only for `resolve-invoke-args`.
+- [ ] Add a focused regression test pinning the judge's attempt-id source:
+  drive `execute-invoke-judge!` (or `execute-judge!`) for an invoke judge with a
+  **stale** `workflow-run` snapshot while the live latest attempt and
+  `routing-context`'s `workflow-attempt-id` are the just-started attempt; assert
+  the judge operation targets the authoritative attempt (no `:attempt-mismatch`),
+  giving parity with the step-path
+  `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`.
