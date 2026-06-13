@@ -45,3 +45,35 @@ build.
 
 Fix shape (a): per-operation phase-key namespacing (judge role gets a distinct
 key set). See design.md.
+
+## Plan/steps ambiguity review (ψ, 2026-06-13)
+
+Actionable ambiguities found:
+
+- **Injection point undecided.** Plan §Mechanism says role is "woven into the
+  phase-opts maps the helpers pass" while Slice 2 says "thread it into
+  `transition-workflow-operation-phase!` / the five phase helpers" — two distinct
+  strategies: (i) central remap of supplied phase-opts in the single
+  `transition-workflow-operation-phase!` chokepoint (reads `(:operation-role
+  invocation)` there), vs (ii) per-helper key rewriting in each phase helper.
+  `λone_way` → pick one. The chokepoint already receives `invocation`, so (i) is
+  the single-point option; plan must state which.
+- **"Five" vs six phase helpers.** Design and plan call them "the five
+  transition helpers" but enumerate/the code has **six**: `reserve`,
+  `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`,
+  `enter-handler`. Ambiguous coverage — if per-helper (ii), an implementer may
+  miss one (notably `enter-handler`, the helper that throws the mismatch). Fix
+  the count or moot it by choosing the chokepoint strategy.
+- **Regression-suite gap.** The actual direct readers/asserters of
+  `:operation-start-state` / `:operation-call-state` /
+  `:operation-handler-entry-state` live in
+  `components/agent-session/test/.../workflow_statechart_runtime_call_start_cancellation_test.clj`
+  (task-225 coverage). Slice 4/5 name the regression suites as
+  `deterministic-operation-runtime`, `workflow-coordination`, `agent-session
+  workflow-judge`, `workflow-runtime step-execution` — it is ambiguous whether
+  this call-start-cancellation suite (the real default-role key-assertion guard)
+  is in the green set. Name it explicitly.
+- **Step-operation explicit-role left to taste.** Slice 3 / plan say add
+  `:operation-role :step` "only if it improves clarity," so the final artifact
+  state (key present vs absent at the step call-site) is non-determinate. Decide
+  one way so the end state is fixed.

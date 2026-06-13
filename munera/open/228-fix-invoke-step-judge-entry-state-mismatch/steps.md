@@ -38,3 +38,10 @@
 - [ ] Run `clj-kondo --lint` on all changed namespaces; resolve any findings.
 - [ ] Run the relevant Scry suites (`deterministic-operation-runtime`, `workflow-coordination`, `agent-session` workflow-judge, `workflow-runtime` step-execution) and confirm green.
 - [ ] Update `implementation.md` with the final key-namespacing decision, the green test summary, and any deviations.
+
+## Review follow-ups — plan/steps ambiguity (ψ 2026-06-13)
+
+- [ ] Resolve the role-injection strategy ambiguity: state explicitly whether `role-phase-key` is applied once at the central `transition-workflow-operation-phase!` chokepoint (remapping the supplied phase-opts after reading `(:operation-role invocation)`) or inside each phase helper, and update Plan §Mechanism + Slice 2 to one consistent description (`λone_way`).
+- [ ] Correct the "five transition helpers" count: there are **six** (`reserve`, `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`, `enter-handler`); fix design.md + plan.md (or note it is moot under the chokepoint strategy) so helper coverage is unambiguous.
+- [ ] Name the `agent-session` call-start-cancellation suite (`workflow_statechart_runtime_call_start_cancellation_test`) explicitly in the Slice 4/Slice 5 regression set, since it is the suite that directly asserts the default-role `:operation-*-state` keys that the namespacing must leave unchanged.
+- [ ] Decide and record whether the step `:operation` call-site carries an explicit `:operation-role :step` or relies on the absent/default; remove the "only if it improves clarity" deferral so the final artifact state is determinate (Slice 3 + plan call-site threading).
