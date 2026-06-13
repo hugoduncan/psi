@@ -508,3 +508,32 @@ Executed the one actionable task-test-review follow-up: extended
   change.
 - Suite green: 5 tests / 32 assertions (was 5/24). clj-kondo clean on the edited
   test namespace.
+
+## Test review — pass 2 (task-test-review skill) (ψ, 2026-06-13)
+
+Re-reviewed against the three skill clauses, verifying claims against runtime
+(not notes). Read the new judge-path and step-path regression tests and the
+namespacing characterization test in full.
+
+- **well-formed** ✓ — all 228-authored focused tests have descriptive names +
+  docstrings stating the defect; each was shown red-on-revert in prior passes.
+- **behaviour coverage** ✓ — AC mapping holds: #1 →
+  `…share-one-attempt-test` (now pins the full `role-phase-opts` key set:
+  `:judge-operation-start-state`/`:judge-operation-call-state` +
+  `:count-key`/`:timestamp-key`, with the step op's `:operation-*` metadata
+  asserted untouched); #2/#4 → end-to-end `workflow-review-step-routing-test`
+  REPEAT/DONE; #3 → `judge-role-operation-honors-workflow-cancellation-test` +
+  default-role `invoke-operation-honors-workflow-cancellation-test`;
+  second-defect parity → `…re-execution-uses-just-started-attempt…` (step) +
+  `execute-invoke-judge-uses-authoritative-attempt…` (judge).
+- **infra deps injectable/nullable, ¬mock/¬stub** ✓ — every 228-authored
+  focused test uses a real `deterministic-operation-registry` + plain `state*`
+  atoms with state-based assertions; no `with-redefs`/mocks in the new tests.
+
+Runtime-verified green: deterministic-operation-runtime core 5/32,
+workflow-judge 18/93, workflow-runtime step-execution 11/67.
+
+No new actionable findings. The prior test-review pass-1 finding
+(key-derivation completeness) is resolved and runtime-verified. The pre-existing
+`workflow-review-step-routing-test` LLM-turn `with-redefs` stub is not
+228-authored (already noted non-actionable). Test quality is sufficient to close.
