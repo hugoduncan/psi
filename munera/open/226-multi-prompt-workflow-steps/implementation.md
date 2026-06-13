@@ -192,3 +192,43 @@ undercutting Q7, and required weakening the Q8 equivalence claim.
   routing mirrors the live `clarity-status` REPEAT→architecture-review
   (max-iterations) loop. Per-prompt reply addressing (Q11) remains load-bearing
   and unchanged; now carries three prompt-groups instead of two.
+
+## Architectural-fit review (design, pass 2) — ψ
+
+Re-reviewed the current design.md for architectural fit against AGENTS.md
+(VSM/replay, workflow-runtime boundary, `λone_way`, `λα. ¬compat(backward)`,
+`consistent`), doc/workflows.md (live `review-task-design` topology),
+doc/workflow-grammar-concepts.md, and doc/workflow_statechart_canonical.md.
+Judged fit only (not ambiguity/inconsistency/correctness). A1–A3 from pass 1 are
+resolved. Two **new** actionable misfits found (D1, D2); recorded as unchecked
+items in design-steps.md. Not duplicates of A1–A3/B1–B5/C1.
+
+- **D1 — Merged exemplar's "matches the real workflow's three-phase topology"
+  claim is architecturally unachievable.** Scope/Q7 rewrite
+  `review-task-design.edn` to merge all three review phases into one multi-prompt
+  `:session` step. But a multi-prompt step is architecturally *N turns in one
+  session → one post-drain judge/route* (Q5, Q8: "exactly one judge + `:on`,
+  applied after the queue drains"). The live `review-task-design` topology
+  (doc/workflows.md) is per-phase **review→follow-up→review**: each `*-follow-up`
+  step *executes the recorded items and mutates design.md/design-steps.md before
+  the next phase reviews*. Running architecture, ambiguity, and inconsistency as
+  three back-to-back turns in one session reviews all three against the **same
+  un-followed-up design**, with no per-phase mutation between them, and the
+  design never states where the three `*-follow-up` steps go. The Q8
+  `pass-feedback-routing` equivalence is only about the *routing disjunction*,
+  not about the lost interleaved-follow-up structure. So the topology-faithful
+  claim is an architectural-fit overclaim: the defining structural feature of the
+  live topology (follow-up mutation between phases) cannot survive the merge.
+- **D2 — Dual single-prompt path/authoring fights `λone_way` and
+  `¬compat(backward)`.** Q6/AC-2/B3 deliberately keep the `:contributions`
+  single-prompt form as a *separate* execution path and authoring form, *not*
+  rewritten as the N=1 degenerate of `:prompts`, justified by "byte-for-byte
+  equivalence"/"behaves exactly as today"/"strict superset." This yields two
+  authorings for ~one concept (single-turn session step) and two parallel runtime
+  paths that must be kept from drifting — fighting `λone_way` (¬ambiguity →
+  singular solution / obvious path) and `consistent` (one idiom). Its sole
+  architectural justification is preserving prior behaviour, a value the project
+  explicitly disclaims (`λα. ¬compat(backward)`). The design weighs neither
+  principle. Reconcile: either treat single-prompt as the N=1 degenerate of one
+  unified path (singular solution), or justify the dual path on a *non-back-compat*
+  architectural basis.
