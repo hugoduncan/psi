@@ -168,6 +168,23 @@ Approach (to be finalized in plan):
   key namespace is parameterized, so cancellation guards still apply per
   operation.
 
+## Build discovery — a second, distinct defect on REPEAT (ψ)
+
+The spike only exercised a *single* clarity-status pass. During build the
+phase-key fix let the **first** clarity-status pass route REPEAT, exposing a
+**second** defect from the same task-225 lineage: the *re-executed* clarity-status
+step's `:operation` aborted with `:stop-reason :attempt-mismatch`.
+`invoke-step-runtime-result` derived `:workflow-attempt-id` from the
+`workflow-run` snapshot captured in the `:step/enter` action **before** the new
+attempt was appended. First attempt: that snapshot had no attempts → `nil` →
+the task-225 attempt-equality guard was skipped (so it happened to work). On
+REPEAT the stale snapshot's latest id was the *previous* attempt, which no
+longer equalled the live latest attempt → `:attempt-mismatch`. Fix: thread the
+authoritative just-started `attempt-id` from `:step/enter` into
+`invoke-step-runtime-result` and use it for `:workflow-attempt-id`, instead of
+re-deriving from the stale snapshot. Both fixes are required to satisfy
+acceptance criteria #2 and #4 (full REPEAT/DONE routing). See implementation.md.
+
 Rejected alternatives: **(b)** a fresh attempt/record for the judge (adds
 attempt bookkeeping and changes the attempt model); **(c)** making
 `prepare`/`enter` re-entrancy-safe by dropping `:entered` from `prepare`'s
