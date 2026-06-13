@@ -374,3 +374,36 @@ resolved):
   the judge's snapshot happens to be fresh at judge time — no test pins the
   judge's attempt-id source. Recommend threading the authoritative id and adding
   a focused assertion (parity with the step-path regression test).
+
+## Implementation-review pass-2 follow-up: judge call-site authoritative attempt-id (ψ, 2026-06-13)
+
+Executed the two pass-2 actionable follow-ups, giving the judge path parity with
+the step path's second-defect structural fix.
+
+- **Source (`workflow_judge.clj` `execute-invoke-judge!`).** Replaced the
+  snapshot-derived `:workflow-attempt-id (some-> workflow-run (get-in [:step-runs
+  current-step-id :attempts]) last :attempt-id)` with the authoritative
+  `workflow-attempt-id` already carried in `routing-context` (now destructured in
+  the `execute-invoke-judge!` arg map). The `workflow-run` snapshot is retained
+  only for `resolve-invoke-args` (stable prior-step outputs). This removes the
+  same latent `:attempt-mismatch` snapshot-staleness failure mode that the step
+  `:operation` path already eliminated by threading the just-started `attempt-id`
+  — `λ consistent(code)`, `cause(structural) → redesign > patch`. Added a comment
+  documenting why the snapshot is no longer the attempt-id source.
+- **Test (`workflow_judge_test.clj`).** Added
+  `execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test`, the
+  judge-path companion to the step-path
+  `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`.
+  It drives `execute-judge!` for an invoke judge with a **stale** `workflow-run`
+  snapshot (latest = `attempt-1`) while live `state*` and `routing-context`'s
+  `:workflow-attempt-id` are the just-started `attempt-2`, using a real
+  `deterministic-operation-registry`. Asserts the judge op runs once, routes via
+  the judge event, drives `attempt-2` to `:judge-operation-handler-entry-state
+  :entered`, and leaves `attempt-1` untouched.
+- **Discrimination verified.** Reverting the source to re-derive
+  `:workflow-attempt-id` from the stale snapshot makes the new test fail 4
+  assertions with `:attempt-mismatch`; source restored → green.
+- **Verification.** `workflow-judge` 18 tests / 93 assertions green;
+  `workflow-judge-cancellation` 8 / 34 green; `workflow-review-step-routing`
+  11 / 82 green. clj-kondo clean on `workflow_judge.clj` and
+  `workflow_judge_test.clj`.

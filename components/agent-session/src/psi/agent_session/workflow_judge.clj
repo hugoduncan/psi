@@ -116,9 +116,16 @@
                               :operation-result operation-result}}})
 
 (defn- execute-invoke-judge!
-  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run stopped?]}]
+  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run workflow-attempt-id stopped?]}]
   (let [stopped? (or stopped? (constantly false))
         invoke-spec (or (:invoke judge-spec) judge-spec)
+        ;; task 228: the `workflow-run` snapshot is captured in :step/enter and
+        ;; is only used here to resolve invoke args (stable prior-step outputs).
+        ;; The authoritative just-started attempt id is threaded through
+        ;; routing-context, mirroring the step :operation path
+        ;; (invoke-step-runtime-result); re-deriving the latest attempt from the
+        ;; possibly-stale snapshot would reintroduce the second-defect
+        ;; :attempt-mismatch failure mode on re-executed steps.
         args (workflow-source-resolution/resolve-invoke-args workflow-run current-step-id (:args invoke-spec))
         operation-result (op-reg/invoke-operation-in
                           (:deterministic-operation-registry ctx)
@@ -126,10 +133,7 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id workflow-run-id
-                           :workflow-attempt-id (some-> workflow-run
-                                                        (get-in [:step-runs current-step-id :attempts])
-                                                        last
-                                                        :attempt-id)
+                           :workflow-attempt-id workflow-attempt-id
                            :step-id current-step-id
                            ;; task 228: the judge runs a second deterministic
                            ;; operation against the same step attempt as the

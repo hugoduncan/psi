@@ -86,7 +86,7 @@
 
 ## Review follow-ups — implementation review pass 2 (ψ 2026-06-13)
 
-- [ ] Make the judge call-site use the authoritative attempt id instead of
+- [x] Make the judge call-site use the authoritative attempt id instead of
   re-deriving it from the `workflow-run` snapshot. In
   `agent_session/workflow_judge.clj` `execute-invoke-judge!`, replace
   `:workflow-attempt-id (some-> workflow-run (get-in [:step-runs current-step-id
@@ -98,10 +98,24 @@
   `attempt-id`), removing the same latent `:attempt-mismatch` snapshot-staleness
   failure mode (`λ consistent(code)`; `cause(structural) → redesign > patch`).
   Keep the `workflow-run` snapshot only for `resolve-invoke-args`.
-- [ ] Add a focused regression test pinning the judge's attempt-id source:
+  - Done: `execute-invoke-judge!` now destructures `workflow-attempt-id` from
+    `routing-context` and passes it directly as `:workflow-attempt-id`; the
+    `workflow-run` snapshot is retained solely for `resolve-invoke-args`. The
+    judge path now matches the step path's structural fix; comment added.
+- [x] Add a focused regression test pinning the judge's attempt-id source:
   drive `execute-invoke-judge!` (or `execute-judge!`) for an invoke judge with a
   **stale** `workflow-run` snapshot while the live latest attempt and
   `routing-context`'s `workflow-attempt-id` are the just-started attempt; assert
   the judge operation targets the authoritative attempt (no `:attempt-mismatch`),
   giving parity with the step-path
   `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`.
+  - Done: added
+    `execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test` to
+    `workflow_judge_test.clj`. Drives `execute-judge!` for an invoke judge with a
+    stale `workflow-run` snapshot (latest = `attempt-1`) while live `state*` and
+    `routing-context`'s `:workflow-attempt-id` are the just-started `attempt-2`
+    (real `deterministic-operation-registry`). Asserts the judge op runs once,
+    routes, drives `attempt-2` to `:judge-operation-handler-entry-state :entered`,
+    and leaves `attempt-1` untouched. Verified red-on-revert: re-deriving from the
+    stale snapshot fails 4 assertions with `:attempt-mismatch`; the threaded fix
+    restores green. Suite: 18 tests / 93 assertions green; clj-kondo clean.
