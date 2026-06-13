@@ -224,7 +224,7 @@
                     invoke-step?
                     (if (state/workflow-stopped? ctx run-id)
                       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-                      (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                      (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run attempt-id)
                             {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)
                             recorded? (update-state-if-live!
                                        ctx

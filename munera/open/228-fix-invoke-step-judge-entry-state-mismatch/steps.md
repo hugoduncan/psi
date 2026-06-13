@@ -19,10 +19,17 @@
 
 ## Slice 3 — Judge call-site role
 
-- [ ] In `components/agent-session/src/psi/agent_session/workflow_judge.clj`, add `:operation-role :judge` to the invocation map in `execute-invoke-judge!`.
-- [ ] In `components/workflow-runtime/.../statechart_runtime/step_execution.clj` `invoke-step-runtime-result`, leave the step `:operation` invocation with **no** `:operation-role` key (relies on absent/default ≡ `:step`); do not add an explicit `:operation-role :step` — only judge invocations annotate a role.
-- [ ] Confirm `invoke-operation-in` (registry) requires no change — invocation passes through unchanged.
-- [ ] Add/extend a step-execution or workflow-runtime test covering an invoke step with both an `:operation` and an invoke `:judge`: both deterministic operations complete and routing follows the judge outcome (no `:workflow-stopped` / `:handler-entry-state-mismatch`).
+- [x] In `components/agent-session/src/psi/agent_session/workflow_judge.clj`, add `:operation-role :judge` to the invocation map in `execute-invoke-judge!`.
+- [x] In `components/workflow-runtime/.../statechart_runtime/step_execution.clj` `invoke-step-runtime-result`, leave the step `:operation` invocation with **no** `:operation-role` key (relies on absent/default ≡ `:step`); do not add an explicit `:operation-role :step` — only judge invocations annotate a role.
+- [x] Confirm `invoke-operation-in` (registry) requires no change — invocation passes through unchanged.
+- [x] Add/extend a step-execution or workflow-runtime test covering an invoke step with both an `:operation` and an invoke `:judge`: both deterministic operations complete and routing follows the judge outcome (no `:workflow-stopped` / `:handler-entry-state-mismatch`). Covered end-to-end by the existing `workflow-review-step-routing-test` clarity-status suites (now green).
+
+## Slice 3b — Second defect discovered: stale-snapshot `:attempt-mismatch` on REPEAT (ψ)
+
+- [x] Diagnosed: with the phase-key fix, the **first** clarity-status pass now routes REPEAT, exposing a **distinct** defect — the second clarity-status attempt's step `:operation` aborts with `:stop-reason :attempt-mismatch`.
+- [x] Root cause: `invoke-step-runtime-result` derived `:workflow-attempt-id` from the `workflow-run` snapshot taken **before** the new attempt was appended. First attempt: snapshot empty → `nil` → task-225 equality guard skipped (worked). REPEAT: stale snapshot's latest = previous attempt id ≠ live latest → `:attempt-mismatch`.
+- [x] Fix: thread the authoritative just-started `attempt-id` from the `:step/enter` caller into `invoke-step-runtime-result` (both call sites: `statechart_runtime.clj` and `step_execution.clj` `execute-actor-step!`); use it for `:workflow-attempt-id` instead of re-deriving from the snapshot.
+- [x] Verified: all 11 `workflow-review-step-routing-test` tests now green (REPEAT loops + iteration-limit failures), confirming acceptance criteria #2 and #4.
 
 ## Slice 4 — Cancellation regression coverage
 

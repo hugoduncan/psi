@@ -168,6 +168,53 @@ Slice 1 characterization test now green:
 `bb clojure:test:scry --namespace psi.deterministic-operation-runtime.core-test`
 → 4 tests / 22 assertions, 0 failures. clj-kondo clean on the edited namespace.
 
+## Build — Slice 3 + discovered second defect (ψ, 2026-06-13)
+
+**Slice 3 (judge call-site role).** Added `:operation-role :judge` to the judge
+invocation map in `agent_session/workflow_judge.clj/execute-invoke-judge!`. The
+step `:operation` call-site (`step_execution.clj/invoke-step-runtime-result`)
+omits the key as designed. `invoke-operation-in` passes the invocation through
+unchanged; no registry/schema change needed (invocation map is open).
+
+**DEVIATION FROM DESIGN — second, distinct defect discovered.** The design/spike
+only exercised a *single* clarity-status pass. Running the existing end-to-end
+`workflow-review-step-routing-test` suite exposed a SECOND defect that the
+phase-key fix alone does not resolve, blocking acceptance criteria #2/#4 (full
+REPEAT/DONE routing):
+
+- With the 228 phase-key fix, the **first** clarity-status pass now succeeds and
+  routes REPEAT. The **second** clarity-status attempt's *step* `:operation`
+  (`workflow/constant-routing`, default role) then aborts with
+  `:stop-reason :attempt-mismatch`.
+- Root cause: `invoke-step-runtime-result` derived `:workflow-attempt-id` from
+  the `workflow-run` **snapshot** captured in the `:step/enter` action *before*
+  the new attempt was appended to `state*`. First attempt: that snapshot has no
+  attempts for the step → `nil` → task-225's attempt-equality guard
+  (`(or attempt-id-required? workflow-attempt-id)`) is skipped, so it happened to
+  work. REPEAT: the stale snapshot's latest attempt id is the *previous* attempt,
+  which no longer equals the live latest attempt → `:attempt-mismatch`.
+- Same lineage as 228: both faults were introduced by task-225's cancellation
+  entry machine (commit 04861433f) and both surface on the clarity-status
+  invoke-op+judge step. The phase-key fix uncovered this one.
+- Fix (`cause(structural) → redesign > patch`): thread the authoritative,
+  just-started `attempt-id` from the `:step/enter` caller into
+  `invoke-step-runtime-result` (signature `… workflow-run attempt-id`; both call
+  sites updated — `statechart_runtime.clj` and `step_execution.clj`
+  `execute-actor-step!`) and use it for `:workflow-attempt-id` instead of
+  re-deriving from the stale snapshot. The `workflow-run` snapshot is still used
+  for `resolve-invoke-args` (args reference stable prior-step outputs). This also
+  makes the *first* attempt properly assert attempt equality (id now non-nil),
+  tightening the cancellation guard rather than weakening it.
+
+**Verification.** `workflow-review-step-routing-test` now 11 tests / 82
+assertions all green (was 3 failing / 21 assertions before — the REPEAT-loop and
+iteration-limit subtests). Regression suites green: deterministic-operation-runtime
+core (4/22), workflow-statechart-runtime-call-start-cancellation (14/63),
+workflow-judge (17/88), workflow-judge-cancellation (8/34),
+workflow-statechart-runtime (and cancellation) + workflow-execution (34/153),
+workflow-runtime step-execution (10/63). clj-kondo clean on all changed
+namespaces.
+
 ## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
 
 Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to

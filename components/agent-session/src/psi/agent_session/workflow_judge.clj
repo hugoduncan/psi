@@ -131,6 +131,12 @@
                                                         last
                                                         :attempt-id)
                            :step-id current-step-id
+                           ;; task 228: the judge runs a second deterministic
+                           ;; operation against the same step attempt as the
+                           ;; step :operation; the :judge role namespaces its
+                           ;; entry phase keys so the two operations no longer
+                           ;; collide on :operation-*-state.
+                           :operation-role :judge
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
     (assert-workflow-live! stopped?

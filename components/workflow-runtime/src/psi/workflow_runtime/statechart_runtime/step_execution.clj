@@ -42,7 +42,7 @@
                     {:result operation-result}))))
 
 (defn invoke-step-runtime-result
-  [ctx parent-session-id run-id step-id step-def workflow-run]
+  [ctx parent-session-id run-id step-id step-def workflow-run attempt-id]
   (let [invoke-spec (or (:invoke step-def)
                         (get-in step-def [:judge :invoke]))
         args (workflow-source-resolution/resolve-invoke-args workflow-run step-id (:args invoke-spec))
@@ -52,10 +52,14 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id run-id
-                           :workflow-attempt-id (some-> workflow-run
-                                                        (get-in [:step-runs step-id :attempts])
-                                                        last
-                                                        :attempt-id)
+                           ;; task 228: use the attempt the caller just started,
+                           ;; not the latest attempt derived from a `workflow-run`
+                           ;; snapshot taken before this attempt was appended. On
+                           ;; a re-executed (REPEAT) invoke step the snapshot is
+                           ;; stale and its latest attempt id no longer matches
+                           ;; the live latest attempt, which task-225's attempt
+                           ;; equality guard rejects with :attempt-mismatch.
+                           :workflow-attempt-id attempt-id
                            :step-id step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
@@ -263,7 +267,7 @@
   (try
     (cond
       (= :invoke (:type step-def))
-      (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+      (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run attempt-id)
             {:keys [attempt-data pending-kind payload]} (apply-invoke-step-result invoke-result)]
         {:attempt-data attempt-data
          :pending-kind pending-kind
