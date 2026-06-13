@@ -1,6 +1,7 @@
 (ns psi.workflow-runtime.statechart-runtime.step-execution-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
@@ -39,6 +40,51 @@
 ;; This surface is integration-tested via workflow execution (e.g. local-logprobs workflow
 ;; exercises {:from {:step "run" :output :session-id}} in its invoke step).
 ;; A unit-level assertion is impractical here without substantial test infrastructure.
+
+(deftest invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test
+  ;; Regression for task 228's SECOND defect (:attempt-mismatch on REPEAT). When
+  ;; an invoke step is re-executed (e.g. a REPEAT routing loop), the `:step/enter`
+  ;; caller appends a fresh attempt to the live `state*` and threads its
+  ;; attempt-id into `invoke-step-runtime-result`. The `workflow-run` snapshot the
+  ;; caller captured BEFORE appending that attempt is stale: its latest attempt is
+  ;; the PREVIOUS attempt. `invoke-step-runtime-result` must drive the
+  ;; deterministic operation against the threaded just-started attempt-id, not the
+  ;; stale snapshot's latest attempt — otherwise task-225's attempt-equality guard
+  ;; aborts the step `:operation` with :attempt-mismatch. This is the localized
+  ;; characterization companion to the first defect's
+  ;; `invoke-step-operation-then-judge-operation-share-one-attempt-test`.
+  (testing "re-executed invoke step operation drives the threaded attempt, not the stale snapshot's latest"
+    (let [handler-calls* (atom 0)
+          reg (deterministic-op-registry/create-registry)
+          _ (deterministic-op-registry/register-operation-in!
+             reg {:id "workflow/constant-routing"
+                  :handler (fn [_]
+                             (swap! handler-calls* inc)
+                             {:status :ok :data {:routed? true}})})
+          ;; Live state*: attempt-2 is the just-started latest live attempt.
+          state* (atom {:workflows {:runs {"run-1" {:run-id "run-1"
+                                                    :status :running
+                                                    :step-runs {"clarity-status"
+                                                                {:attempts [{:attempt-id "attempt-1"}
+                                                                            {:attempt-id "attempt-2"}]}}}}}})
+          ctx {:state* state*
+               :deterministic-operation-registry reg}
+          ;; Stale snapshot captured before attempt-2 was appended: latest = attempt-1.
+          stale-workflow-run {:run-id "run-1"
+                              :step-runs {"clarity-status" {:attempts [{:attempt-id "attempt-1"}]}}}
+          step-def {:invoke {:operation "workflow/constant-routing"}}
+          {:keys [operation-result]}
+          (step-execution/invoke-step-runtime-result
+           ctx nil "run-1" "clarity-status" step-def stale-workflow-run "attempt-2")
+          attempts (get-in @state* [:workflows :runs "run-1" :step-runs
+                                    "clarity-status" :attempts])]
+      (is (= 1 @handler-calls*) "the step operation handler runs once")
+      (is (= :ok (:status operation-result))
+          "the operation succeeds against the just-started attempt, not abort with :attempt-mismatch")
+      (is (= :entered (:operation-handler-entry-state (nth attempts 1)))
+          "the live just-started attempt (attempt-2) is driven to :entered")
+      (is (nil? (:operation-handler-entry-state (nth attempts 0)))
+          "the stale snapshot's latest attempt (attempt-1) is NOT driven"))))
 
 (deftest execute-session-step-invalid-structured-output-blocks-with-envelope-test
   (testing "invalid structured output records raw output and validation errors instead of escaping surface resolution"

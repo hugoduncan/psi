@@ -59,7 +59,7 @@
 
 ## Review follow-ups — implementation review (ψ 2026-06-13)
 
-- [ ] Add a focused regression test for the second defect (`:attempt-mismatch`
+- [x] Add a focused regression test for the second defect (`:attempt-mismatch`
   on REPEAT): pin that a re-executed invoke step's step `:operation` uses the
   just-started `attempt-id` (threaded from `:step/enter`) rather than the latest
   attempt derived from the stale `workflow-run` snapshot. Place it at the
@@ -67,6 +67,15 @@
   localized characterization test with parity to the first defect's
   `…share-one-attempt-test`, instead of relying solely on the end-to-end
   `workflow-review-step-routing-test` REPEAT loops.
+  - Added `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`
+    to `workflow-runtime/.../step_execution_test.clj`. It calls
+    `invoke-step-runtime-result` with a **stale** `workflow-run` snapshot (latest
+    = `attempt-1`) while live `state*` and the threaded `attempt-id` are the
+    just-started `attempt-2`, then asserts `:ok` + `attempt-2` driven to
+    `:entered` + `attempt-1` untouched. Verified red-on-revert: deriving
+    `:workflow-attempt-id` from the stale snapshot fails 3 assertions with
+    `:attempt-mismatch`; green with the threaded fix. Suite: 11 tests / 67
+    assertions green; clj-kondo clean.
 
 ## Review follow-ups — plan/steps inconsistency (ψ 2026-06-13)
 

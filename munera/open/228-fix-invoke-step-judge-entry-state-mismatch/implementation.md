@@ -311,3 +311,28 @@ Not flagged as actionable (handled): the second defect is a scope addition over
 the original handler-entry-state-mismatch design, but it is documented as a
 deviation (design.md Build-discovery, steps Slice 3b) and is required to satisfy
 acceptance criteria #2/#4 — defensible to keep in this task.
+
+## Implementation-review follow-up: focused second-defect regression test (ψ, 2026-06-13)
+
+Executed the one actionable implementation-review follow-up: added a localized
+characterization test for the second defect (`:attempt-mismatch` on REPEAT),
+giving it parity with the first defect's
+`invoke-step-operation-then-judge-operation-share-one-attempt-test`.
+
+- Test: `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`
+  in `components/workflow-runtime/test/.../statechart_runtime/step_execution_test.clj`.
+- Mechanism pinned: `invoke-step-runtime-result` is driven with a **stale**
+  `workflow-run` snapshot whose latest attempt is `attempt-1`, while the live
+  `state*` and the threaded `attempt-id` are the just-started `attempt-2`. A real
+  `deterministic-operation-registry` runs the step `:operation`
+  (`workflow/constant-routing`) end-to-end through the task-225 entry machine.
+- Asserts: the operation returns `:ok` (no `:attempt-mismatch` abort), the live
+  `attempt-2` is driven to `:operation-handler-entry-state :entered`, and the
+  stale snapshot's `attempt-1` is left untouched — proving the operation targets
+  the threaded attempt, not the snapshot's latest.
+- Discrimination verified: temporarily reverting the source to derive
+  `:workflow-attempt-id` from the stale snapshot makes the new test fail 3
+  assertions with `:attempt-mismatch`; the threaded fix restores green (source
+  reverted to its committed state after the check — no production change).
+- Suite green: 11 tests / 67 assertions (was 10/64). clj-kondo clean on the
+  edited test namespace.
