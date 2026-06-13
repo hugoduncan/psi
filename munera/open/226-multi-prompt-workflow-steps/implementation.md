@@ -271,3 +271,41 @@ back-compat).
   precedence note, Q6, B3, the Architecture-alignment materialization bullet, and
   added a D2 resolution subsection.
 - Updated Status line to record pass-2 D1–D2 executed.
+
+## Ambiguity review (design, pass 2) — ψ
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation,
+undefined terms, unspecified edge behaviour), distinct from the architectural-fit
+pass-2 (D1–D2) and the earlier B1–B5/C1 passes. A1–A3/B1–B5/C1/D1–D2 are
+resolved. Three **new** actionable ambiguities found (E1–E3); recorded as
+unchecked items in design-steps.md. Verified-clear: B5 already states routing is
+skipped on both the AC-5 error and AC-6 cancellation paths.
+
+- **E1 — "Sources read once and reused" has no specified mechanism under
+  `:contributions` xor `:prompts`.** The Q7/D1 token-efficiency rationale ("design
+  + architecture sources read once and reused for all three reviews") and the
+  Architecture-alignment "list of prompt strings layered over a **shared
+  preload**" (design.md:155–156, presented as an undecided "or") imply a
+  step-level shared preamble distinct from per-prompt prompts. But the step-level
+  precedence rule is `:contributions` **xor** `:prompts`, so a `:prompts` step
+  carries **no** step-level `:contributions` to act as a shared preload. The
+  design never states how shared source material is loaded once and shared across
+  prompt-groups (relied-on live-session context from prompt 1? a step-level
+  shared-contribution field the grammar shape omits?). The mechanism is
+  load-bearing for the exemplar's stated rationale yet unspecified.
+- **E2 — Prompt-group internal authoring precedence is unspecified.** The grammar
+  shape shows a prompt-group authored via `:prompt-workflow "..."` "or
+  `:contributions [...]`" (design.md:197), but no rule states whether
+  `:prompt-workflow` **xor** `:contributions` holds *within* a prompt-group
+  (mirroring the step-level xor), nor what an IR error is when both/neither are
+  present. The within-group authoring contract is undefined.
+- **E3 — Same-step / sibling-prompt-group `:prompt` source-ref legality is
+  ambiguous.** Scope defers "cross-turn workflow data flow" — no source-ref
+  injecting a prior same-step turn's reply into a later prompt's template — yet
+  the Q12 source-ref integration says the `:prompt` selector resolves **uniformly**
+  across "session `:contributions` source items" and "template `:vars`". The
+  enumerated invalid `:prompt` cases (non-session, single-prompt, unknown group
+  `p`, structured key `k`) do **not** address whether a prompt-group's
+  contributions/template may reference an **earlier sibling prompt-group in the
+  same step** via `{:step <self> :prompt p :output k}`. Scope implies invalid;
+  uniform-resolution implies it resolves. Unreconciled.
