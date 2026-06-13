@@ -2,7 +2,8 @@
 
 ## Status
 
-Design — draft for refinement. One open question on fix shape (below).
+Design — mechanism confirmed by spike; fix shape decided (option **a**, below).
+Ready for planning.
 
 ## Intent
 
@@ -115,26 +116,51 @@ Out of scope:
   attempt's operation-phase keys, and the `prepare` `:ok-states`/`enter`
   required-phase pair is not re-entrancy-safe.
 
-## Open question (fix shape — resolve before plan)
+## Spike outcome (confirmed)
 
-Candidate root-cause fixes (pick after a brief spike confirms the mechanism in a
-test):
+A throwaway spike test drove `deterministic-operation-runtime/invoke-operation`
+twice against one attempt (step `:operation` then `:judge` operation, same
+`:workflow-run-id`/`:step-id`/`:workflow-attempt-id`) and **reproduced the abort
+exactly**:
 
-- **(a) Per-operation phase namespacing.** Distinguish the step `:operation`
-  entry from the `:judge` operation entry so they do not share
-  `:operation-*-state` keys on one attempt (e.g. a judge-scoped key namespace,
-  mirroring how actor turns use `:turn-*` keys). Cleanest separation; localizes
-  to the phase-key scheme.
-- **(b) Fresh attempt/record for the judge operation.** Give the judge operation
-  its own attempt (or its own entry record) so its phase keys start clean.
-  Aligns "one deterministic operation = one entry lifecycle."
-- **(c) Make `prepare`/`enter` re-entrancy-safe.** Have `prepare` always reset
-  `:operation-handler-entry-state` to `:pending` (drop the `:entered` from its
-  `:ok-states`, or have `enter` accept the already-`:entered` idempotent case)
-  so a second operation on the same attempt re-initializes correctly. Smallest
-  change but risks masking the deeper "two operations, one key set" coupling and
-  must not weaken cancellation guards.
+- op 1 → `:ok`, leaves `:operation-handler-entry-state :entered`;
+- op 2 → `{:status :error :reason :workflow-stopped :details {:operation-id
+  "workflow/pass-feedback-routing" :stop-reason :handler-entry-state-mismatch}}`.
 
-Recommendation to discuss: lean **(a)** — it matches the existing actor-vs-judge
-key separation and removes the shared-state coupling at its source, rather than
-papering over it (c) or adding attempt bookkeeping (b). Confirm with the spike.
+This confirms the mechanism and that both the step operation and the judge
+operation target the **same attempt** with the **same** `:operation-*` phase
+keys (verified: both `invoke-step-runtime-result` and `execute-invoke-judge!`
+pass `:workflow-attempt-id` = the step-run's latest attempt id). The spike test
+was reverted (it asserted buggy behaviour); the real characterization test is
+written during build to assert the **fixed** behaviour (judge succeeds).
+
+## Fix shape — decided: (a) per-operation phase namespacing
+
+Give the judge's deterministic-operation entry a **distinct phase-key namespace**
+from the step's deterministic-operation entry, so the two operations on one
+attempt no longer share `:operation-start-state`/`:operation-call-state`/
+`:operation-handler-entry-state`. This mirrors the existing separation whereby a
+session step's actor turn uses `:turn-*-state` keys while its judge operation
+uses `:operation-*-state` keys (which is exactly why session+invoke-judge steps
+never collide).
+
+Approach (to be finalized in plan):
+
+- Thread an explicit **operation role / phase namespace** through the invocation
+  (e.g. the judge invocation in `execute-invoke-judge!` carries a `:judge` role;
+  the step `:operation` invocation carries the default role).
+- In `deterministic-operation-runtime/core`, derive the phase-opts key set from
+  that role (default keys unchanged for back-compat with single-operation steps;
+  judge role uses a `:judge`-scoped key set).
+- Keep the 225 cancellation primitives (`ordinary-entry`,
+  `cancellation-entry/with-run-read-lock`, stop-signal) unchanged — only the
+  key namespace is parameterized, so cancellation guards still apply per
+  operation.
+
+Rejected alternatives: **(b)** a fresh attempt/record for the judge (adds
+attempt bookkeeping and changes the attempt model); **(c)** making
+`prepare`/`enter` re-entrancy-safe by dropping `:entered` from `prepare`'s
+`:ok-states` (smallest change, but papers over the real "two operations share one
+key set" coupling and risks weakening the cancellation guard the `:ok-states`
+idempotency was added for). (a) removes the coupling at its source
+(`cause(structural) → redesign > patch`).
