@@ -344,3 +344,38 @@ step-level shared-preload field.
   reply is withheld. Added the case to the "Source-ref integration for `:prompt`"
   validation enumeration and added the E3 resolution subsection.
 - Updated Status line to record pass-2 E1–E3 executed.
+
+## Inconsistency review (design, pass 2) — ψ
+
+Re-reviewed design.md for internal inconsistencies and contradictions against the
+referenced artifacts (`review-task-design.edn`, `doc/workflows.md`,
+`doc/workflow-grammar-concepts.md`). A1–A3/B1–B5/C1/D1–D2/E1–E3 are resolved. One
+**new** actionable inconsistency found (C2); recorded as an unchecked item in
+design-steps.md. Verified-consistent: Q8's three `*-text` judge args now match the
+live `clarity-status` `pass-feedback-routing` args key-for-key
+(`:architecture-text`/`:ambiguity-text`/`:inconsistency-text`); the E2 grammar
+comment (`:prompt-workflow XOR :contributions`); B1's session-step `:yield :text`
+default matches `doc/workflow-grammar-concepts.md` ("session step ⇒ yields … from
+the `:final-llm-reply` output surface").
+
+- **C2 — Merged exemplar breaks the surviving `final-summary` step's per-review
+  `:yield :text` contributions; unreconciled with B1(b).** The referenced
+  `review-task-design.edn`'s `final-summary` step pulls the three review phases
+  via three separate contributions `{:step "architecture-review" :yield :text}`,
+  `{:step "ambiguity-review" :yield :text}`,
+  `{:step "inconsistency-review" :yield :text}`. The exemplar Scope merges those
+  three review **steps** into one multi-prompt step, so those step names cease to
+  exist. But design.md's own B1(b) makes per-prompt `:yield`
+  (`{:step s :prompt p :yield k}`) **invalid**, and step-level `:yield :text`
+  resolves to only the **last** prompt's reply (inconsistency), per AC-3/B1 and
+  `doc/workflow-grammar-concepts.md`. So `final-summary` cannot recover the
+  architecture/ambiguity review text via `:yield` after the merge. The design
+  never states how `final-summary` migrates — it only notes per-prompt `:output`
+  addressing is "useful for `final-summary`" (Q11) — and does not reconcile the
+  exemplar's elimination of the three review steps with `final-summary`'s
+  dependence on their `:yield :text` and the B1(b) "no per-prompt `:yield`" rule.
+  Reconcile by stating in design.md that the merged exemplar's `final-summary`
+  contributions migrate from three `{:step "<phase>-review" :yield :text}` refs to
+  per-prompt `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}`
+  refs (the only legal way to address per-phase text under B1(b)), as part of the
+  in-scope exemplar rewrite.

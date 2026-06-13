@@ -110,3 +110,20 @@
   add the corresponding entry to the "Source-ref integration for `:prompt`"
   validation list (e.g. same-step/self `:prompt` refs are invalid in the first
   cut) so the validation enumeration is complete.
+
+## Inconsistency review (pass 2)
+
+- [ ] C2: Reconcile the merged exemplar with the surviving `final-summary` step
+  of the referenced `review-task-design.edn`. `final-summary` currently consumes
+  the three review phases via three contributions
+  `{:step "architecture-review" :yield :text}`,
+  `{:step "ambiguity-review" :yield :text}`, and
+  `{:step "inconsistency-review" :yield :text}`, but the exemplar Scope merges
+  those three review steps into one multi-prompt step (eliminating those step
+  names), while B1(b) makes per-prompt `:yield` invalid and step-level
+  `:yield :text` resolves only to the last prompt's reply. State in design.md how
+  `final-summary` obtains all three reviews' text after the merge — i.e. migrate
+  its three `{:step "<phase>-review" :yield :text}` contributions to per-prompt
+  `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}` refs (the
+  only legal per-phase text addressing under B1(b)) — and fold this into the
+  in-scope exemplar rewrite description (Scope / Q7 / Q11).
