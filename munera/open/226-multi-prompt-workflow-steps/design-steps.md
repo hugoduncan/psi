@@ -127,3 +127,22 @@
   `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}` refs (the
   only legal per-phase text addressing under B1(b)) — and fold this into the
   in-scope exemplar rewrite description (Scope / Q7 / Q11).
+
+## Architectural-fit review (pass 3 — post-prune)
+
+- [ ] F1: Specify the resume/suspend contract for the internal N-prompt queue,
+  reconciling the design's synchronous-drain framing ("next prompt submitted only
+  after the prior turn finishes; routing once after drain; one post-drain
+  `:pending-actor-result`") with the resume/suspend-driven canonical runtime
+  (`statechart-runtime`; `psi.workflow-runtime.core` resume; async `ai/generate`
+  effect), where N turns mean N suspend points inside one statechart step. State
+  that on resume (async turn completion, process restart, replay) the queue-driving
+  loop continues at the next **un-run** prompt from the recorded per-turn
+  progression (A3) rather than re-submitting completed turns — otherwise a
+  completed turn's side-effectful, non-deterministic `ai/generate` effect re-fires,
+  violating the VSM `∀change → event → log → replayable` ethos and falsifying the
+  design's "replay-faithful" claim. Either commit to resume-from-progression for
+  the internal queue (and locate the suspend/resume boundary relative to the single
+  statechart step), or explicitly scope mid-queue resume out and state its
+  replay-fidelity consequences. Distinct from A3 (records results) and Q5 (one
+  post-drain route).

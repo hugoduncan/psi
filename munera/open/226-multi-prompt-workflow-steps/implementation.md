@@ -421,3 +421,43 @@ freeze:
   pre-prune review and is superseded by the rewritten design.md.
 
 226 is now single-intent (the capability) and ready for a fresh planning pass.
+
+## Architectural-fit review (design, pass 3 — post-prune) — ψ
+
+Re-reviewed the **pruned** capability-only design.md for architectural fit
+against AGENTS.md (VSM `∀change → event → log → replayable`, workflow-runtime
+boundary, `λone_way`, `λα. ¬compat(backward)`), doc/workflow_statechart_canonical.md
+(resume/suspend-driven runtime: `statechart-runtime`, `psi.workflow-runtime.core`
+resume/cancellation), and doc/workflow-grammar-concepts.md (shared data-flow
+substrate, output surfaces, `:yields`). A1–A3/B1–B5/C1–C2/D1–D2/E1–E3 are
+resolved or moved to task 227 with the exemplar. One **new** actionable misfit
+(F1); recorded as an unchecked item in design-steps.md. Verified-fit:
+`:contributions` xor `:prompts` → one unified queue path (D2); `:prompt`
+source-ref on the shared substrate with fail-fast IR validation (A2/E3); shared
+sources via live session, no `:preload` field (E1, matches grammar-concepts
+"preload subsumed by ordered contributions"); per-prompt records in the canonical
+progression substrate (A3); generic queue mechanism vs authored prompts
+(workflow-runtime boundary).
+
+- **F1 — synchronous-drain framing vs the resume/suspend-driven runtime; the
+  resume-mid-queue contract is unspecified and load-bearing for the claimed S4
+  replay-fidelity.** The design models the N-prompt queue as a synchronous drain
+  ("the next is submitted only after the prior turn finishes; routing/judging runs
+  once, after the queue drains") emitting **one** post-drain
+  `:pending-actor-result`. But the canonical runtime is resume/suspend-driven
+  (`statechart-runtime`; `psi.workflow-runtime.core` exposes run resume; AI
+  generation is an async effect that suspends the run and resumes on completion),
+  so an internal N-turn loop introduces **N suspend points inside one statechart
+  step**. A3 commits each turn's *result* to the progression substrate, but the
+  design never states the **resume contract across the queue**: on resume (async
+  turn completion, process restart, replay) the queue-driving loop must continue
+  at the next **un-run** prompt from recorded progression rather than re-submit
+  already-completed turns. Re-submitting a completed turn re-fires the
+  side-effectful, non-deterministic `ai/generate` effect — directly violating the
+  VSM `∀change → event → log → replayable` ethos and falsifying the design's own
+  "replay-faithful" claim. This is distinct from A3 (which only says results are
+  *recorded*, not *consumed to resume*) and from Q5 (one post-drain route). The
+  design must either state the resume-from-progression contract for the internal
+  queue (and where the suspend/resume boundary sits relative to the single
+  statechart step) or scope mid-queue resume out explicitly with its replay-fidelity
+  consequences stated.
