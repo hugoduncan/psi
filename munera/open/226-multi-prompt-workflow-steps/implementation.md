@@ -528,3 +528,26 @@ stated in the pruned design.
   ambiguous whether a step's judge may use `:prompt` refs to its own groups, and
   if so why that escapes the same-step prohibition (e.g. judge resolves
   post-drain, unlike assembly-time contributions/templates).
+
+## Ambiguity follow-up execution (design, pass 3 — post-prune) — ψ
+
+Executed G1, G2 by updating design.md (both completed; neither blocked).
+
+- **G1 (done).** Made AC-5 symmetric with AC-6 on S4 introspectability. Stated
+  that per-prompt turn records for prompts completed **before** the failing one
+  are retained and introspectable (mirroring AC-6's cancellation path), and that
+  the failing prompt leaves **no** completed turn record — it is identified only
+  by the `:failed` payload, which carries the error. Resolves the prior
+  asymmetry where a reader could not tell whether `:failed` discards prior
+  per-prompt records or keeps them like `:cancelled`. Edit: AC-5.
+- **G2 (done).** Reconciled AC-4 ("judge may reference per-prompt surfaces") with
+  the Source-ref "same step being assembled" invalid rule by carving out the
+  post-drain judge as the **permitted** same-step `:prompt` case. Rationale: the
+  judge resolves **after the drain**, once every prompt's turn record exists (A3),
+  so `{:step s :prompt p :output k}` has a present, deterministic value — unlike
+  an assembly-time contribution/template that would reference a sibling turn not
+  yet run. Edits: AC-4 (states the judge's `:prompt` refs are the permitted
+  same-step case), and a new "Post-drain judge exception" paragraph in the
+  Source-ref integration section carving the judge out of the same-step invalid
+  rule. The remaining same-step prohibition continues to apply to assembly-time
+  contributions/templates (the deferred cross-turn data flow, E3).

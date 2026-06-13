@@ -88,9 +88,16 @@ Out of scope (follow-ons):
      refs only, never `:yield`.
    - a declared step-level structured output applies to the **final** turn.
 4. Routing runs **once**, after the drain, over the post-drain step result; the
-   judge may reference per-prompt surfaces.
+   step's own post-drain `:judge` may reference its prompt-groups' per-prompt
+   surfaces via `{:step s :prompt p :output k}` — the **permitted** same-step
+   `:prompt` case, since the judge resolves after every turn is recorded, unlike
+   assembly-time contributions/templates (see Source-ref integration).
 5. Intermediate turn error ⇒ queue stops, step `:failed` with payload naming the
-   failing prompt, routing skipped.
+   failing prompt, routing skipped; per-prompt turn records for prompts completed
+   **before** the failing one are retained and introspectable (symmetric with
+   AC-6's cancellation path on S4 introspectability); the failing prompt leaves
+   **no** completed turn record — it is identified only by the `:failed` payload,
+   which carries the error.
 6. Cancellation between prompts ⇒ terminal `:cancelled` (distinct from `:failed`):
    queue stops, routing skipped, completed per-prompt turn records retained and
    introspectable.
@@ -170,6 +177,15 @@ step; `s` is single-prompt (no group namespace); `p` is not a declared group of
 ref (`:prompt` is `:output`-only); or it targets the **same step being
 assembled** (sibling-group ref, forward or back) — the deferred cross-turn data
 flow. All reported fail-fast at workflow-load / IR-normalization.
+
+**Post-drain judge exception.** The step's own post-drain `:judge` is **exempt**
+from the same-step invalid rule: it may address its prompt-groups via
+`{:step s :prompt p :output k}`. This is not an assembly-time sibling-group ref —
+the judge resolves **after the drain**, once every prompt's turn record exists
+(A3), so the value is present and deterministic, unlike a contribution/template
+that would reference a sibling turn that has not yet run. This carve-out is what
+makes AC-4 ("the judge may reference per-prompt surfaces") consistent with the
+same-step prohibition on assembly-time refs.
 
 ## Architecture alignment
 
