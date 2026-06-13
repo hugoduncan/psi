@@ -111,9 +111,10 @@ judge (changes the attempt model); (c) dropping `:entered` from `prepare`'s
    the six phase helpers stay unchanged. Default/`:step` role unchanged. Slice 1
    test goes green for the runtime in isolation.
 3. **Judge call-site role.** Pass `:operation-role :judge` from
-   `execute-invoke-judge!` (and make the step-operation default explicit if it
-   aids clarity). End-to-end: an invoke step with operation + invoke judge runs
-   both operations and routes on the judge outcome.
+   `execute-invoke-judge!`; the step `:operation` call-site omits the key (absent
+   ≡ `:step`; only judge invocations annotate a role — see §Call-site threading).
+   End-to-end: an invoke step with operation + invoke judge runs both operations
+   and routes on the judge outcome.
 4. **Cancellation regression coverage.** Add role-aware tests proving a real
    stop before/within either operation still yields a clean `:workflow-stopped`
    terminal; confirm existing 225 cancellation tests stay green —

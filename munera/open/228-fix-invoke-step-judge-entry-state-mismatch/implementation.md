@@ -132,3 +132,26 @@ Actionable inconsistencies found (distinct from the resolved ambiguity pass):
   deferral that follow-up item 4 claims to have removed. Plan Slice 3 thus
   contradicts plan §Call-site-threading and steps.md Slice 3. Remove the
   parenthetical so the call-site decision is determinate everywhere.
+
+## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
+
+Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to
+the verified code facts.
+
+- **design.md Problem §2 corrected.** Rewrote the judge step from the wrong
+  `:workflow-attempt-id nil` claim to the **explicit** latest attempt id
+  (`(-> step-runs <step-id> :attempts last :attempt-id)`), matching
+  `workflow_judge/execute-invoke-judge!` (verified `workflow_judge.clj:129`) and
+  `step_execution/invoke-step-runtime-result` (`step_execution.clj:55`). Added
+  that with a real id + `:attempt-id-required? false`, `ordinary-entry` still
+  asserts equality with the latest attempt because `(or attempt-id-required?
+  workflow-attempt-id)` is truthy (verified `ordinary_entry.clj:77`). Problem §2
+  is now consistent with design's own "Spike outcome", implementation.md
+  "Confirmed facts", and the code.
+
+- **plan.md Slice 3 deferral removed.** Dropped "(and make the step-operation
+  default explicit if it aids clarity)" from §"Slice order" Slice 3 and restated
+  it as the determinate decision (step call-site omits `:operation-role`; absent
+  ≡ `:step`; only judge invocations annotate a role), cross-referencing
+  §"Call-site threading". The call-site decision is now determinate across plan
+  §Slice-order, plan §Call-site-threading, and steps.md Slice 3.

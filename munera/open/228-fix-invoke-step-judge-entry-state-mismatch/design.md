@@ -41,13 +41,18 @@ against the **same step attempt**, sharing those keys:
 
 1. the step `:operation` runs first and leaves
    `:operation-handler-entry-state :entered`;
-2. the `:judge` operation runs next; its invocation carries
-   `:workflow-attempt-id nil`, and the entry uses `:attempt-id-required? false`,
-   so its transitions target the **same latest attempt**. `prepare` sees the
-   residual `:entered` (∈ ok-states) and skips the reset to `:pending`; `enter`
-   then fails the `:pending` requirement → `:handler-entry-state-mismatch` →
-   the operation is reported stopped, the step `:failed`, the delegated workflow
-   failed, and the lifecycle failed.
+2. the `:judge` operation runs next; its invocation carries the **explicit**
+   latest `:workflow-attempt-id` (`(-> step-runs <step-id> :attempts last
+   :attempt-id)` in `execute-invoke-judge!`), the **same** attempt the step
+   `:operation` already drove. The entry uses `:attempt-id-required? false`, but
+   because a real attempt id is supplied, `ordinary-entry` still asserts equality
+   with the latest attempt (`(or attempt-id-required? workflow-attempt-id)` is
+   truthy), so the judge's transitions target that same attempt and its shared
+   `:operation-*` phase keys. `prepare` sees the residual `:entered` (∈ ok-states)
+   and skips the reset to `:pending`; `enter` then fails the `:pending`
+   requirement → `:handler-entry-state-mismatch` → the operation is reported
+   stopped, the step `:failed`, the delegated workflow failed, and the lifecycle
+   failed.
 
 `clarity-status` is the one step in `review-task-design.edn` that is
 `:type :invoke` **with** an invoke `:judge` (`pass-feedback-routing`), so it is
