@@ -232,3 +232,42 @@ items in design-steps.md. Not duplicates of A1–A3/B1–B5/C1.
   principle. Reconcile: either treat single-prompt as the N=1 degenerate of one
   unified path (singular solution), or justify the dual path on a *non-back-compat*
   architectural basis.
+
+## Architectural-fit follow-up execution (design, pass 2) — ψ
+
+Executed D1, D2 by updating design.md (both completed; neither blocked). Verified
+the live topology against `.psi/workflows/review-task-design.edn` +
+`doc/workflows.md`: each review phase `:on {"REPEAT" {:goto "<phase>-follow-up"}}`
+mutates `design.md`/`design-steps.md` **before** the next phase reviews, and the
+terminal `clarity-status` invoke routes via `pass-feedback-routing` over the
+three `*-text` outputs. This confirmed D1's misfit (a single N-turn step cannot
+interleave follow-up) and D2's misfit (dual single-prompt path justified only by
+back-compat).
+
+- **D1 (done).** Chose **option (a)**: keep the three-phase merge but reframe it
+  honestly as a **deliberate topology redesign**, not a faithful refactor.
+  Withdrew the "matches the live three-phase topology / faithful" framing as an
+  architectural-fit overclaim. Stated the fate of the per-phase follow-up steps:
+  the three `*-follow-up` steps **collapse into one `design`-profile follow-up
+  step** placed after the merged review step's post-drain route, executing items
+  accumulated across all three reviews; the merged step reads the design once and
+  reviews all three aspects against the **same un-followed-up** design in one
+  shared session. Net trade: interleaved per-phase follow-up →
+  batch-review-then-follow-up, sanctioned by `λα. ¬compat(backward)`. Clarified
+  the Q8 `pass-feedback-routing` equivalence is about the **routing disjunction
+  only**, not the lost interleaved-follow-up structure. Rejected option (b)
+  (separate phases + different exemplar) — would unwind the Q7/Q8/Q11 investment.
+  Updated: Scope bullet, Q7, Q8, and added a D1 resolution subsection.
+- **D2 (done).** Combined **both** reviewer options: **unified the runtime path**
+  *and* **re-justified the authoring distinction on a non-back-compat basis**.
+  Both `:contributions` and `:prompts` normalize at IR time into the same
+  internal **prompt-queue** representation; the runtime drives **one** queue, and
+  single-prompt is the genuine **N=1 degenerate** (no separate path → no drift →
+  satisfies `λone_way` at the mechanism level). The two authoring surfaces remain
+  but are now justified by **per-prompt addressing capability** (unnamed vs named
+  prompt-group), a forward-looking axis — not back-compat; behaviour preservation
+  is a *consequence* of N=1. Rejected forcing every single-turn step into
+  `:prompts [{:name …}]` as ceremony harming terseness. Updated: AC-2, grammar
+  precedence note, Q6, B3, the Architecture-alignment materialization bullet, and
+  added a D2 resolution subsection.
+- Updated Status line to record pass-2 D1–D2 executed.

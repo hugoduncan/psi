@@ -63,7 +63,7 @@
 
 ## Architectural-fit review (pass 2)
 
-- [ ] D1: Reconcile the merged exemplar's topology claim with the architecture
+- [x] D1: Reconcile the merged exemplar's topology claim with the architecture
   of a multi-prompt step. Scope/Q7 say merging architecture/ambiguity/
   inconsistency review into one multi-prompt `:session` step "matches the real
   workflow's three-phase topology," but a multi-prompt step is *N turns → one
@@ -77,7 +77,7 @@
   review→follow-up steps and scope the exemplar to a place where back-to-back
   same-session turns are genuinely the right architecture. Make the design state
   the fate of the per-phase follow-up steps under the merge.
-- [ ] D2: Reconcile the deliberate dual single-prompt path (Q6/AC-2/B3 — keep
+- [x] D2: Reconcile the deliberate dual single-prompt path (Q6/AC-2/B3 — keep
   `:contributions` as a separate execution path/authoring form, not the N=1
   degenerate of `:prompts`, justified by byte-for-byte/"behaves exactly as
   today") with `λone_way` (singular solution / obvious path), `consistent` (one

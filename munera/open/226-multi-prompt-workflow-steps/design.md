@@ -2,8 +2,9 @@
 
 ## Status
 
-Design — complete. All open questions resolved (Q1–Q11 below). Ready for
-planning.
+Design — complete. All open questions resolved (Q1–Q12 below) and all design
+review follow-ups executed (architectural-fit A1–A3 + pass-2 D1–D2, ambiguity
+B1–B5, inconsistency C1). Ready for planning.
 
 ## Intent
 
@@ -60,9 +61,14 @@ In scope:
   `{:step <s> :prompt <p> :output <k>}`.
 - **Step-level structured output** applied to the **final** prompt's turn (the
   existing single `:outputs` structured entry; unchanged granularity).
-- The exemplar rewrite of `review-task-design.edn` (merge **all three** review
-  phases — architecture, ambiguity, inconsistency — into one multi-prompt step,
-  matching the real workflow's three-phase topology). Its post-drain routing
+- The exemplar rewrite of `review-task-design.edn`: merge the **three** review
+  phases — architecture, ambiguity, inconsistency — into one multi-prompt
+  `:session` step. This is a deliberate **topology redesign** (see D1), **not** a
+  behaviour-preserving refactor: the merged step reads the design **once** and
+  runs all three reviews as back-to-back turns in one shared session against the
+  **same un-followed-up** design, then a **single** `design`-profile follow-up
+  step (replacing the three per-phase `*-follow-up` steps) executes the
+  accumulated recorded items after the post-drain route. Its post-drain routing
   reuses the **existing** `workflow/pass-feedback-routing` family over the merged
   step's per-prompt reply outputs — no new filesystem-state routing operation is
   introduced (Q8).
@@ -102,8 +108,11 @@ Out of scope (candidate follow-on tasks):
 1. A `:session` step can author N ≥ 1 prompts; they execute in author order,
    each as a separate turn in the **same** child session, with prompt _n+1_
    submitted only after prompt _n_'s turn completes.
-2. A single-prompt step behaves exactly as today (the new form is a strict
-   superset; the existing single-prompt authoring continues to work).
+2. A single-prompt step behaves exactly as today — **as the N=1 degenerate of
+   the one unified prompt-queue runtime path** (not a separately maintained
+   path; see D2). The `:contributions` single-prompt authoring continues to work
+   because a queue of length 1 reproduces today's single-turn behaviour, a
+   *consequence* of the unified mechanism rather than a back-compat guarantee.
 3. Each prompt-group exposes its own text output surfaces (`:final-llm-reply`,
    `:transcript`), addressable as `{:step <s> :prompt <p> :output <k>}`. A
    prompt-group's `:final-llm-reply`/`:transcript` are **turn-local** (that
@@ -145,7 +154,11 @@ Out of scope (candidate follow-on tasks):
   prompt + preloaded messages. The natural extension is to produce an ordered
   list of "submission points," each itself a (preload?, prompt) shaping, or a
   list of prompt strings layered over a shared preload. This must stay
-  data-shaped and introspectable.
+  data-shaped and introspectable. **Both authoring forms normalize into this one
+  queue representation (D2):** `:contributions` → a one-element unnamed
+  prompt-group; `:prompts` → named prompt-groups. There is a single
+  queue-driving runtime path; single-prompt is its N=1 degenerate, not a
+  separate path.
 - Statechart execution currently records one pending actor result per attempt
   after the single turn. Multi-prompt must reconcile "one statechart step / one
   attempt / one routing decision" with "N internal turns." The intended model is
@@ -204,14 +217,21 @@ Rationale:
   the first cut.
 
 **Precedence (single vs multi):** a `:session` step uses `:contributions`
-(/`:prompt-workflow`) **xor** `:prompts`. The single-prompt form is exactly
-today's behavior (it is *not* internally rewritten into a one-element
-`:prompts`, to guarantee byte-for-byte equivalence — Q6). A `:prompts` vector
-must be non-empty; a **one-element** `:prompts` is valid and runs the
-multi-prompt path with per-prompt addressing (B3). Prompt-group `:name`s must be
-**unique within the step** (duplicate names are an IR-validation error); the
-`(step-name, prompt-name)` pair is the addressing handle, so names may repeat
-across distinct steps (B4).
+(/`:prompt-workflow`) **xor** `:prompts`. **Both authoring forms normalize at IR
+time into the same internal prompt-queue representation** (an ordered vector of
+prompt-groups), so the runtime drives **one** queue path (D2): `:contributions`
+normalizes to a queue of one **unnamed** prompt-group (step-level surfaces only,
+no per-prompt namespace), and `:prompts` normalizes to a queue of **named**
+prompt-groups (per-prompt addressing). The single-prompt form reproduces today's
+behaviour as the **N=1 degenerate** of this one path — not a separately
+maintained byte-for-byte path. The two authoring forms are not rewritten *into
+each other* (a `:contributions` step does not become a named one-element
+`:prompts`, nor vice versa); what they share is the internal queue
+representation. A `:prompts` vector must be non-empty; a **one-element**
+`:prompts` is valid and exposes per-prompt addressing (B3). Prompt-group
+`:name`s must be **unique within the step** (duplicate names are an
+IR-validation error); the `(step-name, prompt-name)` pair is the addressing
+handle, so names may repeat across distinct steps (B4).
 
 ## Source-ref integration for `:prompt` (Q12)
 
@@ -289,23 +309,25 @@ cross-turn rollup. (The model still *sees* cumulative context at runtime because
 all prompts share one live child session; that live-context sharing is independent
 of how the addressable `:transcript` surface is sliced.)
 
-### B3 — One-element `:prompts` is valid and runs the multi-prompt path
+### B3 — One-element `:prompts` is valid; one unified runtime path (revised — D2)
 
 `:prompts` legality by cardinality:
 
 - **empty `:prompts`** ⇒ IR-validation error (Q6).
-- **one-element `:prompts`** ⇒ **valid** (AC-1, N ≥ 1) and runs the
-  **multi-prompt path**, so its single prompt-group's per-prompt addressing
-  (`{:step s :prompt p :output …}`) is available. It is **not** rejected in favour
-  of `:contributions` and is **not** rewritten to/from the single-prompt form.
-- **single-prompt authoring** stays the `:contributions`/`:prompt-workflow` form
-  (Q6), which is *not* internally rewritten into a one-element `:prompts`.
+- **one-element `:prompts`** ⇒ **valid** (AC-1, N ≥ 1); its single **named**
+  prompt-group exposes per-prompt addressing (`{:step s :prompt p :output …}`).
+- **single-prompt `:contributions`** ⇒ valid; normalizes to a single **unnamed**
+  prompt-group (step-level surfaces only).
 
-So a one-element `:prompts` and the `:contributions` single-prompt form are two
-distinct, both-legal authorings: choose `:prompts` (even with one entry) when you
-want named per-prompt addressing; choose `:contributions` for the exact existing
-single-prompt behaviour. `:contributions` xor `:prompts` (the precedence rule)
-still holds.
+Both authoring forms normalize into the **same internal prompt-queue
+representation** and run the **one unified runtime path** (D2): there is no
+separate single-prompt execution path. They remain two **distinct authoring
+surfaces**, not rewritten *into each other*, differing only in whether the lone
+prompt-group is **named** — i.e. in **per-prompt addressing capability**, the
+forward-looking architectural axis this feature introduces, not backward
+compatibility. Choose `:prompts` (even with one entry) when you want named
+per-prompt addressing; choose `:contributions` for the terse unnamed single-turn
+case. `:contributions` xor `:prompts` (the precedence rule) still holds.
 
 ### B4 — Prompt-group `:name` uniqueness within a step
 
@@ -342,6 +364,80 @@ This makes the cancellation path as explicit as the AC-5 error path: error ⇒
 `:failed` + failing-prompt name, routing skipped; cancellation ⇒ `:cancelled`,
 routing skipped, partial records retained.
 
+## Architectural-fit resolutions (D1–D2, pass 2)
+
+These resolve the pass-2 architectural-fit misfits. They refine the exemplar
+framing (D1) and the single-prompt execution model (D2) without changing the
+core feature (the `:prompts` queue).
+
+### D1 — Merged exemplar is a topology redesign, not a faithful refactor
+
+The pass-2 review noted that claiming the merged multi-prompt step "matches the
+real workflow's three-phase topology" is an architectural-fit overclaim: a
+multi-prompt step is *N turns in one session → one post-drain route* (Q5/Q8) and
+**cannot** reproduce the live `review-task-design` per-phase
+**review→follow-up(mutates design.md)→next review** structure, whose defining
+feature is follow-up mutation *between* phases (`doc/workflows.md`).
+
+Resolution — **option (a)**: keep the merge but reframe it honestly as a
+**deliberate topology redesign**, not a behaviour-preserving refactor.
+
+- The merged step reads the design **once** and runs architecture, ambiguity,
+  and inconsistency reviews as three back-to-back turns in **one shared session**
+  against the **same un-followed-up** design (each later review sees the earlier
+  reviews' replies in the live session context).
+- The three per-phase `*-follow-up` steps **collapse into a single
+  `design`-profile follow-up step** placed *after* the merged review step's
+  post-drain route. It executes the items accumulated across all three reviews in
+  one batch.
+- The post-drain `pass-feedback-routing` over the three per-prompt reply outputs
+  decides whether to repeat the merged-review→follow-up pass (REPEAT) or finish
+  (DONE → `final-summary`), mirroring the live `clarity-status` REPEAT loop but
+  at per-pass granularity instead of per-phase.
+- Net behavioural trade: interleaved per-phase follow-up → **batch-review-then-
+  follow-up**. Sanctioned by `λα. ¬compat(backward)` and justified by token
+  efficiency + shared conversational context. The "faithful to the live
+  topology" framing is withdrawn (Q7 revised).
+
+Option (b) (keep the phases as separate review→follow-up steps and scope the
+exemplar elsewhere) was rejected: it would unwind the Q7/Q8/Q11 design
+investment (`pass-feedback-routing` equivalence, per-prompt reply addressing as
+load-bearing), and the multi-prompt feature's value is precisely the
+shared-session back-to-back turns the merged review exercises.
+
+### D2 — One unified runtime path; authoring distinction is addressing capability
+
+The pass-2 review noted the dual single-prompt path (keep `:contributions` as a
+*separate* execution path, *not* the N=1 degenerate of `:prompts`, justified by
+"byte-for-byte equivalence") fights `λone_way` (singular solution), `consistent`
+(one idiom), and `λα. ¬compat(backward)` (its sole justification was a disclaimed
+value), and risks two parallel runtime paths drifting.
+
+Resolution — combine **both** reviewer options: **unify the runtime path** *and*
+**re-justify the authoring distinction on a non-back-compat basis**.
+
+- **One runtime path.** Both `:contributions` and `:prompts` normalize at IR time
+  into the same internal **prompt-queue** representation (ordered prompt-groups);
+  the runtime drives one queue. Single-prompt is the genuine **N=1 degenerate** —
+  no separately maintained path, so no drift. This satisfies `λone_way` at the
+  mechanism level and dissolves the "two parallel runtime paths" concern.
+- **Authoring distinction = per-prompt addressing capability**, not back-compat.
+  `:contributions` authors one **unnamed** prompt-group (terse, step-level
+  surfaces only, no `:prompt` namespace); `:prompts` authors **named**
+  prompt-groups (per-prompt addressing). The axis is the new capability this
+  feature introduces — a forward-looking architectural distinction. Behaviour
+  preservation for existing single-prompt authors is a *consequence* of N=1, not
+  the driver.
+- **`λone_way` at the decision level.** The obvious authoring is singular per
+  intent: need multiple turns or named per-prompt addressing → `:prompts`;
+  otherwise → `:contributions`. The degenerate one-element `:prompts` stays legal
+  but is never the obvious path for an unaddressed single turn. Forcing every
+  single-turn step into `:prompts [{:name …}]` was rejected as name/vector
+  ceremony on the common case, harming terseness/simplicity (`simple(code)`,
+  `context: minimal > comprehensive`).
+
+This revises Q6/B3/AC-2 and the grammar precedence note accordingly.
+
 ## Open questions
 
 Resolved:
@@ -361,21 +457,45 @@ Resolved:
 - **Q5 — Statechart accounting.** ✅ N turns run as an internal loop inside one
   statechart step attempt (one pending-actor result, one routing decision), not
   N statechart sub-steps.
-- **Q6 — Degenerate cases.** ✅ Empty `:prompts` = IR-validation error;
-  single-prompt authoring stays the existing form (unchanged behavior).
-- **Q7 — Exemplar.** ✅ (Revised — C1 inconsistency reconcile.) Merge **all
-  three** review phases of `review-task-design.edn` —
-  `architecture-review` + `ambiguity-review` + `inconsistency-review` — into one
-  multi-prompt `:session` step so the task design + architecture sources are read
-  once and reused for all three reviews (token efficiency). The real workflow has
-  three review phases (`architecture → ambiguity → inconsistency →
-  clarity-status`), so merging all three (a) keeps the exemplar faithful to the
-  live topology, (b) makes the post-drain routing the **exact** disjunction the
-  real `clarity-status` already computes (Q8), and (c) fully realizes the
-  token-efficiency rationale (no review re-reads the sources separately). Routing
-  for the merged step is over the **per-prompt reply outputs** via the existing
-  `pass-feedback-routing` family (Q8) — i.e. the same workflow-data-flow routing
-  the unmerged steps already use, not new filesystem-state routing.
+- **Q6 — Degenerate cases.** ✅ (Revised — D2 architectural-fit pass 2.) Empty
+  `:prompts` = IR-validation error. Single-prompt `:contributions` authoring
+  stays available but is **internally normalized into the one unified
+  prompt-queue representation** (a one-element **unnamed** prompt-group), so the
+  runtime has **one** execution path and single-prompt is the **N=1 degenerate**
+  of it (not a separately maintained byte-for-byte path). Behaviour preservation
+  is a *consequence* of N=1, not the design driver (`λα. ¬compat(backward)`).
+- **Q7 — Exemplar.** ✅ (Revised — C1 inconsistency reconcile, then D1
+  architectural-fit pass 2.) Merge the **three** review phases of
+  `review-task-design.edn` — `architecture-review` + `ambiguity-review` +
+  `inconsistency-review` — into one multi-prompt `:session` step so the task
+  design + architecture sources are read once and reused for all three reviews
+  (token efficiency + shared conversational context across the three reviews).
+
+  **This is a deliberate topology redesign, not a faithful refactor (D1).** The
+  live `review-task-design` topology is per-phase
+  **review→follow-up(mutates design.md)→next review**: each `*-follow-up`
+  executes the recorded items and mutates `design.md`/`design-steps.md` *before*
+  the next phase reviews. A multi-prompt step is architecturally *N turns in one
+  session → one post-drain route* (Q5/Q8), so it **cannot** reproduce the
+  interleaved per-phase follow-up; merging reviews all three against the **same
+  un-followed-up** design. The merge therefore deliberately **trades** the live
+  topology's interleaved per-phase follow-up for **batch-review-then-follow-up**:
+  the three per-phase `*-follow-up` steps collapse into a **single**
+  `design`-profile follow-up step placed *after* the merged review step's
+  post-drain route, executing the items accumulated across all three reviews in
+  one pass. This is sanctioned by `λα. ¬compat(backward)` (topology change is
+  allowed; behaviour preservation is not a goal). The earlier "matches the real
+  workflow's three-phase topology / faithful to the live topology" framing is
+  **withdrawn** as an architectural-fit overclaim (D1).
+
+  The merge still (b) makes the post-drain **routing disjunction** the **exact**
+  disjunction the real `clarity-status` already computes (Q8) — that equivalence
+  is about the routing computation only, not the lost interleaved-follow-up
+  structure — and (c) fully realizes the token-efficiency rationale (no review
+  re-reads the sources separately). Routing for the merged step is over the
+  **per-prompt reply outputs** via the existing `pass-feedback-routing` family
+  (Q8) — the same workflow-data-flow routing the unmerged steps already use, not
+  new filesystem-state routing.
 
 Resolved (continued):
 
@@ -395,7 +515,11 @@ Resolved (continued):
   disjunction the live `clarity-status` judge already computes via
   `pass-feedback-routing` over the unmerged `review-task-design` phase outputs
   (`:architecture-text`, `:ambiguity-text`, `:inconsistency-text`) — the
-  equivalence is now genuine, with no `*-text` key dropped.
+  equivalence is now genuine, with no `*-text` key dropped. (Per D1: this
+  equivalence is about the post-drain **routing disjunction** only — the merged
+  step does **not** reproduce the live per-phase interleaved follow-up; the three
+  `*-follow-up` steps collapse into one post-route `design`-profile follow-up.
+  See Q7.)
 
   **Why not filesystem-state routing.** An earlier draft proposed routing on
   whether `design-steps.md` still has unchecked items via a new
