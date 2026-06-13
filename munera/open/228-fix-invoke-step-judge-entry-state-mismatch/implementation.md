@@ -103,3 +103,32 @@ single, determinate descriptions.
   `:operation-role` key (absent ≡ `:step` at the chokepoint). Single rule: only
   judge invocations annotate a role. "Only if it improves clarity" deferral
   removed. Keeps every single-operation step's `:operation-*` keys byte-identical.
+
+## Plan/steps inconsistency review (ψ, 2026-06-13)
+
+Actionable inconsistencies found (distinct from the resolved ambiguity pass):
+
+- **design.md self-contradiction on judge `:workflow-attempt-id`.** Problem §2
+  states the judge "invocation carries `:workflow-attempt-id nil`, and the entry
+  uses `:attempt-id-required? false`, so its transitions target the same latest
+  attempt." But design.md's own "Spike outcome (confirmed)" section *and*
+  implementation.md "Confirmed facts" *and* the code
+  (`workflow_judge/execute-invoke-judge!` and
+  `step_execution/invoke-step-runtime-result`) all pass an **explicit**
+  `:workflow-attempt-id = (… :attempts last :attempt-id)` — the real latest
+  attempt id, not nil. The mechanism differs materially: with a real id +
+  `:attempt-id-required? false`, `ordinary-entry` *does* assert equality with the
+  latest attempt (`(or attempt-id-required? workflow-attempt-id)` is truthy);
+  the nil path would *skip* that check. Correct Problem §2 to say the judge
+  passes the explicit latest attempt id (sharing the attempt that way), aligning
+  it with Spike-outcome / implementation.md / code.
+
+- **plan.md Slice 3 retains the deferral the ambiguity pass removed.** Plan
+  §"Call-site threading" decided (`λone_way`) to **omit** `:operation-role` at
+  the step `:operation` call-site ("do **not** add an explicit
+  `:operation-role :step`"), and steps.md Slice 3 matches that. But plan.md
+  §"Slice order" Slice 3 still reads "(and make the step-operation default
+  explicit if it aids clarity)" — the exact "only if it improves clarity"
+  deferral that follow-up item 4 claims to have removed. Plan Slice 3 thus
+  contradicts plan §Call-site-threading and steps.md Slice 3. Remove the
+  parenthetical so the call-site decision is determinate everywhere.

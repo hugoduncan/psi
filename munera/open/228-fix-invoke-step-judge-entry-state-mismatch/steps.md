@@ -49,3 +49,8 @@
   - Named explicitly in plan Slice 4/5 and steps Slice 4/5.
 - [x] Decide and record whether the step `:operation` call-site carries an explicit `:operation-role :step` or relies on the absent/default; remove the "only if it improves clarity" deferral so the final artifact state is determinate (Slice 3 + plan call-site threading).
   - Decided: **omit** `:operation-role` at the step call-site (absent ≡ `:step`); only judge invocations annotate a role. Deferral removed in plan + Slice 3.
+
+## Review follow-ups — plan/steps inconsistency (ψ 2026-06-13)
+
+- [ ] Correct design.md Problem §2: the judge invocation passes the **explicit** latest `:workflow-attempt-id` (`(… :attempts last :attempt-id)`), not `:workflow-attempt-id nil`. Align Problem §2 with design.md "Spike outcome (confirmed)", implementation.md "Confirmed facts", and the actual code (`execute-invoke-judge!` / `invoke-step-runtime-result`), and drop the nil-based "targets the same latest attempt" reasoning (with a real id + `:attempt-id-required? false`, `ordinary-entry` asserts equality with the latest attempt).
+- [ ] Remove the residual deferral in plan.md §"Slice order" Slice 3 — "(and make the step-operation default explicit if it aids clarity)" — so it matches the determinate decision in plan §"Call-site threading" and steps.md Slice 3 (omit `:operation-role` at the step call-site; only judge invocations annotate a role).
