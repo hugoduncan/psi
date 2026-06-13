@@ -30,3 +30,38 @@ misfits found; recorded as unchecked items in design-steps.md.
   and S4 needs intermediate turns introspectable/replay-faithful. Design's
   architecture-alignment flags the reconcile need but does not commit to
   recording each turn in the canonical progression/event substrate.
+
+## Architectural-fit follow-up execution (design) — ψ
+
+Executed A1, A2, A3 by updating design.md (all completed; none blocked).
+
+- **A1 (done).** Reconciled Q8 by **dropping** the proposed filesystem-state
+  routing (`workflow/open-checklist-items-routing` re-reading `design-steps.md`)
+  in favour of routing on the merged step's **per-prompt reply outputs** via the
+  existing `workflow/pass-feedback-routing` operation — the same
+  workflow-data-flow disjunction the unmerged `review-task-design` phases already
+  use. This keeps routing inside the workflow data-flow / event log (replay-safe,
+  deterministic), aligns with `doc/workflows.md`'s `clarity-status` "from phase
+  outputs rather than re-reading task artifacts" decision and the VSM
+  `∀change → event → log → replayable` ethos, and removes the need for any new
+  routing operation. Updated Scope bullet, Q7, Q8 (with explicit "why not
+  filesystem-state routing" rationale), and Q11. Net effect reverses the earlier
+  Q11 consequence: per-prompt reply addressing is now load-bearing for the
+  exemplar's routing and stays in the first cut.
+- **A2 (done).** Added "Source-ref integration for `:prompt` (Q12)": the
+  `{:step s :prompt p :output k}` selector is an optional `:prompt` discriminator
+  on the canonical prior-step source ref, resolved uniformly across the shared
+  substrate (invoke args, contributions, template vars, delegated context), with
+  back-compat that no-`:prompt` refs against a multi-prompt step hit the
+  step-level surface. Specified compile-time validation rejecting `:prompt`
+  against non-session steps, single-prompt session steps, unknown prompt-groups,
+  and structured-output keys — mirroring the existing "output not exposed by that
+  step type is invalid" rule in `doc/workflow-grammar-concepts.md`.
+- **A3 (done).** Added an Architecture-alignment bullet committing each queued
+  prompt's turn result to the canonical step-result/progression substrate (named
+  per-prompt records, introspectable per S4, replay-faithful), reconciled with
+  Q5: the step still emits one post-drain `:pending-actor-result` for one routing
+  decision, carrying the ordered per-prompt records plus the step-level rollup;
+  no turn result lives only in an in-loop local.
+- Cross-referenced A2/A3 as resolved Q12 in the open-questions list for
+  traceability.

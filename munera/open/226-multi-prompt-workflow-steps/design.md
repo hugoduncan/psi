@@ -61,8 +61,10 @@ In scope:
 - **Step-level structured output** applied to the **final** prompt's turn (the
   existing single `:outputs` structured entry; unchanged granularity).
 - The exemplar rewrite of `review-task-design.edn` (merge architecture +
-  ambiguity reviews into one multi-prompt step) and the new state-based routing
-  operation it needs (Q8).
+  ambiguity reviews into one multi-prompt step). Its post-drain routing reuses
+  the **existing** `workflow/pass-feedback-routing` family over the merged
+  step's per-prompt reply outputs — no new filesystem-state routing operation is
+  introduced (Q8).
 
 Out of scope (candidate follow-on tasks):
 
@@ -140,6 +142,19 @@ Out of scope (candidate follow-on tasks):
   attempt / one routing decision" with "N internal turns." The intended model is
   that the N turns are an internal loop **inside** one statechart step attempt,
   not N statechart steps (Q5, resolved).
+- **Per-prompt turn results are recorded in the canonical step-result /
+  progression substrate, not transient loop locals (Q5/Q12).** Each queued
+  prompt's completed turn is recorded as a named prompt-group entry in the same
+  substrate that records the single `:pending-actor-result` envelope today, so
+  every intermediate turn is introspectable (S4 self-awareness) and
+  replay-faithful (`∀change → event → log → replayable`). The reconcile with Q5
+  is structural, not a loss of fidelity: the step still emits **one**
+  post-drain `:pending-actor-result` for the **one** routing decision, but that
+  envelope carries an ordered collection of per-prompt turn records (each keyed
+  by prompt `:name`, each exposing `:final-llm-reply`/`:transcript`) plus the
+  step-level rollup (last prompt's reply; accumulated cross-turn transcript).
+  The internal turn loop never holds a turn's result only in an in-loop local
+  that the recorded step result cannot reproduce on replay.
 
 ## Grammar shape (Q1 — decided: A)
 
@@ -182,6 +197,43 @@ Rationale:
 today's behavior (it is *not* internally rewritten into a one-element
 `:prompts`, to guarantee byte-for-byte equivalence — Q6).
 
+## Source-ref integration for `:prompt` (Q12)
+
+The per-prompt selector `{:step s :prompt p :output k}` is an **optional
+`:prompt` discriminator** layered onto the canonical prior-step source ref
+`{:step s :output k}`. It is one ref shape in the **shared** data-reference
+substrate, so it resolves uniformly everywhere a source ref is admitted: invoke
+`:args`, session `:contributions` source items, template `:vars`, and delegated
+context. No selector-specific code path is added per call site.
+
+Resolution and back-compat:
+
+- `{:step s :output k}` **without** `:prompt` against a multi-prompt step
+  resolves to the **step-level** surface (last prompt's `:final-llm-reply`,
+  accumulated `:transcript`), preserving single-prompt back-compat (AC-3).
+- `{:step s :prompt p :output k}` resolves to prompt-group `p`'s own output
+  surface `k` within step `s`'s recorded per-prompt turn records.
+
+Validation (compile-time IR validation, mirroring the existing "a reference that
+selects an output not exposed by that step type is invalid" rule in
+`doc/workflow-grammar-concepts.md`). A `:prompt` selector is **invalid** when:
+
+- the target step `s` is **not** a `:session` step (invoke/delegate/judge steps
+  expose no prompt-groups);
+- the target session step `s` is **single-prompt** (uses
+  `:contributions`/`:prompt-workflow`, not `:prompts`) — it has no prompt-group
+  namespace;
+- `p` does not name a declared prompt-group of step `s`;
+- `k` is not an output surface that prompt-group exposes — first cut admits only
+  the per-prompt **text** surfaces `:final-llm-reply` and `:transcript`; a
+  `:prompt` selector against a **structured** `:output` key is invalid because
+  per-prompt structured output is deferred (Q11). Structured output stays
+  step-level / final-turn and is addressed by the no-`:prompt` form.
+
+These validation errors are reported at workflow-load / IR-normalization time
+with the same fail-fast shape as other source-ref validation errors, so authors
+catch a mis-targeted `:prompt` ref before runtime.
+
 ## Open questions
 
 Resolved:
@@ -206,22 +258,40 @@ Resolved:
 - **Q7 — Exemplar.** ✅ Merge `architecture-review` + `ambiguity-review` of
   `review-task-design.edn` into one multi-prompt `:session` step so the task
   design + architecture sources are read once and reused for both reviews
-  (token efficiency). Routing for the merged step is state-based over
-  `design-steps.md` (Q8), not per-prompt reply text.
+  (token efficiency). Routing for the merged step is over the **per-prompt reply
+  outputs** via the existing `pass-feedback-routing` family (Q8) — i.e. the
+  same workflow-data-flow routing the unmerged steps already use, not new
+  filesystem-state routing.
 
 Resolved (continued):
 
-- **Q8 — Routing/follow-up for the exemplar.** ✅ The merged step's judge routes
-  on **whether `design-steps.md` has open (unchecked `- [ ]`) checklist items**:
-  REPEAT while open items remain, DONE when none. This is state-based routing
-  over the task artifact, not text-token (`PASS_STATUS`) parsing. Both review
-  turns append follow-up items to `design-steps.md`; the post-drain judge
-  inspects the file. Implication: this likely needs a **new generic
-  deterministic operation** (e.g. `workflow/open-checklist-items-routing` taking
-  an authored file path + routes), consistent with the workflow-runtime boundary
-  (generic parameterized primitive; concrete path/routes authored). Consequence:
-  the exemplar's *routing* no longer depends on per-prompt reply addressing — see
-  Q11.
+- **Q8 — Routing/follow-up for the exemplar.** ✅ (Revised — A1 architectural-fit
+  reconcile.) The merged step's judge routes on the **post-drain step result's
+  per-prompt reply outputs**, reusing the **existing**
+  `workflow/pass-feedback-routing` operation: each review prompt
+  (`architecture`, `ambiguity`) emits a `PASS_STATUS` token in its reply, and
+  the judge takes one `*-text` arg per prompt
+  (`{:architecture-text {:from {:step s :prompt "architecture" :output
+  :final-llm-reply}} :ambiguity-text {:from {:step s :prompt "ambiguity" :output
+  :final-llm-reply}}}`), REPEAT-ing while any prompt returned
+  `ACTIONABLE_FEEDBACK`, DONE when all are `REVIEW_COMPLETE`. This is exactly the
+  disjunction `pass-feedback-routing` already computes across the unmerged
+  `review-task-design` phase outputs.
+
+  **Why not filesystem-state routing.** An earlier draft proposed routing on
+  whether `design-steps.md` still has unchecked items via a new
+  `workflow/open-checklist-items-routing` that re-reads the file. Rejected: even
+  though the workflow-runtime boundary (generic op + authored path) would be
+  satisfied, routing on mutable external file state makes the routing decision
+  depend on data **outside** the workflow data-flow / event log. That fights
+  `doc/workflows.md`'s deliberate decision that `clarity-status` "remembers
+  whether any phase returned `ACTIONABLE_FEEDBACK` from the phase outputs rather
+  than re-reading task artifacts after follow-up execution," and the VSM
+  `∀change → event → log → replayable` ethos (the judge contract normalizes a
+  *step result*, not a filesystem snapshot). Routing on per-prompt reply outputs
+  keeps the merged exemplar replay-faithful and deterministic and introduces no
+  new routing operation. Consequence: the exemplar's routing **does** depend on
+  per-prompt reply addressing, which is shipped in the first cut — see Q11.
 - **Q9 — Model fallback under multi-prompt.** ✅ Fallback applies **per turn**:
   each queued prompt's turn independently attempts ranked-model fallback, and a
   model switch persists to subsequent turns in the same session.
@@ -236,10 +306,24 @@ Resolved (continued):
   - the `:prompts` queue (Option A, named prompt-groups);
   - per-prompt **text** reply addressing (`{:step s :prompt p :output
     :final-llm-reply | :transcript}`), which falls out of named prompt-groups
-    and is useful for `final-summary`;
+    and is now **load-bearing for the exemplar's routing** (Q8, revised) as well
+    as useful for `final-summary`;
   - **step-level** structured output bound to the **final** prompt's turn (no
     new structured-output machinery).
   Deferred to a follow-on task (until an exemplar needs it):
   - per-prompt structured `:outputs`.
+
+- **Q12 — Per-prompt source-ref integration & per-turn recording (A2/A3).** ✅
+  The `{:step s :prompt p :output k}` selector is an optional `:prompt`
+  discriminator on the canonical prior-step source ref, resolved uniformly
+  across the shared substrate (invoke args, contributions, template vars,
+  delegated context), with compile-time validation that rejects `:prompt`
+  against non-session steps, single-prompt session steps, unknown prompt-groups,
+  and structured-output keys (mirroring the existing "output not exposed by that
+  step type is invalid" rule). See "Source-ref integration for `:prompt`". Each
+  queued prompt's turn result is recorded as a named entry in the canonical
+  step-result/progression substrate (introspectable + replay-faithful), with the
+  step still emitting one post-drain `:pending-actor-result` for one routing
+  decision (reconciling Q5). See "Architecture alignment".
 
 All open questions are resolved; the design is ready for planning.
