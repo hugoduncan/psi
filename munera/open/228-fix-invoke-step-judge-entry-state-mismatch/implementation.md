@@ -215,6 +215,42 @@ workflow-statechart-runtime (and cancellation) + workflow-execution (34/153),
 workflow-runtime step-execution (10/63). clj-kondo clean on all changed
 namespaces.
 
+## Build — Slices 4 & 5: cancellation coverage + close-out (ψ, 2026-06-13)
+
+**Slice 4.** Added `judge-role-operation-honors-workflow-cancellation-test` to
+`deterministic-operation-runtime/core_test.clj`: a `:operation-role :judge`
+operation against a cancelled run refuses to start and yields a clean
+`:workflow-stopped` terminal without invoking its handler. Proves the phase-key
+namespacing preserves the task-225 cooperative cancellation guard. The existing
+default-role `invoke-operation-honors-workflow-cancellation-test` stays green.
+
+**Slice 5.** Workflow-level REPEAT/DONE routing is verified by the existing
+`workflow-review-step-routing-test` clarity-status suites (were 3 failing
+pre-fix, now 11/11 green). CHANGELOG `Fixed` entry added covering both faults. No
+schema change needed (`:operation-role` is an open additive invocation key).
+
+**Acceptance criteria status:** #1 characterization test (green), #2 invoke
+operation+judge runs both ops and routes (green via review-step-routing), #3
+task-225 cancellation preserved (judge-role + default-role cancellation tests +
+call-start-cancellation/judge-cancellation suites green), #4 review-task-design
+full REPEAT/DONE pass unblocked (review-step-routing 11/82 green), #5 clj-kondo
+clean + Scry suites green.
+
+**Final test summary (all green):**
+- deterministic-operation-runtime core: 5 tests / 24 assertions
+- workflow-statechart-runtime-call-start-cancellation: 14 / 63
+- workflow-judge: 17 / 88 ; workflow-judge-cancellation: 8 / 34
+- workflow-statechart-runtime + cancellation + workflow-execution: 34 / 153
+- workflow-runtime step-execution: 10 / 63 ; lifecycle + state: 5 / 17
+- workflow-review-step-routing: 11 / 82
+- github find-issue-integration: 1 / 13
+
+**Changed namespaces:**
+`deterministic-operation-runtime/core` (role-phase-key/role-phase-opts +
+chokepoint), `agent-session/workflow_judge` (`:operation-role :judge`),
+`workflow-runtime/statechart_runtime` + `.../step_execution` (thread authoritative
+`attempt-id`).
+
 ## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
 
 Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to

@@ -39,12 +39,12 @@
 
 ## Slice 5 — Workflow-level verification + close-out
 
-- [ ] Add runtime/definition-level coverage (or extend an existing review-task-design / workflow-definition test) asserting the `clarity-status` invoke step with `pass-feedback-routing` judge routes REPEAT/DONE without the abort.
-- [ ] Confirm no malli/invocation schema rejects the additive `:operation-role` key; adjust if a schema exists.
-- [ ] Add a CHANGELOG `Fixed` entry (user-visible: unblocks `task-lifecycle` / `review-task-design` design review).
-- [ ] Run `clj-kondo --lint` on all changed namespaces; resolve any findings.
-- [ ] Run the relevant Scry suites (`deterministic-operation-runtime`, `workflow-coordination`, `agent-session` `workflow_statechart_runtime_call_start_cancellation_test` + workflow-judge, `workflow-runtime` step-execution) and confirm green.
-- [ ] Update `implementation.md` with the final key-namespacing decision, the green test summary, and any deviations.
+- [x] Add runtime/definition-level coverage asserting the `clarity-status` invoke step with `pass-feedback-routing` judge routes REPEAT/DONE without the abort. Covered by the existing `workflow-review-step-routing-test` suite (`design-review-full-pass-routing-test`, `plan-review-full-pass-routing-test`, `review-pass-loop-iteration-limit-failure-test`), which were failing pre-fix (3 tests / 21 assertions) and are now all green (11 tests / 82 assertions).
+- [x] Confirm no malli/invocation schema rejects the additive `:operation-role` key. The invocation map is open; `invoke-operation-in` passes it through unchanged; all suites green.
+- [x] Add a CHANGELOG `Fixed` entry (covers both the `:handler-entry-state-mismatch` phase-key fix and the `:attempt-mismatch` stale-snapshot fix; user-visible: unblocks `task-lifecycle` / `review-task-design`).
+- [x] Run `clj-kondo --lint` on all changed namespaces; 0 errors / 0 warnings.
+- [x] Run the relevant Scry suites and confirm green: deterministic-operation-runtime core (5/24), workflow-statechart-runtime-call-start-cancellation (14/63), workflow-judge (17/88), workflow-judge-cancellation (8/34), workflow-statechart-runtime + cancellation + workflow-execution (34/153), workflow-runtime step-execution (10/63), workflow-review-step-routing (11/82), workflow-runtime lifecycle/state, github find-issue integration (1/13).
+- [x] Update `implementation.md` with the final key-namespacing decision, the green test summary, and the discovered-second-defect deviation.
 
 ## Review follow-ups — plan/steps ambiguity (ψ 2026-06-13)
 
