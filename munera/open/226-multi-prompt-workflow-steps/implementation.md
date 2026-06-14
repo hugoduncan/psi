@@ -3498,3 +3498,44 @@ the now-removed opts override). Behaviour-preserving; `clj-paren-repair` +
 `clj-kondo` clean. step-execution + drive-prompt-queue (+ abort) 25 tests / 146
 assertions green; agent-session dispatch + workflow-async-path (context built via
 test-support) 17 tests / 114 assertions green.
+
+## Code-shaper review (code-shaper skill) — pass 7 — ψ
+
+Fresh code-shaper pass over the full 226 production surface against
+`simplicity ∧ consistency ∧ robustness`: `step_execution.clj` (both drivers +
+`execute-session-turn-outcome` + `session-turn-ok-envelope` +
+`execute-with-ranked-fallback!` + `later-group-turn-prompt`),
+`progression_recording.clj` (per-prompt turn records + `next-un-run-prompt-group`),
+`ir.clj` (`prompt-queue-schema`, `session-prompt-queue-errors`, `prompt-ref-errors`,
+`session-step-prompt-queue`, `step-output-surfaces`/`-value`),
+`ir_error_formatting.clj` (all prompt-queue/prompt-ref error renders present),
+`statechart_runtime.clj` `:step/enter` prompt-queue derivation + `(some :name
+prompt-queue)` dispatch, and `workflow_step_materialization/{core,source_resolution}.clj`
+(`materialize-prompt-group-conversation`, `:prompt`-discriminated `resolve-source-ref`).
+
+CS-1..CS-7 confirmed present and clean. The two-driver disposition→`record-actor-pending!`
+duplication and `post-drain-envelope` loop-local accumulation remain the
+**accepted/documented** design (AC-2 / F1 / R-5), not re-raised. **REVIEW_COMPLETE** —
+no new in-scope actionable finding.
+
+Candidates considered and **deliberately not raised** (recorded so future passes
+don't re-investigate):
+
+- **Dead keys in `execute-with-ranked-fallback!` / `stopped-execution-result`
+  error maps** (`:assistant-message`, `:assistant-text`, `:execution-result`,
+  `:session-id`). On the `:status :error` path `execute-session-turn-outcome`
+  reads only `:status`/`:failure`/`:structured-output`, so these projections are
+  dead — same class as CS-6. **Out of scope:** `execute-with-ranked-fallback!`
+  predates 226 (introduced in #88, `git log -S`); 226 did not introduce these
+  maps. Pre-existing condition, analogous to the CS-7 `core/step-prompt`
+  test-only-caller note.
+- **`resolve-source-ref` `:prompt` branch passes `nil` step-def to
+  `step-output-value`** (`(step-output-value nil {:outputs (:outputs group-record)}
+  output-key)`, source_resolution.clj). This is 226 Slice 4 code and in scope. It
+  is **safe by construction**: per-prompt refs are IR-validated to text surfaces
+  only (`per-prompt-text-surfaces` `#{:final-llm-reply :transcript}`), so the
+  nil-step structured-output lookup branch in `step-output-value` is never
+  exercised, and the inline comment documents the "(text) output key" reliance.
+  No clearly-better shape exists without a synthetic per-prompt step-def (more
+  machinery than the invariant warrants), so raising it would be net-negative.
+  Noted as an acceptable, documented reliance rather than an actionable defect.
