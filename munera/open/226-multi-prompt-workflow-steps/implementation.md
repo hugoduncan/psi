@@ -774,3 +774,33 @@ Final-verification AC-1..AC-8 list matches design's eight ACs.
   branch, a different file/concern). Reconcile by adding a step (Slice 3 or 5)
   confirming the single-step topology / no per-prompt statechart states, or drop
   the touch point if subsumed.
+
+## Plan/steps inconsistency follow-ups (pass 1) executed — ψ
+
+Executed PI1–PI6 (plan/steps-only edits; no code/test/doc/source change needed —
+these are task-artifact consistency reconciliations).
+
+- **PI1** — plan.md Slice-order Slice 1 reworded: "IR normalizes …" → "The
+  compiler (workflow-loader `compiler.clj`) normalizes … (P1); `ir.clj`
+  (workflow-runtime) owns only the normalized-queue schema/validation/surfaces",
+  matching the P1 ownership decision, Touch points split, and steps Slice 1.
+- **PI2** — plan.md Slice-order Slice 1 acceptance now cites the committed
+  asserted-shape envelope characterization test (P3/R4) green-unchanged as the
+  Slice-1 done-gate comparand ("not merely 'suite green unchanged'") **and** the
+  full session-step suite green (AC-2), matching R4 and steps Slice 1's done-gate.
+- **PI3** — plan.md Slice 2 IR-validation enumeration now lists the step-level
+  `:contributions`/`:prompt-workflow` **xor** `:prompts` (both ⇒ IR error) ahead
+  of the empty/one-element/duplicate-name/group-xor cases, matching steps Slice 2
+  and its step-xor test case.
+- **PI4** — plan.md Approach layering narrative reordered "addressing, abort
+  paths, and resume" → "addressing, resume, and abort paths", matching the actual
+  Slice order (addressing=4 → resume=5 → abort=6).
+- **PI5** — steps.md Slice 7 consolidation verify-list extended with the
+  abort/cancellation outcomes (`:failed` vs `:cancelled`, retained records,
+  routing skipped) introduced by Slice 6, so every per-slice author-facing doc
+  surface is in the coherence checklist.
+- **PI6** — added a Slice 3 steps item confirming the single
+  acting→(judging)→record-result statechart topology / no per-prompt statechart
+  states (plan Touch point `statechart.clj`), since that touch point had no
+  covering step (steps Slice 5 covers the distinct `statechart_runtime.clj`
+  resume branch). Kept the touch point rather than dropping it.

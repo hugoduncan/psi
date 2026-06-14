@@ -13,7 +13,7 @@ that loop.
 
 The change decomposes into vertical slices, each shippable and test-backed,
 ordered so the unified single-prompt path lands first (proving N=1 equivalence)
-before N>1, addressing, abort paths, and resume are layered on.
+before N>1, addressing, resume, and abort paths are layered on.
 
 ### Key decisions (from design.md, already resolved)
 
@@ -143,16 +143,22 @@ before N>1, addressing, abort paths, and resume are layered on.
 
 ## Slice order
 
-1. **Unified single-prompt queue path (N=1 degenerate).** IR normalizes
-   `:contributions`/`:prompt-workflow` → one unnamed prompt-group; materialization
-   and `execute-session-step!` drive a length-1 internal queue producing the
-   existing envelope. No grammar surface change. Acceptance: full existing
-   session-step suite green (AC-2).
+1. **Unified single-prompt queue path (N=1 degenerate).** The compiler
+   (workflow-loader `compiler.clj`) normalizes
+   `:contributions`/`:prompt-workflow` → one unnamed prompt-group (P1); `ir.clj`
+   (workflow-runtime) owns only the normalized-queue schema/validation/surfaces.
+   Materialization and `execute-session-step!` drive a length-1 internal queue
+   producing the existing envelope. No grammar surface change. Acceptance: the
+   committed asserted-shape envelope characterization test (P3/R4) green
+   **unchanged** is the Slice-1 done-gate comparand — not merely "suite green
+   unchanged" — **and** the full existing session-step suite green (AC-2).
 2. **`:prompts` grammar + IR normalization (named groups).** Add `:prompts`
    schema (ordered named groups; group-internal `:prompt-workflow` xor
-   `:contributions`), compiler support, and IR validation: empty `:prompts`
-   error, one-element valid, duplicate group-name error, group xor error (B3/B4/
-   E2). Normalize to the same internal queue; named groups carry `:name`.
+   `:contributions`), compiler support, and IR validation: step-level
+   `:contributions`/`:prompt-workflow` **xor** `:prompts` (both ⇒ IR error),
+   empty `:prompts` error, one-element valid, duplicate group-name error, group
+   xor error (B3/B4/E2). Normalize to the same internal queue; named groups carry
+   `:name`.
 3. **Sequential N-turn drain (in-run suspend/resume) + per-prompt records.**
    Because each turn is an async `ai/generate` that suspends the run (design F1:
    N prompts = N suspend points inside one statechart step), advancing prompt _n_
