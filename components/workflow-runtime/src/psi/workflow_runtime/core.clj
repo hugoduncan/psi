@@ -5,7 +5,7 @@
    - create workflow runs with immutable effective-definition snapshots
    - expose small pure run lookup/update helpers for later dispatch/mutation/query layers"
   (:require
-   [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.ir-error-formatting :as ir-error-formatting]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-runtime.target-ir-compiler :as workflow-target-ir-compiler]
@@ -39,7 +39,7 @@
   (let [{:keys [valid? ir structural-errors semantic-errors compile-error]}
         (workflow-target-ir-compiler/compile-and-validate-workflow-definition definition)]
     (when-not valid?
-      (throw (ex-info (workflow-ir/format-compilation-errors
+      (throw (ex-info (ir-error-formatting/format-compilation-errors
                        compile-error structural-errors semantic-errors)
                       {:source source
                        :definition-id (:definition-id definition)

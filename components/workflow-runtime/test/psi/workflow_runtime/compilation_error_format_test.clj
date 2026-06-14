@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.ir-error-formatting :as ir-error-formatting]
    [psi.workflow-runtime.target-ir-compiler :as target-compiler]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
@@ -12,7 +13,7 @@
 
 (defn- format-errors
   ([compile-error structural-errors semantic-errors]
-   (workflow-ir/format-compilation-errors compile-error structural-errors semantic-errors)))
+   (ir-error-formatting/format-compilation-errors compile-error structural-errors semantic-errors)))
 
 (defn- contains-line?
   "Returns true when the formatted output contains a line matching `substr`."
