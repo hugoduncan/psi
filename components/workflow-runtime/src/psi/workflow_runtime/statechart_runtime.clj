@@ -16,6 +16,7 @@
    [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
+   [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
@@ -147,9 +148,16 @@
             (let [step-config (when session-step?
                                 ((:resolve-workflow-step-session-config-fn ctx)
                                  ctx parent-session-id workflow-run step-id))
+                  ;; task 226 Slice 1 — drive the unified internal prompt-queue.
+                  ;; The N=1 degenerate derives one unnamed group from the
+                  ;; canonical `:session :contributions` and materializes it
+                  ;; through the per-group entry point, reproducing today's
+                  ;; single-prompt conversation byte-for-byte.
+                  prompt-queue (when session-step?
+                                 (workflow-ir/session-step-prompt-queue step-def))
                   session-conversation (when session-step?
-                                         ((:materialize-workflow-step-session-conversation-fn ctx)
-                                          workflow-run step-id))
+                                         ((:materialize-workflow-prompt-group-conversation-fn ctx)
+                                          workflow-run (first prompt-queue)))
                   {:keys [preloaded-messages prompt]}
                   (if session-step?
                     ((:split-workflow-step-session-conversation-fn ctx) session-conversation)

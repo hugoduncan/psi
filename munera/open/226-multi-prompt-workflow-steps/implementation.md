@@ -1545,3 +1545,61 @@ runtime rewiring remain.
   wire the queue composition at the `statechart_runtime.clj` `:step/enter`
   materialization site — keeping the characterization test green unchanged. Then
   Slices 2–7 per plan.
+
+## Slice 1 — unified single-prompt queue path wired at the materialization site (complete) — ψ
+
+Completed the remaining Slice-1 work: the `:step/enter` session branch now drives
+the unified internal prompt-queue for the N=1 degenerate, producing byte-identical
+behaviour.
+
+- **Queue wiring at `:step/enter` (statechart_runtime.clj).** Replaced the direct
+  `((:materialize-workflow-step-session-conversation-fn ctx) workflow-run step-id)`
+  call with the unified queue path: derive `prompt-queue` via
+  `workflow-ir/session-step-prompt-queue step-def` (added `[psi.workflow-runtime.ir
+  :as workflow-ir]` to requires), then materialize the single (length-1) group via
+  the new injected `:materialize-workflow-prompt-group-conversation-fn`
+  (`materialize-prompt-group-conversation`) over `(first prompt-queue)`, then split
+  as before. Single-prompt `:contributions` now flows through the queue derivation
+  rather than a direct contributions read.
+
+- **ctx wiring.** Added `:materialize-workflow-prompt-group-conversation-fn`
+  (→ `workflow-step-materialization/materialize-prompt-group-conversation`) to the
+  production ctx (`agent-session/context.clj`) and the test ctx
+  (`agent-session/test_support.clj`).
+
+- **DEVIATION (queue-driver location), reconciling the plan's "refactor
+  `execute-session-step!` to drive a length-1 internal queue".** The queue
+  *driving* for the N=1 degenerate is realized at the **materialization site**
+  (`:step/enter`), not inside `execute-session-step!`. Reason: materialization is
+  upstream of `execute-session-step!` (the latter receives an already-split
+  `prompt` and executes exactly one turn). For N=1 there is no loop to add inside
+  `execute-session-step!` — the unified-path change is *which seam materializes the
+  prompt* (the queue derivation + per-group entry point). The envelope-producing
+  body of `execute-session-step!` is unchanged, so the characterization comparand
+  (P3) stays green unchanged. The genuine N>1 in-run drive loop (advancing prompt
+  _n_→_n+1_ across suspend/resume, consulting recorded progression) lands in
+  Slice 3, where the deeper `execute-session-step!`/`:step/enter` restructure
+  belongs.
+
+- **Verification (per-component Slice-1 gate, P9/PI9).**
+  - workflow-runtime: `step-execution-test` + `ir-test` 18 tests / 195 assertions
+    green — the P3 characterization comparand unchanged.
+  - workflow-runtime + workflow-loader full suites: 166/167 tests green; the **sole**
+    failure is `workflow-loader.workflow-definitions-test/task-lifecycle-test`
+    (16 assertions), confirmed **pre-existing and unrelated** by stashing the Slice-1
+    changes and re-running (identical 16-assertion failure) — it is a stale
+    `task-lifecycle.edn` step-structure assertion (expects 7 steps; the live
+    definition has 9), not a task-226 regression.
+  - agent-session end-to-end `:step/enter` exercise (real materialize fn in ctx):
+    `workflow-session-integration-test` + `workflow-execution-test` +
+    `workflow-statechart-runtime-test` + `workflow-execution-resume-test`
+    29 tests / 142 assertions green — proves the queue wiring is behaviour-preserving
+    through the full session-step path.
+  - workflow-step-materialization `core-test` 8 tests / 16 assertions green.
+  - clj-kondo clean across all edits.
+
+- **Slice 1 done.** AC-2 N=1 equivalence holds as a consequence of the unified
+  queue path. Next: Slice 2 — `:prompts` grammar + IR normalization (named groups)
+  in `ir.clj` + `target_ir_compiler.clj` (per the Slice-1 deviation, the `:prompts`
+  → named-group compilation belongs in `target_ir_compiler.clj`, not
+  workflow-loader `compiler.clj`).

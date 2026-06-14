@@ -34,7 +34,7 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
   `:contributions`/`:prompt-workflow`. (`prompt-group-schema`/`prompt-queue-schema`
   + `session-step-prompt-queue` derivation + `valid-prompt-queue?`; covered by
   `session-step-prompt-queue-derivation-test` + `prompt-queue-schema-test`.)
-- [ ] Normalize `:contributions`/`:prompt-workflow` session steps into a
+- [x] Normalize `:contributions`/`:prompt-workflow` session steps into a
   length-1 internal queue at **compile time** (workflow-loader
   owns the authored-form → normalized-queue transform, P1; `ir.clj` owns only the
   normalized-queue schema/validation), preserving the existing canonical
@@ -45,6 +45,10 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
   carries `:session :contributions`, so the length-1 queue is *derived* from it by
   `ir/session-step-prompt-queue` (no compiler change needed yet); `:prompts` →
   named-group compilation lands in Slice 2 in `target_ir_compiler.clj`.
+  (Done as a *consumed* derivation: the `:step/enter` session branch in
+  `statechart_runtime.clj` now derives the length-1 queue via
+  `ir/session-step-prompt-queue` and materializes it per-group — see the
+  refactor item below.)
 - [x] Add a per-group materialization entry point in
   `workflow_step_materialization/core.clj` (reuse
   `materialize-step-session-conversation` + `split-step-session-conversation`
@@ -52,15 +56,32 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
   (`materialize-prompt-group-conversation` over a shared
   `materialize-contributions-conversation` primitive; covered by
   `materialize-prompt-group-conversation-matches-single-prompt-materialization-test`.)
-- [ ] Refactor `execute-session-step!` to drive a length-1 internal queue
+- [x] Refactor `execute-session-step!` to drive a length-1 internal queue
   producing the **identical** `:pending-actor-result` envelope (no behaviour
-  change). Single suspend point unchanged.
-- [ ] Slice-1 done-gate: the committed envelope characterization test (P3) is
+  change). Single suspend point unchanged. **Deviation (see implementation.md):**
+  for the N=1 degenerate the queue *driving* is realized at the materialization
+  site (`statechart_runtime.clj` `:step/enter` session branch), which now derives
+  the length-1 queue via `ir/session-step-prompt-queue` and materializes the
+  single group via the injected
+  `:materialize-workflow-prompt-group-conversation-fn` (→
+  `materialize-prompt-group-conversation`), then splits into the same prompt.
+  `execute-session-step!` is unchanged — it already executes exactly one turn and
+  emits the identical envelope; for N=1 there is nothing to loop. The N>1 in-run
+  drive loop lands in Slice 3.
+- [x] Slice-1 done-gate: the committed envelope characterization test (P3) is
   green **unchanged** after the unified-path refactor, **and** the **three edited
   components' Scry suites** are green unchanged — workflow-runtime
-  (`ir.clj`/`step_execution.clj`) + workflow-loader (`compiler.clj`) +
-  workflow-step-materialization (`core.clj`), since Slice 1 edits all three
-  (P9/PI9) — (AC-2 N=1 equivalence as a consequence of the unified path).
+  (`ir.clj`/`step_execution.clj`/`statechart_runtime.clj`) + workflow-loader
+  (`compiler.clj`) + workflow-step-materialization (`core.clj`), since Slice 1
+  edits all three (P9/PI9) — (AC-2 N=1 equivalence as a consequence of the
+  unified path). Verified: step-execution-test + ir-test 18/195 green
+  (characterization unchanged); workflow-runtime + workflow-loader suites green
+  (sole failure `workflow-definitions-test/task-lifecycle-test` is pre-existing
+  and unrelated — a stale `task-lifecycle.edn` step-structure assertion, fails
+  identically with the changes stashed); agent-session end-to-end session-step
+  suites (session-integration / execution / statechart-runtime / execution-resume)
+  142/29 green proving the `:step/enter` wiring is behaviour-preserving;
+  workflow-step-materialization core-test 8/16 green.
   **Equivalence comparand scope (P7):** the focused workflow-runtime
   `step_execution_test.clj` namespace
   (`psi.workflow-runtime.statechart-runtime.step-execution-test`) that houses the
@@ -69,7 +90,7 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
   green requirement; it is distinct from Final verification's three-component run
   by the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
   Any change to the asserted envelope shape ⇒ defect.
-- [ ] `clj-kondo` clean; commit Slice 1.
+- [x] `clj-kondo` clean; commit Slice 1.
 
 ## Slice 2 — `:prompts` grammar + IR normalization (named groups)
 

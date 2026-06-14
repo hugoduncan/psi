@@ -251,6 +251,7 @@
        (workflow-step-session-config/effective-config->snapshot
         effective-config (:inherited-defaults workflow-run*))))
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
+   :materialize-workflow-prompt-group-conversation-fn #'workflow-step-materialization/materialize-prompt-group-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :workflow-judge-messages-fn #'persist/messages-from-entries-in
