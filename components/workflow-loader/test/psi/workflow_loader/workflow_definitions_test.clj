@@ -651,7 +651,6 @@
                                "review-task-plan"
                                "implement-task"
                                "review-task-implementation"]
-           expected-delegate-targets (conj first-five-targets "extract-task-knowledge")
            standard-prompt {:type :map
                             :fields {:input {:from :workflow-input
                                              :path [:input]}}}
@@ -661,51 +660,68 @@
                                        :implementation-review-yield
                                        {:from {:step "review-task-implementation"
                                                :yield :text}}}}
-           review-step (nth steps 4)
-           extraction-step (nth steps 5)
-           summary-step (nth steps 6)
-           summary-text (step-template-text summary-step)]
-       (testing "has 7 steps, with extraction guarded after implementation review"
-         (is (= 7 (count steps)))
-         (is (= (conj expected-delegate-targets "final-summary-without-extraction")
+           status-step (nth steps 5)
+           extraction-step (nth steps 6)
+           success-summary-step (nth steps 7)
+           skip-summary-step (nth steps 8)
+           skip-summary-text (step-template-text skip-summary-step)]
+       (testing "has 9 steps, with extraction guarded after implementation review"
+         (is (= 9 (count steps)))
+         (is (= ["review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "implement-task"
+                 "review-task-implementation"
+                 "check-implementation-review-status"
+                 "extract-task-knowledge"
+                 "final-summary-after-extraction"
+                 "final-summary-without-extraction"]
                 (mapv :name steps)))
-         (is (= (concat (repeat 6 :delegate) [:session]) (mapv :type steps)))
-         (is (= expected-delegate-targets (mapv :target (take 6 steps)))))
+         (is (= (concat (repeat 5 :delegate) [:invoke :delegate :session :session])
+                (mapv :type steps)))
+         (is (= first-five-targets (mapv :target (take 5 steps))))
+         (is (= "extract-task-knowledge" (:target extraction-step))))
        (testing "the first five lifecycle delegate steps thread the same task input unchanged"
          (is (= (repeat 5 standard-prompt)
                 (mapv :prompt-string (take 5 steps)))))
-       (testing "implementation review owns the extraction gate"
+       (testing "the status step owns the extraction gate"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
                  :args {:text {:from {:step "review-task-implementation"
                                       :yield :text}}
                         :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-                (:judge review-step)))
+                (:judge status-step)))
          (is (= {"DONE" {:goto "extract-task-knowledge"}
                  "REPEAT" {:goto "final-summary-without-extraction"}}
-                (:on review-step))))
+                (:on status-step))))
        (testing "the extraction step threads task input plus a labeled implementation-review yield"
          (is (= extraction-prompt (:prompt-string extraction-step))))
-       (testing "the extraction step terminates the successful path instead of falling through to the skip summary"
+       (testing "the extraction step routes to the extraction success summary"
          (is (= {:type :invoke
                  :operation "workflow/constant-routing"
                  :args {:route "DONE"}}
                 (:judge extraction-step)))
-         (is (= {"DONE" {:goto :done}} (:on extraction-step))))
-       (testing "the delegate steps keep their original context only"
+         (is (= {"DONE" {:goto "final-summary-after-extraction"}}
+                (:on extraction-step))))
+       (testing "delegate steps keep their original context only"
          (is (= (repeat 6 [{:type :source :from :workflow-original}])
-                (mapv :context (take 6 steps)))))
+                (mapv :context (concat (take 5 steps) [extraction-step])))))
        (testing "non-review-complete summary explains extraction was skipped"
-         (is (= ["read" "bash"] (:tools summary-step)))
-         (is (.contains summary-text "extract-task-knowledge was not invoked"))
-         (is (.contains summary-text "PASS_STATUS: REVIEW_COMPLETE"))
-         (is (.contains summary-text "Do not extract or write mementum knowledge here"))
+         (is (= ["read" "bash"] (:tools skip-summary-step)))
+         (is (.contains skip-summary-text "extract-task-knowledge was not invoked"))
+         (is (.contains skip-summary-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains skip-summary-text "Do not extract or write mementum knowledge here"))
          (is (= {:type :invoke
                  :operation "workflow/constant-routing"
                  :args {:route "DONE"}}
-                (:judge summary-step)))
-         (is (= {"DONE" {:goto :done}} (:on summary-step))))
+                (:judge skip-summary-step)))
+         (is (= {"DONE" {:goto :done}} (:on skip-summary-step))))
+       (testing "successful extraction summary terminates the success path"
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge success-summary-step)))
+         (is (= {"DONE" {:goto :done}} (:on success-summary-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 7 {})
+         (is (= (repeat 9 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
-

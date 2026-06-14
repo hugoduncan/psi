@@ -57,9 +57,9 @@
 
 ## Slice 6 — Verification and cleanup
 
-- [ ] Run focused workflow-loader definition tests for `psi.workflow-loader.workflow-definitions-test` and fix any failures.
-- [ ] Run focused review-routing tests for `psi.agent-session.workflow-review-step-routing-test` and fix any failures.
-- [ ] Run focused deterministic-operation tests if any `workflow/pass-feedback-routing` coverage lives outside the review-routing namespace.
-- [ ] Run `clj-kondo --lint` on all touched Clojure source and test files and fix lint findings.
-- [ ] Re-read all touched workflow markdown/EDN files to verify no stale step names or illegal per-prompt `:yield` refs remain.
-- [ ] Append concise implementation notes to this task's `implementation.md` covering key decisions, verification commands, and any deviations from the plan.
+- [x] Run focused workflow-loader definition tests for `psi.workflow-loader.workflow-definitions-test` and fix any failures.
+- [x] Run focused review-routing tests for `psi.agent-session.workflow-review-step-routing-test` and fix any failures.
+- [x] Run focused deterministic-operation tests if any `workflow/pass-feedback-routing` coverage lives outside the review-routing namespace.
+- [x] Run `clj-kondo --lint` on all touched Clojure source and test files and fix lint findings.
+- [x] Re-read all touched workflow markdown/EDN files to verify no stale step names or illegal per-prompt `:yield` refs remain.
+- [x] Append concise implementation notes to this task's `implementation.md` covering key decisions, verification commands, and any deviations from the plan.
