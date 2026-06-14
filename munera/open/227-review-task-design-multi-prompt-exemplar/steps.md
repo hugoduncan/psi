@@ -2,12 +2,12 @@
 
 ## Slice 1 — Pass-feedback routing validation
 
-- [ ] Read `components/agent-session/src/psi/agent_session/workflow/routing.clj` and `components/agent-session/src/psi/agent_session/workflow/core.clj` to confirm the existing `PASS_STATUS` parser and `workflow/pass-feedback-routing` registration shape.
-- [ ] Add or update focused routing tests proving `workflow/pass-feedback-routing` returns `DONE` when every supplied reply has `PASS_STATUS: REVIEW_COMPLETE`.
-- [ ] Add or update focused routing tests proving `workflow/pass-feedback-routing` returns `REPEAT` when any supplied reply has `PASS_STATUS: ACTIONABLE_FEEDBACK` and reports the actionable keys in details.
-- [ ] Add focused routing tests proving `workflow/pass-feedback-routing` returns deterministic operation errors for missing `PASS_STATUS`, duplicate `PASS_STATUS` lines, malformed status lines, and disallowed known statuses such as `IMPLEMENTATION_COMPLETE`.
-- [ ] Tighten `workflow/pass-feedback-routing` to validate every supplied reply with allowed statuses `ACTIONABLE_FEEDBACK` and `REVIEW_COMPLETE` before computing the pass-level route.
-- [ ] Ensure invalid `pass-feedback-routing` results include per-key validation failure details suitable for diagnosing a blocked or failed workflow run.
+- [x] Read `components/agent-session/src/psi/agent_session/workflow/routing.clj` and `components/agent-session/src/psi/agent_session/workflow/core.clj` to confirm the existing `PASS_STATUS` parser and `workflow/pass-feedback-routing` registration shape.
+- [x] Add or update focused routing tests proving `workflow/pass-feedback-routing` returns `DONE` when every supplied reply has `PASS_STATUS: REVIEW_COMPLETE`.
+- [x] Add or update focused routing tests proving `workflow/pass-feedback-routing` returns `REPEAT` when any supplied reply has `PASS_STATUS: ACTIONABLE_FEEDBACK` and reports the actionable keys in details.
+- [x] Add focused routing tests proving `workflow/pass-feedback-routing` returns deterministic operation errors for missing `PASS_STATUS`, duplicate `PASS_STATUS` lines, malformed status lines, and disallowed known statuses such as `IMPLEMENTATION_COMPLETE`.
+- [x] Tighten `workflow/pass-feedback-routing` to validate every supplied reply with allowed statuses `ACTIONABLE_FEEDBACK` and `REVIEW_COMPLETE` before computing the pass-level route.
+- [x] Ensure invalid `pass-feedback-routing` results include per-key validation failure details suitable for diagnosing a blocked or failed workflow run.
 
 ## Slice 2 — Merged workflow topology
 

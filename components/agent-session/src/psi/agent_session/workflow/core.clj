@@ -107,20 +107,6 @@
     (register-prompt-contribution!)
     result))
 
-(defn- actionable-feedback?
-  [text]
-  (= :ok (:status (routing/parse-pass-status-routing text ["ACTIONABLE_FEEDBACK"]))))
-
-(defn- pass-feedback-routing
-  [args]
-  (let [feedback-keys (sort (keys args))
-        actionable-keys (filterv #(actionable-feedback? (get args %)) feedback-keys)
-        route (if (seq actionable-keys) "REPEAT" "DONE")]
-    {:status :ok
-     :data route
-     :summary route
-     :details {:actionable-keys actionable-keys}}))
-
 (defn- register-built-in-deterministic-operations!
   [api]
   (when-let [register-operation (:register-operation api)]
@@ -131,7 +117,7 @@
     (register-operation
      {:id "workflow/pass-feedback-routing"
       :handler (fn [{:keys [args]}]
-                 (pass-feedback-routing args))})
+                 (routing/parse-pass-feedback-routing args))})
     (register-operation
      {:id "workflow/constant-routing"
       :handler (fn [{:keys [args]}]
