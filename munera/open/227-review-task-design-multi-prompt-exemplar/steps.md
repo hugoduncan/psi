@@ -71,3 +71,7 @@
 - [x] T3: Strengthen the merged design-review runtime routing tests to assert that the `architecture`, `ambiguity`, and `inconsistency` prompts within each `design-review` batch run in the same child session (using the already recorded child session ids), so AC1's shared-child-session behavior is proved rather than only inferred from prompt order/topology.
 - [x] T4: Strengthen `review-follow-up-design.md` prompt-contract tests so they lock the full batch evidence rule from design.md/AC3, not just broad substrings. Cover the contiguous review-batch segment, parent-baseline diff, candidate set as diff-added unchecked `design-steps.md` checklist lines that still exist unchecked, exclusion of pre-existing/stale/checked/`steps.md` items, and the requirement to leave ambiguous or unattributable items unchecked with a terse `implementation.md` block note.
 - [x] T5: Strengthen `workflow/pass-feedback-routing` boundary tests to cover non-string prompt-reply arg values (for example numbers or vectors) and require deterministic `:invalid-pass-feedback` diagnostics rather than uncaught exceptions; adjust the routing implementation if the new test exposes a throw.
+
+## Docs review follow-up
+
+- [ ] DOC1: Update `CHANGELOG.md` so the invoke+judge routing fix entry no longer names `review-task-design`'s removed `clarity-status` step as a current example; keep the historical bug-fix meaning while avoiding stale step references after the merged `design-review` topology.
