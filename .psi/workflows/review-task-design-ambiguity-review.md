@@ -10,7 +10,9 @@ skills:
   - work-independently
   - task-design
 ---
-For the Munera task identified by {{input}}, review the task design for ambiguities. Work independently. Read the task's design.md and any referenced concepts, code, or docs needed to evaluate the design. Do not review plan.md or steps.md. Then:
+For the Munera task identified by {{input}}, run the ambiguity review as the second turn of the shared `design-review` multi-prompt session. Work independently. Use the already-loaded task design.md, architecture sources, and architecture-review reply from the shared session context by default. Perform only targeted re-reads when specific referenced material is missing from context, ambiguous, or plausibly stale; do not unconditionally re-read the whole task design and architecture source set.
+
+Review the task design for ambiguities. Do not review plan.md or steps.md. Then:
 
 1. append a terse review note to the task's implementation.md
 2. add unchecked follow-up items to design-steps.md for every new actionable ambiguity you found (create design-steps.md if it does not exist)

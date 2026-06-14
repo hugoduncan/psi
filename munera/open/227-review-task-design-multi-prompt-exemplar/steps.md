@@ -24,13 +24,13 @@
 
 ## Slice 3 — Prompt contracts
 
-- [ ] Update `review-task-design-architecture-review.md` to state that it is the first shared-session turn and must read the task `design.md` and consult `AGENTS.md`, `META.md`, and `doc/architecture.md` as needed before producing architectural feedback.
-- [ ] Update `review-task-design-ambiguity-review.md` to reuse the shared session's already-loaded design, architecture sources, and architecture-review reply by default, with only targeted re-reads for missing, ambiguous, or stale facts.
-- [ ] Update `review-task-design-inconsistency-review.md` to reuse the shared session context and prior review replies by default, with only targeted re-reads for specific missing or stale referenced material.
-- [ ] Preserve each review prompt's design-steps/implementation note instructions and terminal two-line `PASS_STATUS: ACTIONABLE_FEEDBACK|REVIEW_COMPLETE` menu.
-- [ ] Update `review-follow-up-design.md` to define the preceding review pass as the immediately preceding whole `design-review` batch when used by the merged workflow.
-- [ ] Update `review-follow-up-design.md` with the git/task-file evidence rule for identifying batch-added unchecked `design-steps.md` items.
-- [ ] Update `review-follow-up-design.md` to instruct the agent to leave ambiguous, stale, or unattributable unchecked items untouched and record a terse blocking note in `implementation.md`.
+- [x] Update `review-task-design-architecture-review.md` to state that it is the first shared-session turn and must read the task `design.md` and consult `AGENTS.md`, `META.md`, and `doc/architecture.md` as needed before producing architectural feedback.
+- [x] Update `review-task-design-ambiguity-review.md` to reuse the shared session's already-loaded design, architecture sources, and architecture-review reply by default, with only targeted re-reads for missing, ambiguous, or stale facts.
+- [x] Update `review-task-design-inconsistency-review.md` to reuse the shared session context and prior review replies by default, with only targeted re-reads for specific missing or stale referenced material.
+- [x] Preserve each review prompt's design-steps/implementation note instructions and terminal two-line `PASS_STATUS: ACTIONABLE_FEEDBACK|REVIEW_COMPLETE` menu.
+- [x] Update `review-follow-up-design.md` to define the preceding review pass as the immediately preceding whole `design-review` batch when used by the merged workflow.
+- [x] Update `review-follow-up-design.md` with the git/task-file evidence rule for identifying batch-added unchecked `design-steps.md` items.
+- [x] Update `review-follow-up-design.md` to instruct the agent to leave ambiguous, stale, or unattributable unchecked items untouched and record a terse blocking note in `implementation.md`.
 
 ## Slice 4 — Definition and runtime test alignment
 
