@@ -196,3 +196,101 @@
       (is (= "judge-r" (:judge-session-id attempt)))
       (is (= "REVISE" (:judge-output attempt)))
       (is (= "REVISE" (:judge-event attempt))))))
+
+;;; Per-prompt turn records (task 226 Slice 3).
+
+(deftest prompt-group-turn-record-substrate-test
+  (testing "no per-prompt records on a fresh attempt"
+    (let [[state run-id] (base-state-with-run)
+          run (get-in state [:workflows :runs run-id])]
+      (is (= [] (workflow-recording/prompt-group-turn-records run "plan")))
+      (is (= #{} (workflow-recording/recorded-prompt-group-indices run "plan")))))
+
+  (testing "recording a named-group turn appends an ordered record on the latest attempt"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-prompt-group-turn
+                      run-id "plan" {:index 0 :name "architecture"
+                                     :outputs {:final-llm-reply "arch reply"}}))
+          run (get-in state' [:workflows :runs run-id])
+          records (workflow-recording/prompt-group-turn-records run "plan")]
+      (is (= 1 (count records)))
+      (is (= 0 (:index (first records))))
+      (is (= "architecture" (:name (first records))))
+      (is (= {:final-llm-reply "arch reply"} (:outputs (first records))))
+      (is (some? (:recorded-at (first records))))
+      (is (= #{0} (workflow-recording/recorded-prompt-group-indices run "plan")))))
+
+  (testing "records accumulate in author order across turns"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-prompt-group-turn
+                      run-id "plan" {:index 0 :name "architecture" :outputs {:final-llm-reply "a"}})
+                     (workflow-recording/record-prompt-group-turn
+                      run-id "plan" {:index 1 :name "ambiguity" :outputs {:final-llm-reply "b"}}))
+          run (get-in state' [:workflows :runs run-id])
+          records (workflow-recording/prompt-group-turn-records run "plan")]
+      (is (= ["architecture" "ambiguity"] (mapv :name records)))
+      (is (= #{0 1} (workflow-recording/recorded-prompt-group-indices run "plan")))))
+
+  (testing "recording is idempotent on :index — an already-recorded index is not re-appended"
+    (let [[state run-id] (base-state-with-run)
+          state' (-> state
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-prompt-group-turn
+                      run-id "plan" {:index 0 :name "architecture" :outputs {:final-llm-reply "first"}})
+                     (workflow-recording/record-prompt-group-turn
+                      run-id "plan" {:index 0 :name "architecture" :outputs {:final-llm-reply "second"}}))
+          run (get-in state' [:workflows :runs run-id])
+          records (workflow-recording/prompt-group-turn-records run "plan")]
+      (is (= 1 (count records)) "no second record for an already-recorded index")
+      (is (= "first" (get-in (first records) [:outputs :final-llm-reply]))
+          "the original record is retained (no clobber)"))))
+
+(deftest next-un-run-prompt-group-test
+  (let [queue [{:name "architecture" :contributions []}
+               {:name "ambiguity" :contributions []}
+               {:name "inconsistency" :contributions []}]]
+    (testing "with no recorded turns, selects the first group (index 0)"
+      (let [[state run-id] (base-state-with-run)
+            run (get-in (workflow-recording/start-latest-attempt state run-id "plan")
+                        [:workflows :runs run-id])
+            sel (workflow-recording/next-un-run-prompt-group run "plan" queue)]
+        (is (= 0 (:index sel)))
+        (is (= "architecture" (:name (:group sel))))
+        (is (false? (:final? sel)))))
+
+    (testing "after the first two turns recorded, selects the lowest un-run (index 2, final)"
+      (let [[state run-id] (base-state-with-run)
+            state' (-> state
+                       (workflow-recording/start-latest-attempt run-id "plan")
+                       (workflow-recording/record-prompt-group-turn
+                        run-id "plan" {:index 0 :name "architecture" :outputs {}})
+                       (workflow-recording/record-prompt-group-turn
+                        run-id "plan" {:index 1 :name "ambiguity" :outputs {}}))
+            run (get-in state' [:workflows :runs run-id])
+            sel (workflow-recording/next-un-run-prompt-group run "plan" queue)]
+        (is (= 2 (:index sel)))
+        (is (= "inconsistency" (:name (:group sel))))
+        (is (true? (:final? sel)) "the last queue position is flagged final")))
+
+    (testing "when every group has a recorded turn, the queue is drained (nil)"
+      (let [[state run-id] (base-state-with-run)
+            state' (reduce (fn [s i]
+                             (workflow-recording/record-prompt-group-turn
+                              s run-id "plan" {:index i :name (str i) :outputs {}}))
+                           (workflow-recording/start-latest-attempt state run-id "plan")
+                           (range 3))
+            run (get-in state' [:workflows :runs run-id])]
+        (is (nil? (workflow-recording/next-un-run-prompt-group run "plan" queue)))))
+
+    (testing "a length-1 queue's only group is flagged final"
+      (let [[state run-id] (base-state-with-run)
+            run (get-in (workflow-recording/start-latest-attempt state run-id "plan")
+                        [:workflows :runs run-id])
+            sel (workflow-recording/next-un-run-prompt-group
+                 run "plan" [{:contributions []}])]
+        (is (= 0 (:index sel)))
+        (is (true? (:final? sel)))))))

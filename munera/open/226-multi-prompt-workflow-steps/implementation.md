@@ -1655,3 +1655,59 @@ clean.
   config is ignored for groups (session config is per-step/shared per design
   scope), unlike the step-level `:prompt-workflow` path which merges markdown
   session config.
+
+## Slice 3 (in progress) — per-prompt progression substrate — ψ
+
+Landed the foundational, progression-driven substrate that the in-run N-turn
+drain consumes (Slice 3 item 2 + the next-un-run selector item 1 depends on),
+ahead of wiring the driver loop. Pure, unit-tested, zero integration risk to the
+existing synchronous single-turn path.
+
+- **`progression_recording.clj` additions.**
+  - `record-prompt-group-turn` — appends one completed per-prompt turn record
+    `{:index i :name group-name :outputs {...} :recorded-at …}` to the latest
+    attempt's `:prompt-group-turns`. **Idempotent on `:index`**: a turn whose
+    index already has a record is not re-appended and the original is not
+    clobbered — this is the recording side of the F1 resume non-re-fire invariant.
+    Named groups only; the unnamed N=1 degenerate records no per-prompt record
+    (design C3) — the driver simply won't call this for the unnamed group.
+  - `prompt-group-turn-records` / `recorded-prompt-group-indices` — the
+    **progression-state probe** observable (P6): read which prompts already have a
+    recorded turn under the step's attempt.
+  - `next-un-run-prompt-group` — the **progression-driven** next-un-run selector
+    (P5/F1): given the ordered prompt-queue and recorded indices, returns the
+    lowest static-position group with **no** recorded turn as
+    `{:index i :group g :final? (= i last)}`, or nil when drained. `:final?` is the
+    static IR-position property (P5 final-turn detection) the driver uses to gate
+    structured `:outputs` to the final turn — orthogonal to the no-counter
+    selection (selection reads recorded indices; finality compares position to
+    queue length).
+
+- **DEVIATION (read path).** `latest-attempt` in this ns returns the **attempts
+  vector** (a pre-existing `some->>`-thread quirk: the index becomes a get-in
+  default, so the path-present read yields the whole vector; existing
+  `(:attempt-id (latest-attempt …))` call sites silently get nil). Rather than
+  change that shared fn (terminal-outcome/history attempt-id metadata would shift
+  from nil to real ids — out of task scope), added a private `latest-attempt-map`
+  (index + get-in) for the new readers.
+
+- **Verification.** `progression-recording-test` 9 tests / 46 assertions green
+  (added `prompt-group-turn-record-substrate-test` covering empty/append/order/
+  idempotency, and `next-un-run-prompt-group-test` covering first/lowest-un-run/
+  drained-nil/length-1-final). Focused workflow-runtime suites
+  (progression-recording + ir + step-execution + target-ir-compiler) 38/291 green;
+  clj-kondo clean.
+
+- **Remaining for Slice 3:** the in-run drain **driver** (item 1) — restructure
+  the `:step/enter` session branch / `execute-session-step!` to loop N turns
+  against the same child session, calling `next-un-run-prompt-group` each
+  re-entry, materializing each group via
+  `materialize-prompt-group-conversation` + split, recording each named turn via
+  `record-prompt-group-turn`, requesting structured `:outputs` only when
+  `:final?`, and emitting **one** post-drain `:pending-actor-result` (step-level
+  rollup + per-prompt records). Open design question to resolve there: injecting a
+  later group's split `:preloaded-messages` into the **live** child session (the
+  turn primitive `execute-actor-turn!` submits only a prompt string; first group
+  preloads at session creation, later groups currently only submit a prompt).
+  Then per-prompt surfaces (Slice 4), resume/replay (Slice 5), abort paths
+  (Slice 6), docs (Slice 7).

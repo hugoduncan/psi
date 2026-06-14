@@ -154,9 +154,20 @@ live-session conversation memory, not an authored shared preamble.
   re-entry of the acting state, select the next **un-run** prompt from recorded
   per-prompt progression (progression-driven, **not** an in-memory counter);
   never re-fire a completed turn within the live run.
-- [ ] Add per-prompt turn-record recording in `progression_recording.clj` under
+- [x] Add per-prompt turn-record recording in `progression_recording.clj` under
   the step's attempt (ordered, keyed by `:name` for named groups only; unnamed
-  group records only the step-level rollup, C3).
+  group records only the step-level rollup, C3). Added `record-prompt-group-turn`
+  (idempotent on static queue `:index` — no re-append of an already-recorded turn,
+  upholding F1 non-re-fire), plus the progression-state probe readers
+  `prompt-group-turn-records` / `recorded-prompt-group-indices` and the
+  progression-driven selector `next-un-run-prompt-group` (lowest un-run static
+  position from recorded indices, `:final?` = last position; nil when drained).
+  Records land on the latest attempt under `:prompt-group-turns`; reads resolve the
+  latest attempt **map** by index (`latest-attempt` returns the attempts vector,
+  a pre-existing quirk). Covered by
+  `prompt-group-turn-record-substrate-test` + `next-un-run-prompt-group-test`
+  (9/46 progression-recording green). This is the substrate the driver item (above)
+  consults for next-un-run selection.
 - [ ] Emit **one** post-drain `:pending-actor-result` carrying the step-level
   rollup plus ordered per-prompt records for named groups (A3); reconcile with
   the existing `record-actor-result`/`record-step-result` path (one route, Q5).
