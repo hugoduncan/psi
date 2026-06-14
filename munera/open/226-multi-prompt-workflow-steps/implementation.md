@@ -2171,3 +2171,55 @@ symmetric. R-1..R-5 confirmed done. **One new actionable finding (R-6).**
   (`statechart_runtime.clj` `:step/enter`) now exists, closing the "one path / no
   drift" gap. `clj-kondo` clean; workflow-runtime suite 131 tests / 711 assertions
   green.
+
+## Implementation review (task-implementation-review) — ψ, pass 5
+
+Scope: full re-review of the landed implementation against design + plan +
+architecture. Verified green/clean before judging: workflow-runtime 131/711,
+workflow-step-materialization 26/54, abort suite 4/19, `clj-kondo` clean on
+`step_execution.clj` + `progression_recording.clj`.
+
+Confirmed resolved (no re-flag): R-1 design-coherence (synchronous-drain note),
+R-5 two-driver reconciliation (turn-primitive unification), R-6 dead
+`execute-actor-step!` deletion (single live dispatch site), R-2 later-group
+single-submission limitation (documented + tested). Code matches design;
+workflow-runtime boundary respected (generic queue mechanism, no authored
+policy); IR `:prompt`-ref validation (`prompt-ref-errors`) is clear, complete,
+and carve-out-correct for the post-drain judge; no unnecessary abstractions; the
+O(n) per-iteration progression re-read is the deliberate no-counter design and
+negligible for realistic queue sizes — not a structural-performance issue.
+
+New actionable finding:
+
+- **R-7 — `drive-session-prompt-queue!` lacks a per-iteration pre-turn
+  cancellation checkpoint.** The drain loop selects the next un-run prompt and
+  immediately runs its *full* turn (`execute-session-turn-outcome` →
+  `execute-actor-turn!`) before any `stopped?` check; the only cancellation
+  observation is *after* the turn completes (the post-turn `(stopped?)` inside
+  `execute-session-turn-outcome`, CHECK A), and the common non-fallback
+  `execute-actor-turn!` path is not even passed `stopped?`. So a cancellation
+  arriving strictly *between* prompts still fires the next prompt's
+  `ai/generate` (and its whole tool loop) to completion before the run stops —
+  wasteful and side-effectful for an already-cancelled workflow, and asymmetric
+  with the N=1 `execute-session-step!`, which checks `stopped?` *before* its
+  turn at the `cond` head. The loop's per-iteration entry is the natural
+  cooperative-cancellation checkpoint (225-lineage cooperative checkpoints across
+  session-step execution) and is currently missing. AC-6's "queue stops" /
+  "routing skipped" still holds observably, but the design's P12 "in-flight turn
+  aborted" is not realized for the between-prompts case — the next turn runs in
+  full rather than being skipped. Fix: add a `(stopped?)` checkpoint at the top
+  of each loop iteration (before `next-un-run-prompt-group` selection / turn-prompt
+  construction / turn execution) that enqueues `:workflow/cancel` and exits the
+  loop, so a cancellation observed between turns stops the queue without firing
+  an extra turn. Cover with a test asserting a cancellation observed between
+  turns enqueues `:workflow/cancel` with **zero** additional turn-fn /
+  `ai/generate` invocations and no post-drain `:pending-actor-result`.
+
+Minor coherence nit:
+
+- **R-8 — design.md `## Status` is stale.** It still reads "Design complete;
+  ready for planning," but the task is implemented and through four
+  implementation-review passes. plan.md (authoritative orchestration) already
+  records "Implementation complete," so this is low-severity, but the design
+  Status line would mislead a future reader landing on design.md first. Update it
+  to reflect implementation-complete / under implementation review.

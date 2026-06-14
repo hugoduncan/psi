@@ -832,3 +832,26 @@ consolidates them — it does not first-author them.
   live session-dispatch site now remains (`statechart_runtime.clj` `:step/enter`
   `(some :name prompt-queue)`), upholding the "one path / no drift" thesis.
   `clj-kondo` clean; workflow-runtime suite 131/711 green.
+
+## Implementation-review follow-ups (pass 5)
+
+- [ ] R-7 — Add a per-iteration pre-turn cancellation checkpoint to
+  `drive-session-prompt-queue!` (`step_execution.clj`). The drain loop currently
+  runs each prompt's full turn (`execute-session-turn-outcome` →
+  `execute-actor-turn!`) before any `stopped?` check, so a cancellation arriving
+  **between** prompts still fires the next prompt's `ai/generate` + tool loop to
+  completion before the run stops — wasteful/side-effectful for a cancelled
+  workflow and asymmetric with the N=1 `execute-session-step!` pre-turn `stopped?`
+  check. Add a `(stopped?)` checkpoint at the **top of each loop iteration**
+  (before `next-un-run-prompt-group` selection / turn-prompt construction / turn
+  execution) that enqueues `:workflow/cancel` and exits, so the queue stops
+  cleanly between prompts without firing an extra turn (cooperative-cancellation,
+  225-lineage; realizes P12's between-prompts "queue stops"). Add a covering test:
+  a cancellation observed between turns enqueues `:workflow/cancel` with **zero**
+  additional turn-fn/`ai/generate` invocations and no post-drain
+  `:pending-actor-result`; completed prior records retained.
+
+- [ ] R-8 — Update the stale design.md `## Status` line ("Design complete; ready
+  for planning") to reflect implementation-complete / under implementation review,
+  matching plan.md's authoritative "Implementation complete" so a reader landing
+  on design.md first is not misled. Low-severity coherence fix.
