@@ -3414,3 +3414,19 @@ responsibility and locally comprehensible.
   `execute-session-turn-outcome` docstring's `:branch :success` shape (keep
   `:assistant-message`, which the drain genuinely consumes). Behaviour-preserving;
   re-run step-execution + drive-prompt-queue (+ abort) suites + `clj-kondo`.
+
+### Code-shaper follow-up execution (pass 5 — CS-6)
+
+Removed the dead `:assistant-text` key from `session-turn-ok-envelope`'s return
+map and the corresponding `:assistant-text ...` token from
+`execute-session-turn-outcome`'s docstring `:branch :success` shape. Confirmed
+dead before editing: both `execute-session-turn-outcome` call sites
+(`execute-session-step!`, `drive-session-prompt-queue!`) read only
+`:disposition`/`:branch`/`:payload`/`:raw-outputs` (via `turn-local-outputs`)/
+`:assistant-message` — no `(:assistant-text outcome)` read exists. The
+`assistant-text` *destructure* stays (still feeds `raw-outputs`
+`:final-llm-reply`/`:text` and the `output-result`/`missing-ai-structured-output-result`
+builders); `:assistant-message` retained (drain transcript accumulation consumes
+it; the value is already in `:raw-outputs :final-llm-reply`/`:text`).
+Behaviour-preserving; `clj-kondo` clean; step-execution + drive-prompt-queue
+(+ abort) suites 25 tests / 146 assertions green.

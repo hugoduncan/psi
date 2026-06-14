@@ -238,7 +238,6 @@
      :branch :success
      :payload envelope
      :raw-outputs raw-outputs
-     :assistant-text assistant-text
      :assistant-message assistant-message}))
 
 (defn- execute-session-turn-outcome
@@ -255,7 +254,7 @@
    - `{:disposition :failed :payload failure :branch :error}`;
    - `{:disposition :blocked :payload blocked-payload :branch :error|:success}`;
    - `{:disposition :ok :payload envelope :branch :success
-       :raw-outputs ... :assistant-text ... :assistant-message ...}`.
+       :raw-outputs ... :assistant-message ...}`.
 
    `:branch :success` outcomes still require the caller's pre-record stopped?
    recheck (CHECK B); `:branch :error` outcomes do not (preserving the byte-exact

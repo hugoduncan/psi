@@ -1313,7 +1313,7 @@ consolidates them — it does not first-author them.
 
 ## Code-shaper review follow-ups (pass 5)
 
-- [ ] CS-6 — Remove the dead `:assistant-text` key from the
+- [x] CS-6 — Remove the dead `:assistant-text` key from the
   `session-turn-ok-envelope` return map (`statechart_runtime/step_execution.clj`)
   and from the `execute-session-turn-outcome` docstring's `:branch :success`
   shape. No caller reads `(:assistant-text outcome)`
@@ -1326,3 +1326,15 @@ consolidates them — it does not first-author them.
   `locally_comprehensible`). Keep `:assistant-message` (the drain consumes it).
   Behaviour-preserving; re-run step-execution + drive-prompt-queue (+ abort)
   suites + `clj-kondo`.
+  **DONE:** removed `:assistant-text assistant-text` from the
+  `session-turn-ok-envelope` return map and the `:assistant-text ...` token from
+  the `execute-session-turn-outcome` docstring's `:branch :success` shape.
+  Confirmed dead first: the two `execute-session-turn-outcome` call sites
+  (`execute-session-step!`, `drive-session-prompt-queue!`) read only
+  `:disposition`/`:branch`/`:payload`/`:raw-outputs` (via `turn-local-outputs`)/
+  `:assistant-message` — no `(:assistant-text outcome)` read anywhere. The
+  `assistant-text` destructure stays (still feeds `raw-outputs`
+  `:final-llm-reply`/`:text` and the structured-output result builders);
+  `:assistant-message` retained (the drain's transcript accumulation consumes it).
+  Behaviour-preserving; `clj-kondo` clean; step-execution + drive-prompt-queue
+  (+ abort) suites 25 tests / 146 assertions green.
