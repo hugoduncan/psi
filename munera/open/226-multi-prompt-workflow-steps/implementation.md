@@ -2650,3 +2650,17 @@ This is a structural-call property, not an observable behaviour; the
 characterization test (`single-prompt-session-step-envelope-characterization-test`)
 plus the drive-order/structured-output tests pin the observable equivalence the
 shared primitive guarantees, so a behavioural drift is caught. No item raised.
+
+## Test-review follow-up execution (pass 5)
+
+- **TR-7 — DONE.** Added the `:prompts`-on-non-session-step compiler-guard test
+  to `compiler_test.clj`'s `compile-edn-prompts-step-test`, mirroring the existing
+  `:prompt-workflow` non-session test (`compiler_test.clj:128`): compile a
+  workflow whose step carries `:prompts` with `:type :delegate` and assert
+  `error` = `` "`:prompts` is allowed only on `:session` steps" ``. This pins the
+  authoring-time `compile-prompts-step` session guard (`compiler.clj:226`) so a
+  regression deleting/weakening it now fails the suite (previously green — the
+  IR-level `:prompt-ref-non-session-step` test exercises only the *ref*
+  discriminator, a different path). Test-only; no production change.
+  `clj-kondo` clean; focused workflow-loader `compiler-test` 4 tests / 57
+  assertions green (+1 assertion).

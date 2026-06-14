@@ -999,7 +999,7 @@ consolidates them — it does not first-author them.
 
 ## Test-review follow-ups (pass 5)
 
-- [ ] TR-7 — Add a compiler test for the `:prompts`-on-non-session-step rejection
+- [x] TR-7 — Add a compiler test for the `:prompts`-on-non-session-step rejection
   guard (`workflow-loader/compiler.clj:226`, `compile-prompts-step`). The guard
   rejects `:prompts` authored on a non-`:session` step with `` "`:prompts` is
   allowed only on `:session` steps" `` — the authoring-time enforcement that

@@ -488,4 +488,17 @@
                               :prompts [{:name "architecture"
                                          :contributions [{:type :template :text "arch" :vars {}}]}]}]}
             :source-path "/tmp/design-review.edn"})]
-      (is (= "`:prompts` cannot be combined with a step-level `:prompt-workflow`" error)))))
+      (is (= "`:prompts` cannot be combined with a step-level `:prompt-workflow`" error))))
+
+  (testing "a :prompts step on a non-session step is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :delegate
+                              :prompts [{:name "architecture"
+                                         :contributions [{:type :template :text "arch" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "`:prompts` is allowed only on `:session` steps" error)))))
