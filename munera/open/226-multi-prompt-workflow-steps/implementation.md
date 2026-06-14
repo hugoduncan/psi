@@ -2293,3 +2293,39 @@ Assessed and judged sound:
   idempotency; concepts) and CHANGELOG `[Unreleased]` entry present and accurate.
 
 No new actionable findings. Implementation review converges — REVIEW_COMPLETE.
+
+## Test review (task-test-review skill)
+
+Applied `λ review_tests`: well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps(injectable ∧ nullable ∧ ¬mock ∧ ¬stub). Tests are largely exemplary —
+the drive-prompt-queue, abort, progression-recording, ir-prompts, and
+source-resolution suites assert on **state/outputs** (never interactions), drive
+**real** functions (real `split-step-session-conversation`, real `create-run` +
+source resolution, real progression substrate), and inject the **nullable**
+`:workflow-execute-actor-turn-fn` ctx seam rather than stubbing. Two actionable
+gaps found:
+
+- **T-1 (¬stub / nullable-seam): Slice-1 characterization test stubs via
+  `with-redefs` where the injectable nullable seam exists.**
+  `single-prompt-session-step-envelope-characterization-test`
+  (`step_execution_test.clj`, task-introduced commit `fceaff3b6`) monkey-patches
+  `turn-execution/execute-actor-turn!` with `with-redefs`, while the project's own
+  nullable boundary seam `:workflow-execute-actor-turn-fn` on `ctx` exists
+  (`turn_execution_contract.clj`) and is used cleanly by the sibling
+  `drive-session-prompt-queue!` tests. The skill requires infra deps be
+  `injectable ∧ nullable ∧ ¬stub`; `with-redefs` is a stub. Convert the
+  characterization test to inject the turn fn via `ctx`
+  (`{:workflow-execute-actor-turn-fn (fn …)}`), dropping `with-redefs`. (Pre-existing
+  `execute-session-step!` tests in the same ns share the stub pattern; out of
+  task scope — fix the task-introduced characterization test only.)
+
+- **T-2 (behaviour-coverage gap): no covering test for B1(b) — a `:prompt` on a
+  `:yield` ref is invalid.** AC-3 / Slice-4 enumerate `:prompt` as `:output`-only,
+  never `:yield`; `prompt-source-ref-validation-test` exercises every **other**
+  invalid `:prompt` case (non-session, single-prompt, unknown-group,
+  non-text-surface, same-step) + the judge carve-out + back-compat, but **not**
+  the `:yield` case. The rule is enforced structurally (`:prompt` lives only on
+  `step-output-ref-schema`, not `step-yield-ref-schema`), so a schema regression
+  unifying/loosening those shapes would go uncaught. Add a test asserting a
+  `{:step s :prompt p :yield k}` source-ref is rejected (structural-errors),
+  completing the AC-3 invalid-case coverage.

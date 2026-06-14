@@ -868,3 +868,21 @@ consolidates them — it does not first-author them.
   on design.md first is not misled. Low-severity coherence fix.
   **DONE:** `## Status` now reads "Implementation complete; under implementation
   review." (capability-only note preserved; 227-dependency note preserved).
+
+## Test-review follow-ups (pass 1)
+
+- [ ] T-1 — Convert the Slice-1
+  `single-prompt-session-step-envelope-characterization-test`
+  (`step_execution_test.clj`) from `with-redefs` stubbing of
+  `turn-execution/execute-actor-turn!` to injecting the nullable
+  `:workflow-execute-actor-turn-fn` ctx seam (the same seam the
+  `drive-session-prompt-queue!` tests use), so the task-introduced test obeys the
+  `¬stub ∧ nullable` methodology. Keep the asserted envelope shape unchanged (it
+  is the R4 done-gate comparand). Scope to the task-introduced characterization
+  test only; the pre-existing `execute-session-step!` with-redefs tests are out
+  of scope.
+- [ ] T-2 — Add a covering test for B1(b) (AC-3): a `:prompt` discriminator on a
+  `:yield` ref (`{:step s :prompt p :yield k}`) is invalid. Assert it is rejected
+  (structural-errors, since `:prompt` is absent from `step-yield-ref-schema`) in
+  `ir_prompts_test/prompt-source-ref-validation-test`, completing the AC-3
+  invalid-`:prompt` case coverage (every other invalid case is already tested).
