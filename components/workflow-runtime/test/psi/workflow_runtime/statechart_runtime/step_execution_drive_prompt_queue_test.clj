@@ -5,7 +5,6 @@
    within the file-length budget."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-runtime.progression-recording :as progression-recording]
    [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
    [psi.workflow-runtime.step-test-support :as step-test-support]
    [psi.workflow-step-materialization.core :as materialization]))
@@ -83,8 +82,7 @@
              (map :prompt @submitted*))
           "prompts submitted in author order; group 0 uses the pre-split prompt")
       ;; progression-driven per-prompt records, introspectable, in order (S4)
-      (let [records (progression-recording/prompt-group-turn-records
-                     (get-in @state* (progression-recording/run-path run-id)) step-id)]
+      (let [records (step-test-support/prompt-group-records state* run-id step-id)]
         (is (= [0 1 2] (mapv :index records)))
         (is (= ["architecture" "ambiguity" "consistency"] (mapv :name records)))
         (is (= "reply-PROMPT-architecture"
@@ -104,44 +102,26 @@
         (is (= ["architecture" "ambiguity" "consistency"]
                (map :name (:prompt-group-outputs outputs))))))))
 
-(deftest drive-session-prompt-queue-resume-skips-recorded-prompts-test
-  (testing "a mid-queue re-entry runs only the un-run prompts (progression-driven, no re-fire of recorded turns)"
-    (let [run-id "run-1"
-          step-id "design-review"
-          ;; attempt already has a recorded turn for index 0.
-          state* (recorded-turns-state*
-                  run-id step-id
-                  [{:index 0 :name "architecture"
-                    :outputs {:final-llm-reply "prior"}}])
-          turn-calls* (atom 0)
-          submitted* (atom [])
-          execute-turn (fn [_ctx _session-id prompt]
-                         (swap! turn-calls* inc)
-                         (swap! submitted* conj prompt)
-                         (step-test-support/ok-turn prompt))
-          ctx {:state* state*
-               :workflow-execute-actor-turn-fn execute-turn}
-          working-memory* (atom {:current-step-id step-id})
-          event-queue* (atom [])
-          prompt-queue [{:name "architecture" :contributions []}
-                        {:name "ambiguity" :contributions []}]]
-      (drive! {:ctx ctx :step-def {:name step-id :type :session}
-               :state* state* :run-id run-id :step-id step-id
-               :working-memory* working-memory* :event-queue* event-queue*
-               :prompt-queue prompt-queue})
-      ;; index 0 already recorded → never re-submitted; only index 1 runs
-      (is (= 1 @turn-calls*) "only the un-run prompt fires a turn")
-      (is (= ["PROMPT-ambiguity"] @submitted*))
-      (is (= :actor/done (:event (first @event-queue*)))))))
-
 ;;;; task 226 Slice 5 — resume-from-progression across process-restart / replay.
 ;;;;
-;;;; Slice 3 proved the in-run drain re-reads progression each iteration; Slice 5
-;;;; proves that re-driving against a FRESHLY reconstructed state* + ctx (no
-;;;; in-memory loop state carried across the restart) reconstructs queue position
-;;;; purely from persisted per-prompt progression and never re-fires a recorded
-;;;; turn's `ai/generate` effect (P8 observable: the per-prompt turn-call count
-;;;; at the execute-turn seam is zero for any prompt with an existing record).
+;;;; The progression-skip contract (skip every recorded prompt, run only un-run
+;;;; ones) is exercised by the reconstructs-position test below. Slice 3 proved
+;;;; the in-run drain re-reads progression each iteration; Slice 5 proves that
+;;;; re-driving against a FRESHLY reconstructed state* + ctx (no in-memory loop
+;;;; state carried across the restart) reconstructs queue position purely from
+;;;; persisted per-prompt progression and never re-fires a recorded turn's
+;;;; `ai/generate` effect (P8 observable: the per-prompt turn-call count at the
+;;;; execute-turn seam is zero for any prompt with an existing record).
+;;;;
+;;;; TS-4: a separate in-run `resume-skips-recorded-prompts-test` previously
+;;;; exercised the SAME synchronous `drive!`-over-`recorded-turns-state*`
+;;;; mechanism with a strictly weaker assertion set. Because the realized drain
+;;;; is synchronous, no in-memory loop state distinguishes "in-run" from
+;;;; "restart" (R-1/R-5), so the live-vs-restart distinction was documentary, not
+;;;; behavioural — there is no genuinely-in-run-only observable to assert. It was
+;;;; folded into this single, well-named AC-7 progression-skip test (its
+;;;; assertions are a strict superset: prior records retained verbatim + reaches
+;;;; `:actor/done`).
 
 (deftest drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test
   (testing "a restart re-drive against reconstructed persisted progression runs only un-run prompts (zero re-fire of recorded turns, P8/AC-7)"
@@ -179,8 +159,7 @@
           "position reconstructed purely from persisted progression (next un-run = index 2)")
       ;; Corroborating observable: no second turn record / no progression mutation
       ;; for an already-recorded prompt; the prior records are retained verbatim.
-      (let [records (progression-recording/prompt-group-turn-records
-                     (get-in @state* (progression-recording/run-path run-id)) step-id)]
+      (let [records (step-test-support/prompt-group-records state* run-id step-id)]
         (is (= [0 1 2] (mapv :index records)) "one record per index, no duplicate append")
         (is (= "prior-arch" (get-in records [0 :outputs :final-llm-reply]))
             "pre-restart record for index 0 retained verbatim")
@@ -212,8 +191,7 @@
       ;; No progression mutation: the records are untouched.
       (is (= records
              (mapv #(dissoc % :recorded-at)
-                   (progression-recording/prompt-group-turn-records
-                    (get-in @state* (progression-recording/run-path run-id)) step-id)))
+                   (step-test-support/prompt-group-records state* run-id step-id)))
           "no second turn record written on replay")
       ;; Post-drain route still reached (queue already drained).
       (is (= :actor/done (:event (first @event-queue*)))))))
@@ -292,8 +270,7 @@
                :prompt-queue prompt-queue})
       (is (= 0 @turn-calls*) "zero turns run on an upfront structured-request block")
       (let [pending (:pending-actor-result @working-memory*)
-            records (progression-recording/prompt-group-turn-records
-                     (get-in @state* (progression-recording/run-path run-id)) step-id)]
+            records (step-test-support/prompt-group-records state* run-id step-id)]
         (is (= :blocked (:kind pending)))
         (is (= :blocked (get-in pending [:payload :outcome])))
         (is (empty? records) "zero per-prompt records on an upfront block")

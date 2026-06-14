@@ -2871,3 +2871,38 @@ progression-read idiom and the resume/restart redundancy were left behind).
   in-run test a genuinely-in-run-only observable the restart test cannot assert,
   or fold it into the restart test (keeping one well-named AC-7 skip test), so the
   two are not near-duplicates.
+
+## Test-shaper follow-up execution (pass 9 — TS-3 + TS-4) — ψ
+
+Executed the two pass-9 follow-ups. Test-only; no production change.
+
+- **TS-3 — one spelling for the progression-record read.** Lifted
+  `prompt-group-records` (state*/run-id/step-id → records, over the existing
+  `workflow-recording` alias) and `recorded-indices` (`mapv :index` over it) into
+  `step-test-support`. `_abort_test` now aliases `recorded-indices` and dropped
+  its private def **and** its now-unused `progression-recording` require. `_test`
+  replaced **all 4** inline `prompt-group-turn-records` reads — the 3 the item
+  named (in-order, reconstructs, replay) **plus** the blocks-upfront read it
+  undercounted — with `step-test-support/prompt-group-records`, then dropped its
+  now-unused `progression-recording` require. Replacing the 4th honours the
+  item's stated goal ("the substrate-read has one spelling"); leaving it would
+  have kept the very divergence TS-3 closes.
+
+- **TS-4 — folded the near-duplicate resume test (option b).** Chose folding over
+  manufacturing an in-run-only observable: the realized drain is synchronous, so
+  no in-memory loop state distinguishes "in-run" from "restart" (R-1/R-5) and
+  there is no genuinely-in-run-only observable to assert — option (a) would invent
+  a behavioural distinction that does not exist. Removed the Slice-3
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test`; the Slice-5
+  `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
+  (assertions a strict superset: prior records retained verbatim + reaches
+  `:actor/done`) is now the single well-named AC-7 progression-skip test. Recorded
+  the fold rationale in the Slice-5 namespace comment and updated the AC-7 TraceID
+  in steps.md (Final verification) to point at the surviving test. The two
+  historical Slice-3/Slice-6 DONE notes that mention the removed test by name are
+  left as-is (period-accurate narrative; the current source-of-truth AC-7 mapping
+  is what governs coverage).
+
+Verification: `clj-paren-repair` no-op on all three files; `clj-kondo` clean;
+both drain suites 13 tests / 61 assertions green (was 14/64 — one folded test, its
+3 assertions); full workflow-runtime suite 132 tests / 723 assertions green.

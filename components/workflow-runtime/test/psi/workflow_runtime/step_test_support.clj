@@ -125,6 +125,21 @@
   [group]
   (str "PROMPT-" (:name group)))
 
+(defn prompt-group-records
+  "Read the per-prompt turn records recorded under the step's latest attempt from
+   the live `state*` atom — the progression substrate both sibling drain
+   namespaces consult to assert progression-driven selection / non-re-fire. One
+   spelling for the substrate read (TS-3)."
+  [state* run-id step-id]
+  (workflow-recording/prompt-group-turn-records
+   (get-in @state* (workflow-recording/run-path run-id)) step-id))
+
+(defn recorded-indices
+  "The recorded prompt-group indices under the step's latest attempt — the
+   progression-state probe the abort tests assert against (TS-3)."
+  [state* run-id step-id]
+  (mapv :index (prompt-group-records state* run-id step-id)))
+
 (defn drive!
   "Invoke `drive-session-prompt-queue!` by named keys. Derives the first group's
    pre-split prompt from `prompt-builder` applied to the queue head and supplies

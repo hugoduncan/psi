@@ -7,18 +7,12 @@
    prompt itself leaves no completed turn record (AC-5/AC-6/P10/P12/P13)."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-runtime.progression-recording :as progression-recording]
    [psi.workflow-runtime.step-test-support :as step-test-support]))
 
 (def ^:private running-attempt-state* step-test-support/running-attempt-state*)
 (def ^:private drive! step-test-support/drive!)
 (def ^:private ok-turn step-test-support/ok-turn)
-
-(defn- recorded-indices
-  [state* run-id step-id]
-  (mapv :index
-        (progression-recording/prompt-group-turn-records
-         (get-in @state* (progression-recording/run-path run-id)) step-id)))
+(def ^:private recorded-indices step-test-support/recorded-indices)
 
 (deftest drive-session-prompt-queue-intermediate-turn-error-fails-naming-prompt-test
   (testing "an intermediate-turn error aborts to :failed naming the failing prompt; prior records retained, failing prompt leaves no record, routing skipped (AC-5/G1)"

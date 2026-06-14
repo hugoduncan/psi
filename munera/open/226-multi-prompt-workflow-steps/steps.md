@@ -471,8 +471,8 @@ consolidates them — it does not first-author them.
   - **AC-6** inter-prompt/in-flight cancellation —
     `drive-session-prompt-queue-inter-prompt-cancellation-test`.
   - **AC-7** resume-from-progression idempotency —
-    `...-resume-skips-recorded-prompts-test`,
-    `...-reconstructs-position-from-persisted-progression-test`,
+    `...-reconstructs-position-from-persisted-progression-test` (the single
+    progression-skip test after the TS-4 fold of `...-resume-skips-recorded-prompts-test`),
     `...-replay-fully-recorded-fires-zero-turns-test`.
   - **AC-8** docs + IR-validation + runtime coverage — `session-prompts-grammar-validation-test`
     (ir-prompts-test) + `compile-edn-prompts-step-test` + the runtime suites above
@@ -1085,7 +1085,7 @@ consolidates them — it does not first-author them.
 
 ## Test-shaper follow-ups (pass 9)
 
-- [ ] TS-3 — Consolidate the divergent progression-record-reading idiom across
+- [x] TS-3 — Consolidate the divergent progression-record-reading idiom across
   the two sibling drain namespaces (TS-1/TS-2 lineage escapee). `_abort_test.clj`
   defines a private `recorded-indices` helper while
   `step_execution_drive_prompt_queue_test.clj` re-spells
@@ -1098,8 +1098,17 @@ consolidates them — it does not first-author them.
   `_test`, so the substrate-read has one spelling
   (`consistent(test_abstractions) ∧ economical`). Test-only; no production change;
   re-run both drain suites green.
+  **DONE:** lifted `prompt-group-records` + `recorded-indices` into
+  `step-test-support` (over the existing `workflow-recording` alias). `_abort_test`
+  now aliases `recorded-indices` and dropped both its private `recorded-indices`
+  def **and** its now-unused `progression-recording` require. `_test` replaced
+  **all 4** inline `prompt-group-turn-records` reads (the 3 named — in-order,
+  reconstructs, replay — **plus** the blocks-upfront read the item undercounted,
+  so the spelling is genuinely uniform) with
+  `step-test-support/prompt-group-records`, and dropped its now-unused
+  `progression-recording` require. `clj-kondo` clean; both drain suites green.
 
-- [ ] TS-4 — Reconcile the near-duplicate Slice-3 / Slice-5 resume tests
+- [x] TS-4 — Reconcile the near-duplicate Slice-3 / Slice-5 resume tests
   (`economical ∧ minimal(redundant_tests)`). `drive-session-prompt-queue-resume-skips-recorded-prompts-test`
   (Slice 3) and `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
   (Slice 5) exercise the **identical** mechanism (`drive!` over a freshly-built
@@ -1110,3 +1119,12 @@ consolidates them — it does not first-author them.
   behavioural. Either (a) give the in-run test a genuinely-in-run-only observable
   the restart test cannot assert, or (b) fold it into the restart test (one
   well-named AC-7 progression-skip test), so the two stop being near-duplicates.
+  **DONE (option b):** chose folding because the synchronous drain admits **no**
+  genuinely-in-run-only observable (option a would manufacture a distinction that
+  does not exist behaviourally). Removed the Slice-3
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test`; the Slice-5
+  `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
+  (whose assertions are a strict superset: prior records retained verbatim +
+  reaches `:actor/done`) is now the single, well-named AC-7 progression-skip test.
+  Updated the Slice-5 namespace comment to record the fold rationale and updated
+  the AC-7 TraceID below. Both drain suites green (132/723 full workflow-runtime).
