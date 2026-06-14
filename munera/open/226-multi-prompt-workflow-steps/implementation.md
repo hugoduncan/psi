@@ -2051,3 +2051,46 @@ actionable coherence finding; R-1/R-2/R-3 confirmed done.
   parallel restart/replay overclaim (it speaks only of assembly-time vs.
   post-drain resolution, which is accurate) — no edit needed there. Docs-only
   change; no code/test impact.
+
+## Implementation review (task-implementation-review) — ψ, pass 3
+
+Re-reviewed code+tests+docs against the (R-1..R-4-reconciled) design. Build
+quality remains high: clj-kondo clean on `components/workflow-runtime/src`;
+focused suites green — drive-prompt-queue + abort + ir-prompts +
+progression-recording = 11 tests / 73 assertions; ir + target-ir-compiler +
+step-execution + workflow-step-materialization = 28 tests / 232 assertions. IR
+`:prompt` source-ref validation (`prompt-ref-errors`) and runtime resolution
+(`source-resolution/resolve-source-ref` per-prompt branch) are symmetric and
+clean; the post-drain-envelope / progression substrate split is coherent. R-1..R-4
+confirmed done. **One new actionable coherence finding (R-5).**
+
+- **R-5 (coherence, spec↔code; "one unified runtime path" overclaim).** design.md
+  asserts a **single** unified runtime queue path with single-prompt as the N=1
+  degenerate "**not a separately maintained path**" (AC-2, design.md:92-93), "so
+  the runtime drives **one** queue path" (design.md:156), "One unified queue path …
+  single-prompt = N=1 degenerate (`λone_way`, no drift)" (design.md:219). The code
+  unifies only the **per-turn primitive** (`execute-session-turn-outcome`): at
+  runtime `statechart_runtime.clj` dispatches on `(some :name prompt-queue)` to
+  **two** separately-maintained driver functions —
+  `step-execution/drive-session-prompt-queue!` (named `:prompts`) **vs.**
+  `step-execution/execute-session-step!` (unnamed N=1 `:contributions`). The N=1
+  path does **not** drive through the progression-based drain
+  (`next-un-run-prompt-group`) at all — it runs `prompt` directly — and it
+  **duplicates** the disposition→`record-actor-pending!` control flow (the
+  `:cancelled`/`:failed`/`:blocked`/`:ok` case + structured-request gate) that the
+  drain loop body also carries. So a change to disposition/record semantics (as
+  P13's `:blocked` addition was) must be made in **two** places — the exact drift
+  the "one path / no drift" design language claims is precluded. This split is
+  partly **forced**: the unnamed degenerate intentionally records **no** per-prompt
+  turn record (design C3), so it cannot advance through the progression-driven
+  drain loop (which selects by recorded indices) without an infinite loop. Resolve
+  by **either** (a) reconciling the design language (AC-2 / Grammar
+  "drives one queue path" / Architecture "no drift") to state that the unification
+  is at the **turn-primitive** level (`execute-session-turn-outcome`), while the
+  N=1 degenerate uses a distinct thin driver (`execute-session-step!`) **because**
+  the unnamed group records no progression record and so cannot drive the
+  progression-based drain — i.e. acknowledge the two drivers + shared primitive,
+  the same spec↔code reconciliation R-1 performed — **or** (b) unify the two
+  drivers so the N=1 unnamed case also flows through `drive-session-prompt-queue!`
+  (e.g. a one-shot/unnamed mode that records no per-prompt record yet still
+  terminates), removing the duplicated disposition-handling control flow.

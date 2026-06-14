@@ -777,3 +777,18 @@ consolidates them — it does not first-author them.
   to the not-yet-realized F1 target (synchronous drain today). Verified
   `doc/workflow-grammar-concepts.md` *Per-prompt output surfaces* carries no
   parallel restart/replay overclaim (no edit needed). Docs-only.
+
+## Implementation-review follow-ups (pass 3)
+
+- [ ] R-5 — Reconcile the design's "one unified runtime path / not a separately
+  maintained path / no drift" claim (AC-2 design.md:92-93; "drives one queue
+  path" design.md:156; Architecture "no drift" design.md:219) with the two-driver
+  reality: `statechart_runtime.clj` dispatches on `(some :name prompt-queue)` to
+  `drive-session-prompt-queue!` (named) vs. `execute-session-step!` (unnamed N=1),
+  which duplicate the disposition→`record-actor-pending!` control flow. Choose
+  **either** (a) reword the design so the unification is at the turn-primitive
+  level (`execute-session-turn-outcome`) and the N=1 degenerate uses a distinct
+  thin driver because the unnamed group records no progression record (so it
+  cannot drive the progression-based drain) — the R-1-style spec↔code
+  reconciliation — **or** (b) unify so the N=1 unnamed case also flows through
+  `drive-session-prompt-queue!`, removing the duplicated disposition handling.
