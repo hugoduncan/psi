@@ -231,3 +231,30 @@ consolidates them — it does not first-author them.
   acting→(judging)→record-result statechart topology / no per-prompt statechart
   states (plan Touch point `statechart.clj`), or drop that touch point if it is
   subsumed by the `statechart_runtime.clj` resume-branch step.
+
+## Plan-review follow-ups (ambiguity, pass 2)
+
+- [ ] P5 — State in plan.md (Slice 3 / R5) and steps.md Slice 3 how the queue
+  driver identifies the **final** group for structured-output gating, reconciled
+  with the no-counter rule: final-turn detection uses the static queue position
+  (last group in the ordered normalized IR queue), independent of the
+  progression-driven *selection* of the next un-run prompt (which forbids an
+  in-memory counter). Make explicit that "final turn" is an IR/position property,
+  not progression/counter state.
+- [ ] P6 — Define the "progression-state probe" test observable in plan.md
+  Slice-order 3 and steps.md Slice 3: name the concrete observable the probe
+  reads (e.g. recorded per-prompt progression entries under the step's attempt in
+  `progression_recording.clj`, a runtime introspection surface, or the
+  `:pending-actor-result` records map), so "assert via a progression-state probe,
+  not turn count" is executable as written.
+- [ ] P7 — Define the scope of "full existing session-step suite" in the Slice-1
+  done-gate (plan.md:154 / steps.md:35): name which test namespaces/suite
+  (`step_execution_test.clj` only, the whole workflow-runtime suite, or all three
+  component Scry suites) must be green-unchanged to gate Slice 1, distinct from
+  the Final-verification three-suite run.
+- [ ] P8 — Name the concrete observable used to assert "no `ai/generate` re-fire"
+  / "zero re-fired `ai/generate` effects" across Slice 3 (live drain) and Slice 5
+  (restart/replay resume): emitted-`ai/generate`-effect count at the
+  dispatch/effect boundary, a generate-seam invocation probe, or absence of a
+  second turn record / progression mutation for an already-recorded prompt — so
+  the idempotency acceptance for both slices has an enforceable measurement.

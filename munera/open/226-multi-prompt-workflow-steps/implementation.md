@@ -804,3 +804,68 @@ these are task-artifact consistency reconciliations).
   states (plan Touch point `statechart.clj`), since that touch point had no
   covering step (steps Slice 5 covers the distinct `statechart_runtime.clj`
   resume branch). Kept the touch point rather than dropping it.
+
+## Plan/steps ambiguity review (pass 2) — ψ
+
+Re-reviewed plan.md + steps.md for ambiguities (statements admitting >1
+interpretation, undefined terms, unspecified execution/test-observable edge
+behaviour), distinct from pass 1 (P1–P4) and the inconsistency pass (PI1–PI6),
+all resolved. Four **new** actionable ambiguities found (P5–P8); recorded as
+unchecked items in steps.md. Verified-clear: normalization ownership (P1),
+docs-cadence (P2), equivalence-baseline artifact (P3), and the Slice 3/5 in-run-
+vs-restart boundary (P4) are now explicit; abort-path outcomes match AC-5/AC-6.
+
+- **P5 — Final-turn structured-output gating vs the no-counter
+  progression-driven selection rule (Slice 3 / R5).** Slice 3 explicitly forbids
+  an in-memory counter for picking the next prompt ("progression-driven, **not**
+  an in-memory counter"), yet R5 + the Slice 3 step "Request structured
+  `:outputs` on the **final** turn only" require the driver to recognize that a
+  selected turn is the *last* one. The plan/steps never state how the driver
+  identifies the final group while selecting progression-driven: the static
+  ordered IR queue makes "final" = last index (derivable from IR, independent of
+  any counter, consistent with the no-counter rule which governs *next-un-run
+  selection* only), but this is left implicit. A reader cannot tell whether
+  final-turn detection is permitted to use the static queue length/position or
+  whether it (illegally) needs the forbidden counter. Reconcile by stating that
+  final-turn detection uses the static queue position (the last group in the
+  ordered normalized IR queue), orthogonal to the progression-driven *selection*
+  of the next un-run prompt.
+
+- **P6 — "progression-state probe" is an undefined test observable (Slice 3
+  acceptance).** Both plan.md Slice-order 3 and steps.md Slice 3 assert the
+  ordering/selection invariant "via a progression-state probe (not turn count)",
+  but neither defines what the probe reads. The acceptance is not executable as
+  written: a reader cannot tell what observable the test inspects (the recorded
+  per-prompt progression entries under the step's attempt in
+  `progression_recording.clj`? a runtime/EQL introspection surface? the
+  `:pending-actor-result` records map?). Name the concrete observable the probe
+  reads so "assert via a progression-state probe, not turn count" has a definite
+  meaning.
+
+- **P7 — "full existing session-step suite" scope is undefined for the Slice-1
+  done-gate.** Slice 1's done-gate (plan.md:154, steps.md:35) requires "the full
+  existing session-step suite green unchanged" alongside the committed
+  characterization test, but the concrete scope of "session-step suite" is never
+  defined — only `step_execution_test.clj` is named (for the characterization
+  test), while Final verification names three separate component Scry suites
+  (workflow-runtime + workflow-loader + workflow-step-materialization). It is
+  ambiguous whether the Slice-1 "session-step suite" gate is just
+  `step_execution_test.clj`, the whole workflow-runtime suite, or all three
+  component suites. Define which test namespaces/suite constitute the
+  "session-step suite" whose green-unchanged status gates Slice 1.
+
+- **P8 — The observable for "no `ai/generate` re-fire" / "zero re-fired
+  `ai/generate` effects" is unspecified (Slices 3 and 5).** Multiple steps assert
+  the idempotency invariant — Slice 3: "never re-fire a completed turn within the
+  live run"; Slice 5: "completed turns not re-fired", "replaying the event log
+  reproduces the same per-prompt records without re-firing completed
+  `ai/generate` effects", "zero re-fired `ai/generate` effects" — but none states
+  *how a test observes* that a completed turn's `ai/generate` did not re-fire
+  (count of `ai/generate` effects emitted from the dispatch/effect boundary? a
+  stubbed generate seam call-count? absence of a second turn record / no
+  progression mutation for an already-recorded prompt?). Without a named
+  observable the "zero re-fire" acceptance for both slices has no enforceable
+  measurement. Name the concrete observable (e.g. emitted-`ai/generate`-effect
+  count at the effect boundary, or a generate-seam invocation probe) used to
+  assert non-re-fire across Slice 3's live drain and Slice 5's
+  restart/replay resume.
