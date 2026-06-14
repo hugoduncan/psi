@@ -250,7 +250,7 @@
                              ctx* parent-session-id* workflow-run* step-id*)]
        (workflow-step-session-config/effective-config->snapshot
         effective-config (:inherited-defaults workflow-run*))))
-   :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
+   :materialize-workflow-prompt-group-conversation-fn #'workflow-step-materialization/materialize-prompt-group-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!
    :workflow-judge-messages-fn #'persist/messages-from-entries-in
@@ -289,7 +289,7 @@
                                 create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
                                 scheduler-time-source install-default-ui-capability-provider?
                                 get-session-data-fn list-context-sessions-fn find-skill-fn
-                                resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
+                                resolve-workflow-step-session-config-fn
                                 split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
                          :or {persist? true mutations []
                               install-default-ui-capability-provider? true}
@@ -355,9 +355,6 @@
 
                       (contains? opts :resolve-workflow-step-session-config-fn)
                       (assoc :resolve-workflow-step-session-config-fn resolve-workflow-step-session-config-fn)
-
-                      (contains? opts :materialize-workflow-step-session-conversation-fn)
-                      (assoc :materialize-workflow-step-session-conversation-fn materialize-workflow-step-session-conversation-fn)
 
                       (contains? opts :split-workflow-step-session-conversation-fn)
                       (assoc :split-workflow-step-session-conversation-fn split-workflow-step-session-conversation-fn)

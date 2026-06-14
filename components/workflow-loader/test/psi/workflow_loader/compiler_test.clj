@@ -386,3 +386,119 @@
         (finally
           (.delete md-file)
           (.delete dir))))))
+
+(deftest compile-edn-prompts-step-test
+  (testing "a :prompts step with inline :contributions groups compiles, preserving order and shared config"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :session
+                              :tools ["read"]
+                              :prompts [{:name "architecture"
+                                         :contributions [{:type :template :text "arch" :vars {}}]}
+                                        {:name "ambiguity"
+                                         :contributions [{:type :template :text "ambig" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (nil? error))
+      (is (= ["read"] (get-in definition [:steps 0 :tools])))
+      (is (= ["architecture" "ambiguity"]
+             (mapv :name (get-in definition [:steps 0 :prompts]))))
+      (is (= [{:type :template :text "arch" :vars {}}]
+             (get-in definition [:steps 0 :prompts 0 :contributions])))))
+
+  (testing "a group :prompt-workflow body resolves into group :contributions"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-prompts-" (System/nanoTime)))
+          md-file (io/file dir "architecture.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: architecture\ndescription: Arch review\n---\nReview the architecture.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "design-review"
+                         :description "Multi-prompt design review"
+                         :steps [{:name "review"
+                                  :type :session
+                                  :prompts [{:name "architecture"
+                                             :prompt-workflow "architecture.md"}
+                                            {:name "ambiguity"
+                                             :contributions [{:type :template :text "ambig" :vars {}}]}]}]}
+                :source-path (.getAbsolutePath (io/file dir "design-review.edn"))})]
+          (is (nil? error))
+          (is (not (contains? (get-in definition [:steps 0 :prompts 0]) :prompt-workflow)))
+          (is (= [{:type :template :text "Review the architecture." :vars {}}]
+                 (get-in definition [:steps 0 :prompts 0 :contributions]))))
+        (finally
+          (.delete md-file)
+          (.delete dir)))))
+
+  (testing "a prompt-group with both :prompt-workflow and :contributions is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :session
+                              :prompts [{:name "architecture"
+                                         :prompt-workflow "architecture.md"
+                                         :contributions [{:type :template :text "x" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "A prompt-group must define `:prompt-workflow` XOR `:contributions`, not both" error))))
+
+  (testing "a prompt-group with neither :prompt-workflow nor :contributions is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :session
+                              :prompts [{:name "architecture"}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "A prompt-group must define `:prompt-workflow` or `:contributions`" error))))
+
+  (testing "a :prompts step combined with step-level :contributions is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :session
+                              :contributions [{:type :template :text "x" :vars {}}]
+                              :prompts [{:name "architecture"
+                                         :contributions [{:type :template :text "arch" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "`:prompts` cannot be combined with a step-level `:contributions`/`:system-prompt` prompt source"
+             error))))
+
+  (testing "a :prompts step combined with step-level :prompt-workflow is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :session
+                              :prompt-workflow "x.md"
+                              :prompts [{:name "architecture"
+                                         :contributions [{:type :template :text "arch" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "`:prompts` cannot be combined with a step-level `:prompt-workflow`" error))))
+
+  (testing "a :prompts step on a non-session step is rejected"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "design-review"
+                     :description "Multi-prompt design review"
+                     :steps [{:name "review"
+                              :type :delegate
+                              :prompts [{:name "architecture"
+                                         :contributions [{:type :template :text "arch" :vars {}}]}]}]}
+            :source-path "/tmp/design-review.edn"})]
+      (is (= "`:prompts` is allowed only on `:session` steps" error)))))

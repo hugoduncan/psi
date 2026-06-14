@@ -102,6 +102,84 @@
                      (assoc :updated-at (now)))))
     state))
 
+;;; Per-prompt turn records (task 226 Slice 3).
+;;;
+;;; A multi-prompt `:session` step runs N turns inside ONE statechart step,
+;;; against ONE shared child session. Each completed turn for a NAMED prompt-group
+;;; is recorded as an ordered per-prompt turn record on the step's latest attempt
+;;; under `:prompt-group-turns`. The unnamed N=1 degenerate group records NO
+;;; per-prompt record (it contributes only the step-level rollup, design C3).
+;;;
+;;; Records are the canonical progression substrate the queue driver consults to
+;;; pick the next UN-RUN prompt: each record carries its static queue `:index`, so
+;;; selection is progression-driven (read recorded indices), never an in-memory
+;;; counter, making the drain idempotent under resume (design F1) — a group whose
+;;; turn record already exists is never re-submitted.
+
+(defn- latest-attempt-map
+  "The latest attempt map for `step-id` (or nil). Distinct from `latest-attempt`,
+   which returns the whole attempts vector; this resolves the single latest
+   attempt map by index."
+  [workflow-run step-id]
+  (when-let [idx (latest-attempt-index workflow-run step-id)]
+    (get-in workflow-run [:step-runs step-id :attempts idx])))
+
+(defn prompt-group-turn-records
+  "Read the ordered per-prompt turn records recorded on the latest attempt for
+   `step-id`. Returns `[]` when none recorded (single-turn / unnamed degenerate)."
+  [workflow-run step-id]
+  (or (:prompt-group-turns (latest-attempt-map workflow-run step-id)) []))
+
+(defn recorded-prompt-group-indices
+  "Set of static queue indices that already have a recorded per-prompt turn record
+   on the latest attempt for `step-id`."
+  [workflow-run step-id]
+  (into #{} (map :index) (prompt-group-turn-records workflow-run step-id)))
+
+(defn next-un-run-prompt-group
+  "Select the next un-run prompt-group for `step-id` from recorded progression.
+
+   `prompt-queue` is the ordered normalized prompt-queue (one group per turn). The
+   next un-run group is the LOWEST static queue position whose per-prompt turn
+   record does not yet exist on the latest attempt (progression-driven, not a
+   counter). Returns `{:index i :group group :final? bool}` for that group, or
+   `nil` when every group has a recorded turn (the queue is drained)."
+  [workflow-run step-id prompt-queue]
+  (let [recorded (recorded-prompt-group-indices workflow-run step-id)
+        n (count prompt-queue)]
+    (some (fn [i]
+            (when-not (contains? recorded i)
+              {:index i
+               :group (nth prompt-queue i)
+               :final? (= i (dec n))}))
+          (range n))))
+
+(defn record-prompt-group-turn
+  "Append one completed per-prompt turn record to the latest attempt for `step-id`
+   without owning control flow.
+
+   `turn-record` is `{:index i :name group-name :outputs {...}}` for a NAMED group
+   (the unnamed N=1 degenerate records no per-prompt record). Recording is
+   idempotent on `:index`: a turn whose index already has a record is not
+   re-appended, upholding the resume non-re-fire invariant (design F1)."
+  [state run-id step-id turn-record]
+  (let [idx (:index turn-record)]
+    (update-in state (run-path run-id)
+               (fn [workflow-run]
+                 (if (contains? (recorded-prompt-group-indices workflow-run step-id) idx)
+                   workflow-run
+                   (-> workflow-run
+                       (update-attempt step-id
+                                       #(update % :prompt-group-turns
+                                                (fnil conj [])
+                                                (assoc turn-record :recorded-at (now))))
+                       (assoc :updated-at (now))
+                       (append-history :workflow/prompt-group-turn-recorded
+                                       {:run-id run-id
+                                        :step-id step-id
+                                        :prompt-index idx
+                                        :prompt-name (:name turn-record)})))))))
+
 (defn record-step-result
   "Record a successful step result on the latest attempt without owning control flow.
 

@@ -16,6 +16,7 @@
    [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
+   [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.progression-recording :as workflow-progression-recording]
    [psi.workflow-runtime.statechart :as workflow-statechart]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
@@ -147,9 +148,16 @@
             (let [step-config (when session-step?
                                 ((:resolve-workflow-step-session-config-fn ctx)
                                  ctx parent-session-id workflow-run step-id))
+                  ;; task 226 Slice 1 — drive the unified internal prompt-queue.
+                  ;; The N=1 degenerate derives one unnamed group from the
+                  ;; canonical `:session :contributions` and materializes it
+                  ;; through the per-group entry point, reproducing today's
+                  ;; single-prompt conversation byte-for-byte.
+                  prompt-queue (when session-step?
+                                 (workflow-ir/session-step-prompt-queue step-def))
                   session-conversation (when session-step?
-                                         ((:materialize-workflow-step-session-conversation-fn ctx)
-                                          workflow-run step-id))
+                                         ((:materialize-workflow-prompt-group-conversation-fn ctx)
+                                          workflow-run (first prompt-queue)))
                   {:keys [preloaded-messages prompt]}
                   (if session-step?
                     ((:split-workflow-step-session-conversation-fn ctx) session-conversation)
@@ -217,14 +225,14 @@
               (if-not (append-and-start-attempt-if-live! ctx run-id step-id attempt)
                 (do
                   (abort-unattached-session! ctx execution-session)
-                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
+                  (queue/enqueue-cancel! event-queue* working-memory*))
                 (do
                   (record-started-attempt-working-memory! working-memory* step-id attempt-id execution-session)
                   (cond
                     invoke-step?
                     (if (state/workflow-stopped? ctx run-id)
-                      (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-                      (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
+                      (queue/enqueue-cancel! event-queue* working-memory*)
+                      (let [invoke-result (step-execution/invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run attempt-id)
                             {:keys [attempt-data pending-kind payload]} (step-execution/apply-invoke-step-result invoke-result)
                             recorded? (update-state-if-live!
                                        ctx
@@ -245,11 +253,11 @@
                                                     :failure :actor/failed
                                                     :actor/failed)
                                                   {}))
-                          (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))))
+                          (queue/enqueue-cancel! event-queue* working-memory*))))
 
                     delegate-step?
                     (if (state/workflow-stopped? ctx run-id)
-                      (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                      (queue/enqueue-cancel! event-queue* working-memory*)
                       (let [{:keys [pending-kind payload]}
                             (delegate/delegate-step-runtime-result create-workflow-context send-and-drain!
                                                                    (:resolve-inherited-defaults-fn ctx)
@@ -270,14 +278,39 @@
 
                     :else
                     (if (state/workflow-stopped? ctx run-id)
-                      (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                      (queue/enqueue-cancel! event-queue* working-memory*)
                       (do
                         (ensure-workflow-turn-can-start! ctx run-id (:session-id execution-session))
-                        (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
-                                                              #(state/workflow-stopped? ctx run-id))))))))
+                        (if (some :name prompt-queue)
+                          ;; Named multi-prompt queue (task 226): drive the in-run
+                          ;; N-turn drain. Later groups materialize against the live
+                          ;; child session; per-prompt records persist through the
+                          ;; live-state guard so next-un-run selection is
+                          ;; progression-driven (no in-memory counter).
+                          (step-execution/drive-session-prompt-queue!
+                           ctx execution-session step-def step-id attempt-id working-memory* event-queue*
+                           run-id prompt-queue prompt
+                           (fn [group]
+                             ;; Later groups submit only their split :prompt;
+                             ;; :preloaded-messages are intentionally not
+                             ;; re-injected mid-session (single-submission
+                             ;; limitation — see step-execution/later-group-turn-prompt
+                             ;; and doc/workflow-grammar.md).
+                             (step-execution/later-group-turn-prompt
+                              (:materialize-workflow-prompt-group-conversation-fn ctx)
+                              (:split-workflow-step-session-conversation-fn ctx)
+                              workflow-run group))
+                           (fn [index group-name outputs]
+                             (update-state-if-live!
+                              ctx run-id
+                              #(workflow-progression-recording/record-prompt-group-turn
+                                % run-id step-id {:index index :name group-name :outputs outputs})))
+                           #(state/workflow-stopped? ctx run-id))
+                          (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
+                                                                #(state/workflow-stopped? ctx run-id)))))))))
             (catch Exception e
               (if (state/workflow-stopped? ctx run-id)
-                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                (queue/enqueue-cancel! event-queue* working-memory*)
                 (let [failure-payload (merge (ex-data e)
                                              {:message (ex-message e)})
                       attempt-present? (= attempt-id (get-in @working-memory* [:attempt-ids step-id]))
@@ -286,7 +319,7 @@
                                                                                                   :status :pending
                                                                                                   :execution-session-id nil}))]
                   (if-not attempt-started?
-                    (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                    (queue/enqueue-cancel! event-queue* working-memory*)
                     (do
                       (swap! working-memory*
                              (fn [wm]
@@ -324,7 +357,7 @@
                          (assoc :pending-actor-result nil
                                 :step-outputs (assoc (:step-outputs wm) step-id payload)
                                 :updated-at (state/now)))))
-            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
+            (queue/enqueue-cancel! event-queue* working-memory*))
           nil)
 
         :step/record-failure
@@ -340,7 +373,7 @@
                      (-> wm
                          (assoc :pending-actor-result nil
                                 :updated-at (state/now)))))
-            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
+            (queue/enqueue-cancel! event-queue* working-memory*))
           nil)
 
         :judge/enter
@@ -350,7 +383,7 @@
               routing-table (or (:on step-def) {})
               actor-session-id (get-in @working-memory* [:sessions step-id])]
           (if (state/workflow-stopped? ctx run-id)
-            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+            (queue/enqueue-cancel! event-queue* working-memory*)
             (let [judge-result (execution-adapter/execute-judge!
                                 ctx
                                 parent-session-id
@@ -366,7 +399,7 @@
                                  :stopped? #(state/workflow-stopped? ctx run-id)})
                   routing-result (:routing-result judge-result)]
               (if (state/workflow-stopped? ctx run-id)
-                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                (queue/enqueue-cancel! event-queue* working-memory*)
                 (do
                   (swap! working-memory*
                          (fn [wm]
@@ -424,7 +457,7 @@
                                                                             :judge-output (:judge-output judge-result)}))))))))]
           (if recorded?
             (clear-pending-judge-state! working-memory*)
-            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
+            (queue/enqueue-cancel! event-queue* working-memory*))
           nil)
 
         :step/block
@@ -468,7 +501,7 @@
                                                       :last-result-text (get-in last-step-output [:outputs :final-llm-reply])})))))))]
           (if recorded?
             (clear-pending-judge-state! working-memory*)
-            (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))
+            (queue/enqueue-cancel! event-queue* working-memory*))
           nil)
 
         :terminal/record

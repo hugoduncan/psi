@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-judge :as workflow-judge]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.session-persistence.core]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.turn-execution-contract]))
@@ -704,3 +705,55 @@
         (is (= {:action :complete} (:routing-result result)))
         (is (= :valid (get-in result [:judge-output :routing-result :structured-output :status])))
         (is (= "DONE" (get-in result [:judge-output :routing-result :structured-output :value])))))))
+
+(deftest execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test
+  ;; Regression for task 228 implementation review pass 2: the invoke-judge path
+  ;; must drive its deterministic operation against the authoritative just-started
+  ;; attempt-id threaded through `routing-context` (:workflow-attempt-id), NOT the
+  ;; latest attempt re-derived from the `workflow-run` snapshot. The snapshot is
+  ;; captured in :step/enter and can be stale on a re-executed step (its latest
+  ;; attempt is the PREVIOUS one) — re-deriving from it would reintroduce the
+  ;; second-defect :attempt-mismatch failure mode. This is the judge-path parity
+  ;; companion to the step-path
+  ;; `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`.
+  (testing "invoke judge drives the threaded authoritative attempt, not the stale snapshot's latest"
+    (let [handler-calls* (atom 0)
+          reg (deterministic-op-registry/create-registry)
+          _ (deterministic-op-registry/register-operation-in!
+             reg {:id "workflow/pass-feedback-judge"
+                  :handler (fn [_]
+                             (swap! handler-calls* inc)
+                             {:status :ok :data "APPROVED"})})
+          ;; Live state*: attempt-2 is the just-started latest live attempt.
+          state* (atom {:workflows {:runs {"run-1" {:run-id "run-1"
+                                                    :status :running
+                                                    :step-runs {"clarity-status"
+                                                                {:attempts [{:attempt-id "attempt-1"}
+                                                                            {:attempt-id "attempt-2"}]}}}}}})
+          ctx {:state* state*
+               :deterministic-operation-registry reg}
+          ;; Stale snapshot captured before attempt-2 was appended: latest = attempt-1.
+          stale-workflow-run {:run-id "run-1"
+                              :step-runs {"clarity-status" {:attempts [{:attempt-id "attempt-1"}]}}}
+          judge-spec {:type :invoke
+                      :invoke {:operation "workflow/pass-feedback-judge"}}
+          routing-table {"APPROVED" {:goto :next}}
+          result (workflow-judge/execute-judge!
+                  ctx "parent-1" "actor-1" judge-spec routing-table
+                  {:current-step-id "clarity-status"
+                   :step-order ["clarity-status" "next"]
+                   :step-runs {"clarity-status" {:step-id "clarity-status" :iteration-count 1}
+                               "next" {:step-id "next" :attempts [] :iteration-count 1}}
+                   :workflow-run-id "run-1"
+                   :workflow-run stale-workflow-run
+                   :workflow-attempt-id "attempt-2"})
+          attempts (get-in @state* [:workflows :runs "run-1" :step-runs
+                                    "clarity-status" :attempts])]
+      (is (= 1 @handler-calls*) "the judge operation handler runs once")
+      (is (= "APPROVED" (:judge-event result))
+          "the judge operation succeeds (no :attempt-mismatch abort) and routes")
+      (is (= {:action :goto :target "next"} (:routing-result result)))
+      (is (= :entered (:judge-operation-handler-entry-state (nth attempts 1)))
+          "the live just-started attempt (attempt-2) is driven to :entered")
+      (is (nil? (:judge-operation-handler-entry-state (nth attempts 0)))
+          "the stale snapshot's latest attempt (attempt-1) is NOT driven"))))

@@ -1,12 +1,13 @@
 (ns psi.workflow-runtime.ir
-  "Canonical normalized workflow IR schema, semantic validation, and error formatting.
+  "Canonical normalized workflow IR schema and semantic validation.
 
    This namespace defines the runtime-owned validation boundary for compiled
    workflow IR values. It owns:
    - Malli structural schemas for normalized workflow IR
    - minimal IR-intrinsic semantic validation only
-   - human-readable formatting of all compilation error types (compile errors,
-     structural Malli errors, and semantic validation errors)
+
+   Human-readable formatting of compilation errors lives in
+   `psi.workflow-runtime.ir-error-formatting`.
 
    Semantic checks intentionally stop at invariants intrinsic to normalized IR:
    - step refs must target prior steps only
@@ -17,7 +18,6 @@
 
    Broader execution/compiler semantics remain out of scope for this slice."
   (:require
-   [clojure.string :as str]
    [malli.core :as m]
    [psi.session-profile.names :as profile-names]
    [psi.workflow-runtime.structured-output :as structured-output]
@@ -49,12 +49,23 @@
     [:tool-output {:optional true} [:maybe :boolean]]]])
 
 (def step-output-ref-schema
-  [:map
+  ;; The optional `:prompt` discriminator (task 226 Slice 4) addresses a named
+  ;; prompt-group's turn-local output surface within a multi-prompt `:session`
+  ;; step. Absent `:prompt`, the ref addresses the step-level surface. `:prompt`
+  ;; is `:output`-only (never a `:yield` ref — see `step-yield-ref-schema`).
+  ;; Closed so a `:prompt` discriminator cannot ride a yield ref (B1): a
+  ;; `{:step :prompt :yield}` ref fails this schema (no `:output`) AND the closed
+  ;; `step-yield-ref-schema` (extra `:prompt`), making the case structurally
+  ;; unreachable (`unreachable > forbidden`) rather than a semantic carve-out.
+  [:map {:closed true}
    [:step step-name-schema]
+   [:prompt {:optional true} step-name-schema]
    [:output output-key-schema]])
 
 (def step-yield-ref-schema
-  [:map
+  ;; Closed: `:prompt` is `:output`-only, so a `:prompt` key on a yield ref is
+  ;; structurally rejected here (see `step-output-ref-schema`).
+  [:map {:closed true}
    [:step step-name-schema]
    [:yield yield-field-schema]])
 
@@ -164,6 +175,25 @@
    [:source source-contribution-schema]
    [:template template-contribution-schema]])
 
+;;; Normalized internal prompt-queue representation (task 226).
+;;;
+;;; Both authored session-step forms normalize to ONE internal prompt-queue:
+;;; `:contributions`/`:prompt-workflow` -> a single UNNAMED group (step-level
+;;; surfaces only); `:prompts` -> ordered NAMED groups (per-prompt addressing).
+;;; Single-prompt is the genuine N=1 degenerate of this unified representation,
+;;; not a separately maintained path. `ir.clj` owns the schema of the normalized
+;;; queue and its derivation from canonical IR; per the workflow-runtime boundary
+;;; the authored-form -> normalized-queue transform is owned by the IR compiler.
+(def prompt-group-schema
+  [:map
+   [:name {:optional true} [:maybe step-name-schema]]
+   [:contributions [:vector contribution-schema]]])
+
+(def prompt-queue-schema
+  [:vector {:min 1} prompt-group-schema])
+
+(def valid-prompt-queue? (m/validator prompt-queue-schema))
+
 (def invoke-spec-schema
   [:map
    [:operation operation-id-schema]
@@ -179,6 +209,11 @@
     profile-names/valid-profile-name?]])
 
 (def session-spec-schema
+  ;; A session step carries EITHER a single-prompt `:contributions` (the N=1
+  ;; degenerate unnamed group) OR an ordered `:prompts` queue of named groups
+  ;; (task 226). The step-level `:contributions` xor `:prompts` rule is enforced
+  ;; semantically (`session-prompt-queue-errors`); the schema keeps both optional
+  ;; so each authored form validates structurally.
   [:map {:closed true}
    [:model {:optional true} [:maybe model-id-schema]]
    [:session-profile {:optional true} profile-name-schema]
@@ -191,7 +226,8 @@
    [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
    [:logprobs {:optional true} :boolean]
    [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
-   [:contributions [:vector contribution-schema]]])
+   [:contributions {:optional true} [:vector contribution-schema]]
+   [:prompts {:optional true} prompt-queue-schema]])
 
 (def map-prompt-string-schema
   [:map
@@ -380,44 +416,112 @@
        (contains? source-ref :output)
        (contains? (set (keys (:outputs step))) (:output source-ref))))
 
-(defn- ref-errors [step-index step source-ref]
+(def ^:private per-prompt-text-surfaces
+  "The per-prompt turn-local text surfaces a `:prompt`-discriminated ref may
+   address (task 226 Slice 4). Structured/`:result` keys are deferred."
+  #{:final-llm-reply :transcript})
+
+(defn- named-prompt-group-names
+  "The set of named prompt-group names declared by a canonical session `step`
+   (its `:prompts` queue). Empty for single-prompt (`:contributions`) steps."
+  [step]
+  (when (= :session (:type step))
+    (into #{}
+          (keep :name)
+          (get-in step [:session :prompts]))))
+
+(defn- prompt-ref-errors
+  "Validate a `:prompt`-discriminated source-ref `{:step s :prompt p :output k}`
+   (task 226 Slice 4).
+
+   Invalid when target `s` is non-session, single-prompt (no named groups),
+   group `p` is undeclared, key `k` is not a per-prompt text surface, or the ref
+   targets the SAME step being assembled (sibling-group ref) — except when it is
+   the step's own post-drain `:judge` (`judge?`), which resolves after the drain
+   once every turn is recorded (AC-4 carve-out)."
+  [step-index step judge? source-ref]
+  (let [current-step (:name step)
+        {target-step-name :step group-name :prompt output-key :output} source-ref
+        current-index (get-in step-index [current-step :index])
+        target (:step (get step-index target-step-name))
+        same-step? (= target-step-name current-step)
+        group-names (named-prompt-group-names target)]
+    (cond
+      (nil? target)
+      [{:type :missing-step-ref :step current-step :ref source-ref}]
+
+      (not= :session (:type target))
+      [{:type :prompt-ref-non-session-step :step current-step :ref source-ref}]
+
+      (empty? group-names)
+      [{:type :prompt-ref-single-prompt-step :step current-step :ref source-ref}]
+
+      (not (contains? group-names group-name))
+      [{:type :prompt-ref-unknown-group
+        :step current-step
+        :ref source-ref
+        :available-groups (vec group-names)}]
+
+      (not (contains? per-prompt-text-surfaces output-key))
+      [{:type :prompt-ref-non-text-surface
+        :step current-step
+        :ref source-ref
+        :available-surfaces (vec per-prompt-text-surfaces)}]
+
+      ;; Same-step sibling-group ref: forbidden at assembly time, permitted only
+      ;; for the step's own post-drain judge (resolves after every turn records).
+      (and same-step? (not judge?))
+      [{:type :prompt-ref-same-step :step current-step :ref source-ref}]
+
+      same-step?
+      []
+
+      (>= (get-in step-index [target-step-name :index]) current-index)
+      [{:type :non-prior-step-ref :step current-step :ref source-ref}]
+
+      :else
+      [])))
+
+(defn- ref-errors [step-index step judge? source-ref]
   (when (map? source-ref)
-    (let [current-step (:name step)
-          {target-step-name :step output-key :output yield-field :yield} source-ref
-          current-index (get-in step-index [current-step :index])
-          target (get step-index target-step-name)]
-      (cond
-        (nil? target)
-        [{:type :missing-step-ref
-          :step current-step
-          :ref source-ref}]
-
-        (invoke-judge-same-step-output-ref? step current-step source-ref)
-        []
-
-        (>= (:index target) current-index)
-        [{:type :non-prior-step-ref
-          :step current-step
-          :ref source-ref}]
-
-        output-key
-        (if (contains? (set (keys (get-in target [:step :outputs] {}))) output-key)
-          []
-          [{:type :missing-output-key
+    (if (contains? source-ref :prompt)
+      (prompt-ref-errors step-index step judge? source-ref)
+      (let [current-step (:name step)
+            {target-step-name :step output-key :output yield-field :yield} source-ref
+            current-index (get-in step-index [current-step :index])
+            target (get step-index target-step-name)]
+        (cond
+          (nil? target)
+          [{:type :missing-step-ref
             :step current-step
-            :ref source-ref
-            :available-outputs (vec (keys (get-in target [:step :outputs] {})))}])
+            :ref source-ref}]
 
-        yield-field
-        (if (contains? (yield-fields (:step target)) yield-field)
+          (invoke-judge-same-step-output-ref? step current-step source-ref)
           []
-          [{:type :missing-yield-field
-            :step current-step
-            :ref source-ref
-            :available-yield-fields (vec (yield-fields (:step target)))}])
 
-        :else
-        []))))
+          (>= (:index target) current-index)
+          [{:type :non-prior-step-ref
+            :step current-step
+            :ref source-ref}]
+
+          output-key
+          (if (contains? (set (keys (get-in target [:step :outputs] {}))) output-key)
+            []
+            [{:type :missing-output-key
+              :step current-step
+              :ref source-ref
+              :available-outputs (vec (keys (get-in target [:step :outputs] {})))}])
+
+          yield-field
+          (if (contains? (yield-fields (:step target)) yield-field)
+            []
+            [{:type :missing-yield-field
+              :step current-step
+              :ref source-ref
+              :available-yield-fields (vec (yield-fields (:step target)))}])
+
+          :else
+          [])))))
 
 (defn- source-refs-in-source-spec [source-spec]
   (when (and (map? source-spec)
@@ -451,25 +555,70 @@
     :invoke (source-refs-in-invoke-spec (:invoke judge))
     []))
 
-(defn- step-source-refs [step]
-  (concat
-   (case (:type step)
-     :invoke (source-refs-in-invoke-spec (:invoke step))
-     :session (mapcat source-refs-in-contribution
-                      (get-in step [:session :contributions]))
-     :delegate (concat
-                (source-refs-in-source-spec (get-in step [:delegate :target]))
-                (when-let [prompt-string (get-in step [:delegate :prompt-string])]
-                  (case (when (map? prompt-string) (:type prompt-string))
-                    :template (source-refs-in-template-contribution prompt-string)
-                    :map      (mapcat source-refs-in-source-spec
-                                      (vals (:fields prompt-string)))
-                    []))
-                (mapcat source-refs-in-contribution
-                        (get-in step [:delegate :context])))
-     [])
-   (when-let [judge (:judge step)]
-     (source-refs-in-judge judge))))
+(defn- step-body-source-refs
+  "Source refs from a step's assembly-time body (contributions, prompt-group
+   contributions, invoke args, delegate target/prompt-string/context) — NOT its
+   judge. These are validated with the assembly-time same-step prohibition."
+  [step]
+  (case (:type step)
+    :invoke (source-refs-in-invoke-spec (:invoke step))
+    :session (mapcat source-refs-in-contribution
+                     (concat (get-in step [:session :contributions])
+                             (mapcat :contributions (get-in step [:session :prompts]))))
+    :delegate (concat
+               (source-refs-in-source-spec (get-in step [:delegate :target]))
+               (when-let [prompt-string (get-in step [:delegate :prompt-string])]
+                 (case (when (map? prompt-string) (:type prompt-string))
+                   :template (source-refs-in-template-contribution prompt-string)
+                   :map      (mapcat source-refs-in-source-spec
+                                     (vals (:fields prompt-string)))
+                   []))
+               (mapcat source-refs-in-contribution
+                       (get-in step [:delegate :context])))
+    []))
+
+(defn- step-judge-source-refs
+  "Source refs from a step's post-drain `:judge`. Validated with the same-step
+   `:prompt` carve-out (the judge resolves after the drain, task 226 AC-4)."
+  [step]
+  (when-let [judge (:judge step)]
+    (source-refs-in-judge judge)))
+
+(defn- session-prompt-queue-errors
+  "Return prompt-queue precedence/naming errors for a session `step` (task 226).
+
+   A session step carries EITHER a single-prompt `:contributions` (N=1 unnamed
+   group) OR an ordered `:prompts` queue of named groups — never both, never
+   neither. `:prompts` groups must each be named, with names unique within the
+   step. Empty `:prompts` is rejected structurally by `prompt-queue-schema`."
+  [step]
+  (when (= :session (:type step))
+    (let [session (:session step)
+          step-name (:name step)
+          has-contributions? (contains? session :contributions)
+          has-prompts? (contains? session :prompts)]
+      (concat
+       (when (and has-contributions? has-prompts?)
+         [{:type :session-contributions-and-prompts
+           :step step-name}])
+       (when (and (not has-contributions?) (not has-prompts?))
+         [{:type :session-without-prompt-source
+           :step step-name}])
+       (when has-prompts?
+         (let [names (map :name (:prompts session))]
+           (concat
+            (when (some nil? names)
+              [{:type :unnamed-prompt-group
+                :step step-name}])
+            (let [dups (->> names
+                            (remove nil?)
+                            frequencies
+                            (filter #(> (val %) 1))
+                            (mapv key))]
+              (when (seq dups)
+                [{:type :duplicate-prompt-group-name
+                  :step step-name
+                  :duplicate-names dups}])))))))))
 
 (defn semantic-errors
   "Return semantic validation errors for a structurally valid workflow IR.
@@ -508,8 +657,12 @@
               skills-read-errors (skills-without-read-errors step)
               structured-cardinality-errors (structured-output-cardinality-errors step)
               reusable-schema-errors* (reusable-schema-errors step)
-              ref-errors* (mapcat #(ref-errors step-idx step %)
-                                  (step-source-refs step))]
+              prompt-queue-errors (session-prompt-queue-errors step)
+              ref-errors* (concat
+                           (mapcat #(ref-errors step-idx step false %)
+                                   (step-body-source-refs step))
+                           (mapcat #(ref-errors step-idx step true %)
+                                   (step-judge-source-refs step)))]
           (concat on-without-judge
                   judge-without-routing
                   missing-yields
@@ -517,6 +670,7 @@
                   skills-read-errors
                   structured-cardinality-errors
                   reusable-schema-errors*
+                  prompt-queue-errors
                   ref-errors*)))
       steps))))
 
@@ -572,6 +726,20 @@
                          :structured-output (:structured-output value)})))
       value)))
 
+(defn session-step-prompt-queue
+  "Derive the normalized internal prompt-queue from a canonical session IR `step`.
+
+   Single-prompt `:session :contributions` steps yield ONE unnamed prompt-group
+   (the N=1 degenerate of the unified queue). Authored `:prompts` (named groups,
+   task 226 Slice 2) yield the ordered named groups verbatim. The unnamed group
+   carries no `:name`, so it contributes only the step-level rollup and no
+   addressable per-prompt record."
+  [step]
+  (let [session (:session step)]
+    (if-let [prompts (:prompts session)]
+      (vec prompts)
+      [{:contributions (vec (:contributions session))}])))
+
 (defn step-output-surfaces
   "Return the normalized logical output-surface map for a canonical IR `step`
    and accepted result envelope.
@@ -607,103 +775,3 @@
       :delegated (when (= :text yield-field)
                    (step-output-value step accepted-result :final-llm-reply))
       nil)))
-
-;;;; Compilation error formatting
-
-(defn- format-compile-error
-  "Format a compile-error map `{:message string :data map}` into a human-readable line.
-
-   When both `:step-name` and `:step-index` are present in `:data`, prefixes the
-   message with step context. Both keys are always co-present when set by
-   `compile-step-with-context`; the guard enforces this invariant defensively so
-   a partial map cannot produce \"(index nil)\" output."
-  [{:keys [message data]}]
-  (let [step-name  (:step-name data)
-        step-index (:step-index data)]
-    (if (and step-name (some? step-index))
-      (str "Step '" step-name "' (index " step-index "): " message)
-      message)))
-
-(defn- format-structural-error
-  "Format a single Malli explain-data error entry into a human-readable line.
-
-   Real Malli explain-data error entries carry :path, :in, :schema, :value and
-   sometimes :type (e.g. :malli.core/missing-key) but do NOT carry :message.
-   Falls back to (name :type) when present, then to \"invalid value\" so the
-   description is never blank."
-  [{:keys [path message type]}]
-  (let [msg (or message (some-> type name) "invalid value")]
-    (if (seq path)
-      (str "Structural error at " (pr-str path) ": " msg)
-      (str "Structural error: " msg))))
-
-(defn- format-semantic-error
-  "Format a single semantic error map into a human-readable line."
-  [{:keys [type step ref output-key available-outputs available-yield-fields scope output-keys schema-id schema-version] :as err}]
-  (case type
-    :routing-without-judge
-    (str "Step '" step "': routing table (:on) requires a judge")
-
-    :judge-without-routing
-    (str "Step '" step "': judge requires a non-empty routing table (:on)")
-
-    :missing-yields
-    (str "Step '" step "': missing :yields")
-
-    :missing-local-yield-output-key
-    (str "Step '" step "': yield references output key " output-key
-         " which is not declared in :outputs (available: " (pr-str available-outputs) ")")
-
-    :missing-step-ref
-    (str "Step '" step "': references unknown step '" (:step ref) "'")
-
-    :non-prior-step-ref
-    (str "Step '" step "': references step '" (:step ref)
-         "' which is not prior (forward/self references are not allowed)")
-
-    :missing-output-key
-    (str "Step '" step "': references output key " (:output ref)
-         " of step '" (:step ref) "' but that key is not declared"
-         " (available: " (pr-str available-outputs) ")")
-
-    :missing-yield-field
-    (str "Step '" step "': references yield field " (:yield ref)
-         " of step '" (:step ref) "' but that field is not available"
-         " (available: " (pr-str available-yield-fields) ")")
-
-    :skills-without-read-tool
-    (str "Step '" step "': skills require the 'read' tool to be present in :tools")
-
-    :multiple-structured-outputs
-    (str "Step '" step "': " (name scope) " declares multiple structured outputs "
-         (pr-str output-keys) "; declare one structured output and group fields in its schema")
-
-    :reusable-structured-output-schema-mismatch
-    (str "Step '" step "': " (name scope) " output " output-key
-         " declares schema-id/version " schema-id " v" schema-version
-         " but its inline schema does not match the reusable workflow schema")
-
-    ;; fallback for unknown types
-    (str "Step '" step "': " type " (raw: " (pr-str err) ")")))
-
-(defn format-compilation-errors
-  "Format workflow IR compilation errors into a single actionable human-readable string.
-
-   Accepts:
-   - `compile-error`     — {:message string :data map} or nil
-   - `structural-errors` — Malli explain-data or nil
-   - `semantic-errors`   — seq of semantic error maps (may be empty)
-
-   Returns a multi-line string prefixed with 'Workflow IR compilation failed:'."
-  [compile-error structural-errors semantic-errors]
-  (let [lines (cond-> []
-                (some? compile-error)
-                (conj (format-compile-error compile-error))
-
-                (some? structural-errors)
-                (into (map format-structural-error (:errors structural-errors)))
-
-                (seq semantic-errors)
-                (into (map format-semantic-error semantic-errors)))]
-    (str "Workflow IR compilation failed:\n"
-         (str/join "\n" lines))))

@@ -357,3 +357,46 @@
       (is (= "target-authored" definition-id))
       (is (= "target-authored" (:source-definition-id run)))
       (is (= "target-authored" (get-in run [:effective-definition :definition-id]))))))
+
+;; ── Task 226 Slice 2 — `:prompts` named-group compilation ───────────────────
+
+(def target-multi-prompt-session-definition
+  {:steps [{:name "design-review"
+            :type :session
+            :model "gpt-5.4"
+            :tools ["read"]
+            :prompts [{:name "architecture"
+                       :contributions [{:type :template
+                                        :text "Architecture review: {{input}}"
+                                        :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                      {:name "ambiguity"
+                       :contributions [{:type :template
+                                        :text "Ambiguity review"
+                                        :vars {}}]}]}]})
+
+(deftest compile-target-multi-prompt-session-workflow-test
+  (testing "authored :prompts named groups compile into a canonical :session :prompts queue"
+    (let [ir (target-compiler/compile-workflow-definition
+              target-multi-prompt-session-definition)
+          session-step (first (:steps ir))]
+      (is (= [{:name "architecture"
+               :contributions [{:type :template
+                                :text "Architecture review: {{input}}"
+                                :vars {"input" {:from :workflow-input :path [:input]}}}]}
+              {:name "ambiguity"
+               :contributions [{:type :template
+                                :text "Ambiguity review"
+                                :vars {}}]}]
+             (get-in session-step [:session :prompts])))
+      (is (not (contains? (:session session-step) :contributions))
+          "a :prompts step carries no step-level :contributions")
+      (is (= "gpt-5.4" (get-in session-step [:session :model])))
+      (is (= ["read"] (get-in session-step [:session :tools])))
+      (is (= ["architecture" "ambiguity"]
+             (mapv :name (workflow-ir/session-step-prompt-queue session-step))))))
+
+  (testing "the compiled multi-prompt IR validates"
+    (let [ir (target-compiler/compile-workflow-definition
+              target-multi-prompt-session-definition)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             (dissoc (workflow-ir/validate-workflow-ir ir) :ir :compile-error))))))

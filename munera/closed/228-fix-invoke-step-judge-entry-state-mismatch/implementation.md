@@ -1,0 +1,685 @@
+# 228 — implementation notes
+
+## Spike: reproduce + confirm mechanism (ψ)
+
+Confirmed the `:handler-entry-state-mismatch` root cause empirically.
+
+Added a temporary spike test to
+`components/deterministic-operation-runtime/test/.../core_test.clj` that calls
+`runtime/invoke-operation` twice against one attempt:
+
+```
+state*: {:workflows {:runs {"run-1" {:status :running
+          :step-runs {"clarity-status" {:attempts [{:attempt-id "attempt-1"}]}}}}}}
+invocation: {:ctx {:state* state*} :workflow-run-id "run-1"
+             :workflow-attempt-id "attempt-1" :step-id "clarity-status"}
+op-1 (step :operation)        => :ok    ; leaves :operation-handler-entry-state :entered
+op-2 (:judge pass-feedback)   => :error :workflow-stopped
+                                 :stop-reason :handler-entry-state-mismatch
+```
+
+`bb clojure:test:scry --namespace psi.deterministic-operation-runtime.core-test`
+⇒ 4 tests / 19 assertions green (the spike asserted the buggy behaviour and
+passed). **Spike test then reverted** — it locked in the bug; the real
+characterization test (asserting the judge *succeeds* post-fix) goes in during
+build.
+
+### Confirmed facts
+
+- Both the step `:operation` (`statechart_runtime/step_execution/invoke-step-runtime-result`)
+  and the invoke `:judge` (`agent_session/workflow_judge/execute-invoke-judge!`)
+  pass `:workflow-attempt-id` = `(-> step-runs <step-id> :attempts last :attempt-id)`
+  — i.e. the **same** attempt.
+- Entry phase keys are shared: `:operation-start-state`, `:operation-call-state`,
+  `:operation-handler-entry-state` (in `deterministic-operation-runtime/core`,
+  via `workflow-coordination.ordinary-entry/transition-latest-attempt!`).
+- `prepare-workflow-operation-handler-entry!` has `:ok-states #{:pending :entered}`,
+  so it short-circuits when the key is already `:entered` (left by op-1) without
+  resetting to `:pending`; `enter-workflow-operation-handler!` then requires
+  `:pending` → mismatch.
+- Session-step + invoke-judge is safe: actor turn uses `:turn-*-state` keys
+  (`workflow_runtime/turn_execution_contract`), a different namespace — which is
+  the model for fix (a).
+
+## Decision
+
+Fix shape (a): per-operation phase-key namespacing (judge role gets a distinct
+key set). See design.md.
+
+## Plan/steps ambiguity review (ψ, 2026-06-13)
+
+Actionable ambiguities found:
+
+- **Injection point undecided.** Plan §Mechanism says role is "woven into the
+  phase-opts maps the helpers pass" while Slice 2 says "thread it into
+  `transition-workflow-operation-phase!` / the five phase helpers" — two distinct
+  strategies: (i) central remap of supplied phase-opts in the single
+  `transition-workflow-operation-phase!` chokepoint (reads `(:operation-role
+  invocation)` there), vs (ii) per-helper key rewriting in each phase helper.
+  `λone_way` → pick one. The chokepoint already receives `invocation`, so (i) is
+  the single-point option; plan must state which.
+- **"Five" vs six phase helpers.** Design and plan call them "the five
+  transition helpers" but enumerate/the code has **six**: `reserve`,
+  `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`,
+  `enter-handler`. Ambiguous coverage — if per-helper (ii), an implementer may
+  miss one (notably `enter-handler`, the helper that throws the mismatch). Fix
+  the count or moot it by choosing the chokepoint strategy.
+- **Regression-suite gap.** The actual direct readers/asserters of
+  `:operation-start-state` / `:operation-call-state` /
+  `:operation-handler-entry-state` live in
+  `components/agent-session/test/.../workflow_statechart_runtime_call_start_cancellation_test.clj`
+  (task-225 coverage). Slice 4/5 name the regression suites as
+  `deterministic-operation-runtime`, `workflow-coordination`, `agent-session
+  workflow-judge`, `workflow-runtime step-execution` — it is ambiguous whether
+  this call-start-cancellation suite (the real default-role key-assertion guard)
+  is in the green set. Name it explicitly.
+- **Step-operation explicit-role left to taste.** Slice 3 / plan say add
+  `:operation-role :step` "only if it improves clarity," so the final artifact
+  state (key present vs absent at the step call-site) is non-determinate. Decide
+  one way so the end state is fixed.
+
+## Plan/steps ambiguity resolutions (ψ, 2026-06-13)
+
+Resolved the four review follow-ups; design.md, plan.md, and steps.md updated to
+single, determinate descriptions.
+
+- **Injection point → single chokepoint.** `role-phase-key` is applied **once**
+  inside `transition-workflow-operation-phase!` (the one function every phase
+  helper already calls). It reads `(:operation-role invocation)` and rewrites the
+  supplied `phase-opts` keys — `:phase-key`, `:timestamp-key`, `:count-key`, and
+  each `:required-phases` entry's `:key` — via `role-phase-key`. Chosen over
+  per-helper rewriting (`λone_way`, fewer edit sites, no risk of missing
+  `enter-handler`). Verified against `core.clj`: the six helpers all funnel their
+  phase-opts through this single function, so the chokepoint covers every key.
+- **Helper count → six (moot under chokepoint).** Confirmed six helpers:
+  `reserve`, `commit-start`, `begin-call`, `commit-call`, `prepare-handler-entry`,
+  `enter-handler`. Under the chokepoint strategy they are left unchanged, so the
+  count is informational only. Corrected wording in design.md + plan.md.
+- **Regression suite named.** `components/agent-session/test/.../
+  workflow_statechart_runtime_call_start_cancellation_test.clj` is the suite that
+  directly asserts the default-role `:operation-*-state` keys; named explicitly in
+  plan Slice 4/5 and steps Slice 4/5 green sets.
+- **Step-operation role → omit.** The step `:operation` invocation carries **no**
+  `:operation-role` key (absent ≡ `:step` at the chokepoint). Single rule: only
+  judge invocations annotate a role. "Only if it improves clarity" deferral
+  removed. Keeps every single-operation step's `:operation-*` keys byte-identical.
+
+## Plan/steps inconsistency review (ψ, 2026-06-13)
+
+Actionable inconsistencies found (distinct from the resolved ambiguity pass):
+
+- **design.md self-contradiction on judge `:workflow-attempt-id`.** Problem §2
+  states the judge "invocation carries `:workflow-attempt-id nil`, and the entry
+  uses `:attempt-id-required? false`, so its transitions target the same latest
+  attempt." But design.md's own "Spike outcome (confirmed)" section *and*
+  implementation.md "Confirmed facts" *and* the code
+  (`workflow_judge/execute-invoke-judge!` and
+  `step_execution/invoke-step-runtime-result`) all pass an **explicit**
+  `:workflow-attempt-id = (… :attempts last :attempt-id)` — the real latest
+  attempt id, not nil. The mechanism differs materially: with a real id +
+  `:attempt-id-required? false`, `ordinary-entry` *does* assert equality with the
+  latest attempt (`(or attempt-id-required? workflow-attempt-id)` is truthy);
+  the nil path would *skip* that check. Correct Problem §2 to say the judge
+  passes the explicit latest attempt id (sharing the attempt that way), aligning
+  it with Spike-outcome / implementation.md / code.
+
+- **plan.md Slice 3 retains the deferral the ambiguity pass removed.** Plan
+  §"Call-site threading" decided (`λone_way`) to **omit** `:operation-role` at
+  the step `:operation` call-site ("do **not** add an explicit
+  `:operation-role :step`"), and steps.md Slice 3 matches that. But plan.md
+  §"Slice order" Slice 3 still reads "(and make the step-operation default
+  explicit if it aids clarity)" — the exact "only if it improves clarity"
+  deferral that follow-up item 4 claims to have removed. Plan Slice 3 thus
+  contradicts plan §Call-site-threading and steps.md Slice 3. Remove the
+  parenthetical so the call-site decision is determinate everywhere.
+
+## Build — Slice 1: characterization test (red) (ψ, 2026-06-13)
+
+Added `invoke-step-operation-then-judge-operation-share-one-attempt-test` to
+`deterministic-operation-runtime/core_test.clj`. It drives `invoke-operation`
+twice against one attempt — step op (default role) then judge op
+(`:operation-role :judge`) — and asserts the judge op succeeds and lands
+`:judge-operation-handler-entry-state :entered` while the step op's
+`:operation-handler-entry-state` stays `:entered`.
+
+Red baseline captured: `bb clojure:test:scry --namespace
+psi.deterministic-operation-runtime.core-test` → 3 tests pass, this test fails
+(3 assertions) with `:reason :workflow-stopped` /
+`:stop-reason :handler-entry-state-mismatch` on the judge op (verified in
+`.scry-results`). Confirms the bug exactly as the spike did.
+
+## Build — Slice 2: runtime phase-key namespacing (green) (ψ, 2026-06-13)
+
+Added two private helpers to `deterministic-operation-runtime/core`:
+`role-phase-key` (`(role, base-key)` → `judge-`-prefixed keyword for `:judge`,
+unchanged for `:step`/nil) and `role-phase-opts` (rewrites `:phase-key`,
+`:timestamp-key`, `:count-key`, and each `:required-phases` `:key` through
+`role-phase-key`). Applied once at the single `transition-workflow-operation-phase!`
+chokepoint via `(role-phase-opts (:operation-role invocation) phase-opts)`. The
+six phase helpers and `ordinary-entry` are unchanged.
+
+Deviation from plan wording: factored the per-key rewrite into a separate
+`role-phase-opts` helper (rather than inlining the `cond->` in the chokepoint)
+for readability — still a single application site. Default/`:step` path is a
+no-op (`cond->` with `role` ≠ `:judge` returns base keys unchanged), so
+single-operation steps keep byte-identical `:operation-*` keys.
+
+Slice 1 characterization test now green:
+`bb clojure:test:scry --namespace psi.deterministic-operation-runtime.core-test`
+→ 4 tests / 22 assertions, 0 failures. clj-kondo clean on the edited namespace.
+
+## Build — Slice 3 + discovered second defect (ψ, 2026-06-13)
+
+**Slice 3 (judge call-site role).** Added `:operation-role :judge` to the judge
+invocation map in `agent_session/workflow_judge.clj/execute-invoke-judge!`. The
+step `:operation` call-site (`step_execution.clj/invoke-step-runtime-result`)
+omits the key as designed. `invoke-operation-in` passes the invocation through
+unchanged; no registry/schema change needed (invocation map is open).
+
+**DEVIATION FROM DESIGN — second, distinct defect discovered.** The design/spike
+only exercised a *single* clarity-status pass. Running the existing end-to-end
+`workflow-review-step-routing-test` suite exposed a SECOND defect that the
+phase-key fix alone does not resolve, blocking acceptance criteria #2/#4 (full
+REPEAT/DONE routing):
+
+- With the 228 phase-key fix, the **first** clarity-status pass now succeeds and
+  routes REPEAT. The **second** clarity-status attempt's *step* `:operation`
+  (`workflow/constant-routing`, default role) then aborts with
+  `:stop-reason :attempt-mismatch`.
+- Root cause: `invoke-step-runtime-result` derived `:workflow-attempt-id` from
+  the `workflow-run` **snapshot** captured in the `:step/enter` action *before*
+  the new attempt was appended to `state*`. First attempt: that snapshot has no
+  attempts for the step → `nil` → task-225's attempt-equality guard
+  (`(or attempt-id-required? workflow-attempt-id)`) is skipped, so it happened to
+  work. REPEAT: the stale snapshot's latest attempt id is the *previous* attempt,
+  which no longer equals the live latest attempt → `:attempt-mismatch`.
+- Same lineage as 228: both faults were introduced by task-225's cancellation
+  entry machine (commit 04861433f) and both surface on the clarity-status
+  invoke-op+judge step. The phase-key fix uncovered this one.
+- Fix (`cause(structural) → redesign > patch`): thread the authoritative,
+  just-started `attempt-id` from the `:step/enter` caller into
+  `invoke-step-runtime-result` (signature `… workflow-run attempt-id`; both call
+  sites updated — `statechart_runtime.clj` and `step_execution.clj`
+  `execute-actor-step!`) and use it for `:workflow-attempt-id` instead of
+  re-deriving from the stale snapshot. The `workflow-run` snapshot is still used
+  for `resolve-invoke-args` (args reference stable prior-step outputs). This also
+  makes the *first* attempt properly assert attempt equality (id now non-nil),
+  tightening the cancellation guard rather than weakening it.
+
+**Verification.** `workflow-review-step-routing-test` now 11 tests / 82
+assertions all green (was 3 failing / 21 assertions before — the REPEAT-loop and
+iteration-limit subtests). Regression suites green: deterministic-operation-runtime
+core (4/22), workflow-statechart-runtime-call-start-cancellation (14/63),
+workflow-judge (17/88), workflow-judge-cancellation (8/34),
+workflow-statechart-runtime (and cancellation) + workflow-execution (34/153),
+workflow-runtime step-execution (10/63). clj-kondo clean on all changed
+namespaces.
+
+## Build — Slices 4 & 5: cancellation coverage + close-out (ψ, 2026-06-13)
+
+**Slice 4.** Added `judge-role-operation-honors-workflow-cancellation-test` to
+`deterministic-operation-runtime/core_test.clj`: a `:operation-role :judge`
+operation against a cancelled run refuses to start and yields a clean
+`:workflow-stopped` terminal without invoking its handler. Proves the phase-key
+namespacing preserves the task-225 cooperative cancellation guard. The existing
+default-role `invoke-operation-honors-workflow-cancellation-test` stays green.
+
+**Slice 5.** Workflow-level REPEAT/DONE routing is verified by the existing
+`workflow-review-step-routing-test` clarity-status suites (were 3 failing
+pre-fix, now 11/11 green). CHANGELOG `Fixed` entry added covering both faults. No
+schema change needed (`:operation-role` is an open additive invocation key).
+
+**Acceptance criteria status:** #1 characterization test (green), #2 invoke
+operation+judge runs both ops and routes (green via review-step-routing), #3
+task-225 cancellation preserved (judge-role + default-role cancellation tests +
+call-start-cancellation/judge-cancellation suites green), #4 review-task-design
+full REPEAT/DONE pass unblocked (review-step-routing 11/82 green), #5 clj-kondo
+clean + Scry suites green.
+
+**Final test summary (all green):**
+- deterministic-operation-runtime core: 5 tests / 24 assertions
+- workflow-statechart-runtime-call-start-cancellation: 14 / 63
+- workflow-judge: 17 / 88 ; workflow-judge-cancellation: 8 / 34
+- workflow-statechart-runtime + cancellation + workflow-execution: 34 / 153
+- workflow-runtime step-execution: 10 / 63 ; lifecycle + state: 5 / 17
+- workflow-review-step-routing: 11 / 82
+- github find-issue-integration: 1 / 13
+
+**Changed namespaces:**
+`deterministic-operation-runtime/core` (role-phase-key/role-phase-opts +
+chokepoint), `agent-session/workflow_judge` (`:operation-role :judge`),
+`workflow-runtime/statechart_runtime` + `.../step_execution` (thread authoritative
+`attempt-id`).
+
+## Plan/steps inconsistency resolutions (ψ, 2026-06-13)
+
+Resolved the two inconsistency-pass follow-ups; design.md and plan.md aligned to
+the verified code facts.
+
+- **design.md Problem §2 corrected.** Rewrote the judge step from the wrong
+  `:workflow-attempt-id nil` claim to the **explicit** latest attempt id
+  (`(-> step-runs <step-id> :attempts last :attempt-id)`), matching
+  `workflow_judge/execute-invoke-judge!` (verified `workflow_judge.clj:129`) and
+  `step_execution/invoke-step-runtime-result` (`step_execution.clj:55`). Added
+  that with a real id + `:attempt-id-required? false`, `ordinary-entry` still
+  asserts equality with the latest attempt because `(or attempt-id-required?
+  workflow-attempt-id)` is truthy (verified `ordinary_entry.clj:77`). Problem §2
+  is now consistent with design's own "Spike outcome", implementation.md
+  "Confirmed facts", and the code.
+
+- **plan.md Slice 3 deferral removed.** Dropped "(and make the step-operation
+  default explicit if it aids clarity)" from §"Slice order" Slice 3 and restated
+  it as the determinate decision (step call-site omits `:operation-role`; absent
+  ≡ `:step`; only judge invocations annotate a role), cross-referencing
+  §"Call-site threading". The call-site decision is now determinate across plan
+  §Slice-order, plan §Call-site-threading, and steps.md Slice 3.
+
+## Implementation review (ψ, 2026-06-13)
+
+Reviewed code, tests, design/plan/steps coherence, lint, CHANGELOG. Overall
+solid — fix is structural, key coverage complete, tests state-based (no mocks).
+
+Verified:
+- `role-phase-opts` rewrites every attempt-state key actually written by
+  `ordinary-entry/apply-phase-update` (`:phase-key`, `:timestamp-key`,
+  `:count-key`) plus each `:required-phases` `:key` guard. No un-namespaced key
+  leaks at the single `transition-workflow-operation-phase!` chokepoint. The six
+  helpers stay byte-identical for the default/`:step` role.
+- Second-defect fix is correct: `append-and-start-attempt-if-live!`
+  (statechart_runtime.clj) appends the new attempt to `state*` **before**
+  `invoke-step-runtime-result` runs, so the threaded just-started `attempt-id`
+  *is* the live latest attempt — the task-225 equality guard now matches on every
+  pass (and is tightened, not weakened, since the first-attempt id is no longer
+  nil). Both call sites (`statechart_runtime.clj`, `step_execution.clj`
+  `execute-actor-step!`) have `attempt-id` in scope.
+- clj-kondo clean on all changed namespaces; working tree clean; CHANGELOG
+  `Fixed` entry is user-facing and covers both faults.
+
+Actionable finding:
+- **No focused regression test for the second defect (`:attempt-mismatch` on
+  REPEAT).** The handler-entry-state-mismatch defect got a focused unit
+  characterization test (`…share-one-attempt-test`), but the stale-snapshot
+  `:attempt-mismatch` fix relies solely on the broad end-to-end
+  `workflow-review-step-routing-test` REPEAT-loop subtests. A focused test (at
+  `step_execution` / `deterministic-operation-runtime` level) pinning "a
+  re-executed invoke step's operation uses the just-started attempt-id, not the
+  stale `workflow-run` snapshot's latest attempt" would localize the regression
+  and give parity with the first defect's coverage. Lower diagnosability if it
+  ever regresses through only the end-to-end suite.
+
+Not flagged as actionable (handled): the second defect is a scope addition over
+the original handler-entry-state-mismatch design, but it is documented as a
+deviation (design.md Build-discovery, steps Slice 3b) and is required to satisfy
+acceptance criteria #2/#4 — defensible to keep in this task.
+
+## Implementation-review follow-up: focused second-defect regression test (ψ, 2026-06-13)
+
+Executed the one actionable implementation-review follow-up: added a localized
+characterization test for the second defect (`:attempt-mismatch` on REPEAT),
+giving it parity with the first defect's
+`invoke-step-operation-then-judge-operation-share-one-attempt-test`.
+
+- Test: `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`
+  in `components/workflow-runtime/test/.../statechart_runtime/step_execution_test.clj`.
+- Mechanism pinned: `invoke-step-runtime-result` is driven with a **stale**
+  `workflow-run` snapshot whose latest attempt is `attempt-1`, while the live
+  `state*` and the threaded `attempt-id` are the just-started `attempt-2`. A real
+  `deterministic-operation-registry` runs the step `:operation`
+  (`workflow/constant-routing`) end-to-end through the task-225 entry machine.
+- Asserts: the operation returns `:ok` (no `:attempt-mismatch` abort), the live
+  `attempt-2` is driven to `:operation-handler-entry-state :entered`, and the
+  stale snapshot's `attempt-1` is left untouched — proving the operation targets
+  the threaded attempt, not the snapshot's latest.
+- Discrimination verified: temporarily reverting the source to derive
+  `:workflow-attempt-id` from the stale snapshot makes the new test fail 3
+  assertions with `:attempt-mismatch`; the threaded fix restores green (source
+  reverted to its committed state after the check — no production change).
+- Suite green: 11 tests / 67 assertions (was 10/64). clj-kondo clean on the
+  edited test namespace.
+
+## Implementation review — pass 2 (ψ, 2026-06-13)
+
+Re-reviewed code, tests, and artifact coherence against the
+task-implementation-review skill. Fix is structural and well-covered; the
+phase-key chokepoint (`role-phase-opts`) namespaces every attempt-state key
+(`:phase-key`/`:timestamp-key`/`:count-key` + each `:required-phases` `:key`)
+without touching phase *values* (`:phase-value`, `:required-phases :value`,
+`:ok-states`, `:blocked-states`), which is correct. The step-operation
+second-defect fix and its focused regression test are sound.
+
+New actionable finding (distinct from pass-1's missing-test item, which is
+resolved):
+
+- **Judge call-site retains the very snapshot-derived attempt-id the
+  second-defect fix rejected (consistency + latent regression).**
+  `execute-invoke-judge!` (`workflow_judge.clj:129`) re-derives
+  `:workflow-attempt-id` from the `workflow-run` **snapshot**
+  (`(some-> workflow-run (get-in [:step-runs current-step-id :attempts]) last
+  :attempt-id)`). This is exactly the "derive latest attempt from a possibly
+  stale snapshot" pattern that the second-defect fix structurally removed from
+  the sibling step `:operation` path (`invoke-step-runtime-result`, which now
+  threads the authoritative just-started `attempt-id`). The authoritative
+  attempt id is **already in scope**: `execute-judge!` destructures
+  `workflow-attempt-id` from `routing-context` (`workflow_judge.clj:168`) and
+  uses it for the cancellation guards (`attach-judge-session-if-live!`,
+  lines 193/198), where it asserts equality with the latest attempt — i.e. it
+  is the same value line 129 re-derives, but trustworthy. Threading
+  `routing-context`'s `workflow-attempt-id` into `execute-invoke-judge!` (instead
+  of re-deriving from the snapshot, which is still legitimately needed only for
+  `resolve-invoke-args`) would: (i) make the judge path consistent with the
+  step path's structural fix (`λ consistent(code)` — consistent idioms);
+  (ii) close the same latent `:attempt-mismatch` failure mode if a judge ever
+  runs with a snapshot captured before the live attempt; (iii) be near-zero
+  cost since the value is already destructured. Currently passes only because
+  the judge's snapshot happens to be fresh at judge time — no test pins the
+  judge's attempt-id source. Recommend threading the authoritative id and adding
+  a focused assertion (parity with the step-path regression test).
+
+## Implementation-review pass-2 follow-up: judge call-site authoritative attempt-id (ψ, 2026-06-13)
+
+Executed the two pass-2 actionable follow-ups, giving the judge path parity with
+the step path's second-defect structural fix.
+
+- **Source (`workflow_judge.clj` `execute-invoke-judge!`).** Replaced the
+  snapshot-derived `:workflow-attempt-id (some-> workflow-run (get-in [:step-runs
+  current-step-id :attempts]) last :attempt-id)` with the authoritative
+  `workflow-attempt-id` already carried in `routing-context` (now destructured in
+  the `execute-invoke-judge!` arg map). The `workflow-run` snapshot is retained
+  only for `resolve-invoke-args` (stable prior-step outputs). This removes the
+  same latent `:attempt-mismatch` snapshot-staleness failure mode that the step
+  `:operation` path already eliminated by threading the just-started `attempt-id`
+  — `λ consistent(code)`, `cause(structural) → redesign > patch`. Added a comment
+  documenting why the snapshot is no longer the attempt-id source.
+- **Test (`workflow_judge_test.clj`).** Added
+  `execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test`, the
+  judge-path companion to the step-path
+  `invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`.
+  It drives `execute-judge!` for an invoke judge with a **stale** `workflow-run`
+  snapshot (latest = `attempt-1`) while live `state*` and `routing-context`'s
+  `:workflow-attempt-id` are the just-started `attempt-2`, using a real
+  `deterministic-operation-registry`. Asserts the judge op runs once, routes via
+  the judge event, drives `attempt-2` to `:judge-operation-handler-entry-state
+  :entered`, and leaves `attempt-1` untouched.
+- **Discrimination verified.** Reverting the source to re-derive
+  `:workflow-attempt-id` from the stale snapshot makes the new test fail 4
+  assertions with `:attempt-mismatch`; source restored → green.
+- **Verification.** `workflow-judge` 18 tests / 93 assertions green;
+  `workflow-judge-cancellation` 8 / 34 green; `workflow-review-step-routing`
+  11 / 82 green. clj-kondo clean on `workflow_judge.clj` and
+  `workflow_judge_test.clj`.
+
+## Implementation review — pass 3 (ψ, 2026-06-13)
+
+Re-reviewed code, tests, and artifact coherence against the
+task-implementation-review skill, verifying claims against runtime (not just
+notes).
+
+Verified:
+- **Phase-key chokepoint correct.** `role-phase-opts` namespaces only the four
+  key fields (`:phase-key`/`:timestamp-key`/`:count-key` + each
+  `:required-phases` `:key`) and leaves phase *values* (`:phase-value`,
+  `:required-phases :value`, `:ok-states`, `:blocked-states`) untouched —
+  correct, since values are state markers not attempt-state map keys.
+  Default/`:step` path is a no-op `cond->`, so single-operation steps keep
+  byte-identical `:operation-*` keys.
+- **Judge attempt-id source is authoritative and live.** Confirmed the
+  `routing-context` `:workflow-attempt-id` threaded into `execute-invoke-judge!`
+  comes from `(get-in @working-memory* [:attempt-ids step-id])` at
+  `:judge/enter` (statechart_runtime.clj:365), the runtime's live latest attempt
+  for the step (populated when the attempt is appended) — not a pre-attempt
+  snapshot. The pass-2 fix is genuinely consistent with the step path, not
+  incidentally correct.
+- **Both defects have focused regression tests + end-to-end coverage**, each
+  shown red-on-revert in prior passes.
+- **Runtime checks (not trusting notes):** clj-kondo 0 errors / 0 warnings on
+  all four changed namespaces; `deterministic-operation-runtime.core` 5/24,
+  `workflow-judge` 18/93, `workflow-runtime step-execution` 11/67,
+  `workflow-review-step-routing` 11/82 all green; CHANGELOG `Fixed` entry
+  accurate and user-facing. Working tree clean.
+
+No new actionable findings. All prior-pass follow-ups (ambiguity, inconsistency,
+pass-1 missing focused test, pass-2 judge call-site authoritative attempt-id) are
+committed and verified. Fix is structural, key coverage complete, tests
+state-based (no mocks), cancellation guard preserved and tightened.
+Implementation quality is sufficient to close.
+
+## Test review (task-test-review skill) (ψ, 2026-06-13)
+
+Reviewed against the three skill clauses: well-formed, every design behaviour
+covered, infra deps injectable/nullable (¬mock/¬stub).
+
+Strong: all 228-authored focused tests use real `deterministic-operation-registry`
++ plain `state*` atoms with state-based assertions — no mocks/stubs. AC mapping
+holds: #1 → `…share-one-attempt-test`; #2/#4 → end-to-end
+`workflow-review-step-routing-test` design/plan full-pass + iteration-limit;
+#3 → `judge-role-operation-honors-workflow-cancellation-test` (judge role) +
+`invoke-operation-honors-workflow-cancellation-test` (default role); second-defect
+parity → `…re-execution-uses-just-started-attempt…` (step) +
+`execute-invoke-judge-uses-authoritative-attempt…` (judge).
+
+Actionable finding (test coverage):
+- **Characterization test under-covers the plan's #1 risk (key-derivation
+  completeness).** `invoke-step-operation-then-judge-operation-share-one-attempt-test`
+  asserts only the `:phase-key`-derived state keys
+  (`:judge-operation-handler-entry-state` vs `:operation-handler-entry-state`). It
+  does **not** assert the judge namespaces the start-state/call-state phase keys
+  nor the `:timestamp-key`/`:count-key` fields (`*-at` / `*-count`) that
+  `role-phase-opts` also rewrites (`core.clj:55-61`). A regression dropping the
+  `:timestamp-key`/`:count-key` rewrite lines would silently re-alias those
+  metadata keys across both operations on one attempt yet leave **every test
+  green**, because the mismatch gate is the state key alone. The plan named
+  "Key-derivation completeness" as the top risk and its mitigation was "Still
+  assert judge-namespaced keys in the characterization test" — currently only one
+  of the four namespaced field types is pinned. Extend the test to assert the
+  judge drives `:judge-operation-start-state`/`:judge-operation-call-state` and at
+  least one judge-namespaced timestamp/count key, and that the step op's
+  corresponding `:operation-*` timestamp/count keys are untouched — giving the
+  chokepoint's full key set a regression guard.
+
+Observation (non-actionable, not 228-authored): AC#2/#4 end-to-end coverage
+relies on the pre-existing `workflow-review-step-routing-test` suite, which uses
+`with-redefs` on `psi.agent-session.turn/prompt-execution-result-in!` (LLM-turn
+stub). 228 did not author these and its own focused tests avoid mocks, so this is
+not a task-228 test defect — noted only for completeness.
+
+## Test-review follow-up: namespacing characterization test full key-set coverage (ψ, 2026-06-13)
+
+Executed the one actionable task-test-review follow-up: extended
+`invoke-step-operation-then-judge-operation-share-one-attempt-test`
+(`deterministic-operation-runtime/core_test.clj`) from pinning only the
+`:phase-key`-derived state key to covering the full `role-phase-opts` key set
+(the plan's top "key-derivation completeness" risk).
+
+- Added an `after-step` capture of the step-op attempt before the judge runs, so
+  the test can assert the step's metadata keys are untouched by the judge.
+- New assertions: judge namespaces `:judge-operation-start-state` (`:started`),
+  `:judge-operation-call-state` (`:committed`), `:judge-operation-start-count`
+  (1 — its own `:count-key`), and `:judge-operation-handler-entered-at` (some? —
+  a judge-scoped `:timestamp-key`); the step op's `:operation-start-count` stays
+  1 (not re-incremented) and its `:operation-started-at` /
+  `:operation-handler-entered-at` timestamps are identical before/after the judge.
+- This closes the gap where a regression dropping the `:timestamp-key`/`:count-key`
+  rewrite lines in `role-phase-opts` (core.clj) would silently re-alias the
+  judge's metadata onto the step's `:operation-*` keys while the state-key
+  mismatch gate (the only previously-pinned key) stayed green.
+- Red-on-revert verified: temporarily removing the two rewrite lines fails 6
+  assertions (judge increments `:operation-start-count` to 2 and overwrites the
+  step's `*-at` timestamps); source restored to its committed state, no production
+  change.
+- Suite green: 5 tests / 32 assertions (was 5/24). clj-kondo clean on the edited
+  test namespace.
+
+## Test review — pass 2 (task-test-review skill) (ψ, 2026-06-13)
+
+Re-reviewed against the three skill clauses, verifying claims against runtime
+(not notes). Read the new judge-path and step-path regression tests and the
+namespacing characterization test in full.
+
+- **well-formed** ✓ — all 228-authored focused tests have descriptive names +
+  docstrings stating the defect; each was shown red-on-revert in prior passes.
+- **behaviour coverage** ✓ — AC mapping holds: #1 →
+  `…share-one-attempt-test` (now pins the full `role-phase-opts` key set:
+  `:judge-operation-start-state`/`:judge-operation-call-state` +
+  `:count-key`/`:timestamp-key`, with the step op's `:operation-*` metadata
+  asserted untouched); #2/#4 → end-to-end `workflow-review-step-routing-test`
+  REPEAT/DONE; #3 → `judge-role-operation-honors-workflow-cancellation-test` +
+  default-role `invoke-operation-honors-workflow-cancellation-test`;
+  second-defect parity → `…re-execution-uses-just-started-attempt…` (step) +
+  `execute-invoke-judge-uses-authoritative-attempt…` (judge).
+- **infra deps injectable/nullable, ¬mock/¬stub** ✓ — every 228-authored
+  focused test uses a real `deterministic-operation-registry` + plain `state*`
+  atoms with state-based assertions; no `with-redefs`/mocks in the new tests.
+
+Runtime-verified green: deterministic-operation-runtime core 5/32,
+workflow-judge 18/93, workflow-runtime step-execution 11/67.
+
+No new actionable findings. The prior test-review pass-1 finding
+(key-derivation completeness) is resolved and runtime-verified. The pre-existing
+`workflow-review-step-routing-test` LLM-turn `with-redefs` stub is not
+228-authored (already noted non-actionable). Test quality is sufficient to close.
+
+## Docs review (review-task-docs skill) (ψ, 2026-06-13)
+
+Reviewed user-facing docs against the skill checklist (README ∧ doc/ ∧ CHANGELOG;
+accuracy ∧ completeness ∧ consistency). Runtime-verified, not notes-trusting.
+
+- **CHANGELOG** ✓ — a single `### Fixed` entry under `[Unreleased]` covers both
+  faults: the `:handler-entry-state-mismatch` phase-key fix (judge now runs under
+  a distinct `:judge-operation-*-state` namespace) and the REPEAT
+  `:attempt-mismatch` stale-snapshot fix (step operation uses the just-started
+  attempt). Verified against code: namespace prefix matches `role-phase-key`
+  (`judge-` → `:judge-operation-*`); "such as the `clarity-status` step in
+  `review-task-design`" matches the affected step; user impact (review-task-design
+  REPEAT/DONE + task-lifecycle design-review unblocked) matches acceptance #4.
+  User-visible bug fix → correctly logged. Raw keyword internals
+  (`:handler-entry-state-mismatch` / `:attempt-mismatch`) are retained
+  deliberately so users who saw these in logs can search — acceptable for a
+  bug-fix entry.
+- **doc/** ✓ — `doc/workflows.md` (the only doc mentioning `clarity-status`,
+  lines 676–725) describes the step as "EDN invoke routing" that remembers
+  pass-feedback state; this is behaviour-as-documented and unchanged by the fix
+  (the bug merely prevented it from running). No `:operation-role` /
+  `:judge-operation-*` mention needed — those are internal mechanism, not a
+  user-facing surface. No stale references; no removed behaviours.
+- **README** ✓ — no references to the affected behaviours/error keywords.
+- **Examples** ✓ — none affected.
+
+No actionable docs findings. The change is an internal runtime bug fix whose
+only user-facing surface (the CHANGELOG entry) is present, accurate, complete,
+and consistent.
+
+## Test review — test-shaper skill (ψ, 2026-06-13)
+
+Shaped the four 228-authored tests for clarity ∧ signal ∧ robustness ∧ economy
+(`λtests. clarity ∧ signal ∧ robustness → shape`). Tests reviewed:
+`invoke-step-operation-then-judge-operation-share-one-attempt-test` +
+`judge-role-operation-honors-workflow-cancellation-test`
+(`deterministic-operation-runtime/core_test.clj`),
+`invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test`
+(`workflow-runtime/.../step_execution_test.clj`),
+`execute-invoke-judge-uses-authoritative-attempt-not-stale-snapshot-test`
+(`agent-session/workflow_judge_test.clj`).
+
+Assessment (all satisfied):
+- **clarity / single-concern** ✓ — descriptive names + docstrings tie each test
+  to its specific defect; one invariant per test.
+- **deterministic** ✓ — no time/random/io coupling; wall-clock timestamps pinned
+  with `some?` (presence), not value equality.
+- **mock-free / state-based** ✓ — real `deterministic-operation-registry` + plain
+  `state*` atoms; observable state assertions, no `with-redefs`/interaction
+  assertions in any 228-authored test.
+- **meaningful-failures** ✓ — every `is` carries a contract-explaining message.
+- **economy / boundaries** ✓ — the cancellation "within-operation" partition is
+  covered for the default role by the 12 race tests in
+  `workflow_statechart_runtime_call_start_cancellation_test.clj`; the judge-role
+  namespacing is applied at a chokepoint structurally orthogonal to the
+  cancellation checkpoints (`with-run-read-lock`/stop-signal), so the judge-role
+  "before start" cancellation test + the default-role "within" race suite give
+  sufficient confidence without judge-role race-test duplication.
+
+Considered but NOT actionable (deliberate, already-deliberated tradeoffs):
+- The namespacing characterization test asserts internal phase-machine
+  bookkeeping keys (`:judge-operation-start-count`, `:judge-operation-handler-
+  entered-at`, step-op untouched-timestamps). Implementation-coupled, but added
+  in test-review pass-1 (red-on-revert verified) to guard the key-aliasing
+  invariant that has no observable proxy — defensible under
+  `robust → shaped_by(invariants) → enforceable(confidence)`; reversing it would
+  be churn.
+- Mild expected-map duplication between the default-role and judge-role
+  cancellation tests is acceptable parity coverage; extracting a helper risks
+  `helpers_that_hide(intent)` and would reduce local comprehensibility for only
+  two cases.
+
+No new actionable test-shaping findings. Test quality is sufficient to close.
+
+## Code-shaper review (ψ, 2026-06-13)
+
+Applied the code-shaper skill (simplicity ∧ consistency ∧ robustness) to the
+four changed source namespaces. Code is structurally sound: `role-phase-key` /
+`role-phase-opts` are single-responsibility and well-named; the single
+`transition-workflow-operation-phase!` chokepoint keeps the role rewrite in one
+place; both call-sites now thread the authoritative attempt-id consistently
+(step `invoke-step-runtime-result` + judge `execute-invoke-judge!`); no
+cross-component extraction is warranted (the shared resolve-args/invoke shape
+spans agent-session ↔ workflow-runtime by design).
+
+One actionable `consistent(idioms)` nit:
+
+- **`role-phase-opts` expresses the same partial application two ways**
+  (`core.clj:55-61`). The three scalar branches use `#(role-phase-key role %)`
+  (×3) while the `:required-phases` branch uses `(partial role-phase-key role)`
+  — identical operation, two idioms, plus the closure is textually triplicated.
+  Bind it once (e.g. `(let [namespace-key (partial role-phase-key role)] …)`)
+  and reuse for all four `update` sites. Unifies the idiom and removes the
+  duplication (`λ consistent(code)` → consistent idioms; `locally_comprehensible`).
+  Pure shaping; behaviour-preserving; the existing
+  `…share-one-attempt-test` full-key-set assertions guard it.
+
+## Code-shaper follow-up: unify role-phase-opts partial-application idiom (ψ, 2026-06-13)
+
+Executed the one actionable code-shaper follow-up: unified the partial-
+application idiom in `role-phase-opts` (`deterministic-operation-runtime/core.clj`).
+
+- The three scalar branches previously used `#(role-phase-key role %)` (closure
+  triplicated) while the `:required-phases` branch used
+  `(partial role-phase-key role)` — same operation, two idioms.
+- Bound it once: `(let [namespace-key (partial role-phase-key role)] (cond-> …))`
+  and reused `namespace-key` across all four `update` sites (`:phase-key`,
+  `:timestamp-key`, `:count-key`, and each `:required-phases` entry's `:key`).
+- `consistent(idioms)` + removed duplication; pure shaping, behaviour-preserving.
+- Verified: clj-kondo 0 errors / 0 warnings on the edited namespace;
+  `deterministic-operation-runtime.core` suite 5 tests / 32 assertions green
+  (full `role-phase-opts` key-set assertions in
+  `…share-one-attempt-test` guard the rewrite). No production behaviour change.
+
+## Code-shaper review — pass 2 (ψ, 2026-06-13)
+
+Re-applied the code-shaper skill (simplicity ∧ consistency ∧ robustness) to the
+four changed source namespaces, runtime-verified (clj-kondo 0/0 on all four).
+
+Verified clean:
+- `role-phase-key` / `role-phase-opts` (`deterministic-operation-runtime/core`)
+  are single-responsibility, well-named, and documented; the role rewrite is
+  applied once at the single `transition-workflow-operation-phase!` chokepoint;
+  the six phase helpers stay byte-identical (default/`:step` `cond->` no-op).
+- Pass-1's actionable idiom nit (triplicated `#(role-phase-key role %)` vs
+  `(partial …)` in `role-phase-opts`) is resolved — now one bound
+  `namespace-key` reused across all four `update` sites (commit b695fa0aa).
+- Both attempt-id call-sites are now consistent: step
+  `invoke-step-runtime-result` threads the just-started `attempt-id`; judge
+  `execute-invoke-judge!` threads `routing-context`'s authoritative
+  `workflow-attempt-id`. Snapshot retained only for `resolve-invoke-args` in
+  both — single idiom (`λ consistent(code)`).
+
+Considered, NOT flagged as actionable:
+- `role-phase-key` uses closed dispatch `(= role :judge)` rather than an open
+  slot for arbitrary non-`:step` roles. Generalizing
+  (`(if (#{nil :step} role) base-key (keyword (str (name role) "-" …)))`) would
+  follow `extend: open_slot > closed_dispatch`, but only two roles exist
+  (`:step`, `:judge`) and design fixes the single rule "only judge invocations
+  annotate a role"; generalizing now is speculative (`minimal > comprehensive`,
+  `simple > complex`). Defensible to keep closed until a third role appears.
+- No cross-component extraction of the shared resolve-args/invoke shape
+  (agent-session ↔ workflow-runtime) — correctly judged out of scope in pass 1.
+
+No new actionable code-shaping findings. Code quality is sufficient to close.

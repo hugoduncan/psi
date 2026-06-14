@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.ir-error-formatting :as ir-error-formatting]
    [psi.workflow-runtime.target-ir-compiler :as target-compiler]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
@@ -12,7 +13,7 @@
 
 (defn- format-errors
   ([compile-error structural-errors semantic-errors]
-   (workflow-ir/format-compilation-errors compile-error structural-errors semantic-errors)))
+   (ir-error-formatting/format-compilation-errors compile-error structural-errors semantic-errors)))
 
 (defn- contains-line?
   "Returns true when the formatted output contains a line matching `substr`."
@@ -134,6 +135,51 @@
                                        :skills ["my-skill"]}])]
       (is (contains-line? out "Step 'skill-step'"))
       (is (contains-line? out "skills require the 'read' tool")))))
+
+;;;; Task 226 — session prompt-queue semantic error types
+
+(deftest format-semantic-error-session-contributions-and-prompts-test
+  ;; :session-contributions-and-prompts — step declares both prompt sources
+  (testing ":session-contributions-and-prompts names the step and the xor rule"
+    (let [out (format-errors nil nil [{:type :session-contributions-and-prompts
+                                       :step "design-review"}])]
+      (is (contains-line? out "Step 'design-review'"))
+      (is (contains-line? out "both :contributions and :prompts"))
+      (is (not (str/includes? out "(raw:"))
+          ":session-contributions-and-prompts must not fall through to the raw fallback"))))
+
+(deftest format-semantic-error-session-without-prompt-source-test
+  ;; :session-without-prompt-source — step declares neither prompt source
+  (testing ":session-without-prompt-source names the step and the requirement"
+    (let [out (format-errors nil nil [{:type :session-without-prompt-source
+                                       :step "design-review"}])]
+      (is (contains-line? out "Step 'design-review'"))
+      (is (contains-line? out "neither :contributions nor :prompts"))
+      (is (not (str/includes? out "(raw:"))
+          ":session-without-prompt-source must not fall through to the raw fallback"))))
+
+(deftest format-semantic-error-unnamed-prompt-group-test
+  ;; :unnamed-prompt-group — a :prompts group lacks :name
+  (testing ":unnamed-prompt-group names the step and the naming rule"
+    (let [out (format-errors nil nil [{:type :unnamed-prompt-group
+                                       :step "design-review"}])]
+      (is (contains-line? out "Step 'design-review'"))
+      (is (contains-line? out "missing its :name"))
+      (is (not (str/includes? out "(raw:"))
+          ":unnamed-prompt-group must not fall through to the raw fallback"))))
+
+(deftest format-semantic-error-duplicate-prompt-group-name-test
+  ;; :duplicate-prompt-group-name — names the duplicate group(s) and the step
+  (testing ":duplicate-prompt-group-name names the step and the duplicate group(s)"
+    (let [out (format-errors nil nil [{:type :duplicate-prompt-group-name
+                                       :step "design-review"
+                                       :duplicate-names ["architecture"]}])]
+      (is (contains-line? out "Step 'design-review'"))
+      (is (contains-line? out "duplicate prompt-group name"))
+      (is (contains-line? out "architecture")
+          "the duplicate group name must appear in the rendered message")
+      (is (not (str/includes? out "(raw:"))
+          ":duplicate-prompt-group-name must not fall through to the raw fallback"))))
 
 (deftest format-semantic-error-unknown-type-fallback-test
   ;; Unknown semantic error type uses fallback format

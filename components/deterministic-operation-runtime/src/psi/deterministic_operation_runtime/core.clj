@@ -29,6 +29,38 @@
        (:workflow-run-id invocation)
        (:step-id invocation)))
 
+(defn- role-phase-key
+  "Namespace a base phase key by operation role.
+
+   An `:invoke` step's `:operation` and its invoke `:judge` run two distinct
+   deterministic operations against the same step attempt. Routing the judge's
+   phase keys through a `judge-`-prefixed namespace removes the structural
+   coupling whereby both operations would otherwise share `:operation-*-state`
+   keys (task 228). Absent / `:step` role keeps the existing `:operation-*` keys
+   byte-identical for every single-operation step."
+  [role base-key]
+  (if (= role :judge)
+    (keyword (str "judge-" (name base-key)))
+    base-key))
+
+(defn- role-phase-opts
+  "Rewrite the phase-key fields of `phase-opts` through `role-phase-key`.
+
+   Covers every key that reaches the latest attempt: `:phase-key`,
+   `:timestamp-key`, `:count-key`, and each `:required-phases` entry's `:key`.
+   This is the single chokepoint applying operation role to phase namespacing;
+   the individual phase helpers keep passing their base `:operation-*` keys."
+  [role phase-opts]
+  (let [namespace-key (partial role-phase-key role)]
+    (cond-> phase-opts
+      (:phase-key phase-opts) (update :phase-key namespace-key)
+      (:timestamp-key phase-opts) (update :timestamp-key namespace-key)
+      (:count-key phase-opts) (update :count-key namespace-key)
+      (:required-phases phase-opts)
+      (update :required-phases
+              (fn [phases]
+                (mapv #(update % :key namespace-key) phases))))))
+
 (defn- transition-workflow-operation-phase!
   [invocation success-key phase-opts]
   (if-not (workflow-operation-start-required? invocation)
@@ -39,7 +71,7 @@
                  :workflow-step-id (:step-id invocation)
                  :workflow-attempt-id (:workflow-attempt-id invocation)
                  :attempt-id-required? false}
-                phase-opts))
+                (role-phase-opts (:operation-role invocation) phase-opts)))
         (ordinary-entry/keyed-result success-key))))
 
 (defn- reserve-workflow-operation-start!

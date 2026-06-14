@@ -63,6 +63,18 @@
       (or (get-in (:workflow-input workflow-run) [:original])
           (:workflow-input workflow-run)))
 
+    ;; Per-prompt turn-local surface (task 226 Slice 4): `:prompt` selects a named
+    ;; prompt-group's turn record from the multi-prompt step's accepted result,
+    ;; then resolves the (text) output key against that record's turn-local outputs.
+    (and (map? source-ref) (:prompt source-ref) (:output source-ref))
+    (let [step-id (:step source-ref)
+          group-name (:prompt source-ref)
+          output-key (:output source-ref)
+          accepted (get-in workflow-run [:step-runs step-id :accepted-result])
+          group-record (some #(when (= group-name (:name %)) %)
+                             (get-in accepted [:outputs :prompt-group-outputs]))]
+      (semantics/step-output-value nil {:outputs (:outputs group-record)} output-key))
+
     (and (map? source-ref) (:output source-ref))
     (let [step-id (:step source-ref)
           output-key (:output source-ref)

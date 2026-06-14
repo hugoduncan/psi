@@ -192,6 +192,44 @@
             run
             (-> run :effective-definition :canonical-ir :steps second :session :contributions first))))))
 
+;; ── Task 226 Slice 4 — per-prompt `:prompt` source-ref resolution ───────────
+
+(def ^:private multi-prompt-accepted-result
+  "Post-drain envelope of a named multi-prompt session step: step-level rollup
+   (last prompt's reply + accumulated transcript) plus ordered per-prompt
+   turn-local records under `:prompt-group-outputs`."
+  {:outcome :ok
+   :outputs {:final-llm-reply "ambiguity reply"
+             :transcript ["msg-a" "msg-b"]
+             :prompt-group-outputs
+             [{:index 0 :name "architecture"
+               :outputs {:final-llm-reply "architecture reply"
+                         :transcript ["msg-a"]}}
+              {:index 1 :name "ambiguity"
+               :outputs {:final-llm-reply "ambiguity reply"
+                         :transcript ["msg-a" "msg-b"]}}]}})
+
+(deftest resolve-prompt-discriminated-per-prompt-surface-test
+  (let [run (run-with-report-accepted-result
+             "run-multi-prompt" multi-prompt-accepted-result)]
+    ;; No `:prompt` → step-level surface (last prompt / accumulated transcript).
+    (is (= "ambiguity reply"
+           (workflow-source-resolution/resolve-source-ref
+            run {:step "report" :output :final-llm-reply})))
+    (is (= ["msg-a" "msg-b"]
+           (workflow-source-resolution/resolve-source-ref
+            run {:step "report" :output :transcript})))
+    ;; `:prompt` → that group's turn-local surface.
+    (is (= "architecture reply"
+           (workflow-source-resolution/resolve-source-ref
+            run {:step "report" :prompt "architecture" :output :final-llm-reply})))
+    (is (= ["msg-a"]
+           (workflow-source-resolution/resolve-source-ref
+            run {:step "report" :prompt "architecture" :output :transcript})))
+    (is (= "ambiguity reply"
+           (workflow-source-resolution/resolve-source-ref
+            run {:step "report" :prompt "ambiguity" :output :final-llm-reply})))))
+
 (defn- run-with-chosen-workflow
   [run-id selected-workflow]
   (let [[state2 run-id _] (workflow-runtime/create-run

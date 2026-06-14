@@ -1,6 +1,7 @@
 (ns psi.workflow-runtime.statechart-runtime.step-execution-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.deterministic-operation-registry.registry :as deterministic-op-registry]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
@@ -39,6 +40,51 @@
 ;; This surface is integration-tested via workflow execution (e.g. local-logprobs workflow
 ;; exercises {:from {:step "run" :output :session-id}} in its invoke step).
 ;; A unit-level assertion is impractical here without substantial test infrastructure.
+
+(deftest invoke-step-re-execution-uses-just-started-attempt-not-stale-snapshot-test
+  ;; Regression for task 228's SECOND defect (:attempt-mismatch on REPEAT). When
+  ;; an invoke step is re-executed (e.g. a REPEAT routing loop), the `:step/enter`
+  ;; caller appends a fresh attempt to the live `state*` and threads its
+  ;; attempt-id into `invoke-step-runtime-result`. The `workflow-run` snapshot the
+  ;; caller captured BEFORE appending that attempt is stale: its latest attempt is
+  ;; the PREVIOUS attempt. `invoke-step-runtime-result` must drive the
+  ;; deterministic operation against the threaded just-started attempt-id, not the
+  ;; stale snapshot's latest attempt — otherwise task-225's attempt-equality guard
+  ;; aborts the step `:operation` with :attempt-mismatch. This is the localized
+  ;; characterization companion to the first defect's
+  ;; `invoke-step-operation-then-judge-operation-share-one-attempt-test`.
+  (testing "re-executed invoke step operation drives the threaded attempt, not the stale snapshot's latest"
+    (let [handler-calls* (atom 0)
+          reg (deterministic-op-registry/create-registry)
+          _ (deterministic-op-registry/register-operation-in!
+             reg {:id "workflow/constant-routing"
+                  :handler (fn [_]
+                             (swap! handler-calls* inc)
+                             {:status :ok :data {:routed? true}})})
+          ;; Live state*: attempt-2 is the just-started latest live attempt.
+          state* (atom {:workflows {:runs {"run-1" {:run-id "run-1"
+                                                    :status :running
+                                                    :step-runs {"clarity-status"
+                                                                {:attempts [{:attempt-id "attempt-1"}
+                                                                            {:attempt-id "attempt-2"}]}}}}}})
+          ctx {:state* state*
+               :deterministic-operation-registry reg}
+          ;; Stale snapshot captured before attempt-2 was appended: latest = attempt-1.
+          stale-workflow-run {:run-id "run-1"
+                              :step-runs {"clarity-status" {:attempts [{:attempt-id "attempt-1"}]}}}
+          step-def {:invoke {:operation "workflow/constant-routing"}}
+          {:keys [operation-result]}
+          (step-execution/invoke-step-runtime-result
+           ctx nil "run-1" "clarity-status" step-def stale-workflow-run "attempt-2")
+          attempts (get-in @state* [:workflows :runs "run-1" :step-runs
+                                    "clarity-status" :attempts])]
+      (is (= 1 @handler-calls*) "the step operation handler runs once")
+      (is (= :ok (:status operation-result))
+          "the operation succeeds against the just-started attempt, not abort with :attempt-mismatch")
+      (is (= :entered (:operation-handler-entry-state (nth attempts 1)))
+          "the live just-started attempt (attempt-2) is driven to :entered")
+      (is (nil? (:operation-handler-entry-state (nth attempts 0)))
+          "the stale snapshot's latest attempt (attempt-1) is NOT driven"))))
 
 (deftest execute-session-step-invalid-structured-output-blocks-with-envelope-test
   (testing "invalid structured output records raw output and validation errors instead of escaping surface resolution"
@@ -439,6 +485,101 @@
         (is (= [{:role "assistant" :content [{:type :text :text raw-output}]}]
                (get-in payload [:outputs :transcript])))
         (is (string? (get-in payload [:outputs :final-llm-reply])))
+        (is (= :actor/done (:event (first @event-queue*))))))))
+
+(deftest single-prompt-session-step-envelope-characterization-test
+  ;; Task 226 Slice 1 (P3/R4) — equivalence-baseline characterization. Pins the
+  ;; ASSERTED SHAPE of the single-prompt `execute-session-step!`
+  ;; `:pending-actor-result` envelope (not a full-content golden snapshot): the
+  ;; presence/shape of `:final-llm-reply`/`:text`/`:transcript` for a
+  ;; representative text step, and the structured `:outputs` keys for a
+  ;; representative structured step. The unified N=1-degenerate prompt-queue path
+  ;; (Slice 1) MUST keep this green unchanged; any change to the asserted envelope
+  ;; shape is a defect (R4). This is the Slice-1 done-gate comparand.
+  (testing "single-prompt text session step yields the canonical step-level rollup envelope"
+    (let [working-memory* (atom {:current-step-id "summarize"})
+          event-queue* (atom [])
+          assistant-message {:role "assistant"
+                             :content [{:type :text :text "the summary"}]}]
+      (step-execution/execute-session-step!
+       {:workflow-execute-actor-turn-fn
+        (fn [_ctx _session-id _prompt]
+          {:status :ok
+           :assistant-text "the summary"
+           :execution-result nil
+           :assistant-message assistant-message})}
+       {:session-id "child-session"}
+       {:name "summarize"
+        :type :session
+        :outputs {:final-llm-reply {:source :session/final-llm-reply}
+                  :transcript {:source :session/transcript}}
+        :yields {:type :text :text :final-llm-reply}}
+       "summarize"
+       "attempt-1"
+       working-memory*
+       event-queue*
+       "Summarize")
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)
+            outputs (:outputs payload)]
+        ;; pending-actor-result envelope shape
+        (is (= :success (:kind pending)))
+        (is (= "summarize" (:step-id pending)))
+        (is (= "attempt-1" (:attempt-id pending)))
+        (is (= :ok (:outcome payload)))
+        ;; step-level text surfaces
+        (is (= "the summary" (:final-llm-reply outputs)))
+        (is (= "the summary" (:text outputs)))
+        (is (= [assistant-message] (:transcript outputs)))
+        (is (= "child-session" (:session-id outputs)))
+        (is (contains? outputs :logprobs))
+        ;; C3 (AC-2/AC-3): the N=1 unnamed `:contributions` degenerate carries no
+        ;; per-prompt records — `:prompt-group-outputs` is named-`:prompts`-only.
+        (is (not (contains? outputs :prompt-group-outputs)))
+        (is (= :actor/done (:event (first @event-queue*)))))))
+
+  (testing "single-prompt structured session step binds the declared structured output key"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          ai-structured-output {:strategy :provider-native
+                                :native-mechanism :openai/chat-completions-json-schema-response-format
+                                :source :openai/message-content
+                                :payload {"decision" "pass"}
+                                :raw-payload "{\"decision\":\"pass\"}"}]
+      (step-execution/execute-session-step!
+       {:workflow-execute-actor-turn-fn
+        (fn [_ctx _session-id _prompt _opts]
+          {:status :ok
+           :assistant-text "{\"decision\":\"pass\"}"
+           :structured-output ai-structured-output
+           :execution-result {:execution-result/structured-output ai-structured-output}
+           :assistant-message nil})}
+       {:session-id "child-session"}
+       {:name "classify"
+        :type :session
+        :outputs {:classification {:source :session/structured-output
+                                   :mode :structured
+                                   :schema-id :psi.workflow/test-classification
+                                   :schema-version 1
+                                   :schema [:map [:decision [:enum :pass :fail]]]
+                                   :json-schema {:type "object"}}}}
+       "classify"
+       "attempt-1"
+       working-memory*
+       event-queue*
+       "Classify")
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)
+            classification (get-in payload [:outputs :classification])]
+        (is (= :success (:kind pending)))
+        (is (= :ok (:outcome payload)))
+        ;; structured output key present and valid in the envelope outputs
+        (is (contains? (:outputs payload) :classification))
+        (is (= :valid (get-in classification [:structured-output :status])))
+        (is (= {:decision :pass} (get-in classification [:structured-output :value])))
+        ;; C3 (AC-2/AC-3): the N=1 unnamed `:contributions` degenerate carries no
+        ;; per-prompt records — `:prompt-group-outputs` is named-`:prompts`-only.
+        (is (not (contains? (:outputs payload) :prompt-group-outputs)))
         (is (= :actor/done (:event (first @event-queue*))))))))
 
 (deftest assistant-message-text-test

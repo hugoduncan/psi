@@ -28,7 +28,9 @@ Architecture follows a Viable System Model (see `AGENTS.md` → Architecture):
   `delegate` tool: `task-lifecycle`, `review-task-design`/`-plan`/
   `-implementation`, `create-task-plan`, `implement-task`, `reduce-incidental-complexity`,
   `reduce-architectural-complexity`, `extract-task-knowledge`, and the `gh-*`
-  GitHub workflows.
+  GitHub workflows. `review-task-design` is the multi-prompt exemplar: one
+  shared `design-review` batch (architecture/ambiguity/inconsistency) followed
+  by one batched design follow-up.
 - Workflow routing uses generic deterministic operations (`workflow/pass-status-routing`,
   `workflow/constant-routing`, `workflow/exact-marker-routing`,
   `workflow/munera-open-task-path-routing`); workflow-specific labels/topology

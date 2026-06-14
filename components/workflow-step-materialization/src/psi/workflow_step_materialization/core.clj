@@ -58,23 +58,33 @@
                 (source-resolution/render-template-contribution workflow-run contribution))]
     []))
 
-(defn materialize-step-session-conversation
-  "Materialize canonical IR `:session :contributions` into ordered child-session
-   conversation messages.
+(defn materialize-contributions-conversation
+  "Materialize an ordered `contributions` vector into ordered child-session
+   conversation messages against `workflow-run`.
 
    Semantics:
    - `:template` contributions become synthetic user text messages
    - `:source` contributions preserve canonical conversation messages when the
      resolved value is already message-shaped, otherwise they become synthetic
      user text messages via deterministic stringification
-   - author order is preserved exactly across contributions"
+   - author order is preserved exactly across contributions
+
+   This is the shared single-turn materialization primitive: a single-prompt
+   step's whole `:contributions` and one prompt-group's `:contributions`
+   (task 226) both materialize through here."
+  [workflow-run contributions]
+  (some->> contributions
+           (mapcat #(materialize-session-contribution workflow-run %))
+           vec
+           not-empty))
+
+(defn materialize-step-session-conversation
+  "Materialize canonical IR `:session :contributions` into ordered child-session
+   conversation messages."
   [workflow-run step-id]
   (let [contributions (get-in (semantics/effective-step-def workflow-run step-id)
                               [:session :contributions])]
-    (some->> contributions
-             (mapcat #(materialize-session-contribution workflow-run %))
-             vec
-             not-empty)))
+    (materialize-contributions-conversation workflow-run contributions)))
 
 (defn- prompt-text-from-message
   [message]
@@ -108,6 +118,17 @@
        :prompt prompt}
       {:preloaded-messages (not-empty messages')
        :prompt ""})))
+
+(defn materialize-prompt-group-conversation
+  "Materialize one normalized prompt-group's `:contributions` (task 226) into
+   ordered child-session conversation messages.
+
+   This is the per-group materialization entry point: the runtime derives the
+   ordered prompt-queue from canonical IR (`ir/session-step-prompt-queue`) and
+   materializes each group through here, reusing the same single-turn primitive.
+   A length-1 unnamed-group queue reproduces today's single-prompt submission."
+  [workflow-run prompt-group]
+  (materialize-contributions-conversation workflow-run (:contributions prompt-group)))
 
 (defn step-prompt
   [workflow-run step-id]

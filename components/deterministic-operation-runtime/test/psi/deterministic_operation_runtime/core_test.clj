@@ -129,3 +129,100 @@
       (is (= 1 @handler-calls*))
       (is (= :ok (:status result)))
       (is (= :entered (get-in @state* [:workflows :runs "run-1" :step-runs "invoke" :attempts 0 :operation-handler-entry-state]))))))
+
+(deftest invoke-step-operation-then-judge-operation-share-one-attempt-test
+  ;; Regression for task 228: an :invoke step that carries both an :operation and
+  ;; an invoke :judge runs TWO deterministic operations against the SAME step
+  ;; attempt. Without per-operation phase-key namespacing, the second (judge)
+  ;; operation sees the residual :operation-handler-entry-state :entered left by
+  ;; the first (step) operation and aborts with :handler-entry-state-mismatch.
+  ;; The judge operation must carry :operation-role :judge so it drives a
+  ;; distinct :judge-operation-*-state key namespace.
+  (testing "step operation then judge operation both enter against one attempt"
+    (let [state* (atom {:workflows {:runs {"run-1" {:run-id "run-1"
+                                                    :status :running
+                                                    :step-runs {"clarity-status"
+                                                                {:attempts [{:attempt-id "attempt-1"}]}}}}}})
+          ctx {:state* state*}
+          step-calls* (atom 0)
+          judge-calls* (atom 0)
+          base-invocation {:ctx ctx
+                           :workflow-run-id "run-1"
+                           :workflow-attempt-id "attempt-1"
+                           :step-id "clarity-status"}
+          step-result (runtime/invoke-operation
+                       {:id "workflow/clarity-status"
+                        :handler (fn [_]
+                                   (swap! step-calls* inc)
+                                   {:status :ok :data {:step? true}})}
+                       base-invocation)
+          after-step (get-in @state* [:workflows :runs "run-1" :step-runs
+                                      "clarity-status" :attempts 0])
+          judge-result (runtime/invoke-operation
+                        {:id "workflow/pass-feedback-routing"
+                         :handler (fn [_]
+                                    (swap! judge-calls* inc)
+                                    {:status :ok :data {:judge? true}})}
+                        (assoc base-invocation :operation-role :judge))
+          attempt (get-in @state* [:workflows :runs "run-1" :step-runs
+                                   "clarity-status" :attempts 0])]
+      (is (= 1 @step-calls*) "the step operation handler runs once")
+      (is (= :ok (:status step-result)))
+      (is (= 1 @judge-calls*) "the judge operation handler runs once")
+      (is (= :ok (:status judge-result))
+          "the judge operation must succeed, not abort with :handler-entry-state-mismatch")
+      (is (= :entered (:operation-handler-entry-state attempt))
+          "the step operation's :operation-*-state keys are untouched by the judge")
+      (is (= :entered (:judge-operation-handler-entry-state attempt))
+          "the judge operation drives its own :judge-operation-*-state namespace")
+      (testing "the judge namespaces every phase-opts key field, not just :phase-key"
+        ;; Guards the plan's top "key-derivation completeness" risk: a regression
+        ;; dropping the :timestamp-key/:count-key rewrite in role-phase-opts would
+        ;; re-alias the judge's metadata onto the step op's :operation-* keys while
+        ;; the state-key mismatch gate (the only key the original assertions pin)
+        ;; stays green.
+        (is (= :started (:judge-operation-start-state attempt))
+            "the judge namespaces the :operation-start-state phase key")
+        (is (= :committed (:judge-operation-call-state attempt))
+            "the judge namespaces the :operation-call-state phase key")
+        (is (= 1 (:judge-operation-start-count attempt))
+            "the judge namespaces the :count-key (its own start count)")
+        (is (some? (:judge-operation-handler-entered-at attempt))
+            "the judge namespaces a :timestamp-key (judge-scoped handler-entered-at)")
+        (is (= 1 (:operation-start-count attempt))
+            "the judge does not re-increment the step op's :operation-start-count")
+        (is (= (:operation-start-count after-step) (:operation-start-count attempt))
+            "the step op's :operation-start-count is untouched by the judge")
+        (is (= (:operation-started-at after-step) (:operation-started-at attempt))
+            "the step op's :operation-started-at timestamp is untouched by the judge")
+        (is (= (:operation-handler-entered-at after-step)
+               (:operation-handler-entered-at attempt))
+            "the step op's :operation-handler-entered-at timestamp is untouched by the judge")))))
+
+(deftest judge-role-operation-honors-workflow-cancellation-test
+  ;; Task 228 regression: per-operation phase-key namespacing must not weaken the
+  ;; task-225 cooperative cancellation guard. A judge-role operation against a
+  ;; cancelled run must still refuse to start and yield a clean :workflow-stopped
+  ;; terminal without invoking its handler.
+  (testing "cancelled run stops a judge-role operation before handler invocation"
+    (let [handler-calls* (atom 0)
+          result (runtime/invoke-operation
+                  {:id "workflow/pass-feedback-routing"
+                   :handler (fn [_]
+                              (swap! handler-calls* inc)
+                              {:status :ok :data {:started? true}})}
+                  {:ctx {:state* (atom {:workflows {:runs {"run-cancelled" {:run-id "run-cancelled"
+                                                                            :status :cancelled}}}})}
+                   :workflow-run-id "run-cancelled"
+                   :operation-role :judge
+                   :step-id "clarity-status"})]
+      (is (= 0 @handler-calls*)
+          "the judge operation handler must not run after cancellation")
+      (is (= {:status :error
+              :reason :workflow-stopped
+              :message "Workflow execution stopped before deterministic operation start"
+              :details {:operation-id "workflow/pass-feedback-routing"
+                        :workflow-run-id "run-cancelled"
+                        :step-id "clarity-status"
+                        :stop-reason :cancelled}}
+             result)))))

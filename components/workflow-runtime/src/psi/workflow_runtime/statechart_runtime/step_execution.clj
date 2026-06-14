@@ -6,6 +6,7 @@
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.attempts :as attempts]
    [psi.workflow-runtime.ir :as workflow-ir]
+   [psi.workflow-runtime.progression-recording :as progression-recording]
    [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.statechart-runtime.queue :as queue]
    [psi.workflow-runtime.statechart-runtime.state :as state]
@@ -42,7 +43,7 @@
                     {:result operation-result}))))
 
 (defn invoke-step-runtime-result
-  [ctx parent-session-id run-id step-id step-def workflow-run]
+  [ctx parent-session-id run-id step-id step-def workflow-run attempt-id]
   (let [invoke-spec (or (:invoke step-def)
                         (get-in step-def [:judge :invoke]))
         args (workflow-source-resolution/resolve-invoke-args workflow-run step-id (:args invoke-spec))
@@ -52,10 +53,14 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id run-id
-                           :workflow-attempt-id (some-> workflow-run
-                                                        (get-in [:step-runs step-id :attempts])
-                                                        last
-                                                        :attempt-id)
+                           ;; task 228: use the attempt the caller just started,
+                           ;; not the latest attempt derived from a `workflow-run`
+                           ;; snapshot taken before this attempt was appended. On
+                           ;; a re-executed (REPEAT) invoke step the snapshot is
+                           ;; stale and its latest attempt id no longer matches
+                           ;; the live latest attempt, which task-225's attempt
+                           ;; equality guard rejects with :attempt-mismatch.
+                           :workflow-attempt-id attempt-id
                            :step-id step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
@@ -172,7 +177,126 @@
                                                       :updated-at (state/now)})
   (queue/enqueue-event! event-queue* working-memory* event {}))
 
+(defn- session-turn-ok-envelope
+  "Compute the success-arm disposition for a completed session turn (pure).
+
+   Derives the per-turn `raw-outputs`, applies final-turn structured-output
+   validation, and builds the `:pending-actor-result` envelope. `structured-entry`
+   (`[output-key output-spec]`) is non-nil only on the final turn (structured
+   `:outputs` are requested on the final turn only, P5); on non-final turns the
+   declared structured key is excluded from surface resolution so an absent
+   structured value cannot throw.
+
+   Returns the `:branch :success` disposition map consumed by
+   `execute-session-turn-outcome` — `:disposition :ok` or `:disposition :blocked`
+   (`:invalid-structured-output`). This is the pure OK-envelope computation,
+   separated from `execute-session-turn-outcome`'s disposition flow control.
+
+   `turn-result` is the cohesive turn-result map; its `:assistant-text`,
+   `:assistant-message`, `:execution-result`, and `:structured-output` co-members
+   travel as one named value (no positional transposition risk)."
+  [step-def execution-session structured-entry turn-result]
+  (let [{:keys [assistant-text assistant-message execution-result structured-output]} turn-result
+        logprobs (:execution-result/logprobs execution-result)
+        ;; Structured `:outputs` bind the final turn only (P5). On non-final
+        ;; turns the declared structured key is NOT produced, so it must be
+        ;; excluded from surface resolution to avoid an invalid-resolution
+        ;; throw for an absent structured value.
+        step-structured-key (first (structured-output/single-structured-output-entry (:outputs step-def)))
+        surface-step-def (if (and step-structured-key (nil? structured-entry))
+                           (update step-def :outputs dissoc step-structured-key)
+                           step-def)
+        raw-outputs {:final-llm-reply assistant-text
+                     :text assistant-text
+                     :transcript (when assistant-message [assistant-message])
+                     :logprobs logprobs
+                     :session-id (:session-id execution-session)}
+        raw-outputs (if-let [[output-key output-spec] structured-entry]
+                      (assoc raw-outputs output-key
+                             (if (some? structured-output)
+                               (structured-output/output-result output-spec assistant-text structured-output)
+                               (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
+                      raw-outputs)
+        structured-result (some-> structured-entry first raw-outputs)
+        invalid-structured-output? (and structured-entry
+                                        (not (structured-output/valid-output-result? structured-result)))
+        normalized-outputs (when-not invalid-structured-output?
+                             (workflow-ir/step-output-surfaces
+                              surface-step-def
+                              {:outcome :ok
+                               :outputs raw-outputs}))
+        envelope (if invalid-structured-output?
+                   {:outcome :blocked
+                    :blocked {:reason :invalid-structured-output
+                              :message "Workflow structured output failed validation"
+                              :details {:output-key (first structured-entry)
+                                        :structured-output (:structured-output structured-result)}}
+                    :outputs raw-outputs}
+                   {:outcome :ok
+                    :outputs (merge normalized-outputs raw-outputs)})]
+    {:disposition (if (= :blocked (:outcome envelope)) :blocked :ok)
+     :branch :success
+     :payload envelope
+     :raw-outputs raw-outputs
+     :assistant-message assistant-message}))
+
+(defn- execute-session-turn-outcome
+  "Run one already-shaped session turn and classify its outcome WITHOUT recording
+   or enqueuing.
+
+   `turn-opts` carries the structured-output request and is nil except on the
+   final turn (structured `:outputs` are requested on the final turn only, P5).
+   `structured-entry` (`[output-key output-spec]`) is non-nil only when structured
+   output is requested on this (final) turn.
+
+   Returns a disposition map:
+   - `{:disposition :cancelled}` — the run was stopped after the turn (CHECK A);
+   - `{:disposition :failed :payload failure :branch :error}`;
+   - `{:disposition :blocked :payload blocked-payload :branch :error|:success}`;
+   - `{:disposition :ok :payload envelope :branch :success
+       :raw-outputs ... :assistant-message ...}`.
+
+   `:branch :success` outcomes still require the caller's pre-record stopped?
+   recheck (CHECK B); `:branch :error` outcomes do not (preserving the byte-exact
+   single-turn N=1 control flow)."
+  [ctx execution-session step-def turn-prompt stopped? turn-opts structured-entry]
+  (let [turn-result
+        (if (fallback-enabled? execution-session)
+          (execute-with-ranked-fallback! ctx execution-session turn-prompt turn-opts stopped?)
+          (if turn-opts
+            (turn-execution/execute-actor-turn! ctx (:session-id execution-session) turn-prompt turn-opts)
+            (turn-execution/execute-actor-turn! ctx (:session-id execution-session) turn-prompt)))
+        {:keys [status failure structured-output]} turn-result]
+    (cond
+      (stopped?)
+      {:disposition :cancelled}
+
+      (= :error status)
+      (if (= :unsupported-structured-output (or (:reason structured-output)
+                                                (:reason failure)))
+        {:disposition :blocked
+         :branch :error
+         :payload (structured-output-blocked-payload
+                   :unsupported-structured-output
+                   (or (:message failure)
+                       "Workflow structured output is not supported by the resolved model")
+                   {:output-key (first structured-entry)
+                    :structured-output structured-output
+                    :failure failure}
+                   {})}
+        {:disposition :failed
+         :branch :error
+         :payload failure})
+
+      :else
+      (session-turn-ok-envelope
+       step-def execution-session structured-entry turn-result))))
+
 (defn execute-session-step!
+  "Drive ONE session turn (the unnamed N=1 degenerate of the unified prompt-queue)
+   and record its post-turn `:pending-actor-result`. Named multi-prompt queues are
+   driven by `drive-session-prompt-queue!`, which loops the same per-turn
+   primitive (`execute-session-turn-outcome`)."
   ([ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt]
    (execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt nil))
   ([ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt stopped?]
@@ -182,7 +306,7 @@
                           (structured-output/structured-output-request output-key output-spec))]
      (cond
        (stopped?)
-       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+       (queue/enqueue-cancel! event-queue* working-memory*)
 
        (false? (:ok? request-result))
        (record-actor-pending!
@@ -194,85 +318,157 @@
         :actor/blocked)
 
        :else
-       (let [turn-opts (:opts request-result)
-             {:keys [status assistant-text failure execution-result assistant-message structured-output]}
-             (if (fallback-enabled? execution-session)
-               (execute-with-ranked-fallback! ctx execution-session prompt turn-opts stopped?)
-               (if turn-opts
-                 (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt turn-opts)
-                 (turn-execution/execute-actor-turn! ctx (:session-id execution-session) prompt)))]
-         (cond
-           (stopped?)
-           (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+       (let [outcome (execute-session-turn-outcome
+                      ctx execution-session step-def prompt stopped?
+                      (:opts request-result) structured-entry)]
+         (case (:disposition outcome)
+           :cancelled
+           (queue/enqueue-cancel! event-queue* working-memory*)
 
-           (= :error status)
-           (if (= :unsupported-structured-output (or (get-in structured-output [:reason])
-                                                     (:reason failure)))
-             (record-actor-pending!
-              working-memory* event-queue* step-id attempt-id :blocked
-              (structured-output-blocked-payload :unsupported-structured-output
-                                                 (or (:message failure)
-                                                     "Workflow structured output is not supported by the resolved model")
-                                                 {:output-key (first structured-entry)
-                                                  :structured-output structured-output
-                                                  :failure failure}
-                                                 {})
-              :actor/blocked)
-             (record-actor-pending!
-              working-memory* event-queue* step-id attempt-id :failure failure :actor/failed))
+           :failed
+           (record-actor-pending!
+            working-memory* event-queue* step-id attempt-id :failure (:payload outcome) :actor/failed)
 
-           :else
-           (let [logprobs (:execution-result/logprobs execution-result)
-                 raw-outputs {:final-llm-reply assistant-text
-                              :text assistant-text
-                              :transcript (when assistant-message [assistant-message])
-                              :logprobs logprobs
-                              :session-id (:session-id execution-session)}
-                 raw-outputs (if-let [[output-key output-spec] structured-entry]
-                               (assoc raw-outputs output-key
-                                      (if (some? structured-output)
-                                        (structured-output/output-result output-spec assistant-text structured-output)
-                                        (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
-                               raw-outputs)
-                 structured-result (some-> structured-entry first raw-outputs)
-                 invalid-structured-output? (and structured-entry
-                                                 (not (structured-output/valid-output-result? structured-result)))
-                 normalized-outputs (when-not invalid-structured-output?
-                                      (workflow-ir/step-output-surfaces
-                                       step-def
-                                       {:outcome :ok
-                                        :outputs raw-outputs}))
-                 envelope (if invalid-structured-output?
-                            {:outcome :blocked
-                             :blocked {:reason :invalid-structured-output
-                                       :message "Workflow structured output failed validation"
-                                       :details {:output-key (first structured-entry)
-                                                 :structured-output (:structured-output structured-result)}}
-                             :outputs raw-outputs}
-                            {:outcome :ok
-                             :outputs (merge normalized-outputs raw-outputs)})]
-             (if (stopped?)
-               (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-               (record-actor-pending!
-                working-memory* event-queue* step-id attempt-id
-                (if (= :blocked (:outcome envelope)) :blocked :success)
-                envelope
-                (if (= :blocked (:outcome envelope)) :actor/blocked :actor/done))))))))))
-(defn execute-actor-step!
-  [ctx parent-session-id run-id step-id step-def workflow-run execution-session attempt-id working-memory* event-queue* prompt]
-  (try
+           :blocked
+           (if (and (= :success (:branch outcome)) (stopped?))
+             (queue/enqueue-cancel! event-queue* working-memory*)
+             (record-actor-pending!
+              working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
+
+           :ok
+           (if (stopped?)
+             (queue/enqueue-cancel! event-queue* working-memory*)
+             (record-actor-pending!
+              working-memory* event-queue* step-id attempt-id :success (:payload outcome) :actor/done))))))))
+
+(defn- turn-local-outputs
+  "The turn-local output surfaces recorded for one named prompt-group turn."
+  [outcome]
+  (select-keys (:raw-outputs outcome)
+               [:final-llm-reply :text :transcript :logprobs :session-id]))
+
+(defn- post-drain-envelope
+  "Build the single post-drain `:pending-actor-result` envelope: the final turn's
+   step-level rollup, with the accumulated multi-turn `:transcript` and the ordered
+   per-prompt records nested under `:prompt-group-outputs`."
+  [final-envelope transcript prompt-group-outputs]
+  (-> final-envelope
+      (assoc-in [:outputs :transcript] (vec transcript))
+      (assoc-in [:outputs :prompt-group-outputs] (vec prompt-group-outputs))))
+
+(defn later-group-turn-prompt
+  "Derive a later prompt-group's turn submission against the live child session.
+
+   `materialize-fn` materializes the group's `:contributions` into a conversation
+   (`materialize-prompt-group-conversation`); `split-fn`
+   (`split-step-session-conversation`) splits it into `:preloaded-messages` +
+   `:prompt`. Only the split `:prompt` (the final user message) is returned.
+
+   LIMITATION (task 226 — single submission per later group). Unlike group 0
+   (whose `:preloaded-messages` ARE injected at child-session spawn in
+   `:step/enter`), a later group's `:preloaded-messages` are intentionally **not**
+   re-injected mid-session: later groups rely on the live session's conversation
+   memory for shared context (design E1), and only their final message is
+   submitted. A later group whose `:contributions` materialize to MORE THAN ONE
+   message therefore silently drops every non-final message. Author multi-message
+   bodies as group 0, or keep later groups to a single submission (the common
+   `:prompt-workflow` single-user-message form). See
+   `doc/workflow-grammar.md` (\"Later-group single-submission limitation\")."
+  [materialize-fn split-fn workflow-run group]
+  (:prompt (split-fn (materialize-fn workflow-run group))))
+
+(defn drive-session-prompt-queue!
+  "Drive a named multi-prompt session step as an in-run N-turn drain (design F1).
+
+   Each turn is the same synchronous per-turn primitive
+   (`execute-session-turn-outcome`) the N=1 degenerate uses, looped against the
+   SAME child session id. The next un-run prompt is selected from RECORDED
+   per-prompt progression (`next-un-run-prompt-group`), never an in-memory counter,
+   so a prompt whose turn record already exists is never re-submitted (resume
+   non-re-fire invariant). Structured `:outputs` are requested on the final turn
+   only (P5); the static request-validity gate runs upfront before turn 1 (P13a).
+   On drain, emits ONE post-drain `:pending-actor-result` carrying the step-level
+   rollup plus the ordered per-prompt records.
+
+   `first-prompt` is group 0's already-split prompt (materialized at `:step/enter`).
+   `next-group-prompt-fn` materializes+splits a later group's prompt against the
+   live session. `record-turn-fn` persists one per-prompt turn record through the
+   live-state guard and returns falsey only when the run was cancelled mid-record."
+  [ctx execution-session step-def step-id attempt-id working-memory* event-queue*
+   run-id prompt-queue first-prompt next-group-prompt-fn record-turn-fn stopped?]
+  (let [stopped? (or stopped? (constantly false))
+        structured-entry (structured-output/single-structured-output-entry (:outputs step-def))
+        request-result (when-let [[output-key output-spec] structured-entry]
+                         (structured-output/structured-output-request output-key output-spec))]
     (cond
-      (= :invoke (:type step-def))
-      (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run)
-            {:keys [attempt-data pending-kind payload]} (apply-invoke-step-result invoke-result)]
-        {:attempt-data attempt-data
-         :pending-kind pending-kind
-         :payload payload})
+      (stopped?)
+      (queue/enqueue-cancel! event-queue* working-memory*)
+
+      ;; Upfront structured request-validity gate (P13a): turn-independent, runs
+      ;; before any turn, leaving zero per-prompt records on a request fault.
+      (false? (:ok? request-result))
+      (record-actor-pending!
+       working-memory* event-queue* step-id attempt-id :blocked
+       (structured-output-blocked-payload (:reason request-result)
+                                          (:message request-result)
+                                          (:details request-result)
+                                          {})
+       :actor/blocked)
 
       :else
-      (do
-        (execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt)
-        nil))
-    (catch Exception e
-      {:pending-kind :failure
-       :payload {:message (ex-message e)}})))
+      (loop [transcript []
+             prompt-group-outputs []
+             final-envelope nil]
+        (if (stopped?)
+          ;; Between-prompt cancellation checkpoint (R-7): a cancellation
+          ;; arriving between turns stops the queue cleanly at the top of the
+          ;; iteration, before the next prompt is selected or its turn fires
+          ;; (cooperative-cancellation, 225-lineage; realizes P12's
+          ;; between-prompts "queue stops"). Symmetric with the N=1
+          ;; `execute-session-step!` pre-turn `stopped?` check, so a cancelled
+          ;; queue never fires an extra turn's `ai/generate` + tool loop.
+          (queue/enqueue-cancel! event-queue* working-memory*)
+          (let [workflow-run (get-in @(:state* ctx) (progression-recording/run-path run-id))
+                {:keys [index group final?]}
+                (progression-recording/next-un-run-prompt-group workflow-run step-id prompt-queue)]
+            (if (nil? group)
+            ;; Drained: emit the one post-drain result over the whole queue.
+              (record-actor-pending!
+               working-memory* event-queue* step-id attempt-id :success
+               (post-drain-envelope final-envelope transcript prompt-group-outputs)
+               :actor/done)
+              (let [turn-prompt (if (zero? index) first-prompt (next-group-prompt-fn group))
+                    turn-opts (when final? (:opts request-result))
+                    turn-structured-entry (when final? structured-entry)
+                    outcome (execute-session-turn-outcome
+                             ctx execution-session step-def turn-prompt stopped?
+                             turn-opts turn-structured-entry)]
+                (case (:disposition outcome)
+                  :cancelled
+                  (queue/enqueue-cancel! event-queue* working-memory*)
+
+                  :failed
+                  (record-actor-pending!
+                   working-memory* event-queue* step-id attempt-id :failure
+                   (assoc (:payload outcome)
+                          :failed-prompt {:index index :name (:name group)})
+                   :actor/failed)
+
+                  :blocked
+                  (if (and (= :success (:branch outcome)) (stopped?))
+                    (queue/enqueue-cancel! event-queue* working-memory*)
+                    (record-actor-pending!
+                     working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
+
+                  :ok
+                  (if (stopped?)
+                    (queue/enqueue-cancel! event-queue* working-memory*)
+                    (let [outputs (turn-local-outputs outcome)]
+                      (if (record-turn-fn index (:name group) outputs)
+                        (recur (cond-> transcript
+                                 (:assistant-message outcome) (conj (:assistant-message outcome)))
+                               (conj prompt-group-outputs
+                                     {:index index :name (:name group) :outputs outputs})
+                               (:payload outcome))
+                      ;; Recording was skipped because the run was cancelled.
+                        (queue/enqueue-cancel! event-queue* working-memory*)))))))))))))

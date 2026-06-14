@@ -66,6 +66,74 @@
       (assert-error :malformed-pass-status
                     (routing/parse-pass-status-routing text nil)))))
 
+(deftest pass-feedback-routing-parser-test
+  ;; Tests pass-level review feedback routing validates every prompt/phase reply
+  ;; before computing the aggregate review-pass route.
+  (testing "rejects empty feedback inputs with deterministic diagnostics"
+    (let [result (assert-error :invalid-pass-feedback
+                               (routing/parse-pass-feedback-routing {}))]
+      (is (= :empty-pass-feedback
+             (get-in result [:details :validation-failures :feedback-inputs :reason]))
+          (pr-str result))))
+  (testing "routes DONE only when every supplied reply is REVIEW_COMPLETE"
+    (assert-route "DONE"
+                  (routing/parse-pass-feedback-routing
+                   {:architecture-text "Architecture clear.\nPASS_STATUS: REVIEW_COMPLETE"
+                    :ambiguity-text "No ambiguity.\nPASS_STATUS: REVIEW_COMPLETE"
+                    :inconsistency-text "No inconsistency.\nPASS_STATUS: REVIEW_COMPLETE"})))
+  (testing "routes REPEAT when any supplied reply is ACTIONABLE_FEEDBACK"
+    (let [result (assert-route "REPEAT"
+                               (routing/parse-pass-feedback-routing
+                                {:architecture-text "Architecture clear.\nPASS_STATUS: REVIEW_COMPLETE"
+                                 :ambiguity-text "Ambiguity found.\nPASS_STATUS: ACTIONABLE_FEEDBACK"
+                                 :inconsistency-text "No inconsistency.\nPASS_STATUS: REVIEW_COMPLETE"}))]
+      (is (= [:ambiguity-text]
+             (get-in result [:details :actionable-keys]))
+          (pr-str result))))
+  (testing "rejects missing, duplicate, malformed, and disallowed statuses per key"
+    (let [result (assert-error
+                  :invalid-pass-feedback
+                  (routing/parse-pass-feedback-routing
+                   {:missing-text "No marker here"
+                    :duplicate-text "PASS_STATUS: REVIEW_COMPLETE\nPASS_STATUS: REVIEW_COMPLETE"
+                    :malformed-text "PASS_STATUS: REVIEW_COMPLETE because done"
+                    :disallowed-text "PASS_STATUS: IMPLEMENTATION_COMPLETE"}))
+          failures (get-in result [:details :validation-failures])]
+      (is (= #{:missing-text :duplicate-text :malformed-text :disallowed-text}
+             (set (keys failures)))
+          (pr-str result))
+      (is (= :missing-pass-status (get-in failures [:missing-text :reason]))
+          (pr-str result))
+      (is (= :ambiguous-pass-status (get-in failures [:duplicate-text :reason]))
+          (pr-str result))
+      (is (= :malformed-pass-status (get-in failures [:malformed-text :reason]))
+          (pr-str result))
+      (is (= :invalid-pass-status (get-in failures [:disallowed-text :reason]))
+          (pr-str result))
+      (is (= ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]
+             (get-in failures [:disallowed-text :details :allowed-statuses]))
+          (pr-str result))))
+  (testing "rejects non-string feedback values with deterministic diagnostics"
+    (let [result (assert-error
+                  :invalid-pass-feedback
+                  (routing/parse-pass-feedback-routing
+                   {:numeric-text 42
+                    :vector-text ["PASS_STATUS: REVIEW_COMPLETE"]
+                    :valid-text "PASS_STATUS: REVIEW_COMPLETE"}))
+          failures (get-in result [:details :validation-failures])]
+      (is (= #{:numeric-text :vector-text}
+             (set (keys failures)))
+          (pr-str result))
+      (is (= :non-string-pass-feedback (get-in failures [:numeric-text :reason]))
+          (pr-str result))
+      (is (= 42 (get-in failures [:numeric-text :details :text]))
+          (pr-str result))
+      (is (= :non-string-pass-feedback (get-in failures [:vector-text :reason]))
+          (pr-str result))
+      (is (= ["PASS_STATUS: REVIEW_COMPLETE"]
+             (get-in failures [:vector-text :details :text]))
+          (pr-str result)))))
+
 (deftest munera-open-task-path-routing-parser-test
   ;; Tests pure Munera open task path routing accepts only a single normalized
   ;; root-relative open-task path as the extracted task identity.

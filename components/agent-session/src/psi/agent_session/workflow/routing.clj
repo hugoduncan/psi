@@ -76,6 +76,66 @@
                      :line line
                      :value trimmed-value}})))))
 
+(def ^:private review-feedback-pass-statuses
+  ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+
+(defn- parse-review-feedback-reply
+  [text]
+  (if (string? text)
+    (parse-pass-status-routing text review-feedback-pass-statuses)
+    {:status :error
+     :reason :non-string-pass-feedback
+     :message "workflow/pass-feedback-routing reply must be a string"
+     :details {:text text}}))
+
+(defn parse-pass-feedback-routing
+  "Parse a pass-level set of review replies into a DONE/REPEAT route.
+
+   At least one reply must be supplied. Every supplied reply must contain exactly
+   one PASS_STATUS line with one of ACTIONABLE_FEEDBACK or REVIEW_COMPLETE. The
+   pass repeats when any reply has actionable feedback and completes only when
+   all replies are complete. Invalid replies fail before routing so review
+   workflows do not silently treat malformed feedback as complete."
+  [args]
+  (let [entries (sort-by (comp pr-str key) args)
+        parsed (mapv (fn [[feedback-key text]]
+                       [feedback-key (parse-review-feedback-reply text)])
+                     entries)
+        validation-failures (->> parsed
+                                 (keep (fn [[feedback-key result]]
+                                         (when (= :error (:status result))
+                                           [feedback-key result])))
+                                 (into {}))]
+    (cond
+      (empty? entries)
+      {:status :error
+       :reason :invalid-pass-feedback
+       :message "workflow/pass-feedback-routing requires at least one reply"
+       :details {:validation-failures
+                 {:feedback-inputs
+                  {:status :error
+                   :reason :empty-pass-feedback
+                   :message "workflow/pass-feedback-routing requires at least one reply"
+                   :details {:args args}}}}}
+
+      (seq validation-failures)
+      {:status :error
+       :reason :invalid-pass-feedback
+       :message "workflow/pass-feedback-routing replies are invalid"
+       :details {:validation-failures validation-failures}}
+
+      :else
+      (let [actionable-keys (->> parsed
+                                 (keep (fn [[feedback-key result]]
+                                         (when (= "REPEAT" (:data result))
+                                           feedback-key)))
+                                 vec)
+            route (if (seq actionable-keys) "REPEAT" "DONE")]
+        {:status :ok
+         :data route
+         :summary route
+         :details {:actionable-keys actionable-keys}}))))
+
 (defn parse-munera-open-task-path-routing
   "Parse an extracted Munera task path into a DONE/REPEAT route."
   [text]

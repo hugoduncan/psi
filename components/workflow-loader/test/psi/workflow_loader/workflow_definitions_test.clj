@@ -61,6 +61,13 @@
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
+(defn- prompt-group-template-text
+  [prompt-group]
+  (->> (:contributions prompt-group)
+       (filter #(= :template (:type %)))
+       (map :text)
+       (apply str)))
+
 (deftest review-task-design-test
   (load-edn-with-md-refs
    "review-task-design.edn"
@@ -73,105 +80,84 @@
        (is (empty? errors))
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])]
-       (testing "has 8 steps with correct names and types"
-         (is (= 8 (count steps)))
-         (is (= ["architecture-review"
-                 "architecture-follow-up"
-                 "ambiguity-review"
-                 "ambiguity-follow-up"
-                 "inconsistency-review"
-                 "inconsistency-follow-up"
-                 "clarity-status"
-                 "final-summary"]
+       (testing "has merged review topology with three steps"
+         (is (= 3 (count steps)))
+         (is (= ["design-review" "design-follow-up" "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session :session :session :session :invoke :session]
+         (is (= [:session :session :session]
                 (mapv :type steps))))
-       (let [wired-steps (filter #(= :session (:type %)) (remove #(= "final-summary" (:name %)) steps))
-             final-step (first (filter #(= "final-summary" (:name %)) steps))]
-         (testing "wired non-final session steps have {{input}} wired to :workflow-input"
-           (doseq [step wired-steps]
-             (is (step-has-input-var-wired? step)
-                 (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
-         (testing "final-summary step is inline (not prompt-workflow wired)"
-           ;; final-summary carries :source contributions and is intentionally kept inline
+       (let [step-by-name (into {} (map (juxt :name identity) steps))
+             design-review (get step-by-name "design-review")
+             design-follow-up (get step-by-name "design-follow-up")
+             final-step (get step-by-name "final-summary")]
+         (testing "design-review carries shared step-level capabilities"
+           (is (= ["read" "bash" "edit" "write"]
+                  (:tools design-review)))
+           (is (= ["work-independently" "review-task-architecture" "task-design"]
+                  (:skills design-review))))
+         (testing "design-review contains ordered prompt groups imported from the review prompt workflows"
+           (is (= ["architecture" "ambiguity" "inconsistency"]
+                  (mapv :name (:prompts design-review))))
+           (is (.contains (slurp-workflow-file "review-task-design.edn")
+                          ":prompt-workflow \"review-task-design-architecture-review.md\""))
+           (is (.contains (slurp-workflow-file "review-task-design.edn")
+                          ":prompt-workflow \"review-task-design-ambiguity-review.md\""))
+           (is (.contains (slurp-workflow-file "review-task-design.edn")
+                          ":prompt-workflow \"review-task-design-inconsistency-review.md\""))
+           (is (.contains (prompt-group-template-text (first (:prompts design-review)))
+                          "first turn of the shared `design-review` multi-prompt session"))
+           (is (.contains (prompt-group-template-text (second (:prompts design-review)))
+                          "Use the already-loaded task design.md"))
+           (is (.contains (prompt-group-template-text (nth (:prompts design-review) 2))
+                          "Use the already-loaded task design.md")))
+         (testing "design-review routes directly from validated per-prompt output refs"
+           (is (= {:type :invoke
+                   :operation "workflow/pass-feedback-routing"
+                   :args {:architecture-text {:from {:step "design-review"
+                                                     :prompt "architecture"
+                                                     :output :final-llm-reply}}
+                          :ambiguity-text {:from {:step "design-review"
+                                                  :prompt "ambiguity"
+                                                  :output :final-llm-reply}}
+                          :inconsistency-text {:from {:step "design-review"
+                                                      :prompt "inconsistency"
+                                                      :output :final-llm-reply}}}}
+                  (:judge design-review)))
+           (is (= {"REPEAT" {:goto "design-follow-up"}
+                   "DONE" {:goto "final-summary"}}
+                  (:on design-review))))
+         (testing "design-follow-up uses the shared design profile and loops to the review-pass target"
+           (is (= (constant-routing-judge "DONE")
+                  (:judge design-follow-up)))
+           (is (= {"DONE" {:goto "design-review" :max-iterations 6}}
+                  (:on design-follow-up)))
+           (let [text (step-template-text design-follow-up)]
+             (is (.contains text "design-steps.md"))
+             (is (.contains text "immediately preceding whole `design-review` batch"))
+             (is (.contains text "git diff <baseline>..HEAD -- <task>/design-steps.md"))
+             (is (.contains text "Do not touch plan.md or steps.md"))
+             (is (not (.contains text "code, tests, and docs")))
+             (is (not (.contains text "design.md as read-only context")))))
+         (testing "final-summary sources each review text through per-prompt outputs"
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")
-           (testing "final-summary sources the architecture-review yield"
-             (is (some #(= {:type :source :from {:step "architecture-review" :yield :text}} %)
+           (doseq [source-ref [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
+                               {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
+                               {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]]
+             (is (some #(= {:type :source :from source-ref} %)
                        (:contributions final-step))
-                 "final-summary :contributions includes the architecture-review :yield :text source"))))
-       (let [step-by-name (into {} (map (juxt :name identity) steps))
-             architecture-review (get step-by-name "architecture-review")
-             architecture-follow-up (get step-by-name "architecture-follow-up")
-             ambiguity-review (get step-by-name "ambiguity-review")
-             ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
-             inconsistency-review (get step-by-name "inconsistency-review")
-             inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
-             clarity-step (get step-by-name "clarity-status")]
-         (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
-           (is (= (pass-status-judge-from-step "architecture-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
-                  (:judge architecture-review)))
-           (is (= {"REPEAT" {:goto "architecture-follow-up"}
-                   "DONE" {:goto "ambiguity-review"}}
-                  (:on architecture-review)))
-           (is (= (constant-routing-judge "DONE")
-                  (:judge architecture-follow-up)))
-           (is (= {"DONE" {:goto "ambiguity-review"}} (:on architecture-follow-up)))
-           (is (= (pass-status-judge-from-step "ambiguity-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
-                  (:judge ambiguity-review)))
-           (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
-                   "DONE" {:goto "inconsistency-review"}}
-                  (:on ambiguity-review)))
-           (is (= (constant-routing-judge "DONE")
-                  (:judge ambiguity-follow-up)))
-           (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
-           (is (= (pass-status-judge-from-step "inconsistency-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
-                  (:judge inconsistency-review)))
-           (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
-                   "DONE" {:goto "clarity-status"}}
-                  (:on inconsistency-review)))
-           (is (= (constant-routing-judge "DONE")
-                  (:judge inconsistency-follow-up)))
-           (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
-         (testing "both follow-up steps share the design-profile follow-up body"
-           (doseq [follow-up [architecture-follow-up ambiguity-follow-up inconsistency-follow-up]]
-             (let [text (step-template-text follow-up)]
-               (is (.contains text "design-steps.md")
-                   (str (:name follow-up) " uses the design profile (design-steps.md)"))
-               (is (.contains text "Do not touch plan.md or steps.md")
-                   (str (:name follow-up) " forbids plan.md/steps.md"))
-               ;; Negative discriminator symmetric with the steps-profile tests'
-               ;; (not (.contains text "design-steps.md")) guard (TS3). The
-               ;; design profile (A3/R1) never edits real source and never
-               ;; treats design.md as read-only context, so these steps-profile
-               ;; clauses must be absent. Without the guard, wiring the
-               ;; steps-profile body into the design host — or broadening the
-               ;; design body to permit code/test/doc edits — would pass
-               ;; silently.
-               (is (not (.contains text "code, tests, and docs"))
-                   (str (:name follow-up)
-                        " does not carry the steps-profile code/test/doc"
-                        " broadening clause"))
-               (is (not (.contains text "design.md as read-only context"))
-                   (str (:name follow-up)
-                        " does not treat design.md as read-only context")))))
-         (testing "follow-up steps carry the predate-exclusion guard"
-           ;; Locks in the design Concepts predate guard so a future edit cannot
-           ;; silently regress it (T1).
-           (doseq [follow-up [architecture-follow-up ambiguity-follow-up inconsistency-follow-up]]
-             (is (.contains (step-template-text follow-up)
-                            "predate the preceding review pass")
-                 (str (:name follow-up) " carries the predate-exclusion guard"))))
-         (testing "clarity-status deterministically routes on pass-level feedback memory"
-           (is (= (pass-feedback-routing-step
-                   "clarity-status"
-                   {:architecture-text {:from {:step "architecture-review" :output :final-llm-reply}}
-                    :ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
-                    :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}
-                   {"REPEAT" {:goto "architecture-review" :max-iterations 6}
-                    "DONE" {:goto "final-summary"}})
-                  (select-keys clarity-step [:name :type :operation :args :judge :on])))))))))
-
+                 (str "final-summary should include " source-ref)))
+           (is (not-any? #(and (map? (:from %))
+                               (contains? (:from %) :yield))
+                         (filter #(= :source (:type %)) (:contributions final-step)))
+               "final-summary must not use per-prompt :yield refs"))
+         (testing "removed per-phase topology step names are absent"
+           (doseq [removed ["architecture-review" "architecture-follow-up"
+                            "ambiguity-review" "ambiguity-follow-up"
+                            "inconsistency-review" "inconsistency-follow-up"
+                            "clarity-status"]]
+             (is (not (contains? step-by-name removed))
+                 (str removed " should not remain as a step")))))))))
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
 
@@ -314,29 +300,81 @@
       (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
           (str edn-filename " must not reference stale " removed-filename)))))
 
-(deftest architecture-review-prompt-contract-test
-  ;; AC2a contract guard for review-task-design-architecture-review.md.
-  ;; Relocated here (SH2) from review-task-prompt-artifact-targets-test, whose
-  ;; scope is artifact ownership (design-steps.md vs steps.md); a menu/skill
-  ;; regression should fail under a name that describes the violated AC2a
-  ;; contract. The prompt must (a) load the review-task-architecture skill (not
-  ;; task-design) and (b) *end with* the two-line PASS_STATUS menu. I1 flagged
-  ;; the menu convention as contradiction-prone.
-  (let [content (slurp-workflow-file "review-task-design-architecture-review.md")]
-    (testing "loads the review-task-architecture skill (not task-design)"
-      (is (.contains content "review-task-architecture")
-          "architecture-review prompt loads the review-task-architecture skill"))
-    (testing "ends with the contiguous two-line PASS_STATUS menu (SH1)"
-      ;; Enforce the *ends-with* contract, not mere presence: the menu lead-in
-      ;; and the two PASS_STATUS lines must form a contiguous, terminal block.
-      ;; Trailing whitespace is trimmed before anchoring to end-of-string so a
-      ;; future edit that appends prose after the menu, or splits the lead-in
-      ;; from the status lines, fails this guard.
-      (is (re-find #"(?s)End your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE\s*\z"
-                   content)
-          (str "architecture-review prompt must end with the contiguous "
-               "two-line PASS_STATUS menu (lead-in + ACTIONABLE_FEEDBACK + "
-               "REVIEW_COMPLETE), with nothing but whitespace after it")))))
+(defn- terminal-review-pass-status-menu?
+  [content]
+  (boolean
+   (re-find #"(?s)End your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE\s*\z"
+            content)))
+
+(deftest review-task-design-prompt-contract-test
+  ;; Locks the merged design-review prompt contracts: the first turn loads the
+  ;; shared context and later turns reuse it by default, with only targeted
+  ;; re-reads. All review prompts must end with the same terminal PASS_STATUS menu.
+  (let [architecture (slurp-workflow-file "review-task-design-architecture-review.md")
+        ambiguity (slurp-workflow-file "review-task-design-ambiguity-review.md")
+        inconsistency (slurp-workflow-file "review-task-design-inconsistency-review.md")]
+    (testing "architecture prompt is the shared-session loader"
+      (doseq [needle ["first turn of the shared `design-review` multi-prompt session"
+                      "Read the task's design.md"
+                      "AGENTS.md"
+                      "META.md"
+                      "doc/architecture.md"
+                      "loads the task design and architecture context"]]
+        (is (.contains architecture needle) needle))
+      (is (.contains architecture "review-task-architecture")
+          "architecture-review prompt loads the architecture review skill"))
+    (testing "ambiguity prompt reuses prior shared-session context by default"
+      (doseq [needle ["second turn of the shared `design-review` multi-prompt session"
+                      "Use the already-loaded task design.md, architecture sources, and architecture-review reply"
+                      "Perform only targeted re-reads when specific referenced material is missing from context, ambiguous, or plausibly stale"
+                      "do not unconditionally re-read the whole task design and architecture source set"]]
+        (is (.contains ambiguity needle) needle)))
+    (testing "inconsistency prompt reuses both prior review replies by default"
+      (doseq [needle ["third turn of the shared `design-review` multi-prompt session"
+                      "Use the already-loaded task design.md, architecture sources, architecture-review reply, and ambiguity-review reply"
+                      "Perform only targeted re-reads for specific missing or stale referenced material needed to decide an inconsistency"
+                      "do not unconditionally re-read the whole task design and architecture source set"]]
+        (is (.contains inconsistency needle) needle)))
+    (testing "all design-review prompts end with the exact terminal PASS_STATUS menu"
+      (doseq [[label content] {"architecture" architecture
+                               "ambiguity" ambiguity
+                               "inconsistency" inconsistency}]
+        (is (terminal-review-pass-status-menu? content)
+            (str label " prompt must end with the contiguous two-line PASS_STATUS menu"))))))
+
+(deftest review-follow-up-design-prompt-contract-test
+  ;; Locks AC3's batch-follow-up evidence rule for the merged design-review
+  ;; workflow. These assertions intentionally name the git/task-file mechanics so
+  ;; the prompt cannot regress to broad "new unchecked item" selection.
+  (let [content (slurp-workflow-file "review-follow-up-design.md")]
+    (testing "defines the preceding pass as the whole merged review batch"
+      (doseq [needle ["immediately preceding whole `design-review` batch"
+                      "architecture, ambiguity, and inconsistency review prompts run back-to-back"
+                      "spanning all three review prompts in that immediately preceding batch"]]
+        (is (.contains content needle) needle)))
+    (testing "identifies the contiguous review-batch segment and parent baseline"
+      (doseq [needle ["Identify the contiguous latest task-scoped review-batch segment"
+                      "since the previous design-follow-up completion"
+                      "Use the parent of the oldest commit in that segment as the batch baseline"
+                      "git diff <baseline>..HEAD -- <task>/design-steps.md"]]
+        (is (.contains content needle) needle)))
+    (testing "limits candidates to current unchecked design-step checklist lines added by that diff"
+      (doseq [needle ["candidate work set is exactly the checklist lines added by that diff"
+                      "match unchecked design-step items"
+                      "still exist unchecked in design-steps.md at follow-up start"]]
+        (is (.contains content needle) needle)))
+    (testing "excludes stale, pre-existing, checked, and non-design-step items"
+      (doseq [needle ["Do not execute unchecked items that predate the preceding review pass"
+                      "edited stale items whose addition cannot be attributed to the just-finished batch"
+                      "checked items"
+                      "items from steps.md"]]
+        (is (.contains content needle) needle)))
+    (testing "blocks rather than guessing when evidence is ambiguous or unattributable"
+      (doseq [needle ["If the review-batch segment or baseline cannot be identified confidently"
+                      "cannot be matched unambiguously to a current unchecked item"
+                      "leave the item unchecked"
+                      "record the blocking reason tersely in implementation.md rather than guessing"]]
+        (is (.contains content needle) needle)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
@@ -665,7 +703,6 @@
                                "review-task-plan"
                                "implement-task"
                                "review-task-implementation"]
-           expected-delegate-targets (conj first-five-targets "extract-task-knowledge")
            standard-prompt {:type :map
                             :fields {:input {:from :workflow-input
                                              :path [:input]}}}
@@ -675,51 +712,68 @@
                                        :implementation-review-yield
                                        {:from {:step "review-task-implementation"
                                                :yield :text}}}}
-           review-step (nth steps 4)
-           extraction-step (nth steps 5)
-           summary-step (nth steps 6)
-           summary-text (step-template-text summary-step)]
-       (testing "has 7 steps, with extraction guarded after implementation review"
-         (is (= 7 (count steps)))
-         (is (= (conj expected-delegate-targets "final-summary-without-extraction")
+           status-step (nth steps 5)
+           extraction-step (nth steps 6)
+           success-summary-step (nth steps 7)
+           skip-summary-step (nth steps 8)
+           skip-summary-text (step-template-text skip-summary-step)]
+       (testing "has 9 steps, with extraction guarded after implementation review"
+         (is (= 9 (count steps)))
+         (is (= ["review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "implement-task"
+                 "review-task-implementation"
+                 "check-implementation-review-status"
+                 "extract-task-knowledge"
+                 "final-summary-after-extraction"
+                 "final-summary-without-extraction"]
                 (mapv :name steps)))
-         (is (= (concat (repeat 6 :delegate) [:session]) (mapv :type steps)))
-         (is (= expected-delegate-targets (mapv :target (take 6 steps)))))
+         (is (= (concat (repeat 5 :delegate) [:invoke :delegate :session :session])
+                (mapv :type steps)))
+         (is (= first-five-targets (mapv :target (take 5 steps))))
+         (is (= "extract-task-knowledge" (:target extraction-step))))
        (testing "the first five lifecycle delegate steps thread the same task input unchanged"
          (is (= (repeat 5 standard-prompt)
                 (mapv :prompt-string (take 5 steps)))))
-       (testing "implementation review owns the extraction gate"
+       (testing "the status step owns the extraction gate"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
                  :args {:text {:from {:step "review-task-implementation"
                                       :yield :text}}
                         :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-                (:judge review-step)))
+                (:judge status-step)))
          (is (= {"DONE" {:goto "extract-task-knowledge"}
                  "REPEAT" {:goto "final-summary-without-extraction"}}
-                (:on review-step))))
+                (:on status-step))))
        (testing "the extraction step threads task input plus a labeled implementation-review yield"
          (is (= extraction-prompt (:prompt-string extraction-step))))
-       (testing "the extraction step terminates the successful path instead of falling through to the skip summary"
+       (testing "the extraction step routes to the extraction success summary"
          (is (= {:type :invoke
                  :operation "workflow/constant-routing"
                  :args {:route "DONE"}}
                 (:judge extraction-step)))
-         (is (= {"DONE" {:goto :done}} (:on extraction-step))))
-       (testing "the delegate steps keep their original context only"
+         (is (= {"DONE" {:goto "final-summary-after-extraction"}}
+                (:on extraction-step))))
+       (testing "delegate steps keep their original context only"
          (is (= (repeat 6 [{:type :source :from :workflow-original}])
-                (mapv :context (take 6 steps)))))
+                (mapv :context (concat (take 5 steps) [extraction-step])))))
        (testing "non-review-complete summary explains extraction was skipped"
-         (is (= ["read" "bash"] (:tools summary-step)))
-         (is (.contains summary-text "extract-task-knowledge was not invoked"))
-         (is (.contains summary-text "PASS_STATUS: REVIEW_COMPLETE"))
-         (is (.contains summary-text "Do not extract or write mementum knowledge here"))
+         (is (= ["read" "bash"] (:tools skip-summary-step)))
+         (is (.contains skip-summary-text "extract-task-knowledge was not invoked"))
+         (is (.contains skip-summary-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains skip-summary-text "Do not extract or write mementum knowledge here"))
          (is (= {:type :invoke
                  :operation "workflow/constant-routing"
                  :args {:route "DONE"}}
-                (:judge summary-step)))
-         (is (= {"DONE" {:goto :done}} (:on summary-step))))
+                (:judge skip-summary-step)))
+         (is (= {"DONE" {:goto :done}} (:on skip-summary-step))))
+       (testing "successful extraction summary terminates the success path"
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge success-summary-step)))
+         (is (= {"DONE" {:goto :done}} (:on success-summary-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 7 {})
+         (is (= (repeat 9 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
-

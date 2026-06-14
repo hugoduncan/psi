@@ -161,6 +161,22 @@ Illustrative shape:
 - transcript output is optional but normalized when present
 - structured machine-facing output is declared under step-local `:outputs` with `:source :session/structured-output`
 
+#### Prompt source: `:contributions` vs `:prompts`
+
+A session step's prompt source is normalized at IR time into one internal
+prompt-queue representation, regardless of authoring form:
+
+- a `:contributions` (or `:prompt-workflow`) session step normalizes to a
+  **single unnamed** prompt-group — the degenerate one-turn queue shown above;
+- a `:prompts` session step normalizes to an **ordered queue of named**
+  prompt-groups, each run as its own model turn in the same shared child
+  session, drained in author order by `drive-session-prompt-queue!`.
+
+The two authoring forms are mutually exclusive on a single session step. See
+[`doc/workflow-grammar.md`](workflow-grammar.md) *Multi-prompt session steps
+(`:prompts`)* for the author-facing `:prompts` form, precedence/validation
+rules, per-prompt output surfaces, and drain/resume/abort semantics.
+
 ### Session structured outputs
 
 A session step may declare at most one structured output entry under its
