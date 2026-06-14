@@ -869,3 +869,41 @@ vs-restart boundary (P4) are now explicit; abort-path outcomes match AC-5/AC-6.
   count at the effect boundary, or a generate-seam invocation probe) used to
   assert non-re-fire across Slice 3's live drain and Slice 5's
   restart/replay resume.
+
+## Plan/steps ambiguity follow-ups (pass 2) executed — ψ
+
+Executed P5–P8 (plan/steps-only disambiguation edits; no code/test/doc/source
+change needed — these clarify acceptance/test-observable wording).
+
+- **P5 (done).** Stated final-turn detection (structured-output gating) is a
+  **static IR/position property** — the last group in the ordered normalized IR
+  prompt-queue (`= last index`) — **orthogonal** to the progression-driven
+  next-un-run selection. The no-counter rule governs only *which un-run prompt
+  runs next* (read from recorded progression); *whether the selected group is the
+  last one* is decided by static queue position, needing no counter. Edits:
+  plan.md R5 (new "Final-turn detection (P5)" clause) + Slice-order 3; steps.md
+  Slice 3 structured-`:outputs` item.
+- **P6 (done).** Defined the "progression-state probe" observable: the **recorded
+  per-prompt turn-record set under the step's attempt, read back through
+  `progression_recording.clj`** (the same substrate the driver consults to pick
+  the next un-run prompt). The test reads which prompts already have a recorded
+  turn and asserts the next submission is the lowest-position un-run group — not a
+  turn count. Edits: plan.md Slice-order 3 acceptance; steps.md Slice 3 runtime-
+  tests item.
+- **P7 (done).** Scoped the Slice-1 done-gate "session-step suite" to the
+  workflow-runtime `step_execution_test.clj` namespace
+  (`psi.workflow-runtime.statechart-runtime.step-execution-test`) that houses the
+  characterization test — explicitly **distinct from** Final verification's
+  broader three-component Scry run (workflow-runtime + workflow-loader +
+  workflow-step-materialization). The Slice-1 gate is the focused session-step
+  namespace, not the three-suite run. Edits: plan.md Slice-order 1 acceptance;
+  steps.md Slice 1 done-gate item.
+- **P8 (done).** Named the non-re-fire observable shared by Slice 3 (live drain)
+  and Slice 5 (restart/replay resume): the **count of `ai/generate` effects
+  emitted at the dispatch/effect boundary** (captured via the test effect seam) —
+  exactly one per un-run prompt, **zero** for any prompt with an existing turn
+  record — corroborated by **no second turn record / no progression mutation**
+  for an already-recorded prompt. Slice 5 additionally asserts it across
+  reconstructed/replayed state. Edits: plan.md Slice-order 5 acceptance (new
+  "Non-re-fire observable (P8)" clause); steps.md Slice 3 (new non-re-fire assert
+  item) + Slice 5 replay-path item.

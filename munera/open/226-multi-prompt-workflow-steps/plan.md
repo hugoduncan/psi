@@ -140,6 +140,16 @@ before N>1, addressing, resume, and abort paths are layered on.
 - **R5 — Structured output on the final turn only.** The existing single
   `:outputs` entry must bind the last turn, not every turn. Mitigation: request
   structured output only on the final group's turn in the queue driver.
+  **Final-turn detection (P5).** "Final turn" is a **static IR/position
+  property** — the last group in the ordered normalized IR prompt-queue
+  (`= last index`), derivable from the IR alone. It is **orthogonal to** the
+  progression-driven *selection* of the next un-run prompt: the no-counter rule
+  governs only *which un-run prompt runs next* (read from recorded progression,
+  never an in-memory counter), whereas *whether the selected group is the last
+  one* is decided by comparing the selected group's static queue position to the
+  queue length. Final-turn detection therefore needs no counter and does not
+  violate the no-counter rule; structured `:outputs` is requested only when the
+  selected group is the last position in the IR queue.
 
 ## Slice order
 
@@ -151,7 +161,15 @@ before N>1, addressing, resume, and abort paths are layered on.
    producing the existing envelope. No grammar surface change. Acceptance: the
    committed asserted-shape envelope characterization test (P3/R4) green
    **unchanged** is the Slice-1 done-gate comparand — not merely "suite green
-   unchanged" — **and** the full existing session-step suite green (AC-2).
+   unchanged" — **and** the **session-step suite** green (AC-2). **Session-step
+   suite scope (P7):** the Slice-1 done-gate "session-step suite" is the
+   workflow-runtime `step_execution_test.clj` namespace
+   (`psi.workflow-runtime.statechart-runtime.step-execution-test`) — the
+   session-step execution tests that house the characterization test — which must
+   be green-unchanged to gate Slice 1. This is **distinct from** Final
+   verification's broader three-component Scry run (workflow-runtime +
+   workflow-loader + workflow-step-materialization); the Slice-1 gate is the
+   focused session-step namespace, not the full three-suite run.
 2. **`:prompts` grammar + IR normalization (named groups).** Add `:prompts`
    schema (ordered named groups; group-internal `:prompt-workflow` xor
    `:contributions`), compiler support, and IR validation: step-level
@@ -171,11 +189,18 @@ before N>1, addressing, resume, and abort paths are layered on.
    group's turn result in the progression substrate; emits one post-drain
    `:pending-actor-result` with step-level rollup + per-prompt records (A3/C3).
    Slice 5 then adds **only** the process-restart/replay resume case on top of
-   this mechanism (P4). Acceptance (independently testable): in one live run, N
+   this mechanism (P4). The driver requests structured `:outputs` only on the
+   group at the **last static position** in the ordered IR queue (P5 final-turn
+   detection — an IR/position property, orthogonal to the no-counter
+   next-un-run selection). Acceptance (independently testable): in one live run, N
    turns execute in author order, the driver selects the next un-run prompt from
-   recorded progression (assert via a progression-state probe, not turn count),
-   drain reached only after all turns, one post-drain result, named-turn
-   introspectability (AC-1, parts of AC-3).
+   recorded progression (assert via a **progression-state probe** — the concrete
+   observable is the recorded per-prompt turn-record set under the step's attempt
+   read back through `progression_recording.clj` (the same substrate the driver
+   consults to pick the next un-run prompt), **not** a turn count: the test reads
+   which prompts already have a recorded turn and asserts the next submission is
+   the lowest-position un-run group), drain reached only after all turns, one
+   post-drain result, named-turn introspectability (AC-1, parts of AC-3).
 4. **Per-prompt output surfaces + `:prompt` source-ref + validation.** Step-level
    vs per-prompt `:final-llm-reply`/`:transcript` (B2); `:prompt` discriminator
    on the shared source-ref schema; uniform resolution; compile-time validation
@@ -192,7 +217,16 @@ before N>1, addressing, resume, and abort paths are layered on.
    testable, distinct from Slice 3's live-run acceptance): a mid-queue resume
    reconstructed from persisted progression / replayed event log runs only the
    un-run prompts and reproduces the same per-prompt records with zero re-fired
-   `ai/generate` effects (AC-7).
+   `ai/generate` effects (AC-7). **Non-re-fire observable (P8):** the primary
+   measurement for "zero re-fire" — shared by Slice 3 (live drain) and Slice 5
+   (restart/replay resume) — is the **count of `ai/generate` effects emitted at
+   the dispatch/effect boundary**, captured through the test effect seam:
+   exactly one emission per un-run prompt and **zero** emissions for any prompt
+   that already has a recorded turn. The corroborating progression observable is
+   that **no second turn record is written** (no progression mutation) for an
+   already-recorded prompt. Both slices assert the same emitted-effect-count
+   observable; Slice 5 additionally asserts it across a reconstructed/replayed
+   state.
 6. **Abort paths.** Intermediate-turn error ⇒ `:failed` naming the failing
    prompt, routing skipped, prior records retained, no failing record (AC-5/G1);
    inter-prompt cancellation ⇒ terminal `:cancelled`, routing skipped, completed

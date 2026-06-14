@@ -31,9 +31,13 @@ slice.
   producing the **identical** `:pending-actor-result` envelope (no behaviour
   change). Single suspend point unchanged.
 - [ ] Slice-1 done-gate: the committed envelope characterization test (P3) is
-  green **unchanged** after the unified-path refactor, **and** the full existing
-  session-step suite is green unchanged (AC-2 N=1 equivalence as a consequence of
-  the unified path). Any change to the asserted envelope shape ⇒ defect.
+  green **unchanged** after the unified-path refactor, **and** the **session-step
+  suite** is green unchanged (AC-2 N=1 equivalence as a consequence of the
+  unified path). **Session-step suite scope (P7):** the gating suite is the
+  workflow-runtime `step_execution_test.clj` namespace
+  (`psi.workflow-runtime.statechart-runtime.step-execution-test`) that houses the
+  characterization test — **not** the broader three-component Scry run reserved
+  for Final verification. Any change to the asserted envelope shape ⇒ defect.
 - [ ] `clj-kondo` clean; commit Slice 1.
 
 ## Slice 2 — `:prompts` grammar + IR normalization (named groups)
@@ -77,11 +81,25 @@ un-run prompt. Slice 5 adds only the process-restart/replay resume case on top.
   rollup plus ordered per-prompt records for named groups (A3); reconcile with
   the existing `record-actor-result`/`record-step-result` path (one route, Q5).
 - [ ] Request structured `:outputs` on the **final** turn only (R5/AC-3).
+  Final-turn detection (P5) uses the **static IR queue position** — the group at
+  the last index of the ordered normalized prompt-queue — derivable from the IR
+  alone and **orthogonal** to the progression-driven next-un-run selection (the
+  no-counter rule governs only *which un-run prompt runs next*, never *whether
+  the selected group is last*). No in-memory counter is used for either.
 - [ ] Runtime tests (Slice-3 independent acceptance, P4): in one **live** run, N
   turns execute in author order; assert the driver selects the next un-run prompt
-  from recorded progression via a progression-state probe (not turn count); drain
-  reached only after all turns; one post-drain result; each named turn record
-  introspectable (S4); N=1 unnamed still rollup-only.
+  from recorded progression via a **progression-state probe** (not turn count) —
+  the probe's concrete observable (P6) is the **recorded per-prompt turn-record
+  set under the step's attempt, read back through `progression_recording.clj`**
+  (the same substrate the driver consults): the test reads which prompts already
+  have a recorded turn and asserts the next submission is the lowest-position
+  un-run group; drain reached only after all turns; one post-drain result; each
+  named turn record introspectable (S4); N=1 unnamed still rollup-only.
+- [ ] Assert non-re-fire (P8) within the live drain: the **count of
+  `ai/generate` effects emitted at the dispatch/effect boundary** (captured via
+  the test effect seam) is exactly one per un-run prompt and **zero** for any
+  prompt that already has a recorded turn; corroborate with **no second turn
+  record / no progression mutation** for an already-recorded prompt.
 - [ ] Confirm in `statechart.clj` that the single
   acting→(judging)→record-result step topology still holds with the N-turn drain
   (one statechart step, N internal turns); assert **no per-prompt statechart
@@ -133,7 +151,12 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   reconstructed from persisted progression runs only the un-run prompts
   (resume-from-progression idempotency, AC-7); completed turns not re-fired.
 - [ ] Verify replay path: replaying the event log reproduces the same per-prompt
-  records without re-firing completed `ai/generate` effects.
+  records without re-firing completed `ai/generate` effects. Assert non-re-fire
+  with the **same observable as Slice 3 (P8)**: the **count of `ai/generate`
+  effects emitted at the dispatch/effect boundary** is **zero** for any prompt
+  with an existing turn record across the reconstructed/replayed state;
+  corroborate with no second turn record / no progression mutation for an
+  already-recorded prompt.
 - [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — the resume-from-progression
   contract.
 - [ ] `clj-kondo` clean; commit Slice 5.
@@ -234,25 +257,25 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (ambiguity, pass 2)
 
-- [ ] P5 — State in plan.md (Slice 3 / R5) and steps.md Slice 3 how the queue
+- [x] P5 — State in plan.md (Slice 3 / R5) and steps.md Slice 3 how the queue
   driver identifies the **final** group for structured-output gating, reconciled
   with the no-counter rule: final-turn detection uses the static queue position
   (last group in the ordered normalized IR queue), independent of the
   progression-driven *selection* of the next un-run prompt (which forbids an
   in-memory counter). Make explicit that "final turn" is an IR/position property,
   not progression/counter state.
-- [ ] P6 — Define the "progression-state probe" test observable in plan.md
+- [x] P6 — Define the "progression-state probe" test observable in plan.md
   Slice-order 3 and steps.md Slice 3: name the concrete observable the probe
   reads (e.g. recorded per-prompt progression entries under the step's attempt in
   `progression_recording.clj`, a runtime introspection surface, or the
   `:pending-actor-result` records map), so "assert via a progression-state probe,
   not turn count" is executable as written.
-- [ ] P7 — Define the scope of "full existing session-step suite" in the Slice-1
+- [x] P7 — Define the scope of "full existing session-step suite" in the Slice-1
   done-gate (plan.md:154 / steps.md:35): name which test namespaces/suite
   (`step_execution_test.clj` only, the whole workflow-runtime suite, or all three
   component Scry suites) must be green-unchanged to gate Slice 1, distinct from
   the Final-verification three-suite run.
-- [ ] P8 — Name the concrete observable used to assert "no `ai/generate` re-fire"
+- [x] P8 — Name the concrete observable used to assert "no `ai/generate` re-fire"
   / "zero re-fired `ai/generate` effects" across Slice 3 (live drain) and Slice 5
   (restart/replay resume): emitted-`ai/generate`-effect count at the
   dispatch/effect boundary, a generate-seam invocation probe, or absence of a
