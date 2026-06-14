@@ -69,6 +69,12 @@
 (deftest pass-feedback-routing-parser-test
   ;; Tests pass-level review feedback routing validates every prompt/phase reply
   ;; before computing the aggregate review-pass route.
+  (testing "rejects empty feedback inputs with deterministic diagnostics"
+    (let [result (assert-error :invalid-pass-feedback
+                               (routing/parse-pass-feedback-routing {}))]
+      (is (= :empty-pass-feedback
+             (get-in result [:details :validation-failures :feedback-inputs :reason]))
+          (pr-str result))))
   (testing "routes DONE only when every supplied reply is REVIEW_COMPLETE"
     (assert-route "DONE"
                   (routing/parse-pass-feedback-routing

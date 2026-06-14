@@ -78,4 +78,4 @@
 
 ## Code-shaper review follow-up
 
-- [ ] CS1: Harden `workflow/pass-feedback-routing` against an empty prompt/phase reply arg map. Add focused routing coverage requiring a deterministic invalid-pass-feedback diagnostic when no feedback inputs are supplied, and update `parse-pass-feedback-routing` so a miswired judge cannot silently route `DONE` with zero replies.
+- [x] CS1: Harden `workflow/pass-feedback-routing` against an empty prompt/phase reply arg map. Add focused routing coverage requiring a deterministic invalid-pass-feedback diagnostic when no feedback inputs are supplied, and update `parse-pass-feedback-routing` so a miswired judge cannot silently route `DONE` with zero replies.
