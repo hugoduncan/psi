@@ -803,3 +803,19 @@ consolidates them — it does not first-author them.
   with two thin drivers differing only in disposition orchestration. Design-only
   edit; code already realizes the reconciled claim;
   `doc/workflow-grammar.md` already frames it at mechanism level (no overclaim).
+
+## Implementation-review follow-ups (pass 4)
+
+- [ ] R-6 — Remove or reconcile the dead, divergent `execute-actor-step!`
+  (`step_execution.clj:443`). It is never referenced anywhere in the repo, yet its
+  `:else` session branch calls only `execute-session-step!` (single-turn N=1),
+  with no awareness of the named multi-prompt `drive-session-prompt-queue!`
+  dispatch that lives inline in `statechart_runtime.clj` (`(some :name
+  prompt-queue)`). As a second, stale session-dispatch site it directly
+  contradicts this task's "one path / no drift" thesis — if ever wired it would
+  run `:prompts` steps as a single turn, dropping every later prompt. Resolve by
+  **either** (a) deleting the unused `execute-actor-step!` (and its session
+  branch), **or** (b) if a public step-dispatch entry point is wanted, routing its
+  session branch through the same `(some :name prompt-queue)` dispatch the live
+  `:step/enter` path uses, so the two cannot drift. Confirm no caller/test depends
+  on it first (currently none).

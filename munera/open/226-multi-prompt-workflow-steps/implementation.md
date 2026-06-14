@@ -2121,3 +2121,33 @@ confirmed done. **One new actionable coherence finding (R-5).**
   `doc/workflow-grammar.md` already frames this at the mechanism level ("share one
   internal prompt-queue mechanism"), carrying no "one driver" / "no drift"
   overclaim — no doc edit needed.
+
+## Implementation review (task-implementation-review) — ψ, pass 4
+
+Re-reviewed code+tests+docs against the (R-1..R-5-reconciled) design. Build
+quality remains high: clj-kondo clean on `step_execution.clj`; the
+`execute-session-turn-outcome` shared primitive, `prompt-ref-errors` validation,
+and `resolve-source-ref` per-prompt branch (shape matches the Slice-3
+`:prompt-group-outputs` `{:index :name :outputs}` records) are coherent and
+symmetric. R-1..R-5 confirmed done. **One new actionable finding (R-6).**
+
+- **R-6 (dead code + latent drift surface — `execute-actor-step!`).**
+  `step_execution.clj:443` defines a public `execute-actor-step!` whose `:else`
+  (session) branch calls **only** `execute-session-step!` (the single-turn N=1
+  path) — it has **no** knowledge of the named multi-prompt
+  `drive-session-prompt-queue!` dispatch. It is **never referenced** anywhere in
+  the repo (`grep -rn execute-actor-step` finds only the def + a stale
+  `target/classes` copy); the live session dispatch lives inline in
+  `statechart_runtime.clj` (`(some :name prompt-queue)` → driver vs.
+  `execute-session-step!`). So `execute-actor-step!` is dead code, **and** it is a
+  second, divergent session-dispatch site that — directly contradicting this
+  task's "one path / no drift" thesis — would silently run multi-prompt `:prompts`
+  steps as a single turn (dropping every later prompt) if it were ever wired in.
+  It predates task 226 (commit 2949310eb), but task 226 introduced the
+  multi-prompt dispatch that this stale function now diverges from, so it is the
+  task's drift surface to close. Resolve by either removing the unused
+  `execute-actor-step!` (and its `:else` session branch) or, if a public
+  step-dispatch entry point is genuinely wanted, routing its session branch
+  through the same `(some :name prompt-queue)` dispatch the live path uses so the
+  two cannot drift. (No test covers `execute-actor-step!`, consistent with it
+  being dead.)
