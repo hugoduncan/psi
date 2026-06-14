@@ -2251,3 +2251,45 @@ Minor coherence nit:
   implementation review.", matching plan.md's authoritative state. The
   capability-only scope note and the 227-dependency note are preserved verbatim.
   Docs-only coherence fix.
+
+## Implementation review (task-implementation-review) — ψ, pass 6
+
+Full fresh re-review of the landed implementation against design + plan +
+architecture + docs. Verified green/clean before judging: focused suites
+(drive-prompt-queue 8 + abort 5 + progression-recording + ir-prompts) =
+24 tests / 132 assertions green; `clj-kondo` clean on `step_execution.clj`,
+`progression_recording.clj`, `ir.clj`.
+
+Confirmed resolved, no re-flag: R-1 (synchronous-drain design coherence), R-2
+(later-group single-submission limitation — `later-group-turn-prompt` docstring +
+doc + 2 tests), R-3 (`:test-paths` materialization dir), R-4 (doc resume/idempotency
+reconciliation), R-5 (two-driver / turn-primitive unification reconciliation), R-6
+(dead `execute-actor-step!` deleted — single live dispatch site), R-7 (between-prompt
+pre-turn cancel checkpoint), R-8 (design Status line).
+
+Assessed and judged sound:
+- **Matches design / architecture.** Single live session-dispatch site
+  (`statechart_runtime.clj` `:step/enter` `(some :name prompt-queue)`) → two thin
+  drivers (`drive-session-prompt-queue!` / `execute-session-step!`) over the one
+  shared per-turn primitive `execute-session-turn-outcome`; the workflow-runtime
+  boundary is respected (generic queue mechanism; concrete prompts are authored).
+- **Per-prompt substrate coherent.** `progression_recording` record/select shape
+  (`{:index :name :outputs}` under `:prompt-group-turns`) matches the drain's
+  `post-drain-envelope` `:prompt-group-outputs` and the `source_resolution`
+  per-prompt resolution branch; idempotent-on-`:index` recording upholds the
+  resume non-re-fire invariant.
+- **IR `:prompt`-ref validation complete and carve-out-correct** — non-session,
+  single-prompt, unknown-group, non-text-surface, same-step sibling-group rejected;
+  post-drain judge carve-out admitted; each rejection + the carve-out is tested.
+- **AC-1..AC-8 each covered** across ir-prompts (grammar + ref validation),
+  drive-prompt-queue (ordering, resume-skip, reconstructed-position, replay-zero,
+  final-turn-only structured), abort (intermediate/final error naming prompt,
+  inter-prompt + between-prompt cancellation, structured `:blocked`), and
+  source-resolution (per-prompt addressing) suites.
+- No unnecessary abstraction; no reusable-pattern duplication; the O(n)
+  per-iteration progression re-read is the deliberate no-counter design and is
+  negligible at realistic queue sizes — not a structural-performance issue.
+- Docs (`doc/workflow-grammar.md` `:prompts` + later-group limitation + resume
+  idempotency; concepts) and CHANGELOG `[Unreleased]` entry present and accurate.
+
+No new actionable findings. Implementation review converges — REVIEW_COMPLETE.
