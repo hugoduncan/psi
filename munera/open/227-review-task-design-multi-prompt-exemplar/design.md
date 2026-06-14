@@ -232,10 +232,38 @@ The follow-up must therefore execute every unchecked `design-steps.md` item newl
 added by any of the three prompt replies in that batch, while leaving unchecked
 items that predate that batch untouched.
 
-Update `review-follow-up-design.md` wording/context to make the batch meaning
-explicit. The prompt should continue to say not to execute stale unchecked items,
-but it should clarify that, for batch review workflows, "newly added" spans all
-review prompts in the immediately preceding batch.
+Because `design-follow-up` intentionally remains a shared design-profile prompt
+(`:prompt-workflow "review-follow-up-design.md"`) rather than a bespoke runtime
+operation, item selection is an agent-side evidence rule over the task files and
+git history, not workflow routing:
+
+1. At follow-up start, read the task's `design-steps.md` and `implementation.md`
+   and inspect task-scoped git history for the immediately preceding review
+   batch. The batch is the contiguous set of latest commits/implementation notes
+   produced by the just-finished `design-review` prompts (`architecture`,
+   `ambiguity`, and `inconsistency`) since the previous `design-follow-up`
+   completion for the same task, or since task creation if no previous follow-up
+   exists.
+2. Determine the batch baseline as the parent of the oldest commit in that
+   contiguous review-batch segment, then compare the baseline to current `HEAD`
+   for the task's `design-steps.md` (for example,
+   `git diff <baseline>..HEAD -- <task>/design-steps.md`). The candidate work
+   set is exactly the checklist lines added by that diff that match unchecked
+   design-step items and still exist unchecked in `design-steps.md` at follow-up
+   start.
+3. Execute only those candidate items. Pre-existing unchecked items, edited
+   stale items whose addition cannot be attributed to the just-finished batch,
+   and checked items are not in scope for this follow-up.
+4. If the review-batch segment or baseline cannot be identified confidently, or
+   if a diff-added checklist item cannot be matched unambiguously to a current
+   unchecked item, leave the item unchecked and record the blocking reason
+   tersely in `implementation.md` rather than guessing.
+
+Update `review-follow-up-design.md` wording/context to make this batch meaning
+and evidence rule explicit. The prompt should continue to say not to execute
+stale unchecked items, but it should clarify that, for batch review workflows,
+"newly added" spans all review prompts in the immediately preceding batch and is
+identified by the git/task-file rule above.
 
 ## `final-summary` migration
 
@@ -293,7 +321,9 @@ Out of scope:
    REPEAT iff any phase returned `ACTIONABLE_FEEDBACK`, with the same pass-loop
    bound as today.
 3. A single `design`-profile follow-up step after the route executes the items
-   accumulated across all three reviews.
+   accumulated across all three reviews, identifying the batch-added unchecked
+   `design-steps.md` items via the explicit git/task-file evidence rule and
+   leaving ambiguous or stale unchecked items untouched with a terse block note.
 4. `final-summary` recovers all three phases' text via per-prompt
    `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}` refs.
 5. Workflow-loader/definition tests cover the merged topology and routing;
