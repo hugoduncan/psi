@@ -1275,3 +1275,20 @@ consolidates them — it does not first-author them.
   arm; both reads in the `or` now share the keyword-access idiom. Cosmetic,
   behaviour-identical. `clj-kondo` clean; step-execution-test 12 tests /
   85 assertions green; drive-prompt-queue (+ abort) 13 tests / 61 assertions green.
+
+## Code-shaper review follow-ups (pass 4)
+
+- [ ] CS-5 — Name the repeated cancellation-enqueue idiom. The cancel signal
+  `(queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})` is
+  written verbatim 10 times across `execute-session-step!` and
+  `drive-session-prompt-queue!`
+  (`statechart_runtime/step_execution.clj:310,327,335,341,406,431,449,460,466,475`)
+  — one concept (enqueue the cancel signal, fixed `{}` data) as an unnamed
+  repeated literal at every cancellation checkpoint, asymmetric with its sibling
+  disposition which IS named once (`record-actor-pending!`). `consistent(idioms)`
+  + `locally_comprehensible`: the cancel path should read as a named action and
+  the `:workflow/cancel`/`{}` shape should have one point of change. Extract an
+  `enqueue-cancel!` helper (in this ns, or `queue/enqueue-cancel!` if shared with
+  the `:workflow/cancel` sites in `statechart_runtime.clj`) and call it at each
+  checkpoint. Behaviour-preserving, mechanical; re-run `clj-kondo` + the
+  step-execution + drive-prompt-queue (+ abort) suites.

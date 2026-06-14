@@ -3313,3 +3313,38 @@ single-key reads in the `or` share the keyword-access idiom
 `step-execution-test` 12 tests / 85 assertions green; drive-prompt-queue (+ abort)
 13 tests / 61 assertions green. CS-4 was the sole unchecked item from the pass-3
 code-shaper review; all other steps were already complete.
+
+## Code-shaper review (code-shaper skill) — pass 4 — ψ
+
+Re-reviewed the shipped runtime against `simplicity ∧ consistency ∧ robustness`,
+post CS-1..CS-4: `step_execution.clj` (both drivers + `execute-session-turn-outcome`
++ `session-turn-ok-envelope` + `execute-with-ranked-fallback!`),
+`progression_recording.clj` (per-prompt turn records + `next-un-run-prompt-group`),
+`ir.clj` (prompt-queue normalization + `session-prompt-queue-errors` +
+`prompt-ref-errors`), `ir_error_formatting.clj` (CS-1 cases), and the
+`statechart_runtime.clj` drain wiring. CS-1..CS-4 confirmed present and clean.
+**ACTIONABLE_FEEDBACK** — one new, minor follow-up (CS-5).
+
+- **CS-5 (consistency/simplicity — un-named cancellation-enqueue idiom repeated
+  10×).** The cooperative-cancellation signal
+  `(queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})` is
+  written **verbatim 10 times** across `execute-session-step!` and
+  `drive-session-prompt-queue!` (`step_execution.clj:310,327,335,341,406,431,449,460,466,475`).
+  This is one concept (enqueue the cancel signal) with a fixed shape (`{}` data)
+  appearing as an unnamed repeated literal at every cancellation checkpoint —
+  unlike its sibling success/failure/blocked disposition, which **is** named once
+  (`record-actor-pending!`). `consistent(idioms)` + `locally_comprehensible`: the
+  cancel path should read as a named action symmetric with `record-actor-pending!`,
+  and the `:workflow/cancel`/`{}` shape should have one point of change. Fix:
+  extract a small `enqueue-cancel!` helper (in this ns, or `queue/enqueue-cancel!`
+  if shared with `statechart_runtime.clj`'s own `:workflow/cancel` sites) and call
+  it at each checkpoint. Behaviour-preserving, mechanical. Minor.
+
+Re-confirmed not-flagged (unchanged from passes 1–3): the duplicated
+disposition→`record-actor-pending!` `case` + the upfront structured-request gate
+shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
+**accepted, documented** two-driver design (AC-2 byte-identical N=1 envelope); the
+`post-drain-envelope` loop-local transcript/per-prompt accumulation is the
+**documented** F1-async blocker — both left as-is. The triple near-identical
+`{:status :error …}` envelope in `execute-with-ranked-fallback!` is **pre-existing**
+(predates task 226, commit 13db618d9) and out of this task's scope.
