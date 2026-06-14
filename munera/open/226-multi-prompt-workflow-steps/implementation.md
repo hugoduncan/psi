@@ -2703,3 +2703,46 @@ structural both-drivers-call-shared-primitive property; the `:branch :success` +
 `(stopped?)` cancel-races-block sub-branch) remain reasonable non-raises —
 structural/niche, with the observable equivalence and dominant dispositions
 already pinned. Pass 6 conclusion: REVIEW_COMPLETE.
+
+## Test review (test-shaper skill) — pass 7
+
+Applied `λtests. clarity ∧ signal ∧ robustness ∧ economy → shape` across the 226
+test surface (ir-prompts, compiler prompts, source-resolution per-prompt,
+step-execution characterization, drive + abort drain suites). Behaviour focus,
+state/output assertions (no interaction asserts), real-infra + nullable seams (no
+mocks/with-redefs), single-concern tests, and meaningful failure messages are all
+strong and consistent within each namespace — earlier task-test-review passes
+(1–6) already drove those. **One new actionable shaping finding (TS-1);** recorded
+as an unchecked item in steps.md. It is a *consistency/economy* issue (the
+test-shaper lens), orthogonal to the well-formedness/coverage/infra-dep concerns
+the prior passes closed, so it is not a duplicate.
+
+- **TS-1 (consistency + economy: duplicated drain fixtures + one-sided ceremony
+  compression across the two sibling drain test namespaces).** The two test
+  files that exercise the **same** SUT (`drive-session-prompt-queue!`) —
+  `step_execution_drive_prompt_queue_test.clj` and
+  `step_execution_drive_prompt_queue_abort_test.clj` — diverge in their test
+  abstractions:
+  1. Three fixture helpers are defined **verbatim in both files**:
+     `running-attempt-state*`, `recording-record-turn-fn`, and
+     `assistant-text-message`. This duplication is exactly what TR-4 avoided for
+     the canonical state* literals by lifting them into `step-test-support`; these
+     three escaped that consolidation.
+  2. The abort file defines a clean keyword-arg helper `drive!` that compresses
+     the long positional `drive-session-prompt-queue!` invocation into a named-key
+     map (`:ctx :step-def :state* :run-id :step-id :working-memory* :event-queue*
+     :prompt-queue :stopped?`). The non-abort file has **no** such helper: all 7
+     call sites repeat the full multi-line positional call, including the magic
+     pre-split first prompt literal `"PROMPT-architecture"` and the inline
+     `(fn [group] (str "PROMPT-" (:name group)))` builder — incidental positional
+     ceremony that obscures intent and couples every test to argument *position*.
+     The implicit invariant that the first positional string equals
+     `(builder (first prompt-queue))` is unstated.
+  Per test-shaper `consistent(fixtures) ∧ consistent(test_abstractions)` and
+  `helpers_that_compress(ceremony)`: lift the three duplicated fixtures **and** the
+  `drive!` helper into `psi.workflow-runtime.step-test-support` (the existing
+  TR-4 home for these drive/abort fixtures) and use `drive!` from **both**
+  namespaces, removing the duplicated defs and the 7 positional call sites in the
+  non-abort file. Net: one canonical SUT-invocation abstraction, no duplicated
+  fixture defs, intent (named keys) surfaced over argument position. Test-only;
+  no production change; re-run both drive/abort suites green.

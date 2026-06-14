@@ -1014,3 +1014,26 @@ consolidates them — it does not first-author them.
   `:prompts` with `:type :delegate` (or `:invoke`) and assert `error` =
   `` "`:prompts` is allowed only on `:session` steps" ``. Test-only; re-run the
   workflow-loader compiler suite green.
+
+## Test-shaper follow-ups (pass 7)
+
+- [ ] TS-1 — Consolidate the duplicated multi-prompt drain test fixtures and lift
+  the `drive!` keyword-arg helper into `psi.workflow-runtime.step-test-support`,
+  then use it from **both** sibling drain namespaces
+  (`step_execution_drive_prompt_queue_test.clj` +
+  `step_execution_drive_prompt_queue_abort_test.clj`). Today: (1) the helpers
+  `running-attempt-state*`, `recording-record-turn-fn`, and
+  `assistant-text-message` are defined **verbatim in both files** (they escaped
+  the TR-4 state*-literal consolidation into `step-test-support`); (2) only the
+  abort file has the `drive!` helper that compresses the long positional
+  `drive-session-prompt-queue!` call into a named-key map, while the non-abort
+  file repeats that full positional call at all 7 sites — including the magic
+  pre-split first-prompt literal `"PROMPT-architecture"` and the inline
+  `(fn [group] (str "PROMPT-" (:name group)))` builder, with the
+  first-string-equals-`(builder (first prompt-queue))` invariant left implicit.
+  Move the three shared fixtures + `drive!` into `step-test-support`, delete the
+  per-file duplicates, and rewrite the non-abort call sites to use `drive!`
+  (named keys over argument position). Per test-shaper
+  `consistent(fixtures) ∧ consistent(test_abstractions) ∧
+  helpers_that_compress(ceremony)`. Test-only; no production change; re-run both
+  workflow-runtime drive/abort suites green.
