@@ -62,10 +62,7 @@
           execute-turn (fn [_ctx session-id prompt]
                          (swap! turn-calls* inc)
                          (swap! submitted* conj {:session-id session-id :prompt prompt})
-                         {:status :ok
-                          :assistant-text (str "reply-" prompt)
-                          :execution-result nil
-                          :assistant-message (assistant-text-message (str "reply-" prompt))})
+                         (step-test-support/ok-turn prompt))
           ctx {:state* state*
                :workflow-execute-actor-turn-fn execute-turn}
           working-memory* (atom {:current-step-id step-id})
@@ -121,10 +118,7 @@
           execute-turn (fn [_ctx _session-id prompt]
                          (swap! turn-calls* inc)
                          (swap! submitted* conj prompt)
-                         {:status :ok
-                          :assistant-text (str "reply-" prompt)
-                          :execution-result nil
-                          :assistant-message (assistant-text-message (str "reply-" prompt))})
+                         (step-test-support/ok-turn prompt))
           ctx {:state* state*
                :workflow-execute-actor-turn-fn execute-turn}
           working-memory* (atom {:current-step-id step-id})
@@ -165,10 +159,7 @@
           execute-turn (fn [_ctx _session-id prompt]
                          (swap! turn-calls* inc)
                          (swap! submitted* conj prompt)
-                         {:status :ok
-                          :assistant-text (str "reply-" prompt)
-                          :execution-result nil
-                          :assistant-message (assistant-text-message (str "reply-" prompt))})
+                         (step-test-support/ok-turn prompt))
           ;; A fresh ctx for the post-restart process — only state* + the seam.
           ctx {:state* state*
                :workflow-execute-actor-turn-fn execute-turn}

@@ -12,13 +12,7 @@
 
 (def ^:private running-attempt-state* step-test-support/running-attempt-state*)
 (def ^:private drive! step-test-support/drive!)
-
-(defn- ok-turn
-  [prompt]
-  {:status :ok
-   :assistant-text (str "reply-" prompt)
-   :execution-result nil
-   :assistant-message (step-test-support/assistant-text-message (str "reply-" prompt))})
+(def ^:private ok-turn step-test-support/ok-turn)
 
 (defn- recorded-indices
   [state* run-id step-id]

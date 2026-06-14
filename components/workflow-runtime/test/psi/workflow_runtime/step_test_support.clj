@@ -79,6 +79,17 @@
   [text]
   {:role "assistant" :content [{:type :text :text text}]})
 
+(defn ok-turn
+  "The canonical successful per-turn result the drain seam returns for a given
+   submitted `prompt`: `:status :ok` with `reply-{prompt}` text and the matching
+   assistant message. Shared by both sibling drain namespaces so the OK-turn
+   contract has one spelling (TS-2)."
+  [prompt]
+  {:status :ok
+   :assistant-text (str "reply-" prompt)
+   :execution-result nil
+   :assistant-message (assistant-text-message (str "reply-" prompt))})
+
 (defn running-attempt-state*
   "A canonical state* atom with one started (running, no per-prompt records)
    latest attempt for `run-id`/`step-id`, built via the real run/attempt

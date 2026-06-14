@@ -2809,3 +2809,28 @@ not a duplicate.
   effects (`swap! turn-calls*`/`swap! submitted*`). The minimal `(fn [& _] … {:status
   :ok})` stubs (`:210`, `:288`) are intentionally degenerate zero-/no-turn stubs
   and stay as-is. Test-only; no production change; re-run both drain suites green.
+
+## Test-shaper follow-up execution (pass 8 — TS-2)
+
+Consolidated the canonical OK-turn-result builder shared by the two sibling drain
+test namespaces (the TS-1 escapee). Lifted `ok-turn` (the `:status :ok` /
+`reply-{prompt}` per-turn success result the drain seam returns) into
+`psi.workflow-runtime.step-test-support`, alongside the TS-1 fixtures + `drive!`.
+
+- `_abort_test.clj`: dropped its private `(defn- ok-turn …)` def and aliased the
+  shared helper via `(def ^:private ok-turn step-test-support/ok-turn)` — no call
+  site changed (it already invoked `ok-turn`).
+- `_test.clj`: rewrote the 3 inline drive-file turn closures (the
+  `execute-turn` fns in the in-order, resume-skips, and non-re-fire tests) to
+  return `(step-test-support/ok-turn prompt)` while preserving their per-test
+  recording side effects (`swap! turn-calls* inc`, `swap! submitted* conj …`).
+- Left untouched, per the finding: the degenerate `(fn [& _] … {:status :ok})`
+  zero-/no-turn stubs (the replay/upfront-block tests where no turn completes) and
+  the final-turn **structured-output** closure (returns a distinct
+  `:execution-result {:execution-result/structured-output …}` / invalid-output
+  shape, not the OK-turn contract). The `assistant-text-message` alias stays in
+  the drive file — still used by that structured-output closure.
+
+Net: one canonical OK-turn abstraction across both siblings, no inline
+duplication. Test-only; no production change. `clj-paren-repair` no-op;
+`clj-kondo` clean; both drain suites 14 tests / 64 assertions green.

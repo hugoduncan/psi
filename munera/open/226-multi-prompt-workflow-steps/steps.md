@@ -1051,7 +1051,7 @@ consolidates them — it does not first-author them.
   from the abort file. `clj-kondo` clean; both drain suites 14 tests / 64
   assertions green; full workflow-runtime suite 133 tests / 726 assertions green.
 
-- [ ] TS-2 — Consolidate the canonical OK-turn-result builder shared by the two
+- [x] TS-2 — Consolidate the canonical OK-turn-result builder shared by the two
   sibling drain test namespaces (test-shaper consistency + economy; a TS-1
   escapee). The per-turn success result map the drain seam returns —
   `{:status :ok :assistant-text (str "reply-" prompt) :execution-result nil
@@ -1072,3 +1072,13 @@ consolidates them — it does not first-author them.
   `consistent(test_abstractions) ∧ economical ∧ helpers_that_compress(ceremony)`.
   Test-only; no production change; re-run both workflow-runtime drive/abort suites
   green.
+  **DONE:** lifted `ok-turn` into `step-test-support`; the abort file now aliases
+  it (`def ^:private ok-turn step-test-support/ok-turn`) and dropped its private
+  def; the 3 inline drive-file `execute-turn` closures now return
+  `(step-test-support/ok-turn prompt)` keeping their `swap! turn-calls*` /
+  `swap! submitted*` recording side effects. The degenerate `(fn [& _] …)` stubs
+  and the final-turn structured-output closure (distinct `:execution-result`
+  shape) left untouched; the `assistant-text-message` alias stays (still used by
+  the structured-output closure). `clj-kondo` clean; both drain suites 14 tests /
+  64 assertions green. See implementation.md "Test-shaper follow-up execution
+  (pass 8 — TS-2)".
