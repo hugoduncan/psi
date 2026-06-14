@@ -645,3 +645,45 @@
   (testing "session-spec-schema rejects temperature above 2.0"
     (is (not (m/validate workflow-ir/session-spec-schema
                          (assoc base-session-spec :temperature 2.1))))))
+
+(deftest session-step-prompt-queue-derivation-test
+  ;; Task 226 Slice 1 — the normalized internal prompt-queue derivation.
+  ;; Single-prompt `:contributions` session steps are the N=1 degenerate: one
+  ;; UNNAMED group carrying the step's contributions and no `:name`.
+  (testing "single-prompt :contributions session step derives one unnamed group"
+    (let [queue (workflow-ir/session-step-prompt-queue valid-session-step)]
+      (is (= 1 (count queue)))
+      (is (not (contains? (first queue) :name))
+          "the N=1 degenerate group is unnamed (step-level surfaces only)")
+      (is (= (get-in valid-session-step [:session :contributions])
+             (:contributions (first queue))))
+      (is (workflow-ir/valid-prompt-queue? queue))))
+
+  (testing "a session step with no contributions derives one empty unnamed group"
+    (let [queue (workflow-ir/session-step-prompt-queue
+                 {:name "empty" :type :session :session {:contributions []}})]
+      (is (= [{:contributions []}] queue))
+      (is (workflow-ir/valid-prompt-queue? queue))))
+
+  (testing "authored named :prompts groups derive verbatim, preserving author order"
+    (let [groups [{:name "architecture"
+                   :contributions [{:type :template :text "arch" :vars {}}]}
+                  {:name "ambiguity"
+                   :contributions [{:type :template :text "ambig" :vars {}}]}]
+          queue (workflow-ir/session-step-prompt-queue
+                 {:name "review" :type :session :session {:prompts groups}})]
+      (is (= groups queue))
+      (is (= ["architecture" "ambiguity"] (mapv :name queue)))
+      (is (workflow-ir/valid-prompt-queue? queue)))))
+
+(deftest prompt-queue-schema-test
+  (testing "prompt-queue-schema requires at least one group"
+    (is (not (workflow-ir/valid-prompt-queue? [])))
+    (is (workflow-ir/valid-prompt-queue?
+         [{:contributions [{:type :template :text "x" :vars {}}]}])))
+
+  (testing "prompt-group :name is optional but must be a string when present"
+    (is (workflow-ir/valid-prompt-queue?
+         [{:name "g1" :contributions []}]))
+    (is (not (workflow-ir/valid-prompt-queue?
+              [{:name 7 :contributions []}])))))

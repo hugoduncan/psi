@@ -19,26 +19,39 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
 
 ## Slice 1 — Unified single-prompt queue path (N=1 degenerate)
 
-- [ ] Characterize current single-prompt behaviour: add a **committed
+- [x] Characterize current single-prompt behaviour: add a **committed
   asserted-shape characterization test** (in/alongside
   `statechart_runtime/step_execution_test.clj`) pinning the single-prompt
   `execute-session-step!` `:pending-actor-result` envelope shape
   (`:final-llm-reply`/`:text`/`:transcript`/structured `:outputs` keys) — not a
   full-content golden snapshot. **Commit it first**, green against current
   (pre-refactor) code; this is the R4 equivalence-baseline comparand (P3).
-- [ ] Define the internal normalized prompt-queue representation in `ir.clj`
+  (`single-prompt-session-step-envelope-characterization-test`, committed first,
+  16 assertions green pre-refactor.)
+- [x] Define the internal normalized prompt-queue representation in `ir.clj`
   (ordered vector of prompt-groups; group has optional `:name`, body =
   materialized contributions/prompt-workflow). Single unnamed group for
-  `:contributions`/`:prompt-workflow`.
+  `:contributions`/`:prompt-workflow`. (`prompt-group-schema`/`prompt-queue-schema`
+  + `session-step-prompt-queue` derivation + `valid-prompt-queue?`; covered by
+  `session-step-prompt-queue-derivation-test` + `prompt-queue-schema-test`.)
 - [ ] Normalize `:contributions`/`:prompt-workflow` session steps into a
-  length-1 internal queue at **compile time in `compiler.clj`** (workflow-loader
+  length-1 internal queue at **compile time** (workflow-loader
   owns the authored-form → normalized-queue transform, P1; `ir.clj` owns only the
   normalized-queue schema/validation), preserving the existing canonical
-  `:session :contributions` shape downstream.
-- [ ] Add a per-group materialization entry point in
+  `:session :contributions` shape downstream. **Deviation (see
+  implementation.md):** the authored-form → canonical-IR transform that nests
+  config under `:session` lives in workflow-runtime `target_ir_compiler.clj`, not
+  workflow-loader `compiler.clj`. For the N=1 degenerate the canonical IR already
+  carries `:session :contributions`, so the length-1 queue is *derived* from it by
+  `ir/session-step-prompt-queue` (no compiler change needed yet); `:prompts` →
+  named-group compilation lands in Slice 2 in `target_ir_compiler.clj`.
+- [x] Add a per-group materialization entry point in
   `workflow_step_materialization/core.clj` (reuse
   `materialize-step-session-conversation` + `split-step-session-conversation`
   per group; length-1 queue yields today's single prompt).
+  (`materialize-prompt-group-conversation` over a shared
+  `materialize-contributions-conversation` primitive; covered by
+  `materialize-prompt-group-conversation-matches-single-prompt-materialization-test`.)
 - [ ] Refactor `execute-session-step!` to drive a length-1 internal queue
   producing the **identical** `:pending-actor-result` envelope (no behaviour
   change). Single suspend point unchanged.

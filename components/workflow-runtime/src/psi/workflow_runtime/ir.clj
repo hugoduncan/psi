@@ -164,6 +164,25 @@
    [:source source-contribution-schema]
    [:template template-contribution-schema]])
 
+;;; Normalized internal prompt-queue representation (task 226).
+;;;
+;;; Both authored session-step forms normalize to ONE internal prompt-queue:
+;;; `:contributions`/`:prompt-workflow` -> a single UNNAMED group (step-level
+;;; surfaces only); `:prompts` -> ordered NAMED groups (per-prompt addressing).
+;;; Single-prompt is the genuine N=1 degenerate of this unified representation,
+;;; not a separately maintained path. `ir.clj` owns the schema of the normalized
+;;; queue and its derivation from canonical IR; per the workflow-runtime boundary
+;;; the authored-form -> normalized-queue transform is owned by the IR compiler.
+(def prompt-group-schema
+  [:map
+   [:name {:optional true} [:maybe step-name-schema]]
+   [:contributions [:vector contribution-schema]]])
+
+(def prompt-queue-schema
+  [:vector {:min 1} prompt-group-schema])
+
+(def valid-prompt-queue? (m/validator prompt-queue-schema))
+
 (def invoke-spec-schema
   [:map
    [:operation operation-id-schema]
@@ -571,6 +590,20 @@
                          :output output-key
                          :structured-output (:structured-output value)})))
       value)))
+
+(defn session-step-prompt-queue
+  "Derive the normalized internal prompt-queue from a canonical session IR `step`.
+
+   Single-prompt `:session :contributions` steps yield ONE unnamed prompt-group
+   (the N=1 degenerate of the unified queue). Authored `:prompts` (named groups,
+   task 226 Slice 2) yield the ordered named groups verbatim. The unnamed group
+   carries no `:name`, so it contributes only the step-level rollup and no
+   addressable per-prompt record."
+  [step]
+  (let [session (:session step)]
+    (if-let [prompts (:prompts session)]
+      (vec prompts)
+      [{:contributions (vec (:contributions session))}])))
 
 (defn step-output-surfaces
   "Return the normalized logical output-surface map for a canonical IR `step`

@@ -193,3 +193,50 @@
       (is (nil? (workflow-step-materialization/materialize-step-session-conversation
                  run
                  "empty-session"))))))
+
+(deftest materialize-prompt-group-conversation-matches-single-prompt-materialization-test
+  ;; Task 226 Slice 1 — the per-group materialization entry point. For the N=1
+  ;; degenerate (one unnamed group carrying the whole step's contributions), the
+  ;; per-group materialization reproduces the single-prompt step conversation.
+  (let [contributions [{:type :source :from :workflow-original}
+                       {:type :source :from {:step "plan" :output :final-llm-reply}}
+                       {:type :template
+                        :text "Review {{reply}}"
+                        :vars {"reply" {:from {:step "plan" :output :final-llm-reply}}}}]
+        definition {:steps [{:name "plan"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "Plan {{input}}"
+                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                            {:name "review"
+                             :type :session
+                             :contributions contributions}]}
+        [state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                       {:definition definition
+                                                        :run-id "run-prompt-group"
+                                                        :workflow-input {:input "Ship it"
+                                                                         :original {:ticket 123}}})
+        state3 (assoc-in state2 [:workflows :runs run-id :step-runs "plan" :accepted-result]
+                         {:outcome :ok
+                          :outputs {:final-llm-reply "plan text"
+                                    :text "plan text"}})
+        run (workflow-runtime/workflow-run-in state3 run-id)
+        step-conversation (workflow-step-materialization/materialize-step-session-conversation run "review")
+        group-conversation (workflow-step-materialization/materialize-prompt-group-conversation
+                            run {:contributions contributions})]
+    (is (= [{:role "user" :content "{:ticket 123}"}
+            {:role "user" :content "plan text"}
+            {:role "user" :content "Review plan text"}]
+           group-conversation))
+    (is (= step-conversation group-conversation)
+        "the N=1 unnamed group reproduces the single-prompt step conversation"))
+
+  (testing "an empty-contributions prompt group materializes to nil"
+    (let [definition {:steps [{:name "only" :type :session :contributions []}]}
+          [state2 run-id _] (workflow-runtime/create-run {:workflows {:definitions {} :runs {} :run-order []}}
+                                                         {:definition definition
+                                                          :run-id "run-empty-group"
+                                                          :workflow-input {}})
+          run (workflow-runtime/workflow-run-in state2 run-id)]
+      (is (nil? (workflow-step-materialization/materialize-prompt-group-conversation
+                 run {:contributions []}))))))

@@ -1481,3 +1481,67 @@ follow-up.
   confirm item — the matching parenthetical. Now the AC-1..AC-8 TraceID/coherence
   gate accounts for the scheduled Slice 6 `:blocked` test without inflating the AC
   set — closing the same defect-shape PI9/PI10/PI11 fixed for other surfaces.
+
+## Slice 1 — unified single-prompt queue path (implementation begins) — ψ
+
+First concrete implementation pass (all prior commits were design/plan review).
+Established the Slice-1 equivalence baseline and the additive normalized
+prompt-queue seams; the deeper `execute-session-step!` queue-driver refactor +
+runtime rewiring remain.
+
+- **Characterization baseline (P3) committed first.** Added
+  `single-prompt-session-step-envelope-characterization-test` to
+  `statechart_runtime/step_execution_test.clj` pinning the asserted SHAPE of the
+  single-prompt `:pending-actor-result` envelope (text step:
+  `:kind`/`:step-id`/`:attempt-id`/`:outcome` + `:final-llm-reply`/`:text`/
+  `:transcript`/`:session-id`/`:logprobs` + `:actor/done`; structured step: the
+  declared `:classification` key valid + `{:decision :pass}`). Committed green
+  against pre-refactor code (16 assertions). This is the Slice-1 done-gate
+  comparand; any change to the asserted shape is a defect (R4).
+
+- **Normalized prompt-queue representation (ir.clj).** Added
+  `prompt-group-schema` (`{:name? :contributions}`), `prompt-queue-schema`
+  (`[:vector {:min 1} …]`), `valid-prompt-queue?`, and the derivation
+  `session-step-prompt-queue` (canonical session IR step → ordered queue;
+  `:contributions` → one UNNAMED group = N=1 degenerate; authored `:prompts` →
+  named groups verbatim, forward-compat for Slice 2). Pure/additive; ir.clj owns
+  the normalized-queue schema + derivation per the workflow-runtime boundary.
+
+- **Per-group materialization entry point (workflow-step-materialization core.clj).**
+  Extracted the shared single-turn primitive `materialize-contributions-conversation`
+  (whole-step `materialize-step-session-conversation` now delegates to it,
+  byte-identical) and added `materialize-prompt-group-conversation` (materialize
+  one prompt-group's `:contributions`). The runtime composes
+  `ir/session-step-prompt-queue` + `materialize-prompt-group-conversation` +
+  `split-step-session-conversation`; the length-1 unnamed-group queue reproduces
+  today's single-prompt conversation (proven by the new core test).
+
+- **DEVIATION from plan P1 (normalization owner).** plan.md/steps.md/Touch points
+  attribute the authored-form → normalized-queue transform to **workflow-loader
+  `compiler.clj`**. In the actual code, workflow-loader `compiler.clj` only lowers
+  `.md`/`.edn` files + `:prompt-workflow` markdown into target-authored
+  `:contributions`; the transform that nests session config under `:session` and
+  produces canonical normalized IR is **workflow-runtime `target_ir_compiler.clj`**
+  (`compile-step` `:session` branch). So Slice 2's `:prompts` → named-group
+  compilation belongs in `target_ir_compiler.clj` (+ `ir.clj` schema/validation),
+  not `compiler.clj`. For the N=1 degenerate no compiler change is needed: the
+  length-1 queue is derived from the existing canonical `:session :contributions`
+  by `ir/session-step-prompt-queue`. (workflow-step-materialization cannot depend
+  on workflow-runtime — circular — so the queue *derivation* stays in ir.clj and
+  the runtime composes; core.clj owns only per-group conversation materialization.)
+
+- **Verification.** New tests green: ir-test (6 tests / 112 assertions incl. the
+  two new prompt-queue tests), materialization core-test (8 tests / 16 assertions
+  incl. the new per-group test, via kaocha — note the bb `clojure:test:scry` task
+  runs `-M:test-paths` which omits `components/workflow-step-materialization/test`,
+  so that suite is run via `clojure -M:test --focus`), step-execution-test (12
+  tests / 83 assertions, characterization green), target-ir-compiler-test (9/31),
+  workflow-loader compiler-test + compiler-target-authoring-test (4/54). clj-kondo
+  clean across all edits.
+
+- **Remaining for Slice 1:** refactor `execute-session-step!` to drive a length-1
+  internal queue (consuming `ir/session-step-prompt-queue` +
+  `materialize-prompt-group-conversation`) producing the identical envelope, and
+  wire the queue composition at the `statechart_runtime.clj` `:step/enter`
+  materialization site — keeping the characterization test green unchanged. Then
+  Slices 2–7 per plan.
