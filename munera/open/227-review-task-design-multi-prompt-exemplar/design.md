@@ -87,25 +87,81 @@ This preserves the capabilities the three separate review steps currently get
 from their prompt frontmatter while still using one shared child session for all
 three turns.
 
-## Routing (post-drain)
+## Merged topology and route map
+
+The workflow topology after the merge is exactly:
+
+```text
+design-review --DONE--> final-summary
+design-review --REPEAT--> design-follow-up
+design-follow-up --DONE, :max-iterations 6--> design-review
+```
+
+`design-review` is the only review step. `design-follow-up` is the only
+follow-up step and uses the existing `review-follow-up-design.md` design
+profile. The old `architecture-review`, `architecture-follow-up`,
+`ambiguity-review`, `ambiguity-follow-up`, `inconsistency-review`,
+`inconsistency-follow-up`, and `clarity-status` steps are removed rather than
+kept as shims.
+
+In EDN shape, the merged route-bearing steps are:
+
+```clojure
+{:name "design-review"
+ :type :session
+ :tools ["read" "bash" "edit" "write"]
+ :skills ["work-independently"
+          "review-task-architecture"
+          "task-design"]
+ :prompts
+ [{:name "architecture"
+   :prompt-workflow "review-task-design-architecture-review.md"}
+  {:name "ambiguity"
+   :prompt-workflow "review-task-design-ambiguity-review.md"}
+  {:name "inconsistency"
+   :prompt-workflow "review-task-design-inconsistency-review.md"}]
+ :judge
+ {:type :invoke
+  :operation "workflow/pass-feedback-routing"
+  :args {:architecture-text
+         {:from {:step "design-review"
+                 :prompt "architecture"
+                 :output :final-llm-reply}}
+         :ambiguity-text
+         {:from {:step "design-review"
+                 :prompt "ambiguity"
+                 :output :final-llm-reply}}
+         :inconsistency-text
+         {:from {:step "design-review"
+                 :prompt "inconsistency"
+                 :output :final-llm-reply}}}}
+ :on {"REPEAT" {:goto "design-follow-up"}
+      "DONE" {:goto "final-summary"}}}
+
+{:name "design-follow-up"
+ :type :session
+ :prompt-workflow "review-follow-up-design.md"
+ :judge {:type :invoke
+         :operation "workflow/constant-routing"
+         :args {:route "DONE"}}
+ :on {"DONE" {:goto "design-review" :max-iterations 6}}}
+```
+
+The `:max-iterations 6` bound lives on the transition **targeting**
+`design-review`, not on `design-review`'s `REPEAT` transition to the follow-up.
+Workflow iteration limits count target-step entries, so placing the bound on
+`design-follow-up --DONE--> design-review` preserves the current "at most six
+total review passes" contract. Placing the bound on
+`design-review --REPEAT--> design-follow-up` would instead bound follow-up
+entries and would not express the review-pass limit.
 
 The merged step's judge routes on the **post-drain step result's per-prompt
 reply outputs**, reusing the **existing** `workflow/pass-feedback-routing`
-operation. Each review prompt emits a `PASS_STATUS` token; the judge takes one
-`*-text` arg per prompt:
-
-```clojure
-{:architecture-text  {:from {:step "design-review" :prompt "architecture"   :output :final-llm-reply}}
- :ambiguity-text     {:from {:step "design-review" :prompt "ambiguity"      :output :final-llm-reply}}
- :inconsistency-text {:from {:step "design-review" :prompt "inconsistency"  :output :final-llm-reply}}}
-```
-
-REPEAT while any prompt returned `ACTIONABLE_FEEDBACK`; DONE (→ `final-summary`)
-when all are `REVIEW_COMPLETE`. Because all three phases are merged, this is
-**exactly** the three-key disjunction the live `clarity-status` judge already
-computes via `pass-feedback-routing` over the unmerged phase outputs — the
-routing computation is preserved even though the interleaved follow-up structure
-is not.
+operation. REPEAT while any prompt returned `ACTIONABLE_FEEDBACK`; DONE when all
+three prompts returned `REVIEW_COMPLETE`. Because all three phases are merged,
+this is the same three-key disjunction the live `clarity-status` judge computes
+over the unmerged phase outputs, but the separate `clarity-status` step is no
+longer needed: the pass-feedback judge is attached directly to `design-review`.
 
 **Why not filesystem-state routing.** An alternative routed on whether
 `design-steps.md` still has unchecked `- [ ]` items via a new
@@ -117,6 +173,47 @@ from the phase outputs rather than re-reading task artifacts," and the VSM
 `∀change → event → log → replayable` ethos (the judge normalizes a *step result*,
 not a filesystem snapshot). Per-prompt reply routing keeps the merged exemplar
 replay-faithful and deterministic and introduces no new routing operation.
+
+## Prompt-body changes for shared context
+
+The prompt files remain separate markdown bodies referenced by prompt-group
+`:prompt-workflow`, but their body text must be adjusted for the single shared
+session:
+
+- `review-task-design-architecture-review.md` is the **turn-1 loader**. Its body
+  must explicitly instruct the model to read the task's `design.md` and consult
+  the architecture sources needed for the batch review (`AGENTS.md`, `META.md`,
+  and `doc/architecture.md`) before producing the architecture review note and
+  any design follow-up items.
+- `review-task-design-ambiguity-review.md` runs after the architecture turn in
+  the same child session. Its body must say to use the already-loaded `design.md`,
+  architecture sources, and architecture-review reply from the shared session
+  context. It should perform only targeted re-reads when specific referenced
+  material is missing, ambiguous, or plausibly stale; it must not unconditionally
+  re-read the whole design and architecture source set.
+- `review-task-design-inconsistency-review.md` follows the same rule: use the
+  shared session context and prior review replies by default, with targeted
+  re-reads only for missing/stale facts or specific referenced artifacts needed
+  to decide an inconsistency.
+
+This is the concrete mechanism for acceptance criterion 1: the design and
+architecture sources are assembled once by the first prompt, and later prompts
+reuse them through the live session rather than re-embedding the same material.
+
+## Single design follow-up semantics
+
+`design-follow-up` executes newly added design-review follow-up items from the
+**immediately preceding `design-review` batch**. In this merged workflow,
+"preceding review pass" means the whole three-prompt batch
+(`architecture` + `ambiguity` + `inconsistency`), not any one prompt within it.
+The follow-up must therefore execute every unchecked `design-steps.md` item newly
+added by any of the three prompt replies in that batch, while leaving unchecked
+items that predate that batch untouched.
+
+Update `review-follow-up-design.md` wording/context to make the batch meaning
+explicit. The prompt should continue to say not to execute stale unchecked items,
+but it should clarify that, for batch review workflows, "newly added" spans all
+review prompts in the immediately preceding batch.
 
 ## `final-summary` migration
 
