@@ -94,6 +94,25 @@
     (str "Step '" step "': :prompt ref targets the same step being assembled"
          " (sibling-group refs are only permitted in the step's own post-drain judge)")
 
+    :session-contributions-and-prompts
+    (str "Step '" step "': session step declares both :contributions and :prompts"
+         "; a session step carries exactly one prompt source"
+         " (use :contributions for a single prompt or :prompts for a named queue, never both)")
+
+    :session-without-prompt-source
+    (str "Step '" step "': session step declares neither :contributions nor :prompts"
+         "; a session step requires exactly one prompt source"
+         " (:contributions for a single prompt or :prompts for a named queue)")
+
+    :unnamed-prompt-group
+    (str "Step '" step "': a :prompts group is missing its :name"
+         "; every prompt group in :prompts must be named")
+
+    :duplicate-prompt-group-name
+    (str "Step '" step "': :prompts declares duplicate prompt-group name(s) "
+         (pr-str (:duplicate-names err))
+         "; prompt-group names must be unique within a step")
+
     :skills-without-read-tool
     (str "Step '" step "': skills require the 'read' tool to be present in :tools")
 

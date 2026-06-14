@@ -1198,7 +1198,7 @@ consolidates them — it does not first-author them.
 
 ## Code-shaper review follow-ups (pass 1)
 
-- [ ] CS-1 — Add dedicated `format-semantic-error` cases (in
+- [x] CS-1 — Add dedicated `format-semantic-error` cases (in
   `ir_error_formatting.clj`) for the four session-prompt-queue error types
   emitted by `session-prompt-queue-errors` (`ir.clj`):
   `:session-contributions-and-prompts`, `:session-without-prompt-source`,
@@ -1210,8 +1210,16 @@ consolidates them — it does not first-author them.
   group(s) and the step; both/neither and unnamed-group cases should state the
   xor/naming rule) and add a formatter-level assertion (the error-data is tested
   in `ir_prompts_test.clj:68-100`, but the formatted string is not).
+  **DONE:** added four `format-semantic-error` cases before the raw fallback —
+  `:session-contributions-and-prompts` / `:session-without-prompt-source` state
+  the step name + the one-prompt-source xor rule; `:unnamed-prompt-group` states
+  the naming rule; `:duplicate-prompt-group-name` names the step and renders the
+  duplicate group(s) via `(pr-str (:duplicate-names err))`. Added four
+  formatter-level tests to `compilation_error_format_test.clj` (each asserts the
+  step name + constraint text + `:duplicate-names` rendering + **no** `(raw:`
+  fallback). 20 tests / 83 assertions green.
 
-- [ ] CS-2 — Separate computation from flow control in
+- [x] CS-2 — Separate computation from flow control in
   `execute-session-turn-outcome` (`statechart_runtime/step_execution.clj`).
   Extract the `:else` (success) arm's pure OK-envelope computation
   (`surface-step-def`, `raw-outputs`, structured-result validity,
@@ -1219,3 +1227,11 @@ consolidates them — it does not first-author them.
   (e.g. `session-turn-ok-envelope`), leaving the disposition `cond` as flow
   control only (`xor(computation, flow_control)`). Makes the OK-envelope shape
   independently testable on the design's named single turn-primitive.
+  **DONE:** extracted the success arm verbatim into pure `session-turn-ok-envelope`
+  (`step-def`/`execution-session`/`structured-entry` + the turn's
+  `assistant-text`/`assistant-message`/`execution-result`/`structured-output`),
+  returning the `:branch :success` disposition map. The
+  `execute-session-turn-outcome` `cond` `:else` now only dispatches to it — the
+  disposition `cond` is flow control only. Behaviour-preserving: step-execution +
+  drive-prompt-queue (+ abort) suites 25 tests / 146 assertions green; full
+  workflow-runtime suite 136 tests / 736 assertions green; `clj-kondo` clean.

@@ -3182,3 +3182,31 @@ Not flagged: the duplicated disposition→`record-actor-pending!` `case` between
 documented** two-driver design decision (design.md AC-2 / Architecture alignment:
 collapsing breaks the byte-identical N=1 envelope) — left as-is per
 `shims_adapters`/documented-design-decision carve-out.
+
+## Code-shaper review follow-up execution (pass 1) — ψ
+
+Executed CS-1 and CS-2 (both completed; neither blocked).
+
+- **CS-1 (done).** Added four `format-semantic-error` cases in
+  `ir_error_formatting.clj` ahead of the raw fallback, mirroring the actionable
+  `:prompt-ref-*` rendering: `:session-contributions-and-prompts` and
+  `:session-without-prompt-source` name the step and state the
+  one-prompt-source xor rule; `:unnamed-prompt-group` states the per-group
+  naming rule; `:duplicate-prompt-group-name` names the step and renders the
+  offending group(s) via `(pr-str (:duplicate-names err))`. Closed the
+  formatter-level test gap (the error **data** was tested in `ir_prompts_test.clj`
+  but the **formatted string** was not) by adding four tests to
+  `compilation_error_format_test.clj`, each asserting the step name, the
+  constraint/naming text, the duplicate-name rendering, and **no** `(raw:`
+  fallback leak. 20 tests / 83 assertions green.
+- **CS-2 (done).** Extracted the `:else` (success) arm of
+  `execute-session-turn-outcome` verbatim into pure `session-turn-ok-envelope`
+  (inputs: `step-def`, `execution-session`, `structured-entry`, and the turn's
+  `assistant-text`/`assistant-message`/`execution-result`/`structured-output`;
+  output: the `:branch :success` disposition map). The disposition `cond` now
+  only routes — `:cancelled`/`:error` inline, `:else` → the pure helper —
+  satisfying `xor(computation, flow_control)` on the design's named single
+  turn-primitive and making the OK-envelope shape independently testable.
+  Behaviour-preserving: step-execution + drive-prompt-queue (+ abort) 25 tests /
+  146 assertions green; full workflow-runtime suite 136 tests / 736 assertions
+  green; `clj-kondo` clean on all three edited files.

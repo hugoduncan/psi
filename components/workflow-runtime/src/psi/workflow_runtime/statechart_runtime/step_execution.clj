@@ -177,6 +177,65 @@
                                                       :updated-at (state/now)})
   (queue/enqueue-event! event-queue* working-memory* event {}))
 
+(defn- session-turn-ok-envelope
+  "Compute the success-arm disposition for a completed session turn (pure).
+
+   Derives the per-turn `raw-outputs`, applies final-turn structured-output
+   validation, and builds the `:pending-actor-result` envelope. `structured-entry`
+   (`[output-key output-spec]`) is non-nil only on the final turn (structured
+   `:outputs` are requested on the final turn only, P5); on non-final turns the
+   declared structured key is excluded from surface resolution so an absent
+   structured value cannot throw.
+
+   Returns the `:branch :success` disposition map consumed by
+   `execute-session-turn-outcome` — `:disposition :ok` or `:disposition :blocked`
+   (`:invalid-structured-output`). This is the pure OK-envelope computation,
+   separated from `execute-session-turn-outcome`'s disposition flow control."
+  [step-def execution-session structured-entry assistant-text assistant-message execution-result structured-output]
+  (let [logprobs (:execution-result/logprobs execution-result)
+        ;; Structured `:outputs` bind the final turn only (P5). On non-final
+        ;; turns the declared structured key is NOT produced, so it must be
+        ;; excluded from surface resolution to avoid an invalid-resolution
+        ;; throw for an absent structured value.
+        step-structured-key (first (structured-output/single-structured-output-entry (:outputs step-def)))
+        surface-step-def (if (and step-structured-key (nil? structured-entry))
+                           (update step-def :outputs dissoc step-structured-key)
+                           step-def)
+        raw-outputs {:final-llm-reply assistant-text
+                     :text assistant-text
+                     :transcript (when assistant-message [assistant-message])
+                     :logprobs logprobs
+                     :session-id (:session-id execution-session)}
+        raw-outputs (if-let [[output-key output-spec] structured-entry]
+                      (assoc raw-outputs output-key
+                             (if (some? structured-output)
+                               (structured-output/output-result output-spec assistant-text structured-output)
+                               (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
+                      raw-outputs)
+        structured-result (some-> structured-entry first raw-outputs)
+        invalid-structured-output? (and structured-entry
+                                        (not (structured-output/valid-output-result? structured-result)))
+        normalized-outputs (when-not invalid-structured-output?
+                             (workflow-ir/step-output-surfaces
+                              surface-step-def
+                              {:outcome :ok
+                               :outputs raw-outputs}))
+        envelope (if invalid-structured-output?
+                   {:outcome :blocked
+                    :blocked {:reason :invalid-structured-output
+                              :message "Workflow structured output failed validation"
+                              :details {:output-key (first structured-entry)
+                                        :structured-output (:structured-output structured-result)}}
+                    :outputs raw-outputs}
+                   {:outcome :ok
+                    :outputs (merge normalized-outputs raw-outputs)})]
+    {:disposition (if (= :blocked (:outcome envelope)) :blocked :ok)
+     :branch :success
+     :payload envelope
+     :raw-outputs raw-outputs
+     :assistant-text assistant-text
+     :assistant-message assistant-message}))
+
 (defn- execute-session-turn-outcome
   "Run one already-shaped session turn and classify its outcome WITHOUT recording
    or enqueuing.
@@ -225,49 +284,9 @@
          :payload failure})
 
       :else
-      (let [logprobs (:execution-result/logprobs execution-result)
-            ;; Structured `:outputs` bind the final turn only (P5). On non-final
-            ;; turns the declared structured key is NOT produced, so it must be
-            ;; excluded from surface resolution to avoid an invalid-resolution
-            ;; throw for an absent structured value.
-            step-structured-key (first (structured-output/single-structured-output-entry (:outputs step-def)))
-            surface-step-def (if (and step-structured-key (nil? structured-entry))
-                               (update step-def :outputs dissoc step-structured-key)
-                               step-def)
-            raw-outputs {:final-llm-reply assistant-text
-                         :text assistant-text
-                         :transcript (when assistant-message [assistant-message])
-                         :logprobs logprobs
-                         :session-id (:session-id execution-session)}
-            raw-outputs (if-let [[output-key output-spec] structured-entry]
-                          (assoc raw-outputs output-key
-                                 (if (some? structured-output)
-                                   (structured-output/output-result output-spec assistant-text structured-output)
-                                   (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
-                          raw-outputs)
-            structured-result (some-> structured-entry first raw-outputs)
-            invalid-structured-output? (and structured-entry
-                                            (not (structured-output/valid-output-result? structured-result)))
-            normalized-outputs (when-not invalid-structured-output?
-                                 (workflow-ir/step-output-surfaces
-                                  surface-step-def
-                                  {:outcome :ok
-                                   :outputs raw-outputs}))
-            envelope (if invalid-structured-output?
-                       {:outcome :blocked
-                        :blocked {:reason :invalid-structured-output
-                                  :message "Workflow structured output failed validation"
-                                  :details {:output-key (first structured-entry)
-                                            :structured-output (:structured-output structured-result)}}
-                        :outputs raw-outputs}
-                       {:outcome :ok
-                        :outputs (merge normalized-outputs raw-outputs)})]
-        {:disposition (if (= :blocked (:outcome envelope)) :blocked :ok)
-         :branch :success
-         :payload envelope
-         :raw-outputs raw-outputs
-         :assistant-text assistant-text
-         :assistant-message assistant-message}))))
+      (session-turn-ok-envelope
+       step-def execution-session structured-entry
+       assistant-text assistant-message execution-result structured-output))))
 
 (defn execute-session-step!
   "Drive ONE session turn (the unnamed N=1 degenerate of the unified prompt-queue)
