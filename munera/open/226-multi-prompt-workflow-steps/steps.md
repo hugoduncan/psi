@@ -304,3 +304,27 @@ consolidates them — it does not first-author them.
   plan.md (full workflow-runtime + workflow-loader + workflow-step-materialization
   Scry run + AC-1..AC-8 coverage confirm) mirroring steps.md, so plan's "Final
   verification" references resolve to a defined plan step.
+
+## Plan-review follow-ups (ambiguity, pass 3)
+
+- [ ] P9 — Define which component Scry suite(s) gate Slices 2–6 in plan.md
+  (change_chain note) + steps.md (header): the per-slice "relevant Scry suite" is
+  unnamed for Slices 2–6 even though the work spans multiple components (Slice 2
+  edits both workflow-loader `compiler.clj` and workflow-runtime `ir.clj`; Slices
+  3–6 also touch workflow-step-materialization + progression-recording). State, per
+  slice or as a per-component rule, which Scry suite(s) must be green to gate each
+  non-Slice-1 slice — distinct from Slice 1's focused `step_execution_test.clj`
+  gate (P7) and Final verification's three-suite run.
+- [ ] P10 — Specify the **final/last-turn** error abort semantics in Slice 6,
+  reconciled with AC-5/AC-2: Slice 6 covers only the "intermediate-turn error"
+  path, leaving undefined whether a last-prompt turn error (N>1) and the N=1
+  single-turn error follow the same `:failed`-naming-the-prompt abort (routing
+  skipped, prior records retained) or the pre-existing single-prompt failure
+  route. State the outcome for a final/last-turn error and for the N=1 degenerate.
+- [ ] P11 — Define "shared sources" in steps.md Slice 3 (and plan.md), since the
+  design forbids any step-level shared `:contributions`/preamble/`:preload`:
+  clarify that "first group loads shared sources" means the session's first-turn
+  materialized conversation (first group body + session-level system/skill/tool
+  content) persisting in the live child session for later groups — not a
+  prohibited step-level shared preamble — so the wording and the
+  no-step-level-preamble rule do not appear to contradict.

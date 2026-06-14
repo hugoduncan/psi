@@ -994,3 +994,63 @@ selection naturally lives — confirming steps Slice 3's placement.
   TraceID coherence check. This resolves the dangling "Final verification"
   references (plan.md Slice-1 done-gate scope contrast) to a defined plan element.
   Edit: new plan.md `## Final verification` section after the docs-cadence note.
+
+## Plan/steps ambiguity review (pass 3) — ψ
+
+Third plan-level ambiguity pass over plan.md + steps.md (statements admitting >1
+interpretation, undefined terms, unspecified edge behaviour), distinct from
+ambiguity passes 1–2 (P1–P8, all resolved), inconsistency passes 1–2 (PI1–PI8,
+resolved), and the design-review passes. Three **new** actionable ambiguities
+found (P9–P11); recorded as unchecked items in steps.md. Verified-clear: the
+P1–P8 disambiguations hold (normalization owner, docs cadence, equivalence
+baseline, Slice-3/5 boundary, final-turn detection, progression probe observable,
+Slice-1 gate scope, non-re-fire observable); per-prompt-record keyed-by-`:name`
+named-only is unambiguous; the `:prompt`-validation invalid-case enumeration
+(Slice 4) is exhaustive and clear; structured-`:outputs` final-turn gating (P5)
+is well-defined.
+
+- **P9 — "the relevant Scry suite per slice" is undefined for Slices 2–6.** Both
+  the steps.md header (steps.md:5) and the plan.md change_chain note (plan.md:277)
+  instruct "run the relevant Scry suite(s) per slice", but only Slice 1's gating
+  suite is scoped (P7: workflow-runtime `step_execution_test.clj`). For Slices 2–6
+  the "relevant Scry suite" is named nowhere, and the work spans **two
+  components**: Slice 2 edits both workflow-loader `compiler.clj` *and*
+  workflow-runtime `ir.clj` (and Slices 3–6 touch workflow-step-materialization +
+  progression-recording too), so a reader cannot tell whether "the relevant Scry
+  suite" for a given slice means the workflow-runtime suite, the workflow-loader
+  suite, the workflow-step-materialization suite, or some per-slice subset. This
+  leaves each non-Slice-1 done-gate's pass/green comparand ambiguous. (P7 fixed
+  only Slice 1 and explicitly contrasts it with "each slice's relevant per-slice
+  suite" without ever naming those per-slice suites.) Resolve by stating, per
+  slice (or as a per-component rule), which component Scry suite(s) must be green
+  to gate Slices 2–6, distinct from Slice 1's focused gate and Final
+  verification's three-suite run.
+
+- **P10 — final-/last-turn error abort semantics vs "intermediate-turn error"
+  (Slice 6) is unspecified.** Slice 6 / AC-5 specify only the **intermediate**
+  turn error path ("Intermediate-turn error ⇒ stop queue, step `:failed` naming
+  the failing prompt, routing skipped"). The behaviour when the **final** prompt's
+  turn errors in an N>1 queue is undefined: "intermediate" excludes the last
+  prompt, so it is ambiguous whether a last-turn error follows the same
+  `:failed`-naming-the-prompt abort (routing skipped, prior records retained) or
+  falls through to the pre-existing single-prompt failure route (which AC-2 says
+  N=1 preserves "exactly as today"). For N=1 the only turn is also the final turn,
+  compounding the ambiguity (is the single-prompt failure path the "intermediate"
+  abort path or the legacy path?). Resolve by stating in Slice 6 (and reconciling
+  with AC-5/AC-2) whether a final/last-turn error produces the same `:failed`
+  abort outcome as an intermediate-turn error, and whether the N=1 single-turn
+  failure follows that unified abort path or the legacy single-prompt route.
+
+- **P11 — "shared sources" is an undefined term in Slice 3.** steps.md Slice 3
+  ("first group loads shared sources; later groups rely on live-session memory,
+  E1") and plan.md ("the first group loads shared sources on turn 1") use "shared
+  sources" without definition, while the design explicitly forbids any step-level
+  shared `:contributions`/preamble/`:preload`. A reader cannot tell whether
+  "shared sources" denotes (a) the first group's own materialized body/system
+  content (skills/tools/system prompt) loaded at session start, which later groups
+  see via conversation memory, or (b) some step-level shared material the grammar
+  prohibits. Resolve by defining "shared sources" precisely in Slice 3 (e.g. "the
+  session's first-turn materialized conversation — first group body plus
+  session-level system/skill/tool content — which persists in the live child
+  session for later groups"), so the no-step-level-preamble rule and the
+  "shared sources" wording do not appear to contradict.
