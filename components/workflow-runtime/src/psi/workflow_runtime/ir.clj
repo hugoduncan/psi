@@ -49,8 +49,13 @@
     [:tool-output {:optional true} [:maybe :boolean]]]])
 
 (def step-output-ref-schema
+  ;; The optional `:prompt` discriminator (task 226 Slice 4) addresses a named
+  ;; prompt-group's turn-local output surface within a multi-prompt `:session`
+  ;; step. Absent `:prompt`, the ref addresses the step-level surface. `:prompt`
+  ;; is `:output`-only (never a `:yield` ref — see `step-yield-ref-schema`).
   [:map
    [:step step-name-schema]
+   [:prompt {:optional true} step-name-schema]
    [:output output-key-schema]])
 
 (def step-yield-ref-schema
@@ -405,44 +410,112 @@
        (contains? source-ref :output)
        (contains? (set (keys (:outputs step))) (:output source-ref))))
 
-(defn- ref-errors [step-index step source-ref]
+(def ^:private per-prompt-text-surfaces
+  "The per-prompt turn-local text surfaces a `:prompt`-discriminated ref may
+   address (task 226 Slice 4). Structured/`:result` keys are deferred."
+  #{:final-llm-reply :transcript})
+
+(defn- named-prompt-group-names
+  "The set of named prompt-group names declared by a canonical session `step`
+   (its `:prompts` queue). Empty for single-prompt (`:contributions`) steps."
+  [step]
+  (when (= :session (:type step))
+    (into #{}
+          (keep :name)
+          (get-in step [:session :prompts]))))
+
+(defn- prompt-ref-errors
+  "Validate a `:prompt`-discriminated source-ref `{:step s :prompt p :output k}`
+   (task 226 Slice 4).
+
+   Invalid when target `s` is non-session, single-prompt (no named groups),
+   group `p` is undeclared, key `k` is not a per-prompt text surface, or the ref
+   targets the SAME step being assembled (sibling-group ref) — except when it is
+   the step's own post-drain `:judge` (`judge?`), which resolves after the drain
+   once every turn is recorded (AC-4 carve-out)."
+  [step-index step judge? source-ref]
+  (let [current-step (:name step)
+        {target-step-name :step group-name :prompt output-key :output} source-ref
+        current-index (get-in step-index [current-step :index])
+        target (:step (get step-index target-step-name))
+        same-step? (= target-step-name current-step)
+        group-names (named-prompt-group-names target)]
+    (cond
+      (nil? target)
+      [{:type :missing-step-ref :step current-step :ref source-ref}]
+
+      (not= :session (:type target))
+      [{:type :prompt-ref-non-session-step :step current-step :ref source-ref}]
+
+      (empty? group-names)
+      [{:type :prompt-ref-single-prompt-step :step current-step :ref source-ref}]
+
+      (not (contains? group-names group-name))
+      [{:type :prompt-ref-unknown-group
+        :step current-step
+        :ref source-ref
+        :available-groups (vec group-names)}]
+
+      (not (contains? per-prompt-text-surfaces output-key))
+      [{:type :prompt-ref-non-text-surface
+        :step current-step
+        :ref source-ref
+        :available-surfaces (vec per-prompt-text-surfaces)}]
+
+      ;; Same-step sibling-group ref: forbidden at assembly time, permitted only
+      ;; for the step's own post-drain judge (resolves after every turn records).
+      (and same-step? (not judge?))
+      [{:type :prompt-ref-same-step :step current-step :ref source-ref}]
+
+      same-step?
+      []
+
+      (>= (get-in step-index [target-step-name :index]) current-index)
+      [{:type :non-prior-step-ref :step current-step :ref source-ref}]
+
+      :else
+      [])))
+
+(defn- ref-errors [step-index step judge? source-ref]
   (when (map? source-ref)
-    (let [current-step (:name step)
-          {target-step-name :step output-key :output yield-field :yield} source-ref
-          current-index (get-in step-index [current-step :index])
-          target (get step-index target-step-name)]
-      (cond
-        (nil? target)
-        [{:type :missing-step-ref
-          :step current-step
-          :ref source-ref}]
-
-        (invoke-judge-same-step-output-ref? step current-step source-ref)
-        []
-
-        (>= (:index target) current-index)
-        [{:type :non-prior-step-ref
-          :step current-step
-          :ref source-ref}]
-
-        output-key
-        (if (contains? (set (keys (get-in target [:step :outputs] {}))) output-key)
-          []
-          [{:type :missing-output-key
+    (if (contains? source-ref :prompt)
+      (prompt-ref-errors step-index step judge? source-ref)
+      (let [current-step (:name step)
+            {target-step-name :step output-key :output yield-field :yield} source-ref
+            current-index (get-in step-index [current-step :index])
+            target (get step-index target-step-name)]
+        (cond
+          (nil? target)
+          [{:type :missing-step-ref
             :step current-step
-            :ref source-ref
-            :available-outputs (vec (keys (get-in target [:step :outputs] {})))}])
+            :ref source-ref}]
 
-        yield-field
-        (if (contains? (yield-fields (:step target)) yield-field)
+          (invoke-judge-same-step-output-ref? step current-step source-ref)
           []
-          [{:type :missing-yield-field
-            :step current-step
-            :ref source-ref
-            :available-yield-fields (vec (yield-fields (:step target)))}])
 
-        :else
-        []))))
+          (>= (:index target) current-index)
+          [{:type :non-prior-step-ref
+            :step current-step
+            :ref source-ref}]
+
+          output-key
+          (if (contains? (set (keys (get-in target [:step :outputs] {}))) output-key)
+            []
+            [{:type :missing-output-key
+              :step current-step
+              :ref source-ref
+              :available-outputs (vec (keys (get-in target [:step :outputs] {})))}])
+
+          yield-field
+          (if (contains? (yield-fields (:step target)) yield-field)
+            []
+            [{:type :missing-yield-field
+              :step current-step
+              :ref source-ref
+              :available-yield-fields (vec (yield-fields (:step target)))}])
+
+          :else
+          [])))))
 
 (defn- source-refs-in-source-spec [source-spec]
   (when (and (map? source-spec)
@@ -476,26 +549,34 @@
     :invoke (source-refs-in-invoke-spec (:invoke judge))
     []))
 
-(defn- step-source-refs [step]
-  (concat
-   (case (:type step)
-     :invoke (source-refs-in-invoke-spec (:invoke step))
-     :session (mapcat source-refs-in-contribution
-                      (concat (get-in step [:session :contributions])
-                              (mapcat :contributions (get-in step [:session :prompts]))))
-     :delegate (concat
-                (source-refs-in-source-spec (get-in step [:delegate :target]))
-                (when-let [prompt-string (get-in step [:delegate :prompt-string])]
-                  (case (when (map? prompt-string) (:type prompt-string))
-                    :template (source-refs-in-template-contribution prompt-string)
-                    :map      (mapcat source-refs-in-source-spec
-                                      (vals (:fields prompt-string)))
-                    []))
-                (mapcat source-refs-in-contribution
-                        (get-in step [:delegate :context])))
-     [])
-   (when-let [judge (:judge step)]
-     (source-refs-in-judge judge))))
+(defn- step-body-source-refs
+  "Source refs from a step's assembly-time body (contributions, prompt-group
+   contributions, invoke args, delegate target/prompt-string/context) — NOT its
+   judge. These are validated with the assembly-time same-step prohibition."
+  [step]
+  (case (:type step)
+    :invoke (source-refs-in-invoke-spec (:invoke step))
+    :session (mapcat source-refs-in-contribution
+                     (concat (get-in step [:session :contributions])
+                             (mapcat :contributions (get-in step [:session :prompts]))))
+    :delegate (concat
+               (source-refs-in-source-spec (get-in step [:delegate :target]))
+               (when-let [prompt-string (get-in step [:delegate :prompt-string])]
+                 (case (when (map? prompt-string) (:type prompt-string))
+                   :template (source-refs-in-template-contribution prompt-string)
+                   :map      (mapcat source-refs-in-source-spec
+                                     (vals (:fields prompt-string)))
+                   []))
+               (mapcat source-refs-in-contribution
+                       (get-in step [:delegate :context])))
+    []))
+
+(defn- step-judge-source-refs
+  "Source refs from a step's post-drain `:judge`. Validated with the same-step
+   `:prompt` carve-out (the judge resolves after the drain, task 226 AC-4)."
+  [step]
+  (when-let [judge (:judge step)]
+    (source-refs-in-judge judge)))
 
 (defn- session-prompt-queue-errors
   "Return prompt-queue precedence/naming errors for a session `step` (task 226).
@@ -571,8 +652,11 @@
               structured-cardinality-errors (structured-output-cardinality-errors step)
               reusable-schema-errors* (reusable-schema-errors step)
               prompt-queue-errors (session-prompt-queue-errors step)
-              ref-errors* (mapcat #(ref-errors step-idx step %)
-                                  (step-source-refs step))]
+              ref-errors* (concat
+                           (mapcat #(ref-errors step-idx step false %)
+                                   (step-body-source-refs step))
+                           (mapcat #(ref-errors step-idx step true %)
+                                   (step-judge-source-refs step)))]
           (concat on-without-judge
                   judge-without-routing
                   missing-yields
@@ -748,6 +832,28 @@
     (str "Step '" step "': references yield field " (:yield ref)
          " of step '" (:step ref) "' but that field is not available"
          " (available: " (pr-str available-yield-fields) ")")
+
+    :prompt-ref-non-session-step
+    (str "Step '" step "': :prompt ref targets step '" (:step ref)
+         "' which is not a :session step")
+
+    :prompt-ref-single-prompt-step
+    (str "Step '" step "': :prompt ref targets single-prompt step '" (:step ref)
+         "' which has no named prompt groups")
+
+    :prompt-ref-unknown-group
+    (str "Step '" step "': :prompt ref names group " (pr-str (:prompt ref))
+         " which is not a declared group of step '" (:step ref)
+         "' (available: " (pr-str (:available-groups err)) ")")
+
+    :prompt-ref-non-text-surface
+    (str "Step '" step "': :prompt ref output key " (:output ref)
+         " is not a per-prompt text surface"
+         " (available: " (pr-str (:available-surfaces err)) ")")
+
+    :prompt-ref-same-step
+    (str "Step '" step "': :prompt ref targets the same step being assembled"
+         " (sibling-group refs are only permitted in the step's own post-drain judge)")
 
     :skills-without-read-tool
     (str "Step '" step "': skills require the 'read' tool to be present in :tools")

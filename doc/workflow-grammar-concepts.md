@@ -166,6 +166,7 @@ The core data-flow surface is:
 - `:path`
 - `:projection`
 - `{:step ... :output ...}`
+- `{:step ... :prompt ... :output ...}`
 - `{:step ... :yield ...}`
 
 This data-flow surface is shared across:
@@ -270,6 +271,45 @@ For the first cut:
 - delegate steps do not re-export callee step-local outputs and do not add first-cut step-specific output surfaces beyond any future explicit delegate-local debug/result surface
 
 A reference that selects an output not exposed by that step type is invalid.
+
+### Per-prompt output surfaces (`:prompt` discriminator)
+
+A multi-prompt session step (`:prompts`, see the grammar reference) exposes two
+levels of output surface:
+
+- **step-level** — the unqualified `{:step s :output k}` ref. `:final-llm-reply`
+  is the **last** group's reply; `:transcript` is **accumulated** across every
+  group's turn. This is back-compatible: a no-`:prompt` ref against a
+  multi-prompt step resolves the step-level surface exactly as against a
+  single-prompt step.
+- **per-prompt** — `{:step s :prompt p :output k}` addresses named group `p`'s
+  **turn-local** surface in step `s`: that group's own `:final-llm-reply` and
+  `:transcript` for the turn it ran. `:prompt` is an optional discriminator on
+  the canonical `{:step s :output k}` ref; it lives on the shared data-flow
+  substrate and resolves uniformly wherever a source ref is admitted (invoke
+  args, source contributions, template vars, delegated context).
+
+A `:prompt` ref is invalid (reported fail-fast at workflow load / IR validation)
+when any of the following hold:
+
+- step `s` is **not** a `:session` step;
+- step `s` is **single-prompt** (a `:contributions` step has no named-group
+  namespace);
+- `p` is **not** a declared group of `s`;
+- `k` is **not** a per-prompt text surface (`:final-llm-reply` / `:transcript`)
+  — structured/`:result` keys are not per-prompt-addressable;
+- the ref targets the **same step being assembled** (a sibling-group ref,
+  forward or back) — assembly-time refs cannot see a turn that has not run yet.
+
+**Post-drain judge carve-out.** The one exception to the same-step rule is the
+step's **own post-drain `:judge`**: it *may* address its prompt-groups via
+`{:step s :prompt p :output k}`. The judge resolves **after the drain**, once
+every group's turn is recorded, so the value is present and deterministic —
+unlike an assembly-time contribution/template that would reference a sibling
+turn that has not yet run.
+
+`:prompt` is `:output`-only — it never applies to a `:yield` ref, and the step's
+yielded value is unchanged (text from the step-level `:final-llm-reply`).
 
 ### Yielded value
 

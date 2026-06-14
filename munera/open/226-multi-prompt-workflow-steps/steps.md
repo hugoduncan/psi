@@ -248,30 +248,47 @@ driver but their full retained-records/naming semantics land in Slice 6.
 
 ## Slice 4 — Per-prompt output surfaces + `:prompt` source-ref + validation
 
-- [ ] Implement step-level surfaces (`:final-llm-reply` = last prompt;
+- [x] Implement step-level surfaces (`:final-llm-reply` = last prompt;
   `:transcript` = accumulated) vs per-prompt turn-local surfaces
   (`:final-llm-reply`/`:transcript` = that group's turn slice, B2) in
   `step-output-surfaces`/`step-output-value`.
-- [ ] Add the optional `:prompt` discriminator to `source-ref-schema` /
+  - **Deviation**: step-level surfaces were already built in Slice 3's
+    `post-drain-envelope` (last reply + accumulated transcript). `step-output-value`
+    needed **no** change — per-prompt resolution reuses it over the named group's
+    turn-local outputs map (`step-output-value nil {:outputs turn-local} k`). The
+    actual resolution lives in `workflow-step-materialization/source_resolution.clj`,
+    not `step_execution.clj` (plan touch-point listed the latter; the shared
+    source-ref resolution substrate is in materialization).
+- [x] Add the optional `:prompt` discriminator to `source-ref-schema` /
   `step-output-ref-schema` in `ir.clj` (key on `{:step s :output k}`).
-- [ ] Resolve `{:step s :prompt p :output k}` uniformly across the shared
+- [x] Resolve `{:step s :prompt p :output k}` uniformly across the shared
   substrate (invoke args, contributions source items, template vars, delegated
   context) via the existing source-resolution path — no per-call-site code.
-- [ ] Extend `ref-errors` with `:prompt`-selector validation: invalid when target
+  (Added one `:prompt` clause to `resolve-source-ref`, ordered before the
+  step-level `:output` clause; all call sites inherit it.)
+- [x] Extend `ref-errors` with `:prompt`-selector validation: invalid when target
   step is non-session, single-prompt, unknown group `p`, non-text key `k`
   (structured/`:result`), a `:yield` ref (B1 — `:prompt` is `:output`-only), or
   the **same step being assembled** (sibling-group ref, E3).
-- [ ] Carve out the step's own **post-drain `:judge`** from the same-step invalid
+  - **Deviation**: the `:yield`+`:prompt` invalid case is enforced **structurally**
+    (`:prompt` is on `step-output-ref-schema` only, which requires `:output`), so
+    a `:prompt`+`:yield` ref cannot pass `source-ref-schema` — `unreachable >
+    forbidden`, no dedicated semantic error needed.
+  - Split `step-source-refs` into `step-body-source-refs` + `step-judge-source-refs`
+    so `ref-errors` receives a `judge?` flag (precise carve-out) instead of the
+    pre-existing imprecise flat-list heuristic.
+- [x] Carve out the step's own **post-drain `:judge`** from the same-step invalid
   rule: its `{:step s :prompt p :output k}` refs are permitted (resolves after
   drain, all turns recorded, G2/AC-4).
-- [ ] IR-validation tests for every invalid case + the post-drain-judge carve-out
-  + back-compat (no-`:prompt` ref → step-level surface).
-- [ ] Runtime test: a no-`:prompt` ref against a multi-prompt step hits the
+- [x] IR-validation tests for every invalid case + the post-drain-judge carve-out
+  + back-compat (no-`:prompt` ref → step-level surface). (`prompt-source-ref-validation-test`)
+- [x] Runtime test: a no-`:prompt` ref against a multi-prompt step hits the
   step-level surface; a `:prompt` ref hits the group's turn-local surface.
-- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — per-prompt output surfaces,
+  (`resolve-prompt-discriminated-per-prompt-surface-test`)
+- [x] Docs (P2): `doc/workflow-grammar-concepts.md` — per-prompt output surfaces,
   the `:prompt` source-ref discriminator + its validation rules + the post-drain
   judge carve-out.
-- [ ] `clj-kondo` clean; commit Slice 4.
+- [x] `clj-kondo` clean; commit Slice 4.
 
 ## Slice 5 — Resume-from-progression across process-restart/replay (F1)
 

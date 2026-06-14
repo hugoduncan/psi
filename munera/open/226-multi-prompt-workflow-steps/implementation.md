@@ -1753,3 +1753,45 @@ Landed the in-run drain driver `drive-session-prompt-queue!`, completing Slice 3
   consulting progression each iteration (Slice 5 adds restart/replay re-entry);
   later-group multi-message preloaded-messages not re-injected (submit split
   prompt only); abort dispositions wired but full Slice-6 semantics deferred.
+
+## Slice 4 — Per-prompt output surfaces + `:prompt` source-ref + validation — ψ
+
+Landed the `:prompt` discriminator end-to-end: schema, uniform resolution,
+fail-fast IR validation with the post-drain judge carve-out, tests, docs. All
+workflow-runtime + workflow-step-materialization Scry suites green (149 tests /
+735 assertions); clj-kondo clean.
+
+- **Schema (`ir.clj`).** Added optional `:prompt` (a group name, `:string`) to
+  `step-output-ref-schema`. It is `:output`-only by construction: `:prompt` is
+  not on `step-yield-ref-schema`, and `step-output-ref-schema` requires
+  `:output`, so a `:prompt`+`:yield` ref is **structurally** impossible
+  (`unreachable > forbidden`) — no dedicated semantic error.
+- **Validation (`ir.clj`).** New `prompt-ref-errors` rejects a `:prompt` ref to a
+  non-session step (`:prompt-ref-non-session-step`), a single-prompt step with no
+  named groups (`:prompt-ref-single-prompt-step`), an unknown group
+  (`:prompt-ref-unknown-group`), a non-text key (`:prompt-ref-non-text-surface`,
+  text surfaces = `#{:final-llm-reply :transcript}`), and a same-step sibling-group
+  ref (`:prompt-ref-same-step`) — except the post-drain judge. To make the
+  carve-out **precise**, `step-source-refs` was split into `step-body-source-refs`
+  (validated with the assembly-time same-step prohibition, `judge? false`) and
+  `step-judge-source-refs` (`judge? true`, same-step `:prompt` permitted);
+  `ref-errors` gained the `judge?` param and dispatches `:prompt` refs to
+  `prompt-ref-errors`. `format-semantic-error` gained the five new cases.
+- **Resolution (`workflow-step-materialization/source_resolution.clj`).**
+  `resolve-source-ref` gained one `:prompt` clause (ordered **before** the
+  step-level `:output` clause, since both carry `:output`): it looks up the named
+  group in `accepted-result[:outputs][:prompt-group-outputs]` (the Slice-3
+  post-drain envelope shape) and resolves the text key via
+  `step-output-value nil {:outputs turn-local} k`. All shared call sites (invoke
+  args, contributions, template vars, delegated context) inherit it through this
+  one substrate fn — no per-call-site code.
+- **Surfaces unchanged.** `step-output-surfaces`/`step-output-value` needed **no**
+  per-prompt change: step-level surfaces are already produced by Slice 3's
+  `post-drain-envelope`, and per-prompt resolution reuses `step-output-value` over
+  the turn-local outputs map.
+- **Tests.** `ir-test/prompt-source-ref-validation-test` (valid prior-group ref,
+  back-compat no-`:prompt`, unknown group, non-text key, single-prompt,
+  non-session, same-step-in-contribution rejected, judge carve-out accepted);
+  `source-resolution-test/resolve-prompt-discriminated-per-prompt-surface-test`
+  (no-`:prompt` → step-level last/accumulated; `:prompt` → that group's turn-local
+  surface).
