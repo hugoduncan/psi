@@ -63,3 +63,8 @@
 - [x] Run `clj-kondo --lint` on all touched Clojure source and test files and fix lint findings.
 - [x] Re-read all touched workflow markdown/EDN files to verify no stale step names or illegal per-prompt `:yield` refs remain.
 - [x] Append concise implementation notes to this task's `implementation.md` covering key decisions, verification commands, and any deviations from the plan.
+
+## Test review follow-up
+
+- [ ] T1: Strengthen prompt-contract tests for the merged design review prompts so they lock each required prompt behavior from design.md/Slice 3, not just weak substrings. Cover that the architecture prompt names `AGENTS.md`, `META.md`, and `doc/architecture.md`; ambiguity reuses the architecture-review reply and only targeted re-reads missing/ambiguous/stale facts; inconsistency reuses both prior review replies and only targeted re-reads missing/stale facts; and ambiguity/inconsistency, like architecture, end with the exact two-line `PASS_STATUS: ACTIONABLE_FEEDBACK|REVIEW_COMPLETE` menu.
+- [ ] T2: Replace the new/updated merged design-review runtime routing tests' global `with-redefs` stubbing of `psi.agent-session.turn/prompt-execution-result-in!` with the existing injectable nullable actor-turn seam (for example `:workflow-execute-actor-turn-fn` on the test ctx, or an equivalent project-approved nullable boundary) so the tests keep workflow execution real while disabling provider infrastructure without mocks/stubs.
