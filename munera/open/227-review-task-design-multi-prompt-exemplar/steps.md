@@ -11,16 +11,16 @@
 
 ## Slice 2 — Merged workflow topology
 
-- [ ] Rewrite `.psi/workflows/review-task-design.edn` so the review loop contains `design-review`, `design-follow-up`, and `final-summary` only.
-- [ ] Configure `design-review` as a `:session` step with step-level tools `read`, `bash`, `edit`, `write`.
-- [ ] Configure `design-review` with step-level skills `work-independently`, `review-task-architecture`, and `task-design`.
-- [ ] Add three ordered `:prompts` groups to `design-review`: `architecture`, `ambiguity`, and `inconsistency`, each referencing the existing corresponding review prompt markdown file.
-- [ ] Attach a post-drain `workflow/pass-feedback-routing` judge to `design-review` with args sourced from each prompt's `:final-llm-reply` output.
-- [ ] Route `design-review` `REPEAT` to `design-follow-up` and `DONE` to `final-summary`.
-- [ ] Add `design-follow-up` as a single design-profile session step using `review-follow-up-design.md` and a constant `DONE` judge.
-- [ ] Route `design-follow-up` `DONE` back to `design-review` with `:max-iterations 6` on that transition.
-- [ ] Migrate `final-summary` source contributions from the removed per-phase step `:yield` refs to per-prompt output refs on `design-review` for `architecture`, `ambiguity`, and `inconsistency`.
-- [ ] Remove stale references in `review-task-design.edn` to `architecture-review`, `architecture-follow-up`, `ambiguity-review`, `ambiguity-follow-up`, `inconsistency-review`, `inconsistency-follow-up`, and `clarity-status`.
+- [x] Rewrite `.psi/workflows/review-task-design.edn` so the review loop contains `design-review`, `design-follow-up`, and `final-summary` only.
+- [x] Configure `design-review` as a `:session` step with step-level tools `read`, `bash`, `edit`, `write`.
+- [x] Configure `design-review` with step-level skills `work-independently`, `review-task-architecture`, and `task-design`.
+- [x] Add three ordered `:prompts` groups to `design-review`: `architecture`, `ambiguity`, and `inconsistency`, each referencing the existing corresponding review prompt markdown file.
+- [x] Attach a post-drain `workflow/pass-feedback-routing` judge to `design-review` with args sourced from each prompt's `:final-llm-reply` output.
+- [x] Route `design-review` `REPEAT` to `design-follow-up` and `DONE` to `final-summary`.
+- [x] Add `design-follow-up` as a single design-profile session step using `review-follow-up-design.md` and a constant `DONE` judge.
+- [x] Route `design-follow-up` `DONE` back to `design-review` with `:max-iterations 6` on that transition.
+- [x] Migrate `final-summary` source contributions from the removed per-phase step `:yield` refs to per-prompt output refs on `design-review` for `architecture`, `ambiguity`, and `inconsistency`.
+- [x] Remove stale references in `review-task-design.edn` to `architecture-review`, `architecture-follow-up`, `ambiguity-review`, `ambiguity-follow-up`, `inconsistency-review`, `inconsistency-follow-up`, and `clarity-status`.
 
 ## Slice 3 — Prompt contracts
 
