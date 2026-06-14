@@ -134,3 +134,27 @@ slice.
 - [ ] Confirm AC-1..AC-8 each have covering tests (ordering, drain, N=1
   equivalence, per-prompt addressing + validation, intermediate-failure abort,
   inter-prompt cancellation, resume-from-progression idempotency, docs).
+
+## Plan-review follow-ups (ambiguity, pass 1)
+
+- [ ] P1 — Decide and state in plan.md (Slice 1/2 + Touch points) which component
+  owns prompt-queue normalization: `:contributions`/`:prompt-workflow` → unnamed
+  group and `:prompts` → named groups as workflow-loader compilation
+  (`compiler.clj`) vs workflow-runtime IR shaping (`ir.clj`). Replace the
+  "`compiler.clj` +/or `ir.clj`" with a single owner per the workflow-runtime
+  boundary; `λone_way`.
+- [ ] P2 — Clarify in plan.md (Slice order note + Slice 7) whether author-facing
+  `doc/workflow-grammar*.md` is updated incrementally per slice (change_chain
+  "spec") or consolidated in Slice 7; if incremental, state what each earlier
+  slice documents; if Slice 7-only, reconcile with the per-slice "update spec
+  (grammar docs)" change_chain wording.
+- [ ] P3 — Specify the Slice-1 equivalence-baseline artifact: name the concrete
+  mechanism (committed characterization/snapshot test pinning the
+  `:pending-actor-result` envelope shape, or an asserted-shape test) that R4's
+  "treat any diff as a defect" compares against, and make it the Slice-1
+  done-gate comparand rather than only "suite green unchanged".
+- [ ] P4 — Disambiguate the Slice 3 / Slice 5 boundary: state whether Slice 3
+  builds the in-run suspend/resume drain (Slice 5 adds only process-restart/replay
+  resume) or whether the resume-from-progression mechanism must land with Slice 3;
+  give each slice an independently testable acceptance for the shared
+  N-suspend-point mechanism (design F1).

@@ -607,3 +607,59 @@ Executed C3 by updating design.md (completed; not blocked).
   Grammar Step-level precedence (`:contributions` → unnamed group, step-level
   surfaces only). Edit: Architecture-alignment "Per-turn results are recorded"
   bullet.
+
+## Plan/steps ambiguity review (pass 1) — ψ
+
+Reviewed plan.md + steps.md for ambiguities (statements admitting >1
+interpretation, undefined terms, unspecified execution edge behaviour),
+distinct from the design-review passes (A1–A3/B1–B5/C1–C3/D1–D2/E1–E3/F1/G1–G2,
+all resolved or moved to 227). First plan-level pass. Four new actionable
+ambiguities found (P1–P4); recorded as unchecked items in steps.md.
+Verified-clear: per-prompt records keyed-by-`:name`-for-named-only (Slice 3 step
+matches design C3); abort-path outcomes (Slice 6) match AC-5/AC-6; touch points
+ground against real code (`ir.clj` `ref-errors`/`semantic-errors`/
+`step-output-surfaces`, `compiler.clj` markdown-session/`:prompt-workflow`
+compile, `step_execution.clj`/`statechart_runtime.clj` session branch).
+
+- **P1 — Normalization ownership undecided (`compiler.clj` +/or `ir.clj`).**
+  Slice 1's IR-normalization step writes "Normalize … at IR/compile time
+  (`compiler.clj` +/or `ir.clj`)", and the Touch points list both files. But the
+  two live in different components (`compiler.clj` = workflow-loader;
+  `ir.clj` = workflow-runtime) and the workflow-runtime boundary
+  (`λ workflow_runtime_boundary`) makes the loader-vs-runtime split load-bearing.
+  The plan never decides which component owns the `:contributions`/`:prompt-workflow`
+  → unnamed-group queue normalization (and, in Slice 2, `:prompts` → named-group
+  normalization), so a reader cannot tell whether normalization is authored-form
+  compilation (loader) or runtime IR shaping (runtime). `λone_way` wants a
+  singular owner.
+- **P2 — Author-facing grammar docs: per-slice spec vs the dedicated Slice 7.**
+  The Slice-order closing note says "Each slice follows the change_chain: update
+  spec (grammar docs/examples as needed) → tests → code → … → docs", implying
+  every slice touches `doc/workflow-grammar*.md`. But Slice 7 is a dedicated
+  "Docs" slice that writes the `:prompts` form, per-prompt surfaces, `:prompt`
+  source-ref, drain/route, and resume contract. It is ambiguous whether the
+  author-facing grammar docs are updated incrementally per slice (as the
+  change_chain "spec") or deferred wholesale to Slice 7 — and which "spec" each
+  earlier slice updates if grammar docs wait. Affects every slice's done-gate.
+- **P3 — Slice-1 equivalence "baseline" artifact/mechanism unspecified.** Slice 1
+  step 1 says "capture the existing `execute-session-step!` envelope shape … under
+  a green run of `…step_execution_test.clj` as the equivalence baseline", and R4
+  says "treat any diff as a defect". But the baseline's concrete form is undefined:
+  a committed characterization/golden snapshot test, an asserted-shape test, or an
+  informal recorded note. Without a concrete committed reference, "any diff is a
+  defect" has no enforceable comparand, and the Slice-1 done-gate ("full existing
+  session-step suite green unchanged") may not actually pin the envelope shape the
+  N=1 path must reproduce.
+- **P4 — Slice 3 "sequential N-turn drain" vs Slice 5 "resume-from-progression":
+  what each slice independently delivers is ambiguous.** Each turn is an async
+  `ai/generate` effect that suspends the run (design F1: "N prompts = N suspend
+  points inside the one statechart step"), so advancing from prompt _n_ to _n+1_
+  already requires a suspend/resume re-entry that consults recorded progression to
+  pick the next un-run prompt. Slice 3 ("run prompt _n+1_ after prompt _n_
+  completes … emit one post-drain result") presupposes that re-entry, yet the
+  resume-from-progression contract (consult progression, continue at next un-run
+  prompt, no `ai/generate` re-fire) is deferred to Slice 5. It is unspecified
+  whether Slice 3 already builds the in-run suspend/resume drain (leaving Slice 5
+  to add only the process-restart/replay case) or whether Slice 3's drain is
+  unrealizable without Slice 5 (mis-drawn slice boundary). The two slices'
+  independent acceptance and the shared suspend mechanism are not disambiguated.
