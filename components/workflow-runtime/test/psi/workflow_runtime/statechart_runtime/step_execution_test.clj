@@ -487,6 +487,97 @@
         (is (string? (get-in payload [:outputs :final-llm-reply])))
         (is (= :actor/done (:event (first @event-queue*))))))))
 
+(deftest single-prompt-session-step-envelope-characterization-test
+  ;; Task 226 Slice 1 (P3/R4) — equivalence-baseline characterization. Pins the
+  ;; ASSERTED SHAPE of the single-prompt `execute-session-step!`
+  ;; `:pending-actor-result` envelope (not a full-content golden snapshot): the
+  ;; presence/shape of `:final-llm-reply`/`:text`/`:transcript` for a
+  ;; representative text step, and the structured `:outputs` keys for a
+  ;; representative structured step. The unified N=1-degenerate prompt-queue path
+  ;; (Slice 1) MUST keep this green unchanged; any change to the asserted envelope
+  ;; shape is a defect (R4). This is the Slice-1 done-gate comparand.
+  (testing "single-prompt text session step yields the canonical step-level rollup envelope"
+    (let [working-memory* (atom {:current-step-id "summarize"})
+          event-queue* (atom [])
+          assistant-message {:role "assistant"
+                             :content [{:type :text :text "the summary"}]}]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx _session-id _prompt]
+                      {:status :ok
+                       :assistant-text "the summary"
+                       :execution-result nil
+                       :assistant-message assistant-message})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "summarize"
+          :type :session
+          :outputs {:final-llm-reply {:source :session/final-llm-reply}
+                    :transcript {:source :session/transcript}}
+          :yields {:type :text :text :final-llm-reply}}
+         "summarize"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Summarize"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)
+            outputs (:outputs payload)]
+        ;; pending-actor-result envelope shape
+        (is (= :success (:kind pending)))
+        (is (= "summarize" (:step-id pending)))
+        (is (= "attempt-1" (:attempt-id pending)))
+        (is (= :ok (:outcome payload)))
+        ;; step-level text surfaces
+        (is (= "the summary" (:final-llm-reply outputs)))
+        (is (= "the summary" (:text outputs)))
+        (is (= [assistant-message] (:transcript outputs)))
+        (is (= "child-session" (:session-id outputs)))
+        (is (contains? outputs :logprobs))
+        (is (= :actor/done (:event (first @event-queue*)))))))
+
+  (testing "single-prompt structured session step binds the declared structured output key"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          ai-structured-output {:strategy :provider-native
+                                :native-mechanism :openai/chat-completions-json-schema-response-format
+                                :source :openai/message-content
+                                :payload {"decision" "pass"}
+                                :raw-payload "{\"decision\":\"pass\"}"}]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx _session-id _prompt _opts]
+                      {:status :ok
+                       :assistant-text "{\"decision\":\"pass\"}"
+                       :structured-output ai-structured-output
+                       :execution-result {:execution-result/structured-output ai-structured-output}
+                       :assistant-message nil})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)
+            classification (get-in payload [:outputs :classification])]
+        (is (= :success (:kind pending)))
+        (is (= :ok (:outcome payload)))
+        ;; structured output key present and valid in the envelope outputs
+        (is (contains? (:outputs payload) :classification))
+        (is (= :valid (get-in classification [:structured-output :status])))
+        (is (= {:decision :pass} (get-in classification [:structured-output :value])))
+        (is (= :actor/done (:event (first @event-queue*))))))))
+
 (deftest assistant-message-text-test
   (testing "assistant-message-text delegates to turn-execution-contract"
     (is (= "hello world"
