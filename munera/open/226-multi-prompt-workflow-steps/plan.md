@@ -38,7 +38,14 @@ before N>1, addressing, resume, and abort paths are layered on.
 - **Turn boundary unchanged**: each group reuses
   `materialize-step-session-conversation` + `split-step-session-conversation`;
   the first group loads shared sources on turn 1, later groups run against the
-  same live child session (E1 — no `:preload` field).
+  same live child session (E1 — no `:preload` field). **"Shared sources" (P11):**
+  the first group's turn-1 materialized conversation — the first prompt-group body
+  materialized **with** the session-level system/skill/tool content — persists in
+  the live child session and is seen by later groups via conversation memory. It
+  is **not** a step-level shared `:contributions`/preamble/`:preload` (forbidden
+  by the step-level `:contributions` xor `:prompts` rule; no `:preload` field), so
+  "first group loads shared sources" does not contradict the
+  no-step-level-preamble rule.
 - **Per-prompt records in the canonical progression substrate** (A3/F1): the
   step emits **one** post-drain `:pending-actor-result` carrying the step-level
   rollup plus, for named groups only, ordered per-prompt turn records keyed by
@@ -237,7 +244,15 @@ before N>1, addressing, resume, and abort paths are layered on.
 6. **Abort paths.** Intermediate-turn error ⇒ `:failed` naming the failing
    prompt, routing skipped, prior records retained, no failing record (AC-5/G1);
    inter-prompt cancellation ⇒ terminal `:cancelled`, routing skipped, completed
-   records retained (AC-6/B5).
+   records retained (AC-6/B5). **Final/last-turn + N=1 error (P10).** A turn
+   error at **any** position — including the **last** prompt of an N>1 queue —
+   follows the same `:failed` abort (drain never completes ⇒ post-drain route not
+   reached ⇒ routing skipped; prior records retained; failing prompt leaves no
+   record): AC-5's "intermediate" means "any non-completing turn", not "strictly
+   not-last". The **N=1 degenerate** (unnamed group) takes the same unified
+   `:failed` abort with no prompt name in the payload, which is byte-equivalent
+   to today's single-prompt failure route — preserving the AC-2 N=1 equivalence
+   with no separate single-prompt failure path.
 7. **Docs consolidation + changelog + coherence.** Final coherence pass over the
    incrementally-written author-facing docs (cross-link, fill gaps), the CHANGELOG
    `[Unreleased] Added` entry (user-visible grammar capability), and the
@@ -276,6 +291,31 @@ Each slice follows the change_chain: update spec (author-facing grammar docs
 (IR-validation + runtime) → code → review/simplify → docs → verify coherence.
 Lint (`clj-kondo`) + `clj-paren-repair` after edits; run the relevant Scry suites
 per slice; commit per slice.
+
+**Per-slice Scry gating (P9) — gate on each edited component's suite.** The
+"relevant Scry suite per slice" is, concretely, the Scry suite of **every
+component the slice edits** (the slice's commit must be green across all of
+them). This is a per-component rule, distinct from Slice 1's focused
+`step_execution_test.clj` namespace gate (P7) and from Final verification's
+full three-component run:
+
+- **Slice 1** — focused `psi.workflow-runtime.statechart-runtime.step-execution-test`
+  namespace only (P7), the characterization-test done-gate.
+- **Slice 2** — **workflow-loader** + **workflow-runtime** Scry suites (edits
+  `compiler.clj` and `ir.clj`).
+- **Slice 3** — **workflow-runtime** + **workflow-step-materialization** Scry
+  suites (edits `step_execution.clj`/`statechart_runtime.clj`/
+  `progression_recording.clj`/`statechart.clj` and the per-group
+  materialization in `core.clj`).
+- **Slice 4** — **workflow-runtime** Scry suite (edits `ir.clj` source-ref
+  schema/validation/surfaces and `step_execution.clj` surface resolution).
+- **Slice 5** — **workflow-runtime** Scry suite (resume/replay re-entry in
+  `statechart_runtime.clj` + `progression_recording.clj`).
+- **Slice 6** — **workflow-runtime** Scry suite (abort/cancellation in
+  `step_execution.clj`).
+
+A slice that grows to touch a component not listed above adds that component's
+Scry suite to its gate.
 
 ## Final verification
 

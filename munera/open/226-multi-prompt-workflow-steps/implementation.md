@@ -1054,3 +1054,39 @@ is well-defined.
   session-level system/skill/tool content — which persists in the live child
   session for later groups"), so the no-step-level-preamble rule and the
   "shared sources" wording do not appear to contradict.
+
+## Plan/steps ambiguity follow-up execution (pass 3) — ψ
+
+Executed P9–P11 by updating plan.md + steps.md (all completed; none blocked). No
+code/test/doc changes were required — these are plan-disambiguation follow-ups.
+
+- **P9 (done).** Defined per-slice Scry gating as a **per-component rule**: each
+  slice's gate is the Scry suite of **every component it edits**. Slice 1 = the
+  focused `step_execution_test.clj` namespace only (P7); Slice 2 = workflow-loader
+  + workflow-runtime (edits `compiler.clj` + `ir.clj`); Slice 3 = workflow-runtime
+  + workflow-step-materialization (edits `step_execution`/`statechart_runtime`/
+  `progression_recording`/`statechart` + per-group `core.clj` materialization);
+  Slices 4–6 = workflow-runtime. Stated this is distinct from Slice 1's focused
+  namespace gate and Final verification's full three-component run, with a "grows
+  to touch a new component → add its suite" rule. Added a "Per-slice Scry gating
+  (P9)" note to plan.md (after the docs-cadence note) and a header note to
+  steps.md.
+- **P10 (done).** Specified final/last-turn + N=1 error abort, reconciled with
+  AC-5/AC-2: a turn error at **any** position (incl. the last prompt of an N>1
+  queue) follows the **same** `:failed` abort as the intermediate case — the drain
+  never completes, so the post-drain route is not reached (routing skipped), prior
+  records retained, failing prompt leaves no record. AC-5's "intermediate" = "any
+  non-completing turn", not "strictly not-last". The N=1 degenerate takes the same
+  unified `:failed` abort with no prompt name in the payload, byte-equivalent to
+  today's single-prompt failure route (preserves AC-2 N=1 equivalence; no separate
+  single-prompt failure path). Added a Slice 6 steps item and extended plan.md
+  Slice 6.
+- **P11 (done).** Defined "shared sources" (design E1): the **first turn's
+  materialized conversation** — first prompt-group body materialized **with** the
+  session-level system/skill/tool content — submitted on turn 1 and persisting in
+  the live child session, seen by later groups via conversation memory. **Not** a
+  step-level shared `:contributions`/preamble/`:preload` (forbidden by the
+  step-level xor; no `:preload` field), so "first group loads shared sources" and
+  the no-step-level-preamble rule do not contradict. Added the definition to
+  steps.md Slice 3 preamble and the plan.md "Turn boundary unchanged" key
+  decision.

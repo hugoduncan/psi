@@ -5,6 +5,13 @@ and verifiable. Tick with a sha/decision note as completed. Run `clj-kondo` +
 `clj-paren-repair` after edits; run the relevant Scry suite per slice; commit per
 slice.
 
+**Per-slice Scry gating (P9):** the "relevant Scry suite" for each slice is the
+Scry suite of **every component that slice edits** (see plan.md "Per-slice Scry
+gating"): Slice 1 = the focused `step_execution_test.clj` namespace only (P7);
+Slice 2 = workflow-loader + workflow-runtime; Slice 3 = workflow-runtime +
+workflow-step-materialization; Slices 4–6 = workflow-runtime. Distinct from Final
+verification's full three-component run.
+
 ## Slice 1 — Unified single-prompt queue path (N=1 degenerate)
 
 - [ ] Characterize current single-prompt behaviour: add a **committed
@@ -67,6 +74,17 @@ Slice 3 builds the **in-run** suspend/resume drain mechanism (P4): because each
 turn is an async `ai/generate` that suspends the run, advancing _n_ → _n+1_
 re-enters the acting state and consults recorded progression to pick the next
 un-run prompt. Slice 5 adds only the process-restart/replay resume case on top.
+
+**"Shared sources" defined (P11, design E1).** Throughout Slice 3, "first group
+loads shared sources" means the **first turn's materialized conversation** — the
+first prompt-group's body materialized **together with** the session-level
+system/skill/tool content — submitted on turn 1 and then **persisting in the live
+child session** so later groups see it via conversation memory. It is **not** a
+step-level shared `:contributions`/preamble/`:preload` (the step-level
+`:contributions` xor `:prompts` rule forbids one, and the grammar has no
+`:preload` field). So "first group loads shared sources" and the
+no-step-level-preamble rule do **not** contradict: the sharing mechanism is
+live-session conversation memory, not an authored shared preamble.
 
 - [ ] Extend the queue driver in `execute-session-step!` to run prompt _n+1_
   after prompt _n_ completes, against the **same** child session id (first group
@@ -166,6 +184,19 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
 - [ ] Intermediate-turn error ⇒ stop queue, step `:failed` with payload naming
   the failing prompt, routing skipped; prior per-prompt records retained, failing
   prompt leaves **no** record (AC-5/G1).
+- [ ] **Final/last-turn error + N=1 error semantics (P10), reconciled with
+  AC-5/AC-2.** A turn error at **any** queue position — including the **final
+  (last) prompt** of an N>1 queue — follows the **same** `:failed` abort as the
+  intermediate case: the drain never completes successfully, so the post-drain
+  route is **not** reached (routing skipped), per-prompt records for prompts
+  completed before the failing one are retained and introspectable, and the
+  failing (last) prompt leaves **no** record — identified only by the `:failed`
+  payload. "Intermediate" in AC-5 is therefore "any non-completing turn", not
+  "strictly not-last". For the **N=1 degenerate** (unnamed `:contributions`
+  group): the same unified `:failed` abort applies, but with no named group the
+  `:failed` payload names no prompt (no `:name`), so the outcome is byte-
+  equivalent to today's pre-existing single-prompt failure route — preserving the
+  AC-2 N=1 equivalence (no separate single-prompt failure path is retained).
 - [ ] Inter-prompt cancellation ⇒ terminal `:cancelled` (distinct from
   `:failed`), routing skipped, completed per-prompt records retained +
   introspectable, in-flight turn aborted per existing cancellation contract
@@ -307,7 +338,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (ambiguity, pass 3)
 
-- [ ] P9 — Define which component Scry suite(s) gate Slices 2–6 in plan.md
+- [x] P9 — Define which component Scry suite(s) gate Slices 2–6 in plan.md
   (change_chain note) + steps.md (header): the per-slice "relevant Scry suite" is
   unnamed for Slices 2–6 even though the work spans multiple components (Slice 2
   edits both workflow-loader `compiler.clj` and workflow-runtime `ir.clj`; Slices
@@ -315,13 +346,13 @@ consolidates them — it does not first-author them.
   slice or as a per-component rule, which Scry suite(s) must be green to gate each
   non-Slice-1 slice — distinct from Slice 1's focused `step_execution_test.clj`
   gate (P7) and Final verification's three-suite run.
-- [ ] P10 — Specify the **final/last-turn** error abort semantics in Slice 6,
+- [x] P10 — Specify the **final/last-turn** error abort semantics in Slice 6,
   reconciled with AC-5/AC-2: Slice 6 covers only the "intermediate-turn error"
   path, leaving undefined whether a last-prompt turn error (N>1) and the N=1
   single-turn error follow the same `:failed`-naming-the-prompt abort (routing
   skipped, prior records retained) or the pre-existing single-prompt failure
   route. State the outcome for a final/last-turn error and for the N=1 degenerate.
-- [ ] P11 — Define "shared sources" in steps.md Slice 3 (and plan.md), since the
+- [x] P11 — Define "shared sources" in steps.md Slice 3 (and plan.md), since the
   design forbids any step-level shared `:contributions`/preamble/`:preload`:
   clarify that "first group loads shared sources" means the session's first-turn
   materialized conversation (first group body + session-level system/skill/tool
