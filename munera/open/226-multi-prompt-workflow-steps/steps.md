@@ -428,6 +428,26 @@ consolidates them — it does not first-author them.
   before cancellation are retained + introspectable. Make the cancellation path's
   in-flight-record disposition as explicit as AC-5 makes the failure path's.
 
+## Plan-review follow-ups (ambiguity, pass 5)
+
+- [ ] P13 — Specify the structured-output `:blocked` outcome across the
+  multi-prompt drain (plan Slice 3/Slice 6 + steps Slice 6, reconciled with
+  AC-3/AC-5). `execute-session-step!` has a third non-success outcome besides
+  `:error`/`:failed` and `:cancelled`: `:actor/blocked`, raised for (i) an
+  invalid structured-output **request** (`(:ok? request-result)` false, a static
+  pre-turn check today), (ii) `:unsupported-structured-output` (resolved model
+  cannot do structured output), and (iii) `:invalid-structured-output` (final
+  reply fails validation). With "structured `:outputs` on the final turn only"
+  (P5), state (a) **when** structured-output viability is checked in the drain —
+  the upfront static request-validity / blocked check before turn 1 (fail-fast,
+  no wasted turns) vs deferred to the final turn — and (b) the `:blocked`
+  disposition when the **final** turn blocks after N−1 turns already ran: the
+  step outcome (terminal `:blocked`, distinct from `:failed`/`:cancelled`),
+  whether routing is skipped, and whether prior completed per-prompt records are
+  retained + introspectable (symmetric with AC-5/AC-6). Add `:blocked` to Slice
+  6's abort-path enumeration (currently only `:failed`/`:cancelled`) with a
+  covering test.
+
 ## Plan-review follow-ups (inconsistency, pass 4)
 
 - [x] PI11 — Reword plan.md P9 ("Per-slice Scry gating") **Slice 5** so it stops

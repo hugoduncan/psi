@@ -1326,3 +1326,54 @@ inconsistent edited-files attribution.
   production-file edit. This matches steps Slice 5 (all confirm/verify/test, no
   production-edit item; "boundary unchanged from Slice 3") and PI10's Slice-3
   treatment of the same `statechart_runtime.clj`. Edit: plan.md P9 Slice 5 bullet.
+
+## Plan/steps ambiguity review (pass 5) — ψ
+
+Re-reviewed plan.md + steps.md for ambiguities against design.md ACs and the
+current `execute-session-step!` code. Distinct from ambiguity passes 1–4
+(P1–P12, resolved) and inconsistency passes 1–4 (PI1–PI11, resolved). **One**
+new actionable ambiguity found (P13); recorded as an unchecked item in steps.md
+(new "ambiguity, pass 5" section). Verified-clear (re-checked, no new
+ambiguity): P11's "shared sources" reconciles with the persistent child-session
++ per-group `materialize-step-session-conversation` (system/skill/tool content
+is established at session creation on turn 1, not re-embedded by later groups);
+per-prompt `:transcript`/`:final-llm-reply` turn-local surfaces map onto the
+existing per-turn `{:transcript [assistant-message] :final-llm-reply
+assistant-text}` shape (turn-local already; step-level accumulation is the new
+part); P5 final-turn detection (static IR position) and P8 non-re-fire observable
+remain unambiguous.
+
+- **P13 — the structured-output `:blocked` outcome is unspecified across the
+  multi-prompt drain (plan Slice 3/Slice 6, AC-3/AC-5).** `execute-session-step!`
+  has a **third** non-success step outcome besides `:error`/`:failed` and the new
+  `:cancelled`: `:actor/blocked` (`record-actor-pending! … :blocked …`), raised
+  in three current cases — (i) `(false? (:ok? request-result))` (the structured-
+  output *request* is itself invalid, a static check done **before** the turn
+  today), (ii) `:unsupported-structured-output` (the resolved model cannot do
+  structured output), and (iii) `:invalid-structured-output` (the final reply
+  fails structured-output validation). Slice 3 says "request structured
+  `:outputs` on the **final** turn only" (P5) and Slice 6 "Abort paths" enumerates
+  only `:failed` (turn error, any position incl. last, P10) and `:cancelled`
+  (inter-/in-flight, P12) — **`:blocked` is named nowhere** in design/plan/steps.
+  Two sub-questions are left genuinely two-way for an implementer:
+  - **(a) When is structured-output viability checked in the drain?** Today the
+    upfront `(:ok? request-result)` static check and the structured request gate
+    run **before** the single turn. With "structured on the final turn only",
+    does the static request-validity / blocked check (case i) still run **upfront
+    before turn 1** (fail-fast, no turns wasted), or is it deferred to the final
+    turn so an invalid structured-output spec only blocks after N−1 turns already
+    ran? The plan does not say.
+  - **(b) What is the multi-prompt `:blocked` disposition?** When the **final**
+    turn yields `:unsupported-structured-output` or `:invalid-structured-output`
+    (cases ii/iii) after N−1 prior turns completed, what is the step outcome and
+    record/routing disposition? By analogy with AC-5/AC-6 one would expect:
+    terminal `:blocked` (distinct from `:failed`/`:cancelled`), routing skipped,
+    prior completed per-prompt records retained + introspectable, the final
+    prompt leaving no successful turn record — but none of this is stated, and
+    Slice 6's "Abort paths" omits `:blocked` entirely, so a reader cannot tell
+    whether `:blocked` retains prior records like `:failed`/`:cancelled` or
+    discards them, nor whether it skips routing. Resolve by (a) stating where the
+    upfront structured-request-validity check runs (recommended: before turn 1,
+    fail-fast) and (b) adding the `:blocked` outcome to Slice 6's abort-path
+    enumeration with explicit retained-records + routing-skipped disposition
+    symmetric to AC-5/AC-6, and a covering test.
