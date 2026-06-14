@@ -908,3 +908,25 @@ consolidates them — it does not first-author them.
   `some? :structural-errors` ∧ `[] :semantic-errors`. Updated
   `doc/workflow-grammar-concepts.md` to state the structural rejection. Full
   workflow-runtime suite 132 tests / 719 assertions green; `clj-kondo` clean.
+
+## Test-review follow-ups (pass 2)
+
+- [ ] TR-3 — Add a behaviour-coverage assertion for design C3 (AC-2/AC-3): the
+  N=1 unnamed `:contributions` `execute-session-step!` envelope carries **no**
+  `:prompt-group-outputs` (per-prompt records are named-`:prompts`-only). Add
+  `(is (not (contains? outputs :prompt-group-outputs)))` to both `testing` blocks
+  of `single-prompt-session-step-envelope-characterization-test`
+  (`step_execution_test.clj`), or a focused test, so a refactor leaking
+  per-prompt records into the degenerate envelope is caught. Currently the
+  absence is asserted nowhere (only the IR-level no-`:name` derivation and the
+  presence of step-level keys are pinned).
+- [ ] TR-4 — Re-base the hand-rolled run/attempt `state*` fixtures in
+  `step_execution_drive_prompt_queue_test.clj` +
+  `step_execution_drive_prompt_queue_abort_test.clj` (`running-attempt-state*`,
+  `recorded-turns-state*`) onto the canonical constructors (`create-run` +
+  `append-attempt-to-run` + `start-latest-attempt`, as `progression_recording_test`
+  / `base-state-with-run` already does), layering recorded `:prompt-group-turns`
+  on top for the resume/replay cases. This couples the drive/abort tests to the
+  real run/attempt shape the production `latest-attempt`-based readers navigate,
+  so a canonical-shape change can't leave the tests green against a stale
+  literal while production breaks.

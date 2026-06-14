@@ -2373,3 +2373,52 @@ gaps found:
     carve-out.
   - **Verification:** full workflow-runtime suite 132 tests / 719 assertions
     green; `clj-kondo` clean on all edited files.
+
+## Test review (task-test-review skill) — pass 2
+
+Re-applied `λ review_tests` (well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps injectable/nullable/¬mock/¬stub) across the task test suite after the
+pass-1 T-1/T-2 fixes. Infra-deps are clean: the drive/abort suites inject the
+nullable `:workflow-execute-actor-turn-fn` ctx seam (¬stub), assert on
+state/outputs only (event-queue, working-memory, recorded progression — never
+interactions), and drive **real** functions (`record-prompt-group-turn`,
+`next-un-run-prompt-group`, `split-step-session-conversation`, `create-run` +
+source resolution). Two **new** actionable gaps found (TR-3, TR-4); recorded as
+unchecked items in steps.md.
+
+- **TR-3 (behaviour-coverage gap): no runtime test asserts the N=1
+  unnamed/`:contributions` envelope omits `:prompt-group-outputs` (design C3).**
+  Design C3 makes it load-bearing that the unnamed group "contributes **only** the
+  step-level rollup and **no** addressable per-prompt record" — the unified-path
+  result-shape consistency for the degenerate. `session-step-prompt-queue-derivation-test`
+  pins the *IR* derivation (group has no `:name`), and
+  `single-prompt-session-step-envelope-characterization-test` pins the *presence*
+  of step-level keys (`:final-llm-reply`/`:text`/`:transcript`), but **nothing**
+  asserts the *absence* of `:prompt-group-outputs` from the N=1
+  `execute-session-step!` envelope. A refactor that leaked an (empty or populated)
+  `:prompt-group-outputs` into the degenerate envelope would go uncaught,
+  silently violating C3 / the named-only addressing contract. Add an assertion
+  (`(is (not (contains? outputs :prompt-group-outputs)))`) to the characterization
+  test's text/structured blocks (or a focused test), completing AC-2/AC-3 N=1
+  no-per-prompt-record coverage.
+
+- **TR-4 (robustness / shape-drift): drive + abort test fixtures hand-roll the
+  canonical run/attempt `state*` instead of deriving it from the real
+  constructors.** `running-attempt-state*` / `recorded-turns-state*` (in
+  `step_execution_drive_prompt_queue_test.clj` +
+  `step_execution_drive_prompt_queue_abort_test.clj`) embed the
+  `{:workflows {:runs {… :step-runs {… :attempts [{:status :running}]}}}}` shape
+  as a literal, while the production `record-prompt-group-turn` /
+  `next-un-run-prompt-group` readers navigate it via `latest-attempt` /
+  `latest-attempt-map`. The sibling `progression_recording_test` already builds
+  its state from the canonical `create-run` + `append-attempt-to-run` +
+  `start-latest-attempt` constructors. If the canonical attempt/run shape evolves,
+  the hand-rolled fixtures won't track it: the drive/abort tests would keep
+  passing against a stale shape while production navigation breaks — the fixtures
+  decouple the tests from the real shape they purport to exercise. Derive the
+  running-attempt `state*` from the real constructors (mirroring
+  `base-state-with-run`) so the drive-queue tests are coupled to the canonical
+  run/attempt shape and cannot silently drift. (The reconstructed-state Slice-5
+  cases legitimately model a post-restart reload; even there, building the base
+  via the constructors and then layering the recorded `:prompt-group-turns`
+  preserves the restart semantics while tracking the canonical shape.)
