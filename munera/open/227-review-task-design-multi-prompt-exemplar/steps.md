@@ -34,6 +34,7 @@
 
 ## Slice 4 — Definition and runtime test alignment
 
+- [ ] Resolve the plan/steps test-timing inconsistency: either move/add the definition, prompt-contract, and runtime test updates so they occur before or in the same slices as the workflow topology and prompt behavioral changes, or revise `plan.md` to remove the “before or with each behavioral change” requirement.
 - [ ] Update `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj` `review-task-design-test` to expect three steps: `design-review`, `design-follow-up`, and `final-summary`.
 - [ ] Add workflow-definition assertions that `design-review` carries the exact step-level tools and skills required by the merged prompt groups.
 - [ ] Add workflow-definition assertions that `design-review` contains the ordered prompt groups `architecture`, `ambiguity`, and `inconsistency` with the expected prompt-workflow filenames.
