@@ -1883,3 +1883,30 @@ production code — only the covering tests and author-facing docs.
   `doc/workflow-grammar.md`.
 
 - **Verification.** abort suite 4 tests / 19 assertions green; clj-kondo clean.
+
+## Slice 7 — Docs consolidation + changelog + coherence — ψ
+
+Final consolidation slice; no production code.
+
+- **Docs cross-linking.** Multi-prompt author docs are split: `workflow-grammar.md`
+  owns the `:prompts` form, precedence/validation, drain-route, resume-and-
+  idempotency, and abort/cancel/blocked subsections; `workflow-grammar-concepts.md`
+  owns the `:prompt` source-ref + validation + post-drain-judge carve-out. Added a
+  cross-link from grammar.md's per-prompt-record bullet to concepts.md's
+  *Per-prompt output surfaces*; concepts.md already links back to "the grammar
+  reference". All required surfaces present and consistent.
+
+- **CHANGELOG.** `[Unreleased] Added` entry for the multi-prompt `:session` step
+  capability (ordered `:prompts` queue, per-prompt addressing, drain/route,
+  resume idempotency, abort outcomes).
+
+- **Coherence / TraceID (AC-1..AC-8).** Each AC has a covering test (enumerated in
+  steps.md Final verification). `:blocked` is preservation-only, traced under
+  AC-3 + AC-5 (PI12) — no separate AC.
+
+- **Three-component verification.** workflow-runtime 129/709 green;
+  workflow-step-materialization 26/54 green; workflow-loader 53 green with the
+  sole `task-lifecycle-test` failure **confirmed pre-existing and unrelated**
+  (fails identically — 4 passed / 16 failed — at session-start commit cf3f43d9f,
+  verified in a throwaway base worktree; touches `task-lifecycle.edn` structure,
+  not multi-prompt). clj-kondo clean across the edited components.

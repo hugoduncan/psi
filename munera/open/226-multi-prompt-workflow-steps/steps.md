@@ -424,30 +424,64 @@ Author-facing grammar docs are written **incrementally** in the slice that
 introduces each surface (P2; see plan.md "Author-facing docs cadence"). Slice 7
 consolidates them — it does not first-author them.
 
-- [ ] Consolidation pass over the incrementally-written `doc/workflow-grammar.md`
+- [x] Consolidation pass over the incrementally-written `doc/workflow-grammar.md`
   + `doc/workflow-grammar-concepts.md` content (Slices 2–6): cross-link sections,
   fill any gaps, verify the `:prompts` form / group-internal xor / per-prompt
   surfaces / `:prompt` source-ref + validation + post-drain-judge carve-out /
   drain-route / resume contract / abort + cancellation + blocked outcomes
   (`:failed` vs `:cancelled` vs `:blocked`, retained records, routing skipped) are
-  all present and consistent.
-- [ ] CHANGELOG `[Unreleased] Added`: multi-prompt `:session` step capability
-  (ordered `:prompts` queue, per-prompt addressing).
-- [ ] Verify coherence across meta/spec/tests/code/docs (TraceID for AC-1..AC-8).
-- [ ] `clj-kondo` clean; commit Slice 7.
+  all present and consistent. **DONE:** grammar.md carries the `:prompts` form,
+  precedence/validation, drain-route, resume-and-idempotency, and abort/cancel/
+  blocked subsections; concepts.md carries the per-prompt source-ref + validation
+  + judge carve-out. Added a cross-link from grammar.md's per-prompt-record bullet
+  to concepts.md's *Per-prompt output surfaces*; concepts.md already cross-links
+  back to "the grammar reference".
+- [x] CHANGELOG `[Unreleased] Added`: multi-prompt `:session` step capability
+  (ordered `:prompts` queue, per-prompt addressing). **DONE.**
+- [x] Verify coherence across meta/spec/tests/code/docs (TraceID for AC-1..AC-8).
+  **DONE (see Final verification below).**
+- [x] `clj-kondo` clean; commit Slice 7.
 
 ## Final verification
 
-- [ ] Run the full workflow-runtime + workflow-loader + workflow-step-
-  materialization Scry suites green.
-- [ ] Confirm AC-1..AC-8 each have covering tests (ordering, drain, N=1
-  equivalence, per-prompt addressing + validation, intermediate-failure abort
-  **including the structured-output `:blocked` terminal outcome — preservation-only
-  (an existing `execute-session-step!` `:actor/blocked` outcome preserved across
-  the drain), traced under AC-3 (structured-output viability) + AC-5 (abort
-  disposition: routing skipped, prior records retained, blocking prompt leaves no
-  record), not a separate AC (PI12)**, inter-prompt cancellation,
-  resume-from-progression idempotency, docs).
+- [x] Run the full workflow-runtime + workflow-loader + workflow-step-
+  materialization Scry suites green. **DONE:** workflow-runtime 129 tests / 709
+  assertions green; workflow-step-materialization 26 / 54 green; workflow-loader
+  53 green with the sole `workflow-definitions-test/task-lifecycle-test` failure
+  **confirmed pre-existing and unrelated** (a stale `task-lifecycle.edn`
+  step-structure assertion: fails identically — 4 passed / 16 failed — at the
+  session-start commit `cf3f43d9f`, before any 226 multi-prompt work, verified in
+  a throwaway base worktree).
+- [x] Confirm AC-1..AC-8 each have covering tests. **DONE (TraceID):**
+  - **AC-1** ordering/same-session/sequential —
+    `drive-session-prompt-queue-runs-named-turns-in-order-test`.
+  - **AC-2** N=1 equivalence — `single-prompt-session-step-envelope-characterization-test`
+    + the `execute-session-step!` single-turn suite (unnamed degenerate).
+  - **AC-3** output surfaces (step-level last/accumulated, per-prompt turn-local,
+    structured on final turn, yield unchanged) — in-order test +
+    `drive-session-prompt-queue-requests-structured-output-on-final-turn-only-test`
+    + `resolve-prompt-discriminated-per-prompt-surface-test`.
+  - **AC-4** route once after drain + judge per-prompt carve-out — in-order test
+    (`(= 1 (count @event-queue*))`, one `:actor/done`) + `prompt-source-ref-validation-test`.
+  - **AC-5** intermediate-failure abort (+ structured `:blocked`, PI12) —
+    `drive-session-prompt-queue-intermediate-turn-error-fails-naming-prompt-test`,
+    `...-final-turn-error-fails-naming-prompt-test`,
+    `...-final-turn-structured-output-blocked-test`,
+    `...-blocks-upfront-on-invalid-structured-request-test`.
+  - **AC-6** inter-prompt/in-flight cancellation —
+    `drive-session-prompt-queue-inter-prompt-cancellation-test`.
+  - **AC-7** resume-from-progression idempotency —
+    `...-resume-skips-recorded-prompts-test`,
+    `...-reconstructs-position-from-persisted-progression-test`,
+    `...-replay-fully-recorded-fires-zero-turns-test`.
+  - **AC-8** docs + IR-validation + runtime coverage — `session-prompts-grammar-validation-test`
+    (ir-prompts-test) + `compile-edn-prompts-step-test` + the runtime suites above
+    + `doc/workflow-grammar.md` / `-concepts.md`.
+  The `:blocked` terminal outcome is preservation-only (an existing
+  `execute-session-step!` `:actor/blocked` outcome preserved across the drain),
+  traced under AC-3 (structured-output viability) + AC-5 (abort disposition: routing
+  skipped, prior records retained, blocking prompt leaves no record), not a
+  separate AC (PI12).
 
 ## Plan-review follow-ups (ambiguity, pass 1)
 

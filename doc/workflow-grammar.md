@@ -262,7 +262,10 @@ that step, not separate steps. Concretely:
 - Each **named** group additionally records a per-prompt turn record (its own
   turn-local `:final-llm-reply`/`:transcript`), so completed turns are
   introspectable; the unnamed single-prompt (`:contributions`) degenerate
-  records only the step-level rollup.
+  records only the step-level rollup. Other steps (and the step's own post-drain
+  `:judge`) address a named group's turn-local surface via the `:prompt`
+  source-ref discriminator — see *Per-prompt output surfaces* in
+  [workflow-grammar-concepts.md](workflow-grammar-concepts.md).
 
 ### Resume and idempotency
 
