@@ -297,24 +297,44 @@ the process-restart / event-log-replay resume case and proves its idempotency
 (P4). The suspend/resume boundary inside the single statechart step is unchanged
 from Slice 3 — this slice exercises and hardens it across reconstructed state.
 
-- [ ] Confirm the `statechart_runtime.clj` session (`:else`) branch resume path
+- [x] Confirm the `statechart_runtime.clj` session (`:else`) branch resume path
   reconstructs queue position **purely** from persisted per-prompt progression on
   process-restart re-entry (no reliance on in-memory loop state surviving the
   restart); continue at the next **un-run** prompt; never re-submit a prompt whose
-  turn record exists (no `ai/generate` re-fire).
-- [ ] Runtime test (Slice-5 independent acceptance, P4): a mid-queue resume
+  turn record exists (no `ai/generate` re-fire). **DONE (confirm-only, no edit):**
+  the `:else` branch re-invokes `drive-session-prompt-queue!`, whose loop reads
+  `next-un-run-prompt-group` from `(:state* ctx)` (the persisted canonical atom)
+  **each iteration** — there is no in-memory queue counter, so a fresh
+  post-restart process consults only persisted progression. **Finding (see
+  implementation.md):** because `execute-actor-turn!` is **synchronous** (the
+  Slice-3 R1 fallback), the entire N-turn drain completes inside one `:step/enter`
+  action — the statechart never suspends mid-drain, and `:workflow/resume` fires
+  only from `:blocked` (a new attempt). So statechart-level mid-drain restart is
+  not an occurring path; the realized resume mechanism is the per-iteration
+  progression re-read, exercised here against a reconstructed state*.
+- [x] Runtime test (Slice-5 independent acceptance, P4): a mid-queue resume
   reconstructed from persisted progression runs only the un-run prompts
   (resume-from-progression idempotency, AC-7); completed turns not re-fired.
-- [ ] Verify replay path: replaying the event log reproduces the same per-prompt
+  (`drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`:
+  fresh state*/ctx with indices 0+1 recorded ⇒ only index 2 fires; prior records
+  retained verbatim; reaches `:actor/done`.)
+- [x] Verify replay path: replaying the event log reproduces the same per-prompt
   records without re-firing completed `ai/generate` effects. Assert non-re-fire
   with the **same observable as Slice 3 (P8)**: the **count of `ai/generate`
   effects emitted at the dispatch/effect boundary** is **zero** for any prompt
   with an existing turn record across the reconstructed/replayed state;
   corroborate with no second turn record / no progression mutation for an
   already-recorded prompt.
-- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — the resume-from-progression
-  contract.
-- [ ] `clj-kondo` clean; commit Slice 5.
+  (`drive-session-prompt-queue-replay-fully-recorded-fires-zero-turns-test`:
+  fully-recorded reconstructed state* ⇒ 0 turn-calls, records untouched, drains
+  straight to `:actor/done`. The P8 observable is the `:workflow-execute-actor-turn-fn`
+  seam call-count — zero for already-recorded prompts.)
+- [x] Docs (P2): the resume-from-progression contract. **DONE:** added the
+  "Resume and idempotency" subsection to `doc/workflow-grammar.md` (alongside the
+  Slice-3 "Drain and routing" subsection where the multi-prompt grammar lives;
+  per the Slice-3 deviation, multi-prompt doc content is consolidated in
+  `workflow-grammar.md` rather than split into `-concepts.md`).
+- [x] `clj-kondo` clean; commit Slice 5.
 
 ## Slice 6 — Abort paths
 

@@ -133,6 +133,115 @@
       (is (= ["PROMPT-ambiguity"] @submitted*))
       (is (= :actor/done (:event (first @event-queue*)))))))
 
+(defn- recorded-turns-state*
+  "A canonical state* reconstructed (as if reloaded after a process restart /
+   rebuilt by event-log replay) carrying the given per-prompt turn `records` on
+   the latest attempt for `run-id`/`step-id`. Models persisted progression that
+   survives a restart independent of any in-memory queue-driver loop state."
+  [run-id step-id records]
+  (atom {:workflows
+         {:runs
+          {run-id {:run-id run-id
+                   :status :running
+                   :step-runs {step-id {:attempts [{:attempt-id "attempt-1"
+                                                    :status :running
+                                                    :prompt-group-turns (vec records)}]}}}}}}))
+
+;;;; task 226 Slice 5 — resume-from-progression across process-restart / replay.
+;;;;
+;;;; Slice 3 proved the in-run drain re-reads progression each iteration; Slice 5
+;;;; proves that re-driving against a FRESHLY reconstructed state* + ctx (no
+;;;; in-memory loop state carried across the restart) reconstructs queue position
+;;;; purely from persisted per-prompt progression and never re-fires a recorded
+;;;; turn's `ai/generate` effect (P8 observable: the per-prompt turn-call count
+;;;; at the execute-turn seam is zero for any prompt with an existing record).
+
+(deftest drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test
+  (testing "a restart re-drive against reconstructed persisted progression runs only un-run prompts (zero re-fire of recorded turns, P8/AC-7)"
+    (let [run-id "run-1"
+          step-id "design-review"
+          ;; Reconstructed state*: indices 0 and 1 already have recorded turns;
+          ;; nothing about the prior (now-dead) drain loop survives — only the
+          ;; persisted progression does.
+          state* (recorded-turns-state*
+                  run-id step-id
+                  [{:index 0 :name "architecture" :outputs {:final-llm-reply "prior-arch"}}
+                   {:index 1 :name "ambiguity" :outputs {:final-llm-reply "prior-ambig"}}])
+          turn-calls* (atom 0)
+          submitted* (atom [])
+          execute-turn (fn [_ctx _session-id prompt]
+                         (swap! turn-calls* inc)
+                         (swap! submitted* conj prompt)
+                         {:status :ok
+                          :assistant-text (str "reply-" prompt)
+                          :execution-result nil
+                          :assistant-message (assistant-text-message (str "reply-" prompt))})
+          ;; A fresh ctx for the post-restart process — only state* + the seam.
+          ctx {:state* state*
+               :workflow-execute-actor-turn-fn execute-turn}
+          working-memory* (atom {:current-step-id step-id})
+          event-queue* (atom [])
+          prompt-queue [{:name "architecture" :contributions []}
+                        {:name "ambiguity" :contributions []}
+                        {:name "consistency" :contributions []}]]
+      (step-execution/drive-session-prompt-queue!
+       ctx {:session-id "child-session"}
+       {:name step-id :type :session}
+       step-id "attempt-1" working-memory* event-queue*
+       run-id prompt-queue "PROMPT-architecture"
+       (fn [group] (str "PROMPT-" (:name group)))
+       (recording-record-turn-fn state* run-id step-id)
+       (constantly false))
+      ;; P8: exactly one ai/generate effect — for the single un-run prompt; zero
+      ;; for each already-recorded prompt.
+      (is (= 1 @turn-calls*) "only the un-run prompt fires a turn after a restart")
+      (is (= ["PROMPT-consistency"] @submitted*)
+          "position reconstructed purely from persisted progression (next un-run = index 2)")
+      ;; Corroborating observable: no second turn record / no progression mutation
+      ;; for an already-recorded prompt; the prior records are retained verbatim.
+      (let [records (progression-recording/prompt-group-turn-records
+                     (get-in @state* (progression-recording/run-path run-id)) step-id)]
+        (is (= [0 1 2] (mapv :index records)) "one record per index, no duplicate append")
+        (is (= "prior-arch" (get-in records [0 :outputs :final-llm-reply]))
+            "pre-restart record for index 0 retained verbatim")
+        (is (= "prior-ambig" (get-in records [1 :outputs :final-llm-reply]))
+            "pre-restart record for index 1 retained verbatim"))
+      ;; Post-drain route reached only after every prompt has a recorded turn.
+      (is (= :actor/done (:event (first @event-queue*)))))))
+
+(deftest drive-session-prompt-queue-replay-fully-recorded-fires-zero-turns-test
+  (testing "re-driving a fully-recorded queue (event-log replay) fires zero turns and drains immediately (P8 zero re-fire/AC-7)"
+    (let [run-id "run-1"
+          step-id "design-review"
+          records [{:index 0 :name "architecture" :outputs {:final-llm-reply "r0"}}
+                   {:index 1 :name "ambiguity" :outputs {:final-llm-reply "r1"}}]
+          state* (recorded-turns-state* run-id step-id records)
+          turn-calls* (atom 0)
+          ctx {:state* state*
+               :workflow-execute-actor-turn-fn (fn [& _] (swap! turn-calls* inc) {:status :ok})}
+          working-memory* (atom {:current-step-id step-id})
+          event-queue* (atom [])
+          prompt-queue [{:name "architecture" :contributions []}
+                        {:name "ambiguity" :contributions []}]]
+      (step-execution/drive-session-prompt-queue!
+       ctx {:session-id "child-session"}
+       {:name step-id :type :session}
+       step-id "attempt-1" working-memory* event-queue*
+       run-id prompt-queue "PROMPT-architecture"
+       (fn [group] (str "PROMPT-" (:name group)))
+       (recording-record-turn-fn state* run-id step-id)
+       (constantly false))
+      ;; Zero ai/generate effects across the fully-recorded reconstructed state.
+      (is (= 0 @turn-calls*) "no turn re-fires when every prompt already has a record")
+      ;; No progression mutation: the records are untouched.
+      (is (= records
+             (mapv #(dissoc % :recorded-at)
+                   (progression-recording/prompt-group-turn-records
+                    (get-in @state* (progression-recording/run-path run-id)) step-id)))
+          "no second turn record written on replay")
+      ;; Post-drain route still reached (queue already drained).
+      (is (= :actor/done (:event (first @event-queue*)))))))
+
 (deftest drive-session-prompt-queue-requests-structured-output-on-final-turn-only-test
   (testing "structured :outputs are requested on the final turn only (P5)"
     (let [run-id "run-1"

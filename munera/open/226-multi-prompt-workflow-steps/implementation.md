@@ -1795,3 +1795,56 @@ workflow-runtime + workflow-step-materialization Scry suites green (149 tests /
   `source-resolution-test/resolve-prompt-discriminated-per-prompt-surface-test`
   (no-`:prompt` → step-level last/accumulated; `:prompt` → that group's turn-local
   surface).
+
+## Slice 5 — Resume-from-progression across process-restart/replay — ψ
+
+Confirm + test slice; **no production code** (matches plan PI11). Proves the
+queue driver reconstructs position purely from persisted progression and never
+re-fires a recorded turn.
+
+- **Confirm (code inspection).** `drive-session-prompt-queue!` reads
+  `next-un-run-prompt-group` from `(get-in @(:state* ctx) (run-path run-id))`
+  **each loop iteration** — selection is driven by the persisted canonical atom,
+  not an in-memory counter. The `:step/enter` `:else` branch only re-invokes the
+  driver (PI7); next-un-run ownership stays in the driver. So a fresh
+  post-restart process consults only persisted per-prompt progression.
+
+- **Architecture finding (synchronous drain).** Because `execute-actor-turn!` is
+  **synchronous** here (the Slice-3 R1 fallback), the whole N-turn drain runs
+  inside one `:step/enter` action; the statechart does **not** suspend mid-drain.
+  `:workflow/resume` transitions only from `:blocked` → `:running` (a new
+  attempt), so there is no statechart path that re-enters a half-drained step.
+  The realized resume/idempotency mechanism is therefore the driver's
+  per-iteration progression re-read (already exercised in-run by Slice 3), and
+  event-log replay reconstructs state via the dispatch layer's effect-suppressing
+  replay rather than by re-running turns. Slice 5's tests exercise that mechanism
+  against a freshly reconstructed `state*`/`ctx` (no in-memory loop state carried
+  across the "restart").
+
+- **Known caveat (non-occurring path).** `post-drain-envelope` builds
+  `:prompt-group-outputs`/`:transcript`/`:final-llm-reply` from the **current
+  invocation's** loop accumulator, not from persisted records. After a *partial*
+  resume the envelope would reflect only the resuming invocation's turns. This is
+  unreachable under the current synchronous architecture (the drain is atomic
+  within one `:step/enter`; no statechart mid-drain restart exists), so no
+  speculative production code was added (`λone_way` / simplicity). If a future
+  slice makes turns async-suspending (true F1 N-suspend-points), the envelope
+  would need to reconstruct from persisted `prompt-group-turn-records` — recorded
+  here as a deferred follow-up tied to that (currently absent) async path.
+
+- **Tests (P4/P8/AC-7).** Added to
+  `step_execution_drive_prompt_queue_test.clj`:
+  - `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
+    — fresh state*/ctx with indices 0+1 recorded; only index 2 fires (1 turn-call
+    = 1 `ai/generate`; zero for the recorded prompts); prior records retained
+    verbatim (no duplicate append); `:actor/done` reached.
+  - `drive-session-prompt-queue-replay-fully-recorded-fires-zero-turns-test`
+    — fully-recorded reconstructed state*; **0** turn-calls (zero re-fire), no
+    progression mutation, drains straight to `:actor/done`.
+  P8 observable = the `:workflow-execute-actor-turn-fn` seam call-count.
+
+- **Docs.** Added the "Resume and idempotency" subsection to
+  `doc/workflow-grammar.md`.
+
+- **Verification.** drive-prompt-queue suite 6 tests / 33 assertions green;
+  clj-kondo clean.

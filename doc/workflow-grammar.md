@@ -264,6 +264,21 @@ that step, not separate steps. Concretely:
   introspectable; the unnamed single-prompt (`:contributions`) degenerate
   records only the step-level rollup.
 
+### Resume and idempotency
+
+The queue's position is reconstructed **purely from the recorded per-prompt turn
+records**, never from an in-memory counter. On every re-entry of the step — an
+ordinary in-run advance, a process restart, or an event-log replay — the driver
+reads which group indices already have a recorded turn and submits the **lowest
+un-run** group next. A prompt whose turn record already exists is **never**
+re-submitted, so its non-deterministic model turn (`ai/generate`) never re-fires.
+
+This makes a multi-prompt step idempotent under resume: re-driving a partially
+recorded queue runs only the remaining un-run prompts and reproduces the same
+ordered per-prompt records, and re-driving a fully recorded queue runs **zero**
+turns and proceeds straight to the single post-drain result/route. The post-drain
+route is reached only once every group has a recorded turn.
+
 ## Structured outputs
 
 Session steps may declare machine-facing structured outputs under the existing
