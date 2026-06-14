@@ -3302,3 +3302,14 @@ shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
 **accepted, documented** two-driver design (AC-2 byte-identical N=1 envelope); the
 `post-drain-envelope` loop-local transcript/per-prompt accumulation is the
 **documented** F1-async blocker — both left as-is.
+
+## Code-shaper review follow-up execution (pass 3 — CS-4) — ψ
+
+Executed CS-4. Replaced `(get-in structured-output [:reason])` with
+`(:reason structured-output)` in `execute-session-turn-outcome`'s
+`:unsupported-structured-output` blocked arm (`step_execution.clj:276`), so both
+single-key reads in the `or` share the keyword-access idiom
+(`consistent(idioms)`). Behaviour-identical, cosmetic. `clj-kondo` clean;
+`step-execution-test` 12 tests / 85 assertions green; drive-prompt-queue (+ abort)
+13 tests / 61 assertions green. CS-4 was the sole unchecked item from the pass-3
+code-shaper review; all other steps were already complete.

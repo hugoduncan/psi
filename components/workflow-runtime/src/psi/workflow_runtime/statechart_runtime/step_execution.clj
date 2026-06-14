@@ -273,7 +273,7 @@
       {:disposition :cancelled}
 
       (= :error status)
-      (if (= :unsupported-structured-output (or (get-in structured-output [:reason])
+      (if (= :unsupported-structured-output (or (:reason structured-output)
                                                 (:reason failure)))
         {:disposition :blocked
          :branch :error

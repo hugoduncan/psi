@@ -1262,7 +1262,7 @@ consolidates them — it does not first-author them.
   step-execution + drive-prompt-queue (+ abort) suites 25 tests / 146 assertions
   green; full workflow-runtime suite 136 tests / 736 assertions green.
 
-- [ ] CS-4 — Use consistent keyword-access idiom for the single-key map read.
+- [x] CS-4 — Use consistent keyword-access idiom for the single-key map read.
   `execute-session-turn-outcome` (`statechart_runtime/step_execution.clj:276-277`)
   reads `(or (get-in structured-output [:reason]) (:reason failure))` — the two
   reads in the same `or` use different idioms for the same single-key access
@@ -1270,3 +1270,8 @@ consolidates them — it does not first-author them.
   `(get-in structured-output [:reason])` with `(:reason structured-output)` so
   both reads share the keyword-access idiom. Behaviour-identical, cosmetic;
   re-run `clj-kondo` + the step-execution suite.
+  **DONE:** replaced `(get-in structured-output [:reason])` with
+  `(:reason structured-output)` in the `:unsupported-structured-output` blocked
+  arm; both reads in the `or` now share the keyword-access idiom. Cosmetic,
+  behaviour-identical. `clj-kondo` clean; step-execution-test 12 tests /
+  85 assertions green; drive-prompt-queue (+ abort) 13 tests / 61 assertions green.
