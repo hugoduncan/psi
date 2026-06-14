@@ -74,4 +74,4 @@
 
 ## Docs review follow-up
 
-- [ ] DOC1: Update `CHANGELOG.md` so the invoke+judge routing fix entry no longer names `review-task-design`'s removed `clarity-status` step as a current example; keep the historical bug-fix meaning while avoiding stale step references after the merged `design-review` topology.
+- [x] DOC1: Update `CHANGELOG.md` so the invoke+judge routing fix entry no longer names `review-task-design`'s removed `clarity-status` step as a current example; keep the historical bug-fix meaning while avoiding stale step references after the merged `design-review` topology.
