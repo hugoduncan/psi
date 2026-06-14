@@ -1173,3 +1173,17 @@ consolidates them — it does not first-author them.
   → single unnamed group; `:prompts` → ordered named-group queue drained by
   `drive-session-prompt-queue!`), mutual exclusivity, and a cross-reference to
   `doc/workflow-grammar.md` *Multi-prompt session steps (`:prompts`)*. Docs-only.
+
+## Docs-review follow-ups (pass 3)
+
+- [ ] DOC-4 — Add the `:prompt` per-prompt discriminator form to the `source-ref`
+  EBNF production in `doc/workflow-grammar.md` (lines 108–111). The production
+  currently lists only `{:step step-name :output output-key}` and
+  `{:step step-name :yield yield-field}`, but the new prose in the same doc
+  ("the `:prompt` source-ref discriminator", grammar.md:287–288) and
+  `doc/workflow-grammar-concepts.md` (`{:step … :prompt … :output …}` in the
+  data-flow surface; `:prompt` as an optional discriminator on `{:step s :output k}`)
+  treat `{:step :prompt :output}` as a legal source-ref. Add the alternative
+  `{:step step-name :prompt prompt-name :output output-key}` to the production
+  (`prompt-name` is already a defined terminal per DOC-1) so the formal grammar
+  and the prose agree within the grammar reference.

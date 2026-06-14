@@ -3054,3 +3054,34 @@ on a single session step and cross-referenced `doc/workflow-grammar.md`
 *Multi-prompt session steps (`:prompts`)* for the author-facing form, precedence/
 validation, per-prompt surfaces, and drain/resume/abort semantics. Docs-only; no
 code/test change. The IR reference is now complete vs the shipped IR.
+
+## Docs review (review-task-docs skill) — pass 3 — ψ
+
+Re-reviewed user-facing docs per `review-task-docs` (README.md, doc/,
+CHANGELOG.md) against the implementation. Re-verified prior-pass corrections
+still hold: grammar.md `session-step`/`prompt-group` productions and the
+`prompt-name`/`relative-md-path` terminals (DOC-1/DOC-2); workflow-ir.md
+`:prompts` IR subsection (DOC-3); CHANGELOG `[Unreleased] Added` entry. Spot-
+checked code: `drive-session-prompt-queue!` and `:failed-prompt {:index :name}`
+(`step_execution.clj:357,431`), final-turn-only structured request with upfront
+request-validity gate (`step_execution.clj:378-394`) — all match the prose.
+
+One new actionable consistency defect (not a duplicate of DOC-1/2/3, which
+covered the `session-step`/`prompt-group` productions, terminals, and the
+workflow-ir IR section — none touched the `source-ref` production):
+
+- **DOC-4 — `source-ref` EBNF omits the `:prompt` per-prompt discriminator form.**
+  The `source-ref` production (`doc/workflow-grammar.md`:108–111) lists only
+  `{:step step-name :output output-key}` and `{:step step-name :yield yield-field}`.
+  But the new prose in the same document — "address a named group's turn-local
+  surface via the `:prompt` source-ref discriminator" (grammar.md:287–288) — and
+  `doc/workflow-grammar-concepts.md` (`{:step … :prompt … :output …}` added to the
+  shared data-flow surface; "`:prompt` is an optional discriminator on the
+  canonical `{:step s :output k}` ref") both treat `{:step :prompt :output}` as a
+  legal source-ref. A reader of the formal `source-ref` grammar cannot see the
+  `:prompt` form, so the production and the prose disagree within the grammar
+  reference — the same class of defect as DOC-2 (production omitting a form the
+  prose relies on). `prompt-name` is already a defined terminal (DOC-1), so the
+  fix is to add the `{:step step-name :prompt prompt-name :output output-key}`
+  alternative to the `source-ref` production. Recorded as an unchecked follow-up
+  in steps.md.
