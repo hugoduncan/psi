@@ -2094,3 +2094,30 @@ confirmed done. **One new actionable coherence finding (R-5).**
   drivers so the N=1 unnamed case also flows through `drive-session-prompt-queue!`
   (e.g. a one-shot/unnamed mode that records no per-prompt record yet still
   terminates), removing the duplicated disposition-handling control flow.
+
+## Implementation-review follow-up execution (pass 3) — ψ
+
+- **R-5 (done via option (a) — spec↔code reconciliation, the R-1 path).** Chose
+  (a) over (b). (b) — routing the N=1 unnamed case through
+  `drive-session-prompt-queue!` — would **break AC-2**: the drain emits
+  `post-drain-envelope`, which wraps outputs in `:prompt-group-outputs` + an
+  accumulated `:transcript`, altering the byte-identical single-prompt
+  `:pending-actor-result` envelope pinned by the Slice-1 characterization test.
+  It is also structurally blocked: the unnamed group records **no** per-prompt
+  progression record (design C3), so it cannot advance through the
+  `next-un-run-prompt-group` progression-driven selection without special-casing.
+  The genuine unification is at the **turn primitive** (`execute-session-turn-outcome`),
+  which both drivers already share (Slice-3 deviation: "one turn path"). So the
+  honest reconciliation is to state the unification at that level and acknowledge
+  the two thin drivers differ only in disposition orchestration. Edits (design.md
+  only; no code/test/doc change — the code already realizes the reconciled claim):
+  AC-2 (unification at the shared per-turn primitive; N=1 keeps a distinct thin
+  driver, with both structural reasons — no progression record + byte-identical
+  envelope); Grammar Step-level precedence ("drives one queue path" → "drive the
+  same shared per-turn primitive"); Architecture-alignment "One unified queue
+  path" bullet → "One unified turn primitive (not one driver function)", naming
+  the two drivers, the duplicated disposition→`record-actor-pending!` `case`, and
+  why collapsing them is not pursued (AC-2 envelope). Verified
+  `doc/workflow-grammar.md` already frames this at the mechanism level ("share one
+  internal prompt-queue mechanism"), carrying no "one driver" / "no drift"
+  overclaim — no doc edit needed.

@@ -90,9 +90,20 @@ Out of scope (follow-ons):
 1. A `:session` step can author N ≥ 1 prompts; they run in author order, each a
    separate turn in the **same** child session, prompt _n+1_ after prompt _n_.
 2. A single-prompt step behaves exactly as today, as the **N=1 degenerate of one
-   unified prompt-queue runtime path** (not a separately maintained path); the
-   equivalence is a consequence of the unified mechanism, not a back-compat
-   guarantee.
+   unified prompt-queue mechanism**; the equivalence is a consequence of the
+   unified mechanism, not a back-compat guarantee. **The unification is at the
+   shared per-turn primitive** (`execute-session-turn-outcome`): both the named
+   multi-prompt drain (`drive-session-prompt-queue!`) and the unnamed N=1
+   degenerate (`execute-session-step!`) drive the **same** turn path, so the turn
+   mechanics cannot drift. The N=1 degenerate keeps a **distinct thin driver**
+   rather than flowing through the progression-driven drain, for two structural
+   reasons: the unnamed group records **no** per-prompt progression record (see
+   Architecture alignment), so it cannot drive the `next-un-run-prompt-group`
+   selection the named drain consults; and its `:pending-actor-result` envelope
+   must stay byte-identical to today's single-prompt envelope (this AC's
+   equivalence), which the drain's per-prompt `post-drain-envelope` wrapping would
+   alter. "One path" is therefore at the turn-primitive level — the two drivers
+   differ only in disposition orchestration, not turn mechanics.
 3. Output surfaces:
    - step-level `:final-llm-reply` = **last** prompt's reply; step-level
      `:transcript` = accumulated across all turns; `{:step s :output k}` without
@@ -153,9 +164,9 @@ same session id.
 
 **Step-level precedence.** A step uses `:contributions`(/`:prompt-workflow`)
 **xor** `:prompts`. Both normalize at IR time into the **same internal
-prompt-queue representation**, so the runtime drives **one** queue path:
-`:contributions` → one **unnamed** group (step-level surfaces only); `:prompts`
-→ **named** groups (per-prompt addressing). The forms are not rewritten into
+prompt-queue representation** and drive the **same** shared per-turn primitive
+(`execute-session-turn-outcome`): `:contributions` → one **unnamed** group
+(step-level surfaces only); `:prompts` → **named** groups (per-prompt addressing). The forms are not rewritten into
 each other; they share the internal representation, and single-prompt is the N=1
 degenerate (no separate path). The distinction is per-prompt **addressing
 capability**, not back-compat. `λone_way`: multiple turns or named addressing →
@@ -215,8 +226,20 @@ same-step prohibition on assembly-time refs.
   Multi-prompt adds no turn mechanics; the change is queue-driving + IR/
   materialization shaping. Per the workflow-runtime boundary, the queue
   mechanism is generic runtime; concrete prompts are authored content.
-- **One unified queue path**: both authoring forms normalize to one internal
-  representation; single-prompt = N=1 degenerate (`λone_way`, no drift).
+- **One unified turn primitive (not one driver function)**: both authoring forms
+  normalize to one internal prompt-queue representation and drive the **same**
+  shared per-turn primitive (`execute-session-turn-outcome`); single-prompt is the
+  N=1 degenerate (`λone_way`). The named multi-prompt drain
+  (`drive-session-prompt-queue!`) and the unnamed N=1 degenerate
+  (`execute-session-step!`) are **two thin drivers** over that one turn primitive,
+  not a single driver: the unnamed degenerate records **no** per-prompt
+  progression record (so it cannot drive the `next-un-run-prompt-group` selection
+  the named drain consults) and must preserve today's byte-identical single-prompt
+  envelope (which the drain's `post-drain-envelope` per-prompt wrapping would
+  alter). They share the turn path and so cannot drift on turn mechanics; they
+  differ only in disposition orchestration (the duplicated
+  disposition→`record-actor-pending!` `case`). Collapsing them into one driver is
+  not pursued because it would break the AC-2 byte-identical N=1 envelope.
 - **Per-turn results are recorded in the canonical step-result/progression
   substrate**, not loop locals: the step emits **one** post-drain
   `:pending-actor-result` (one routing decision), carrying the step-level rollup

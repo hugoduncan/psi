@@ -780,7 +780,7 @@ consolidates them — it does not first-author them.
 
 ## Implementation-review follow-ups (pass 3)
 
-- [ ] R-5 — Reconcile the design's "one unified runtime path / not a separately
+- [x] R-5 — Reconcile the design's "one unified runtime path / not a separately
   maintained path / no drift" claim (AC-2 design.md:92-93; "drives one queue
   path" design.md:156; Architecture "no drift" design.md:219) with the two-driver
   reality: `statechart_runtime.clj` dispatches on `(some :name prompt-queue)` to
@@ -792,3 +792,14 @@ consolidates them — it does not first-author them.
   cannot drive the progression-based drain) — the R-1-style spec↔code
   reconciliation — **or** (b) unify so the N=1 unnamed case also flows through
   `drive-session-prompt-queue!`, removing the duplicated disposition handling.
+  **DONE via option (a)** (see implementation.md "Implementation-review follow-up
+  execution (pass 3)"). Rejected (b): routing N=1 through
+  `drive-session-prompt-queue!` would break the AC-2 byte-identical envelope (the
+  drain's `post-drain-envelope` wraps `:prompt-group-outputs`/accumulated
+  `:transcript`) and is structurally blocked by the unnamed group recording no
+  per-prompt progression record (C3). Reworded AC-2, Grammar step-level
+  precedence, and the Architecture-alignment unified-path bullet to state the
+  unification at the shared per-turn primitive (`execute-session-turn-outcome`),
+  with two thin drivers differing only in disposition orchestration. Design-only
+  edit; code already realizes the reconciled claim;
+  `doc/workflow-grammar.md` already frames it at mechanism level (no overclaim).
