@@ -2467,3 +2467,47 @@ changed.
   progression-recording-test) 34 tests / 190 assertions green; full
   workflow-runtime suite 132 tests / 721 assertions green (+2 assertions from
   TR-3, no regressions from the shared-fixture re-base).
+
+## Test review (task-test-review skill) — pass 3
+
+Re-applied `λ review_tests` (well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps injectable/nullable/¬mock/¬stub) after the pass-1/2 fixes
+(T-1/T-2/TR-3/TR-4). Infra-deps remain clean: the drive/abort suites inject the
+nullable `:workflow-execute-actor-turn-fn` + record-turn-fn ctx seams (¬stub),
+assert on state/outputs only (event-queue, working-memory, recorded
+progression — never interactions), and drive **real** functions
+(`split-step-session-conversation`, `record-prompt-group-turn`,
+`next-un-run-prompt-group`, `create-run` + source resolution). AC-1..AC-8 each
+have covering tests (TraceID in steps.md Final verification confirmed).
+**One new actionable gap found (TR-5); recorded as an unchecked item in steps.md.**
+
+- **TR-5 (robustness / shape-drift — residual TR-4 instance):
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test` still
+  hand-rolls a literal `state*`.** TR-4 re-based the `running-attempt-state*` /
+  `recorded-turns-state*` fixture helpers onto the canonical
+  `canonical-running-run-state` / `canonical-recorded-run-state` constructors so
+  the drive/abort tests track the real run/attempt shape the production
+  `latest-attempt`-based readers navigate. But
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test` (in
+  `step_execution_drive_prompt_queue_test.clj`) does **not** use
+  `recorded-turns-state*` — it inlines its own
+  `(atom {:workflows {:runs {… :step-runs {… :attempts [{… :prompt-group-turns
+  [{:index 0 …}]}]}}}})` literal with a pre-recorded index-0 turn. This is the
+  **exact** shape-drift defect TR-4 fixed, in a call site that escaped the
+  re-base: if the canonical attempt/run shape evolves, this resume test keeps
+  passing against a stale literal while production navigation breaks. The
+  `recorded-turns-state*` helper already exists and takes precisely
+  `[run-id step-id records]` — the test can build its single-record state via
+  `(recorded-turns-state* run-id step-id [{:index 0 :name "architecture" :outputs
+  {:final-llm-reply "prior"}}])`, dropping the literal. Test-only; no production
+  change.
+
+**Verified-acceptable (not raised):** the workflow-step-materialization
+`resolve-prompt-discriminated-per-prompt-surface-test`
+(`source_resolution_test.clj`) consumes a literal `multi-prompt-accepted-result`
+envelope modelling the producer's `post-drain-envelope` shape. This is a focused
+**consumer-side** resolution unit test in a **different component**; coupling it
+to the workflow-runtime producer would cross the component boundary, so the
+representative literal is the idiomatic isolation choice (the producer-side
+`drive-session-prompt-queue-runs-named-turns-in-order-test` independently pins
+the `:prompt-group-outputs` shape on the producer side).

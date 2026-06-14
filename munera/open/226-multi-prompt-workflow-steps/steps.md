@@ -946,3 +946,18 @@ consolidates them — it does not first-author them.
   shared builders; all call sites unchanged. `clj-kondo` clean; focused run
   34 tests / 190 assertions green; full workflow-runtime suite 132 / 721 green.
   See implementation.md "Test-review follow-up execution (pass 2)".
+
+## Test-review follow-ups (pass 3)
+
+- [ ] TR-5 — Re-base the residual hand-rolled literal `state*` in
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test`
+  (`step_execution_drive_prompt_queue_test.clj`) onto the canonical
+  `recorded-turns-state*` helper (→ `step-test-support/canonical-recorded-run-state`),
+  the same TR-4 re-base the other drive/abort fixtures already received. The test
+  inlines `(atom {:workflows … :prompt-group-turns [{:index 0 …}]})` instead of
+  calling `recorded-turns-state*`; this call site escaped the TR-4 fix, so it can
+  drift from the canonical run/attempt shape the production `latest-attempt`
+  readers navigate (stale-literal-green while production breaks). Replace the
+  literal with `(recorded-turns-state* run-id step-id [{:index 0 :name
+  "architecture" :outputs {:final-llm-reply "prior"}}])`. Test-only; re-run the
+  workflow-runtime drive-prompt-queue suite green.
