@@ -34,6 +34,16 @@
            {:index index :name group-name :outputs outputs})
     true))
 
+(defn- recorded-turns-state*
+  "A canonical state* reconstructed (as if reloaded after a process restart /
+   rebuilt by event-log replay) carrying the given per-prompt turn `records` on
+   the latest attempt for `run-id`/`step-id`. Built via the real run/attempt
+   constructors with the records recorded canonically (TR-4), modelling persisted
+   progression that survives a restart independent of any in-memory queue-driver
+   loop state."
+  [run-id step-id records]
+  (atom (step-test-support/canonical-recorded-run-state run-id step-id records)))
+
 ;;;; task 226 R-2 — later-group single-submission limitation.
 ;;;;
 ;;;; A later prompt-group submits only its split :prompt (the final user
@@ -129,15 +139,10 @@
     (let [run-id "run-1"
           step-id "design-review"
           ;; attempt already has a recorded turn for index 0.
-          state* (atom {:workflows
-                        {:runs
-                         {run-id {:run-id run-id
-                                  :status :running
-                                  :step-runs {step-id {:attempts [{:attempt-id "attempt-1"
-                                                                   :status :running
-                                                                   :prompt-group-turns
-                                                                   [{:index 0 :name "architecture"
-                                                                     :outputs {:final-llm-reply "prior"}}]}]}}}}}})
+          state* (recorded-turns-state*
+                  run-id step-id
+                  [{:index 0 :name "architecture"
+                    :outputs {:final-llm-reply "prior"}}])
           turn-calls* (atom 0)
           submitted* (atom [])
           execute-turn (fn [_ctx _session-id prompt]
@@ -165,16 +170,6 @@
       (is (= 1 @turn-calls*) "only the un-run prompt fires a turn")
       (is (= ["PROMPT-ambiguity"] @submitted*))
       (is (= :actor/done (:event (first @event-queue*)))))))
-
-(defn- recorded-turns-state*
-  "A canonical state* reconstructed (as if reloaded after a process restart /
-   rebuilt by event-log replay) carrying the given per-prompt turn `records` on
-   the latest attempt for `run-id`/`step-id`. Built via the real run/attempt
-   constructors with the records recorded canonically (TR-4), modelling persisted
-   progression that survives a restart independent of any in-memory queue-driver
-   loop state."
-  [run-id step-id records]
-  (atom (step-test-support/canonical-recorded-run-state run-id step-id records)))
 
 ;;;; task 226 Slice 5 — resume-from-progression across process-restart / replay.
 ;;;;

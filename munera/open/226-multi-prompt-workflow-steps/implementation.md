@@ -2511,3 +2511,22 @@ to the workflow-runtime producer would cross the component boundary, so the
 representative literal is the idiomatic isolation choice (the producer-side
 `drive-session-prompt-queue-runs-named-turns-in-order-test` independently pins
 the `:prompt-group-outputs` shape on the producer side).
+
+## Test-review follow-up pass 3 — TR-5 executed
+
+TR-5 (test-only) **DONE**: re-based the residual hand-rolled literal `state*` in
+`drive-session-prompt-queue-resume-skips-recorded-prompts-test`
+(`step_execution_drive_prompt_queue_test.clj`) onto the canonical
+`recorded-turns-state*` helper (→ `step-test-support/canonical-recorded-run-state`),
+eliminating the last TR-4 escapee. The inline
+`(atom {:workflows … :prompt-group-turns [{:index 0 …}]})` literal is replaced
+with `(recorded-turns-state* run-id step-id [{:index 0 :name "architecture"
+:outputs {:final-llm-reply "prior"}}])`. Moved the `recorded-turns-state*` defn
+up to sit with the other private helpers (after `recording-record-turn-fn`) so it
+is defined before its now-earlier first call site. No production change.
+
+Verification: `clj-paren-repair` Success, `clj-kondo` clean (0/0), and the full
+workflow-runtime drive-prompt-queue suite green via Scry CLI
+(`clojure -M:test-paths -m scry.cli --namespace
+psi.workflow-runtime.statechart-runtime.step-execution-drive-prompt-queue-test`
+→ 8 tests / 35 assertions, 0 failed, 0 errored, exit 0).

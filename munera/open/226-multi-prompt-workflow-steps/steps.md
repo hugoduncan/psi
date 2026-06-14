@@ -949,7 +949,7 @@ consolidates them — it does not first-author them.
 
 ## Test-review follow-ups (pass 3)
 
-- [ ] TR-5 — Re-base the residual hand-rolled literal `state*` in
+- [x] TR-5 — Re-base the residual hand-rolled literal `state*` in
   `drive-session-prompt-queue-resume-skips-recorded-prompts-test`
   (`step_execution_drive_prompt_queue_test.clj`) onto the canonical
   `recorded-turns-state*` helper (→ `step-test-support/canonical-recorded-run-state`),
