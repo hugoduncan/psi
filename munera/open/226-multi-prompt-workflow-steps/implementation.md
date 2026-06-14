@@ -2777,3 +2777,35 @@ no duplicated fixtures, named keys over argument position.
 
 Test-only; no production change. `clj-kondo` clean; both drain suites 14 tests /
 64 assertions green; full workflow-runtime suite 133 tests / 726 assertions green.
+
+## Test review (test-shaper skill) — pass 8
+
+Re-applied `λtests. clarity ∧ signal ∧ robustness ∧ economy → shape` to the post-TS-1
+drain surface (`step_execution_drive_prompt_queue_test` +
+`_abort_test`) and the surrounding 226 test namespaces. Behaviour focus,
+state/output assertions, real-infra + nullable seams, single-concern tests, and
+meaningful failure messages remain strong; the TS-1 fixture/`drive!`
+consolidation is in place and used from both sibling namespaces. **One new
+actionable shaping finding (TS-2);** recorded as an unchecked steps.md item. It
+is a *consistency/economy* residual TS-1 did not enumerate (`ok-turn`), so it is
+not a duplicate.
+
+- **TS-2 (consistency + economy: the canonical OK-turn-result builder is still
+  split across the two sibling drain namespaces).** TS-1 lifted the shared
+  fixtures + `drive!` into `step-test-support`, but the per-turn **success
+  result map** the drain seam returns —
+  ``{:status :ok :assistant-text (str "reply-" prompt) :execution-result nil
+  :assistant-message (assistant-text-message (str "reply-" prompt))}`` — was not
+  consolidated. The abort file factors it into a private `ok-turn` helper
+  (`_abort_test.clj:16-21`); the non-abort drive file repeats the **same** shape
+  **inline at 3 call sites** (`_test.clj:65`, `:124`, `:168`). Same SUT, same
+  result contract, two spellings across siblings — exactly the
+  `consistent(test_abstractions)` divergence TS-1 closed for the other fixtures,
+  with `ok-turn` an escapee. Per test-shaper
+  `consistent(test_abstractions) ∧ economical ∧ helpers_that_compress(ceremony)`:
+  lift `ok-turn` into `step-test-support`, have the abort file alias it (drop its
+  private def), and rewrite the 3 inline drive-file closures to return
+  `(step-test-support/ok-turn prompt)` while keeping their per-test recording side
+  effects (`swap! turn-calls*`/`swap! submitted*`). The minimal `(fn [& _] … {:status
+  :ok})` stubs (`:210`, `:288`) are intentionally degenerate zero-/no-turn stubs
+  and stay as-is. Test-only; no production change; re-run both drain suites green.

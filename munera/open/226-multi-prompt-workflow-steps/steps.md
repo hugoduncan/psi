@@ -1050,3 +1050,25 @@ consolidates them — it does not first-author them.
   call sites in the non-abort file; dropped the now-unused `step-execution` require
   from the abort file. `clj-kondo` clean; both drain suites 14 tests / 64
   assertions green; full workflow-runtime suite 133 tests / 726 assertions green.
+
+- [ ] TS-2 — Consolidate the canonical OK-turn-result builder shared by the two
+  sibling drain test namespaces (test-shaper consistency + economy; a TS-1
+  escapee). The per-turn success result map the drain seam returns —
+  `{:status :ok :assistant-text (str "reply-" prompt) :execution-result nil
+  :assistant-message (assistant-text-message (str "reply-" prompt))}` — is factored
+  as a private `ok-turn` helper in
+  `step_execution_drive_prompt_queue_abort_test.clj` (lines 16-21) but repeated
+  **inline at 3 call sites** in `step_execution_drive_prompt_queue_test.clj`
+  (lines 65, 124, 168). Same SUT, same result contract, two spellings across the
+  siblings — the `consistent(test_abstractions)` divergence TS-1 closed for the
+  other shared fixtures, with `ok-turn` left behind. Lift `ok-turn` into
+  `psi.workflow-runtime.step-test-support` (the TS-1 home), have the abort file
+  alias it (`def ^:private … step-test-support/ok-turn`) and drop its private def,
+  and rewrite the 3 inline drive-file turn closures to return
+  `(step-test-support/ok-turn prompt)` while preserving their per-test recording
+  side effects (`swap! turn-calls*` / `swap! submitted*`). Leave the degenerate
+  `(fn [& _] … {:status :ok})` zero-/no-turn stubs (lines 210, 288) untouched —
+  they are intentionally minimal where no turn actually completes. Per test-shaper
+  `consistent(test_abstractions) ∧ economical ∧ helpers_that_compress(ceremony)`.
+  Test-only; no production change; re-run both workflow-runtime drive/abort suites
+  green.
