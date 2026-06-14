@@ -714,3 +714,34 @@ consolidates them — it does not first-author them.
   Slice 6 test is traced under an existing AC (e.g. AC-3 structured-output / AC-5
   abort), naming it in the Final-verification coverage parenthetical so the
   TraceID check accounts for it.
+
+## Implementation-review follow-ups (pass 1)
+
+- [ ] R-1 — Reconcile design.md (source of truth) with the synchronous-drain
+  reality. design.md still presents the F1 async `ai/generate` suspend/resume
+  contract ("N suspend points inside one statechart step") and AC-7's "process
+  restart, replay" resume as realized, but `execute-actor-turn!` is synchronous:
+  the whole N-turn drain runs inside one `:step/enter` action, the statechart
+  never suspends mid-drain, and statechart-level mid-drain restart is a
+  non-occurring path (implementation.md Slice-5 finding). Update design.md to mark
+  the suspend/resume contract as not-yet-realized (synchronous drain) and AC-7
+  resume idempotency as a structural progression guard validated via reconstructed
+  `state*`, not an occurring runtime path — so spec↔code coherence holds and a
+  future reader is not misled. (Capture the `post-drain-envelope` "current-
+  invocation accumulator" caveat as the explicit blocker for any future async F1.)
+
+- [ ] R-2 — Close the later-group multi-message `:contributions` gap. The
+  `:step/enter` `next-group-prompt-fn` discards `:preloaded-messages` (keeps only
+  `:prompt`), so a later prompt-group whose `:contributions` materialize to >1
+  message silently loses every non-final message (group 0 honours preloaded
+  messages; later groups do not). The grammar permits such a group and there is no
+  IR validation, test, or author-doc warning. Either (a) add IR validation
+  rejecting a multi-message later group, (b) handle preloaded-messages for later
+  groups, or (c) document the single-submission-per-later-group limitation in
+  doc/workflow-grammar.md — and add a covering test either way.
+
+- [ ] R-3 — Add `components/workflow-step-materialization/test` to the
+  `:test-paths` alias (deps.edn) so the focused scry runner can load the task-226
+  materialization tests (`core-test`/`source-resolution-test`); they currently run
+  only under CI kaocha (`:test` alias, deps.edn:303). Confirm pre-existing; if
+  out-of-scope for 226, raise a separate tooling task instead.

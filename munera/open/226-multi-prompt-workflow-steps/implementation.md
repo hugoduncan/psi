@@ -1910,3 +1910,47 @@ Final consolidation slice; no production code.
   (fails identically — 4 passed / 16 failed — at session-start commit cf3f43d9f,
   verified in a throwaway base worktree; touches `task-lifecycle.edn` structure,
   not multi-prompt). clj-kondo clean across the edited components.
+
+## Implementation review (task-implementation-review) — ψ, pass 1
+
+Reviewed code+tests+docs against design/plan. Build quality is high: the
+`execute-session-turn-outcome` extraction gives one shared per-turn primitive
+(N=1 degenerate + N>1 driver), IR validation split (`prompt-ref-errors`,
+`ir-error-formatting` extraction) is clean, clj-kondo clean, focused suites green
+(drive-prompt-queue 6 + abort 4 + ir-prompts + progression-recording = 21 tests
+/125 assertions; step-execution/ir/target-ir/compiler 32/288; materialization
+kaocha 25/50). Two actionable findings + one minor observation (see follow-ups):
+
+- **R-1 (coherence, spec↔code). design.md asserts the async F1 suspend/resume
+  contract as realized, but the drain is synchronous.** `execute-actor-turn!` is
+  synchronous, so the whole N-turn drain runs inside one `:step/enter` action; the
+  statechart never suspends mid-drain and `:workflow/resume` fires only from
+  `:blocked` (Slice-5 finding). Consequently AC-7's "process restart, replay"
+  resume path is a documented **non-occurring path** — its covering tests exercise
+  only synthetically reconstructed `state*`, not a real runtime path, and the
+  `post-drain-envelope` "known caveat" (envelope built from the live loop
+  accumulator, not persisted records) is latent. The divergence is captured only
+  here in implementation.md; design.md (source of truth) still presents the async
+  mechanism + AC-7 restart/replay as realized, violating the coherence /
+  source_of_truth ethos. Reconcile design.md to mark the suspend/resume contract
+  as not-yet-realized (synchronous drain) and AC-7 resume as a structural
+  progression guard validated via reconstructed state, not an occurring path.
+
+- **R-2 (latent correctness). Later prompt-groups silently drop multi-message
+  `:contributions`.** The `:step/enter` `next-group-prompt-fn` keeps only
+  `:prompt` from the split and discards `:preloaded-messages`, whereas group 0
+  honours both. A later group authored with multi-message `:contributions`
+  (>1 materialized message — permitted by the group-internal grammar) silently
+  loses every non-final message. There is no IR validation rejecting it, no test,
+  and no author-doc warning (doc/workflow-grammar.md is silent). Slice-3 deviation
+  #3 notes it as "revisit if needed" but it is reachable from authored grammar
+  today. Add a guard (reject multi-message later groups) or handle them, and/or
+  document the limitation + add a covering test.
+
+- **R-3 (minor, likely pre-existing). The focused `:test-paths` alias omits
+  `components/workflow-step-materialization/test`**, so the scry focused runner
+  cannot load the task-226 materialization tests (`core-test`/`source-resolution-test`).
+  CI's kaocha `:test` alias DOES include the dir (deps.edn:303) and the tests pass
+  there, so coverage holds; but the focused/scry path many slices gate on cannot
+  run them. Confirm pre-existing and add materialization/test to `:test-paths` (or
+  note as out-of-scope).
