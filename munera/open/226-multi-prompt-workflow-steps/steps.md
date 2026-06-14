@@ -1341,7 +1341,7 @@ consolidates them — it does not first-author them.
 
 ## Code-shaper review follow-ups (pass 6)
 
-- [ ] CS-7 — Remove the dead ctx injection seam
+- [x] CS-7 — Remove the dead ctx injection seam
   `:materialize-workflow-step-session-conversation-fn`. Task 226 rewired
   `:step/enter` session-conversation derivation to the per-group seam
   (`statechart_runtime.clj:157-159` derives the prompt-queue and materializes the
@@ -1364,3 +1364,17 @@ consolidates them — it does not first-author them.
   `core/step-prompt`'s own test-only-caller status (pre-existing, not introduced
   by 226). Behaviour-preserving; `clj-kondo` clean; re-run agent-session context +
   workflow-runtime suites.
+  **DONE:** confirmed dead first — repo-wide grep (`.clj`/`.cljc`, excluding
+  `target/classes`) found only the registration/destructure/opts/test-support
+  plumbing for `:materialize-workflow-step-session-conversation-fn`, with **zero**
+  `(:materialize-workflow-step-session-conversation-fn ctx)` read sites (the
+  underlying fn `materialize-step-session-conversation` is still called directly
+  by `core.clj:136` + its own tests). Removed the four dead surfaces: the
+  default-ctx registration (`context.clj`), the `create-context*` destructure
+  param, the opts override `(contains? opts …) → (assoc …)` path, and the
+  `test_support.clj` registration. Kept the sibling
+  `:materialize-workflow-prompt-group-conversation-fn` (live per-group seam) and
+  the underlying fn. Behaviour-preserving; `clj-paren-repair` + `clj-kondo` clean;
+  step-execution + drive-prompt-queue (+ abort) 25 tests / 146 assertions green,
+  agent-session dispatch + workflow-async-path (context-building via test-support)
+  17 tests / 114 assertions green.

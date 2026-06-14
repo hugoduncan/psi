@@ -315,7 +315,6 @@
                        :list-context-sessions-fn     ss/list-context-sessions-in
                        :find-skill-fn                psi.skill-registry.root-storage/find-skill-in
                        :resolve-workflow-step-session-config-fn psi.workflow-step-session-config.core/resolve-step-session-config
-                       :materialize-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/materialize-step-session-conversation
                        :materialize-workflow-prompt-group-conversation-fn psi.workflow-step-materialization.core/materialize-prompt-group-conversation
                        :split-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/split-step-session-conversation
                        :execute-workflow-judge-fn    psi.agent-session.workflow-judge/execute-judge!

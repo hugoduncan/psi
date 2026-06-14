@@ -3474,3 +3474,27 @@ any prior pass (none touched the ctx-injection seams).
   out of CS-7 scope: `core/step-prompt` itself currently has only test callers —
   a pre-existing condition not introduced by 226.) Behaviour-preserving;
   `clj-kondo` clean; re-run agent-session context + workflow-runtime suites.
+
+### Code-shaper follow-up execution (pass 6 — CS-7)
+
+Removed the dead `:materialize-workflow-step-session-conversation-fn` ctx seam.
+Confirmed dead first: repo-wide grep (`.clj`/`.cljc`, excluding `target/classes`)
+found only registration/destructure/opts/test-support plumbing — **zero**
+`(:materialize-workflow-step-session-conversation-fn ctx)` read sites. The
+underlying fn `materialize-step-session-conversation` is still called directly
+(`workflow-step-materialization/core.clj:136` + its own `core-test`), so only the
+dead ctx-key plumbing was removed:
+
+- `agent_session/context.clj` — default-ctx registration line, the
+  `create-context*` destructure param, and the `(contains? opts …) → (assoc …)`
+  opts override path.
+- `agent_session/test_support.clj` — the test-support registration line.
+
+Kept the live sibling seam `:materialize-workflow-prompt-group-conversation-fn`
+(the per-group seam `:step/enter` actually drives) and the
+`:split-workflow-step-session-conversation-fn` seam (still ctx-invoked). Verified
+`create-context*` still builds (the dropped destructure key was only forwarded by
+the now-removed opts override). Behaviour-preserving; `clj-paren-repair` +
+`clj-kondo` clean. step-execution + drive-prompt-queue (+ abort) 25 tests / 146
+assertions green; agent-session dispatch + workflow-async-path (context built via
+test-support) 17 tests / 114 assertions green.
