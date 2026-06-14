@@ -49,11 +49,11 @@
 
 ## Slice 5 — Documentation and changelog
 
-- [ ] Update `doc/workflows.md` to describe `review-task-design` as a batch-review-then-follow-up workflow using one multi-prompt `design-review` step.
-- [ ] Document in `doc/workflows.md` that the batch shape deliberately differs from the old interleaved per-phase follow-up topology.
-- [ ] Document in `doc/workflows.md` that the single design follow-up executes only unchecked items newly added by the immediately preceding review batch using the git/task-file evidence rule.
-- [ ] Update `doc/workflows.md` or nearby workflow grammar docs only if needed to reference the existing per-prompt output refs used by the exemplar.
-- [ ] Add a `CHANGELOG.md` `[Unreleased]` entry for the user-visible `review-task-design` workflow topology change and stricter pass-feedback validation.
+- [x] Update `doc/workflows.md` to describe `review-task-design` as a batch-review-then-follow-up workflow using one multi-prompt `design-review` step.
+- [x] Document in `doc/workflows.md` that the batch shape deliberately differs from the old interleaved per-phase follow-up topology.
+- [x] Document in `doc/workflows.md` that the single design follow-up executes only unchecked items newly added by the immediately preceding review batch using the git/task-file evidence rule.
+- [x] Update `doc/workflows.md` or nearby workflow grammar docs only if needed to reference the existing per-prompt output refs used by the exemplar.
+- [x] Add a `CHANGELOG.md` `[Unreleased]` entry for the user-visible `review-task-design` workflow topology change and stricter pass-feedback validation.
 
 ## Slice 6 — Verification and cleanup
 

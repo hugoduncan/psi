@@ -652,45 +652,63 @@ runtime.
 Tokens that do not match the var pattern (e.g. `{{1bad}}`, `{{}}`) pass through
 literally and are not subject to this check.
 
-## Architectural-fit design review
+## Batch design review
 
-`review-task-design` reviews a Munera task `design.md` along three aspects, in
-order: **architectural fit**, then **ambiguity**, then **inconsistency**.
+`review-task-design` reviews a Munera task `design.md` along three aspects in
+one shared `design-review` multi-prompt session step:
 
-The architectural-fit aspect runs **first** so structural misfit is caught
-before fine-grained clarity/consistency polishing. Its `architecture-review`
-step is the workflow's start step (the first `:steps` element) and loads the
-`review-task-architecture` skill — a thin lens that asks the reviewing agent to
-check the design's fit with the current architecture, consulting the in-context
-architecture sources (`AGENTS.md`, `META.md`, `doc/architecture.md`) as needed.
-It judges architectural *fit* — does the design follow the one-way principle,
-the dispatch/resolver/mutation boundaries, VSM layering, extension isolation,
-effects-as-data, and the "no silent shims/adapters/compatibility layers" rule —
-rather than correctness, clarity, or completeness.
+1. **architecture** — architectural fit
+2. **ambiguity** — design ambiguity
+3. **inconsistency** — internal and referenced-artifact inconsistency
 
-Like the ambiguity and inconsistency aspects, architectural fit is a review
-step + follow-up step pair gated by `pass-status-routing`: actionable misfits
-are recorded as unchecked `design-steps.md` items, the `architecture-follow-up`
-step reuses the shared `design`-profile follow-up (see below) to execute them,
-and each pass advances deterministically through `architecture → ambiguity →
-inconsistency → clarity-status`. `review-task-design` completes the remaining
-phases in the current pass even when an earlier phase produced actionable
-feedback. The `clarity-status` step is EDN invoke routing, not a standalone
-prompt workflow; it remembers whether any phase in the completed pass returned
-`ACTIONABLE_FEEDBACK` from the phase outputs rather than re-reading task
-artifacts after follow-up execution. A clean pass goes to `final-summary`; a
-feedback pass restarts at `architecture-review` with `:max-iterations 6`, so the
-workflow can enter the first phase at most six total times including the initial
-pass.
+The three prompts run as back-to-back turns in the same workflow-owned child
+session. The first architecture turn reads the task `design.md` and consults the
+in-context architecture sources (`AGENTS.md`, `META.md`, and
+`doc/architecture.md`) as needed. The later ambiguity and inconsistency turns use
+that already-loaded design/architecture context and prior review replies by
+default, performing only targeted re-reads for missing, ambiguous, or stale facts.
+
+This is intentionally a **batch-review-then-follow-up** topology. Earlier
+versions interleaved review and follow-up per aspect (`architecture review →
+architecture follow-up → ambiguity review → ...`). The current workflow instead
+runs the whole three-prompt review batch against the same pre-follow-up design,
+then routes once after the queue drains:
+
+```text
+design-review --DONE--> final-summary
+design-review --REPEAT--> design-follow-up
+design-follow-up --DONE, :max-iterations 6--> design-review
+```
+
+Post-drain routing uses the deterministic `workflow/pass-feedback-routing`
+operation over the three per-prompt final replies, addressed through refs such as
+`{:step "design-review" :prompt "architecture" :output :final-llm-reply}`. The
+router validates every supplied reply with the review `PASS_STATUS` grammar: each
+reply must contain exactly one `PASS_STATUS: ACTIONABLE_FEEDBACK` or
+`PASS_STATUS: REVIEW_COMPLETE` line. Missing, duplicate, malformed, or
+implementation-only statuses fail the workflow instead of being silently treated
+as complete. When all replies are valid, the pass routes `REPEAT` iff any prompt
+returned `ACTIONABLE_FEEDBACK`; otherwise it routes `DONE`.
+
+The `architecture` prompt still judges architectural *fit* — whether the design
+follows the one-way principle, dispatch/resolver/mutation boundaries, VSM
+layering, extension isolation, effects-as-data, and the "no silent
+shims/adapters/compatibility layers" rule — rather than correctness, clarity, or
+completeness.
+
+A clean batch goes to `final-summary`. A feedback batch runs one
+`design-follow-up` step and then starts another full `design-review` batch. The
+workflow can enter `design-review` at most six total times including the initial
+pass; the workflow runtime counts `:max-iterations` as total target-step entries,
+including the initial entry.
 
 ## Shared review follow-up steps
 
 The review workflows (`review-task-design`, `review-task-plan`, and the
 `review-step` sub-workflow that `review-task-implementation` delegates to) all
-run the same kind of follow-up step after each review pass: execute the
-unchecked items the preceding review pass just added, update the in-scope task
-artifacts, mark completed items done, leave blocked items unchecked with a terse
-`implementation.md` reason, and commit.
+run follow-up steps that execute the unchecked items the preceding review pass
+just added, update the in-scope task artifacts, mark completed items done, leave
+blocked items unchecked with a terse `implementation.md` reason, and commit.
 
 That follow-up behaviour is shared across hosts via **two** profile follow-up
 `.md` files, referenced with `:prompt-workflow`. A profile is chosen by *which*
@@ -701,11 +719,21 @@ file a host references — there is no per-step parameter to get wrong:
 | `design` | `review-follow-up-design.md` | `design-steps.md` | `design.md`, `design-steps.md`, `implementation.md` | `plan.md`/`steps.md` (forbidden) |
 | `steps`  | `review-follow-up-steps.md`  | `steps.md`        | `plan.md`, `steps.md`, `implementation.md`, plus referenced code/tests/docs | `design.md` (read-only context)  |
 
-- `review-task-design` references the `design`-profile follow-up from its
-  `architecture-follow-up`, `ambiguity-follow-up`, and `inconsistency-follow-up`
-  steps.
-- `review-task-plan` and `review-step` reference the `steps`-profile follow-up;
-  `review-task-implementation` inherits it transitively via `review-step`.
+- `review-task-design` references the `design` profile from its single
+  `design-follow-up` step after the whole three-prompt review batch.
+- `review-task-plan` and `review-step` reference the `steps` profile from their
+  per-aspect/per-review follow-up steps; `review-task-implementation` inherits it
+  transitively via `review-step`.
+
+For `review-task-design`, "preceding review pass" means the immediately
+preceding whole `design-review` batch, not one prompt within it. The design
+follow-up executes only unchecked `design-steps.md` items newly added by that
+batch. It identifies them from task-scoped git history and a `design-steps.md`
+diff from the batch baseline to current `HEAD`, then matches the added checklist
+lines to currently unchecked items. Pre-existing unchecked items, checked items,
+stale edited items, and unattributable/ambiguous items are left untouched; the
+follow-up records a terse blocking note in `implementation.md` rather than
+guessing.
 
 The `steps` profile hosts both plan review and *implementation* review. When it
 hosts implementation review (via `review-step`), follow-up items routinely
@@ -714,23 +742,16 @@ require editing the actual code, tests, and docs they reference — so the
 artifacts, not just the task files. For plan review there are simply no
 code/test items to edit, so the broader scope is harmless.
 
-Each shared file uses generic "preceding review pass" wording rather than naming
-a specific review aspect: every host wires the follow-up immediately after its
-review step, so "the preceding review pass" is unambiguous at runtime. Both
-profiles execute only the items the immediately preceding review pass added,
-leaving any pre-existing unchecked items untouched.
-
 Host routing owns repetition; only the follow-up step *body* is shared.
-`review-task-design` and `review-task-plan` both finish every phase in the
-current pass before the deterministic `clarity-status` invoke step decides
-whether to restart another full pass from the first phase. `review-task-design`
-can enter `architecture-review` at most six total times, and `review-task-plan`
-can enter `ambiguity-review` at most five total times. `review-step` loops back
-to its `review` step (`REPEAT → review`) with `:max-iterations 10`, so
-implementation-review profiles delegated through `review-task-implementation`
-can enter the review step at most ten total times (the initial review plus up to
-nine follow-up-driven re-reviews). The workflow runtime counts
-`:max-iterations` as total target-step entries, including the initial entry.
+`review-task-plan` finishes every phase in the current pass before the
+deterministic `clarity-status` invoke step decides whether to restart another
+full pass from the first phase, and can enter `ambiguity-review` at most five
+total times. `review-step` loops back to its `review` step (`REPEAT → review`)
+with `:max-iterations 10`, so implementation-review profiles delegated through
+`review-task-implementation` can enter the review step at most ten total times
+(the initial review plus up to nine follow-up-driven re-reviews). The workflow
+runtime counts `:max-iterations` as total target-step entries, including the
+initial entry.
 
 ## Task knowledge extraction
 
