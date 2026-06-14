@@ -911,7 +911,7 @@ consolidates them — it does not first-author them.
 
 ## Test-review follow-ups (pass 2)
 
-- [ ] TR-3 — Add a behaviour-coverage assertion for design C3 (AC-2/AC-3): the
+- [x] TR-3 — Add a behaviour-coverage assertion for design C3 (AC-2/AC-3): the
   N=1 unnamed `:contributions` `execute-session-step!` envelope carries **no**
   `:prompt-group-outputs` (per-prompt records are named-`:prompts`-only). Add
   `(is (not (contains? outputs :prompt-group-outputs)))` to both `testing` blocks
@@ -920,7 +920,13 @@ consolidates them — it does not first-author them.
   per-prompt records into the degenerate envelope is caught. Currently the
   absence is asserted nowhere (only the IR-level no-`:name` derivation and the
   presence of step-level keys are pinned).
-- [ ] TR-4 — Re-base the hand-rolled run/attempt `state*` fixtures in
+  **DONE:** added `(is (not (contains? … :prompt-group-outputs)))` to both the
+  text block (over the bound `outputs`) and the structured block (over
+  `(:outputs payload)`) of
+  `single-prompt-session-step-envelope-characterization-test`. Test-only;
+  full workflow-runtime suite 132 tests / 721 assertions green (+2). See
+  implementation.md "Test-review follow-up execution (pass 2)".
+- [x] TR-4 — Re-base the hand-rolled run/attempt `state*` fixtures in
   `step_execution_drive_prompt_queue_test.clj` +
   `step_execution_drive_prompt_queue_abort_test.clj` (`running-attempt-state*`,
   `recorded-turns-state*`) onto the canonical constructors (`create-run` +
@@ -930,3 +936,13 @@ consolidates them — it does not first-author them.
   real run/attempt shape the production `latest-attempt`-based readers navigate,
   so a canonical-shape change can't leave the tests green against a stale
   literal while production breaks.
+  **DONE:** added two shared canonical builders
+  (`canonical-running-run-state` = register + `create-run` +
+  `append-attempt-to-run` + `start-latest-attempt`; `canonical-recorded-run-state`
+  = the former plus per-prompt `records` recorded via `record-prompt-group-turn`)
+  to the workflow-runtime test support ns `step_test_support.clj` rather than
+  duplicating across both files (consistency / λone_way). Each file's thin
+  `running-attempt-state*` / `recorded-turns-state*` wrappers now atom-wrap the
+  shared builders; all call sites unchanged. `clj-kondo` clean; focused run
+  34 tests / 190 assertions green; full workflow-runtime suite 132 / 721 green.
+  See implementation.md "Test-review follow-up execution (pass 2)".

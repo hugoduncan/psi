@@ -2422,3 +2422,48 @@ unchecked items in steps.md.
   cases legitimately model a post-restart reload; even there, building the base
   via the constructors and then layering the recorded `:prompt-group-turns`
   preserves the restart semantics while tracking the canonical shape.)
+
+## Test-review follow-up execution (pass 2)
+
+Executed the two newly-added test-review-pass-2 items (TR-3, TR-4). Both are
+test-only (TR-3 adds an assertion; TR-4 re-bases fixtures); no production code
+changed.
+
+- **TR-3 — DONE.** Added `(is (not (contains? outputs :prompt-group-outputs)))`
+  to **both** `testing` blocks of
+  `single-prompt-session-step-envelope-characterization-test`
+  (`step_execution_test.clj`) — the text block (over the bound `outputs`) and the
+  structured block (over `(:outputs payload)`). Now a refactor leaking an
+  (empty or populated) `:prompt-group-outputs` into the N=1 unnamed
+  `:contributions` `execute-session-step!` envelope is caught, completing the
+  AC-2/AC-3 C3 named-only-addressing coverage (absence was previously asserted
+  nowhere).
+
+- **TR-4 — DONE.** Re-based the hand-rolled `running-attempt-state*` /
+  `recorded-turns-state*` fixtures (in both
+  `step_execution_drive_prompt_queue_test.clj` and
+  `step_execution_drive_prompt_queue_abort_test.clj`) onto canonical
+  constructors. Added two shared builders to the existing workflow-runtime test
+  support ns `step_test_support.clj` (the natural home; both files already sit in
+  that component's test tree) rather than duplicating the canonical-construction
+  logic in each file (consistency / λone_way):
+  - `canonical-running-run-state` — `register-definition` +
+    `create-run` + `append-attempt-to-run` + `start-latest-attempt` (mirrors
+    `progression_recording_test/base-state-with-run`), parameterized by
+    `run-id`/`step-id` over a minimal single-session-step definition.
+  - `canonical-recorded-run-state` — the running state plus per-prompt `records`
+    recorded canonically via `record-prompt-group-turn` (so reconstructed
+    restart/replay fixtures carry the real `:prompt-group-turns` shape +
+    `:recorded-at`, not a literal). The Slice-5 replay test already dissocs
+    `:recorded-at` before comparison, so canonical recording is transparent.
+  Each file's thin `running-attempt-state*` / `recorded-turns-state*` wrappers now
+  atom-wrap these shared builders, leaving every call site unchanged. The
+  drive/abort tests are now coupled to the canonical run/attempt shape the
+  production `latest-attempt`-based readers navigate, so a canonical-shape change
+  can no longer leave them green against a stale literal while production breaks.
+
+  **Verification.** `clj-kondo` clean; `clj-paren-repair` no changes. Focused
+  run (step-execution-test + drive-prompt-queue-test + abort-test +
+  progression-recording-test) 34 tests / 190 assertions green; full
+  workflow-runtime suite 132 tests / 721 assertions green (+2 assertions from
+  TR-3, no regressions from the shared-fixture re-base).

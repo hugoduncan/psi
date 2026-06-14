@@ -7,6 +7,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.progression-recording :as progression-recording]
    [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
+   [psi.workflow-runtime.step-test-support :as step-test-support]
    [psi.workflow-step-materialization.core :as materialization]))
 
 (defn- user-text-message
@@ -19,14 +20,10 @@
 
 (defn- running-attempt-state*
   "A canonical state* atom with one started (running, no per-prompt records)
-   latest attempt for `run-id`/`step-id`."
+   latest attempt for `run-id`/`step-id`, built via the real run/attempt
+   constructors (TR-4)."
   [run-id step-id]
-  (atom {:workflows
-         {:runs
-          {run-id {:run-id run-id
-                   :status :running
-                   :step-runs {step-id {:attempts [{:attempt-id "attempt-1"
-                                                    :status :running}]}}}}}}))
+  (atom (step-test-support/canonical-running-run-state run-id step-id)))
 
 (defn- recording-record-turn-fn
   "Mirror the production record-turn-fn: persist one per-prompt turn record
@@ -172,16 +169,12 @@
 (defn- recorded-turns-state*
   "A canonical state* reconstructed (as if reloaded after a process restart /
    rebuilt by event-log replay) carrying the given per-prompt turn `records` on
-   the latest attempt for `run-id`/`step-id`. Models persisted progression that
-   survives a restart independent of any in-memory queue-driver loop state."
+   the latest attempt for `run-id`/`step-id`. Built via the real run/attempt
+   constructors with the records recorded canonically (TR-4), modelling persisted
+   progression that survives a restart independent of any in-memory queue-driver
+   loop state."
   [run-id step-id records]
-  (atom {:workflows
-         {:runs
-          {run-id {:run-id run-id
-                   :status :running
-                   :step-runs {step-id {:attempts [{:attempt-id "attempt-1"
-                                                    :status :running
-                                                    :prompt-group-turns (vec records)}]}}}}}}))
+  (atom (step-test-support/canonical-recorded-run-state run-id step-id records)))
 
 ;;;; task 226 Slice 5 — resume-from-progression across process-restart / replay.
 ;;;;

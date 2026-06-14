@@ -8,20 +8,18 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.progression-recording :as progression-recording]
-   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]))
+   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
+   [psi.workflow-runtime.step-test-support :as step-test-support]))
 
 (defn- assistant-text-message
   [text]
   {:role "assistant" :content [{:type :text :text text}]})
 
 (defn- running-attempt-state*
+  "A canonical state* atom with one started (running) latest attempt for
+   `run-id`/`step-id`, built via the real run/attempt constructors (TR-4)."
   [run-id step-id]
-  (atom {:workflows
-         {:runs
-          {run-id {:run-id run-id
-                   :status :running
-                   :step-runs {step-id {:attempts [{:attempt-id "attempt-1"
-                                                    :status :running}]}}}}}}))
+  (atom (step-test-support/canonical-running-run-state run-id step-id)))
 
 (defn- recording-record-turn-fn
   [state* run-id step-id]

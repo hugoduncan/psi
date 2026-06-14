@@ -533,6 +533,9 @@
         (is (= [assistant-message] (:transcript outputs)))
         (is (= "child-session" (:session-id outputs)))
         (is (contains? outputs :logprobs))
+        ;; C3 (AC-2/AC-3): the N=1 unnamed `:contributions` degenerate carries no
+        ;; per-prompt records — `:prompt-group-outputs` is named-`:prompts`-only.
+        (is (not (contains? outputs :prompt-group-outputs)))
         (is (= :actor/done (:event (first @event-queue*)))))))
 
   (testing "single-prompt structured session step binds the declared structured output key"
@@ -574,6 +577,9 @@
         (is (contains? (:outputs payload) :classification))
         (is (= :valid (get-in classification [:structured-output :status])))
         (is (= {:decision :pass} (get-in classification [:structured-output :value])))
+        ;; C3 (AC-2/AC-3): the N=1 unnamed `:contributions` degenerate carries no
+        ;; per-prompt records — `:prompt-group-outputs` is named-`:prompts`-only.
+        (is (not (contains? (:outputs payload) :prompt-group-outputs)))
         (is (= :actor/done (:event (first @event-queue*))))))))
 
 (deftest assistant-message-text-test
