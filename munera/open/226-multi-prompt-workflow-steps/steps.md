@@ -1131,16 +1131,26 @@ consolidates them — it does not first-author them.
 
 ## Docs-review follow-ups (pass 1)
 
-- [ ] DOC-1 — Define the EBNF nonterminals `prompt-name` and `relative-md-path`
+- [x] DOC-1 — Define the EBNF nonterminals `prompt-name` and `relative-md-path`
   introduced by the `prompt-group` production in `doc/workflow-grammar.md`
   (lines 43–44). Add them to the terminal-definition list (grammar.md:182–199)
   alongside `step-name ::= string` (e.g. `prompt-name ::= string`;
   `relative-md-path ::= string`), so the grammar reference has no dangling
   nonterminals.
-- [ ] DOC-2 — Reconcile the `session-step` EBNF production
+  **DONE:** added `prompt-name ::= string` and `relative-md-path ::= string` to
+  the terminal-definition list immediately after `step-name ::= string`
+  (grammar.md:185–186). Both nonterminals are now referenced (`prompt-group`,
+  `session-step`) and defined; no dangling nonterminals remain.
+- [x] DOC-2 — Reconcile the `session-step` EBNF production
   (`doc/workflow-grammar.md`:35–40) with the new Step-level precedence prose
   (grammar.md:235) and the implementation: step-level `:prompt-workflow` is a
   valid single-prompt session form (xor `:prompts`, resolves to `:contributions`
   per `compiler.clj:153–165`), but the production shows only
   `(:contributions … | :prompts …)`. Add the step-level `:prompt-workflow`
   alternative to the production so the EBNF and the precedence rule agree.
+  **DONE:** the `session-step` production now lists three alternatives —
+  `(:contributions [contribution+] | :prompt-workflow relative-md-path |
+  :prompts [prompt-group+])` — matching the Step-level precedence prose
+  (`:contributions`/`:prompt-workflow` xor `:prompts`) and the compiler, where
+  step-level `:prompt-workflow` is allowed only on `:session` steps and resolves
+  to `:contributions` (`workflow_loader/compiler.clj` `compile-prompt-workflow-step`).

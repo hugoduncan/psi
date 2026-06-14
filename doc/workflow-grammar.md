@@ -35,7 +35,9 @@ invoke-step ::= {:name step-name
 session-step ::= {:name step-name
                   :type :session
                   session-config-entry*
-                  (:contributions [contribution+] | :prompts [prompt-group+])
+                  (:contributions [contribution+]
+                   | :prompt-workflow relative-md-path
+                   | :prompts [prompt-group+])
                   outputs?
                   yields?
                   control-flow*}
@@ -180,6 +182,8 @@ yields ::= {:type :data :data output-keyword}
 output-keyword ::= keyword
 
 step-name ::= string
+prompt-name ::= string
+relative-md-path ::= string
 workflow-ref ::= {:type :workflow-ref
                  :name workflow-name}
 

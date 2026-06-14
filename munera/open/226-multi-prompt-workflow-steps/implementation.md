@@ -2992,3 +2992,22 @@ docs pass).
   `:prompt-workflow` as a legal step-level key, so the production and the
   precedence prose disagree within one document. (Pre-existing gap that the task's
   new prose now makes an active inconsistency.)
+
+## Docs-review follow-up execution (pass 1 — DOC-1, DOC-2)
+
+Both docs-review follow-ups are documentation-only (`doc/workflow-grammar.md`);
+no code/test change required.
+
+- **DOC-1 done.** Added `prompt-name ::= string` and `relative-md-path ::= string`
+  to the terminal-definition list directly after `step-name ::= string`
+  (grammar.md:185–186). Both nonterminals — referenced by the `prompt-group` and
+  (post-DOC-2) `session-step` productions — are now defined; no dangling
+  nonterminals remain in the EBNF.
+- **DOC-2 done.** Expanded the `session-step` prompt-source alternation to three
+  forms: `(:contributions [contribution+] | :prompt-workflow relative-md-path |
+  :prompts [prompt-group+])`. This matches the Step-level precedence prose
+  (`:contributions`/`:prompt-workflow` xor `:prompts`) and the compiler
+  (`workflow_loader/compiler.clj` `compile-prompt-workflow-step`: step-level
+  `:prompt-workflow` allowed only on `:session` steps, resolves to
+  `:contributions`). The EBNF production and the precedence rule now agree within
+  the document.
