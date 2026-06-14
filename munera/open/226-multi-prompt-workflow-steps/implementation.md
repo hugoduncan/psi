@@ -2906,3 +2906,39 @@ Executed the two pass-9 follow-ups. Test-only; no production change.
 Verification: `clj-paren-repair` no-op on all three files; `clj-kondo` clean;
 both drain suites 13 tests / 61 assertions green (was 14/64 — one folded test, its
 3 assertions); full workflow-runtime suite 132 tests / 723 assertions green.
+
+## Test-shaper review (pass 10) — ψ
+
+Fresh full-suite re-application of `λtests. clarity ∧ signal ∧ robustness ∧
+economy → shape` after the pass-9 TS-3/TS-4 fixes. Read the drain suites
+(`step_execution_drive_prompt_queue_test`, `_abort_test`), the shared
+`step_test_support`, `ir_prompts_test`, `progression_recording_test`,
+`step_execution_test` (incl. the Slice-1 characterization), `source_resolution_test`,
+and `compiler_test`'s `compile-edn-prompts-step-test`.
+
+**No new actionable findings.** The suite is well-shaped against all four lenses:
+
+- **Economy/consistency** — the substantive cross-namespace duplication is already
+  resolved: drain fixtures + `drive!` (TS-1), `ok-turn` (TS-2), and the
+  progression-record read idiom (TS-3) are single-homed in `step-test-support`;
+  the near-duplicate resume test is folded (TS-4). No remaining redundant tests.
+- **Robustness** — fixtures build state via the real run/attempt constructors
+  (TR-4/TR-5), so they cannot drift green against a stale literal; infra deps use
+  injectable/nullable seams (`:workflow-execute-actor-turn-fn`) for the
+  task-introduced tests (T-1), `¬mock`/`¬stub`.
+- **Signal** — assertions are state/output-based with meaningful failure messages
+  on the load-bearing checks (turn counts, terminal events, retained records).
+- **Coverage** — AC-1..AC-8 each map to a covering test (TR-3/TR-6/TR-7/T-2
+  closed the prior gaps); abort paths (intermediate/final `:failed`,
+  inter-/between-prompt `:cancelled`, final-turn `:blocked` both branches) are
+  each their own single-concern test.
+
+Non-actionable observations (below the signal floor, not raised as follow-ups):
+the two sibling drain namespaces differ cosmetically in `ctx` construction (drive
+suite let-binds `ctx`; abort suite inlines it in the `drive!` map) — identical
+shape, no comprehension cost; and the temp-dir try/finally ceremony in
+`compiler_test` is a pre-existing file-wide pattern the new prompts test
+correctly mirrors (reworking it is out of task scope). Neither warrants churn
+after the substantive consolidation already done.
+
+Conclusion: REVIEW_COMPLETE.
