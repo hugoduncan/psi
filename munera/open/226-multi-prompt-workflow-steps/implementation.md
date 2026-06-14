@@ -2942,3 +2942,53 @@ correctly mirrors (reworking it is out of task scope). Neither warrants churn
 after the substantive consolidation already done.
 
 Conclusion: REVIEW_COMPLETE.
+
+## Docs review (review-task-docs skill) — ψ
+
+Reviewed user-facing docs for the implemented task per `review-task-docs`
+(README.md, doc/, CHANGELOG.md). Scope: accuracy/completeness/consistency of
+the task's doc deltas vs the implementation. Diffed docs vs task base
+`04861433f`: `CHANGELOG.md`, `doc/workflow-grammar.md` (+138), and
+`doc/workflow-grammar-concepts.md` (+43) changed.
+
+Verified-correct:
+- **CHANGELOG** `[Unreleased] Added` entry accurately describes the `:prompts`
+  capability (ordered named groups, same shared child session, author-order
+  drain-before-route, step/per-prompt surfaces, final-turn structured output,
+  `:prompt` text-only addressing, resume idempotency, `:failed`/`:cancelled`/
+  `:blocked` outcomes). The `:invoke`+`:judge` *Fixed* entry is task **228**
+  (commit `23e3b5573`), not in 226 scope.
+- **Payload accuracy**: grammar.md's `:failed-prompt {:index … :name …}` matches
+  `step_execution.clj:431`. Final-turn-only structured output, upfront vs
+  final-turn `:blocked`, per-prompt text surfaces (`:final-llm-reply`/
+  `:transcript`), the `:prompt`-only-on-`:output` structural rejection, and the
+  post-drain-judge carve-out all match the code/Slice deviations.
+- **Realized-vs-target** synchronous-drain note in grammar.md is consistent with
+  the R-1-reconciled design and implementation.
+- **README.md** needs no change: it routes workflow usage to `doc/workflows.md`
+  and does not enumerate grammar surfaces.
+- concepts.md adds `{:step … :prompt … :output …}` to the shared data-flow
+  surface enumeration — consistent with grammar.md.
+
+Two actionable consistency defects found in `doc/workflow-grammar.md`
+(grammar-reference EBNF); recorded as unchecked items in steps.md. Not
+duplicates of any prior pass (all prior passes were design/plan/impl/test, none a
+docs pass).
+
+- **DOC-1 — EBNF `prompt-group` production uses undefined nonterminals.** The new
+  `prompt-group ::= {:name prompt-name (:prompt-workflow relative-md-path |
+  :contributions [contribution+])}` (grammar.md:43–44) references `prompt-name`
+  and `relative-md-path`, but neither is defined in the terminal-definition list
+  (grammar.md:182–199) where `step-name ::= string`, `workflow-name`,
+  `operation-id`, etc. are defined. Dangling nonterminals make the EBNF
+  internally incomplete/inconsistent.
+- **DOC-2 — session-step EBNF omits step-level `:prompt-workflow`, which the new
+  prose precedence rule relies on.** The `session-step` production
+  (grammar.md:35–40) shows only `(:contributions [contribution+] | :prompts
+  [prompt-group+])`, but the new Step-level precedence prose (grammar.md:235) and
+  the implementation (`compiler.clj:153–165`, "`:prompt-workflow` is allowed only
+  on `:session` steps") treat step-level `:prompt-workflow` as a valid
+  single-prompt form (xor `:prompts`). A reader of the EBNF production cannot see
+  `:prompt-workflow` as a legal step-level key, so the production and the
+  precedence prose disagree within one document. (Pre-existing gap that the task's
+  new prose now makes an active inconsistency.)
