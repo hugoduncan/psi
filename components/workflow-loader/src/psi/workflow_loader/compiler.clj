@@ -175,6 +175,73 @@
                    (assoc :contributions (markdown-body->contribution (:body referenced)
                                                                       (:vars referenced))))})))))
 
+(defn- compile-prompt-group
+  "Resolve one authored prompt-group's body into `:contributions` (task 226).
+
+   Within a group the body is `:prompt-workflow` XOR `:contributions` (mirrors
+   the step-level rule): both => error, neither => error. Per-prompt session
+   config is out of scope; session config is shared at the step level, so a
+   group's `:prompt-workflow` contributes only its markdown body."
+  [workflow-path group]
+  (let [has-prompt-workflow? (contains? group :prompt-workflow)
+        has-contributions? (contains? group :contributions)]
+    (cond
+      (and has-prompt-workflow? has-contributions?)
+      (invalid "A prompt-group must define `:prompt-workflow` XOR `:contributions`, not both")
+
+      (and (not has-prompt-workflow?) (not has-contributions?))
+      (invalid "A prompt-group must define `:prompt-workflow` or `:contributions`")
+
+      has-prompt-workflow?
+      (let [prompt-workflow (:prompt-workflow group)]
+        (cond
+          (not (string? prompt-workflow))
+          (invalid "A prompt-group `:prompt-workflow` must be a relative .md file string")
+
+          (not (relative-prompt-workflow-path? prompt-workflow))
+          (invalid "A prompt-group `:prompt-workflow` must be a relative .md path within the consuming workflow directory")
+
+          :else
+          (let [{referenced :ok reference-error :error}
+                (read-prompt-workflow workflow-path prompt-workflow)]
+            (if reference-error
+              {:error reference-error}
+              {:ok (-> group
+                       (dissoc :prompt-workflow)
+                       (assoc :contributions (markdown-body->contribution (:body referenced)
+                                                                          (:vars referenced))))}))))
+
+      :else
+      {:ok group})))
+
+(defn- compile-prompts-step
+  "Resolve an authored multi-prompt `:prompts` session step (task 226).
+
+   Validates step-level precedence (`:prompts` excludes a step-level
+   `:contributions`/`:system-prompt`/`:prompt-workflow` prompt source) and
+   resolves each prompt-group's body into `:contributions`."
+  [workflow-path step]
+  (cond
+    (not= :session (:type step))
+    (invalid "`:prompts` is allowed only on `:session` steps")
+
+    (prompt-source-conflict? step)
+    (invalid "`:prompts` cannot be combined with a step-level `:contributions`/`:system-prompt` prompt source")
+
+    (contains? step :prompt-workflow)
+    (invalid "`:prompts` cannot be combined with a step-level `:prompt-workflow`")
+
+    :else
+    (loop [remaining (:prompts step)
+           compiled []]
+      (if (empty? remaining)
+        {:ok (assoc step :prompts compiled)}
+        (let [{compiled-group :ok group-error :error}
+              (compile-prompt-group workflow-path (first remaining))]
+          (if group-error
+            {:error group-error}
+            (recur (rest remaining) (conj compiled compiled-group))))))))
+
 (defn- compile-edn-steps
   [workflow-path steps]
   (loop [remaining steps
@@ -182,12 +249,22 @@
     (if (empty? remaining)
       {:ok compiled}
       (let [step (first remaining)]
-        (if (contains? step :prompt-workflow)
+        (cond
+          (contains? step :prompts)
+          (let [{compiled-step :ok step-error :error}
+                (compile-prompts-step workflow-path step)]
+            (if step-error
+              {:error step-error}
+              (recur (rest remaining) (conj compiled compiled-step))))
+
+          (contains? step :prompt-workflow)
           (let [{compiled-step :ok step-error :error}
                 (compile-prompt-workflow-step workflow-path step)]
             (if step-error
               {:error step-error}
               (recur (rest remaining) (conj compiled compiled-step))))
+
+          :else
           (recur (rest remaining) (conj compiled step)))))))
 
 (defn- compile-edn-workflow-file

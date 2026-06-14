@@ -182,6 +182,14 @@
     (contains? step :max-iterations)
     (assoc :max-iterations (:max-iterations step))))
 
+(defn- compile-prompt-group
+  "Compile an authored named prompt-group into a canonical IR prompt-group
+   (task 226). Each group carries its `:name` and compiled `:contributions`;
+   per-prompt session config is shared at the step level, not per group."
+  [{:keys [name contributions]}]
+  {:name name
+   :contributions (mapv compile-contribution contributions)})
+
 (defn- compile-step
   [{:keys [type] :as step}]
   (case type
@@ -192,8 +200,10 @@
 
     :session
     (assoc (compile-common-step-fields step)
-           :session (assoc (compile-session-config step [:model :session-profile :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])
-                           :contributions (mapv compile-contribution (:contributions step))))
+           :session (let [session-config (compile-session-config step [:model :session-profile :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])]
+                      (if (contains? step :prompts)
+                        (assoc session-config :prompts (mapv compile-prompt-group (:prompts step)))
+                        (assoc session-config :contributions (mapv compile-contribution (:contributions step))))))
 
     :delegate
     (assoc (compile-common-step-fields step)

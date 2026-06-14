@@ -198,6 +198,11 @@
     profile-names/valid-profile-name?]])
 
 (def session-spec-schema
+  ;; A session step carries EITHER a single-prompt `:contributions` (the N=1
+  ;; degenerate unnamed group) OR an ordered `:prompts` queue of named groups
+  ;; (task 226). The step-level `:contributions` xor `:prompts` rule is enforced
+  ;; semantically (`session-prompt-queue-errors`); the schema keeps both optional
+  ;; so each authored form validates structurally.
   [:map {:closed true}
    [:model {:optional true} [:maybe model-id-schema]]
    [:session-profile {:optional true} profile-name-schema]
@@ -210,7 +215,8 @@
    [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
    [:logprobs {:optional true} :boolean]
    [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
-   [:contributions [:vector contribution-schema]]])
+   [:contributions {:optional true} [:vector contribution-schema]]
+   [:prompts {:optional true} prompt-queue-schema]])
 
 (def map-prompt-string-schema
   [:map
@@ -475,7 +481,8 @@
    (case (:type step)
      :invoke (source-refs-in-invoke-spec (:invoke step))
      :session (mapcat source-refs-in-contribution
-                      (get-in step [:session :contributions]))
+                      (concat (get-in step [:session :contributions])
+                              (mapcat :contributions (get-in step [:session :prompts]))))
      :delegate (concat
                 (source-refs-in-source-spec (get-in step [:delegate :target]))
                 (when-let [prompt-string (get-in step [:delegate :prompt-string])]
@@ -489,6 +496,42 @@
      [])
    (when-let [judge (:judge step)]
      (source-refs-in-judge judge))))
+
+(defn- session-prompt-queue-errors
+  "Return prompt-queue precedence/naming errors for a session `step` (task 226).
+
+   A session step carries EITHER a single-prompt `:contributions` (N=1 unnamed
+   group) OR an ordered `:prompts` queue of named groups — never both, never
+   neither. `:prompts` groups must each be named, with names unique within the
+   step. Empty `:prompts` is rejected structurally by `prompt-queue-schema`."
+  [step]
+  (when (= :session (:type step))
+    (let [session (:session step)
+          step-name (:name step)
+          has-contributions? (contains? session :contributions)
+          has-prompts? (contains? session :prompts)]
+      (concat
+       (when (and has-contributions? has-prompts?)
+         [{:type :session-contributions-and-prompts
+           :step step-name}])
+       (when (and (not has-contributions?) (not has-prompts?))
+         [{:type :session-without-prompt-source
+           :step step-name}])
+       (when has-prompts?
+         (let [names (map :name (:prompts session))]
+           (concat
+            (when (some nil? names)
+              [{:type :unnamed-prompt-group
+                :step step-name}])
+            (let [dups (->> names
+                            (remove nil?)
+                            frequencies
+                            (filter #(> (val %) 1))
+                            (mapv key))]
+              (when (seq dups)
+                [{:type :duplicate-prompt-group-name
+                  :step step-name
+                  :duplicate-names dups}])))))))))
 
 (defn semantic-errors
   "Return semantic validation errors for a structurally valid workflow IR.
@@ -527,6 +570,7 @@
               skills-read-errors (skills-without-read-errors step)
               structured-cardinality-errors (structured-output-cardinality-errors step)
               reusable-schema-errors* (reusable-schema-errors step)
+              prompt-queue-errors (session-prompt-queue-errors step)
               ref-errors* (mapcat #(ref-errors step-idx step %)
                                   (step-source-refs step))]
           (concat on-without-judge
@@ -536,6 +580,7 @@
                   skills-read-errors
                   structured-cardinality-errors
                   reusable-schema-errors*
+                  prompt-queue-errors
                   ref-errors*)))
       steps))))
 

@@ -35,10 +35,13 @@ invoke-step ::= {:name step-name
 session-step ::= {:name step-name
                   :type :session
                   session-config-entry*
-                  :contributions [contribution+]
+                  (:contributions [contribution+] | :prompts [prompt-group+])
                   outputs?
                   yields?
                   control-flow*}
+
+prompt-group ::= {:name prompt-name
+                  (:prompt-workflow relative-md-path | :contributions [contribution+])}
 
 delegate-step ::= {:name step-name
                    :type :delegate
@@ -199,6 +202,50 @@ number ::= clojure-number
 boolean ::= true | false
 nil ::= nil
 ```
+
+## Multi-prompt session steps (`:prompts`)
+
+A session step authors **either** a single-prompt `:contributions` body **or**
+an ordered `:prompts` queue of named prompt-groups — never both. The two forms
+share one internal prompt-queue mechanism; single-prompt `:contributions` is the
+N=1 degenerate (one unnamed group). The distinction is per-prompt **addressing
+capability**, not behaviour: author `:prompts` when you want multiple turns in
+one shared session or named per-prompt addressing; otherwise use
+`:contributions`.
+
+```clojure
+{:name "design-review"
+ :type :session
+ :tools ["read"]                                ; session config is per-step, shared by all groups
+ :prompts
+ [{:name "architecture" :prompt-workflow "review-architecture.md"}
+  {:name "ambiguity"    :contributions [{:type :template :text "..." :vars {}}]}]}
+```
+
+Each prompt-group materializes to one submitted prompt that runs one model turn
+against the **same** child session, in author order; the next group's turn is
+submitted only after the prior turn completes. Session config (`:model`,
+`:tools`, `:skills`, …) is declared once at the step level and shared by every
+group — there is no per-prompt model/tools/skills, and there is no step-level
+shared `:contributions` preamble (the first group loads shared sources on turn
+1; later groups see them via the live session's conversation memory).
+
+Precedence and validation rules:
+
+- **Step-level precedence** — `:contributions`/`:prompt-workflow` **xor**
+  `:prompts`. Declaring both on one session step is an error; a session step
+  must declare exactly one prompt source.
+- **Group-internal precedence** — within a prompt-group the body is
+  `:prompt-workflow` **xor** `:contributions` (mirroring the step-level rule):
+  declaring both, or neither, is an error.
+- **Non-empty** — an empty `:prompts` vector is rejected; a one-element
+  `:prompts` is valid (and runs the multi-prompt path with per-prompt
+  addressing, distinct from the `:contributions` single-prompt form).
+- **Named, unique within a step** — every `:prompts` group is named, and group
+  names are unique within a step (`(step-name, prompt-name)` is the addressing
+  handle). Names may repeat across different steps.
+
+All of these rules are reported fail-fast at workflow load / IR validation.
 
 ## Structured outputs
 

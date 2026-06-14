@@ -1603,3 +1603,55 @@ behaviour.
   in `ir.clj` + `target_ir_compiler.clj` (per the Slice-1 deviation, the `:prompts`
   → named-group compilation belongs in `target_ir_compiler.clj`, not
   workflow-loader `compiler.clj`).
+
+## Slice 2 — `:prompts` grammar + IR normalization (named groups) — ψ
+
+Landed the authored `:prompts` multi-prompt session form end-to-end (schema +
+validation + both compile stages + docs + tests). All three suites green
+(`ir-test` 7/125, `target-ir-compiler-test` 10/37, `compiler-test` 4/56); the
+sole `workflow-loader` suite failure is the pre-existing
+`workflow-definitions-test/task-lifecycle-test` (16 fails, asserts a stale
+7-step `task-lifecycle.edn` topology vs the live 9-step gated topology) —
+confirmed identical with these changes stashed, unrelated to 226. clj-kondo
+clean.
+
+- **Schema (ir.clj).** `session-spec-schema` `:contributions` made optional and
+  `:prompts` (= `prompt-queue-schema`, `[:vector {:min 1} prompt-group-schema]`)
+  added; the step-level `:contributions` xor `:prompts` rule is enforced
+  **semantically** (`session-prompt-queue-errors`), keeping the schema permissive
+  so each authored form validates structurally. Empty `:prompts` is rejected
+  **structurally** by `{:min 1}` (matches the "empty ⇒ error" requirement without
+  a redundant semantic check).
+- **Semantic validation (ir.clj).** New `session-prompt-queue-errors` wired into
+  `semantic-errors`: `:session-contributions-and-prompts` (both present),
+  `:session-without-prompt-source` (neither), `:unnamed-prompt-group` (a
+  `:prompts` group missing `:name`), `:duplicate-prompt-group-name` (name
+  collision within one step). `step-source-refs` `:session` branch now also
+  collects refs from `:prompts` group contributions so prior-step refs inside
+  groups are validated (the `:prompt` discriminator + per-prompt surfaces remain
+  Slice 4).
+- **Authored → canonical IR (target_ir_compiler.clj).** `compile-step` `:session`
+  branch emits `:session :prompts` (via new `compile-prompt-group`) when the
+  authored step carries `:prompts`, else the existing `:contributions` path. A
+  `:prompts` step carries **no** step-level `:contributions` in canonical IR;
+  `ir/session-step-prompt-queue` already returns the named groups verbatim.
+- **Group `:prompt-workflow` resolution + xor (workflow-loader compiler.clj).**
+  **Deviation note (extends the Slice-1 P1 deviation):** P1/plan assign the
+  authored-form → normalized-queue transform to workflow-loader `compiler.clj`,
+  but Slice 1 recorded that the config-nesting transform actually lives in
+  workflow-runtime `target_ir_compiler.clj`. Slice 2 follows that same split:
+  workflow-loader `compiler.clj` owns only the **file-resolution** half it
+  uniquely can do — `compile-prompts-step`/`compile-prompt-group` resolve each
+  group's relative `:prompt-workflow` `.md` into group `:contributions` (reusing
+  `read-prompt-workflow`/`markdown-body->contribution`) and enforce the
+  group-internal `:prompt-workflow` xor `:contributions` rule + the step-level
+  `:prompts`-excludes-step-level-prompt-source rule (these involve
+  `:prompt-workflow`, which only exists pre-resolution at the loader). The
+  canonical IR emission of `:session :prompts` stays in
+  `target_ir_compiler.clj`, consistent with where Slice 1 placed the session
+  config-nesting transform.
+- **Per-prompt session config out of scope.** A group's `:prompt-workflow`
+  markdown contributes only its **body**; the markdown's own frontmatter session
+  config is ignored for groups (session config is per-step/shared per design
+  scope), unlike the step-level `:prompt-workflow` path which merges markdown
+  session config.

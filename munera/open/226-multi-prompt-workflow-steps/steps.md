@@ -94,24 +94,41 @@ the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
 
 ## Slice 2 — `:prompts` grammar + IR normalization (named groups)
 
-- [ ] Add the `:prompts` session-step schema to `ir.clj`: ordered vector of named
+- [x] Add the `:prompts` session-step schema to `ir.clj`: ordered vector of named
   prompt-groups; each group `{:name … (:prompt-workflow XOR :contributions)}`.
-- [ ] Add step-level precedence validation: `:contributions`/`:prompt-workflow`
-  **xor** `:prompts` (both ⇒ IR error).
-- [ ] Add `:prompts` validation: empty `:prompts` ⇒ error; one-element ⇒ valid
-  (B3); duplicate prompt-group `:name` within a step ⇒ error, names may repeat
-  across steps (B4).
-- [ ] Add group-internal precedence validation: `:prompt-workflow` **xor**
-  `:contributions` within a group; both ⇒ error, neither ⇒ error (E2).
-- [ ] Compile `:prompts` in `compiler.clj`: each group resolves its
+  (`session-spec-schema` now carries optional `:contributions`/`:prompts` —
+  `:prompts` reuses `prompt-queue-schema` (`[:vector {:min 1} prompt-group-schema]`).
+  Group bodies are canonical `:contributions` post-compile; group-internal
+  `:prompt-workflow` is an authored-form key resolved in workflow-loader.)
+- [x] Add step-level precedence validation: `:contributions`/`:prompt-workflow`
+  **xor** `:prompts` (both ⇒ IR error). (`session-prompt-queue-errors` →
+  `:session-contributions-and-prompts`; the `:prompt-workflow` half is caught at
+  the workflow-loader before it resolves to `:contributions`. Neither present ⇒
+  `:session-without-prompt-source`.)
+- [x] Add `:prompts` validation: empty `:prompts` ⇒ error (structural via
+  `prompt-queue-schema` `{:min 1}`); one-element ⇒ valid (B3); duplicate
+  prompt-group `:name` within a step ⇒ error (`:duplicate-prompt-group-name`),
+  names may repeat across steps (B4); unnamed `:prompts` group ⇒
+  `:unnamed-prompt-group`.
+- [x] Add group-internal precedence validation: `:prompt-workflow` **xor**
+  `:contributions` within a group; both ⇒ error, neither ⇒ error (E2). (In
+  workflow-loader `compiler.clj` `compile-prompt-group`, where `:prompt-workflow`
+  exists before resolution.)
+- [x] Compile `:prompts` in `compiler.clj`: each group resolves its
   `:prompt-workflow` (relative .md, existing path rules) or `:contributions` into
-  the normalized internal queue; named groups carry `:name`.
-- [ ] IR-validation tests: empty/one-element/duplicate-name/group-xor/step-xor
-  cases (red→green).
-- [ ] Docs (P2): `doc/workflow-grammar.md` — `:prompts` author form, step-level
+  the normalized internal queue; named groups carry `:name`. (workflow-loader
+  `compile-prompts-step`/`compile-prompt-group` resolve group `:prompt-workflow`
+  → group `:contributions`; workflow-runtime `target_ir_compiler.clj`
+  `compile-prompt-group` lowers each authored group into canonical IR under
+  `:session :prompts`.)
+- [x] IR-validation tests: empty/one-element/duplicate-name/group-xor/step-xor
+  cases (red→green). (`ir_test/session-prompts-grammar-validation-test`,
+  `target_ir_compiler_test/compile-target-multi-prompt-session-workflow-test`,
+  `compiler_test/compile-edn-prompts-step-test`.)
+- [x] Docs (P2): `doc/workflow-grammar.md` — `:prompts` author form, step-level
   `:contributions`/`:prompt-workflow` xor `:prompts`, group-internal
   `:prompt-workflow` xor `:contributions`, name-uniqueness/empty/one-element rules.
-- [ ] `clj-kondo` clean; commit Slice 2.
+- [x] `clj-kondo` clean; commit Slice 2.
 
 ## Slice 3 — Sequential N-turn drain (in-run suspend/resume) + per-prompt records
 

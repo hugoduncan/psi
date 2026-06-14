@@ -687,3 +687,94 @@
          [{:name "g1" :contributions []}]))
     (is (not (workflow-ir/valid-prompt-queue?
               [{:name 7 :contributions []}])))))
+
+;; ── Task 226 Slice 2 — `:prompts` grammar + IR normalization ────────────────
+
+(def ^:private named-prompt-group-a
+  {:name "architecture"
+   :contributions [{:type :template :text "arch review" :vars {}}]})
+
+(def ^:private named-prompt-group-b
+  {:name "ambiguity"
+   :contributions [{:type :template :text "ambiguity review" :vars {}}]})
+
+(defn- multi-prompt-session-step
+  [prompts]
+  {:name "design-review"
+   :type :session
+   :session {:tools ["read"]
+             :prompts prompts}
+   :outputs {:final-llm-reply {:source :session/final-llm-reply}
+             :transcript {:source :session/transcript}}
+   :yields {:type :text :text :final-llm-reply}})
+
+(defn- session-step-semantic-result
+  [step]
+  (workflow-ir/validate-workflow-ir {:version :workflow-ir/v1 :steps [step]}))
+
+(deftest session-prompts-grammar-validation-test
+  (testing "a multi-prompt session step with named groups is valid"
+    (is (= {:valid? true :structural-errors nil :semantic-errors []}
+           (session-step-semantic-result
+            (multi-prompt-session-step [named-prompt-group-a named-prompt-group-b])))))
+
+  (testing "a one-element :prompts queue is valid (AC-1 N>=1)"
+    (is (= {:valid? true :structural-errors nil :semantic-errors []}
+           (session-step-semantic-result
+            (multi-prompt-session-step [named-prompt-group-a])))))
+
+  (testing "an empty :prompts queue is rejected structurally"
+    (let [result (session-step-semantic-result (multi-prompt-session-step []))]
+      (is (false? (:valid? result)))
+      (is (some? (:structural-errors result)))))
+
+  (testing "step-level :contributions and :prompts together is a semantic error"
+    (let [step (assoc-in (multi-prompt-session-step [named-prompt-group-a])
+                         [:session :contributions] [])
+          result (session-step-semantic-result step)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :session-contributions-and-prompts
+               :step "design-review"}]
+             (:semantic-errors result)))))
+
+  (testing "a session step with neither :contributions nor :prompts is a semantic error"
+    (let [step {:name "design-review"
+                :type :session
+                :session {:tools ["read"]}
+                :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                :yields {:type :text :text :final-llm-reply}}
+          result (session-step-semantic-result step)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :session-without-prompt-source
+               :step "design-review"}]
+             (:semantic-errors result)))))
+
+  (testing "duplicate prompt-group names within a step are a semantic error"
+    (let [step (multi-prompt-session-step
+                [named-prompt-group-a
+                 (assoc named-prompt-group-b :name "architecture")])
+          result (session-step-semantic-result step)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :duplicate-prompt-group-name
+               :step "design-review"
+               :duplicate-names ["architecture"]}]
+             (:semantic-errors result)))))
+
+  (testing "an unnamed group inside :prompts is a semantic error"
+    (let [step (multi-prompt-session-step
+                [named-prompt-group-a (dissoc named-prompt-group-b :name)])
+          result (session-step-semantic-result step)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :unnamed-prompt-group
+               :step "design-review"}]
+             (:semantic-errors result)))))
+
+  (testing "names may repeat across distinct steps"
+    (let [step-1 (assoc (multi-prompt-session-step [named-prompt-group-a])
+                        :name "review-1")
+          step-2 (assoc (multi-prompt-session-step [named-prompt-group-a])
+                        :name "review-2")
+          result (workflow-ir/validate-workflow-ir
+                  {:version :workflow-ir/v1 :steps [step-1 step-2]})]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result)))))
