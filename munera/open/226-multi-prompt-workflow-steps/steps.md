@@ -1338,3 +1338,29 @@ consolidates them — it does not first-author them.
   `:assistant-message` retained (the drain's transcript accumulation consumes it).
   Behaviour-preserving; `clj-kondo` clean; step-execution + drive-prompt-queue
   (+ abort) suites 25 tests / 146 assertions green.
+
+## Code-shaper review follow-ups (pass 6)
+
+- [ ] CS-7 — Remove the dead ctx injection seam
+  `:materialize-workflow-step-session-conversation-fn`. Task 226 rewired
+  `:step/enter` session-conversation derivation to the per-group seam
+  (`statechart_runtime.clj:157-159` derives the prompt-queue and materializes the
+  head group via `:materialize-workflow-prompt-group-conversation-fn`; the N=1
+  degenerate flows through the same per-group seam), so **no runtime path invokes
+  `(:materialize-workflow-step-session-conversation-fn ctx)`** (grep: zero call
+  sites) — unlike the sibling `:split-...-fn` seam, which is still invoked
+  (`statechart_runtime.clj:163,301`). The dead seam still carries full injection
+  plumbing: default-ctx registration (`agent_session/context.clj:253`), the
+  `create-context*` destructure param (`context.clj:293`), the opts override path
+  (`context.clj:360-361`), and the test-support registration
+  (`test_support.clj:318`). Same dead-surface class as CS-6, worse failure mode:
+  the override is **silently ignored** (a test/caller overriding it to alter
+  session-step conversation derivation has no effect), violating `robust`
+  (orthogonal / no misleading unreachable surface) and `locally_comprehensible`.
+  Remove the default-ctx registration, the `create-context*` destructure + opts
+  override path, and the test-support registration. Keep the underlying fn
+  `materialize-step-session-conversation` (still directly called by
+  `core/step-prompt`); only the dead ctx-key plumbing is removed. Out of scope:
+  `core/step-prompt`'s own test-only-caller status (pre-existing, not introduced
+  by 226). Behaviour-preserving; `clj-kondo` clean; re-run agent-session context +
+  workflow-runtime suites.

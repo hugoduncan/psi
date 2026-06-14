@@ -3430,3 +3430,47 @@ builders); `:assistant-message` retained (drain transcript accumulation consumes
 it; the value is already in `:raw-outputs :final-llm-reply`/`:text`).
 Behaviour-preserving; `clj-kondo` clean; step-execution + drive-prompt-queue
 (+ abort) suites 25 tests / 146 assertions green.
+
+## Code-shaper review (code-shaper skill) — pass 6 — ψ
+
+Fresh code-shaper pass over the 226 production surface against
+`simplicity ∧ consistency ∧ robustness`: `statechart_runtime.clj` `:step/enter`
+dispatch + the new prompt-group conversation wiring, `step_execution.clj` (both
+drivers + `execute-session-turn-outcome` + `session-turn-ok-envelope`),
+`progression_recording.clj`, `ir.clj` (prompt-queue normalization + ref
+validation), `ir_error_formatting.clj`, `workflow_loader/compiler.clj`, and
+`workflow_step_materialization/{core,source_resolution}.clj`. CS-1..CS-6 confirmed
+present and clean; the two-driver disposition duplication and `post-drain-envelope`
+loop-local accumulation remain the **accepted/documented** design (AC-2 / F1), not
+re-raised. **ACTIONABLE_FEEDBACK** — one new follow-up (CS-7), not a duplicate of
+any prior pass (none touched the ctx-injection seams).
+
+- **CS-7 (robustness/simplicity — dead ctx injection seam
+  `:materialize-workflow-step-session-conversation-fn`).** Task 226 rewired the
+  `:step/enter` session-conversation derivation from the old step-level seam to
+  the per-group seam: `statechart_runtime.clj:157-159` now derives the
+  prompt-queue (`workflow-ir/session-step-prompt-queue`) and materializes the head
+  group via `((:materialize-workflow-prompt-group-conversation-fn ctx) workflow-run
+  (first prompt-queue))` — the N=1 degenerate flows through the **same** per-group
+  seam. As a result **no runtime code path invokes
+  `(:materialize-workflow-step-session-conversation-fn ctx)`** anywhere (grep:
+  zero call sites), yet the seam still carries its full injection plumbing:
+  default-ctx registration (`agent_session/context.clj:253`), the `create-context*`
+  destructure param (`context.clj:293`), the opts override path
+  (`context.clj:360-361`), and the test-support registration
+  (`test_support.clj:318`). Contrast the sibling `:split-...-fn` seam, which **is**
+  still invoked via ctx (`statechart_runtime.clj:163,301`) — so this is a genuine
+  asymmetry, not a whole-family pattern. This is the same dead-surface class CS-6
+  closed (the `:assistant-text` key), but with a worse failure mode: the override
+  plumbing is a **silently-ignored** seam — a caller/test that overrides
+  `:materialize-workflow-step-session-conversation-fn` expecting to alter
+  session-step conversation derivation is now ignored (the runtime reads the
+  prompt-group seam), violating `robust` (`orthogonal` / no misleading
+  unreachable surface) and `locally_comprehensible`. Fix: drop the dead seam —
+  remove the default-ctx registration, the `create-context*` destructure + opts
+  override path, and the test-support registration. The underlying fn
+  `materialize-step-session-conversation` stays (still directly called by
+  `core/step-prompt`); only the dead **ctx key** plumbing is removed. (Note,
+  out of CS-7 scope: `core/step-prompt` itself currently has only test callers —
+  a pre-existing condition not introduced by 226.) Behaviour-preserving;
+  `clj-kondo` clean; re-run agent-session context + workflow-runtime suites.
