@@ -284,7 +284,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (inconsistency, pass 2)
 
-- [ ] PI7 — Reconcile the in-run `statechart_runtime.clj` `:else`-branch
+- [x] PI7 — Reconcile the in-run `statechart_runtime.clj` `:else`-branch
   resume-from-progression ownership between plan.md and steps.md. plan Touch
   points (plan.md:89) assign the `:else` branch the in-run "consult progression,
   continue at next un-run prompt" work and plan Slice 3 says Slice 3 *builds* the
@@ -296,7 +296,7 @@ consolidates them — it does not first-author them.
   with plan Touch points), or scope the plan `statechart_runtime.clj` touch point
   to the restart/replay re-entry only (matching steps Slice 5) so in-run
   next-un-run selection ownership is stated once, consistently, in both files.
-- [ ] PI8 — Resolve the dangling "Final verification" reference: steps.md has a
+- [x] PI8 — Resolve the dangling "Final verification" reference: steps.md has a
   `## Final verification` section running the full three-component Scry suites,
   and plan.md:170–172 references "Final verification's broader three-component
   Scry run", but plan.md defines no Final-verification slice/step (its slices stop

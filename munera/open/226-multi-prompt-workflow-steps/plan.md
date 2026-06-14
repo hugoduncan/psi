@@ -87,9 +87,16 @@ before N>1, addressing, resume, and abort paths are layered on.
   — drive the queue: per-turn `execute-actor-turn!`, record per-prompt result,
   emit one post-drain `:pending-actor-result`; abort on error/cancel.
 - `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj`
-  — `:else` (session) branch: resume-from-progression (consult recorded
-  per-prompt progression, continue at next un-run prompt), suspend/resume inside
-  the one statechart step.
+  — `:else` (session) branch: the **suspend/resume re-entry boundary** through
+  which `execute-session-step!` is re-driven on each resume (async-turn
+  completion in-run; process-restart/replay in Slice 5). Next-un-run **selection**
+  is owned by the queue driver `execute-session-step!` (step_execution.clj),
+  **not** this branch (PI7, `λone_way` — selection ownership stated once); this
+  branch re-enters the one statechart step and re-invokes the driver, which
+  consults recorded per-prompt progression to pick the next un-run prompt. The
+  in-run drain (Slice 3) needs no next-un-run-selection logic here; Slice 5
+  confirms process-restart/replay re-entry through this branch reconstructs queue
+  position purely from persisted progression.
 - `components/workflow-runtime/src/psi/workflow_runtime/progression_recording.clj`
   — record/read per-prompt turn records under the step's attempt.
 - `components/workflow-runtime/src/psi/workflow_runtime/statechart.clj` — confirm
@@ -269,3 +276,19 @@ Each slice follows the change_chain: update spec (author-facing grammar docs
 (IR-validation + runtime) → code → review/simplify → docs → verify coherence.
 Lint (`clj-kondo`) + `clj-paren-repair` after edits; run the relevant Scry suites
 per slice; commit per slice.
+
+## Final verification
+
+After Slice 7, a dedicated **Final verification** pass (mirrors steps.md's
+`## Final verification` section; this is the "Final verification" the Slice-1
+done-gate scope (P7) contrasts against — distinct from the focused per-slice
+gating suites):
+
+- Run the **full three-component Scry suites green**: workflow-runtime +
+  workflow-loader + workflow-step-materialization (the broader run, distinct from
+  the Slice-1 focused `step_execution_test.clj` gate and each slice's relevant
+  per-slice suite).
+- Confirm **AC-1..AC-8** each have covering tests (ordering, drain, N=1
+  equivalence, per-prompt addressing + validation, intermediate-failure abort,
+  inter-prompt cancellation, resume-from-progression idempotency, docs) — the
+  TraceID coherence check.

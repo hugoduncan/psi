@@ -964,3 +964,33 @@ named touch-point files exist as referenced.
   plan.md (the full three-component Scry run + AC-1..AC-8 coverage confirm)
   mirroring steps.md's section, so the "Final verification" plan references
   resolve to a defined plan step.
+
+## Plan/steps inconsistency follow-ups (pass 2) executed — ψ
+
+Executed PI7–PI8 (plan-only edits; no code/test/doc/source change needed — these
+are task-artifact consistency reconciliations). Grounded against the code: in
+`statechart_runtime.clj` the session (`:else`) branch (line ~276) is the re-entry
+point that calls `step-execution/execute-session-step!` with the prompt; the
+queue driver `execute-session-step!` (step_execution.clj) is where next-un-run
+selection naturally lives — confirming steps Slice 3's placement.
+
+- **PI7 (done).** Chose the reviewer's option (b): scoped the plan
+  `statechart_runtime.clj` Touch point to the **suspend/resume re-entry boundary**
+  (the point through which `execute-session-step!` is re-driven on each resume —
+  in-run async-turn completion and, in Slice 5, process-restart/replay), and
+  stated next-un-run **selection** ownership **once** in the queue driver
+  `execute-session-step!` (matching steps Slice 3), removing the contradiction
+  where plan Touch points attributed "continue at next un-run prompt" selection to
+  the `:else` branch while steps placed it in `execute-session-step!`. The in-run
+  drain (Slice 3) therefore needs no next-un-run-selection logic in
+  `statechart_runtime.clj`; Slice 5 confirms restart/replay re-entry through this
+  branch reconstructs queue position from persisted progression. No new Slice 3
+  steps item is required (selection is already covered by the existing Slice 3
+  `execute-session-step!` driver item), satisfying `λone_way`. Edit: plan.md Touch
+  points `statechart_runtime.clj` bullet.
+- **PI8 (done).** Added a `## Final verification` section to plan.md mirroring
+  steps.md's section: the full three-component Scry run (workflow-runtime +
+  workflow-loader + workflow-step-materialization) green + the AC-1..AC-8 covering
+  TraceID coherence check. This resolves the dangling "Final verification"
+  references (plan.md Slice-1 done-gate scope contrast) to a defined plan element.
+  Edit: new plan.md `## Final verification` section after the docs-cadence note.
