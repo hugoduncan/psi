@@ -8,48 +8,23 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.progression-recording :as progression-recording]
-   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
    [psi.workflow-runtime.step-test-support :as step-test-support]))
 
-(defn- assistant-text-message
-  [text]
-  {:role "assistant" :content [{:type :text :text text}]})
-
-(defn- running-attempt-state*
-  "A canonical state* atom with one started (running) latest attempt for
-   `run-id`/`step-id`, built via the real run/attempt constructors (TR-4)."
-  [run-id step-id]
-  (atom (step-test-support/canonical-running-run-state run-id step-id)))
-
-(defn- recording-record-turn-fn
-  [state* run-id step-id]
-  (fn [index group-name outputs]
-    (swap! state* progression-recording/record-prompt-group-turn run-id step-id
-           {:index index :name group-name :outputs outputs})
-    true))
+(def ^:private running-attempt-state* step-test-support/running-attempt-state*)
+(def ^:private drive! step-test-support/drive!)
 
 (defn- ok-turn
   [prompt]
   {:status :ok
    :assistant-text (str "reply-" prompt)
    :execution-result nil
-   :assistant-message (assistant-text-message (str "reply-" prompt))})
+   :assistant-message (step-test-support/assistant-text-message (str "reply-" prompt))})
 
 (defn- recorded-indices
   [state* run-id step-id]
   (mapv :index
         (progression-recording/prompt-group-turn-records
          (get-in @state* (progression-recording/run-path run-id)) step-id)))
-
-(defn- drive!
-  [{:keys [ctx step-def state* run-id step-id working-memory* event-queue* prompt-queue stopped?]}]
-  (step-execution/drive-session-prompt-queue!
-   ctx {:session-id "child-session"} step-def
-   step-id "attempt-1" working-memory* event-queue*
-   run-id prompt-queue "PROMPT-architecture"
-   (fn [group] (str "PROMPT-" (:name group)))
-   (recording-record-turn-fn state* run-id step-id)
-   (or stopped? (constantly false))))
 
 (deftest drive-session-prompt-queue-intermediate-turn-error-fails-naming-prompt-test
   (testing "an intermediate-turn error aborts to :failed naming the failing prompt; prior records retained, failing prompt leaves no record, routing skipped (AC-5/G1)"
@@ -229,7 +204,7 @@
                           {:status :ok
                            :assistant-text "reply-decide"
                            :execution-result nil
-                           :assistant-message (assistant-text-message "reply-decide")
+                           :assistant-message (step-test-support/assistant-text-message "reply-decide")
                            :structured-output nil}))
           working-memory* (atom {:current-step-id step-id})
           event-queue* (atom [])

@@ -5,7 +5,8 @@
    [psi.workflow-runtime.attempts :as workflow-attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.model :as workflow-model]
-   [psi.workflow-runtime.progression-recording :as workflow-recording]))
+   [psi.workflow-runtime.progression-recording :as workflow-recording]
+   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]))
 
 (def create-session-context workflow-fixtures/create-session-context)
 (def multi-step-definition-with-meta workflow-fixtures/multi-step-definition-with-meta)
@@ -62,6 +63,72 @@
             (workflow-recording/record-prompt-group-turn state run-id step-id record))
           (canonical-running-run-state run-id step-id)
           records))
+
+;;;; Shared multi-prompt drain fixtures + SUT-invocation helper (task 226 TS-1).
+;;;;
+;;;; The two sibling drain test namespaces (step_execution_drive_prompt_queue_test
+;;;; + step_execution_drive_prompt_queue_abort_test) exercise the SAME SUT
+;;;; (`drive-session-prompt-queue!`). These helpers are the single home for the
+;;;; fixtures + the keyword-arg `drive!` invocation both namespaces share, so the
+;;;; fixtures are not defined verbatim per file and the SUT is invoked by named
+;;;; keys (intent) rather than argument position.
+
+(defn assistant-text-message
+  "An assistant message carrying a single text block — the shape the drain's
+   per-turn outcome returns as its `:assistant-message`."
+  [text]
+  {:role "assistant" :content [{:type :text :text text}]})
+
+(defn running-attempt-state*
+  "A canonical state* atom with one started (running, no per-prompt records)
+   latest attempt for `run-id`/`step-id`, built via the real run/attempt
+   constructors."
+  [run-id step-id]
+  (atom (canonical-running-run-state run-id step-id)))
+
+(defn recorded-turns-state*
+  "A canonical state* reconstructed (as if reloaded after a process restart /
+   rebuilt by event-log replay) carrying the given per-prompt turn `records` on
+   the latest attempt for `run-id`/`step-id`, built via the real run/attempt
+   constructors — modelling persisted progression that survives a restart
+   independent of any in-memory queue-driver loop state."
+  [run-id step-id records]
+  (atom (canonical-recorded-run-state run-id step-id records)))
+
+(defn recording-record-turn-fn
+  "Mirror the production record-turn-fn: persist one per-prompt turn record
+   through the canonical progression substrate; returns truthy (live)."
+  [state* run-id step-id]
+  (fn [index group-name outputs]
+    (swap! state* workflow-recording/record-prompt-group-turn run-id step-id
+           {:index index :name group-name :outputs outputs})
+    true))
+
+(defn prompt-builder
+  "Shared next-group-prompt builder used by the drain tests: a group's turn
+   prompt is `PROMPT-{name}`. The first group's pre-split prompt (materialized at
+   :step/enter in production) is the same builder applied to the queue head, so
+   `drive!` derives the first-prompt as `(prompt-builder (first prompt-queue))`,
+   making the first-prompt = builder-of-queue-head invariant explicit rather than
+   a magic positional literal."
+  [group]
+  (str "PROMPT-" (:name group)))
+
+(defn drive!
+  "Invoke `drive-session-prompt-queue!` by named keys. Derives the first group's
+   pre-split prompt from `prompt-builder` applied to the queue head and supplies
+   the shared `prompt-builder` + a canonical `recording-record-turn-fn` over
+   `state*`, so each call site states only what varies (`:ctx :step-def :state*
+   :run-id :step-id :working-memory* :event-queue* :prompt-queue :stopped?`)."
+  [{:keys [ctx step-def state* run-id step-id working-memory* event-queue*
+           prompt-queue stopped?]}]
+  (step-execution/drive-session-prompt-queue!
+   ctx {:session-id "child-session"} step-def
+   step-id "attempt-1" working-memory* event-queue*
+   run-id prompt-queue (prompt-builder (first prompt-queue))
+   prompt-builder
+   (recording-record-turn-fn state* run-id step-id)
+   (or stopped? (constantly false))))
 
 (def single-step-definition-with-meta
   {:definition-id "planner"

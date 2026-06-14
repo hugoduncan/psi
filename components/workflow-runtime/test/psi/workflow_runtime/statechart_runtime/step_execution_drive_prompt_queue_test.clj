@@ -14,35 +14,12 @@
   [text]
   {:role "user" :content [{:type :text :text text}]})
 
-(defn- assistant-text-message
-  [text]
-  {:role "assistant" :content [{:type :text :text text}]})
-
-(defn- running-attempt-state*
-  "A canonical state* atom with one started (running, no per-prompt records)
-   latest attempt for `run-id`/`step-id`, built via the real run/attempt
-   constructors (TR-4)."
-  [run-id step-id]
-  (atom (step-test-support/canonical-running-run-state run-id step-id)))
-
-(defn- recording-record-turn-fn
-  "Mirror the production record-turn-fn: persist one per-prompt turn record
-   through the canonical progression substrate; returns truthy (live)."
-  [state* run-id step-id]
-  (fn [index group-name outputs]
-    (swap! state* progression-recording/record-prompt-group-turn run-id step-id
-           {:index index :name group-name :outputs outputs})
-    true))
-
-(defn- recorded-turns-state*
-  "A canonical state* reconstructed (as if reloaded after a process restart /
-   rebuilt by event-log replay) carrying the given per-prompt turn `records` on
-   the latest attempt for `run-id`/`step-id`. Built via the real run/attempt
-   constructors with the records recorded canonically (TR-4), modelling persisted
-   progression that survives a restart independent of any in-memory queue-driver
-   loop state."
-  [run-id step-id records]
-  (atom (step-test-support/canonical-recorded-run-state run-id step-id records)))
+;;;; Shared multi-prompt drain fixtures + SUT-invocation helper live in
+;;;; step-test-support (TS-1) and are used from both sibling drain namespaces.
+(def ^:private assistant-text-message step-test-support/assistant-text-message)
+(def ^:private running-attempt-state* step-test-support/running-attempt-state*)
+(def ^:private recorded-turns-state* step-test-support/recorded-turns-state*)
+(def ^:private drive! step-test-support/drive!)
 
 ;;;; task 226 R-2 — later-group single-submission limitation.
 ;;;;
@@ -96,14 +73,10 @@
           prompt-queue [{:name "architecture" :contributions []}
                         {:name "ambiguity" :contributions []}
                         {:name "consistency" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"}
-       {:name step-id :type :session}
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-architecture"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def {:name step-id :type :session}
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       ;; exactly one turn per prompt (no re-fire) in author order, same session
       (is (= 3 @turn-calls*) "one turn per un-run prompt, no re-fire")
       (is (= ["child-session" "child-session" "child-session"]
@@ -158,14 +131,10 @@
           event-queue* (atom [])
           prompt-queue [{:name "architecture" :contributions []}
                         {:name "ambiguity" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"}
-       {:name step-id :type :session}
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-architecture"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def {:name step-id :type :session}
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       ;; index 0 already recorded → never re-submitted; only index 1 runs
       (is (= 1 @turn-calls*) "only the un-run prompt fires a turn")
       (is (= ["PROMPT-ambiguity"] @submitted*))
@@ -208,14 +177,10 @@
           prompt-queue [{:name "architecture" :contributions []}
                         {:name "ambiguity" :contributions []}
                         {:name "consistency" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"}
-       {:name step-id :type :session}
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-architecture"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def {:name step-id :type :session}
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       ;; P8: exactly one ai/generate effect — for the single un-run prompt; zero
       ;; for each already-recorded prompt.
       (is (= 1 @turn-calls*) "only the un-run prompt fires a turn after a restart")
@@ -247,14 +212,10 @@
           event-queue* (atom [])
           prompt-queue [{:name "architecture" :contributions []}
                         {:name "ambiguity" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"}
-       {:name step-id :type :session}
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-architecture"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def {:name step-id :type :session}
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       ;; Zero ai/generate effects across the fully-recorded reconstructed state.
       (is (= 0 @turn-calls*) "no turn re-fires when every prompt already has a record")
       ;; No progression mutation: the records are untouched.
@@ -303,13 +264,10 @@
                                                :json-schema {:type "object"}}}}
           prompt-queue [{:name "gather" :contributions []}
                         {:name "decide" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"} step-def
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-gather"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def step-def
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       ;; first (non-final) turn gets no structured-output opts; final turn does
       (is (= [["PROMPT-gather" nil]] (filter #(= "PROMPT-gather" (first %)) @opts-by-prompt*)))
       (let [[final-prompt final-opts] (first (filter #(= "PROMPT-decide" (first %)) @opts-by-prompt*))]
@@ -337,13 +295,10 @@
                                                :mode :structured}}}
           prompt-queue [{:name "gather" :contributions []}
                         {:name "decide" :contributions []}]]
-      (step-execution/drive-session-prompt-queue!
-       ctx {:session-id "child-session"} step-def
-       step-id "attempt-1" working-memory* event-queue*
-       run-id prompt-queue "PROMPT-gather"
-       (fn [group] (str "PROMPT-" (:name group)))
-       (recording-record-turn-fn state* run-id step-id)
-       (constantly false))
+      (drive! {:ctx ctx :step-def step-def
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue prompt-queue})
       (is (= 0 @turn-calls*) "zero turns run on an upfront structured-request block")
       (let [pending (:pending-actor-result @working-memory*)
             records (progression-recording/prompt-group-turn-records

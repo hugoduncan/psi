@@ -1017,7 +1017,7 @@ consolidates them — it does not first-author them.
 
 ## Test-shaper follow-ups (pass 7)
 
-- [ ] TS-1 — Consolidate the duplicated multi-prompt drain test fixtures and lift
+- [x] TS-1 — Consolidate the duplicated multi-prompt drain test fixtures and lift
   the `drive!` keyword-arg helper into `psi.workflow-runtime.step-test-support`,
   then use it from **both** sibling drain namespaces
   (`step_execution_drive_prompt_queue_test.clj` +
@@ -1037,3 +1037,16 @@ consolidates them — it does not first-author them.
   `consistent(fixtures) ∧ consistent(test_abstractions) ∧
   helpers_that_compress(ceremony)`. Test-only; no production change; re-run both
   workflow-runtime drive/abort suites green.
+  **DONE:** lifted `assistant-text-message`, `running-attempt-state*`,
+  `recorded-turns-state*`, `recording-record-turn-fn`, a shared `prompt-builder`,
+  and the keyword-arg `drive!` into `step-test-support`. **Made the implicit
+  invariant explicit:** the shared `drive!` derives the first group's pre-split
+  prompt as `(prompt-builder (first prompt-queue))` instead of the magic
+  `"PROMPT-architecture"` literal, so it works for both the `architecture`- and
+  `gather`-headed queues (the abort `drive!` had hardcoded the literal — would not
+  have served the gather-headed non-abort tests). Both drain namespaces now alias
+  the shared helpers (`def ^:private … step-test-support/…`) and invoke the SUT via
+  `drive!` named keys; deleted the per-file duplicate defs and the 6 positional
+  call sites in the non-abort file; dropped the now-unused `step-execution` require
+  from the abort file. `clj-kondo` clean; both drain suites 14 tests / 64
+  assertions green; full workflow-runtime suite 133 tests / 726 assertions green.

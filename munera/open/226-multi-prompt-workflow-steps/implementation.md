@@ -2746,3 +2746,34 @@ the prior passes closed, so it is not a duplicate.
   non-abort file. Net: one canonical SUT-invocation abstraction, no duplicated
   fixture defs, intent (named keys) surfaced over argument position. Test-only;
   no production change; re-run both drive/abort suites green.
+
+## Test-shaper follow-up execution (pass 7 — TS-1)
+
+Consolidated the duplicated multi-prompt drain test fixtures + lifted the
+keyword-arg `drive!` SUT-invocation helper into
+`psi.workflow-runtime.step-test-support` (the TR-4 home for the canonical
+drive/abort state* builders). Moved into `step-test-support`:
+`assistant-text-message`, `running-attempt-state*`, `recorded-turns-state*`,
+`recording-record-turn-fn`, a shared `prompt-builder`, and `drive!`.
+
+**Design refinement over the abort file's `drive!`.** The abort file's local
+`drive!` hardcoded the magic pre-split first-prompt literal `"PROMPT-architecture"`,
+which only worked for `architecture`-headed queues — it could not be shared with
+the non-abort structured-output / upfront-block tests whose queues are
+`gather`-headed. The shared `drive!` instead derives the first group's pre-split
+prompt as `(prompt-builder (first prompt-queue))`, making the
+`first-prompt = builder-of-queue-head` invariant explicit (was implicit and
+positionally coupled) and letting one helper serve every drain test regardless of
+queue head.
+
+Both sibling drain namespaces
+(`step_execution_drive_prompt_queue_test` + `_abort_test`) now alias the shared
+helpers via `def ^:private … step-test-support/…` and invoke the SUT through
+`drive!` named keys. Deleted the per-file duplicate defs and rewrote the 6
+positional `drive-session-prompt-queue!` call sites in the non-abort file to
+`drive!`; dropped the now-unused `step-execution` require from the abort file (it
+no longer calls the SUT directly). Net: one canonical SUT-invocation abstraction,
+no duplicated fixtures, named keys over argument position.
+
+Test-only; no production change. `clj-kondo` clean; both drain suites 14 tests /
+64 assertions green; full workflow-runtime suite 133 tests / 726 assertions green.
