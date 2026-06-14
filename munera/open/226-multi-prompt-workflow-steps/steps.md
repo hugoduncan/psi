@@ -486,3 +486,25 @@ consolidates them — it does not first-author them.
   `progression_recording.clj` as read-only (recording added in Slice 3) in the
   Slice-5 enumeration, and — if Slice 5 edits no production code — state that its
   gate is the workflow-runtime suite for the added resume/replay tests.
+
+## Plan-review follow-ups (inconsistency, pass 5)
+
+- [ ] PI12 — Give the P13 `:blocked` terminal outcome (Slice 6) a design AC and a
+  Final-verification AC-1..AC-8 coverage home, or explicitly trace it under an
+  existing AC. P13 added `:blocked` (`:actor/blocked`) as a **third** terminal
+  non-success outcome (plan R6 + Slice 6; steps Slice 6 enumeration + dedicated
+  `:blocked` runtime-test item + Slice 7 verify-list), but design.md still
+  enumerates only `:failed` (AC-5) and `:cancelled` (AC-6) as queue non-success
+  outcomes, and the Final-verification AC-1..AC-8 coverage list (plan.md:409,
+  steps.md:276) still names only the original seven areas + docs — **no
+  `:blocked` entry**. So the Slice 6 `:blocked` covering test traces to no AC and
+  the AC-1..AC-8 TraceID/coherence gate would pass without verifying it (the same
+  defect-shape PI9/PI10/PI11 fixed for other surfaces, re-introduced by P13).
+  Resolve by **either** (a) adding a design AC for the `:blocked` outcome
+  (routing skipped, prior records retained, blocking prompt leaves no record) —
+  or extending AC-5 — **and** adding a `:blocked` entry to the Final-verification
+  AC-1..AC-8 coverage enumeration in **both** plan.md and steps.md, **or** (b)
+  stating explicitly in plan/steps that `:blocked` is preservation-only and its
+  Slice 6 test is traced under an existing AC (e.g. AC-3 structured-output / AC-5
+  abort), naming it in the Final-verification coverage parenthetical so the
+  TraceID check accounts for it.

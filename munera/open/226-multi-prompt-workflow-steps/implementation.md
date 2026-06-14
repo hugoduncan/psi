@@ -1405,3 +1405,52 @@ consolidation verify-list). Resolution (grounded in `execute-session-step!`,
 
 Plan/steps-only refinement (no code/test/doc edits — Slice 6 is unstarted; the
 `:blocked` covering test is scheduled as a Slice 6 steps item). P13 ticked.
+
+## Plan/steps inconsistency review (pass 5) — ψ
+
+Re-reviewed plan.md + steps.md for internal inconsistencies against each other,
+design.md, and the touch-point code. Distinct from inconsistency passes 1–4
+(PI1–PI11, resolved) and ambiguity passes 1–5 (P1–P13, resolved). **One** new
+actionable inconsistency found (PI12); recorded as an unchecked item in
+steps.md. It was **introduced by the P13 (ambiguity pass 5) resolution**, which
+post-dates the last inconsistency pass's explicit verification that "abort
+outcomes (Slice 6) match AC-5/AC-6; AC-1..AC-8 coverage list matches between
+Final-verification sections" (implementation.md pass-4 note) — that check is now
+stale. Verified-consistent (re-checked, no new inconsistency): PI1–PI11 hold;
+per-slice Scry gating wording matches between plan P9 and steps header; P10
+final-turn error folds under AC-5's relabeled "any non-completing turn" and P12
+in-flight cancellation folds under AC-6's `:cancelled` — both remain traceable;
+docs-cadence per-slice ownership matches; P11 shared-sources and P5
+final-turn/no-counter definitions agree across files.
+
+- **PI12 — the P13 `:blocked` terminal outcome (Slice 6) has no design AC and no
+  Final-verification AC-1..AC-8 coverage entry, so the TraceID/coherence gate
+  cannot trace its scheduled covering test.** P13 added a **third** terminal
+  non-success outcome — `:blocked` (`:actor/blocked`) — to plan R6 + Slice 6
+  abort-path paragraph and to steps Slice 6 (enumeration item + a dedicated
+  `:blocked` runtime-test item) + Slice 7 verify-list. But:
+  - **design.md** still enumerates only **two** queue non-success outcomes:
+    AC-5 (`:failed`) and AC-6 (`:cancelled`). There is **no** design AC for the
+    `:blocked` terminal outcome (its routing-skipped / prior-records-retained /
+    blocking-prompt-leaves-no-record disposition), even though plan/steps now
+    treat it as a first-class terminal outcome with its own test.
+  - the **Final verification** AC-1..AC-8 coverage list (plan.md:409,
+    steps.md:276) still enumerates only the original seven test areas + docs
+    ("ordering, drain, N=1 equivalence, per-prompt addressing + validation,
+    intermediate-failure abort, inter-prompt cancellation,
+    resume-from-progression idempotency, docs") — **no `:blocked` entry**. The
+    Slice 6 `:blocked` covering test therefore traces to **no AC**, so the
+    AC-1..AC-8 TraceID/coherence gate (plan Slice 7 / Final verification; steps
+    Slice 7 / Final verification) would pass green **without** verifying the
+    scheduled `:blocked` test exists.
+  This is the same defect-shape PI9/PI10/PI11 fixed for other surfaces
+  (a behaviour/test scheduled in the slices but unaccounted for in the
+  coverage/attribution checks), left re-introduced by P13. Reconcile by **either**
+  (a) adding a design AC for the `:blocked` outcome (or extending AC-5 to cover
+  the third structured-output-block terminal disposition) **and** adding a
+  `:blocked` entry to the Final-verification AC-1..AC-8 coverage enumeration in
+  **both** plan.md and steps.md, **or** (b) if `:blocked` is intentionally a
+  preservation-only behaviour with no new AC, stating explicitly in plan/steps
+  that the Slice 6 `:blocked` test is traced under an existing AC (e.g. AC-3
+  structured-output / AC-5 abort) and naming it in the Final-verification
+  coverage parenthetical so the TraceID check accounts for it.
