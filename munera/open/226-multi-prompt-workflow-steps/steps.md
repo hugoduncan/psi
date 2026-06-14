@@ -961,3 +961,27 @@ consolidates them — it does not first-author them.
   literal with `(recorded-turns-state* run-id step-id [{:index 0 :name
   "architecture" :outputs {:final-llm-reply "prior"}}])`. Test-only; re-run the
   workflow-runtime drive-prompt-queue suite green.
+
+## Test-review follow-ups (pass 4)
+
+- [ ] TR-6 — Add a `drive-session-prompt-queue!` covering test for the final-turn
+  `:invalid-structured-output` block (P13 case iii; AC-3/AC-5). Through the
+  multi-prompt drain, case (i) (upfront invalid request) and case (ii)
+  (`:unsupported-structured-output`) are covered
+  (`...-blocks-upfront-on-invalid-structured-request-test`,
+  `...-final-turn-structured-output-blocked-test`), but case (iii) is covered only
+  for the N=1 `execute-session-step!` path — no drive-queue test exercises it.
+  This is structurally distinct: case (ii) hits the drain's `:blocked` arm as
+  `{:disposition :blocked :branch :error}`, whereas case (iii) hits it as
+  `{:disposition :blocked :branch :success}` (the `invalid-structured-output?`
+  envelope), and the drain's `:blocked` handler branches on exactly that flag
+  (`(if (and (= :success (:branch outcome)) (stopped?)) cancel record-blocked)`),
+  so the `:branch :success` blocked path through the drain is unverified. Add an
+  N>1 drive-queue test whose **final** turn returns a `:status :ok` reply that
+  fails structured-output validation (`:branch :success` → `:outcome :blocked` /
+  `:invalid-structured-output`): assert terminal `:blocked` with
+  `(get-in pending [:payload :blocked :reason])` = `:invalid-structured-output`,
+  routing skipped (`:actor/blocked`, no `:actor/done`), prior N−1 records
+  retained, blocking final prompt leaves no record — symmetric with the case-(ii)
+  `drive-session-prompt-queue-final-turn-structured-output-blocked-test`.
+  Test-only; re-run the workflow-runtime drive-prompt-queue-abort suite green.

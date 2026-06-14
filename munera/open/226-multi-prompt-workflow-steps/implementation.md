@@ -2530,3 +2530,54 @@ workflow-runtime drive-prompt-queue suite green via Scry CLI
 (`clojure -M:test-paths -m scry.cli --namespace
 psi.workflow-runtime.statechart-runtime.step-execution-drive-prompt-queue-test`
 → 8 tests / 35 assertions, 0 failed, 0 errored, exit 0).
+
+## Test review (task-test-review skill) — pass 4
+
+Re-applied `λ review_tests` (well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps injectable/nullable/¬mock/¬stub) after the T-1/T-2/TR-3/TR-4/TR-5
+fixes. Infra-deps remain clean: drive/abort suites inject the nullable
+`:workflow-execute-actor-turn-fn` + record-turn-fn ctx seams (¬stub), assert on
+state/outputs only (event-queue, working-memory, recorded progression — never
+interactions), and drive **real** functions (`split-step-session-conversation`,
+`record-prompt-group-turn`, `next-un-run-prompt-group`, real source resolution).
+TR-4/TR-5 fixtures now track the canonical run/attempt shape. **One new
+actionable behaviour-coverage gap found (TR-6); recorded as an unchecked item in
+steps.md.**
+
+- **TR-6 (behaviour-coverage gap): the multi-prompt drain's final-turn
+  `:invalid-structured-output` block (P13 case iii, `:branch :success`) is
+  untested.** P13 / Slice 6 / steps enumerate **three** structured-output
+  `:blocked` reasons across the drain: (i) upfront invalid request, (ii)
+  final-turn `:unsupported-structured-output`, and (iii) final-turn
+  `:invalid-structured-output` (final reply fails validation). Through
+  `drive-session-prompt-queue!`, (i) is covered by
+  `...-blocks-upfront-on-invalid-structured-request-test` and (ii) by
+  `...-final-turn-structured-output-blocked-test`, but **(iii) is covered only
+  for the N=1 `execute-session-step!` path**
+  (`execute-session-step-invalid-structured-output-blocks-with-envelope-test` /
+  `...-missing-turn-result-structured-output-blocks-test`) — **no** drive-queue
+  test exercises it. This matters structurally: case (ii) reaches the drain's
+  `:blocked` arm as `{:disposition :blocked :branch :error}` (from
+  `execute-session-turn-outcome`'s `:error` cond), whereas case (iii) reaches it
+  as `{:disposition :blocked :branch :success}` (the `invalid-structured-output?`
+  envelope path), and the drain's `:blocked` handler **branches on exactly that
+  flag**: `(if (and (= :success (:branch outcome)) (stopped?)) (cancel) (record
+  :blocked))`. The `:branch :success` blocked path through the drain (including
+  its retained-prior-records / no-final-record / routing-skipped disposition for a
+  multi-turn queue) is therefore unverified — a regression that broke
+  `:branch :success` blocked handling in the drain would leave the case-(ii)
+  `:branch :error` test green. Add a drive-queue test: an N>1 queue whose **final**
+  turn returns a `:status :ok` reply that fails structured-output validation
+  (`:branch :success` → `:outcome :blocked` / `:invalid-structured-output`) yields
+  terminal `:blocked` with `(get-in pending [:payload :blocked :reason])` =
+  `:invalid-structured-output`, routing skipped (`:actor/blocked`, no
+  `:actor/done`), prior N−1 records retained, blocking final prompt leaves no
+  record — completing the P13 case-(iii) coverage symmetric with the existing
+  case-(ii) `...-final-turn-structured-output-blocked-test`.
+
+**Verified-acceptable (not raised):** the `:branch :success` + `(stopped?)` →
+cancel sub-branch of the drain's `:blocked` arm (a cancellation racing a
+final-turn validation block) is a niche cancellation-precedence corner; the
+between-prompt/in-flight cancellation paths are already covered and the dominant
+`:branch :success` blocked disposition is the TR-6 record-`:blocked` path — no
+separate item raised for the race sub-branch.
