@@ -2,9 +2,9 @@
 
 ## Status
 
-Design complete; ready for planning. Delivers the **capability** only; the
-motivating consumer (merging `review-task-design.edn`'s review phases) is task
-**227**, which depends on this.
+Implementation complete; under implementation review. Delivers the **capability**
+only; the motivating consumer (merging `review-task-design.edn`'s review phases)
+is task **227**, which depends on this.
 
 ## Intent
 

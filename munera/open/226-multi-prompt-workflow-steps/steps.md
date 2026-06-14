@@ -835,7 +835,7 @@ consolidates them — it does not first-author them.
 
 ## Implementation-review follow-ups (pass 5)
 
-- [ ] R-7 — Add a per-iteration pre-turn cancellation checkpoint to
+- [x] R-7 — Add a per-iteration pre-turn cancellation checkpoint to
   `drive-session-prompt-queue!` (`step_execution.clj`). The drain loop currently
   runs each prompt's full turn (`execute-session-turn-outcome` →
   `execute-actor-turn!`) before any `stopped?` check, so a cancellation arriving
@@ -850,8 +850,21 @@ consolidates them — it does not first-author them.
   a cancellation observed between turns enqueues `:workflow/cancel` with **zero**
   additional turn-fn/`ai/generate` invocations and no post-drain
   `:pending-actor-result`; completed prior records retained.
+  **DONE:** wrapped the drain `loop` body in a top-of-iteration `(if (stopped?)
+  (enqueue :workflow/cancel) …)` checkpoint that runs **before**
+  `next-un-run-prompt-group` selection and turn construction — symmetric with the
+  N=1 `execute-session-step!` pre-turn check. Covering test
+  `drive-session-prompt-queue-between-prompt-cancellation-checkpoint-test`
+  (abort-test ns): a cancellation observable only after prompt 0's record is
+  written (`stopped? = (seq (recorded-indices …))`) fires **exactly one** turn
+  (without R-7 it would be 2 — prompt 1's turn runs before the old post-turn
+  check), enqueues `:workflow/cancel`, leaves no `:pending-actor-result`, routing
+  skipped, index-0 record retained. `clj-kondo` clean; workflow-runtime suite
+  132 tests / 716 assertions green.
 
-- [ ] R-8 — Update the stale design.md `## Status` line ("Design complete; ready
+- [x] R-8 — Update the stale design.md `## Status` line ("Design complete; ready
   for planning") to reflect implementation-complete / under implementation review,
   matching plan.md's authoritative "Implementation complete" so a reader landing
   on design.md first is not misled. Low-severity coherence fix.
+  **DONE:** `## Status` now reads "Implementation complete; under implementation
+  review." (capability-only note preserved; 227-dependency note preserved).

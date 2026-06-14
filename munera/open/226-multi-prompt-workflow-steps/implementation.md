@@ -2223,3 +2223,31 @@ Minor coherence nit:
   records "Implementation complete," so this is low-severity, but the design
   Status line would mislead a future reader landing on design.md first. Update it
   to reflect implementation-complete / under implementation review.
+
+## Implementation-review follow-up execution (pass 5 — R-7, R-8)
+
+- **R-7 (between-prompt cancellation checkpoint) — DONE.** Wrapped the
+  `drive-session-prompt-queue!` drain `loop` body in a top-of-iteration
+  `(if (stopped?) (queue/enqueue-event! … :workflow/cancel {}) <select+run>)`
+  checkpoint. It runs **before** `next-un-run-prompt-group` selection,
+  turn-prompt construction, and `execute-session-turn-outcome`, so a
+  cancellation arriving between prompts stops the queue without firing the next
+  prompt's turn — symmetric with the N=1 `execute-session-step!` pre-turn
+  `stopped?` check, and realizing P12's between-prompts "queue stops". The
+  pre-existing top-level cond `(stopped?)` branch (before turn 1) is unchanged;
+  the new check covers iterations ≥ 2. Covering test
+  `drive-session-prompt-queue-between-prompt-cancellation-checkpoint-test`: with
+  `stopped? = (seq (recorded-indices …))` the cancel becomes observable only
+  after prompt 0's record lands (strictly between prompts 0 and 1), so the
+  checkpoint catches it at the top of iteration 2 and the turn-fn fires **once**
+  — without R-7 it would fire twice (prompt 1's turn ran before the old post-turn
+  `:ok` check). Asserts: `turn-calls = 1`, `:workflow/cancel` enqueued, no
+  `:actor/done` (routing skipped), no `:pending-actor-result`, index-0 record
+  retained. `clj-kondo` clean; full workflow-runtime suite 132 tests / 716
+  assertions green (was 131/711; +1 test / +5 assertions = the new test).
+
+- **R-8 (stale design.md Status) — DONE.** `## Status` updated from "Design
+  complete; ready for planning." to "Implementation complete; under
+  implementation review.", matching plan.md's authoritative state. The
+  capability-only scope note and the 227-dependency note are preserved verbatim.
+  Docs-only coherence fix.

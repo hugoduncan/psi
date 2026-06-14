@@ -140,6 +140,40 @@
       ;; (and the never-reached index 2) leave no record.
       (is (= [0] (recorded-indices state* run-id step-id))))))
 
+(deftest drive-session-prompt-queue-between-prompt-cancellation-checkpoint-test
+  (testing "a cancellation observed between turns stops the queue at the top of the next iteration WITHOUT firing another turn (R-7): zero additional turn-fn invocations, :workflow/cancel enqueued, no post-drain result, prior records retained"
+    (let [run-id "run-1"
+          step-id "design-review"
+          state* (running-attempt-state* run-id step-id)
+          turn-calls* (atom 0)
+          execute-turn (fn [_ctx _sid prompt]
+                         (swap! turn-calls* inc)
+                         (ok-turn prompt))
+          working-memory* (atom {:current-step-id step-id})
+          event-queue* (atom [])]
+      (drive! {:ctx {:state* state* :workflow-execute-actor-turn-fn execute-turn}
+               :step-def {:name step-id :type :session}
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue [{:name "architecture" :contributions []}
+                              {:name "ambiguity" :contributions []}
+                              {:name "consistency" :contributions []}]
+               ;; The cancellation becomes observable only once the first prompt's
+               ;; turn record has been written — i.e. strictly BETWEEN prompt 0
+               ;; and prompt 1. The pre-turn checkpoint must catch it before
+               ;; prompt 1's turn fires (turn-calls stays at 1).
+               :stopped? (fn [] (seq (recorded-indices state* run-id step-id)))})
+      ;; exactly one turn fired (prompt 0); the between-prompt checkpoint stops
+      ;; the queue before prompt 1's turn would have fired (without R-7 this
+      ;; would be 2 — prompt 1's turn runs before the post-turn stopped? check).
+      (is (= 1 @turn-calls*) "no additional turn fired after the between-prompt cancellation")
+      (is (= :workflow/cancel (:event (first @event-queue*))) "terminal :cancelled")
+      (is (not-any? #(= :actor/done (:event %)) @event-queue*) "routing skipped")
+      (is (nil? (:pending-actor-result @working-memory*))
+          "no post-drain :pending-actor-result on between-prompt cancellation")
+      ;; the prompt completed before the cancel is retained.
+      (is (= [0] (recorded-indices state* run-id step-id))))))
+
 (deftest drive-session-prompt-queue-final-turn-structured-output-blocked-test
   (testing "a final-turn structured-output block after N-1 turns yields terminal :blocked; prior records retained, blocking final prompt leaves no record, routing skipped (P13/AC-3/AC-5)"
     (let [run-id "run-1"

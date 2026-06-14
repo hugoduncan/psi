@@ -396,47 +396,56 @@
       (loop [transcript []
              prompt-group-outputs []
              final-envelope nil]
-        (let [workflow-run (get-in @(:state* ctx) (progression-recording/run-path run-id))
-              {:keys [index group final?]}
-              (progression-recording/next-un-run-prompt-group workflow-run step-id prompt-queue)]
-          (if (nil? group)
+        (if (stopped?)
+          ;; Between-prompt cancellation checkpoint (R-7): a cancellation
+          ;; arriving between turns stops the queue cleanly at the top of the
+          ;; iteration, before the next prompt is selected or its turn fires
+          ;; (cooperative-cancellation, 225-lineage; realizes P12's
+          ;; between-prompts "queue stops"). Symmetric with the N=1
+          ;; `execute-session-step!` pre-turn `stopped?` check, so a cancelled
+          ;; queue never fires an extra turn's `ai/generate` + tool loop.
+          (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+          (let [workflow-run (get-in @(:state* ctx) (progression-recording/run-path run-id))
+                {:keys [index group final?]}
+                (progression-recording/next-un-run-prompt-group workflow-run step-id prompt-queue)]
+            (if (nil? group)
             ;; Drained: emit the one post-drain result over the whole queue.
-            (record-actor-pending!
-             working-memory* event-queue* step-id attempt-id :success
-             (post-drain-envelope final-envelope transcript prompt-group-outputs)
-             :actor/done)
-            (let [turn-prompt (if (zero? index) first-prompt (next-group-prompt-fn group))
-                  turn-opts (when final? (:opts request-result))
-                  turn-structured-entry (when final? structured-entry)
-                  outcome (execute-session-turn-outcome
-                           ctx execution-session step-def turn-prompt stopped?
-                           turn-opts turn-structured-entry)]
-              (case (:disposition outcome)
-                :cancelled
-                (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-
-                :failed
-                (record-actor-pending!
-                 working-memory* event-queue* step-id attempt-id :failure
-                 (assoc (:payload outcome)
-                        :failed-prompt {:index index :name (:name group)})
-                 :actor/failed)
-
-                :blocked
-                (if (and (= :success (:branch outcome)) (stopped?))
+              (record-actor-pending!
+               working-memory* event-queue* step-id attempt-id :success
+               (post-drain-envelope final-envelope transcript prompt-group-outputs)
+               :actor/done)
+              (let [turn-prompt (if (zero? index) first-prompt (next-group-prompt-fn group))
+                    turn-opts (when final? (:opts request-result))
+                    turn-structured-entry (when final? structured-entry)
+                    outcome (execute-session-turn-outcome
+                             ctx execution-session step-def turn-prompt stopped?
+                             turn-opts turn-structured-entry)]
+                (case (:disposition outcome)
+                  :cancelled
                   (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+
+                  :failed
                   (record-actor-pending!
-                   working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
+                   working-memory* event-queue* step-id attempt-id :failure
+                   (assoc (:payload outcome)
+                          :failed-prompt {:index index :name (:name group)})
+                   :actor/failed)
 
-                :ok
-                (if (stopped?)
-                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
-                  (let [outputs (turn-local-outputs outcome)]
-                    (if (record-turn-fn index (:name group) outputs)
-                      (recur (cond-> transcript
-                               (:assistant-message outcome) (conj (:assistant-message outcome)))
-                             (conj prompt-group-outputs
-                                   {:index index :name (:name group) :outputs outputs})
-                             (:payload outcome))
+                  :blocked
+                  (if (and (= :success (:branch outcome)) (stopped?))
+                    (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                    (record-actor-pending!
+                     working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
+
+                  :ok
+                  (if (stopped?)
+                    (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                    (let [outputs (turn-local-outputs outcome)]
+                      (if (record-turn-fn index (:name group) outputs)
+                        (recur (cond-> transcript
+                                 (:assistant-message outcome) (conj (:assistant-message outcome)))
+                               (conj prompt-group-outputs
+                                     {:index index :name (:name group) :outputs outputs})
+                               (:payload outcome))
                       ;; Recording was skipped because the run was cancelled.
-                      (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))))))))))))
+                        (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})))))))))))))
