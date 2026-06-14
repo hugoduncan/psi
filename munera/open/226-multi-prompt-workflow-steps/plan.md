@@ -190,6 +190,20 @@ before N>1, addressing, resume, and abort paths are layered on.
   upfront static gate at the same pre-turn position as today and attach the
   structured-output request only to the final group's turn, so the three `:blocked`
   reasons keep their existing single-prompt semantics in the N=1 degenerate.
+  **AC home (PI12) — preservation-only, no new AC.** `:blocked` is **not** a new
+  behaviour this task introduces: it is an existing `execute-session-step!`
+  non-success outcome (`:actor/blocked`) **preserved across the drain**. It is
+  therefore traced under existing ACs rather than its own: the structured-output
+  viability that raises it is governed by **AC-3** (declared step-level structured
+  output applies to the final turn), and its drain disposition — routing skipped,
+  prior N−1 completed per-prompt records retained + introspectable, blocking final
+  prompt leaves no completed turn record — is the **AC-5** abort disposition
+  (intermediate-failure abort semantics, of which a final-turn block is an
+  instance per P10's "any non-completing turn"). The Slice 6 `:blocked` covering
+  test thus traces to AC-3 + AC-5 and is named in the Final-verification coverage
+  enumeration so the AC-1..AC-8 TraceID check accounts for it without inflating the
+  AC set (design.md AC-5/AC-6 deliberately enumerate only `:failed`/`:cancelled`;
+  `:blocked` is the preserved structured-output instance of the AC-5 abort shape).
 
 ## Slice order
 
@@ -407,6 +421,8 @@ by its AC-1..AC-8 coverage confirmation, not by a different suite set):
   `step_execution_test.clj` namespace is only the N=1-equivalence comparand —
   Final verification additionally confirms AC coverage below).
 - Confirm **AC-1..AC-8** each have covering tests (ordering, drain, N=1
-  equivalence, per-prompt addressing + validation, intermediate-failure abort,
-  inter-prompt cancellation, resume-from-progression idempotency, docs) — the
-  TraceID coherence check.
+  equivalence, per-prompt addressing + validation, intermediate-failure abort
+  **including the structured-output `:blocked` terminal outcome — preservation-only,
+  traced under AC-3 structured-output viability + AC-5 abort disposition, not a
+  separate AC (PI12)**, inter-prompt cancellation, resume-from-progression
+  idempotency, docs) — the TraceID coherence check.

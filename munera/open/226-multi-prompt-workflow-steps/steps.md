@@ -274,8 +274,13 @@ consolidates them — it does not first-author them.
 - [ ] Run the full workflow-runtime + workflow-loader + workflow-step-
   materialization Scry suites green.
 - [ ] Confirm AC-1..AC-8 each have covering tests (ordering, drain, N=1
-  equivalence, per-prompt addressing + validation, intermediate-failure abort,
-  inter-prompt cancellation, resume-from-progression idempotency, docs).
+  equivalence, per-prompt addressing + validation, intermediate-failure abort
+  **including the structured-output `:blocked` terminal outcome — preservation-only
+  (an existing `execute-session-step!` `:actor/blocked` outcome preserved across
+  the drain), traced under AC-3 (structured-output viability) + AC-5 (abort
+  disposition: routing skipped, prior records retained, blocking prompt leaves no
+  record), not a separate AC (PI12)**, inter-prompt cancellation,
+  resume-from-progression idempotency, docs).
 
 ## Plan-review follow-ups (ambiguity, pass 1)
 
@@ -489,7 +494,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (inconsistency, pass 5)
 
-- [ ] PI12 — Give the P13 `:blocked` terminal outcome (Slice 6) a design AC and a
+- [x] PI12 — Give the P13 `:blocked` terminal outcome (Slice 6) a design AC and a
   Final-verification AC-1..AC-8 coverage home, or explicitly trace it under an
   existing AC. P13 added `:blocked` (`:actor/blocked`) as a **third** terminal
   non-success outcome (plan R6 + Slice 6; steps Slice 6 enumeration + dedicated

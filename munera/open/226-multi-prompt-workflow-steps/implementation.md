@@ -1454,3 +1454,30 @@ final-turn/no-counter definitions agree across files.
   that the Slice 6 `:blocked` test is traced under an existing AC (e.g. AC-3
   structured-output / AC-5 abort) and naming it in the Final-verification
   coverage parenthetical so the TraceID check accounts for it.
+
+## Plan/steps inconsistency follow-up execution (pass 5) — ψ
+
+Executed PI12 by updating plan.md + steps.md (completed; not blocked). No
+code/test/doc changes were required — this is a plan/coverage-traceability
+follow-up.
+
+- **PI12 (done).** Chose **option (b)** — `:blocked` is preservation-only, no new
+  AC — over option (a) (adding/extending a design AC). Two reasons: (1) design.md
+  is read-only context for this follow-up pass, and (2) `:blocked` is genuinely
+  preservation-only — it is an **existing** `execute-session-step!` non-success
+  outcome (`:actor/blocked`) **preserved across the drain**, not a new behaviour
+  this task introduces, so design.md's deliberate AC-5/AC-6 enumeration of only
+  `:failed`/`:cancelled` stays accurate. Traced the Slice 6 `:blocked` covering
+  test under **two existing ACs**: **AC-3** governs the structured-output
+  viability that raises `:blocked` (declared step-level structured output applies
+  to the final turn), and **AC-5** governs its drain disposition (routing skipped,
+  prior N−1 completed per-prompt records retained + introspectable, blocking final
+  prompt leaves no record — a final-turn block is an instance of AC-5's "any
+  non-completing turn" per P10). Edits: (i) plan.md R6 — added an "AC home (PI12)
+  — preservation-only, no new AC" paragraph stating `:blocked` traces to AC-3 +
+  AC-5; (ii) plan.md Final-verification AC-1..AC-8 coverage bullet — named the
+  `:blocked` terminal outcome in the intermediate-failure-abort parenthetical
+  (preservation-only, traced under AC-3/AC-5); (iii) steps.md Final-verification
+  confirm item — the matching parenthetical. Now the AC-1..AC-8 TraceID/coherence
+  gate accounts for the scheduled Slice 6 `:blocked` test without inflating the AC
+  set — closing the same defect-shape PI9/PI10/PI11 fixed for other surfaces.
