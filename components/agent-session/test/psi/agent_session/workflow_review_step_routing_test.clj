@@ -461,28 +461,37 @@
                                                               :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
               s)))))
 
+(defn- actor-turn-result
+  [text]
+  (let [message {:role "assistant"
+                 :content [{:type :text :text text}]
+                 :stop-reason :stop}]
+    {:status :ok
+     :assistant-message message
+     :assistant-text text
+     :execution-result {:execution-result/assistant-message message}}))
+
 (defn- execute-conditional-review-proof!
   ([definition-name run-id replies]
    (execute-conditional-review-proof! definition-name run-id replies {}))
   ([definition-name run-id replies opts]
    (let [[ctx session-id] (support/create-session-context {:persist? false})
-         prompts* (atom [])]
+         prompts* (atom [])
+         ctx (assoc ctx
+                    :workflow-execute-actor-turn-fn
+                    (fn [_ctx child-session-id prompt & _]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      (actor-turn-result
+                       (if (fn? replies)
+                         (replies prompt)
+                         (get replies prompt prompt)))))]
      (register-review-routing-ops! ctx)
      (create-conditional-review-run! ctx definition-name run-id opts)
-     (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                   (fn [_ctx child-session-id prompt]
-                     (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                     {:execution-result/assistant-message
-                      {:role "assistant"
-                       :content [{:type :text :text (if (fn? replies)
-                                                      (replies prompt)
-                                                      (get replies prompt prompt))}]
-                       :stop-reason :stop}})]
-       (let [result (workflow-execution/execute-run! ctx session-id run-id)
-             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-         {:result result
-          :run run
-          :prompts (mapv :prompt @prompts*)})))))
+     (let [result (workflow-execution/execute-run! ctx session-id run-id)
+           run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+       {:result result
+        :run run
+        :prompts (mapv :prompt @prompts*)}))))
 
 (deftest conditional-review-invalid-implementation-status-fails-before-follow-up-test
   (testing "design/plan review routing rejects implementation-only PASS_STATUS tokens"

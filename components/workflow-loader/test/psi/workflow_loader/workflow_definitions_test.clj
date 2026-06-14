@@ -300,29 +300,47 @@
       (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
           (str edn-filename " must not reference stale " removed-filename)))))
 
-(deftest architecture-review-prompt-contract-test
-  ;; AC2a contract guard for review-task-design-architecture-review.md.
-  ;; Relocated here (SH2) from review-task-prompt-artifact-targets-test, whose
-  ;; scope is artifact ownership (design-steps.md vs steps.md); a menu/skill
-  ;; regression should fail under a name that describes the violated AC2a
-  ;; contract. The prompt must (a) load the review-task-architecture skill (not
-  ;; task-design) and (b) *end with* the two-line PASS_STATUS menu. I1 flagged
-  ;; the menu convention as contradiction-prone.
-  (let [content (slurp-workflow-file "review-task-design-architecture-review.md")]
-    (testing "loads the review-task-architecture skill"
-      (is (.contains content "review-task-architecture")
-          "architecture-review prompt loads the review-task-architecture skill"))
-    (testing "ends with the contiguous two-line PASS_STATUS menu (SH1)"
-      ;; Enforce the *ends-with* contract, not mere presence: the menu lead-in
-      ;; and the two PASS_STATUS lines must form a contiguous, terminal block.
-      ;; Trailing whitespace is trimmed before anchoring to end-of-string so a
-      ;; future edit that appends prose after the menu, or splits the lead-in
-      ;; from the status lines, fails this guard.
-      (is (re-find #"(?s)End your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE\s*\z"
-                   content)
-          (str "architecture-review prompt must end with the contiguous "
-               "two-line PASS_STATUS menu (lead-in + ACTIONABLE_FEEDBACK + "
-               "REVIEW_COMPLETE), with nothing but whitespace after it")))))
+(defn- terminal-review-pass-status-menu?
+  [content]
+  (boolean
+   (re-find #"(?s)End your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE\s*\z"
+            content)))
+
+(deftest review-task-design-prompt-contract-test
+  ;; Locks the merged design-review prompt contracts: the first turn loads the
+  ;; shared context and later turns reuse it by default, with only targeted
+  ;; re-reads. All review prompts must end with the same terminal PASS_STATUS menu.
+  (let [architecture (slurp-workflow-file "review-task-design-architecture-review.md")
+        ambiguity (slurp-workflow-file "review-task-design-ambiguity-review.md")
+        inconsistency (slurp-workflow-file "review-task-design-inconsistency-review.md")]
+    (testing "architecture prompt is the shared-session loader"
+      (doseq [needle ["first turn of the shared `design-review` multi-prompt session"
+                      "Read the task's design.md"
+                      "AGENTS.md"
+                      "META.md"
+                      "doc/architecture.md"
+                      "loads the task design and architecture context"]]
+        (is (.contains architecture needle) needle))
+      (is (.contains architecture "review-task-architecture")
+          "architecture-review prompt loads the architecture review skill"))
+    (testing "ambiguity prompt reuses prior shared-session context by default"
+      (doseq [needle ["second turn of the shared `design-review` multi-prompt session"
+                      "Use the already-loaded task design.md, architecture sources, and architecture-review reply"
+                      "Perform only targeted re-reads when specific referenced material is missing from context, ambiguous, or plausibly stale"
+                      "do not unconditionally re-read the whole task design and architecture source set"]]
+        (is (.contains ambiguity needle) needle)))
+    (testing "inconsistency prompt reuses both prior review replies by default"
+      (doseq [needle ["third turn of the shared `design-review` multi-prompt session"
+                      "Use the already-loaded task design.md, architecture sources, architecture-review reply, and ambiguity-review reply"
+                      "Perform only targeted re-reads for specific missing or stale referenced material needed to decide an inconsistency"
+                      "do not unconditionally re-read the whole task design and architecture source set"]]
+        (is (.contains inconsistency needle) needle)))
+    (testing "all design-review prompts end with the exact terminal PASS_STATUS menu"
+      (doseq [[label content] {"architecture" architecture
+                               "ambiguity" ambiguity
+                               "inconsistency" inconsistency}]
+        (is (terminal-review-pass-status-menu? content)
+            (str label " prompt must end with the contiguous two-line PASS_STATUS menu"))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
