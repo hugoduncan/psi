@@ -75,3 +75,7 @@
 ## Docs review follow-up
 
 - [x] DOC1: Update `CHANGELOG.md` so the invoke+judge routing fix entry no longer names `review-task-design`'s removed `clarity-status` step as a current example; keep the historical bug-fix meaning while avoiding stale step references after the merged `design-review` topology.
+
+## Code-shaper review follow-up
+
+- [ ] CS1: Harden `workflow/pass-feedback-routing` against an empty prompt/phase reply arg map. Add focused routing coverage requiring a deterministic invalid-pass-feedback diagnostic when no feedback inputs are supplied, and update `parse-pass-feedback-routing` so a miswired judge cannot silently route `DONE` with zero replies.
