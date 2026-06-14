@@ -427,3 +427,22 @@ consolidates them — it does not first-author them.
   explicit failing-prompt "leaves no record" rule — so only prompts completed
   before cancellation are retained + introspectable. Make the cancellation path's
   in-flight-record disposition as explicit as AC-5 makes the failure path's.
+
+## Plan-review follow-ups (inconsistency, pass 4)
+
+- [ ] PI11 — Reword plan.md P9 ("Per-slice Scry gating") **Slice 5** so it stops
+  listing confirm-only / read-only files as the slice's gating work-files,
+  matching steps Slice 5 and PI10's same-file resolution for Slice 3. plan P9
+  Slice 5 reads "(resume/replay re-entry in `statechart_runtime.clj` +
+  `progression_recording.clj`)" — framing both files like the "(edits …)"
+  parentheticals of Slices 2/4/6 — but steps Slice 5 has **no** production-edit
+  item (all "Confirm …"/runtime-test/"Verify …"/docs, with the boundary
+  "unchanged from Slice 3"), plan Touch points scope `statechart_runtime.clj` as
+  the confirm-only re-entry boundary needing **no** edit (PI7/PI10), and the
+  `progression_recording.clj` per-prompt recording lands in **Slice 3**
+  (read-only in Slice 5). So the same `statechart_runtime.clj` is "confirm-only,
+  no edit" in plan P9 Slice 3 but a plain work-file in plan P9 Slice 5. Reconcile
+  by marking `statechart_runtime.clj` as the confirm-only re-entry boundary and
+  `progression_recording.clj` as read-only (recording added in Slice 3) in the
+  Slice-5 enumeration, and — if Slice 5 edits no production code — state that its
+  gate is the workflow-runtime suite for the added resume/replay tests.

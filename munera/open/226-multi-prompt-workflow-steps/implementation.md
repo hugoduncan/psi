@@ -1252,3 +1252,56 @@ without re-opening the design.
   cancellation context, added a dedicated in-flight-cancellation record-
   disposition item, and extended the Slice-6 runtime-tests item to cover the
   mid-turn cancellation case).
+
+## Plan/steps inconsistency review (pass 4) — ψ
+
+Re-reviewed plan.md + steps.md for internal inconsistencies / contradictions
+against each other and the referenced design.md ACs / code touch points.
+Distinct from inconsistency passes 1–3 (PI1–PI10, all resolved) and ambiguity
+passes 1–4 (P1–P12, resolved). **One** new actionable inconsistency found
+(PI11); recorded as an unchecked item in steps.md. Verified-consistent
+(re-checked, no new inconsistency): PI1–PI10 reconciliations still hold; the P9
+per-component Scry-gating wording matches between plan P9 note and steps header
+for Slice 1 (three components), Slice 2 (workflow-loader + workflow-runtime),
+Slice 3 (workflow-runtime; `core.clj` in Slice 1 per PI9/PI10), Slice 4 and
+Slice 6 (workflow-runtime); plan P9 Slice 3 "edits" enumeration now lists only
+`step_execution.clj` + `progression_recording.clj` with `statechart.clj` /
+`statechart_runtime.clj` confirm-only (PI10 holds); docs-cadence per-slice
+ownership matches (Slice 1 none / Slice 2 grammar / Slices 3–6 concepts /
+Slice 7 consolidation); abort + cancellation outcomes (Slice 6) match
+AC-5/AC-6 incl. P10/P12 reconciliations; the `:prompt`-validation invalid-case
+enumeration (Slice 4) matches design's Source-ref section; Final-verification
+AC-1..AC-8 coverage list matches design's eight ACs across plan + steps.
+
+- **PI11 — plan P9 Slice 5 lists confirm-only / read-only files as the slice's
+  gating work-files, inconsistent with steps Slice 5 and with PI10's same-file
+  resolution for Slice 3.** plan.md P9 ("Per-slice Scry gating") Slice 5 reads
+  "**Slice 5** — **workflow-runtime** Scry suite (resume/replay re-entry in
+  `statechart_runtime.clj` + `progression_recording.clj`)", framing both files
+  as where Slice 5 does its work — parallel to the "(edits …)" parentheticals
+  for Slices 2/4/6. But (a) steps.md Slice 5 has **no** production-edit item:
+  every item is "**Confirm** the `statechart_runtime.clj` … resume path
+  reconstructs …", a runtime test, "**Verify** replay path …", docs, and the
+  commit — and its preamble states "the suspend/resume boundary inside the
+  single statechart step is **unchanged from Slice 3**", i.e. confirm + read +
+  test, no edit; (b) plan Touch points scope `statechart_runtime.clj` as "the
+  suspend/resume **re-entry boundary** … needing **no** Slice-3 edit … Slice 5
+  confirms process-restart/replay re-entry through this branch reconstructs queue
+  position **purely from persisted progression**" — confirm-only; and the
+  per-prompt recording added to `progression_recording.clj` lands in **Slice 3**
+  (read-only in Slice 5). (c) PI10 already reworded the **Slice 3** P9
+  enumeration to mark this same `statechart_runtime.clj` as the confirm-only /
+  no-edit re-entry boundary, yet the Slice 5 enumeration still lists it (and the
+  Slice-3-owned `progression_recording.clj`) as plain work-files — so the same
+  file is "confirm-only, no edit" in plan P9 Slice 3 but a plain Slice-5
+  work-file in plan P9 Slice 5, while steps Slice 5 treats both as
+  confirm/read-only. Gating consequence is nil (both live in workflow-runtime,
+  already the Slice-5 gate), but the edited-files attribution is internally
+  inconsistent — the same defect PI10 fixed for Slice 3, left unfixed for Slice
+  5. Reconcile by rewording plan P9 Slice 5 to separate any genuinely-edited
+  Slice-5 file from confirm-only/read re-entry files (mark `statechart_runtime.clj`
+  as the confirm-only re-entry boundary and `progression_recording.clj` as
+  read-only — per-prompt recording added in Slice 3), consistent with steps
+  Slice 5 (confirm/verify/test only, boundary unchanged from Slice 3) and PI10's
+  Slice-3 treatment; if Slice 5 genuinely edits no production code, state that
+  its gate is the workflow-runtime suite for the added resume/replay tests.
