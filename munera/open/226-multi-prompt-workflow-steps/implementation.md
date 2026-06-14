@@ -3381,3 +3381,36 @@ clean (0/0); step-execution + drive-prompt-queue (+ abort) 25 tests / 146
 assertions green; full workflow-runtime suite 136 tests / 736 assertions green
 (covers both the step_execution and statechart_runtime cancellation paths, so the
 shared-helper refactor is verified across both sharers — no drift).
+
+## Code-shaper review (pass 5) — ψ
+
+Fresh code-shaper pass over the 226 production code (`step_execution.clj`
+drivers, `progression_recording.clj` per-prompt records, `ir.clj`
+`session-step-prompt-queue`/surfaces, `statechart_runtime.clj` `(some :name
+prompt-queue)` dispatch). CS-1..CS-5 are resolved; the two-driver
+disposition→`record-actor-pending!` duplication and `post-drain-envelope`
+loop-local accumulation remain the **accepted/documented** design (R-5/R-1), not
+re-raised. One **new** actionable simplicity issue (CS-6); recorded as an
+unchecked item in steps.md. Verified-clean: `next-un-run-prompt-group`
+selection, `record-prompt-group-turn` idempotency, `turn-local-outputs`,
+`session-turn-ok-envelope` structured-output gating, the upfront request-validity
+gate, and the R-7 between-prompt cancellation checkpoint are all single-
+responsibility and locally comprehensible.
+
+- **CS-6 — `session-turn-ok-envelope` returns a dead `:assistant-text` key.** The
+  success-arm disposition map (`step_execution.clj`, `session-turn-ok-envelope`
+  return) carries `:assistant-text` alongside `:raw-outputs`/`:assistant-message`,
+  and `execute-session-turn-outcome`'s docstring documents `:assistant-text ...`
+  as part of the `:branch :success` contract. But **no consumer reads
+  `(:assistant-text outcome)`**: `execute-session-step!` reads only
+  `:disposition`/`:branch`/`:payload`; `drive-session-prompt-queue!` additionally
+  reads `:raw-outputs` (via `turn-local-outputs`) and `:assistant-message` (for
+  transcript accumulation). The value is already carried inside `:raw-outputs`
+  (`:final-llm-reply`/`:text` = `assistant-text`), so the top-level
+  `:assistant-text` projection is a dead return key — `simple` /
+  `locally_comprehensible`: a returned key with no consumer misleads a reader into
+  treating it as load-bearing. Drop the `:assistant-text` key from the
+  `session-turn-ok-envelope` return and remove it from the
+  `execute-session-turn-outcome` docstring's `:branch :success` shape (keep
+  `:assistant-message`, which the drain genuinely consumes). Behaviour-preserving;
+  re-run step-execution + drive-prompt-queue (+ abort) suites + `clj-kondo`.

@@ -1310,3 +1310,19 @@ consolidates them — it does not first-author them.
   `clj-paren-repair` + `clj-kondo` clean; step-execution + drive-prompt-queue
   (+ abort) suites 25 tests / 146 assertions green; full workflow-runtime suite
   136 tests / 736 assertions green.
+
+## Code-shaper review follow-ups (pass 5)
+
+- [ ] CS-6 — Remove the dead `:assistant-text` key from the
+  `session-turn-ok-envelope` return map (`statechart_runtime/step_execution.clj`)
+  and from the `execute-session-turn-outcome` docstring's `:branch :success`
+  shape. No caller reads `(:assistant-text outcome)`
+  (`execute-session-step!` reads `:disposition`/`:branch`/`:payload` only;
+  `drive-session-prompt-queue!` additionally reads `:raw-outputs` via
+  `turn-local-outputs` and `:assistant-message` for transcript accumulation), and
+  the value is already carried inside `:raw-outputs`
+  (`:final-llm-reply`/`:text` = `assistant-text`). A returned key with no consumer
+  misleads a reader into treating it as load-bearing (`simple` /
+  `locally_comprehensible`). Keep `:assistant-message` (the drain consumes it).
+  Behaviour-preserving; re-run step-execution + drive-prompt-queue (+ abort)
+  suites + `clj-kondo`.
