@@ -3247,3 +3247,29 @@ gate shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
 and the `post-drain-envelope` loop-local accumulation of transcript/per-prompt
 records (vs reading recorded progression) is the **documented** F1-async blocker
 (design.md Intent "Realized vs. target") — both left as-is.
+
+## Code-shaper follow-up execution (pass 2 — CS-3)
+
+Executed CS-3 (the sole follow-up added by code-shaper review pass 2).
+
+Changed `session-turn-ok-envelope` from a 7-arg signature
+(`[step-def execution-session structured-entry assistant-text assistant-message
+execution-result structured-output]`) to a 4-arg signature
+(`[step-def execution-session structured-entry turn-result]`). The four turn
+co-members now travel as one named value — the helper destructures
+`{:keys [assistant-text assistant-message execution-result structured-output]}`
+from `turn-result` locally as its first `let` binding. Removes the positional
+transposition risk (notably the easy-to-swap `assistant-text`/`assistant-message`
+pair).
+
+`execute-session-turn-outcome` now binds the whole turn result as `turn-result`
+and destructures only `status`/`failure`/`structured-output` for the disposition
+`cond` (flow control). The `:else` success arm passes `turn-result` straight
+through — no destructure-then-repass dance. `xor(computation, flow_control)`
+upheld: the `cond` is flow control only; the pure OK-envelope computation lives
+entirely in `session-turn-ok-envelope`.
+
+Behaviour-preserving (pure helper, identical envelope shape). `clj-paren-repair`
++ `clj-kondo` clean. step-execution + drive-prompt-queue (+ abort) suites 25
+tests / 146 assertions green; full workflow-runtime suite 136 tests / 736
+assertions green.

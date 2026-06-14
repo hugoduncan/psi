@@ -190,9 +190,14 @@
    Returns the `:branch :success` disposition map consumed by
    `execute-session-turn-outcome` — `:disposition :ok` or `:disposition :blocked`
    (`:invalid-structured-output`). This is the pure OK-envelope computation,
-   separated from `execute-session-turn-outcome`'s disposition flow control."
-  [step-def execution-session structured-entry assistant-text assistant-message execution-result structured-output]
-  (let [logprobs (:execution-result/logprobs execution-result)
+   separated from `execute-session-turn-outcome`'s disposition flow control.
+
+   `turn-result` is the cohesive turn-result map; its `:assistant-text`,
+   `:assistant-message`, `:execution-result`, and `:structured-output` co-members
+   travel as one named value (no positional transposition risk)."
+  [step-def execution-session structured-entry turn-result]
+  (let [{:keys [assistant-text assistant-message execution-result structured-output]} turn-result
+        logprobs (:execution-result/logprobs execution-result)
         ;; Structured `:outputs` bind the final turn only (P5). On non-final
         ;; turns the declared structured key is NOT produced, so it must be
         ;; excluded from surface resolution to avoid an invalid-resolution
@@ -256,12 +261,13 @@
    recheck (CHECK B); `:branch :error` outcomes do not (preserving the byte-exact
    single-turn N=1 control flow)."
   [ctx execution-session step-def turn-prompt stopped? turn-opts structured-entry]
-  (let [{:keys [status assistant-text failure execution-result assistant-message structured-output]}
+  (let [turn-result
         (if (fallback-enabled? execution-session)
           (execute-with-ranked-fallback! ctx execution-session turn-prompt turn-opts stopped?)
           (if turn-opts
             (turn-execution/execute-actor-turn! ctx (:session-id execution-session) turn-prompt turn-opts)
-            (turn-execution/execute-actor-turn! ctx (:session-id execution-session) turn-prompt)))]
+            (turn-execution/execute-actor-turn! ctx (:session-id execution-session) turn-prompt)))
+        {:keys [status failure structured-output]} turn-result]
     (cond
       (stopped?)
       {:disposition :cancelled}
@@ -285,8 +291,7 @@
 
       :else
       (session-turn-ok-envelope
-       step-def execution-session structured-entry
-       assistant-text assistant-message execution-result structured-output))))
+       step-def execution-session structured-entry turn-result))))
 
 (defn execute-session-step!
   "Drive ONE session turn (the unnamed N=1 degenerate of the unified prompt-queue)

@@ -1238,7 +1238,7 @@ consolidates them — it does not first-author them.
 
 ## Code-shaper review follow-ups (pass 2)
 
-- [ ] CS-3 — Pass the cohesive turn result as one value, not four scattered
+- [x] CS-3 — Pass the cohesive turn result as one value, not four scattered
   positionals. `execute-session-turn-outcome`
   (`statechart_runtime/step_execution.clj:259`) destructures the turn result
   `{:keys [status assistant-text failure execution-result assistant-message
@@ -1250,3 +1250,14 @@ consolidates them — it does not first-author them.
   fields travel as one named value and `session-turn-ok-envelope` destructures
   locally (arg count 4). Behaviour-preserving, pure helper; re-run
   step-execution + drive-prompt-queue (+ abort) suites and `clj-kondo`.
+  **DONE:** `session-turn-ok-envelope` now takes the cohesive `turn-result` map
+  (arg count 4: `step-def execution-session structured-entry turn-result`) and
+  destructures `{:keys [assistant-text assistant-message execution-result
+  structured-output]}` locally — the four turn co-members travel as one named
+  value, removing the positional transposition risk.
+  `execute-session-turn-outcome` binds the whole turn result as `turn-result`
+  (destructuring only `status`/`failure`/`structured-output` for the disposition
+  `cond` flow control) and passes `turn-result` straight through on the `:else`
+  success arm. Behaviour-preserving, pure helper; `clj-kondo` clean;
+  step-execution + drive-prompt-queue (+ abort) suites 25 tests / 146 assertions
+  green; full workflow-runtime suite 136 tests / 736 assertions green.
