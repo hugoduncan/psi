@@ -308,8 +308,11 @@ every group's turn is recorded, so the value is present and deterministic —
 unlike an assembly-time contribution/template that would reference a sibling
 turn that has not yet run.
 
-`:prompt` is `:output`-only — it never applies to a `:yield` ref, and the step's
-yielded value is unchanged (text from the step-level `:final-llm-reply`).
+`:prompt` is `:output`-only — a `:prompt` discriminator on a `:yield` ref
+(`{:step s :prompt p :yield k}`) is **structurally** rejected (it matches neither
+the `:output` ref shape nor the closed `:yield` ref shape), so the case is
+unreachable rather than a semantic carve-out. The step's yielded value is
+unchanged (text from the step-level `:final-llm-reply`).
 
 ### Yielded value
 

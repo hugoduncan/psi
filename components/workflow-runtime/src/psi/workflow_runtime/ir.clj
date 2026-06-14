@@ -53,13 +53,19 @@
   ;; prompt-group's turn-local output surface within a multi-prompt `:session`
   ;; step. Absent `:prompt`, the ref addresses the step-level surface. `:prompt`
   ;; is `:output`-only (never a `:yield` ref — see `step-yield-ref-schema`).
-  [:map
+  ;; Closed so a `:prompt` discriminator cannot ride a yield ref (B1): a
+  ;; `{:step :prompt :yield}` ref fails this schema (no `:output`) AND the closed
+  ;; `step-yield-ref-schema` (extra `:prompt`), making the case structurally
+  ;; unreachable (`unreachable > forbidden`) rather than a semantic carve-out.
+  [:map {:closed true}
    [:step step-name-schema]
    [:prompt {:optional true} step-name-schema]
    [:output output-key-schema]])
 
 (def step-yield-ref-schema
-  [:map
+  ;; Closed: `:prompt` is `:output`-only, so a `:prompt` key on a yield ref is
+  ;; structurally rejected here (see `step-output-ref-schema`).
+  [:map {:closed true}
    [:step step-name-schema]
    [:yield yield-field-schema]])
 

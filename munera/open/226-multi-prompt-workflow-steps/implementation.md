@@ -2329,3 +2329,47 @@ gaps found:
   unifying/loosening those shapes would go uncaught. Add a test asserting a
   `{:step s :prompt p :yield k}` source-ref is rejected (structural-errors),
   completing the AC-3 invalid-case coverage.
+
+## Test-review follow-up execution (pass 1)
+
+- **T-1 (DONE).** Converted both `testing` blocks of
+  `single-prompt-session-step-envelope-characterization-test`
+  (`step_execution_test.clj`) from `with-redefs` on
+  `turn-execution/execute-actor-turn!` to injecting the nullable
+  `:workflow-execute-actor-turn-fn` ctx seam (passed as the first
+  `execute-session-step!` arg). Asserted envelope shape unchanged (R4 comparand
+  preserved). Scoped to the task-introduced characterization test only; the
+  pre-existing `execute-session-step!` with-redefs tests in the same ns were left
+  untouched, so the `turn-execution` alias require remains in use. 14 tests / 113
+  assertions green (step-execution-test + ir-prompts-test).
+
+- **T-2 (DONE + code-correction).** Writing the test surfaced that the Slice-4
+  deviation's claim — "the `:yield`+`:prompt` invalid case is enforced
+  **structurally** … cannot pass `source-ref-schema`" — was **false**:
+  `step-output-ref-schema` and `step-yield-ref-schema` were **open** malli maps,
+  so `{:step s :prompt p :yield k}` validated against `step-yield-ref-schema`
+  (the extra `:prompt` key is allowed by an open map) and was only rejected
+  *semantically* as `:prompt-ref-non-text-surface` (because `validate-prompt-source-ref`
+  reads a nil `:output` key). Empirically confirmed via the project classpath
+  before editing.
+  - **Resolution (chose code-fix over test-of-reality):** closed both ref map
+    schemas with `{:closed true}`, making the Slice-4 `unreachable > forbidden`
+    claim true. The `:prompt`+`:yield` ref now fails `step-output-ref-schema`
+    (missing required `:output`) **and** the closed `step-yield-ref-schema`
+    (extra `:prompt`), so `source-ref-schema`'s `:or` rejects it structurally:
+    `{:valid? false :structural-errors <data> :semantic-errors []}`. Verified
+    valid refs still pass (`{:step :output}`, `{:step :prompt :output}`,
+    `{:step :yield}`). Rejected the alternative (assert the accidental semantic
+    `:prompt-ref-non-text-surface` rejection) because it would canonicalize a
+    misleading error mechanism and leave the documented structural invariant
+    unenforced (a schema regression unifying the ref shapes would go uncaught) —
+    closing the schemas realizes `impossible_invalid_states` / `enforceable
+    invariants`.
+  - **Test:** added `prompt-source-ref-validation-test` case "a `:prompt`
+    discriminator on a `:yield` ref is structurally rejected (B1(b))" asserting
+    `false? :valid?` ∧ `some? :structural-errors` ∧ `[] :semantic-errors`.
+  - **Docs:** `doc/workflow-grammar-concepts.md` now states the `:prompt`+`:yield`
+    case is structurally rejected (matches neither ref shape), not a semantic
+    carve-out.
+  - **Verification:** full workflow-runtime suite 132 tests / 719 assertions
+    green; `clj-kondo` clean on all edited files.

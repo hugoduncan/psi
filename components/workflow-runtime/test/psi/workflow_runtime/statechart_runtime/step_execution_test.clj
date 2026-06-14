@@ -501,25 +501,24 @@
           event-queue* (atom [])
           assistant-message {:role "assistant"
                              :content [{:type :text :text "the summary"}]}]
-      (with-redefs [turn-execution/execute-actor-turn!
-                    (fn [_ctx _session-id _prompt]
-                      {:status :ok
-                       :assistant-text "the summary"
-                       :execution-result nil
-                       :assistant-message assistant-message})]
-        (step-execution/execute-session-step!
-         {}
-         {:session-id "child-session"}
-         {:name "summarize"
-          :type :session
-          :outputs {:final-llm-reply {:source :session/final-llm-reply}
-                    :transcript {:source :session/transcript}}
-          :yields {:type :text :text :final-llm-reply}}
-         "summarize"
-         "attempt-1"
-         working-memory*
-         event-queue*
-         "Summarize"))
+      (step-execution/execute-session-step!
+       {:workflow-execute-actor-turn-fn
+        (fn [_ctx _session-id _prompt]
+          {:status :ok
+           :assistant-text "the summary"
+           :execution-result nil
+           :assistant-message assistant-message})}
+       {:session-id "child-session"}
+       {:name "summarize"
+        :type :session
+        :outputs {:final-llm-reply {:source :session/final-llm-reply}
+                  :transcript {:source :session/transcript}}
+        :yields {:type :text :text :final-llm-reply}}
+       "summarize"
+       "attempt-1"
+       working-memory*
+       event-queue*
+       "Summarize")
       (let [pending (:pending-actor-result @working-memory*)
             payload (:payload pending)
             outputs (:outputs payload)]
@@ -544,29 +543,28 @@
                                 :source :openai/message-content
                                 :payload {"decision" "pass"}
                                 :raw-payload "{\"decision\":\"pass\"}"}]
-      (with-redefs [turn-execution/execute-actor-turn!
-                    (fn [_ctx _session-id _prompt _opts]
-                      {:status :ok
-                       :assistant-text "{\"decision\":\"pass\"}"
-                       :structured-output ai-structured-output
-                       :execution-result {:execution-result/structured-output ai-structured-output}
-                       :assistant-message nil})]
-        (step-execution/execute-session-step!
-         {}
-         {:session-id "child-session"}
-         {:name "classify"
-          :type :session
-          :outputs {:classification {:source :session/structured-output
-                                     :mode :structured
-                                     :schema-id :psi.workflow/test-classification
-                                     :schema-version 1
-                                     :schema [:map [:decision [:enum :pass :fail]]]
-                                     :json-schema {:type "object"}}}}
-         "classify"
-         "attempt-1"
-         working-memory*
-         event-queue*
-         "Classify"))
+      (step-execution/execute-session-step!
+       {:workflow-execute-actor-turn-fn
+        (fn [_ctx _session-id _prompt _opts]
+          {:status :ok
+           :assistant-text "{\"decision\":\"pass\"}"
+           :structured-output ai-structured-output
+           :execution-result {:execution-result/structured-output ai-structured-output}
+           :assistant-message nil})}
+       {:session-id "child-session"}
+       {:name "classify"
+        :type :session
+        :outputs {:classification {:source :session/structured-output
+                                   :mode :structured
+                                   :schema-id :psi.workflow/test-classification
+                                   :schema-version 1
+                                   :schema [:map [:decision [:enum :pass :fail]]]
+                                   :json-schema {:type "object"}}}}
+       "classify"
+       "attempt-1"
+       working-memory*
+       event-queue*
+       "Classify")
       (let [pending (:pending-actor-result @working-memory*)
             payload (:payload pending)
             classification (get-in payload [:outputs :classification])]

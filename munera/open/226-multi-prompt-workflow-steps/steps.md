@@ -871,7 +871,7 @@ consolidates them — it does not first-author them.
 
 ## Test-review follow-ups (pass 1)
 
-- [ ] T-1 — Convert the Slice-1
+- [x] T-1 — Convert the Slice-1
   `single-prompt-session-step-envelope-characterization-test`
   (`step_execution_test.clj`) from `with-redefs` stubbing of
   `turn-execution/execute-actor-turn!` to injecting the nullable
@@ -881,8 +881,30 @@ consolidates them — it does not first-author them.
   is the R4 done-gate comparand). Scope to the task-introduced characterization
   test only; the pre-existing `execute-session-step!` with-redefs tests are out
   of scope.
-- [ ] T-2 — Add a covering test for B1(b) (AC-3): a `:prompt` discriminator on a
+  **DONE:** both `testing` blocks now pass the turn outcome via the ctx seam
+  `{:workflow-execute-actor-turn-fn (fn …)}` (first arg to `execute-session-step!`)
+  instead of `with-redefs` on `turn-execution/execute-actor-turn!`. Asserted
+  envelope shape unchanged — 14 tests / 113 assertions green in
+  step-execution-test + ir-prompts-test. Pre-existing `execute-session-step!`
+  with-redefs tests left untouched (out of scope); the `turn-execution` alias
+  require remains (still used by those tests).
+- [x] T-2 — Add a covering test for B1(b) (AC-3): a `:prompt` discriminator on a
   `:yield` ref (`{:step s :prompt p :yield k}`) is invalid. Assert it is rejected
   (structural-errors, since `:prompt` is absent from `step-yield-ref-schema`) in
   `ir_prompts_test/prompt-source-ref-validation-test`, completing the AC-3
   invalid-`:prompt` case coverage (every other invalid case is already tested).
+  **DONE + code-correction (see implementation.md "Test-review follow-up
+  execution (pass 1)"):** the Slice-4 deviation claimed this case was *already*
+  structurally enforced, but `step-output-ref-schema`/`step-yield-ref-schema`
+  were **open** malli maps, so a `{:step :prompt :yield}` ref slipped through
+  `step-yield-ref-schema` (extra `:prompt` allowed) and was only rejected
+  *semantically* as `:prompt-ref-non-text-surface`. Closed both ref map schemas
+  (`{:closed true}`) to make the Slice-4 `unreachable > forbidden` claim true:
+  the ref now fails `step-output-ref-schema` (no `:output`) **and** the closed
+  `step-yield-ref-schema` (extra `:prompt`), so it is rejected structurally with
+  empty `:semantic-errors`. Test
+  `prompt-source-ref-validation-test` "a `:prompt` discriminator on a `:yield`
+  ref is structurally rejected (B1(b))" asserts `false? :valid?` ∧
+  `some? :structural-errors` ∧ `[] :semantic-errors`. Updated
+  `doc/workflow-grammar-concepts.md` to state the structural rejection. Full
+  workflow-runtime suite 132 tests / 719 assertions green; `clj-kondo` clean.

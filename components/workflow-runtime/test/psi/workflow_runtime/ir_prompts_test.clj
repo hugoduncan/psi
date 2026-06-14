@@ -197,6 +197,18 @@
       (is (= :prompt-ref-same-step
              (-> result :semantic-errors first :type)))))
 
+  (testing "a `:prompt` discriminator on a `:yield` ref is structurally rejected (B1(b))"
+    ;; `:prompt` is `:output`-only. A `{:step s :prompt p :yield k}` ref cannot
+    ;; pass `step-output-ref-schema` (missing `:output`) nor the closed
+    ;; `step-yield-ref-schema` (extra `:prompt`), so it fails structurally —
+    ;; `unreachable > forbidden`, no dedicated semantic error.
+    (let [result (two-step-result {:step "review" :prompt "architecture"
+                                   :yield :final-llm-reply})]
+      (is (false? (:valid? result)))
+      (is (some? (:structural-errors result))
+          "rejected structurally, not as a semantic `:prompt-ref-*` error")
+      (is (= [] (:semantic-errors result)))))
+
   (testing "the step's own post-drain judge may reference its prompt-groups (carve-out)"
     (let [step (assoc prior-multi-prompt-step
                       :judge {:type :llm
