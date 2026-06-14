@@ -806,7 +806,7 @@ consolidates them — it does not first-author them.
 
 ## Implementation-review follow-ups (pass 4)
 
-- [ ] R-6 — Remove or reconcile the dead, divergent `execute-actor-step!`
+- [x] R-6 — Remove or reconcile the dead, divergent `execute-actor-step!`
   (`step_execution.clj:443`). It is never referenced anywhere in the repo, yet its
   `:else` session branch calls only `execute-session-step!` (single-turn N=1),
   with no awareness of the named multi-prompt `drive-session-prompt-queue!`
@@ -819,3 +819,16 @@ consolidates them — it does not first-author them.
   session branch through the same `(some :name prompt-queue)` dispatch the live
   `:step/enter` path uses, so the two cannot drift. Confirm no caller/test depends
   on it first (currently none).
+  **DONE via option (a)** (deleted). Confirmed dead first: `grep` across all
+  `.clj`/`.cljc`/`.cljs` (excluding stale `target/classes`) found only the
+  definition — no caller, no test; `git log -S` showed it introduced unused by the
+  component-extraction commit (#72). Chose (a) over (b): (b) would resurrect a
+  public step-dispatch entry point nothing wants, re-creating the very second
+  dispatch site whose drift R-6 flags (λone_way; `addition > modification` does
+  not apply to dead code). The three helpers it called
+  (`invoke-step-runtime-result`, `apply-invoke-step-result`,
+  `execute-session-step!`) are still live via the inlined dispatch in
+  `statechart_runtime.clj`, so deletion removes only the divergent wrapper. Single
+  live session-dispatch site now remains (`statechart_runtime.clj` `:step/enter`
+  `(some :name prompt-queue)`), upholding the "one path / no drift" thesis.
+  `clj-kondo` clean; workflow-runtime suite 131/711 green.

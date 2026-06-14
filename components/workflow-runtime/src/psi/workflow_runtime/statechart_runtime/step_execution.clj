@@ -440,21 +440,3 @@
                              (:payload outcome))
                       ;; Recording was skipped because the run was cancelled.
                       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {}))))))))))))
-(defn execute-actor-step!
-  [ctx parent-session-id run-id step-id step-def workflow-run execution-session attempt-id working-memory* event-queue* prompt]
-  (try
-    (cond
-      (= :invoke (:type step-def))
-      (let [invoke-result (invoke-step-runtime-result ctx parent-session-id run-id step-id step-def workflow-run attempt-id)
-            {:keys [attempt-data pending-kind payload]} (apply-invoke-step-result invoke-result)]
-        {:attempt-data attempt-data
-         :pending-kind pending-kind
-         :payload payload})
-
-      :else
-      (do
-        (execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt)
-        nil))
-    (catch Exception e
-      {:pending-kind :failure
-       :payload {:message (ex-message e)}})))

@@ -2151,3 +2151,23 @@ symmetric. R-1..R-5 confirmed done. **One new actionable finding (R-6).**
   through the same `(some :name prompt-queue)` dispatch the live path uses so the
   two cannot drift. (No test covers `execute-actor-step!`, consistent with it
   being dead.)
+
+### Implementation-review follow-up execution (pass 4)
+
+- **R-6 resolved via option (a) — deleted `execute-actor-step!`.** Confirmed dead
+  first: `grep` across `.clj`/`.cljc`/`.cljs` (excluding stale `target/classes`)
+  found only the definition — zero callers, zero tests; `git log -S` showed it was
+  introduced unused by the component-extraction commit (#72), never wired. Deleted
+  the whole `defn` (was `step_execution.clj:443`, end of file). Chose (a) over (b):
+  (b) — routing its session branch through the live `(some :name prompt-queue)`
+  dispatch — would resurrect a public step-dispatch entry point nothing calls,
+  re-creating the very second dispatch site whose latent drift R-6 flags; deleting
+  dead code is the λone_way move (no `addition > modification` tradeoff applies to
+  code with no callers). The three helpers it referenced
+  (`invoke-step-runtime-result`, `apply-invoke-step-result`,
+  `execute-session-step!`) remain live via the inlined dispatch in
+  `statechart_runtime.clj`, so the deletion removes only the divergent wrapper, not
+  any reachable behaviour. Net: a single live session-dispatch site
+  (`statechart_runtime.clj` `:step/enter`) now exists, closing the "one path / no
+  drift" gap. `clj-kondo` clean; workflow-runtime suite 131 tests / 711 assertions
+  green.
