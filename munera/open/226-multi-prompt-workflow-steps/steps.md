@@ -1157,7 +1157,7 @@ consolidates them — it does not first-author them.
 
 ## Docs-review follow-ups (pass 2)
 
-- [ ] DOC-3 — Document the `:prompts` form in the `doc/workflow-ir.md`
+- [x] DOC-3 — Document the `:prompts` form in the `doc/workflow-ir.md`
   Session-step IR section (workflow-ir.md:132-158). That section currently shows
   only the `:session`+`:contributions` normalized shape and says
   "`:contributions` are ordered and preserved as authored", but the implemented
@@ -1167,3 +1167,9 @@ consolidates them — it does not first-author them.
   cross-reference to `doc/workflow-grammar.md` *Multi-prompt session steps*) so the
   IR reference reflects that a session step's prompt source may also be a named
   `:prompts` queue, keeping the IR doc complete vs the shipped IR.
+  **DONE:** added a "Prompt source: `:contributions` vs `:prompts`" subsection to
+  the workflow-ir.md *Session semantics* section describing the IR-time
+  normalization into one internal prompt-queue (`:contributions`/`:prompt-workflow`
+  → single unnamed group; `:prompts` → ordered named-group queue drained by
+  `drive-session-prompt-queue!`), mutual exclusivity, and a cross-reference to
+  `doc/workflow-grammar.md` *Multi-prompt session steps (`:prompts`)*. Docs-only.

@@ -3040,3 +3040,17 @@ prior docs pass covered only the task-changed `grammar`/`concepts` files):
   `:prompts` (named multi-prompt groups) exists at the IR level or how it
   normalizes — a completeness gap in a user-facing reference doc relative to the
   shipped IR. Recorded as an unchecked follow-up in steps.md.
+
+## Docs-review follow-up execution (pass 2 — DOC-3)
+
+Executed DOC-3. Added a "Prompt source: `:contributions` vs `:prompts`"
+subsection under workflow-ir.md *Session semantics*: a session step's prompt
+source normalizes at IR time into one internal prompt-queue —
+`:contributions`/`:prompt-workflow` → a single unnamed prompt-group (the
+degenerate one-turn queue already shown), `:prompts` → an ordered queue of named
+prompt-groups, each run as its own model turn in the shared child session and
+drained in author order by `drive-session-prompt-queue!`. Noted mutual exclusivity
+on a single session step and cross-referenced `doc/workflow-grammar.md`
+*Multi-prompt session steps (`:prompts`)* for the author-facing form, precedence/
+validation, per-prompt surfaces, and drain/resume/abort semantics. Docs-only; no
+code/test change. The IR reference is now complete vs the shipped IR.
