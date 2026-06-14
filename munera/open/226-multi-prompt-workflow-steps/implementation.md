@@ -3099,3 +3099,43 @@ now agrees with the `:prompt` source-ref discriminator prose (grammar.md
 `{:step … :prompt … :output …}` data-flow surface. `prompt-name` was already a
 defined terminal (DOC-1), so no new terminal was needed and no dangling
 nonterminals remain. Docs-only; no code/test change.
+
+## Docs review (review-task-docs skill) — pass 4 — ψ
+
+Full re-review of user-facing docs per `review-task-docs` (README.md, doc/,
+CHANGELOG.md) against the shipped implementation. **No new actionable findings;
+REVIEW_COMPLETE.**
+
+Verified the four prior corrections still hold and re-checked accuracy against
+code:
+
+- **Grammar EBNF (DOC-1/DOC-2/DOC-4).** `session-step` three-way prompt-source
+  alternation, `prompt-group` production, the `prompt-name`/`relative-md-path`
+  terminals, and the `source-ref` `{:step :prompt :output}` alternative are all
+  present and self-consistent (no dangling nonterminals).
+- **workflow-ir.md (DOC-3).** "Prompt source: `:contributions` vs `:prompts`"
+  subsection present; cross-reference heading "Multi-prompt session steps
+  (`:prompts`)" matches grammar.md; grammar.md → concepts.md "Per-prompt output
+  surfaces" link target matches the concepts heading.
+- **Per-prompt text-surface validity.** Concepts/grammar prose ("`:final-llm-reply`
+  / `:transcript` only; structured/`:result` not per-prompt-addressable") matches
+  `ir.clj:419-422` `per-prompt-text-surfaces #{:final-llm-reply :transcript}` and
+  the invalidity check (`ir.clj:465`).
+- **Abort semantics.** `:failed` payload `:failed-prompt {:index … :name …}`
+  (`step_execution.clj:431`), final-turn-only structured request with the upfront
+  request-validity `:blocked` gate (`step_execution.clj:375-394`), and the
+  between-prompt cancellation checkpoint match the grammar.md *Abort,
+  cancellation, and blocked outcomes* prose.
+- **Later-group single-submission limitation.** grammar.md section matches the
+  `later-group-turn-prompt` docstring/behaviour (`step_execution.clj:334-356`):
+  only group 0's preloaded messages are injected; later groups submit only the
+  final message.
+- **CHANGELOG.** `[Unreleased] Added` entry describes the `:prompts` queue, xor
+  precedence, output surfaces, idempotent drain, and terminal `:failed`/
+  `:cancelled`/`:blocked` outcomes — accurate and user-facing.
+- **README / doc/workflows.md.** Both defer grammar detail to
+  `doc/workflow-grammar.md`; no `:prompts`-specific gap (README lists no grammar
+  forms; workflows.md is high-level and points at the formal grammar). No change
+  warranted.
+
+No follow-up steps added.
