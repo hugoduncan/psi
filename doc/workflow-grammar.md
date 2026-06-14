@@ -287,17 +287,30 @@ that step, not separate steps. Concretely:
 ### Resume and idempotency
 
 The queue's position is reconstructed **purely from the recorded per-prompt turn
-records**, never from an in-memory counter. On every re-entry of the step — an
-ordinary in-run advance, a process restart, or an event-log replay — the driver
-reads which group indices already have a recorded turn and submits the **lowest
-un-run** group next. A prompt whose turn record already exists is **never**
+records**, never from an in-memory counter. The realized guarantee is a
+**structural progression guard**: on **every** iteration the queue-driving loop
+re-reads which group indices already have a recorded turn and submits the
+**lowest un-run** group next, so the next prompt is derived from recorded
+progression alone. A prompt whose turn record already exists is **never**
 re-submitted, so its non-deterministic model turn (`ai/generate`) never re-fires.
 
-This makes a multi-prompt step idempotent under resume: re-driving a partially
-recorded queue runs only the remaining un-run prompts and reproduces the same
-ordered per-prompt records, and re-driving a fully recorded queue runs **zero**
-turns and proceeds straight to the single post-drain result/route. The post-drain
-route is reached only once every group has a recorded turn.
+This makes a multi-prompt step idempotent: re-driving a partially recorded queue
+runs only the remaining un-run prompts and reproduces the same ordered per-prompt
+records, and re-driving a fully recorded queue runs **zero** turns and proceeds
+straight to the single post-drain result/route. The post-drain route is reached
+only once every group has a recorded turn. The idempotency property is validated
+by re-driving against a **reconstructed** queue state — the same observable an
+async restart or replay would produce.
+
+> **Realized vs. target.** As built the drain is **synchronous**: the whole
+> queue drains inside one step action with no mid-drain suspend, so an async
+> turn-completion resume, a process restart, or an event-log replay re-entering
+> mid-drain is a **not-yet-realized target**, not an occurring runtime path. What
+> *is* realized today is the structural progression guard above — the per-iteration
+> re-read of recorded per-prompt progression. The async suspend/resume contract
+> (continue-from-progression across an actual process restart / replay) is the F1
+> target the synchronous drain stands in for; the progression guard is exactly
+> the mechanism a future async resume would reconstruct from.
 
 ### Abort, cancellation, and blocked outcomes
 

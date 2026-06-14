@@ -754,7 +754,7 @@ consolidates them — it does not first-author them.
 
 ## Implementation-review follow-ups (pass 2)
 
-- [ ] R-4 — Reconcile `doc/workflow-grammar.md` "Resume and idempotency" with the
+- [x] R-4 — Reconcile `doc/workflow-grammar.md` "Resume and idempotency" with the
   R-1-reconciled design. The section still presents async/process-restart/
   event-log-replay mid-drain re-entry as a realized runtime path ("On every
   re-entry of the step — an ordinary in-run advance, a process restart, or an
@@ -769,3 +769,11 @@ consolidates them — it does not first-author them.
   capability the reconciled spec marks unrealized. Also verify
   `doc/workflow-grammar-concepts.md` (*Per-prompt output surfaces*) carries no
   parallel overclaim.
+  **DONE:** reworded the "Resume and idempotency" section — realized guarantee now
+  stated as the structural progression guard (per-iteration re-read of recorded
+  per-prompt turn records, never a counter; idempotency validated against a
+  reconstructed queue state), and a *Realized vs. target* block demotes async
+  turn-completion resume / process restart / event-log replay mid-drain re-entry
+  to the not-yet-realized F1 target (synchronous drain today). Verified
+  `doc/workflow-grammar-concepts.md` *Per-prompt output surfaces* carries no
+  parallel restart/replay overclaim (no edit needed). Docs-only.

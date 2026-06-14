@@ -2031,3 +2031,23 @@ actionable coherence finding; R-1/R-2/R-3 confirmed done.
   unrealized. Reword `doc/workflow-grammar.md` "Resume and idempotency"
   accordingly. (Verify `doc/workflow-grammar-concepts.md` *Per-prompt output
   surfaces* carries no parallel overclaim.)
+
+## Implementation-review follow-up execution (pass 2) — ψ
+
+- **R-4 DONE.** Reworded `doc/workflow-grammar.md` "Resume and idempotency" to
+  match the R-1-reconciled design.md. (a) The realized guarantee is now stated as
+  the **structural progression guard** — the queue-driving loop re-reads recorded
+  per-prompt turn records on **every** iteration to pick the lowest un-run group,
+  never an in-memory counter; idempotency is validated by re-driving against a
+  **reconstructed** queue state. (b) Added a *Realized vs. target* block that
+  qualifies the synchronous drain (whole queue drains inside one step action, no
+  mid-drain suspend) and demotes async turn-completion resume / process restart /
+  event-log replay mid-drain re-entry to the **not-yet-realized F1 target** the
+  synchronous drain stands in for — no longer presented as an occurring runtime
+  path. Removed the prior "On every re-entry of the step — an ordinary in-run
+  advance, a process restart, or an event-log replay — the driver reads …" framing
+  that asserted the unrealized capability. Verified
+  `doc/workflow-grammar-concepts.md` *Per-prompt output surfaces* carries **no**
+  parallel restart/replay overclaim (it speaks only of assembly-time vs.
+  post-drain resolution, which is accurate) — no edit needed there. Docs-only
+  change; no code/test impact.
