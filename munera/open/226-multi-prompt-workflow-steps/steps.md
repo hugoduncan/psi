@@ -430,7 +430,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (inconsistency, pass 4)
 
-- [ ] PI11 — Reword plan.md P9 ("Per-slice Scry gating") **Slice 5** so it stops
+- [x] PI11 — Reword plan.md P9 ("Per-slice Scry gating") **Slice 5** so it stops
   listing confirm-only / read-only files as the slice's gating work-files,
   matching steps Slice 5 and PI10's same-file resolution for Slice 3. plan P9
   Slice 5 reads "(resume/replay re-entry in `statechart_runtime.clj` +

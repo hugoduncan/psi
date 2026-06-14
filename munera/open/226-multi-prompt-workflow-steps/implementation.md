@@ -1305,3 +1305,24 @@ AC-1..AC-8 coverage list matches design's eight ACs across plan + steps.
   Slice 5 (confirm/verify/test only, boundary unchanged from Slice 3) and PI10's
   Slice-3 treatment; if Slice 5 genuinely edits no production code, state that
   its gate is the workflow-runtime suite for the added resume/replay tests.
+
+## Plan/steps inconsistency follow-up execution (pass 4) — ψ
+
+Executed PI11 by updating plan.md (completed; not blocked). No code/test/doc
+changes required — a plan-attribution consistency follow-up, consistent with
+PI10's same-file resolution for Slice 3. Gating consequence is nil (Slice 5
+already gates on the workflow-runtime suite); PI11 only fixes the internally
+inconsistent edited-files attribution.
+
+- **PI11 (done).** Reworded plan.md P9 ("Per-slice Scry gating") **Slice 5** so
+  it no longer frames `statechart_runtime.clj` + `progression_recording.clj` as
+  the slice's gating work-files (parallel to the "(edits …)" parentheticals of
+  Slices 2/4/6). It now states Slice 5 **edits no production code**:
+  `statechart_runtime.clj` is the **confirm-only** suspend/resume re-entry
+  boundary (unchanged from Slice 3, Touch points / PI7/PI10) and
+  `progression_recording.clj` is **read-only** (its per-prompt recording lands in
+  Slice 3); the Slice-5 gate is therefore the workflow-runtime Scry suite for the
+  added resume/replay tests (runtime test + replay-path verification), not any
+  production-file edit. This matches steps Slice 5 (all confirm/verify/test, no
+  production-edit item; "boundary unchanged from Slice 3") and PI10's Slice-3
+  treatment of the same `statechart_runtime.clj`. Edit: plan.md P9 Slice 5 bullet.

@@ -335,8 +335,13 @@ coverage confirmation (the TraceID check), not by a different suite set:
   (PI9).
 - **Slice 4** — **workflow-runtime** Scry suite (edits `ir.clj` source-ref
   schema/validation/surfaces and `step_execution.clj` surface resolution).
-- **Slice 5** — **workflow-runtime** Scry suite (resume/replay re-entry in
-  `statechart_runtime.clj` + `progression_recording.clj`).
+- **Slice 5** — **workflow-runtime** Scry suite. Slice 5 **edits no production
+  code** (PI11): `statechart_runtime.clj` is the suspend/resume re-entry boundary
+  needing **no** Slice-5 edit — **confirm-only**, the boundary is unchanged from
+  Slice 3 (Touch points / PI7/PI10) — and `progression_recording.clj` is
+  **read-only** here (its per-prompt recording lands in **Slice 3**). Its gate is
+  therefore the **workflow-runtime** Scry suite for the added resume/replay tests
+  (the runtime test + replay-path verification), not any production-file edit.
 - **Slice 6** — **workflow-runtime** Scry suite (abort/cancellation in
   `step_execution.clj`).
 
