@@ -663,3 +663,47 @@ compile, `step_execution.clj`/`statechart_runtime.clj` session branch).
   to add only the process-restart/replay case) or whether Slice 3's drain is
   unrealizable without Slice 5 (mis-drawn slice boundary). The two slices'
   independent acceptance and the shared suspend mechanism are not disambiguated.
+
+## Plan/steps ambiguity follow-up execution (pass 1) — ψ
+
+Executed P1–P4 by updating plan.md + steps.md (all completed; none blocked). No
+code/test/doc changes were required — these are plan-disambiguation follow-ups.
+
+- **P1 (done).** Decided a single normalization owner per `λ
+  workflow_runtime_boundary`/`λone_way`: the **workflow-loader `compiler.clj`**
+  owns the authored-form → normalized-prompt-queue **transform**
+  (`:contributions`/`:prompt-workflow` → unnamed group; `:prompts` → named
+  groups), resolving each prompt body exactly as the existing single-prompt
+  `:prompt-workflow`/markdown lowering does; **workflow-runtime `ir.clj`** owns
+  only the normalized-queue **schema + semantic validation + output surfaces** and
+  consumes normalized IR (does not transform authored forms). Replaced
+  "`compiler.clj` +/or `ir.clj`" in Slice 1. Updated plan.md Key-decisions (new
+  P1 bullet) + Touch points (explicit ownership split) and steps.md Slice 1.
+- **P2 (done).** Chose **incremental per-slice** author-facing grammar docs (per
+  change_chain "update spec per change" + `coherence`), reframing Slice 7 as a
+  consolidation + changelog + TraceID coherence slice rather than the sole
+  doc-authoring slice. Stated per-slice doc ownership: Slice 1 = none (internal
+  unification, no author-visible surface); Slice 2 = `:prompts` form/precedence in
+  `workflow-grammar.md`; Slices 3–6 = drain/records, per-prompt surfaces +
+  `:prompt` source-ref, resume contract, abort outcomes in
+  `workflow-grammar-concepts.md`. Added a "docs cadence (P2)" note to the
+  Slice-order section, reworded the change_chain closing note, reframed Slice 7,
+  and added per-slice Docs items to steps.md Slices 2–6.
+- **P3 (done).** Named the Slice-1 equivalence-baseline artifact: a committed
+  **asserted-shape characterization test** (not a full-content golden snapshot)
+  pinning the single-prompt `execute-session-step!` `:pending-actor-result`
+  envelope keys, added in/alongside `step_execution_test.clj`, **committed first**
+  and green against pre-refactor code; the unified-path refactor must keep it green
+  unchanged. Made this test (not "suite green unchanged") the Slice-1 done-gate
+  comparand for R4. Updated plan.md R4 and steps.md Slice 1 (characterization step
+  + done-gate step).
+- **P4 (done).** Disambiguated the Slice 3 / Slice 5 boundary: **Slice 3 builds
+  the in-run suspend/resume drain** (each turn is an async `ai/generate` suspend
+  per design F1, so advancing _n_→_n+1_ already requires progression-consulting
+  re-entry; the driver selects the next un-run prompt from recorded progression,
+  not a counter). **Slice 5 adds only the process-restart/replay resume case** and
+  its idempotency proof. Gave each slice an independently testable acceptance
+  (Slice 3: live-run progression-probe ordering/drain; Slice 5: resume
+  reconstructed from persisted progression / replayed log runs only un-run prompts
+  with zero `ai/generate` re-fire). Updated plan.md Slice-order 3 & 5 + R1 and
+  steps.md Slice 3 & Slice 5 headers/steps.
