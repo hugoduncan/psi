@@ -79,6 +79,15 @@
 (def ^:private review-feedback-pass-statuses
   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
 
+(defn- parse-review-feedback-reply
+  [text]
+  (if (string? text)
+    (parse-pass-status-routing text review-feedback-pass-statuses)
+    {:status :error
+     :reason :non-string-pass-feedback
+     :message "workflow/pass-feedback-routing reply must be a string"
+     :details {:text text}}))
+
 (defn parse-pass-feedback-routing
   "Parse a pass-level set of review replies into a DONE/REPEAT route.
 
@@ -90,8 +99,7 @@
   [args]
   (let [entries (sort-by (comp pr-str key) args)
         parsed (mapv (fn [[feedback-key text]]
-                       [feedback-key
-                        (parse-pass-status-routing text review-feedback-pass-statuses)])
+                       [feedback-key (parse-review-feedback-reply text)])
                      entries)
         validation-failures (->> parsed
                                  (keep (fn [[feedback-key result]]

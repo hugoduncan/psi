@@ -106,6 +106,26 @@
           (pr-str result))
       (is (= ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]
              (get-in failures [:disallowed-text :details :allowed-statuses]))
+          (pr-str result))))
+  (testing "rejects non-string feedback values with deterministic diagnostics"
+    (let [result (assert-error
+                  :invalid-pass-feedback
+                  (routing/parse-pass-feedback-routing
+                   {:numeric-text 42
+                    :vector-text ["PASS_STATUS: REVIEW_COMPLETE"]
+                    :valid-text "PASS_STATUS: REVIEW_COMPLETE"}))
+          failures (get-in result [:details :validation-failures])]
+      (is (= #{:numeric-text :vector-text}
+             (set (keys failures)))
+          (pr-str result))
+      (is (= :non-string-pass-feedback (get-in failures [:numeric-text :reason]))
+          (pr-str result))
+      (is (= 42 (get-in failures [:numeric-text :details :text]))
+          (pr-str result))
+      (is (= :non-string-pass-feedback (get-in failures [:vector-text :reason]))
+          (pr-str result))
+      (is (= ["PASS_STATUS: REVIEW_COMPLETE"]
+             (get-in failures [:vector-text :details :text]))
           (pr-str result)))))
 
 (deftest munera-open-task-path-routing-parser-test
