@@ -1082,3 +1082,31 @@ consolidates them — it does not first-author them.
   the structured-output closure). `clj-kondo` clean; both drain suites 14 tests /
   64 assertions green. See implementation.md "Test-shaper follow-up execution
   (pass 8 — TS-2)".
+
+## Test-shaper follow-ups (pass 9)
+
+- [ ] TS-3 — Consolidate the divergent progression-record-reading idiom across
+  the two sibling drain namespaces (TS-1/TS-2 lineage escapee). `_abort_test.clj`
+  defines a private `recorded-indices` helper while
+  `step_execution_drive_prompt_queue_test.clj` re-spells
+  `(progression-recording/prompt-group-turn-records (get-in @state*
+  (progression-recording/run-path run-id)) step-id)` **inline 3×** (in-order,
+  reconstructs, replay tests). Lift a shared `prompt-group-records` reader (and
+  `recorded-indices` = `(mapv :index (prompt-group-records …))`) into
+  `psi.workflow-runtime.step-test-support` (the TS-1/TS-2 home), have
+  `_abort_test` alias it (drop its private def), and replace the 3 inline reads in
+  `_test`, so the substrate-read has one spelling
+  (`consistent(test_abstractions) ∧ economical`). Test-only; no production change;
+  re-run both drain suites green.
+
+- [ ] TS-4 — Reconcile the near-duplicate Slice-3 / Slice-5 resume tests
+  (`economical ∧ minimal(redundant_tests)`). `drive-session-prompt-queue-resume-skips-recorded-prompts-test`
+  (Slice 3) and `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
+  (Slice 5) exercise the **identical** mechanism (`drive!` over a freshly-built
+  `recorded-turns-state*`), and the Slice-5 test's assertions are a strict
+  superset (prior-records-retained-verbatim + reaches `:actor/done`). Because the
+  realized drain is synchronous (no in-memory loop state distinguishes "in-run"
+  from "restart"; R-1/R-5), the live-vs-restart distinction is documentary, not
+  behavioural. Either (a) give the in-run test a genuinely-in-run-only observable
+  the restart test cannot assert, or (b) fold it into the restart test (one
+  well-named AC-7 progression-skip test), so the two stop being near-duplicates.

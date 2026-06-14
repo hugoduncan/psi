@@ -2834,3 +2834,40 @@ test namespaces (the TS-1 escapee). Lifted `ok-turn` (the `:status :ok` /
 Net: one canonical OK-turn abstraction across both siblings, no inline
 duplication. Test-only; no production change. `clj-paren-repair` no-op;
 `clj-kondo` clean; both drain suites 14 tests / 64 assertions green.
+
+## Test-shaper review (pass 9) — ψ
+
+Re-shaped the task's tests for clarity/signal/economy after the TS-1/TS-2
+fixture+`ok-turn` consolidation. Read the drain (`step_execution_drive_prompt_queue_test`,
+`_abort_test`), `ir_prompts_test`, `progression_recording_test`, the Slice-1
+characterization test, `source_resolution_test`, and `core_test`. Most tests are
+well-shaped (state-based, real-seam, no mocks, meaningful messages). Two new
+actionable findings; recorded as unchecked TS-3/TS-4 in steps.md. Not duplicates
+of TS-1/TS-2 (those consolidated fixtures + the OK-turn builder; the
+progression-read idiom and the resume/restart redundancy were left behind).
+
+- **TS-3 (consistency/economy).** The progression-record-reading idiom diverges
+  across the two sibling drain namespaces: `_abort_test` defines a private
+  `recorded-indices` helper, while `_test` re-spells
+  `(progression-recording/prompt-group-turn-records (get-in @state*
+  (progression-recording/run-path run-id)) step-id)` **inline 3×** (in-order,
+  reconstructs, replay tests). Same SUT-substrate read, two spellings — the exact
+  `consistent(test_abstractions)` divergence TS-1/TS-2 closed for the fixtures and
+  `ok-turn`, with the records reader left behind. Lift a shared
+  `prompt-group-records` (and `recorded-indices` = `(mapv :index …)`) reader into
+  `step-test-support` and use from both.
+
+- **TS-4 (economy / minimal-redundant).** The Slice-3
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test` and the Slice-5
+  `drive-session-prompt-queue-reconstructs-position-from-persisted-progression-test`
+  exercise the **identical mechanism** — `drive!` over a freshly-built
+  `recorded-turns-state*` — and the Slice-5 test's assertions are a strict
+  superset (it additionally pins prior-record-retained-verbatim + reaches
+  `:actor/done`). Because the realized drain is synchronous (no in-memory loop
+  state survives between "in-run" and "restart"; see R-1/R-5), the "live in-run
+  advance" vs "process-restart reconstruction" distinction is documentary, not
+  behavioural — the two tests prove the same progression-driven-skip property the
+  same way. Reconcile per `economical ∧ minimal(redundant_tests)`: either give the
+  in-run test a genuinely-in-run-only observable the restart test cannot assert,
+  or fold it into the restart test (keeping one well-named AC-7 skip test), so the
+  two are not near-duplicates.
