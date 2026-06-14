@@ -1090,3 +1090,62 @@ code/test/doc changes were required — these are plan-disambiguation follow-ups
   the no-step-level-preamble rule do not contradict. Added the definition to
   steps.md Slice 3 preamble and the plan.md "Turn boundary unchanged" key
   decision.
+
+## Plan/steps inconsistency review (pass 3) — ψ
+
+Re-reviewed plan.md + steps.md for internal inconsistencies and contradictions
+against each other and the design.md decisions / code touch points. Distinct from
+inconsistency passes 1–2 (PI1–PI8, all resolved) and ambiguity passes 1–3
+(P1–P11, resolved). Two **new** actionable inconsistencies found (PI9, PI10);
+recorded as unchecked items in steps.md. Verified-consistent: PI1–PI8
+reconciliations hold; per-slice Scry gating wording matches between plan P9 note
+and steps header for Slices 2 (workflow-loader + workflow-runtime) and 4–6
+(workflow-runtime); docs-cadence per-slice ownership matches; abort outcomes
+(Slice 6) match AC-5/AC-6; AC-1..AC-8 coverage list matches between Final-
+verification sections; P9 final-turn/no-counter and P11 shared-sources definitions
+agree across files.
+
+- **PI9 — Slice 1's per-component Scry gate (P9) omits two of the three
+  components Slice 1 actually edits, and plan P9 mis-attributes the
+  `core.clj` per-group materialization edit to Slice 3.** steps.md Slice 1 edits
+  **three** components: workflow-runtime (`ir.clj` queue schema + `step_execution.clj`
+  refactor), workflow-loader (`compiler.clj` single-prompt → unnamed-group
+  normalization, steps.md:29), and workflow-step-materialization (`core.clj`
+  per-group materialization entry point, steps.md:34). But the P9 per-component
+  rule — "each slice's gate is the Scry suite of **every component it edits**"
+  (plan.md:295) — scopes Slice 1's gate to the workflow-runtime
+  `step_execution_test.clj` namespace **only** (plan.md:302, steps.md:10). So
+  Slice 1's `compiler.clj` (workflow-loader) and `core.clj`
+  (workflow-step-materialization) edits are not gated by their own suites,
+  contradicting the per-component rationale ("the slice's commit must be green
+  across all of them"): a Slice-1 break in either suite would escape the focused
+  gate. Compounding this, plan P9 lists "the per-group materialization in
+  `core.clj`" among **Slice 3's** edits (plan.md:309) and gates
+  workflow-step-materialization for **Slice 3**, even though steps.md adds that
+  `core.clj` entry point in **Slice 1** and steps Slice 3 has **no** `core.clj`
+  item — so the workflow-step-materialization suite is gated at the wrong slice
+  (Slice 3, which does not edit `core.clj`) and ungated at the slice that does
+  (Slice 1). Reconcile by either (a) attributing the `core.clj` edit +
+  workflow-step-materialization gating (and the workflow-loader gating for the
+  `compiler.clj` edit) to **Slice 1** in plan P9 + steps header, and removing the
+  `core.clj` attribution from Slice 3; or (b) explicitly justifying why Slice 1's
+  `compiler.clj`/`core.clj` edits are gate-exempt despite the per-component rule,
+  and moving the `core.clj` materialization edit to the slice P9 claims owns it.
+
+- **PI10 — plan P9 "edits" enumerations list confirm-only / no-edit touch points
+  as edits.** plan P9 Slice 3 says it "edits
+  `step_execution.clj`/`statechart_runtime.clj`/`progression_recording.clj`/`statechart.clj`"
+  (plan.md:306–309), but the plan Touch points scope `statechart_runtime.clj` for
+  Slice 3 to "The in-run drain (Slice 3) needs **no** next-un-run-selection logic
+  here; Slice 5 confirms …" (no Slice-3 edit, per the PI7 resolution) and
+  `statechart.clj` to "**confirm** the single … topology still holds … no
+  per-prompt statechart states" (a verification, not an edit), and steps Slice 3
+  has **no** `statechart_runtime.clj` item and only a *confirm* item for
+  `statechart.clj`. Listing both as Slice-3 "edits" contradicts the touch points
+  and steps Slice 3. (Gating consequence is nil — both live in workflow-runtime,
+  already gated — but the edited-files attribution is internally inconsistent and
+  could mislead the per-component rule's application.) Reconcile by rewording the
+  Slice-3 P9 enumeration to separate edited files (`step_execution.clj`,
+  `progression_recording.clj`) from confirm-only touch points
+  (`statechart.clj`, and `statechart_runtime.clj` as the re-entry boundary), so
+  "edits" names only files the slice changes.

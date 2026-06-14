@@ -359,3 +359,33 @@ consolidates them — it does not first-author them.
   content) persisting in the live child session for later groups — not a
   prohibited step-level shared preamble — so the wording and the
   no-step-level-preamble rule do not appear to contradict.
+
+## Plan-review follow-ups (inconsistency, pass 3)
+
+- [ ] PI9 — Reconcile Slice 1's per-component Scry gate (P9) with the three
+  components Slice 1 actually edits, and fix the `core.clj` slice mis-attribution.
+  steps Slice 1 edits workflow-runtime (`ir.clj`/`step_execution.clj`),
+  workflow-loader (`compiler.clj` single-prompt normalization), and
+  workflow-step-materialization (`core.clj` per-group materialization entry
+  point), but P9 scopes Slice 1's gate to the workflow-runtime
+  `step_execution_test.clj` namespace only — leaving the `compiler.clj` and
+  `core.clj` edits ungated by their own suites despite the per-component rule
+  ("gate on every component the slice edits"). Plan P9 also lists "the per-group
+  materialization in `core.clj`" among **Slice 3's** edits and gates
+  workflow-step-materialization for Slice 3, though steps adds that `core.clj`
+  entry point in **Slice 1** and Slice 3 has no `core.clj` item. Reconcile by
+  either (a) attributing the `core.clj` (workflow-step-materialization) and
+  `compiler.clj` (workflow-loader) edits + their suite gating to **Slice 1** and
+  removing the `core.clj` attribution from Slice 3, or (b) explicitly justifying
+  Slice 1's focused-namespace gate exemption and relocating the `core.clj`
+  materialization edit to the slice P9 claims owns it.
+- [ ] PI10 — Reword the plan P9 Slice-3 "edits" enumeration to stop listing
+  confirm-only / no-edit touch points as edits. plan P9 Slice 3 says it "edits
+  `step_execution.clj`/`statechart_runtime.clj`/`progression_recording.clj`/`statechart.clj`",
+  but the plan Touch points scope `statechart_runtime.clj` for Slice 3 to "needs
+  **no** next-un-run-selection logic here; Slice 5 confirms …" and `statechart.clj`
+  to a "**confirm** … topology … no per-prompt statechart states" verification,
+  and steps Slice 3 has no `statechart_runtime.clj` item and only a confirm item
+  for `statechart.clj`. Separate the genuinely-edited Slice-3 files
+  (`step_execution.clj`, `progression_recording.clj`) from confirm-only touch
+  points so "edits" names only files the slice changes.
