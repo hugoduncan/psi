@@ -2,16 +2,16 @@
 
 ## Status
 
-Design — ready once task **226 (multi-prompt workflow steps)** lands. This task
-is the first consumer of 226's capability and validates the multi-prompt grammar
-against a real authored workflow. Do not plan/implement before 226's grammar is
-real.
+Design — prerequisite satisfied; ready to plan. Task **226 (multi-prompt
+workflow steps)** has landed, so this task can now consume the real
+multi-prompt grammar against a real authored workflow.
 
 ## Depends on
 
-- **226** — multi-prompt `:session` steps (`:prompts` queue, per-prompt named
-  groups, per-prompt text output addressing, post-drain single judge). This task
-  uses those surfaces; it adds no new runtime capability.
+- **226** — satisfied. The repository now has multi-prompt `:session` steps
+  (`:prompts` queue, per-prompt named groups, per-prompt text output
+  addressing, post-drain single judge). This task uses those existing surfaces;
+  it adds no new runtime capability.
 
 ## Intent
 
