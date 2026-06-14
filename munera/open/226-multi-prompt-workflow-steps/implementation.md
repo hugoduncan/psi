@@ -1186,3 +1186,44 @@ enumeration against the files each slice actually edits).
   Gating consequence is nil (both confirm-only files live in workflow-runtime,
   already gated), but the attribution is now internally consistent with the Touch
   points and steps Slice 3. Edit: plan.md P9 Slice 3 bullet (shared with PI9).
+
+## Plan/steps ambiguity review (pass 4) — ψ
+
+Fourth plan-level ambiguity pass over plan.md + steps.md (statements admitting >1
+interpretation, undefined terms, unspecified execution edge behaviour), distinct
+from ambiguity passes 1–3 (P1–P11, all resolved), inconsistency passes 1–3
+(PI1–PI10, resolved), and the design-review passes. **One** new actionable
+ambiguity found (P12); recorded as an unchecked item in steps.md.
+Verified-clear (re-checked, no new ambiguity): the P9 per-component Scry gating,
+P10 final-/last-turn + N=1 error abort, P11 "shared sources" definition, P5
+final-turn detection, P6 progression-state probe observable, P8 non-re-fire
+observable, and the Slice-4 `:prompt`-validation invalid-case enumeration all
+hold; "lowest-position un-run group" selection is well-defined; per-prompt
+records keyed-by-`:name` named-only is unambiguous (pass-1/pass-3 judgment
+stands).
+
+- **P12 — in-flight (mid-turn) cancellation outcome + record disposition is
+  unspecified, asymmetric with AC-5's explicit failing-prompt rule.** AC-5 (and
+  the P10 follow-up) make the failure path explicit: a turn error at any position
+  ⇒ `:failed`, and the failing prompt "leaves **no** completed turn record"
+  (design.md:98). The cancellation path is specified only for cancellation
+  **between** prompts (AC-6 / design.md:101–103: terminal `:cancelled`, routing
+  skipped, **completed** per-prompt records retained), yet steps.md Slice 6 adds
+  "**in-flight turn aborted** per existing cancellation contract (AC-6/B5)" —
+  introducing the case where cancellation arrives **while a prompt's turn is in
+  flight** (mid tool-loop), which design AC-6 ("between prompts") does not cover.
+  Two things are left ambiguous for that mid-turn case: (a) whether a cancellation
+  arriving mid-turn still produces the same terminal `:cancelled` outcome as an
+  inter-prompt cancellation (vs some other disposition), and (b) whether the
+  interrupted in-flight prompt leaves **no** record — symmetric with AC-5's
+  failing prompt — or a partial record. AC-6/plan/steps assert only that
+  *completed* records are retained and give no parallel "leaves no record"
+  statement for the interrupted prompt (unlike AC-5). A reader cannot tell whether
+  the in-flight-cancelled prompt is treated like AC-5's failing prompt (no record,
+  identified only by the terminal outcome) or differently. Resolve by stating in
+  Slice 6 (and reconciling with AC-6/AC-5) that a cancellation arriving mid-turn
+  yields the same terminal `:cancelled` outcome as an inter-prompt cancellation,
+  and that the interrupted in-flight prompt leaves **no** completed turn record
+  (only prompts completed *before* cancellation are retained + introspectable) —
+  i.e. make the cancellation path's in-flight-record disposition as explicit as
+  AC-5 makes the failure path's.

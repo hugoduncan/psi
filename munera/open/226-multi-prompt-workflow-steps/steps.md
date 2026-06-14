@@ -400,3 +400,17 @@ consolidates them — it does not first-author them.
   for `statechart.clj`. Separate the genuinely-edited Slice-3 files
   (`step_execution.clj`, `progression_recording.clj`) from confirm-only touch
   points so "edits" names only files the slice changes.
+
+## Plan-review follow-ups (ambiguity, pass 4)
+
+- [ ] P12 — Specify the **in-flight (mid-turn) cancellation** outcome and record
+  disposition in Slice 6 (plan.md + steps.md), reconciled with AC-6/AC-5. AC-6
+  covers only cancellation **between** prompts, but steps Slice 6 adds "in-flight
+  turn aborted per existing cancellation contract", introducing the case where
+  cancellation arrives while a prompt's turn is in flight. State (a) that a
+  mid-turn cancellation yields the **same** terminal `:cancelled` outcome
+  (routing skipped) as an inter-prompt cancellation, and (b) that the interrupted
+  in-flight prompt leaves **no** completed turn record — symmetric with AC-5's
+  explicit failing-prompt "leaves no record" rule — so only prompts completed
+  before cancellation are retained + introspectable. Make the cancellation path's
+  in-flight-record disposition as explicit as AC-5 makes the failure path's.
