@@ -907,3 +907,60 @@ change needed — these clarify acceptance/test-observable wording).
   reconstructed/replayed state. Edits: plan.md Slice-order 5 acceptance (new
   "Non-re-fire observable (P8)" clause); steps.md Slice 3 (new non-re-fire assert
   item) + Slice 5 replay-path item.
+
+## Plan/steps inconsistency review (pass 2) — ψ
+
+Re-reviewed plan.md + steps.md for internal inconsistencies and contradictions
+against each other and the referenced design.md / code touch points. Distinct
+from the plan/steps inconsistency pass 1 (PI1–PI6, all resolved) and the
+plan/steps ambiguity passes (P1–P8, resolved). Two **new** actionable
+inconsistencies found (PI7, PI8); recorded as unchecked items in steps.md.
+Verified-consistent: PI1–PI6 reconciliations hold (Slice 1 compiler-owns-transform
+wording, Slice 1 characterization-test done-gate, Slice 2 step-level xor, Approach
+layering order, Slice 7 abort-doc verify-list, Slice 3 statechart.clj topology
+step); docs-cadence per-slice ownership matches; abort-path outcomes (Slice 6)
+match AC-5/AC-6; AC-1..AC-8 coverage list matches design's eight ACs; the
+`execute-session-step!` `:else` call site (statechart_runtime.clj:276) and the
+named touch-point files exist as referenced.
+
+- **PI7 — statechart_runtime.clj in-run `:else`-branch resume-from-progression
+  is a plan Slice-3 touch point with no covering steps item, and the two files
+  disagree on which component owns next-un-run selection.** plan.md Touch points
+  (plan.md:89) assigns the `statechart_runtime.clj` session (`:else`) branch the
+  "resume-from-progression (consult recorded per-prompt progression, continue at
+  next un-run prompt), suspend/resume inside the one statechart step" work, and
+  plan Slice 3 states "Slice 3 therefore builds that **in-run** suspend/resume
+  drain mechanism" (Slice 5 adds "only the process-restart/replay resume case on
+  top"). But steps.md Slice 3 has **no** `statechart_runtime.clj` item — its
+  next-un-run selection is placed entirely inside `execute-session-step!`
+  (step_execution.clj): "Extend the queue driver in `execute-session-step!` …
+  select the next un-run prompt from recorded per-prompt progression". The only
+  steps `statechart_runtime.clj` item is Slice 5 (steps.md:145), framed as
+  "**Confirm** … on **process-restart** re-entry" — verification, restart-scoped,
+  not the in-run drain build. So (a) the in-run `:else`-branch
+  resume-from-progression work plan Slice 3 says it *builds* has no covering steps
+  item in Slice 3, and (b) plan (statechart_runtime.clj `:else` branch owns
+  "continue at next un-run prompt") and steps Slice 3 (`execute-session-step!`
+  owns next-un-run selection) **contradict** on which file owns the in-run
+  next-un-run selection. Reconcile by either adding a Slice 3 steps item building
+  the in-run `statechart_runtime.clj` `:else`-branch resume-from-progression
+  re-entry (and aligning the file-ownership wording with plan Touch points), or —
+  if `execute-session-step!` truly owns next-un-run selection — correcting the
+  plan `statechart_runtime.clj` touch point to scope it to the restart/replay
+  re-entry only (matching steps Slice 5) so the in-run selection ownership is
+  stated once, consistently, in both files.
+- **PI8 — steps.md "Final verification" full three-suite Scry run has no plan
+  counterpart, yet plan references "Final verification".** steps.md has a
+  dedicated `## Final verification` section (steps.md:197) whose first item runs
+  "the full workflow-runtime + workflow-loader + workflow-step-materialization
+  Scry suites green". plan.md has no Final-verification slice/section and no step
+  scheduling that full three-suite run — its slices stop at Slice 7 ("Docs
+  consolidation + changelog + coherence"), and its only Scry guidance is "run the
+  relevant Scry suites **per slice**". Yet plan.md:170–172 explicitly contrasts
+  the Slice-1 gate with "**Final verification's** broader three-component Scry run
+  (workflow-runtime + workflow-loader + workflow-step-materialization) … the full
+  three-suite run" — a dangling reference to a "Final verification" element the
+  plan never defines as a step. Reconcile by adding a Final-verification entry to
+  plan.md (the full three-component Scry run + AC-1..AC-8 coverage confirm)
+  mirroring steps.md's section, so the "Final verification" plan references
+  resolve to a defined plan step.

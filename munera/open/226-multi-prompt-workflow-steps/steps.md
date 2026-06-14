@@ -281,3 +281,26 @@ consolidates them — it does not first-author them.
   dispatch/effect boundary, a generate-seam invocation probe, or absence of a
   second turn record / progression mutation for an already-recorded prompt — so
   the idempotency acceptance for both slices has an enforceable measurement.
+
+## Plan-review follow-ups (inconsistency, pass 2)
+
+- [ ] PI7 — Reconcile the in-run `statechart_runtime.clj` `:else`-branch
+  resume-from-progression ownership between plan.md and steps.md. plan Touch
+  points (plan.md:89) assign the `:else` branch the in-run "consult progression,
+  continue at next un-run prompt" work and plan Slice 3 says Slice 3 *builds* the
+  in-run suspend/resume drain, but steps Slice 3 has no `statechart_runtime.clj`
+  item (it places next-un-run selection in `execute-session-step!`) and the only
+  steps `statechart_runtime.clj` item is Slice 5's restart-scoped *confirm*.
+  Either add a Slice 3 steps item building the in-run `statechart_runtime.clj`
+  `:else`-branch resume-from-progression re-entry (aligning file-ownership wording
+  with plan Touch points), or scope the plan `statechart_runtime.clj` touch point
+  to the restart/replay re-entry only (matching steps Slice 5) so in-run
+  next-un-run selection ownership is stated once, consistently, in both files.
+- [ ] PI8 — Resolve the dangling "Final verification" reference: steps.md has a
+  `## Final verification` section running the full three-component Scry suites,
+  and plan.md:170–172 references "Final verification's broader three-component
+  Scry run", but plan.md defines no Final-verification slice/step (its slices stop
+  at Slice 7 with only per-slice Scry guidance). Add a Final-verification entry to
+  plan.md (full workflow-runtime + workflow-loader + workflow-step-materialization
+  Scry run + AC-1..AC-8 coverage confirm) mirroring steps.md, so plan's "Final
+  verification" references resolve to a defined plan step.
