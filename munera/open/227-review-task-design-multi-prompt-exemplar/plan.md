@@ -12,7 +12,7 @@ Key decisions:
 - Route the merged step directly from the post-drain `pass-feedback-routing` judge over per-prompt `:final-llm-reply` outputs; keep the six-review-pass bound on the `design-follow-up --DONE--> design-review` transition.
 - Keep the existing three review prompt files as prompt-group bodies, but adjust their text so the architecture prompt loads the task design and architecture sources first, while later prompts reuse the shared session context by default.
 - Keep `review-follow-up-design.md` as the shared design follow-up body and clarify its batch evidence rule rather than adding a bespoke runtime operation or filesystem-state router.
-- Update tests before or with each behavioral change so the workflow definition, routing operation, and prompt contracts are locked by executable proof.
+- Update tests in the dedicated definition/runtime alignment slice after the routing, workflow-definition, and prompt-contract edits and before docs/final verification, so the workflow definition, routing operation, and prompt contracts are locked by executable proof before completion.
 
 ## Risks
 
