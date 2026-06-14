@@ -196,3 +196,32 @@ consolidates them — it does not first-author them.
   resume) or whether the resume-from-progression mechanism must land with Slice 3;
   give each slice an independently testable acceptance for the shared
   N-suspend-point mechanism (design F1).
+
+## Plan-review follow-ups (inconsistency, pass 1)
+
+- [ ] PI1 — Reword plan.md Slice 1 ("IR normalizes
+  `:contributions`/`:prompt-workflow` → one unnamed prompt-group") to attribute
+  the authored-form → normalized-queue transform to the **compiler
+  (workflow-loader `compiler.clj`)**, consistent with the resolved P1 ownership
+  decision, the Touch points split, and steps Slice 1 (`ir.clj` owns only
+  schema/validation/surfaces, not the transform).
+- [ ] PI2 — Update plan.md Slice-order Slice 1 acceptance ("full existing
+  session-step suite green") to cite the committed asserted-shape envelope
+  characterization test as the Slice-1 **done-gate comparand**, matching R4
+  ("not merely 'suite green unchanged'") and steps Slice 1's done-gate.
+- [ ] PI3 — Add the step-level `:contributions`/`:prompt-workflow` **xor**
+  `:prompts` validation (both ⇒ IR error) to plan.md Slice 2's IR-validation
+  enumeration, so plan Slice 2 covers the same step-level xor that steps Slice 2
+  (and its step-xor test case) already schedules.
+- [ ] PI4 — Reorder the plan.md Approach layering narrative ("before N>1,
+  addressing, abort paths, and resume are layered on") to reflect the actual
+  slice order — addressing (Slice 4) → resume (Slice 5) → abort (Slice 6), i.e.
+  "addressing, resume, and abort paths".
+- [ ] PI5 — Add the abort/cancellation outcomes (`:failed` vs `:cancelled`,
+  retained records, routing skipped) introduced by Slice 6 into the Slice 7
+  consolidation verify-list, so the Slice-7 coherence checklist covers every
+  per-slice author-facing doc surface.
+- [ ] PI6 — Add a steps item (Slice 3 or 5) confirming the single
+  acting→(judging)→record-result statechart topology / no per-prompt statechart
+  states (plan Touch point `statechart.clj`), or drop that touch point if it is
+  subsumed by the `statechart_runtime.clj` resume-branch step.

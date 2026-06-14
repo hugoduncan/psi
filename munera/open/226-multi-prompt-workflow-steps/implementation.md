@@ -707,3 +707,70 @@ code/test/doc changes were required — these are plan-disambiguation follow-ups
   reconstructed from persisted progression / replayed log runs only un-run prompts
   with zero `ai/generate` re-fire). Updated plan.md Slice-order 3 & 5 + R1 and
   steps.md Slice 3 & Slice 5 headers/steps.
+
+## Plan/steps inconsistency review (pass 1) — ψ
+
+Reviewed plan.md + steps.md for internal inconsistencies and contradictions
+against each other and the referenced design.md decisions and code touch points.
+Distinct from the plan/steps **ambiguity** pass (P1–P4, resolved) and the
+design-review passes. First plan-level inconsistency pass. Six new actionable
+inconsistencies found (PI1–PI6); recorded as unchecked items in steps.md.
+Verified-consistent: docs-cadence per-slice ownership (Slice 1 none / Slice 2
+grammar / Slices 3–6 concepts) matches between plan and steps; abort-path
+outcomes (Slice 6) match AC-5/AC-6; P-label cross-references (P1–P4) resolve;
+Final-verification AC-1..AC-8 list matches design's eight ACs.
+
+- **PI1 — plan Slice 1 says "IR normalizes", contradicting the resolved P1
+  ownership decision.** Slice 1 (plan.md:146) reads "IR normalizes
+  `:contributions`/`:prompt-workflow` → one unnamed prompt-group", but the P1
+  Key-decision, the Touch points split, and steps.md Slice 1 all place the
+  authored-form → normalized-queue **transform** in the workflow-loader
+  `compiler.clj`, with `ir.clj` (workflow-runtime) owning only the
+  schema/validation/surfaces and **not** transforming authored forms. "IR
+  normalizes" attributes the transform to the runtime IR — the exact split P1
+  resolved against `λ workflow_runtime_boundary`. Reconcile by rewording Slice 1
+  to "the compiler (workflow-loader) normalizes … → one unnamed prompt-group"
+  consistent with P1 / Touch points / steps Slice 1.
+- **PI2 — plan Slice 1 acceptance contradicts plan R4's characterization-test
+  done-gate.** Slice 1's acceptance (plan.md:149) is "full existing session-step
+  suite green (AC-2)", but R4 (plan.md:138) states the committed asserted-shape
+  envelope characterization test — "not merely 'suite green unchanged'" — is the
+  Slice-1 done-gate comparand, and steps.md Slice 1's done-gate requires that test
+  green **and** the suite green. The Slice-order Slice 1 acceptance line was not
+  updated when P3 made the characterization test the comparand. Reconcile by
+  citing the characterization test as the Slice-1 done-gate in the Slice-order
+  Slice 1 acceptance, matching R4 and steps Slice 1.
+- **PI3 — plan Slice 2 omits the step-level `:contributions`/`:prompt-workflow`
+  xor `:prompts` validation that steps Slice 2 schedules.** Plan Slice 2
+  enumerates IR validation as "empty `:prompts` error, one-element valid,
+  duplicate group-name error, group xor error (B3/B4/E2)" — no step-level xor.
+  steps.md Slice 2 has a dedicated item "Add step-level precedence validation:
+  `:contributions`/`:prompt-workflow` **xor** `:prompts` (both ⇒ IR error)" and a
+  "step-xor" test case. The design grammar's step-level precedence is a required
+  validation; plan Slice 2's description drops it while steps includes it.
+  Reconcile by adding the step-level xor validation to plan Slice 2 (the slice
+  that lands `:prompts`).
+- **PI4 — plan Approach layering order mis-states the actual slice order.** The
+  Approach (plan.md:16) says the path is "unified single-prompt path lands first …
+  before N>1, **addressing, abort paths, and resume** are layered on", listing
+  abort before resume. The actual Slice order layers addressing (Slice 4) →
+  resume (Slice 5) → abort (Slice 6) — resume **before** abort. Reconcile by
+  reordering the Approach narrative to "addressing, resume, and abort paths".
+- **PI5 — Slice 7 consolidation verify-list omits the abort/cancellation doc
+  content Slice 6 introduces.** Slice 7's consolidation item (steps.md:159–162)
+  verifies "the `:prompts` form / group-internal xor / per-prompt surfaces /
+  `:prompt` source-ref + validation + post-drain-judge carve-out / drain-route /
+  resume contract are all present and consistent" — but Slice 6 adds
+  abort/cancellation outcomes (`:failed` vs `:cancelled`, retained records,
+  routing skipped) to `doc/workflow-grammar-concepts.md`, and that surface is
+  absent from the Slice-7 coherence checklist. Reconcile by adding the
+  abort/cancellation outcomes to the Slice 7 consolidation verify-list so every
+  per-slice doc surface is covered.
+- **PI6 — Touch point `statechart.clj` topology-confirmation has no covering
+  step.** Plan Touch points (plan.md:95) lists `statechart.clj` — "confirm the
+  single acting→(judging)→record-result step topology still holds … no per-prompt
+  statechart states", an explicit verification action, but no steps.md checklist
+  item schedules it (steps Slice 5 confirms the `statechart_runtime.clj` resume
+  branch, a different file/concern). Reconcile by adding a step (Slice 3 or 5)
+  confirming the single-step topology / no per-prompt statechart states, or drop
+  the touch point if subsumed.
