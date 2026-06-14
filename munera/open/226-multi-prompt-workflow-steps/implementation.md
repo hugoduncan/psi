@@ -3139,3 +3139,46 @@ code:
   warranted.
 
 No follow-up steps added.
+
+## Code-shaper review (code-shaper skill) — pass 1 — ψ
+
+Reviewed the shipped source against `simplicity ∧ consistency ∧ robustness`,
+scoped to the task's new/changed runtime: `ir.clj`, `ir_error_formatting.clj`,
+`progression_recording.clj`, `statechart_runtime/step_execution.clj`,
+`workflow_loader/compiler.clj`, `workflow_step_materialization/{core,source_resolution}.clj`.
+**ACTIONABLE_FEEDBACK** — two follow-ups recorded in steps.md.
+
+- **CS-1 (consistency — author-facing error rendering gap).**
+  `session-prompt-queue-errors` (`ir.clj`) emits four semantic error types —
+  `:session-contributions-and-prompts`, `:session-without-prompt-source`,
+  `:unnamed-prompt-group`, `:duplicate-prompt-group-name` — but
+  `format-semantic-error` (`ir_error_formatting.clj:41-110`) has **no** dedicated
+  case for any of them, so they render through the raw fallback
+  (`ir_error_formatting.clj:109`): `"Step 'x': :duplicate-prompt-group-name (raw:
+  {…})"`. The sibling `:prompt-ref-*` family added by the same task all got
+  actionable messages; the prompt-queue precedence/naming family did not — an
+  inconsistent idiom on the **same surface** (`format-compilation-errors` is the
+  string thrown at workflow load, `core.clj:42`). An author who writes both
+  `:contributions` and `:prompts`, neither, an unnamed group, or duplicate group
+  names gets an EDN dump instead of a precise message. The error-data is tested
+  (`ir_prompts_test.clj:68-100`) but the formatted-string layer is not, so the
+  gap is invisible to the suite. Fix: add the four cases to `format-semantic-error`
+  (e.g. duplicate names → name them and the step) and add a formatter assertion.
+
+- **CS-2 (simplicity — mixed computation/flow in the shared turn primitive).**
+  `execute-session-turn-outcome` (`step_execution.clj`) interleaves turn-execution
+  flow control (`fallback-enabled?` dispatch + the `:cancelled`/`:error`/`:else`
+  `cond`) with a dense pure-computation block in the `:else` arm building the OK
+  envelope (`surface-step-def` dissoc, `raw-outputs`, structured-result validity,
+  `normalized-outputs`, `envelope`). This violates `xor(computation, flow_control)`
+  for the function the design names the single unification point. Extracting the
+  `:else` envelope computation into a pure helper (e.g.
+  `session-turn-ok-envelope`) leaves the disposition `cond` as flow-only and makes
+  the OK-envelope shape independently testable. Behaviour-preserving;
+  locally-comprehensible win on the most-shared primitive.
+
+Not flagged: the duplicated disposition→`record-actor-pending!` `case` between
+`execute-session-step!` and `drive-session-prompt-queue!` is an **accepted,
+documented** two-driver design decision (design.md AC-2 / Architecture alignment:
+collapsing breaks the byte-identical N=1 envelope) — left as-is per
+`shims_adapters`/documented-design-decision carve-out.

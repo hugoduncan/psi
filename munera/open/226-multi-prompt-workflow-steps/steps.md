@@ -1195,3 +1195,27 @@ consolidates them — it does not first-author them.
   output surfaces* cross-reference) and `workflow-grammar-concepts.md`'s
   `{:step … :prompt … :output …}` data-flow surface. `prompt-name` was already
   defined as a terminal (DOC-1). Docs-only; no dangling nonterminals.
+
+## Code-shaper review follow-ups (pass 1)
+
+- [ ] CS-1 — Add dedicated `format-semantic-error` cases (in
+  `ir_error_formatting.clj`) for the four session-prompt-queue error types
+  emitted by `session-prompt-queue-errors` (`ir.clj`):
+  `:session-contributions-and-prompts`, `:session-without-prompt-source`,
+  `:unnamed-prompt-group`, `:duplicate-prompt-group-name`. They currently fall
+  through to the raw `(raw: …)` fallback (`ir_error_formatting.clj:109`), unlike
+  the actionable `:prompt-ref-*` messages added by the same task — inconsistent
+  author-facing rendering on the workflow-load error string (`core.clj:42`).
+  Render precise messages (duplicate-name case should name the duplicate
+  group(s) and the step; both/neither and unnamed-group cases should state the
+  xor/naming rule) and add a formatter-level assertion (the error-data is tested
+  in `ir_prompts_test.clj:68-100`, but the formatted string is not).
+
+- [ ] CS-2 — Separate computation from flow control in
+  `execute-session-turn-outcome` (`statechart_runtime/step_execution.clj`).
+  Extract the `:else` (success) arm's pure OK-envelope computation
+  (`surface-step-def`, `raw-outputs`, structured-result validity,
+  `normalized-outputs`, `envelope`) into a behaviour-preserving pure helper
+  (e.g. `session-turn-ok-envelope`), leaving the disposition `cond` as flow
+  control only (`xor(computation, flow_control)`). Makes the OK-envelope shape
+  independently testable on the design's named single turn-primitive.
