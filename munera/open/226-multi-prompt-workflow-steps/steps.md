@@ -996,3 +996,21 @@ consolidates them — it does not first-author them.
   `clj-kondo` clean; focused abort suite 6/29 green; full workflow-runtime suite
   133 tests / 726 assertions green. See implementation.md "Test-review follow-up
   execution (pass 4)".
+
+## Test-review follow-ups (pass 5)
+
+- [ ] TR-7 — Add a compiler test for the `:prompts`-on-non-session-step rejection
+  guard (`workflow-loader/compiler.clj:226`, `compile-prompts-step`). The guard
+  rejects `:prompts` authored on a non-`:session` step with `` "`:prompts` is
+  allowed only on `:session` steps" `` — the authoring-time enforcement that
+  `:prompts` is `:session`-only (`λone_way`). The symmetric `:prompt-workflow`
+  guard (`compiler.clj:156`) is tested (`compiler_test.clj:138`
+  "prompt-workflow rejects non-session step usage") but the `:prompts` analog has
+  no test, so a regression deleting/weakening the session guard would leave the
+  suite green (the IR `:prompt-ref-non-session-step` test is a different path —
+  the *ref* discriminator, not the authoring `:prompts` key). Mirror the existing
+  `:prompt-workflow` non-session test in `compiler_test.clj`'s
+  `compile-edn-prompts-step-test`: compile a workflow whose step carries
+  `:prompts` with `:type :delegate` (or `:invoke`) and assert `error` =
+  `` "`:prompts` is allowed only on `:session` steps" ``. Test-only; re-run the
+  workflow-loader compiler suite green.

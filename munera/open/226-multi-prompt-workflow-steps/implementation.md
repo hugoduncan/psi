@@ -2606,3 +2606,47 @@ separate item raised for the race sub-branch.
   `clj-kondo` clean; focused abort suite 6 tests / 29 assertions green; full
   workflow-runtime suite 133 tests / 726 assertions green (+1 test / +5
   assertions).
+
+## Test review (task-test-review skill) — pass 5
+
+Re-applied `λ review_tests` (well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps injectable/nullable/¬mock/¬stub) after the T-1/T-2/TR-3..TR-6 fixes.
+Infra-deps remain clean across the drive/abort/step-execution suites (nullable
+`:workflow-execute-actor-turn-fn` + record-turn-fn ctx seams, real
+`split-step-session-conversation`/`record-prompt-group-turn`/`next-un-run-prompt-group`/
+source-resolution, state/output assertions only — never interactions); compiler
+tests use real temp-dir filesystem (real infra, ¬mock). Coverage is otherwise
+strong: ordering/drain/N=1-equivalence/per-prompt addressing+IR validation/
+intermediate+final failure/inter-prompt+between-prompt cancellation/resume-from-
+progression idempotency/structured-output-on-final-turn (incl. both `:branch
+:error` and `:branch :success` blocked paths) are all pinned. **One new
+actionable behaviour-coverage gap found (TR-7); recorded as an unchecked item in
+steps.md.**
+
+- **TR-7 (behaviour-coverage gap): the `:prompts`-on-non-session-step compiler
+  guard is untested.** `compile-prompts-step` (`workflow-loader/compiler.clj:226`)
+  rejects `:prompts` authored on a non-`:session` step with `` "`:prompts` is
+  allowed only on `:session` steps" `` — the authoring-time enforcement of the
+  grammar invariant that `:prompts` is a `:session`-only concept (the `λone_way`
+  authoring rule). The **symmetric** `:prompt-workflow` guard
+  (`compiler.clj:156`, same message shape) **is** tested
+  (`compiler_test.clj:138`, "prompt-workflow rejects non-session step usage"), but
+  the `:prompts` analog has **no** test (confirmed: the
+  `is-allowed-only-on-:session` assertion appears only for `:prompt-workflow` in
+  the compiler test ns). The IR-level `prompt-source-ref-validation-test` covers
+  `:prompt-ref-non-session-step` (the *reference* discriminator), which is a
+  different code path — it does not exercise the authoring-time `:prompts`-key
+  rejection. A regression deleting/weakening the `compile-prompts-step` session
+  guard would leave the whole suite green. Add a one-case test mirroring the
+  existing `:prompt-workflow` non-session test: compile a workflow whose step
+  carries `:prompts` with `:type :delegate` (or `:invoke`) and assert
+  `error` = `` "`:prompts` is allowed only on `:session` steps" ``. Test-only;
+  no production change.
+
+**Verified-acceptable (not raised):** no test pins that the two drivers
+(`drive-session-prompt-queue!` / `execute-session-step!`) both invoke the shared
+`execute-session-turn-outcome` primitive directly (AC-2's "one turn primitive").
+This is a structural-call property, not an observable behaviour; the
+characterization test (`single-prompt-session-step-envelope-characterization-test`)
+plus the drive-order/structured-output tests pin the observable equivalence the
+shared primitive guarantees, so a behavioural drift is caught. No item raised.
