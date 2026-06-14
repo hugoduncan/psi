@@ -6,7 +6,12 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.progression-recording :as progression-recording]
-   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]))
+   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
+   [psi.workflow-step-materialization.core :as materialization]))
+
+(defn- user-text-message
+  [text]
+  {:role "user" :content [{:type :text :text text}]})
 
 (defn- assistant-text-message
   [text]
@@ -31,6 +36,37 @@
     (swap! state* progression-recording/record-prompt-group-turn run-id step-id
            {:index index :name group-name :outputs outputs})
     true))
+
+;;;; task 226 R-2 — later-group single-submission limitation.
+;;;;
+;;;; A later prompt-group submits only its split :prompt (the final user
+;;;; message); any preloaded (non-final) messages a multi-message group
+;;;; materializes to are intentionally NOT re-injected mid-session. This pins
+;;;; the documented limitation (doc/workflow-grammar.md) using the real
+;;;; split-step-session-conversation.
+
+(deftest later-group-turn-prompt-single-message-test
+  (testing "a single-message later group submits that message as its turn prompt"
+    (let [materialize-fn (fn [_workflow-run group]
+                           [(user-text-message (str "only-" (:name group)))])]
+      (is (= "only-ambiguity"
+             (step-execution/later-group-turn-prompt
+              materialize-fn
+              materialization/split-step-session-conversation
+              {} {:name "ambiguity" :contributions []}))))))
+
+(deftest later-group-turn-prompt-drops-multi-message-preload-test
+  (testing "a later group whose contributions materialize to >1 message submits ONLY the final message; preloaded messages are dropped"
+    (let [materialize-fn (fn [_workflow-run _group]
+                           [(user-text-message "preamble-1")
+                            (user-text-message "preamble-2")
+                            (user-text-message "actual-ask")])]
+      (is (= "actual-ask"
+             (step-execution/later-group-turn-prompt
+              materialize-fn
+              materialization/split-step-session-conversation
+              {} {:name "ambiguity" :contributions []}))
+          "only the final user message is submitted; earlier (preloaded) messages are silently dropped for later groups"))))
 
 (deftest drive-session-prompt-queue-runs-named-turns-in-order-test
   (testing "N named prompts run as sequential turns in author order against the same session, with one post-drain result"

@@ -247,6 +247,23 @@ Precedence and validation rules:
 
 All of these rules are reported fail-fast at workflow load / IR validation.
 
+### Later-group single-submission limitation
+
+Each prompt-group submits **one** message per turn. The **first** group's
+materialized conversation is split into preloaded messages plus a final prompt,
+and the preloaded messages are injected when the shared child session is spawned
+— so a multi-message first group is honoured in full. **Later** groups, however,
+submit **only** their final message: a later group's body materializes against
+the already-live session and is split the same way, but its preloaded (non-final)
+messages are **not** re-injected mid-session. Later groups instead rely on the
+live session's conversation memory for shared context (the first group's loaded
+sources persist across turns).
+
+Consequently, a later prompt-group whose `:contributions` materialize to **more
+than one message** silently drops every non-final message. Author multi-message
+bodies as the first group, or keep later groups to a single submission — the
+common `:prompt-workflow` (single user message) form always satisfies this.
+
 ### Drain and routing
 
 The prompt-queue **drains** before the step routes: every group's turn runs (in

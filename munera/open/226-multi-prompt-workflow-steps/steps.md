@@ -717,31 +717,37 @@ consolidates them — it does not first-author them.
 
 ## Implementation-review follow-ups (pass 1)
 
-- [ ] R-1 — Reconcile design.md (source of truth) with the synchronous-drain
-  reality. design.md still presents the F1 async `ai/generate` suspend/resume
-  contract ("N suspend points inside one statechart step") and AC-7's "process
-  restart, replay" resume as realized, but `execute-actor-turn!` is synchronous:
-  the whole N-turn drain runs inside one `:step/enter` action, the statechart
-  never suspends mid-drain, and statechart-level mid-drain restart is a
-  non-occurring path (implementation.md Slice-5 finding). Update design.md to mark
-  the suspend/resume contract as not-yet-realized (synchronous drain) and AC-7
-  resume idempotency as a structural progression guard validated via reconstructed
-  `state*`, not an occurring runtime path — so spec↔code coherence holds and a
-  future reader is not misled. (Capture the `post-drain-envelope` "current-
-  invocation accumulator" caveat as the explicit blocker for any future async F1.)
+- [x] R-1 — Reconcile design.md (source of truth) with the synchronous-drain
+  reality. **DONE:** added a "Realized vs. target" implementation note to Intent,
+  marked the F1 Architecture-alignment bullet "TARGET, not yet realized
+  (synchronous drain)", and reworded AC-7 as a structural progression guard
+  validated via reconstructed `state*` (not an occurring async restart). Captured
+  the `post-drain-envelope` current-invocation-accumulator caveat as the explicit
+  blocker for any future async F1. spec↔code coherence now holds; a future reader
+  is told the async suspend/resume + process-restart resume is the target, while
+  the realized guarantee is the per-iteration progression re-read.
 
-- [ ] R-2 — Close the later-group multi-message `:contributions` gap. The
-  `:step/enter` `next-group-prompt-fn` discards `:preloaded-messages` (keeps only
-  `:prompt`), so a later prompt-group whose `:contributions` materialize to >1
-  message silently loses every non-final message (group 0 honours preloaded
-  messages; later groups do not). The grammar permits such a group and there is no
-  IR validation, test, or author-doc warning. Either (a) add IR validation
-  rejecting a multi-message later group, (b) handle preloaded-messages for later
-  groups, or (c) document the single-submission-per-later-group limitation in
-  doc/workflow-grammar.md — and add a covering test either way.
+- [x] R-2 — Close the later-group multi-message `:contributions` gap. **DONE via
+  option (c)** (document + covering test). Chose (c) over (a)/(b): (a) IR
+  validation cannot robustly reject a multi-message later group because the
+  message count is only known at runtime materialization (sources can expand a
+  single contribution into multiple messages) — a static guard would have false
+  negatives; (b) re-injecting preloaded messages mid-session was deliberately
+  deferred (Slice-3 deviation 3) and is a larger change than the gap warrants
+  (nothing currently authors a multi-message later group; the common
+  `:prompt-workflow` form is single-message). Extracted the inline `:step/enter`
+  later-group lambda into a named, documented `step-execution/later-group-turn-prompt`
+  (docstring states the single-submission limitation), wired the production path
+  to it, documented the limitation in `doc/workflow-grammar.md`
+  ("Later-group single-submission limitation"), and added two covering tests
+  (`later-group-turn-prompt-single-message-test`,
+  `later-group-turn-prompt-drops-multi-message-preload-test`) exercising the real
+  `split-step-session-conversation`.
 
-- [ ] R-3 — Add `components/workflow-step-materialization/test` to the
-  `:test-paths` alias (deps.edn) so the focused scry runner can load the task-226
-  materialization tests (`core-test`/`source-resolution-test`); they currently run
-  only under CI kaocha (`:test` alias, deps.edn:303). Confirm pre-existing; if
-  out-of-scope for 226, raise a separate tooling task instead.
+- [x] R-3 — Add `components/workflow-step-materialization/test` to the
+  `:test-paths` alias (deps.edn). **DONE.** The focused scry runner is
+  `clojure -M:test-paths -m scry.cli` (bb.edn:176), so the materialization tests
+  (`core-test`/`source-resolution-test`) were off its classpath. Added the path;
+  verified both namespaces now load and pass under the focused runner (25 tests /
+  50 assertions). In-scope tooling fix for 226 (the task's own materialization
+  tests).

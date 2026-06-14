@@ -291,8 +291,15 @@
                            ctx execution-session step-def step-id attempt-id working-memory* event-queue*
                            run-id prompt-queue prompt
                            (fn [group]
-                             (:prompt ((:split-workflow-step-session-conversation-fn ctx)
-                                       ((:materialize-workflow-prompt-group-conversation-fn ctx) workflow-run group))))
+                             ;; Later groups submit only their split :prompt;
+                             ;; :preloaded-messages are intentionally not
+                             ;; re-injected mid-session (single-submission
+                             ;; limitation — see step-execution/later-group-turn-prompt
+                             ;; and doc/workflow-grammar.md).
+                             (step-execution/later-group-turn-prompt
+                              (:materialize-workflow-prompt-group-conversation-fn ctx)
+                              (:split-workflow-step-session-conversation-fn ctx)
+                              workflow-run group))
                            (fn [index group-name outputs]
                              (update-state-if-live!
                               ctx run-id

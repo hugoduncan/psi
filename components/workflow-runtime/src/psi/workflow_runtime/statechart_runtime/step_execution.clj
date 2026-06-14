@@ -333,6 +333,27 @@
       (assoc-in [:outputs :transcript] (vec transcript))
       (assoc-in [:outputs :prompt-group-outputs] (vec prompt-group-outputs))))
 
+(defn later-group-turn-prompt
+  "Derive a later prompt-group's turn submission against the live child session.
+
+   `materialize-fn` materializes the group's `:contributions` into a conversation
+   (`materialize-prompt-group-conversation`); `split-fn`
+   (`split-step-session-conversation`) splits it into `:preloaded-messages` +
+   `:prompt`. Only the split `:prompt` (the final user message) is returned.
+
+   LIMITATION (task 226 — single submission per later group). Unlike group 0
+   (whose `:preloaded-messages` ARE injected at child-session spawn in
+   `:step/enter`), a later group's `:preloaded-messages` are intentionally **not**
+   re-injected mid-session: later groups rely on the live session's conversation
+   memory for shared context (design E1), and only their final message is
+   submitted. A later group whose `:contributions` materialize to MORE THAN ONE
+   message therefore silently drops every non-final message. Author multi-message
+   bodies as group 0, or keep later groups to a single submission (the common
+   `:prompt-workflow` single-user-message form). See
+   `doc/workflow-grammar.md` (\"Later-group single-submission limitation\")."
+  [materialize-fn split-fn workflow-run group]
+  (:prompt (split-fn (materialize-fn workflow-run group))))
+
 (defn drive-session-prompt-queue!
   "Drive a named multi-prompt session step as an in-run N-turn drain (design F1).
 

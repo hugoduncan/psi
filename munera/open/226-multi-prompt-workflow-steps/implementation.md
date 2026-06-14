@@ -1954,3 +1954,48 @@ kaocha 25/50). Two actionable findings + one minor observation (see follow-ups):
   there, so coverage holds; but the focused/scry path many slices gate on cannot
   run them. Confirm pre-existing and add materialization/test to `:test-paths` (or
   note as out-of-scope).
+
+## Implementation-review follow-up execution (pass 1) — ψ
+
+Executed R-1, R-2, R-3 (all completed; none blocked). No design behaviour
+change — R-1 is a spec-coherence reconciliation, R-2 a documentation +
+test-coverage close of an existing limitation, R-3 a test-tooling fix.
+
+- **R-1 (done).** Reconciled design.md with the synchronous-drain reality.
+  Intent gains a "Realized vs. target" note; the F1 Architecture-alignment bullet
+  is marked "TARGET, not yet realized (synchronous drain)"; AC-7 reworded as a
+  structural progression guard validated against a reconstructed `state*` rather
+  than an occurring async restart. Recorded the blocker for any future async F1:
+  `post-drain-envelope` accumulates the transcript / per-prompt records in the
+  **current invocation's** loop locals, which a true cross-restart async resume
+  would have to reconstruct from recorded progression instead. No code change —
+  the code already matched this reality; design.md was the drifting artifact.
+
+- **R-2 (done, option c).** Documented + test-covered the later-group
+  single-submission limitation rather than (a) IR validation or (b) mid-session
+  preload re-injection. Rationale: (a) the multi-message condition is only known
+  at runtime materialization (a single contribution can expand to multiple
+  messages), so a static IR guard would have false negatives — `unreachable >
+  forbidden` is not achievable here; (b) mid-session preload re-injection was the
+  deliberately-deferred Slice-3 deviation 3 and a disproportionate change (no
+  authored multi-message later group exists; the common `:prompt-workflow` form
+  is single-message). Extracted the inline `:step/enter` later-group lambda into
+  a named `step-execution/later-group-turn-prompt` whose docstring states the
+  limitation, wired the production path through it (no behaviour change — same
+  `(:prompt (split (materialize …)))`), documented it in `doc/workflow-grammar.md`
+  ("Later-group single-submission limitation"), and added two covering tests over
+  the real `split-step-session-conversation` (single-message → that message;
+  multi-message → only the final message, preloaded dropped).
+
+- **R-3 (done).** Added `components/workflow-step-materialization/test` to the
+  `:test-paths` alias (deps.edn). The focused scry runner is
+  `clojure -M:test-paths -m scry.cli` (bb.edn:176); the materialization tests were
+  off its classpath (only on CI kaocha's `:test` alias). Verified both
+  `core-test` + `source-resolution-test` now load and pass under the focused
+  runner (25 tests / 50 assertions). In-scope: these are task-226's own
+  materialization tests.
+
+Validation: focused drive-prompt-queue suite 8/35 green (incl. 2 new R-2 tests);
+full workflow-runtime suite 131 tests / 711 assertions green;
+workflow-step-materialization 25/50 green under the focused runner;
+`clj-kondo` + `clj-paren-repair` clean on all edited Clojure files.

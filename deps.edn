@@ -246,6 +246,7 @@
                              "components/workflow-judge/test"
                              "components/workflow-runtime/test"
                              "components/workflow-loader/test"
+                             "components/workflow-step-materialization/test"
                              "components/turn-statechart/test"
                              "components/turn-runtime/test"
                              "components/tool-runtime/test"

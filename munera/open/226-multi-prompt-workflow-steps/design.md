@@ -17,10 +17,26 @@ asks into one prompt (no turn boundary) or using separate steps (separate child
 sessions that lose prior context).
 
 "Submitted only after the prior turn finishes" is a **logical ordering**
-constraint, not a synchronous in-thread loop: each turn is an async
-`ai/generate` effect that suspends the run, so the drain is realized as N
+constraint. The design's **target** contract is that each turn is an async
+`ai/generate` effect that suspends the run, so the drain would be realized as N
 suspend/resume cycles within one statechart step, resuming from recorded
 progression (see Architecture alignment, F1).
+
+**Realized vs. target (implementation note).** As built, `execute-actor-turn!`
+is **synchronous** — it returns a turn result directly rather than suspending the
+run — so the whole N-turn drain runs inside **one** `:step/enter` action and the
+statechart **never suspends mid-drain**. The async F1 suspend/resume contract
+below is therefore **not yet realized**; statechart-level mid-drain
+process-restart is a **non-occurring** path today. What *is* realized is the
+**resume-from-progression structural guard**: the drain loop re-reads recorded
+per-prompt progression on **every** iteration (never an in-memory counter), so
+the idempotency property F1/AC-7 specifies holds — validated by re-driving
+against a reconstructed `state*` (the same observable an async restart would
+produce), not by an occurring async restart at runtime. Realizing the full async
+F1 contract is blocked by `post-drain-envelope` accumulating the transcript /
+per-prompt records in the **current invocation** (loop locals), which a true
+async suspend/resume across process restart would have to reconstruct from
+recorded progression instead.
 
 ## Problem
 
@@ -101,11 +117,16 @@ Out of scope (follow-ons):
 6. Cancellation between prompts ⇒ terminal `:cancelled` (distinct from `:failed`):
    queue stops, routing skipped, completed per-prompt turn records retained and
    introspectable.
-7. On resume (async turn completion, process restart, replay) the queue
-   continues at the next **un-run** prompt from recorded per-prompt progression;
-   a prompt whose turn record already exists is never re-submitted (no
-   re-fire of its `ai/generate` effect). Routing is reached only after every
-   prompt has a recorded turn.
+7. Resume idempotency (structural progression guard). The queue continues at the
+   next **un-run** prompt from recorded per-prompt progression; a prompt whose
+   turn record already exists is never re-submitted (no re-fire of its
+   `ai/generate` effect). Routing is reached only after every prompt has a
+   recorded turn. **As built the drain is synchronous** (the async
+   suspend/resume of "async turn completion, process restart, replay" is the
+   not-yet-realized F1 target), so this idempotency is the per-iteration
+   progression re-read and is validated by re-driving against a **reconstructed**
+   `state*` — the same observable an async restart/replay would produce — not an
+   occurring async restart at runtime.
 8. Docs describe the form; IR-validation + runtime tests cover ordering, drain,
    N=1 equivalence, per-prompt addressing + its validation, intermediate-failure
    abort, inter-prompt cancellation, and resume-from-progression idempotency
@@ -210,7 +231,16 @@ same-step prohibition on assembly-time refs.
   turns (an internal loop, not N statechart steps).
 - **Model fallback is per turn** (`execute-with-ranked-fallback!`); a switch
   persists to later turns in the same session.
-- **Resume/suspend contract for the internal queue (F1).** The canonical runtime
+- **Resume/suspend contract for the internal queue (F1) — TARGET, not yet
+  realized.** As built the drain is **synchronous** (see Intent "Realized vs.
+  target"): `execute-actor-turn!` returns directly, so the whole queue drains
+  inside one `:step/enter` action with **no** mid-drain statechart suspend, and
+  statechart-level mid-drain restart is a **non-occurring** path. The realized
+  guarantee is the **structural progression guard** — the loop re-reads recorded
+  per-prompt progression each iteration (no counter), so a recorded turn is never
+  re-submitted; AC-7 idempotency is validated against a **reconstructed** `state*`
+  rather than an occurring async restart. The paragraphs below describe the
+  **target** async contract that the synchronous drain stands in for. The canonical runtime
   is resume/suspend-driven (`psi.workflow-runtime.statechart-runtime`;
   `psi.workflow-runtime.core` run resume; `resume-and-execute-run!`), and
   `ai/generate` is an **async effect that suspends the run** and resumes on turn
