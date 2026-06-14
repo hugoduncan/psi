@@ -1848,3 +1848,38 @@ re-fires a recorded turn.
 
 - **Verification.** drive-prompt-queue suite 6 tests / 33 assertions green;
   clj-kondo clean.
+
+## Slice 6 — Abort paths — ψ
+
+Test + docs slice. **Deviation:** the abort dispositions were **already wired**
+in the Slice-3 driver (`drive-session-prompt-queue!`), so Slice 6 added no
+production code — only the covering tests and author-facing docs.
+
+- **Already-correct driver mechanism.** The driver's per-turn `case` maps each
+  `execute-session-turn-outcome` disposition: `:failed` records an `:actor/failed`
+  pending result annotated with `:failed-prompt {:index :name}`; `:cancelled`
+  enqueues `:workflow/cancel`; `:blocked` records `:actor/blocked`. Prior records
+  are retained because per-prompt records are persisted incrementally through
+  `record-turn-fn` and no abort branch removes them; the aborting prompt leaves no
+  record because `record-turn-fn` is only called on the `:ok` branch. The N=1
+  degenerate (`execute-session-step!`) takes the same dispositions without a
+  prompt name (P10/AC-2).
+
+- **Synchronous-model note (P12).** With the synchronous turn primitive,
+  "in-flight" and "inter-prompt" cancellation collapse: the turn runs at the seam,
+  then `execute-session-turn-outcome` checks `stopped?` first and returns
+  `:cancelled` before recording — so the interrupted prompt leaves no record and
+  prompts completed before are retained, exactly as P12 requires.
+
+- **Tests.** New `step_execution_drive_prompt_queue_abort_test.clj` (4 tests / 19
+  assertions): intermediate-turn `:failed` naming the prompt + index-0 retained;
+  final/last-turn `:failed` (P10) + indices 0/1 retained; inter-prompt/in-flight
+  `:cancelled` + index-0 retained + no post-drain result; final-turn
+  `:unsupported-structured-output` `:blocked` after N−1 turns + index-0 retained +
+  final prompt no record. The P13a upfront invalid-request block is covered by
+  the Slice-3 `...-blocks-upfront-on-invalid-structured-request-test`.
+
+- **Docs.** "Abort, cancellation, and blocked outcomes" subsection in
+  `doc/workflow-grammar.md`.
+
+- **Verification.** abort suite 4 tests / 19 assertions green; clj-kondo clean.

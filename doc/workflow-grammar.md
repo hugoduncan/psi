@@ -279,6 +279,30 @@ ordered per-prompt records, and re-driving a fully recorded queue runs **zero**
 turns and proceeds straight to the single post-drain result/route. The post-drain
 route is reached only once every group has a recorded turn.
 
+### Abort, cancellation, and blocked outcomes
+
+When a turn does not complete successfully the queue stops and the step routing
+is **skipped** — the drain never produces a successful post-drain result. The
+per-prompt turn records of groups that completed **before** the aborting turn are
+retained and introspectable; the aborting group itself leaves **no** completed
+turn record. There are three non-success terminal outcomes:
+
+- **`:failed`** — a turn errors. The failure payload names the failing prompt
+  (`:failed-prompt {:index … :name …}`). An error at **any** position — including
+  the **last** prompt — follows the same `:failed` abort. The single-prompt
+  (`:contributions`) degenerate fails the same way, with no prompt name (no named
+  group), byte-equivalent to today's single-prompt failure.
+- **`:cancelled`** — the run is cancelled. Whether the cancel lands between turns
+  or while a turn is in flight, the outcome is the same terminal `:cancelled`; an
+  interrupted in-flight prompt leaves no record, and only prompts completed
+  before the cancel are retained.
+- **`:blocked`** — structured-output viability fails. An invalid structured-output
+  **request** is checked **upfront before turn 1** (fail-fast: zero turns run,
+  zero records). An `:unsupported-structured-output` or `:invalid-structured-output`
+  block can only arise on the **final** turn (structured output is requested on
+  the final turn only), yielding a terminal `:blocked` after the prior turns ran
+  and were recorded, with the blocking final prompt leaving no record.
+
 ## Structured outputs
 
 Session steps may declare machine-facing structured outputs under the existing

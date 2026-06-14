@@ -338,12 +338,20 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
 
 ## Slice 6 — Abort paths
 
-- [ ] Intermediate-turn error ⇒ stop queue, step `:failed` with payload naming
+- [x] Intermediate-turn error ⇒ stop queue, step `:failed` with payload naming
   the failing prompt, routing skipped; prior per-prompt records retained, failing
-  prompt leaves **no** record (AC-5/G1).
-- [ ] **Final/last-turn error + N=1 error semantics (P10), reconciled with
-  AC-5/AC-2.** A turn error at **any** queue position — including the **final
-  (last) prompt** of an N>1 queue — follows the **same** `:failed` abort as the
+  prompt leaves **no** record (AC-5/G1). **DONE (already wired in the Slice-3
+  driver; Slice 6 = covering test):**
+  `drive-session-prompt-queue-intermediate-turn-error-fails-naming-prompt-test`.
+- [x] **Final/last-turn error + N=1 error semantics (P10), reconciled with
+  AC-5/AC-2.** **DONE:**
+  `drive-session-prompt-queue-final-turn-error-fails-naming-prompt-test` (last
+  prompt of a 3-queue errors ⇒ `:failed` naming index 2, indices 0/1 retained, no
+  index-2 record, routing skipped). The N=1 degenerate failure path
+  (`execute-session-step!`, no prompt name) is covered by the pre-existing
+  single-prompt failure tests. A turn error at **any** queue position — including
+  the **final (last) prompt** of an N>1 queue — follows the **same** `:failed`
+  abort as the
   intermediate case: the drain never completes successfully, so the post-drain
   route is **not** reached (routing skipped), per-prompt records for prompts
   completed before the failing one are retained and introspectable, and the
@@ -354,11 +362,12 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   `:failed` payload names no prompt (no `:name`), so the outcome is byte-
   equivalent to today's pre-existing single-prompt failure route — preserving the
   AC-2 N=1 equivalence (no separate single-prompt failure path is retained).
-- [ ] Inter-prompt cancellation ⇒ terminal `:cancelled` (distinct from
+- [x] Inter-prompt cancellation ⇒ terminal `:cancelled` (distinct from
   `:failed`), routing skipped, completed per-prompt records retained +
   introspectable, in-flight turn aborted per existing cancellation contract
-  (AC-6/B5).
-- [ ] **In-flight (mid-turn) cancellation record disposition (P12), reconciled
+  (AC-6/B5). **DONE:**
+  `drive-session-prompt-queue-inter-prompt-cancellation-test`.
+- [x] **In-flight (mid-turn) cancellation record disposition (P12), reconciled
   with AC-6/AC-5.** A cancellation arriving **while a prompt's turn is in flight**
   yields the **same** terminal `:cancelled` outcome (routing skipped) as the
   inter-prompt case — one cancellation outcome regardless of whether the cancel
@@ -369,8 +378,13 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   contract. Make the cancellation path's in-flight-record disposition as explicit
   as AC-5 makes the failure path's: completed-before ⇒ retained;
   interrupted-in-flight ⇒ no record.
-- [ ] **Structured-output `:blocked` across the drain (P13), reconciled with
-  AC-3/AC-5.** Add `:blocked` (`:actor/blocked`) as a third terminal non-success
+- [x] **Structured-output `:blocked` across the drain (P13), reconciled with
+  AC-3/AC-5.** **DONE:** upfront invalid-request block covered by Slice-3's
+  `drive-session-prompt-queue-blocks-upfront-on-invalid-structured-request-test`;
+  final-turn `:unsupported-structured-output` block after N−1 turns covered by
+  `drive-session-prompt-queue-final-turn-structured-output-blocked-test` (terminal
+  `:blocked`, index-0 record retained, blocking final prompt leaves no record,
+  routing skipped). Add `:blocked` (`:actor/blocked`) as a third terminal non-success
   outcome alongside `:failed`/`:cancelled`, for three structured-output reasons:
   (i) invalid structured-output **request** — checked **upfront before turn 1**
   (static / turn-independent, fail-fast: zero turns run, zero per-prompt records);
@@ -384,7 +398,7 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   interrupted-in-flight). For the **N=1 degenerate** the `:blocked` outcome is
   byte-equivalent to today's single-prompt blocked path (no named group ⇒ no
   prompt name; zero records either way), preserving AC-2 equivalence.
-- [ ] Runtime tests: intermediate-failure abort + retained prior records;
+- [x] Runtime tests: intermediate-failure abort + retained prior records;
   inter-prompt cancellation outcome + retained records; **in-flight (mid-turn)
   cancellation: same `:cancelled` outcome + completed-before records retained +
   interrupted prompt leaves no record (P12)**; **structured-output `:blocked`
@@ -392,10 +406,17 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   final-turn `:unsupported-structured-output`/`:invalid-structured-output` block
   after N−1 turns ⇒ terminal `:blocked` + prior N−1 records retained +
   introspectable + blocking final prompt leaves no record**; all skip routing.
-- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — abort/cancellation/blocked
-  outcomes across the queue (`:failed` vs `:cancelled` vs `:blocked`, retained
-  records, routing skipped).
-- [ ] `clj-kondo` clean; commit Slice 6.
+  **DONE:** new namespace
+  `step_execution_drive_prompt_queue_abort_test.clj` (4 tests: intermediate
+  `:failed`, final-turn `:failed`, inter-prompt/in-flight `:cancelled`,
+  final-turn structured-output `:blocked`); P13 upfront block reuses the Slice-3
+  test.
+- [x] Docs (P2): abort/cancellation/blocked outcomes across the queue (`:failed`
+  vs `:cancelled` vs `:blocked`, retained records, routing skipped). **DONE:**
+  "Abort, cancellation, and blocked outcomes" subsection in
+  `doc/workflow-grammar.md` (consolidated with the multi-prompt grammar there per
+  the Slice-3 doc-placement deviation).
+- [x] `clj-kondo` clean; commit Slice 6.
 
 ## Slice 7 — Docs consolidation + changelog + coherence
 
