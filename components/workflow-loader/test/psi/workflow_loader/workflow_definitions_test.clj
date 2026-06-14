@@ -342,6 +342,40 @@
         (is (terminal-review-pass-status-menu? content)
             (str label " prompt must end with the contiguous two-line PASS_STATUS menu"))))))
 
+(deftest review-follow-up-design-prompt-contract-test
+  ;; Locks AC3's batch-follow-up evidence rule for the merged design-review
+  ;; workflow. These assertions intentionally name the git/task-file mechanics so
+  ;; the prompt cannot regress to broad "new unchecked item" selection.
+  (let [content (slurp-workflow-file "review-follow-up-design.md")]
+    (testing "defines the preceding pass as the whole merged review batch"
+      (doseq [needle ["immediately preceding whole `design-review` batch"
+                      "architecture, ambiguity, and inconsistency review prompts run back-to-back"
+                      "spanning all three review prompts in that immediately preceding batch"]]
+        (is (.contains content needle) needle)))
+    (testing "identifies the contiguous review-batch segment and parent baseline"
+      (doseq [needle ["Identify the contiguous latest task-scoped review-batch segment"
+                      "since the previous design-follow-up completion"
+                      "Use the parent of the oldest commit in that segment as the batch baseline"
+                      "git diff <baseline>..HEAD -- <task>/design-steps.md"]]
+        (is (.contains content needle) needle)))
+    (testing "limits candidates to current unchecked design-step checklist lines added by that diff"
+      (doseq [needle ["candidate work set is exactly the checklist lines added by that diff"
+                      "match unchecked design-step items"
+                      "still exist unchecked in design-steps.md at follow-up start"]]
+        (is (.contains content needle) needle)))
+    (testing "excludes stale, pre-existing, checked, and non-design-step items"
+      (doseq [needle ["Do not execute unchecked items that predate the preceding review pass"
+                      "edited stale items whose addition cannot be attributed to the just-finished batch"
+                      "checked items"
+                      "items from steps.md"]]
+        (is (.contains content needle) needle)))
+    (testing "blocks rather than guessing when evidence is ambiguous or unattributable"
+      (doseq [needle ["If the review-batch segment or baseline cannot be identified confidently"
+                      "cannot be matched unambiguously to a current unchecked item"
+                      "leave the item unchecked"
+                      "record the blocking reason tersely in implementation.md rather than guessing"]]
+        (is (.contains content needle) needle)))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
 
