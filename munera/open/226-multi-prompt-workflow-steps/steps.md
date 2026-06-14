@@ -751,3 +751,21 @@ consolidates them — it does not first-author them.
   verified both namespaces now load and pass under the focused runner (25 tests /
   50 assertions). In-scope tooling fix for 226 (the task's own materialization
   tests).
+
+## Implementation-review follow-ups (pass 2)
+
+- [ ] R-4 — Reconcile `doc/workflow-grammar.md` "Resume and idempotency" with the
+  R-1-reconciled design. The section still presents async/process-restart/
+  event-log-replay mid-drain re-entry as a realized runtime path ("On every
+  re-entry of the step — an ordinary in-run advance, a process restart, or an
+  event-log replay — the driver reads …"), but design.md (source of truth) marks
+  the async suspend/resume + restart/replay resume as **TARGET, not yet realized**
+  (synchronous drain; AC-7 validated against a reconstructed `state*`, not an
+  occurring restart). Reword the doc to (a) describe the realized guarantee as the
+  structural progression-reconstruction guard (position read from recorded
+  per-prompt turn records, never an in-memory counter) and (b) qualify the
+  process-restart/event-log-replay framing as the not-yet-realized async target
+  rather than an occurring path — matching design.md so user docs do not assert a
+  capability the reconciled spec marks unrealized. Also verify
+  `doc/workflow-grammar-concepts.md` (*Per-prompt output surfaces*) carries no
+  parallel overclaim.

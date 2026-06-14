@@ -1999,3 +1999,35 @@ Validation: focused drive-prompt-queue suite 8/35 green (incl. 2 new R-2 tests);
 full workflow-runtime suite 131 tests / 711 assertions green;
 workflow-step-materialization 25/50 green under the focused runner;
 `clj-kondo` + `clj-paren-repair` clean on all edited Clojure files.
+
+## Implementation review (task-implementation-review) — ψ, pass 2
+
+Re-reviewed code+tests+docs against the (now R-1-reconciled) design. Build
+quality remains high: focused suites green (drive-prompt-queue + abort +
+ir-prompts + progression-recording = 23 tests / 127 assertions); IR `:prompt`
+source-ref validation (`prompt-ref-errors`) and runtime resolution
+(`resolve-source-ref` per-prompt branch) are clean and symmetric; the
+synchronous-drain reality now matches design.md after pass-1 R-1. One new
+actionable coherence finding; R-1/R-2/R-3 confirmed done.
+
+- **R-4 (coherence, doc↔spec; R-1 propagation gap). `doc/workflow-grammar.md`
+  "Resume and idempotency" still presents async/process-restart/event-log-replay
+  mid-drain re-entry as a realized runtime path.** R-1 reconciled design.md to
+  mark the async suspend/resume + process-restart/replay resume as **TARGET, not
+  yet realized** (synchronous drain; AC-7 idempotency validated against a
+  *reconstructed* `state*`, not an occurring runtime restart). But the user-facing
+  doc section (authored in Slice 5/7, untouched by R-1's doc edit, which only added
+  the Later-group section) still reads: "On every re-entry of the step — an
+  ordinary in-run advance, a process restart, or an event-log replay — the driver
+  reads which group indices already have a recorded turn …", presenting those
+  re-entries as occurring. Since the drain is synchronous within one `:step/enter`
+  action (no mid-drain suspend), process-restart/replay mid-drain re-entry is a
+  **non-occurring** path — the same overclaim R-1 removed from design.md. Per the
+  change_chain `update(doc, reflect(meta spec code))` + coherence ethos, the doc
+  must carry the same caveat: describe the realized guarantee as the structural
+  progression-reconstruction guard (recorded records, never a counter) and qualify
+  the restart/replay framing as the not-yet-realized async target (synchronous
+  drain today), so user docs do not assert a capability the reconciled spec marks
+  unrealized. Reword `doc/workflow-grammar.md` "Resume and idempotency"
+  accordingly. (Verify `doc/workflow-grammar-concepts.md` *Per-prompt output
+  surfaces* carries no parallel overclaim.)
