@@ -1278,7 +1278,7 @@ consolidates them — it does not first-author them.
 
 ## Code-shaper review follow-ups (pass 4)
 
-- [ ] CS-5 — Name the repeated cancellation-enqueue idiom. The cancel signal
+- [x] CS-5 — Name the repeated cancellation-enqueue idiom. The cancel signal
   `(queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})` is
   written verbatim 10 times across `execute-session-step!` and
   `drive-session-prompt-queue!`
@@ -1292,3 +1292,21 @@ consolidates them — it does not first-author them.
   the `:workflow/cancel` sites in `statechart_runtime.clj`) and call it at each
   checkpoint. Behaviour-preserving, mechanical; re-run `clj-kondo` + the
   step-execution + drive-prompt-queue (+ abort) suites.
+  **DONE via `queue/enqueue-cancel!`** (shared location). The `:workflow/cancel`/
+  `{}` idiom is repeated in **two** sibling namespaces — `step_execution.clj`
+  (10×, the CS-5 checkpoints) **and** `statechart_runtime.clj` (13×) — so the
+  named action was placed in their shared `statechart-runtime.queue` ns
+  (`enqueue-cancel! [event-queue* working-memory*]`), giving the cancel shape one
+  point of change for **both** sharers (the explicit "if shared with the
+  `:workflow/cancel` sites in `statechart_runtime.clj`" path; a step-execution-
+  local helper would have left the 13 statechart_runtime copies unnamed,
+  defeating the single-point-of-change rationale). Replaced all 23 single-line
+  `:workflow/cancel {}` enqueues across both files (exact-literal substitution);
+  left untouched the distinct `record-actor-pending!` general
+  `enqueue-event! … event {}` (step_execution.clj:178), the dynamic-event
+  `enqueue-event!` dispatches (`statechart_runtime.clj` `(case pending-kind …)` /
+  `(case (:action routing-result) …)` / `:actor/failed` / `(:event data)`), which
+  carry non-`:workflow/cancel` events. Behaviour-preserving, mechanical;
+  `clj-paren-repair` + `clj-kondo` clean; step-execution + drive-prompt-queue
+  (+ abort) suites 25 tests / 146 assertions green; full workflow-runtime suite
+  136 tests / 736 assertions green.

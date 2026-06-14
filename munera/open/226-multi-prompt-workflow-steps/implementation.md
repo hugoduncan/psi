@@ -3348,3 +3348,36 @@ shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
 **documented** F1-async blocker — both left as-is. The triple near-identical
 `{:status :error …}` envelope in `execute-with-ranked-fallback!` is **pre-existing**
 (predates task 226, commit 13db618d9) and out of this task's scope.
+
+## Code-shaper follow-up execution (pass 4 — CS-5)
+
+Named the repeated cancellation-enqueue idiom. The fixed
+`(queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})` shape
+was an unnamed literal repeated across **two** sibling namespaces — 10× in
+`step_execution.clj` (CS-5's enumerated checkpoints) and 13× in the sibling
+`statechart_runtime.clj` — so the named action was placed in their shared
+`psi.workflow-runtime.statechart-runtime.queue` ns rather than ns-local:
+
+- `queue/enqueue-cancel! [event-queue* working-memory*]` — the single named
+  cancel action (`:workflow/cancel`/`{}`), docstring states it is symmetric with
+  the sibling disposition `record-actor-pending!` and is the one point of change
+  for the cancel shape.
+
+Chose the shared `queue` home over a `step_execution.clj`-local helper precisely
+because the idiom is shared with `statechart_runtime.clj` (the item's explicit
+"if shared …" path): a step-execution-local helper would have left the 13
+`statechart_runtime.clj` copies unnamed, only partly realizing the
+single-point-of-change rationale CS-5 cites. Replaced all 23 single-line
+`:workflow/cancel {}` enqueues across both files via exact-literal substitution.
+
+Left untouched (correctly not the cancel idiom): the general
+`record-actor-pending!` `enqueue-event! … event {}` (step_execution.clj:178,
+parameterized event), and `statechart_runtime.clj`'s dynamic-event dispatches
+(`(case pending-kind …)`, `(case (:action routing-result) …)`, `:actor/failed`,
+`(:event data)`) — these carry non-`:workflow/cancel` events.
+
+Behaviour-preserving, mechanical. `clj-paren-repair` (3 files) + `clj-kondo`
+clean (0/0); step-execution + drive-prompt-queue (+ abort) 25 tests / 146
+assertions green; full workflow-runtime suite 136 tests / 736 assertions green
+(covers both the step_execution and statechart_runtime cancellation paths, so the
+shared-helper refactor is verified across both sharers — no drift).

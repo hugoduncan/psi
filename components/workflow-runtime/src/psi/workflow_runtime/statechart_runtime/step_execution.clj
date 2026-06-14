@@ -307,7 +307,7 @@
                           (structured-output/structured-output-request output-key output-spec))]
      (cond
        (stopped?)
-       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+       (queue/enqueue-cancel! event-queue* working-memory*)
 
        (false? (:ok? request-result))
        (record-actor-pending!
@@ -324,7 +324,7 @@
                       (:opts request-result) structured-entry)]
          (case (:disposition outcome)
            :cancelled
-           (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+           (queue/enqueue-cancel! event-queue* working-memory*)
 
            :failed
            (record-actor-pending!
@@ -332,13 +332,13 @@
 
            :blocked
            (if (and (= :success (:branch outcome)) (stopped?))
-             (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+             (queue/enqueue-cancel! event-queue* working-memory*)
              (record-actor-pending!
               working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
 
            :ok
            (if (stopped?)
-             (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+             (queue/enqueue-cancel! event-queue* working-memory*)
              (record-actor-pending!
               working-memory* event-queue* step-id attempt-id :success (:payload outcome) :actor/done))))))))
 
@@ -403,7 +403,7 @@
                          (structured-output/structured-output-request output-key output-spec))]
     (cond
       (stopped?)
-      (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+      (queue/enqueue-cancel! event-queue* working-memory*)
 
       ;; Upfront structured request-validity gate (P13a): turn-independent, runs
       ;; before any turn, leaving zero per-prompt records on a request fault.
@@ -428,7 +428,7 @@
           ;; between-prompts "queue stops"). Symmetric with the N=1
           ;; `execute-session-step!` pre-turn `stopped?` check, so a cancelled
           ;; queue never fires an extra turn's `ai/generate` + tool loop.
-          (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+          (queue/enqueue-cancel! event-queue* working-memory*)
           (let [workflow-run (get-in @(:state* ctx) (progression-recording/run-path run-id))
                 {:keys [index group final?]}
                 (progression-recording/next-un-run-prompt-group workflow-run step-id prompt-queue)]
@@ -446,7 +446,7 @@
                              turn-opts turn-structured-entry)]
                 (case (:disposition outcome)
                   :cancelled
-                  (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                  (queue/enqueue-cancel! event-queue* working-memory*)
 
                   :failed
                   (record-actor-pending!
@@ -457,13 +457,13 @@
 
                   :blocked
                   (if (and (= :success (:branch outcome)) (stopped?))
-                    (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                    (queue/enqueue-cancel! event-queue* working-memory*)
                     (record-actor-pending!
                      working-memory* event-queue* step-id attempt-id :blocked (:payload outcome) :actor/blocked))
 
                   :ok
                   (if (stopped?)
-                    (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
+                    (queue/enqueue-cancel! event-queue* working-memory*)
                     (let [outputs (turn-local-outputs outcome)]
                       (if (record-turn-fn index (:name group) outputs)
                         (recur (cond-> transcript
@@ -472,4 +472,4 @@
                                      {:index index :name (:name group) :outputs outputs})
                                (:payload outcome))
                       ;; Recording was skipped because the run was cancelled.
-                        (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})))))))))))))
+                        (queue/enqueue-cancel! event-queue* working-memory*)))))))))))))
