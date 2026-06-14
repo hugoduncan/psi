@@ -7,10 +7,15 @@ slice.
 
 **Per-slice Scry gating (P9):** the "relevant Scry suite" for each slice is the
 Scry suite of **every component that slice edits** (see plan.md "Per-slice Scry
-gating"): Slice 1 = the focused `step_execution_test.clj` namespace only (P7);
-Slice 2 = workflow-loader + workflow-runtime; Slice 3 = workflow-runtime +
-workflow-step-materialization; Slices 4–6 = workflow-runtime. Distinct from Final
-verification's full three-component run.
+gating"): Slice 1 = workflow-runtime + workflow-loader +
+workflow-step-materialization (Slice 1 edits all three — `ir.clj`/
+`step_execution.clj`, `compiler.clj`, `core.clj`, PI9; the focused
+`step_execution_test.clj` namespace is the N=1-equivalence done-gate comparand,
+P7, not a narrower gate); Slice 2 = workflow-loader + workflow-runtime; Slice 3 =
+workflow-runtime (edits `step_execution.clj` + `progression_recording.clj`;
+`core.clj` materialization lands in Slice 1, not Slice 3, PI9/PI10); Slices 4–6 =
+workflow-runtime. Distinct from Final verification's full three-component run by
+the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
 
 ## Slice 1 — Unified single-prompt queue path (N=1 degenerate)
 
@@ -38,13 +43,19 @@ verification's full three-component run.
   producing the **identical** `:pending-actor-result` envelope (no behaviour
   change). Single suspend point unchanged.
 - [ ] Slice-1 done-gate: the committed envelope characterization test (P3) is
-  green **unchanged** after the unified-path refactor, **and** the **session-step
-  suite** is green unchanged (AC-2 N=1 equivalence as a consequence of the
-  unified path). **Session-step suite scope (P7):** the gating suite is the
-  workflow-runtime `step_execution_test.clj` namespace
+  green **unchanged** after the unified-path refactor, **and** the **three edited
+  components' Scry suites** are green unchanged — workflow-runtime
+  (`ir.clj`/`step_execution.clj`) + workflow-loader (`compiler.clj`) +
+  workflow-step-materialization (`core.clj`), since Slice 1 edits all three
+  (P9/PI9) — (AC-2 N=1 equivalence as a consequence of the unified path).
+  **Equivalence comparand scope (P7):** the focused workflow-runtime
+  `step_execution_test.clj` namespace
   (`psi.workflow-runtime.statechart-runtime.step-execution-test`) that houses the
-  characterization test — **not** the broader three-component Scry run reserved
-  for Final verification. Any change to the asserted envelope shape ⇒ defect.
+  characterization test is the specific N=1-equivalence **comparand** within the
+  workflow-runtime suite — **not** a narrower substitute for the per-component
+  green requirement; it is distinct from Final verification's three-component run
+  by the latter's AC-1..AC-8 coverage confirmation, not by a different suite set.
+  Any change to the asserted envelope shape ⇒ defect.
 - [ ] `clj-kondo` clean; commit Slice 1.
 
 ## Slice 2 — `:prompts` grammar + IR normalization (named groups)
@@ -362,7 +373,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (inconsistency, pass 3)
 
-- [ ] PI9 — Reconcile Slice 1's per-component Scry gate (P9) with the three
+- [x] PI9 — Reconcile Slice 1's per-component Scry gate (P9) with the three
   components Slice 1 actually edits, and fix the `core.clj` slice mis-attribution.
   steps Slice 1 edits workflow-runtime (`ir.clj`/`step_execution.clj`),
   workflow-loader (`compiler.clj` single-prompt normalization), and
@@ -379,7 +390,7 @@ consolidates them — it does not first-author them.
   removing the `core.clj` attribution from Slice 3, or (b) explicitly justifying
   Slice 1's focused-namespace gate exemption and relocating the `core.clj`
   materialization edit to the slice P9 claims owns it.
-- [ ] PI10 — Reword the plan P9 Slice-3 "edits" enumeration to stop listing
+- [x] PI10 — Reword the plan P9 Slice-3 "edits" enumeration to stop listing
   confirm-only / no-edit touch points as edits. plan P9 Slice 3 says it "edits
   `step_execution.clj`/`statechart_runtime.clj`/`progression_recording.clj`/`statechart.clj`",
   but the plan Touch points scope `statechart_runtime.clj` for Slice 3 to "needs

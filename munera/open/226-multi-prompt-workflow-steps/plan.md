@@ -175,15 +175,17 @@ before N>1, addressing, resume, and abort paths are layered on.
    producing the existing envelope. No grammar surface change. Acceptance: the
    committed asserted-shape envelope characterization test (P3/R4) green
    **unchanged** is the Slice-1 done-gate comparand — not merely "suite green
-   unchanged" — **and** the **session-step suite** green (AC-2). **Session-step
-   suite scope (P7):** the Slice-1 done-gate "session-step suite" is the
-   workflow-runtime `step_execution_test.clj` namespace
+   unchanged" — **and** the **three edited components' Scry suites** green
+   (workflow-runtime + workflow-loader + workflow-step-materialization; Slice 1
+   edits all three, P9/PI9) (AC-2). **Equivalence comparand scope (P7):** the
+   focused workflow-runtime `step_execution_test.clj` namespace
    (`psi.workflow-runtime.statechart-runtime.step-execution-test`) — the
-   session-step execution tests that house the characterization test — which must
-   be green-unchanged to gate Slice 1. This is **distinct from** Final
-   verification's broader three-component Scry run (workflow-runtime +
-   workflow-loader + workflow-step-materialization); the Slice-1 gate is the
-   focused session-step namespace, not the full three-suite run.
+   session-step execution tests that house the characterization test — is the
+   specific N=1-equivalence done-gate **comparand** within the workflow-runtime
+   suite, **not** a narrower substitute for the per-component green requirement;
+   per the per-component rule (P9/PI9) Slice 1 additionally gates on all three
+   edited components' Scry suites. Final verification runs the same three suites
+   but is distinguished by its additional AC-1..AC-8 coverage confirmation.
 2. **`:prompts` grammar + IR normalization (named groups).** Add `:prompts`
    schema (ordered named groups; group-internal `:prompt-workflow` xor
    `:contributions`), compiler support, and IR validation: step-level
@@ -295,18 +297,31 @@ per slice; commit per slice.
 **Per-slice Scry gating (P9) — gate on each edited component's suite.** The
 "relevant Scry suite per slice" is, concretely, the Scry suite of **every
 component the slice edits** (the slice's commit must be green across all of
-them). This is a per-component rule, distinct from Slice 1's focused
-`step_execution_test.clj` namespace gate (P7) and from Final verification's
-full three-component run:
+them). This per-component rule applies to **every** slice, **Slice 1 included**
+(PI9): within Slice 1 the focused `step_execution_test.clj` namespace is the
+specific N=1-equivalence done-gate **comparand** (P7), **not** a narrower
+substitute for the per-component green requirement. Final verification runs the
+same three component suites but is distinguished by its additional AC-1..AC-8
+coverage confirmation (the TraceID check), not by a different suite set:
 
-- **Slice 1** — focused `psi.workflow-runtime.statechart-runtime.step-execution-test`
-  namespace only (P7), the characterization-test done-gate.
+- **Slice 1** — **workflow-runtime** + **workflow-loader** +
+  **workflow-step-materialization** Scry suites (Slice 1 edits all three:
+  workflow-runtime `ir.clj` queue schema + `step_execution.clj` refactor,
+  workflow-loader `compiler.clj` single-prompt → unnamed-group normalization,
+  workflow-step-materialization `core.clj` per-group materialization entry
+  point, PI9). The focused
+  `psi.workflow-runtime.statechart-runtime.step-execution-test` namespace is the
+  N=1-equivalence done-gate **comparand** (P7) within the workflow-runtime
+  suite, **not** a substitute for the per-component green requirement.
 - **Slice 2** — **workflow-loader** + **workflow-runtime** Scry suites (edits
   `compiler.clj` and `ir.clj`).
-- **Slice 3** — **workflow-runtime** + **workflow-step-materialization** Scry
-  suites (edits `step_execution.clj`/`statechart_runtime.clj`/
-  `progression_recording.clj`/`statechart.clj` and the per-group
-  materialization in `core.clj`).
+- **Slice 3** — **workflow-runtime** Scry suite. Slice 3 **edits**
+  `step_execution.clj` and `progression_recording.clj` (PI10); `statechart.clj`
+  is **confirm-only** (the single-step-topology verification, no edit) and
+  `statechart_runtime.clj` is the suspend/resume re-entry boundary needing
+  **no** Slice-3 edit (Touch points / PI7); there is **no** `core.clj` edit in
+  Slice 3 — the per-group materialization entry point lands in **Slice 1**
+  (PI9).
 - **Slice 4** — **workflow-runtime** Scry suite (edits `ir.clj` source-ref
   schema/validation/surfaces and `step_execution.clj` surface resolution).
 - **Slice 5** — **workflow-runtime** Scry suite (resume/replay re-entry in
@@ -321,13 +336,14 @@ Scry suite to its gate.
 
 After Slice 7, a dedicated **Final verification** pass (mirrors steps.md's
 `## Final verification` section; this is the "Final verification" the Slice-1
-done-gate scope (P7) contrasts against — distinct from the focused per-slice
-gating suites):
+done-gate scope (P7) contrasts against — distinguished from the per-slice gating
+by its AC-1..AC-8 coverage confirmation, not by a different suite set):
 
 - Run the **full three-component Scry suites green**: workflow-runtime +
-  workflow-loader + workflow-step-materialization (the broader run, distinct from
-  the Slice-1 focused `step_execution_test.clj` gate and each slice's relevant
-  per-slice suite).
+  workflow-loader + workflow-step-materialization (the same three component
+  suites Slice 1 gates on per the per-component rule, P9/PI9; the Slice-1
+  `step_execution_test.clj` namespace is only the N=1-equivalence comparand —
+  Final verification additionally confirms AC coverage below).
 - Confirm **AC-1..AC-8** each have covering tests (ordering, drain, N=1
   equivalence, per-prompt addressing + validation, intermediate-failure abort,
   inter-prompt cancellation, resume-from-progression idempotency, docs) — the

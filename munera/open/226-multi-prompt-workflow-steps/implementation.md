@@ -1149,3 +1149,40 @@ agree across files.
   `progression_recording.clj`) from confirm-only touch points
   (`statechart.clj`, and `statechart_runtime.clj` as the re-entry boundary), so
   "edits" names only files the slice changes.
+
+## Plan/steps inconsistency follow-ups (pass 3) executed — ψ
+
+Executed PI9–PI10 (plan/steps-only edits; no code/test/doc/source change needed —
+these are task-artifact consistency reconciliations of the P9 Scry-gating
+enumeration against the files each slice actually edits).
+
+- **PI9 (done).** Chose reviewer **option (a)**: attributed the `compiler.clj`
+  (workflow-loader) and `core.clj` (workflow-step-materialization) edits **and
+  their suite gating** to **Slice 1** in plan P9 + steps header, and **removed**
+  the `core.clj`/workflow-step-materialization attribution from **Slice 3** (steps
+  adds the per-group `core.clj` entry point in Slice 1; Slice 3 has no `core.clj`
+  item). Slice 1's gate is now the **three edited components' Scry suites**
+  (workflow-runtime + workflow-loader + workflow-step-materialization), with the
+  focused `step_execution_test.clj` namespace kept as the specific
+  **N=1-equivalence done-gate comparand** (P7) within the workflow-runtime suite
+  — **not** a narrower substitute for the per-component green requirement. Rejected
+  option (b) (gate-exempt Slice 1 + relocate `core.clj`): it would either leave
+  Slice 1's loader/materialization edits ungated by their own suites or move an
+  edit steps already places in Slice 1. Reconciled the dependent P7 wording in
+  three places that previously said the Slice-1 gate was the focused namespace
+  "only / not the three-suite run": plan Slice-order 1 acceptance, plan Final-
+  verification section, and steps Slice-1 done-gate — restating the distinction
+  from Final verification as the latter's **AC-1..AC-8 coverage confirmation**,
+  not a different suite set. Edits: plan.md P9 intro + Slice 1 bullet,
+  Slice-order 1 acceptance (P7 scope), Final-verification section; steps.md P9
+  header note + Slice-1 done-gate item.
+- **PI10 (done).** Reworded the plan P9 **Slice 3** "edits" enumeration to list
+  only genuinely-edited files — `step_execution.clj` and
+  `progression_recording.clj` — and to mark `statechart.clj` as **confirm-only**
+  (single-step-topology verification, no edit) and `statechart_runtime.clj` as
+  the suspend/resume **re-entry boundary** needing no Slice-3 edit (Touch
+  points / PI7). Removed `statechart_runtime.clj`/`statechart.clj`/`core.clj`
+  from the Slice-3 "edits" list so "edits" names only files the slice changes.
+  Gating consequence is nil (both confirm-only files live in workflow-runtime,
+  already gated), but the attribution is now internally consistent with the Touch
+  points and steps Slice 3. Edit: plan.md P9 Slice 3 bullet (shared with PI9).
