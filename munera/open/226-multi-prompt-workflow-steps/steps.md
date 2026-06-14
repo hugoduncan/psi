@@ -1176,7 +1176,7 @@ consolidates them — it does not first-author them.
 
 ## Docs-review follow-ups (pass 3)
 
-- [ ] DOC-4 — Add the `:prompt` per-prompt discriminator form to the `source-ref`
+- [x] DOC-4 — Add the `:prompt` per-prompt discriminator form to the `source-ref`
   EBNF production in `doc/workflow-grammar.md` (lines 108–111). The production
   currently lists only `{:step step-name :output output-key}` and
   `{:step step-name :yield yield-field}`, but the new prose in the same doc
@@ -1187,3 +1187,11 @@ consolidates them — it does not first-author them.
   `{:step step-name :prompt prompt-name :output output-key}` to the production
   (`prompt-name` is already a defined terminal per DOC-1) so the formal grammar
   and the prose agree within the grammar reference.
+  **DONE:** added the alternative
+  `{:step step-name :prompt prompt-name :output output-key}` to the `source-ref`
+  EBNF production in `doc/workflow-grammar.md` between the plain
+  `{:step :output}` and `{:step :yield}` alternatives, so the formal grammar now
+  matches the `:prompt` source-ref discriminator prose (grammar.md *Per-prompt
+  output surfaces* cross-reference) and `workflow-grammar-concepts.md`'s
+  `{:step … :prompt … :output …}` data-flow surface. `prompt-name` was already
+  defined as a terminal (DOC-1). Docs-only; no dangling nonterminals.

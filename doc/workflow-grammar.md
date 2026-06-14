@@ -108,6 +108,7 @@ source-projection ::= :path path
 source-ref ::= :workflow-input
              | :workflow-original
              | {:step step-name :output output-key}
+             | {:step step-name :prompt prompt-name :output output-key}
              | {:step step-name :yield yield-field}
 
 outputs ::= {output-key output-spec}+

@@ -3085,3 +3085,17 @@ workflow-ir IR section — none touched the `source-ref` production):
   fix is to add the `{:step step-name :prompt prompt-name :output output-key}`
   alternative to the `source-ref` production. Recorded as an unchecked follow-up
   in steps.md.
+
+### Docs-review follow-up execution (pass 3 — DOC-4)
+
+Executed DOC-4 (the sole newly-added unchecked follow-up). Added the alternative
+
+    {:step step-name :prompt prompt-name :output output-key}
+
+to the `source-ref` EBNF production in `doc/workflow-grammar.md`, placed between
+the plain `{:step :output}` and `{:step :yield}` alternatives. The formal grammar
+now agrees with the `:prompt` source-ref discriminator prose (grammar.md
+*Per-prompt output surfaces*) and `workflow-grammar-concepts.md`'s
+`{:step … :prompt … :output …}` data-flow surface. `prompt-name` was already a
+defined terminal (DOC-1), so no new terminal was needed and no dangling
+nonterminals remain. Docs-only; no code/test change.
