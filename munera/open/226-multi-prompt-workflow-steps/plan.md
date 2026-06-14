@@ -254,7 +254,18 @@ before N>1, addressing, resume, and abort paths are layered on.
    not-last". The **N=1 degenerate** (unnamed group) takes the same unified
    `:failed` abort with no prompt name in the payload, which is byte-equivalent
    to today's single-prompt failure route — preserving the AC-2 N=1 equivalence
-   with no separate single-prompt failure path.
+   with no separate single-prompt failure path. **In-flight (mid-turn)
+   cancellation (P12), reconciled with AC-6/AC-5.** AC-6 covers cancellation
+   **between** prompts; a cancellation that arrives **while a prompt's turn is in
+   flight** yields the **same** terminal `:cancelled` outcome (routing skipped)
+   as the inter-prompt case — there is one cancellation outcome regardless of
+   whether the cancel lands between turns or mid-turn. The interrupted in-flight
+   prompt leaves **no** completed turn record (symmetric with AC-5's failing
+   prompt "leaves no record"); only prompts that completed **before** the cancel
+   are retained and introspectable. The in-flight turn is aborted per the
+   existing cancellation contract. So the cancellation path's in-flight-record
+   disposition is as explicit as AC-5's failure-path disposition: completed-
+   before ⇒ retained; interrupted-in-flight ⇒ no record.
 7. **Docs consolidation + changelog + coherence.** Final coherence pass over the
    incrementally-written author-facing docs (cross-link, fill gaps), the CHANGELOG
    `[Unreleased] Added` entry (user-visible grammar capability), and the

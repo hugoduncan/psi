@@ -212,8 +212,21 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   `:failed`), routing skipped, completed per-prompt records retained +
   introspectable, in-flight turn aborted per existing cancellation contract
   (AC-6/B5).
+- [ ] **In-flight (mid-turn) cancellation record disposition (P12), reconciled
+  with AC-6/AC-5.** A cancellation arriving **while a prompt's turn is in flight**
+  yields the **same** terminal `:cancelled` outcome (routing skipped) as the
+  inter-prompt case — one cancellation outcome regardless of whether the cancel
+  lands between turns or mid-turn. The interrupted in-flight prompt leaves **no**
+  completed turn record (symmetric with AC-5's failing prompt "leaves no
+  record"); only prompts that **completed before** the cancel are retained and
+  introspectable. The in-flight turn is aborted per the existing cancellation
+  contract. Make the cancellation path's in-flight-record disposition as explicit
+  as AC-5 makes the failure path's: completed-before ⇒ retained;
+  interrupted-in-flight ⇒ no record.
 - [ ] Runtime tests: intermediate-failure abort + retained prior records;
-  inter-prompt cancellation outcome + retained records; both skip routing.
+  inter-prompt cancellation outcome + retained records; **in-flight (mid-turn)
+  cancellation: same `:cancelled` outcome + completed-before records retained +
+  interrupted prompt leaves no record (P12)**; all skip routing.
 - [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — abort/cancellation outcomes
   across the queue (`:failed` vs `:cancelled`, retained records, routing skipped).
 - [ ] `clj-kondo` clean; commit Slice 6.
@@ -403,7 +416,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (ambiguity, pass 4)
 
-- [ ] P12 — Specify the **in-flight (mid-turn) cancellation** outcome and record
+- [x] P12 — Specify the **in-flight (mid-turn) cancellation** outcome and record
   disposition in Slice 6 (plan.md + steps.md), reconciled with AC-6/AC-5. AC-6
   covers only cancellation **between** prompts, but steps Slice 6 adds "in-flight
   turn aborted per existing cancellation contract", introducing the case where

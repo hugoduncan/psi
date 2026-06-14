@@ -1227,3 +1227,28 @@ stands).
   (only prompts completed *before* cancellation are retained + introspectable) —
   i.e. make the cancellation path's in-flight-record disposition as explicit as
   AC-5 makes the failure path's.
+
+## Plan/steps ambiguity follow-up execution (pass 4) — ψ
+
+Executed P12 by updating plan.md + steps.md (completed; not blocked). No
+code/test/doc changes required — a plan-disambiguation follow-up, consistent
+with P1–P11. Design AC-5 (failure: failing prompt "leaves no record") and AC-6
+(inter-prompt cancellation: terminal `:cancelled`, completed records retained)
+already stand; P12 only resolves the previously-undefined **mid-turn**
+cancellation case introduced by steps Slice 6's "in-flight turn aborted per
+existing cancellation contract", reconciling it with AC-6/AC-5 in the plan/steps
+without re-opening the design.
+
+- **P12 (done).** Stated in plan.md Slice 6 and steps.md Slice 6 that a
+  cancellation arriving **while a prompt's turn is in flight** yields the **same**
+  terminal `:cancelled` outcome (routing skipped) as an inter-prompt
+  cancellation — one cancellation outcome regardless of mid-turn vs between-turn
+  timing — and that the interrupted in-flight prompt leaves **no** completed turn
+  record (symmetric with AC-5's failing prompt "leaves no record"), so only
+  prompts that completed **before** the cancel are retained + introspectable.
+  Made the cancellation path's in-flight-record disposition as explicit as AC-5
+  makes the failure path's. Edits: plan.md Slice-order Slice 6 (added the P12
+  in-flight-cancellation clause); steps.md Slice 6 (expanded the inter-prompt
+  cancellation context, added a dedicated in-flight-cancellation record-
+  disposition item, and extended the Slice-6 runtime-tests item to cover the
+  mid-turn cancellation case).
