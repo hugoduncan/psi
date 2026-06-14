@@ -1154,3 +1154,16 @@ consolidates them — it does not first-author them.
   (`:contributions`/`:prompt-workflow` xor `:prompts`) and the compiler, where
   step-level `:prompt-workflow` is allowed only on `:session` steps and resolves
   to `:contributions` (`workflow_loader/compiler.clj` `compile-prompt-workflow-step`).
+
+## Docs-review follow-ups (pass 2)
+
+- [ ] DOC-3 — Document the `:prompts` form in the `doc/workflow-ir.md`
+  Session-step IR section (workflow-ir.md:132-158). That section currently shows
+  only the `:session`+`:contributions` normalized shape and says
+  "`:contributions` are ordered and preserved as authored", but the implemented
+  feature normalizes both authoring forms at IR time into one internal
+  prompt-queue representation (`:contributions` → one unnamed group, `:prompts` →
+  named groups; driven by `drive-session-prompt-queue!`). Add a brief note (and/or
+  cross-reference to `doc/workflow-grammar.md` *Multi-prompt session steps*) so the
+  IR reference reflects that a session step's prompt source may also be a named
+  `:prompts` queue, keeping the IR doc complete vs the shipped IR.

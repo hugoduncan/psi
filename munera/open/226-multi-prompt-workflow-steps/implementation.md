@@ -3011,3 +3011,32 @@ no code/test change required.
   `:prompt-workflow` allowed only on `:session` steps, resolves to
   `:contributions`). The EBNF production and the precedence rule now agree within
   the document.
+
+## Docs review (review-task-docs skill) — pass 2 — ψ
+
+Re-reviewed user-facing docs for the implemented task per `review-task-docs`
+(README.md, doc/, CHANGELOG.md). The task's directly-changed docs
+(`doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, `CHANGELOG.md`)
+were already verified accurate in pass 1 and hardened by DOC-1/DOC-2 (both done):
+EBNF nonterminals defined, `session-step` production reconciled with the
+step-level `:prompt-workflow`/`:prompts` precedence prose. Re-verified payload
+accuracy against code: `:failed-prompt {:index :name}`
+(`step_execution.clj:431`), upfront structured request-validity gate then
+final-turn-only `:blocked` (`step_execution.clj:357-394`), `:cancelled`/`:failed`
+dispositions — all match. No regressions.
+
+One new actionable completeness gap found (not a duplicate of any prior pass —
+prior docs pass covered only the task-changed `grammar`/`concepts` files):
+
+- **DOC-3 — `doc/workflow-ir.md` Session-step IR section omits `:prompts`.** The
+  IR reference's "Session step" section (workflow-ir.md:132-158) documents only
+  the `:session`+`:contributions` normalized shape and states "`:contributions`
+  are ordered and preserved as authored", with no mention of the `:prompts`
+  authoring form or its IR normalization. The implemented feature normalizes
+  **both** authoring forms at IR time into one internal prompt-queue
+  representation (design "Step-level precedence": `:contributions` → one unnamed
+  group, `:prompts` → named groups), driven by `drive-session-prompt-queue!`. A
+  reader of the IR reference for session steps therefore cannot learn that
+  `:prompts` (named multi-prompt groups) exists at the IR level or how it
+  normalizes — a completeness gap in a user-facing reference doc relative to the
+  shipped IR. Recorded as an unchecked follow-up in steps.md.
