@@ -1235,3 +1235,18 @@ consolidates them — it does not first-author them.
   disposition `cond` is flow control only. Behaviour-preserving: step-execution +
   drive-prompt-queue (+ abort) suites 25 tests / 146 assertions green; full
   workflow-runtime suite 136 tests / 736 assertions green; `clj-kondo` clean.
+
+## Code-shaper review follow-ups (pass 2)
+
+- [ ] CS-3 — Pass the cohesive turn result as one value, not four scattered
+  positionals. `execute-session-turn-outcome`
+  (`statechart_runtime/step_execution.clj:259`) destructures the turn result
+  `{:keys [status assistant-text failure execution-result assistant-message
+  structured-output]}` then re-passes four of those fields positionally to
+  `session-turn-ok-envelope` (`:287-290`), whose 7-arg signature (`:198`)
+  interleaves step config with four co-members of one value. `consistent(data_shapes)`
+  + transposition risk (e.g. swapping `assistant-text`/`assistant-message`, no
+  compiler guard). Pass the turn-result map (or a `{:keys ...}` param) so the turn
+  fields travel as one named value and `session-turn-ok-envelope` destructures
+  locally (arg count 4). Behaviour-preserving, pure helper; re-run
+  step-execution + drive-prompt-queue (+ abort) suites and `clj-kondo`.

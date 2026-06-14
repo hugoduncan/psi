@@ -3210,3 +3210,40 @@ Executed CS-1 and CS-2 (both completed; neither blocked).
   Behaviour-preserving: step-execution + drive-prompt-queue (+ abort) 25 tests /
   146 assertions green; full workflow-runtime suite 136 tests / 736 assertions
   green; `clj-kondo` clean on all three edited files.
+
+## Code-shaper review (code-shaper skill) — pass 2 — ψ
+
+Re-reviewed the shipped runtime against `simplicity ∧ consistency ∧ robustness`,
+post CS-1/CS-2: `ir.clj`, `ir_error_formatting.clj`, `progression_recording.clj`,
+`statechart_runtime/step_execution.clj`, `statechart_runtime.clj` (drain wiring),
+`workflow_loader/compiler.clj`, `workflow_step_materialization/{core,source_resolution}.clj`.
+CS-1 (four `format-semantic-error` cases + formatter tests) and CS-2
+(`session-turn-ok-envelope` extraction) confirmed present and clean.
+**ACTIONABLE_FEEDBACK** — one new follow-up (CS-3).
+
+- **CS-3 (consistency/robustness — cohesive turn-result passed as 4 scattered
+  positionals).** `execute-session-turn-outcome` (`step_execution.clj:259`)
+  destructures the turn result `{:keys [status assistant-text failure
+  execution-result assistant-message structured-output]}`, then in the `:else`
+  arm re-passes **four** of those fields — `assistant-text`, `assistant-message`,
+  `execution-result`, `structured-output` — as separate trailing positional args
+  to `session-turn-ok-envelope` (`step_execution.clj:287-290`), whose 7-arg
+  signature (`[step-def execution-session structured-entry assistant-text
+  assistant-message execution-result structured-output]`, line 198) interleaves
+  step config with four co-members of one value (the completed turn). This is a
+  destructure-then-repass dance that violates `consistent(data_shapes)` and
+  invites a silent transposition bug (four same-shaped positionals, no compiler
+  guard) — `assistant-text`/`assistant-message` in particular are easy to swap.
+  The extraction was deliberately verbatim under CS-2, which deferred this shape
+  cleanup. Fix: pass the cohesive turn-result map (or a `{:keys ...}`-destructured
+  param) to `session-turn-ok-envelope` so the turn fields travel as one named
+  value and the helper destructures locally; drops the arg count to 4 and removes
+  the positional re-threading. Behaviour-preserving, pure helper, locally-checkable.
+
+Re-confirmed not-flagged (unchanged from pass 1): the duplicated
+disposition→`record-actor-pending!` `case` and the upfront structured-request
+gate shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
+**accepted, documented** two-driver design (AC-2 byte-identical N=1 envelope);
+and the `post-drain-envelope` loop-local accumulation of transcript/per-prompt
+records (vs reading recorded progression) is the **documented** F1-async blocker
+(design.md Intent "Realized vs. target") — both left as-is.
