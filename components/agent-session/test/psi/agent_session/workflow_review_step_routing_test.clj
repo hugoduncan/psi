@@ -390,28 +390,65 @@
      :on {"REPEAT" {:goto first-step :max-iterations max-iterations}
           "DONE" {:goto "final-summary"}}}))
 
+(defn- conditional-review-design-definition
+  [definition-name]
+  {:definition-id definition-name
+   :name definition-name
+   :steps [{:name "design-review"
+            :type :session
+            :prompts [{:name "architecture"
+                       :contributions [{:type :template :text "architecture-review"}]}
+                      {:name "ambiguity"
+                       :contributions [{:type :template :text "ambiguity-review"}]}
+                      {:name "inconsistency"
+                       :contributions [{:type :template :text "inconsistency-review"}]}]
+            :judge {:type :invoke
+                    :operation "workflow/pass-feedback-routing"
+                    :args {:architecture-text {:from {:step "design-review"
+                                                      :prompt "architecture"
+                                                      :output :final-llm-reply}}
+                           :ambiguity-text {:from {:step "design-review"
+                                                   :prompt "ambiguity"
+                                                   :output :final-llm-reply}}
+                           :inconsistency-text {:from {:step "design-review"
+                                                       :prompt "inconsistency"
+                                                       :output :final-llm-reply}}}}
+            :on {"REPEAT" {:goto "design-follow-up"}
+                 "DONE" {:goto "final-summary"}}}
+           {:name "design-follow-up"
+            :type :session
+            :contributions [{:type :template :text "design-follow-up"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"DONE" {:goto "design-review" :max-iterations 6}}}
+           {:name "final-summary"
+            :type :session
+            :contributions [{:type :template :text "final-summary"}]}]})
+
+(defn- conditional-review-plan-definition
+  [definition-name opts]
+  (let [phase-steps ["ambiguity-review" "inconsistency-review"]]
+    {:definition-id definition-name
+     :name definition-name
+     :steps (vec
+             (concat
+              (mapcat (fn [[step-name next-step]]
+                        [(conditional-review-phase-step step-name next-step opts)
+                         (conditional-review-follow-up-step step-name next-step)])
+                      (map vector phase-steps (concat (rest phase-steps) ["clarity-status"])))
+              [(conditional-review-clarity-status-step phase-steps "ambiguity-review" 5)
+               {:name "final-summary"
+                :type :session
+                :contributions [{:type :template :text "final-summary"}]}]))}))
+
 (defn- conditional-review-definition
   ([definition-name]
    (conditional-review-definition definition-name {}))
   ([definition-name opts]
-   (let [design? (= :design (:kind opts))
-         phase-steps (if design?
-                       ["architecture-review" "ambiguity-review" "inconsistency-review"]
-                       ["ambiguity-review" "inconsistency-review"])
-         first-step (first phase-steps)
-         max-iterations (if design? 6 5)]
-     {:definition-id definition-name
-      :name definition-name
-      :steps (vec
-              (concat
-               (mapcat (fn [[step-name next-step]]
-                         [(conditional-review-phase-step step-name next-step opts)
-                          (conditional-review-follow-up-step step-name next-step)])
-                       (map vector phase-steps (concat (rest phase-steps) ["clarity-status"])))
-               [(conditional-review-clarity-status-step phase-steps first-step max-iterations)
-                {:name "final-summary"
-                 :type :session
-                 :contributions [{:type :template :text "final-summary"}]}]))})))
+   (if (= :design (:kind opts))
+     (conditional-review-design-definition definition-name)
+     (conditional-review-plan-definition definition-name opts))))
 
 (defn- create-conditional-review-run!
   ([ctx definition-name run-id]
@@ -452,20 +489,27 @@
     (let [{:keys [result run prompts]} (execute-conditional-review-proof!
                                         "review-task-design-proof"
                                         "design-invalid-implementation-status"
-                                        {"ambiguity-review" "PASS_STATUS: IMPLEMENTATION_COMPLETE"}
-                                        {:allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]})]
+                                        {"architecture-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                         "ambiguity-review" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                                         "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"}
+                                        {:kind :design})]
       (is (= :failed (:status result)))
       (is (= :failed (:status run)))
-      (is (= ["ambiguity-review"] prompts))
-      (is (zero? (count (get-in run [:step-runs "ambiguity-review-follow-up" :attempts]))))
+      (is (= ["architecture-review" "ambiguity-review" "inconsistency-review"] prompts))
+      (is (zero? (count (get-in run [:step-runs "design-follow-up" :attempts]))))
       (is (= {:status :error
-              :reason :invalid-pass-status
-              :message "PASS_STATUS token is not valid for this workflow step"
-              :details {:text "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                        :line "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                        :value "IMPLEMENTATION_COMPLETE"
-                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-             (get-in run [:step-runs "ambiguity-review" :attempts 0 :judge-output :routing-result])))))
+              :reason :invalid-pass-feedback
+              :message "workflow/pass-feedback-routing replies are invalid"
+              :details {:validation-failures
+                        {:ambiguity-text
+                         {:status :error
+                          :reason :invalid-pass-status
+                          :message "PASS_STATUS token is not valid for this workflow step"
+                          :details {:text "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                                    :line "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                                    :value "IMPLEMENTATION_COMPLETE"
+                                    :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}}}}
+             (get-in run [:step-runs "design-review" :attempts 0 :judge-output :routing-result])))))
   (testing "implementation loop routing continues accepting implementation PASS_STATUS tokens"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
@@ -519,8 +563,8 @@
                                         prompt))
                                     {:kind :design})]
       (is (= :completed (:status result)))
-      (is (= ["architecture-review" "architecture-review-follow-up"
-              "ambiguity-review" "inconsistency-review"
+      (is (= ["architecture-review" "ambiguity-review" "inconsistency-review"
+              "design-follow-up"
               "architecture-review" "ambiguity-review" "inconsistency-review"
               "final-summary"]
              prompts))))
@@ -539,8 +583,8 @@
                                         prompt))
                                     {:kind :design})]
       (is (= :completed (:status result)))
-      (is (= ["architecture-review" "ambiguity-review"
-              "inconsistency-review" "inconsistency-review-follow-up"
+      (is (= ["architecture-review" "ambiguity-review" "inconsistency-review"
+              "design-follow-up"
               "architecture-review" "ambiguity-review" "inconsistency-review"
               "final-summary"]
              prompts)))))
@@ -603,12 +647,10 @@
                                         {:kind :design})]
       (is (= :failed (:status result)))
       (is (= :failed (:status run)))
-      (is (= 6 (count (get-in run [:step-runs "architecture-review" :attempts]))))
-      (is (= 6 (count (get-in run [:step-runs "architecture-review-follow-up" :attempts]))))
-      (is (= 6 (count (get-in run [:step-runs "ambiguity-review" :attempts]))))
-      (is (= 6 (count (get-in run [:step-runs "inconsistency-review" :attempts]))))
+      (is (= 6 (count (get-in run [:step-runs "design-review" :attempts]))))
+      (is (= 6 (count (get-in run [:step-runs "design-follow-up" :attempts]))))
       (is (= :iteration-exhausted (:reason (:terminal-outcome run))))
-      (is (= "clarity-status" (:step-id (:terminal-outcome run))))
+      (is (= "design-follow-up" (:step-id (:terminal-outcome run))))
       (is (= 24 (count prompts)))))
   (testing "plan pass 5 actionable feedback fails on attempted pass 6"
     (let [{:keys [result run prompts]} (execute-conditional-review-proof!

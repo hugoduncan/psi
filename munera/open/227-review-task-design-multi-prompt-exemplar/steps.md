@@ -35,17 +35,17 @@
 ## Slice 4 — Definition and runtime test alignment
 
 - [x] Resolve the plan/steps test-timing inconsistency: either move/add the definition, prompt-contract, and runtime test updates so they occur before or in the same slices as the workflow topology and prompt behavioral changes, or revise `plan.md` to remove the “before or with each behavioral change” requirement.
-- [ ] Update `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj` `review-task-design-test` to expect three steps: `design-review`, `design-follow-up`, and `final-summary`.
-- [ ] Add workflow-definition assertions that `design-review` carries the exact step-level tools and skills required by the merged prompt groups.
-- [ ] Add workflow-definition assertions that `design-review` contains the ordered prompt groups `architecture`, `ambiguity`, and `inconsistency` with the expected prompt-workflow filenames.
-- [ ] Add workflow-definition assertions that `design-review`'s judge uses `workflow/pass-feedback-routing` over the three per-prompt `:final-llm-reply` output refs.
-- [ ] Add workflow-definition assertions that `design-follow-up` uses `review-follow-up-design.md`, routes constant `DONE`, and returns to `design-review` with `:max-iterations 6`.
-- [ ] Add workflow-definition assertions that `final-summary` sources all three review texts through per-prompt output refs rather than removed step-yield refs.
-- [ ] Update prompt artifact/contract tests so the design review prompts and follow-up prompt lock the shared-session and batch-follow-up wording without accepting the old interleaved-only wording.
-- [ ] Update review-routing runtime tests to model the merged multi-prompt design-review batch and prove a clean batch reaches final summary.
-- [ ] Update review-routing runtime tests to prove actionable feedback from any prompt in the batch runs one `design-follow-up` and then starts the next `design-review` pass.
-- [ ] Update review-routing runtime tests to prove the sixth actionable design-review pass fails through the iteration guard on the attempted seventh `design-review` entry.
-- [ ] Keep or adjust `review-task-plan` tests so valid plan-review pass-feedback routing still works under the tightened validation semantics.
+- [x] Update `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj` `review-task-design-test` to expect three steps: `design-review`, `design-follow-up`, and `final-summary`.
+- [x] Add workflow-definition assertions that `design-review` carries the exact step-level tools and skills required by the merged prompt groups.
+- [x] Add workflow-definition assertions that `design-review` contains the ordered prompt groups `architecture`, `ambiguity`, and `inconsistency` with the expected prompt-workflow filenames.
+- [x] Add workflow-definition assertions that `design-review`'s judge uses `workflow/pass-feedback-routing` over the three per-prompt `:final-llm-reply` output refs.
+- [x] Add workflow-definition assertions that `design-follow-up` uses `review-follow-up-design.md`, routes constant `DONE`, and returns to `design-review` with `:max-iterations 6`.
+- [x] Add workflow-definition assertions that `final-summary` sources all three review texts through per-prompt output refs rather than removed step-yield refs.
+- [x] Update prompt artifact/contract tests so the design review prompts and follow-up prompt lock the shared-session and batch-follow-up wording without accepting the old interleaved-only wording.
+- [x] Update review-routing runtime tests to model the merged multi-prompt design-review batch and prove a clean batch reaches final summary.
+- [x] Update review-routing runtime tests to prove actionable feedback from any prompt in the batch runs one `design-follow-up` and then starts the next `design-review` pass.
+- [x] Update review-routing runtime tests to prove the sixth actionable design-review pass fails through the iteration guard on the attempted seventh `design-review` entry.
+- [x] Keep or adjust `review-task-plan` tests so valid plan-review pass-feedback routing still works under the tightened validation semantics.
 
 ## Slice 5 — Documentation and changelog
 
