@@ -164,6 +164,32 @@ before N>1, addressing, resume, and abort paths are layered on.
   queue length. Final-turn detection therefore needs no counter and does not
   violate the no-counter rule; structured `:outputs` is requested only when the
   selected group is the last position in the IR queue.
+- **R6 — Structured-output `:blocked` viability across the drain (P13).**
+  `execute-session-step!` has a third non-success outcome besides
+  `:error`/`:failed` and `:cancelled`: a terminal `:blocked`
+  (`:pending-actor-result` kind `:blocked` / `:actor/blocked`), raised for (i) an
+  invalid structured-output **request** (`(:ok? request-result)` false), (ii)
+  `:unsupported-structured-output` (resolved model cannot do structured output),
+  and (iii) `:invalid-structured-output` (final reply fails validation).
+  Reconciled with "structured `:outputs` on the final turn only" (P5), viability
+  is checked in **two phases**: **(a) the static request-validity gate (case i)
+  runs upfront, before turn 1** — it depends only on the step's `:outputs` spec
+  (static / IR-derivable, turn-independent), so it fails fast with **zero turns
+  run and zero per-prompt records** (byte-equivalent to today's single-prompt
+  pre-turn block in the N=1 degenerate); **(b) the turn-dependent cases (ii)
+  `:unsupported-structured-output` and (iii) `:invalid-structured-output` can only
+  arise on the final turn**, since structured `:outputs` is requested on the final
+  turn only (P5), so they surface only when the final group's turn executes. When
+  the **final** turn blocks after N−1 turns already ran, the step outcome is
+  terminal **`:blocked`** (distinct from `:failed`/`:cancelled`), **routing is
+  skipped** (the drain produces no successful post-drain result), the **N−1 prior
+  completed per-prompt records are retained + introspectable** (symmetric with
+  AC-5/AC-6), and the **blocking final prompt leaves no completed turn record**
+  (symmetric with AC-5's failing-prompt and P12's interrupted-in-flight "leaves no
+  record": only successfully-completed turns are recorded). Mitigation: keep the
+  upfront static gate at the same pre-turn position as today and attach the
+  structured-output request only to the final group's turn, so the three `:blocked`
+  reasons keep their existing single-prompt semantics in the N=1 degenerate.
 
 ## Slice order
 
@@ -208,7 +234,11 @@ before N>1, addressing, resume, and abort paths are layered on.
    this mechanism (P4). The driver requests structured `:outputs` only on the
    group at the **last static position** in the ordered IR queue (P5 final-turn
    detection — an IR/position property, orthogonal to the no-counter
-   next-un-run selection). Acceptance (independently testable): in one live run, N
+   next-un-run selection). The static structured-output **request-validity** gate
+   (P13a, case i) runs **upfront before turn 1** (turn-independent, fail-fast,
+   zero wasted turns); the turn-dependent `:blocked` reasons (ii/iii) surface only
+   on the final turn and are handled in Slice 6's abort-path enumeration.
+   Acceptance (independently testable): in one live run, N
    turns execute in author order, the driver selects the next un-run prompt from
    recorded progression (assert via a **progression-state probe** — the concrete
    observable is the recorded per-prompt turn-record set under the step's attempt
@@ -265,7 +295,23 @@ before N>1, addressing, resume, and abort paths are layered on.
    are retained and introspectable. The in-flight turn is aborted per the
    existing cancellation contract. So the cancellation path's in-flight-record
    disposition is as explicit as AC-5's failure-path disposition: completed-
-   before ⇒ retained; interrupted-in-flight ⇒ no record.
+   before ⇒ retained; interrupted-in-flight ⇒ no record. **Structured-output
+   `:blocked` across the drain (P13), reconciled with AC-3/AC-5.** Besides
+   `:failed`/`:cancelled`, the drain has a terminal **`:blocked`** outcome
+   (`:actor/blocked`) for three structured-output reasons: (i) an invalid
+   structured-output **request** — checked **upfront before turn 1** (static /
+   turn-independent, fail-fast: zero turns run, zero per-prompt records); (ii)
+   `:unsupported-structured-output` and (iii) `:invalid-structured-output` — both
+   **final-turn-only**, since structured `:outputs` is requested on the final turn
+   alone (P5). A **final-turn block after N−1 turns ran** yields terminal
+   `:blocked` (distinct from `:failed`/`:cancelled`), **routing skipped** (no
+   successful post-drain result), **prior N−1 completed per-prompt records
+   retained + introspectable** (symmetric with AC-5/AC-6), and the **blocking
+   final prompt leaves no completed turn record** (symmetric with AC-5's failing
+   prompt / P12's interrupted-in-flight). For the **N=1 degenerate** the
+   `:blocked` outcome is byte-equivalent to today's single-prompt blocked path (no
+   named group ⇒ no prompt name; zero records either way), preserving the AC-2
+   equivalence.
 7. **Docs consolidation + changelog + coherence.** Final coherence pass over the
    incrementally-written author-facing docs (cross-link, fill gaps), the CHANGELOG
    `[Unreleased] Added` entry (user-visible grammar capability), and the
@@ -294,8 +340,8 @@ slice. Per-slice doc ownership:
   judge carve-out.
 - **Slice 5** — `doc/workflow-grammar-concepts.md`: the resume-from-progression
   contract.
-- **Slice 6** — `doc/workflow-grammar-concepts.md`: abort/cancellation outcomes
-  across the queue.
+- **Slice 6** — `doc/workflow-grammar-concepts.md`: abort/cancellation/blocked
+  outcomes across the queue (`:failed` vs `:cancelled` vs `:blocked`).
 - **Slice 7** — consolidation + cross-linking, CHANGELOG entry, TraceID coherence
   check (no new surface introduced here).
 

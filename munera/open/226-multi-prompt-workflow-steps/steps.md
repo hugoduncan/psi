@@ -223,12 +223,32 @@ from Slice 3 — this slice exercises and hardens it across reconstructed state.
   contract. Make the cancellation path's in-flight-record disposition as explicit
   as AC-5 makes the failure path's: completed-before ⇒ retained;
   interrupted-in-flight ⇒ no record.
+- [ ] **Structured-output `:blocked` across the drain (P13), reconciled with
+  AC-3/AC-5.** Add `:blocked` (`:actor/blocked`) as a third terminal non-success
+  outcome alongside `:failed`/`:cancelled`, for three structured-output reasons:
+  (i) invalid structured-output **request** — checked **upfront before turn 1**
+  (static / turn-independent, fail-fast: zero turns run, zero per-prompt records);
+  (ii) `:unsupported-structured-output` and (iii) `:invalid-structured-output` —
+  both **final-turn-only**, since structured `:outputs` is requested on the final
+  turn alone (P5). A **final-turn block after N−1 turns ran** yields terminal
+  `:blocked` (distinct from `:failed`/`:cancelled`), **routing skipped** (no
+  successful post-drain result), **prior N−1 completed per-prompt records retained
+  + introspectable** (symmetric with AC-5/AC-6), and the **blocking final prompt
+  leaves no completed turn record** (symmetric with AC-5's failing prompt / P12's
+  interrupted-in-flight). For the **N=1 degenerate** the `:blocked` outcome is
+  byte-equivalent to today's single-prompt blocked path (no named group ⇒ no
+  prompt name; zero records either way), preserving AC-2 equivalence.
 - [ ] Runtime tests: intermediate-failure abort + retained prior records;
   inter-prompt cancellation outcome + retained records; **in-flight (mid-turn)
   cancellation: same `:cancelled` outcome + completed-before records retained +
-  interrupted prompt leaves no record (P12)**; all skip routing.
-- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — abort/cancellation outcomes
-  across the queue (`:failed` vs `:cancelled`, retained records, routing skipped).
+  interrupted prompt leaves no record (P12)**; **structured-output `:blocked`
+  (P13): upfront invalid-request block before turn 1 (zero turns/records); a
+  final-turn `:unsupported-structured-output`/`:invalid-structured-output` block
+  after N−1 turns ⇒ terminal `:blocked` + prior N−1 records retained +
+  introspectable + blocking final prompt leaves no record**; all skip routing.
+- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — abort/cancellation/blocked
+  outcomes across the queue (`:failed` vs `:cancelled` vs `:blocked`, retained
+  records, routing skipped).
 - [ ] `clj-kondo` clean; commit Slice 6.
 
 ## Slice 7 — Docs consolidation + changelog + coherence
@@ -241,9 +261,9 @@ consolidates them — it does not first-author them.
   + `doc/workflow-grammar-concepts.md` content (Slices 2–6): cross-link sections,
   fill any gaps, verify the `:prompts` form / group-internal xor / per-prompt
   surfaces / `:prompt` source-ref + validation + post-drain-judge carve-out /
-  drain-route / resume contract / abort + cancellation outcomes (`:failed` vs
-  `:cancelled`, retained records, routing skipped) are all present and
-  consistent.
+  drain-route / resume contract / abort + cancellation + blocked outcomes
+  (`:failed` vs `:cancelled` vs `:blocked`, retained records, routing skipped) are
+  all present and consistent.
 - [ ] CHANGELOG `[Unreleased] Added`: multi-prompt `:session` step capability
   (ordered `:prompts` queue, per-prompt addressing).
 - [ ] Verify coherence across meta/spec/tests/code/docs (TraceID for AC-1..AC-8).
@@ -430,7 +450,7 @@ consolidates them — it does not first-author them.
 
 ## Plan-review follow-ups (ambiguity, pass 5)
 
-- [ ] P13 — Specify the structured-output `:blocked` outcome across the
+- [x] P13 — Specify the structured-output `:blocked` outcome across the
   multi-prompt drain (plan Slice 3/Slice 6 + steps Slice 6, reconciled with
   AC-3/AC-5). `execute-session-step!` has a third non-success outcome besides
   `:error`/`:failed` and `:cancelled`: `:actor/blocked`, raised for (i) an

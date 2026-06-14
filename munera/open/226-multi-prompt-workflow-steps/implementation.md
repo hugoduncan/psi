@@ -1377,3 +1377,31 @@ remain unambiguous.
     fail-fast) and (b) adding the `:blocked` outcome to Slice 6's abort-path
     enumeration with explicit retained-records + routing-skipped disposition
     symmetric to AC-5/AC-6, and a covering test.
+
+### P13 resolved — structured-output `:blocked` drain disposition
+
+Executed the pass-5 ambiguity follow-up P13. Specified the `:blocked` outcome
+across the multi-prompt drain in plan.md (new R6 risk + Slice 3 viability-gate
+note + Slice 6 abort-path paragraph + Slice 6 doc-cadence line) and steps.md
+(Slice 6 enumeration item + runtime-test item + docs item + Slice 7
+consolidation verify-list). Resolution (grounded in `execute-session-step!`,
+`step_execution.clj`):
+
+- **(a) timing** — the static structured-output **request-validity** gate
+  (`(false? (:ok? request-result))`, case i) runs **upfront before turn 1**:
+  it depends only on the step's `:outputs` spec (static / IR-derivable,
+  turn-independent), matching today's pre-turn cond branch; fail-fast with zero
+  turns run and zero per-prompt records. The turn-dependent reasons (ii)
+  `:unsupported-structured-output` and (iii) `:invalid-structured-output` can
+  only arise on the **final** turn, since structured `:outputs` is requested on
+  the final turn only (P5).
+- **(b) disposition** — a final-turn block after N−1 turns ran ⇒ terminal
+  `:blocked` (distinct from `:failed`/`:cancelled`), routing skipped (no
+  successful post-drain result), prior N−1 completed per-prompt records retained
+  + introspectable (symmetric AC-5/AC-6), blocking final prompt leaves no
+  completed turn record (symmetric AC-5 failing-prompt / P12 interrupted-in-
+  flight). N=1 degenerate ⇒ byte-equivalent to today's single-prompt blocked
+  path (no name, zero records), preserving AC-2.
+
+Plan/steps-only refinement (no code/test/doc edits — Slice 6 is unstarted; the
+`:blocked` covering test is scheduled as a Slice 6 steps item). P13 ticked.
