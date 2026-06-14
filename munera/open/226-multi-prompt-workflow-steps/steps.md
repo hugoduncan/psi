@@ -964,7 +964,7 @@ consolidates them — it does not first-author them.
 
 ## Test-review follow-ups (pass 4)
 
-- [ ] TR-6 — Add a `drive-session-prompt-queue!` covering test for the final-turn
+- [x] TR-6 — Add a `drive-session-prompt-queue!` covering test for the final-turn
   `:invalid-structured-output` block (P13 case iii; AC-3/AC-5). Through the
   multi-prompt drain, case (i) (upfront invalid request) and case (ii)
   (`:unsupported-structured-output`) are covered
@@ -985,3 +985,14 @@ consolidates them — it does not first-author them.
   retained, blocking final prompt leaves no record — symmetric with the case-(ii)
   `drive-session-prompt-queue-final-turn-structured-output-blocked-test`.
   Test-only; re-run the workflow-runtime drive-prompt-queue-abort suite green.
+  **DONE:** added
+  `drive-session-prompt-queue-final-turn-invalid-structured-output-blocked-test`
+  (abort-test ns) — final turn returns `:status :ok` with `:structured-output
+  nil` (⇒ `missing-ai-structured-output-result` ⇒ `:invalid-structured-output`,
+  the `:branch :success` blocked path the drain's `:blocked` handler branches on,
+  distinct from case (ii)'s `:branch :error`). Asserts terminal `:blocked` /
+  `:reason :invalid-structured-output`, `:actor/blocked` (no `:actor/done`),
+  index-0 record retained, blocking final prompt leaves no record. Test-only;
+  `clj-kondo` clean; focused abort suite 6/29 green; full workflow-runtime suite
+  133 tests / 726 assertions green. See implementation.md "Test-review follow-up
+  execution (pass 4)".

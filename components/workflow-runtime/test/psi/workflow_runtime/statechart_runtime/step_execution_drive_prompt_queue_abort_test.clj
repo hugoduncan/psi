@@ -210,3 +210,49 @@
       ;; the gather turn (index 0) completed before the final-turn block is
       ;; retained; the blocking final prompt (index 1) leaves no record.
       (is (= [0] (recorded-indices state* run-id step-id))))))
+
+(deftest drive-session-prompt-queue-final-turn-invalid-structured-output-blocked-test
+  (testing "a final-turn :invalid-structured-output block (P13 case iii: :status :ok reply that fails structured-output validation, the :branch :success blocked path) after N-1 turns yields terminal :blocked; prior records retained, blocking final prompt leaves no record, routing skipped (AC-3/AC-5)"
+    (let [run-id "run-1"
+          step-id "classify-chain"
+          state* (running-attempt-state* run-id step-id)
+          execute-turn (fn
+                         ([_ctx _sid prompt] (ok-turn prompt))
+                         ([_ctx _sid _prompt _opts]
+                          ;; the final turn requests structured output and the
+                          ;; model REPLIES OK, but the reply omits the
+                          ;; authoritative :structured-output metadata seam ⇒
+                          ;; missing-ai-structured-output-result ⇒
+                          ;; :invalid-structured-output (the :branch :success
+                          ;; blocked path, distinct from case (ii)'s :branch
+                          ;; :error :unsupported-structured-output).
+                          {:status :ok
+                           :assistant-text "reply-decide"
+                           :execution-result nil
+                           :assistant-message (assistant-text-message "reply-decide")
+                           :structured-output nil}))
+          working-memory* (atom {:current-step-id step-id})
+          event-queue* (atom [])
+          step-def {:name step-id
+                    :type :session
+                    :outputs {:classification {:source :session/structured-output
+                                               :mode :structured
+                                               :schema-id :psi.workflow/test-classification
+                                               :schema-version 1
+                                               :schema [:map [:decision [:enum :pass :fail]]]
+                                               :json-schema {:type "object"}}}}]
+      (drive! {:ctx {:state* state* :workflow-execute-actor-turn-fn execute-turn}
+               :step-def step-def
+               :state* state* :run-id run-id :step-id step-id
+               :working-memory* working-memory* :event-queue* event-queue*
+               :prompt-queue [{:name "gather" :contributions []}
+                              {:name "decide" :contributions []}]})
+      (let [pending (:pending-actor-result @working-memory*)]
+        (is (= :blocked (:kind pending)) "terminal :blocked (distinct from :failed/:cancelled)")
+        (is (= :invalid-structured-output (get-in pending [:payload :blocked :reason]))
+            "the :branch :success invalid-structured-output blocked reason"))
+      (is (= :actor/blocked (:event (first @event-queue*))))
+      (is (not-any? #(= :actor/done (:event %)) @event-queue*) "routing skipped")
+      ;; the gather turn (index 0) completed before the final-turn block is
+      ;; retained; the blocking final prompt (index 1) leaves no record.
+      (is (= [0] (recorded-indices state* run-id step-id))))))

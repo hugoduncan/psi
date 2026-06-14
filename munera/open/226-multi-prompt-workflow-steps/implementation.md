@@ -2581,3 +2581,28 @@ final-turn validation block) is a niche cancellation-precedence corner; the
 between-prompt/in-flight cancellation paths are already covered and the dominant
 `:branch :success` blocked disposition is the TR-6 record-`:blocked` path — no
 separate item raised for the race sub-branch.
+
+## Test-review follow-up execution (pass 4)
+
+- **TR-6 — DONE.** Added
+  `drive-session-prompt-queue-final-turn-invalid-structured-output-blocked-test`
+  to `step_execution_drive_prompt_queue_abort_test.clj`, completing the P13
+  case-(iii) (`:invalid-structured-output`) coverage through the multi-prompt
+  drain. The test mirrors the case-(ii)
+  `...-final-turn-structured-output-blocked-test` step-def/queue shape (N=2
+  named queue with a structured `:outputs` declaration), but the final turn's
+  4-arity (opts) `execute-turn` returns a **`:status :ok`** reply with
+  `:structured-output nil` instead of `:status :error`. The nil structured-output
+  drives `execute-session-turn-outcome`'s `missing-ai-structured-output-result`
+  (`:status :invalid`), so `valid-output-result?` is false ⇒
+  `invalid-structured-output?` ⇒ envelope `{:outcome :blocked :reason
+  :invalid-structured-output}` ⇒ `{:disposition :blocked :branch :success}` — the
+  exact `:branch :success` path the drain's `:blocked` handler branches on
+  (`(if (and (= :success (:branch outcome)) (stopped?)) cancel record-blocked)`),
+  which the case-(ii) `:branch :error` test does not exercise. Asserts terminal
+  `:blocked` with `:payload :blocked :reason` = `:invalid-structured-output`,
+  `:actor/blocked` (no `:actor/done`, routing skipped), prior index-0 record
+  retained, blocking final prompt (index 1) leaves no record (`[0]`). Test-only;
+  `clj-kondo` clean; focused abort suite 6 tests / 29 assertions green; full
+  workflow-runtime suite 133 tests / 726 assertions green (+1 test / +5
+  assertions).
