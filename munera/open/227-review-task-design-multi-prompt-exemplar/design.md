@@ -156,12 +156,34 @@ total review passes" contract. Placing the bound on
 entries and would not express the review-pass limit.
 
 The merged step's judge routes on the **post-drain step result's per-prompt
-reply outputs**, reusing the **existing** `workflow/pass-feedback-routing`
-operation. REPEAT while any prompt returned `ACTIONABLE_FEEDBACK`; DONE when all
-three prompts returned `REVIEW_COMPLETE`. Because all three phases are merged,
-this is the same three-key disjunction the live `clarity-status` judge computes
-over the unmerged phase outputs, but the separate `clarity-status` step is no
-longer needed: the pass-feedback judge is attached directly to `design-review`.
+reply outputs**, using `workflow/pass-feedback-routing` directly on those three
+outputs. The operation must be tightened before the workflow is rewired so it is
+both a validator and a pass-level disjunction:
+
+- For every supplied prompt-reply arg, parse the text with the same
+  `PASS_STATUS` grammar as `workflow/pass-status-routing`, with allowed statuses
+  exactly `ACTIONABLE_FEEDBACK` and `REVIEW_COMPLETE`.
+- If any reply is missing a `PASS_STATUS` line, has duplicate lines, has a
+  malformed line, or uses a disallowed status, return a deterministic operation
+  error and do **not** choose a route. This preserves the validation guard that
+  the current unmerged workflow gets from each phase's separate
+  `pass-status-routing` judge.
+- If every reply is valid, route `REPEAT` when any parsed status maps to
+  `ACTIONABLE_FEEDBACK`; otherwise route `DONE` when all parsed statuses are
+  `REVIEW_COMPLETE`.
+
+This is an in-place semantic tightening of the existing generic review-pass
+operation, not a new multi-prompt runtime capability and not a filesystem-state
+router. Existing `review-task-design`/`review-task-plan` pass-level clarity
+routing is unchanged for valid phase outputs, but malformed pass outputs now
+fail fast instead of being silently treated as "not actionable". The operation's
+result details should identify the actionable keys and, on error, the per-key
+validation failures so blocked workflow runs are diagnosable.
+
+Because all three phases are merged, this validated three-key disjunction is the
+same pass-level decision the live `clarity-status` judge computes over the
+unmerged phase outputs, but the separate `clarity-status` step is no longer
+needed: the pass-feedback judge is attached directly to `design-review`.
 
 **Why not filesystem-state routing.** An alternative routed on whether
 `design-steps.md` still has unchecked `- [ ]` items via a new
@@ -245,6 +267,9 @@ In scope:
   + one post-route `design`-profile follow-up step.
 - Wire the post-drain `pass-feedback-routing` judge over the three per-prompt
   reply outputs; preserve the REPEAT pass loop (`:max-iterations` as today).
+- Tighten `workflow/pass-feedback-routing` so it validates every supplied
+  prompt/phase reply with the `ACTIONABLE_FEEDBACK|REVIEW_COMPLETE`
+  `PASS_STATUS` grammar before choosing `REPEAT` or `DONE`.
 - Migrate `final-summary` contributions to per-prompt `:output` refs.
 - Update the review prompts only as needed for the shared-session, single-read
   framing (e.g. later reviews need not re-read sources already loaded).
@@ -263,12 +288,16 @@ Out of scope:
    multi-prompt `design-review` step in one shared child session; the design +
    architecture sources are assembled into the conversation once (turn 1).
 2. Post-drain routing reuses `pass-feedback-routing` over the three per-prompt
-   reply outputs; REPEAT iff any phase returned `ACTIONABLE_FEEDBACK`, with the
-   same pass-loop bound as today.
+   reply outputs; it first validates that every prompt reply contains exactly one
+   allowed `PASS_STATUS: ACTIONABLE_FEEDBACK|REVIEW_COMPLETE` line, then routes
+   REPEAT iff any phase returned `ACTIONABLE_FEEDBACK`, with the same pass-loop
+   bound as today.
 3. A single `design`-profile follow-up step after the route executes the items
    accumulated across all three reviews.
 4. `final-summary` recovers all three phases' text via per-prompt
    `{:step "design-review" :prompt "<phase>" :output :final-llm-reply}` refs.
 5. Workflow-loader/definition tests cover the merged topology and routing;
-   `doc/workflows.md` describes the batch-review-then-follow-up shape and notes
-   the deliberate departure from interleaved per-phase follow-up.
+   deterministic routing tests cover `pass-feedback-routing` valid DONE/REPEAT
+   and invalid/missing/malformed status errors; `doc/workflows.md` describes the
+   batch-review-then-follow-up shape and notes the deliberate departure from
+   interleaved per-phase follow-up.
