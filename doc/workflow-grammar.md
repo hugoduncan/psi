@@ -247,6 +247,23 @@ Precedence and validation rules:
 
 All of these rules are reported fail-fast at workflow load / IR validation.
 
+### Drain and routing
+
+The prompt-queue **drains** before the step routes: every group's turn runs (in
+author order) and is recorded, and only then does the step's single post-drain
+result — and any step `:judge`/`:on` routing — run. A multi-prompt step is still
+**one** workflow step with **one** routing decision; the N turns are internal to
+that step, not separate steps. Concretely:
+
+- The step's `:final-llm-reply` is the **last** group's reply; its `:transcript`
+  is **accumulated** across every group's turn.
+- A declared step-level structured `:output` is requested on the **final** turn
+  only.
+- Each **named** group additionally records a per-prompt turn record (its own
+  turn-local `:final-llm-reply`/`:transcript`), so completed turns are
+  introspectable; the unnamed single-prompt (`:contributions`) degenerate
+  records only the step-level rollup.
+
 ## Structured outputs
 
 Session steps may declare machine-facing structured outputs under the existing

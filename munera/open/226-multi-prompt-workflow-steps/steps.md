@@ -148,12 +148,21 @@ step-level shared `:contributions`/preamble/`:preload` (the step-level
 no-step-level-preamble rule do **not** contradict: the sharing mechanism is
 live-session conversation memory, not an authored shared preamble.
 
-- [ ] Extend the queue driver in `execute-session-step!` to run prompt _n+1_
+- [x] Extend the queue driver in `execute-session-step!` to run prompt _n+1_
   after prompt _n_ completes, against the **same** child session id (first group
   loads shared sources; later groups rely on live-session memory, E1). On each
   re-entry of the acting state, select the next **un-run** prompt from recorded
   per-prompt progression (progression-driven, **not** an in-memory counter);
-  never re-fire a completed turn within the live run.
+  never re-fire a completed turn within the live run. **DONE:** added
+  `drive-session-prompt-queue!` (loops the shared per-turn primitive
+  `execute-session-turn-outcome`, extracted from `execute-session-step!`), wired
+  at the `:step/enter` `:else` branch behind `(some :name prompt-queue)` (named
+  multi-prompt queues drive; the unnamed N=1 degenerate keeps calling
+  `execute-session-step!` byte-identically). Group 0 uses the pre-split
+  `:step/enter` prompt; later groups materialize+split against the live session
+  via the ctx materialize/split fns. Selection reads
+  `next-un-run-prompt-group` from live `state*` each loop iteration; recording
+  through `update-state-if-live!` advances the next read.
 - [x] Add per-prompt turn-record recording in `progression_recording.clj` under
   the step's attempt (ordered, keyed by `:name` for named groups only; unnamed
   group records only the step-level rollup, C3). Added `record-prompt-group-turn`
@@ -168,16 +177,25 @@ live-session conversation memory, not an authored shared preamble.
   `prompt-group-turn-record-substrate-test` + `next-un-run-prompt-group-test`
   (9/46 progression-recording green). This is the substrate the driver item (above)
   consults for next-un-run selection.
-- [ ] Emit **one** post-drain `:pending-actor-result` carrying the step-level
+- [x] Emit **one** post-drain `:pending-actor-result` carrying the step-level
   rollup plus ordered per-prompt records for named groups (A3); reconcile with
   the existing `record-actor-result`/`record-step-result` path (one route, Q5).
-- [ ] Request structured `:outputs` on the **final** turn only (R5/AC-3).
+  **DONE:** `post-drain-envelope` builds the final turn's envelope with the
+  accumulated `:transcript` and the ordered per-prompt records under
+  `:prompt-group-outputs`; emitted once via `record-actor-pending!` →
+  `:actor/done`. Tests assert exactly one terminal event (one statechart-visible
+  route, Q5).
+- [x] Request structured `:outputs` on the **final** turn only (R5/AC-3).
   Final-turn detection (P5) uses the **static IR queue position** — the group at
   the last index of the ordered normalized prompt-queue — derivable from the IR
   alone and **orthogonal** to the progression-driven next-un-run selection (the
   no-counter rule governs only *which un-run prompt runs next*, never *whether
   the selected group is last*). No in-memory counter is used for either.
-- [ ] Runtime tests (Slice-3 independent acceptance, P4): in one **live** run, N
+  **DONE:** `turn-opts`/`turn-structured-entry` attach only when
+  `(:final? group)`; the upfront request-validity gate (P13a) runs before turn 1.
+  Non-final turns exclude the declared structured key from surface resolution
+  (`surface-step-def`) so an absent structured value cannot throw.
+- [x] Runtime tests (Slice-3 independent acceptance, P4): in one **live** run, N
   turns execute in author order; assert the driver selects the next un-run prompt
   from recorded progression via a **progression-state probe** (not turn count) —
   the probe's concrete observable (P6) is the **recorded per-prompt turn-record
@@ -186,18 +204,47 @@ live-session conversation memory, not an authored shared preamble.
   have a recorded turn and asserts the next submission is the lowest-position
   un-run group; drain reached only after all turns; one post-drain result; each
   named turn record introspectable (S4); N=1 unnamed still rollup-only.
-- [ ] Assert non-re-fire (P8) within the live drain: the **count of
+  **DONE:** `drive-session-prompt-queue-runs-named-turns-in-order-test` (order +
+  introspectable records + one post-drain) and
+  `drive-session-prompt-queue-resume-skips-recorded-prompts-test` (a pre-recorded
+  index 0 re-entry runs only index 1 — progression-state probe).
+- [x] Assert non-re-fire (P8) within the live drain: the **count of
   `ai/generate` effects emitted at the dispatch/effect boundary** (captured via
   the test effect seam) is exactly one per un-run prompt and **zero** for any
   prompt that already has a recorded turn; corroborate with **no second turn
   record / no progression mutation** for an already-recorded prompt.
-- [ ] Confirm in `statechart.clj` that the single
+  **DONE:** the `:workflow-execute-actor-turn-fn` seam counts turn calls; the
+  in-order test asserts exactly N calls (one per prompt), and the resume test
+  asserts 1 call (zero for the pre-recorded index).
+- [x] Confirm in `statechart.clj` that the single
   acting→(judging)→record-result step topology still holds with the N-turn drain
   (one statechart step, N internal turns); assert **no per-prompt statechart
-  states** are introduced (plan Touch point `statechart.clj`).
-- [ ] Docs (P2): `doc/workflow-grammar-concepts.md` — drain/route semantics and
-  per-prompt turn records (named groups only).
-- [ ] `clj-kondo` clean; commit Slice 3.
+  states** are introduced (plan Touch point `statechart.clj`). **DONE (confirm-only,
+  no edit):** the drain loops synchronously **inside** the one `:step/enter`
+  acting action and emits exactly one terminal `:pending-actor-result`/event, so
+  the statechart sees one acting→done identical to single-prompt — no new states.
+  The in-order test's `(= 1 (count @event-queue*))` locks the single-route shape.
+- [x] Docs (P2): `doc/workflow-grammar-concepts.md` — drain/route semantics and
+  per-prompt turn records (named groups only). **DONE:** added the "Drain and
+  routing" subsection to `doc/workflow-grammar.md` (where the multi-prompt grammar
+  section lives) covering drain-before-route, last-reply/accumulated-transcript,
+  final-turn structured output, and named-only per-prompt records.
+- [x] `clj-kondo` clean; commit Slice 3.
+
+**Slice 3 deviations.** (1) Driver lives in a dedicated
+`drive-session-prompt-queue!`, not by overloading `execute-session-step!` — both
+share the extracted per-turn primitive `execute-session-turn-outcome`, so there
+is one turn path (N=1 degenerate stays byte-identical; the loop is orchestration
+only). (2) Because `execute-actor-turn!` is **synchronous** here (returns a
+result directly, not an async suspend), the in-run drain is a synchronous loop;
+it still consults recorded progression each iteration (progression-driven, no
+counter), so the resume contract holds — Slice 5 only adds the
+process-restart/replay re-entry on top. (3) Later-group `preloaded-messages`
+(multi-message groups) are not re-injected mid-session — later groups submit only
+their split `prompt` (the common `:prompt-workflow`/single-user-message case has
+empty preloaded-messages); revisit if a multi-message later group is needed.
+(4) Basic abort dispositions (`:failed`/`:blocked`/`:cancelled`) are wired in the
+driver but their full retained-records/naming semantics land in Slice 6.
 
 ## Slice 4 — Per-prompt output surfaces + `:prompt` source-ref + validation
 

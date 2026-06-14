@@ -281,8 +281,26 @@
                       (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})
                       (do
                         (ensure-workflow-turn-can-start! ctx run-id (:session-id execution-session))
-                        (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
-                                                              #(state/workflow-stopped? ctx run-id))))))))
+                        (if (some :name prompt-queue)
+                          ;; Named multi-prompt queue (task 226): drive the in-run
+                          ;; N-turn drain. Later groups materialize against the live
+                          ;; child session; per-prompt records persist through the
+                          ;; live-state guard so next-un-run selection is
+                          ;; progression-driven (no in-memory counter).
+                          (step-execution/drive-session-prompt-queue!
+                           ctx execution-session step-def step-id attempt-id working-memory* event-queue*
+                           run-id prompt-queue prompt
+                           (fn [group]
+                             (:prompt ((:split-workflow-step-session-conversation-fn ctx)
+                                       ((:materialize-workflow-prompt-group-conversation-fn ctx) workflow-run group))))
+                           (fn [index group-name outputs]
+                             (update-state-if-live!
+                              ctx run-id
+                              #(workflow-progression-recording/record-prompt-group-turn
+                                % run-id step-id {:index index :name group-name :outputs outputs})))
+                           #(state/workflow-stopped? ctx run-id))
+                          (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt
+                                                                #(state/workflow-stopped? ctx run-id)))))))))
             (catch Exception e
               (if (state/workflow-stopped? ctx run-id)
                 (queue/enqueue-event! event-queue* working-memory* :workflow/cancel {})

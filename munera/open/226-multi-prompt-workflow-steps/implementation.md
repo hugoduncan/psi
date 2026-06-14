@@ -1711,3 +1711,45 @@ existing synchronous single-turn path.
   preloads at session creation, later groups currently only submit a prompt).
   Then per-prompt surfaces (Slice 4), resume/replay (Slice 5), abort paths
   (Slice 6), docs (Slice 7).
+
+## Slice 3 (driver) — in-run N-turn drain — ψ
+
+Landed the in-run drain driver `drive-session-prompt-queue!`, completing Slice 3.
+
+- **Per-turn primitive extracted.** Pulled the turn-execution + outcome
+  classification out of `execute-session-step!` into a private
+  `execute-session-turn-outcome` returning a disposition map
+  (`:cancelled`/`:failed`/`:blocked`/`:ok` with `:branch :error|:success`).
+  `execute-session-step!` (the unnamed N=1 degenerate) now calls it and maps the
+  disposition to the same `record-actor-pending!`/cancel control flow as before —
+  the `:branch` flag preserves the original two-place stopped? recheck so the N=1
+  envelope is byte-identical (step-execution-test 12/83 unchanged; agent-session
+  workflow-execution/statechart/resume 27/131 green).
+- **Driver.** `drive-session-prompt-queue!` loops the shared primitive: reads
+  `next-un-run-prompt-group` from live `state*` each iteration (progression-driven
+  selection, no in-memory counter), runs group 0 with the pre-split `:step/enter`
+  prompt and later groups with a materialize+split closure against the live
+  session, records each named turn through `update-state-if-live!` +
+  `record-prompt-group-turn`, requests structured `:outputs` only on the
+  `:final?` group, and on drain emits one post-drain `:pending-actor-result`
+  (`post-drain-envelope`: final-turn rollup + accumulated `:transcript` + ordered
+  `:prompt-group-outputs`). The upfront structured request-validity gate (P13a)
+  runs before turn 1.
+- **Wiring.** `:step/enter` `:else` branch routes `(some :name prompt-queue)` →
+  driver; else → `execute-session-step!` (single turn). Selection ownership stays
+  in the driver (PI7); the `:else` branch is just the re-entry/dispatch site.
+- **Non-final structured surfaces fix.** `step-output-surfaces` over a step that
+  declares structured `:outputs` threw on non-final turns (the structured key is
+  not produced until the final turn). Fixed by resolving surfaces against a
+  `surface-step-def` that dissocs the structured key when it is not being bound
+  this turn.
+- **Tests.** Four new `drive-session-prompt-queue!` tests (step-execution-test
+  16/107 green): author-order N-turn drain + introspectable records + one
+  post-drain event; progression-driven resume skipping a pre-recorded prompt
+  (zero re-fire); structured output on the final turn only; upfront
+  structured-request block with zero turns/records.
+- **Deviations.** See steps.md "Slice 3 deviations": separate driver fn sharing
+  one turn primitive; synchronous in-run loop (execute-actor-turn! is synchronous)
+  consulting progression each iteration (Slice 5 adds restart/replay re-entry);
+  later-group multi-message preloaded-messages not re-injected (submit split
+  prompt only); abort dispositions wired but full Slice-6 semantics deferred.
