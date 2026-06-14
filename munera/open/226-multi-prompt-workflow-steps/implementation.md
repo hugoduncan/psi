@@ -3273,3 +3273,32 @@ Behaviour-preserving (pure helper, identical envelope shape). `clj-paren-repair`
 + `clj-kondo` clean. step-execution + drive-prompt-queue (+ abort) suites 25
 tests / 146 assertions green; full workflow-runtime suite 136 tests / 736
 assertions green.
+
+## Code-shaper review (code-shaper skill) — pass 3 — ψ
+
+Re-reviewed the shipped runtime against `simplicity ∧ consistency ∧ robustness`,
+post CS-1/CS-2/CS-3: `step_execution.clj` (both drivers + the shared turn
+primitive `execute-session-turn-outcome` + `session-turn-ok-envelope`),
+`progression_recording.clj`, `ir.clj` (prompt-queue normalization +
+`session-prompt-queue-errors`), `ir_error_formatting.clj` (CS-1 cases),
+`statechart_runtime.clj` (drain wiring). CS-1 (four `format-semantic-error` cases),
+CS-2 (`session-turn-ok-envelope` extraction), and CS-3 (cohesive `turn-result`
+arg) confirmed present and clean. **ACTIONABLE_FEEDBACK** — one new, minor
+follow-up (CS-4).
+
+- **CS-4 (consistency — `get-in` single-key path vs sibling keyword access).**
+  `execute-session-turn-outcome` (`step_execution.clj:276-277`) reads
+  `(or (get-in structured-output [:reason]) (:reason failure))` — the two map
+  reads in the **same** `or` form use **different idioms** for the **same**
+  single-key access: `(get-in structured-output [:reason])` vs `(:reason failure)`.
+  `get-in` with a one-element path is just keyword access, so the first reduces to
+  `(:reason structured-output)`. This violates `consistent(idioms)` on one
+  expression. Minor/cosmetic, behaviour-identical; fix by writing
+  `(:reason structured-output)` so both reads share the keyword-access idiom.
+
+Re-confirmed not-flagged (unchanged from passes 1–2): the duplicated
+disposition→`record-actor-pending!` `case` + the upfront structured-request gate
+shared by `execute-session-step!` / `drive-session-prompt-queue!` are the
+**accepted, documented** two-driver design (AC-2 byte-identical N=1 envelope); the
+`post-drain-envelope` loop-local transcript/per-prompt accumulation is the
+**documented** F1-async blocker — both left as-is.

@@ -1261,3 +1261,12 @@ consolidates them — it does not first-author them.
   success arm. Behaviour-preserving, pure helper; `clj-kondo` clean;
   step-execution + drive-prompt-queue (+ abort) suites 25 tests / 146 assertions
   green; full workflow-runtime suite 136 tests / 736 assertions green.
+
+- [ ] CS-4 — Use consistent keyword-access idiom for the single-key map read.
+  `execute-session-turn-outcome` (`statechart_runtime/step_execution.clj:276-277`)
+  reads `(or (get-in structured-output [:reason]) (:reason failure))` — the two
+  reads in the same `or` use different idioms for the same single-key access
+  (`get-in` one-element path vs keyword access). `consistent(idioms)`. Replace
+  `(get-in structured-output [:reason])` with `(:reason structured-output)` so
+  both reads share the keyword-access idiom. Behaviour-identical, cosmetic;
+  re-run `clj-kondo` + the step-execution suite.
