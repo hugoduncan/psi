@@ -2664,3 +2664,42 @@ shared primitive guarantees, so a behavioural drift is caught. No item raised.
   discriminator, a different path). Test-only; no production change.
   `clj-kondo` clean; focused workflow-loader `compiler-test` 4 tests / 57
   assertions green (+1 assertion).
+
+## Test review (task-test-review skill) — pass 6
+
+Re-applied `λ review_tests` (well-formed ∧ behaviour-coverage(design ACs) ∧
+infra-deps injectable/nullable/¬mock/¬stub) after the pass-5 TR-7 fix. Fresh full
+re-scan across the 226 test surface: `ir_prompts_test` (grammar + `:prompt`
+source-ref validation incl. the post-drain judge carve-out, AC-4),
+`session-step-prompt-queue-derivation`/`prompt-queue-schema` (ir_test, AC-2 N=1
+unnamed-group derivation), `step_execution_drive_prompt_queue_test` (order/drain/
+resume-skips/restart-reconstruct/replay-zero-fire/final-turn-structured-only/
+upfront-block — AC-1/AC-3/AC-7/P5/P13a), `step_execution_drive_prompt_queue_abort_test`
+(intermediate+final error, inter-prompt + between-prompt cancellation,
+final-turn `:blocked` both `:branch :error` and `:branch :success` — AC-5/AC-6/P10/
+P12/P13), `single-prompt-session-step-envelope-characterization-test` (AC-2 incl.
+TR-3 no-`:prompt-group-outputs` leak guard), `source_resolution_test`'s
+`resolve-prompt-discriminated-per-prompt-surface-test` (AC-3 per-prompt
+`:final-llm-reply`/`:transcript` runtime resolution), and `compiler_test`'s
+`compile-edn-prompts-step-test` (authoring xor/dup/empty/non-session incl. TR-7).
+
+Findings:
+- **well-formed:** clean — `clj-kondo` 0/0 across all three components' test dirs;
+  implementation notes report full suites green (workflow-runtime 133/726,
+  workflow-loader compiler 4/57).
+- **behaviour-coverage:** AC-1..AC-8 each have covering tests; abort/cancel/blocked
+  symmetry (prior records retained + introspectable via `recorded-indices`,
+  failing/blocking/interrupted prompt leaves no record) pinned; per-prompt
+  addressing pinned at both IR-validation and runtime-resolution ends.
+- **infra-deps:** clean — no `with-redefs`/mock/stub/spy in any 226 test ns; the
+  drive/abort tests inject nullable functional seams
+  (`:workflow-execute-actor-turn-fn`, record-turn-fn, `stopped?`) and drive real
+  `progression-recording`/`next-un-run-prompt-group`/source-resolution; assertions
+  are over state/outputs (`pending-actor-result`, recorded indices, submitted
+  prompts, resolved surface values), never interactions.
+
+**No new actionable gap.** The pass-5 "verified-acceptable" non-items (the
+structural both-drivers-call-shared-primitive property; the `:branch :success` +
+`(stopped?)` cancel-races-block sub-branch) remain reasonable non-raises —
+structural/niche, with the observable equivalence and dominant dispositions
+already pinned. Pass 6 conclusion: REVIEW_COMPLETE.
