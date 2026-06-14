@@ -54,6 +54,39 @@ Sanctioned by `λα. ¬compat(backward)` (topology change allowed; behaviour
 preservation is not a goal). The "faithful to the live three-phase topology"
 framing is explicitly **not** claimed.
 
+## Merged `design-review` step session config
+
+The merged `design-review` step must declare the shared session config at the
+**step level**. Under the 226 multi-prompt grammar, a prompt-group's
+`:prompt-workflow` imports the markdown body for that group; prompt frontmatter
+(`tools`, `skills`, model config, etc.) is not a per-prompt config surface. The
+workflow therefore must not rely on the existing review prompt frontmatters after
+moving those prompts under `:prompts`.
+
+Use the exact union required by the three current review prompt frontmatters:
+
+```clojure
+{:name "design-review"
+ :type :session
+ :tools ["read" "bash" "edit" "write"]
+ :skills ["work-independently"
+          "review-task-architecture"
+          "task-design"]
+ :prompts
+ [{:name "architecture"
+   :prompt-workflow "review-task-design-architecture-review.md"}
+  {:name "ambiguity"
+   :prompt-workflow "review-task-design-ambiguity-review.md"}
+  {:name "inconsistency"
+   :prompt-workflow "review-task-design-inconsistency-review.md"}]
+ ;; post-drain judge/on routing as described below
+ }
+```
+
+This preserves the capabilities the three separate review steps currently get
+from their prompt frontmatter while still using one shared child session for all
+three turns.
+
 ## Routing (post-drain)
 
 The merged step's judge routes on the **post-drain step result's per-prompt
