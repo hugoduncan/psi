@@ -219,7 +219,7 @@
   pages, choice POST, `:file` serving; static-asset subtree exempt per AMB-18).
   Distinct from AMB-1 (transport), AMB-18 (enforcement layer), and INC-6
   (static-asset exemption wording).
-- [ ] AMB-20 Define the **unknown / unregistered route-id browser-facing
+- [x] AMB-20 Define the **unknown / unregistered route-id browser-facing
   response** and its **precedence against the AMB-18 token middleware**. The
   design pins every other browser-facing response precisely (AMB-8 "session no
   longer active", AMB-11 "choice already submitted", AMB-15 "no selection",
@@ -363,7 +363,7 @@
   metadata is likewise in the log" claim) accordingly. Distinct from INC-3
   (which classes are event-sourced, written pre-scope-split), AF-7 (the scope
   decision), and AF-9 (the realizing surface).
-- [ ] INC-13 Reconcile the **Scope ("In scope") and Slicing sections with the
+- [x] INC-13 Reconcile the **Scope ("In scope") and Slicing sections with the
   AF-9 / AF-10 core extension-API contract additions** the design's own
   resolutions require. AF-9 resolves the system-scoped status projection onto a
   **non-session-rebound, system-scoped extension dispatch surface** described as

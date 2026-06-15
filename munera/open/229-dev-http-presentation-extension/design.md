@@ -496,6 +496,31 @@ reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
   active", AMB-11 "choice already submitted", AMB-15 "no selection"). Distinct
   from AMB-1 (token *transport*), AMB-18 (enforcement *layer*), and INC-6
   (static-asset *exemption wording*) — AMB-19 is the token-rejection *response*.
+- **Unknown / unregistered route response + token-vs-route precedence (AMB-20)**:
+  a GET to an **unknown `/s/:route-id`** (e.g. a stale tab/link reopened after a
+  `/dev-http stop`+`start` cleared the registry — AMB-8 — and minted a new token,
+  with no pre-server staging registry — AMB-16) or an unknown persisted `dev/`
+  path is resolved by the router as **unmatched** and returns **HTTP `404 Not
+  Found`** with a short plain-text body — **`"dev-http: no such route"`** —
+  matching the design's posture of pinning every browser-facing response. The
+  **precedence is route-resolution-first**: the AMB-18 token middleware wraps the
+  **matched** dynamic-route subtrees and (per reitit, where middleware runs only
+  for matched routes) **never runs for an unmatched path**, so an unknown route-id
+  returns `404` **regardless of whether a token is present**. Concretely: an
+  **untokened** request to an *unknown* route returns `404` (route-resolution
+  first), while an untokened request to a *known* gated route returns `403`
+  (AMB-19, token-middleware-on-matched-route); a **valid-token** request to an
+  unknown route-id likewise returns the same `404` + body (the token is irrelevant
+  once the route is unmatched). This existent-vs-nonexistent distinction (`403`
+  known-but-untokened vs `404` unknown) is **accepted**: AMB-19 already chose
+  `403` over existence-hiding `404` because the token is dev-grade,
+  localhost-bound, and developer debuggability outweighs hiding route existence on
+  a loopback dev server, so the same posture makes the `404`-vs-`403` signal
+  acceptable here (no attempt to mask unknown routes as `403`). Distinct from
+  AMB-19 (token rejection on a gated *existing* route), AMB-8 (a *known live*
+  route whose *target session* ended → "session no longer active"), and AMB-16
+  (the registration *call* while the server is stopped) — AMB-20 is the
+  unknown-route *response + token/route precedence*.
 - **Status projection (AF-2, AF-4, AF-6, AF-7)**: the observable server status —
   `running?` and the resolved **token-less base** `url` (INC-8) — is projected into canonical `:state*` via a
   **first-class `psi.extension/*` dispatch-routed mutation declared in the
@@ -684,6 +709,20 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   http-kit server (localhost + token), reitit router, persisted-route loading
   from the extension-local `extensions/dev-http/dev/`, session-route registry +
   dispatch subtree, and server-status projection into `:state*`.
+- **Two generic core extension-API contract additions (INC-13)** required by the
+  resolved architecture, both **non-dev-http-specific** so the Lifecycle Boundary
+  ("no core namespace gains dev-http-specific code") still holds — they are
+  generic platform capabilities, distinct from the extension-local deliverables:
+  (1) the **AF-9 non-session-rebound, system-scoped extension dispatch surface**
+  whose pure handler writes a system/runtime-scoped `:state*` key carrying no
+  invoking session-id (used here for the `[:runtime :dev-http]` status
+  projection); and (2) the **AF-10 generic non-subprocess `:type :managed-handle`
+  managed-service lifecycle type** whose runtime-owned
+  `:ensure-service`/`:stop-service` owns a `ctx` slot keyed by logical identity
+  and delegates start/stop to extension-provided in-process functions (used here
+  to host the dev-http integrant system handle on `ctx`). Both are core/platform
+  additions in the AF-3/AF-6 first-class-contract lineage (one-way / no shim);
+  the dev-http integrant *definition* and `init`/`halt!` stay in the extension.
 - The `dev-present` tool + `register-route!` REPL fn.
 - The built-in declarative renderer set plus the raw-handler render helpers: the
   hiccup/file escape hatches and the choices interaction helper, reached via
@@ -720,7 +759,14 @@ exists until slice 2).
 1. **Platform + persisted route** (D5): lifecycle (`start/status/stop`) +
    integrant system + http-kit server (localhost+token) + token-enforcement
    middleware (AMB-18) + status projection + reitit router + one persisted demo
-   route under `extensions/dev-http/dev/`. The slice-1 demo route uses
+   route under `extensions/dev-http/dev/`. This slice also delivers the **two
+   generic core extension-API contract additions it depends on (INC-13)**: the
+   **AF-10 `:type :managed-handle`** managed-service lifecycle type (to host the
+   integrant system handle on `ctx`, keyed by logical identity) and the **AF-9
+   system-scoped dispatch surface** (to land the status projection in `[:runtime
+   :dev-http]` with no invoking session-id). Both are generic,
+   non-dev-http-specific platform additions (Lifecycle Boundary upheld). The
+   slice-1 demo route uses
    **platform-only, hand-rolled handler output** (a full-power Clojure handler
    emitting its own HTML directly), independent of the Slice 2 declarative
    renderer set (INC-1). Complete behaviour: open the persisted route in a
@@ -780,7 +826,11 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   never see an untokened request; the vendored static-asset subtree is the sole
   exempt path (AMB-18). A request to a gated route with a **missing or invalid
   token** is rejected with **`403 Forbidden`** and the body `"dev-http: missing or
-  invalid token"` (AMB-19). The server binds to `127.0.0.1` only.
+  invalid token"` (AMB-19). A request to an **unknown / unregistered route-id** is
+  unmatched and returns **`404 Not Found`** with the body `"dev-http: no such
+  route"` **regardless of token presence**, since route resolution precedes the
+  token middleware (the middleware wraps only matched routes — AMB-20). The server
+  binds to `127.0.0.1` only.
 - AC-8 No HTTP handler reads or writes core state except through the extension
   `:query`/`:mutate` API; integrant usage stays inside the extension.
 - AC-9 Docs + changelog updated; extension tests pass (Scry) and clj-kondo clean.
@@ -1054,3 +1104,28 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   excluded from both scopes/journals (AF-4/INC-8). Distinct from INC-3 (which
   classes are event-sourced), AF-7 (the scope decision), and AF-9 (the realizing
   surface).
+- **Unknown / unregistered route response + precedence (AMB-20)** — a GET to an
+  unknown `/s/:route-id` or unknown persisted `dev/` path is **unmatched** and
+  returns **`404 Not Found`** with the plain-text body `"dev-http: no such
+  route"`. Precedence is **route-resolution-first**: the AMB-18 token middleware
+  wraps only matched dynamic-route subtrees (reitit middleware runs only for
+  matched routes), so an unknown route-id returns `404` **regardless of token
+  presence** — an untokened *unknown* route → `404` while an untokened *known*
+  gated route → `403` (AMB-19), and a valid-token unknown route → the same `404`.
+  The `404`-vs-`403` existent-vs-nonexistent signal is accepted under AMB-19's
+  already-chosen debuggability-over-hiding posture on a loopback dev server.
+  Distinct from AMB-19 (token rejection on a gated existing route), AMB-8 (a known
+  live route whose target session ended), and AMB-16 (the registration call while
+  stopped).
+- **Scope/Slicing cover the AF-9/AF-10 core extension-API contract additions
+  (INC-13)** — the AF-9 non-session-rebound system-scoped dispatch surface and
+  the AF-10 generic `:type :managed-handle` managed-service lifecycle type are
+  **explicit in-scope, generic (non-dev-http-specific) core extension-API contract
+  additions** (so the Lifecycle Boundary's no-dev-http-specific-core-code
+  constraint still holds), now listed in "In scope" and assigned to **slice 1**
+  (which depends on both: the managed-handle hosts the integrant system handle on
+  `ctx`, and the system-scoped surface lands the status projection in `[:runtime
+  :dev-http]`). Resolves the prior reading of "the `dev-http` extension platform"
+  framing + the Lifecycle Boundary as excluding the required generic core
+  additions. Distinct from INC-11 (dev-http internal slice ordering +
+  `register-route!` sliced) and INC-12 (log-membership scope split).

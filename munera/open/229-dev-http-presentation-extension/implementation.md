@@ -1324,3 +1324,64 @@ actionable inconsistency:
   (non-dev-http-specific) core extension-API additions. Distinct from INC-11
   (dev-http internal slice ordering + register-route! sliced) and INC-12
   (log-membership scope split).
+
+### design-review · round-9 follow-up execution (AMB-20, INC-13)
+
+Evidence rule applied. Previous design-follow-up completion = `8e0be10cd`
+(execute round-8 follow-ups AF-10, AMB-19, INC-12). The contiguous latest
+review-batch segment since then is the round-9 batch — `e50028ae4`
+(architecture-fit r9, no new misfit), `5b4523ac8` (ambiguity r9, AMB-20),
+`90a746229` (inconsistency r9, INC-13). Oldest segment commit = `e50028ae4`; its
+parent = `8e0be10cd` (the round-8 follow-up commit), confirmed via `git
+rev-parse`, so that is the batch baseline. `git diff 8e0be10cd..HEAD --
+design-steps.md` added exactly two unchecked checklist items — AMB-20 and INC-13
+— both still unchecked at follow-up start and the entire candidate work set.
+Prior `[x]` lines appear only as unchanged diff context, correctly excluded; no
+predating/edited/stale/steps.md items in scope.
+
+Verified precedents before editing: AMB-18/AMB-19 Lifecycle bullets (token
+middleware over matched dynamic-route subtrees; `403` + body for missing/invalid
+token on a gated existing route); AF-9/AF-10 resolutions (system-scoped dispatch
+surface; generic `:type :managed-handle`); the In-scope list + Slicing section.
+
+Resolutions written into design.md:
+
+- **AMB-20 — unknown/unregistered route response + token-vs-route precedence.**
+  Resolved to **`404 Not Found`** + plain-text body `"dev-http: no such route"`
+  for an unmatched `/s/:route-id` (or unknown persisted `dev/` path), with
+  **route-resolution-first precedence**: the AMB-18 token middleware wraps only
+  *matched* dynamic-route subtrees (reitit middleware runs only for matched
+  routes), so an unknown route-id returns `404` **regardless of token presence** —
+  untokened *unknown* → `404` while untokened *known* gated → `403` (AMB-19), and
+  valid-token unknown → the same `404`. The `404`-vs-`403` existent-vs-nonexistent
+  signal is accepted under AMB-19's already-chosen debuggability-over-hiding
+  posture on a loopback dev server (no attempt to mask unknown routes as `403`).
+  Added a Lifecycle bullet, strengthened AC-7 with the unknown-route `404`
+  clause, and added a resolved-decision entry. Distinct from AMB-19 (gated
+  existing route), AMB-8 (known live route, dead target session), AMB-16
+  (registration call while stopped).
+
+- **INC-13 — Scope/Slicing cover the AF-9/AF-10 core extension-API additions.**
+  AF-9 (non-session-rebound system-scoped dispatch surface) and AF-10 (generic
+  `:type :managed-handle` managed-service lifecycle type) both resolve to
+  **core/platform** extension-API contract additions outside dev-http's own
+  namespaces, but "In scope" listed only extension-local deliverables and Slicing
+  assigned neither. Resolved by adding an explicit "In scope" bullet naming both
+  as **generic (non-dev-http-specific) core extension-API contract additions** —
+  so the Lifecycle Boundary ("no core namespace gains dev-http-specific code")
+  still holds — and assigning both to **slice 1** (which depends on both: the
+  managed-handle hosts the integrant system handle on `ctx`; the system-scoped
+  surface lands the status projection in `[:runtime :dev-http]`). Added the
+  In-scope bullet, the slice-1 assignment, and a resolved-decision entry. This
+  resolves the prior reading of "the dev-http extension platform" framing + the
+  Boundary as excluding the required generic core additions.
+
+Cross-item coherence checks: AMB-20 sits beside AMB-19 (gated-route token
+rejection) and AMB-18 (enforcement layer) without altering the exempt
+static-asset subtree, and is consistent with AMB-19's accepted
+existence-revealing posture; the route-resolution-first precedence is the natural
+reitit semantics already implied by AMB-18's "middleware over matched subtrees".
+INC-13 leaves the AF-9/AF-10 resolutions themselves untouched (only Scope/Slicing
+now name them as in-scope generic core additions) and keeps the Lifecycle
+Boundary intact (the additions are generic, not dev-http-specific). Both
+design-steps marked done. No blocked/skipped items.
