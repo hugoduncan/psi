@@ -172,3 +172,13 @@
   (reconstructed from the base url + the external token at render time), so
   projecting/logging `url` cannot leak the token. Distinct from AF-4 (token
   externality) and INC-3 (log membership).
+- [ ] INC-9 Reconcile the **token-embedded surface enumeration** with the
+  `/dev-http start` return. INC-8 says the token-embedded copy-pasteable URL is
+  shown **only** in the `status` output and the dev start-up log line, but AMB-9
+  says an already-running `start` is a no-op **returning the existing
+  `url`+`token`** — a third token-embedded surface (the `start` command return)
+  not in INC-8's enumeration. Either add the `start`-command return to the
+  enumerated token-embedded surfaces, or specify `start` surfaces the token via
+  the same `status`-output channel so INC-8's "only" holds. Distinct from INC-8
+  (url-term conflation), AF-4 (token externality), and AMB-14 (registration-call
+  return URL form).

@@ -191,6 +191,34 @@ new actionable ambiguities:
   tests need the defined behavior. Distinct from AMB-3 (mid-turn timing), AMB-8
   (target liveness), and AMB-11 (repeat of a *selected* submission).
 
+### design-review · inconsistency (round 5, turn 3)
+
+Fresh inconsistency pass over the fully-resolved design (INC-1..8 resolved).
+Used in-context design.md + architecture sources + round-5 architecture (AF-8)
+and ambiguity (AMB-14/15) replies. INC-1..8 confirmed resolved; AF-8 / AMB-14 /
+AMB-15 are architecture/ambiguity items, not duplicated here. One new actionable
+inconsistency:
+
+- INC-9 **Token-embedded surface enumeration vs the `/dev-http start` return.**
+  INC-8 states the token-embedded copy-pasteable URL "is shown **only** in the
+  human-facing `status` output and the dev start-up log line." But AMB-9's
+  idempotent-start resolution says an already-running `start` "is a no-op
+  returning the existing `url`+`token`" — making the `/dev-http start` command's
+  own return value a third token-embedded surface, distinct from a `status` query
+  and from the timbre start-up log line, which INC-8's "only" enumeration
+  excludes. The two resolutions were never reconciled. Either add the
+  `start`-command return to the enumerated token-embedded surfaces, or specify
+  that `start` surfaces the token via the same `status`-output channel so INC-8's
+  "only" holds. Internal contradiction between the INC-8 token-externality
+  enumeration and the AMB-9 start-return text. Distinct from INC-8 (url-term
+  conflation), AF-4 (token externality principle), and AMB-14 (the
+  *registration-call* return URL form — INC-9 is the *lifecycle `start` command*
+  return).
+
+  (Considered but not filed: AC-3's "returned URL renders the content" vs AC-7's
+  token-gated dynamic routes + AF-4 token-externality is the same root issue
+  already captured by AMB-14; not duplicated as an inconsistency.)
+
 ### design-review · inconsistency (round 4, turn 3)
 
 Fresh inconsistency pass over the fully-resolved design (INC-1..6 resolved).
