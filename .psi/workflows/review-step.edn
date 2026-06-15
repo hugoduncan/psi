@@ -7,7 +7,7 @@
    [{:type :source, :from :workflow-original}
     {:type :template,
      :text
-     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. end your response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE",
+     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n2. append a terse review note to the task's implementation.md. Do not note compliance with these instructions; only note any non-compliance. Avoid duplicating information that is in the steps.md updatate\n3. avoid duplicating review notes or steps that already exist\n4. commit.\n5. End your response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE",
      :vars {"input" {:from :workflow-input, :path [:input]},
             "skill" {:from :workflow-input, :path [:skill]}}}],
    :judge {:type :invoke
