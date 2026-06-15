@@ -248,3 +248,19 @@
   therefore logged) — then amend INC-3's class-(2) definition to admit no-message
   no-op interaction mutations. Distinct from AMB-8 (liveness), AMB-15
   (empty-selection), and INC-3 (log classes).
+
+- [ ] INC-11 Reconcile the **Slicing section** with the "vertical,
+  behaviour-first" principle and the Capability surface. Slice 1 ships the
+  session-route registry + `/s/:route-id` dispatch mechanism, but its only
+  slice-1 behaviour is a **persisted** demo route (which never touches the
+  session-route registry), and no session-route registration surface exists until
+  slice 2 (`dev-present`) — so slice 1 delivers an unexercisable mechanism
+  (horizontal, not behaviour-first). Separately, `register-route!` (a top-level
+  Capability-surface/Scope deliverable) and its hiccup/file raw-handler
+  escape-hatch helpers are assigned to **no slice** (slice 2 only references
+  `register-route!` obliquely; slice 3 adds only the choices helper). Either move
+  the session-route registry/dispatch + a minimal registration surface into the
+  slice that first delivers a session-route behaviour, or explicitly assign
+  `register-route!` (+ hiccup/file helpers) to a slice and note that slice 1's
+  registry/dispatch is exercised by that surface. Distinct from INC-1 (slice-1
+  demo-output example vs renderer-set ordering).

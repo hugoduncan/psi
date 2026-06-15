@@ -908,3 +908,39 @@ AMB-1..16 re-confirmed resolved. Two new actionable ambiguities:
   subtrees uniformly, with the static-asset path exempt) for the router build and
   the AC-7 tests. Distinct from AMB-1 (token *transport*) and INC-6 (static-asset
   *exemption wording*) — AMB-18 is the *enforcement-layer/responsibility* gap.
+
+### design-review · inconsistency (round 7, turn 3)
+
+Fresh inconsistency pass using in-context design.md + architecture sources +
+round-7 architecture (AF-9) and ambiguity (AMB-17/18) replies; AF-9 / AMB-17 /
+AMB-18 are architecture/ambiguity items, not duplicated here. INC-1..10
+re-confirmed resolved; verified the round-6 INC-10 rewording is consistent
+across AMB-8/AMB-11/AMB-15 (no leftover "the wrapping mutation no-ops" except the
+correction note quoting old wording). One new actionable inconsistency:
+
+- INC-11 **Slicing vs the "vertical, behaviour-first" principle and the
+  Capability surface: slice-1 ships an unexercisable mechanism and
+  `register-route!` has no slice.** The Slicing section header asserts "vertical,
+  behaviour-first," but **slice 1** bundles the **session-route registry +
+  `/s/:route-id` dispatch** mechanism while its only slice-1 behaviour is a
+  **persisted** demo route — and a persisted `dev/` route never touches the
+  session-route registry (registry routes are reached through `/s/:route-id`, and
+  the slice-1 demo uses platform-only hand-rolled handler output independent of
+  registration). No session-route **registration surface** exists until slice 2
+  (`dev-present`), so slice 1's session-route registry/dispatch is delivered with
+  nothing to populate or exercise it — a horizontal (mechanism-without-behaviour)
+  slice, contradicting the section's behaviour-first claim. Separately,
+  **`register-route!`** — a top-level Capability-surface and Scope deliverable
+  ("the `dev-present` tool + `register-route!` REPL fn") together with its
+  hiccup/file raw-handler escape-hatch helpers — is **assigned to no slice**:
+  slice 2 only references it obliquely ("escape hatches reachable via
+  `register-route!` only") without listing it as a deliverable, and slice 3 adds
+  only the choices helper. The Slicing section is therefore internally
+  inconsistent with both the behaviour-first principle (slice-1 unexercisable
+  registry mechanism) and the Capability surface (`register-route!` unsliced).
+  Reconcile by either moving the session-route registry/dispatch (and a minimal
+  registration surface) into the slice that first delivers a session-route
+  behaviour, or explicitly assigning `register-route!` (and its hiccup/file
+  helpers) to a slice and noting that slice 1's registry/dispatch is exercised by
+  that registration surface. Distinct from INC-1 (slice-1 demo-output example vs
+  renderer-set ordering).
