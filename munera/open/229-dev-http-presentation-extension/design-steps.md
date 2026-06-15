@@ -37,7 +37,7 @@
   `:session/set-nrepl-runtime` is core-owned, so the precedent governs *shape*,
   not the dispatching event's ownership).
 
-- [ ] AF-7 Specify the **canonical-state scope** of the status-projection
+- [x] AF-7 Specify the **canonical-state scope** of the status-projection
   mutation (`running?`/`url`): the dev-http server is a process-wide singleton,
   so project its status into **system/runtime-scoped** state queryable
   system-wide (matching the system-scoped nREPL `[:runtime :nrepl]` and OAuth
@@ -86,11 +86,11 @@
   subsequent submit). Distinct from AMB-3 (mid-turn timing) and AMB-8 (target
   liveness).
 
-- [ ] AMB-12 Define lifecycle command behavior when the server is **not
+- [x] AMB-12 Define lifecycle command behavior when the server is **not
   running**: `/dev-http stop` against a stopped server (no-op success vs error)
   and what `/dev-http status` reports when stopped (`running? false`, no
   url/token). Distinct from AMB-9 (start-side idempotency).
-- [ ] AMB-13 Define the **persisted-route discovery/aggregation contract**: how
+- [x] AMB-13 Define the **persisted-route discovery/aggregation contract**: how
   the platform collects `extensions/dev-http/dev/` reitit route-data + handler
   namespaces into the router at integrant `init`/reload (conventional entry
   namespace/var vs auto-scan vs explicit register call), so AC-2 and the
@@ -127,13 +127,13 @@
   requirement to dynamic content routes (HTML pages, choice POST, `:file`),
   noting vendored static JS/CSS assets are exempt.
 
-- [ ] INC-7 Reconcile `register-route!` choice feedback with INC-5's
+- [x] INC-7 Reconcile `register-route!` choice feedback with INC-5's
   dev-present-only `:choices`: either expose a platform choice-POST mechanism /
   helper for `register-route!` raw handlers (defining how a raw handler emits a
   platform-wired choice form bound to its `:session-id`), or drop the AMB-4
   "`:choices`/POST feedback" + `:session-id` framing for `register-route!` as
   vestigial after INC-5. Distinct from INC-5 (hiccup/file reframing).
-- [ ] INC-8 Reconcile the `url` term: state explicitly that the projected/logged
+- [x] INC-8 Reconcile the `url` term: state explicitly that the projected/logged
   canonical `url` (AF-4/INC-3) is the **token-less base** URL, while the
   surfaced/`status`/log copy-pasteable URL (AMB-1) is **token-embedded**
   (reconstructed from the base url + the external token at render time), so

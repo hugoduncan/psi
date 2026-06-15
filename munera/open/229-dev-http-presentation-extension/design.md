@@ -45,6 +45,19 @@ Two route sources feed one router:
    on agent-session end (AMB-8). This avoids rebuilding the immutable reitit
    router on every registration.
 
+**Persisted-route discovery contract (AMB-13).** Persisted routes are collected
+through a **single conventional entry var** — not namespace auto-scanning and not
+ad-hoc `register` calls. The extension's integrant `init` `require`s one
+conventional entry namespace under `extensions/dev-http/dev/` (e.g.
+`dev-http.routes`) and reads a conventional var (e.g. `dev-http.routes/routes`)
+that returns a **reitit route-data vector**; that vector may pull in sibling
+handler namespaces under `dev/` (ordinary `require` + handler refs). integrant
+`init`/reload re-`require`s the entry namespace and rebuilds the router from the
+returned vector, so editing a `dev/` route and reloading picks it up via this one
+deterministic entry point. There is **no marker-scan / auto-discovery
+convention** (one obvious path; AMB-13). AC-2 is satisfied when a route
+contributed through this entry var is served by the running server.
+
 ## Capability surface
 
 ### Registration (D1 = both)
@@ -59,9 +72,12 @@ Two route sources feed one router:
 - **`register-route!` (REPL/dev, fn-based)**: dev registers an arbitrary ring
   handler fn into the registry for full-power session routes. In-process,
   throwaway, not persisted/replayed. Because the handler is a raw fn (not a
-  renderer spec), it is the only path to the **hiccup** and **file** render
-  helpers (raw-handler idioms, not `dev-present` renderer keywords — INC-5); the
-  handler fn calls those helpers to build its ring response.
+  renderer spec), it is the path to the platform **render helpers** the handler
+  fn calls to build its ring response: the **hiccup** and **file** escape-hatch
+  helpers (raw-handler idioms, not `dev-present` renderer keywords — INC-5) and
+  the **choices** interaction helper (INC-7). With an explicit `:session-id`
+  (AMB-4) the handler can use the choices helper to participate in the choice
+  loop; without one it is presentation-only.
 
 **Route-id assignment (AMB-2).** Both `dev-present` and `register-route!` accept
 an **optional caller-supplied `:route-id`**. When supplied, it is used verbatim
@@ -84,17 +100,34 @@ by the `dev-present` tool (one keyword per route):
 The **escape hatches are raw-handler idioms, not declarative renderer keywords**
 (INC-5). Because `register-route!` registers an **arbitrary ring handler fn**
 (not a renderer spec), there is no renderer-keyword channel for them; instead the
-platform exposes two **render helper fns** that such a handler fn may call to
-build its ring response:
+platform exposes **render helper fns** that such a handler fn may call to
+build its ring response — two **escape-hatch** helpers and one **interaction**
+helper:
 
 - **hiccup helper** — renders arbitrary HTML from a hiccup form (the raw-HTML
   escape hatch).
 - **file helper** — serves an arbitrary file artifact from disk
   (HTML/SVG/PNG/PDF/…) produced out-of-band (e.g. a benchmark report).
+- **choices helper (INC-7)** — emits a **platform-wired choice form** bound to
+  the route's feedback `:session-id` (AMB-4), so a full-power raw handler can
+  present the same interaction primitive the `dev-present :choices` renderer
+  offers. The platform owns the choice-POST endpoint, the first-class
+  `psi.extension/*` choice-submit mutation, and the single-shot (AMB-11) /
+  target-liveness (AMB-8) machinery; the helper only renders the wired form
+  (option spec per AMB-7). This is the **documented path by which a
+  `register-route!` raw handler participates in the choice loop**, and it is why
+  `register-route!` carries an explicit `:session-id`: without a feedback target
+  the choices helper has nowhere to deliver the user message, so the route is
+  presentation-only.
 
-Both helpers are reachable **only from a `register-route!` handler fn** (not from
-the `dev-present` tool — INC-2). They are not entries in the `dev-present`
-`:renderer` vocabulary; they are functions a full-power handler invokes.
+These helpers are invoked from a `register-route!` handler fn (not selected as
+`dev-present` `:renderer` keywords). The **hiccup/file escape hatches have no
+`dev-present` channel at all** (INC-2); the **choices helper is the raw-handler
+counterpart of the declarative `:choices` renderer** — same platform choice-POST
+machinery, different entry surface (raw handler fn vs declarative tool call). So
+`:choices` interaction is reachable from both registration paths (declaratively
+via `dev-present`, imperatively via the `register-route!` choices helper), while
+hiccup/file remain `register-route!`-only.
 
 **`dev-present` content-data shapes (AMB-10).** A `dev-present` call carries a
 `:renderer` keyword and a `:content` value; the `:content` shape is fixed
@@ -159,9 +192,10 @@ submission drives the next available turn automatically.
 **Choice-feedback target session (AMB-4).** Choice feedback requires a target
 session-id. The `dev-present` tool defaults the target to its **invoking
 session**. The REPL `register-route!` fn has no invoking agent session, so it
-takes an explicit `:session-id` argument naming the feedback target; if omitted,
-the route is **presentation-only** (its `:choices`/POST feedback is disabled —
-there is nowhere to deliver the user message).
+takes an explicit `:session-id` argument naming the feedback target — consumed by
+the platform **choices helper** (INC-7) when the raw handler emits a choice form;
+if omitted, the route is **presentation-only** (its `:choices`/POST feedback is
+disabled — there is nowhere to deliver the user message).
 
 Routes target the **invoking session only**; multi-session targeting is out of
 scope.
@@ -213,6 +247,14 @@ once.) To present a fresh decision, register a new route. A submission that is
   `url` + `token`** (and reports "already running"); it does **not** start a
   second server, restart, or error. There is **no `restart` command** — to
   restart, `stop` then `start`. This upholds AC-1's no-orphaned-server guarantee.
+- **Stop / status when not running (AMB-12)**: the no-server-running edges are
+  defined symmetrically with the idempotent `start`. `/dev-http stop` against a
+  server that is **not running** is a **no-op success** (reports "not running";
+  nothing to halt, **no error**). `/dev-http status` when stopped reports
+  **`running? false`** with **no `url` and no `token`** — and the projected
+  canonical status is correspondingly `running? false` carrying no `url` (the
+  external handle/token are absent). Neither command errors against an
+  already-stopped server. (Distinct from AMB-9's start-side idempotency.)
 - **integrant** manages the extension-local system
   (`config → registry → router → server`), chosen for clean `halt!`/`init`
   reload ergonomics against the churny `dev/` routes.
@@ -222,17 +264,28 @@ once.) To present a fresh decision, register a new route. A submission that is
   (as `mcp-tasks-run`, `work-on` already do), never in the core state atom.
 - **Server**: http-kit, bound to `127.0.0.1` only. **Ephemeral port** (OS-assigned
   at start; not user-configurable — see O3). A **per-launch token** is required
-  for access (dev-grade, not auth); both the resolved URL and token are surfaced
-  in the `status` output and the log.
+  for access (dev-grade, not auth); the **token-embedded copy-pasteable URL**
+  (base + `?token=…`) and the token are surfaced in the `status` output and the
+  dev start-up log line, while the **token-less base URL** is what the canonical
+  status / event-log carries (INC-8).
 - **Token transport + gated routes (AMB-1)**: the per-launch token is carried as
-  a **URL query param** (`?token=…`), so the URL surfaced in `status`/log is
-  copy-pasteable and opens directly in a browser. The token gates **all dynamic
+  a **URL query param** (`?token=…`), so the URL surfaced in the `status` output
+  and the dev start-up log line is copy-pasteable and opens directly in a
+  browser. **Two URL forms are distinguished (INC-8)** to keep AMB-1's
+  copy-pasteable surface from colliding with AF-4/INC-3 token-externality: the
+  **token-less base URL** (`http://127.0.0.1:<port>/…`) is the value projected
+  into canonical `:state*` and written to the event-log (AF-4/INC-3) — it
+  **never** carries the token; the **token-embedded copy-pasteable URL** (base +
+  `?token=…`) is **reconstructed at render time** from the base URL plus the
+  external token and is shown only in the human-facing `status` output and the
+  dev start-up log line. Projecting/logging the canonical `url` therefore cannot
+  leak the token. The token gates **all dynamic
   content routes** — HTML page routes, the choice POST endpoint, and `:file`
   serving. **Vendored static JS/CSS assets are exempt** (inert, localhost-bound,
   no state access), keeping asset URLs simple. Server-rendered pages propagate
   the token into their own same-origin links and the choice POST.
-- **Status projection (AF-2, AF-4, AF-6)**: the observable server status —
-  `running?` and the resolved `url` — is projected into canonical `:state*` via a
+- **Status projection (AF-2, AF-4, AF-6, AF-7)**: the observable server status —
+  `running?` and the resolved **token-less base** `url` (INC-8) — is projected into canonical `:state*` via a
   **first-class `psi.extension/*` dispatch-routed mutation declared in the
   extension's `:allowed-events`** (e.g. `psi.extension/dev-http-set-status`),
   driven by the `/dev-http` lifecycle command handler on `start`/`stop`. The
@@ -248,7 +301,20 @@ once.) To present a fresh decision, register a new route. A submission that is
   projects only login *status*), the token is a credential-class secret and must
   not land in the replayable event-log / dispatch-trace. The token stays in the
   extension-local handle and is surfaced live via the `status` output / log path
-  (which reads the external handle). Only `running?`/`url` status metadata is
+  (which reads the external handle). **Canonical-state scope (AF-7)**: the
+  dev-http server is a process-wide **singleton** (one server shared across all
+  agent sessions), so its status is projected into **system/runtime-scoped**
+  canonical state — queryable system-wide, exactly like the system runtime
+  handles `[:runtime :nrepl]` and OAuth login status (AGENTS.md S2:
+  `system_scope(¬agent_session_scope)`) — **not** into invoking-session scope.
+  It is therefore dispatched so the projection lands in system/runtime scope,
+  **not** via the slash-command's session-rebound implicit `(:mutate api)` (which
+  doc/extension-api.md rebinds to the invoking session) nor `:mutate-session`;
+  a session-rebound projection would mislocate a singleton's status (divergent
+  per-session copies, no system-wide "is the server up?" answer). This keeps the
+  scope asymmetry explicit: **server status = system-scoped**, while the
+  **choice-submit mutation = session-scoped** (`:mutate-session` against the
+  AMB-4 feedback target). Only `running?`/`url` status metadata is
   projected; the integrant **system instance/handle (and the token) stay
   extension-local/external** (never in the core state atom), preserving the
   isolation boundary below.
@@ -287,10 +353,15 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   `psi.extension/*` status-projection mutation** that projects `running?`/`url`
   into `:state*` (AF-6). Neither reaches into a core-owned projection event.
 - **Status projection, handle + secret externality.** Server status
-  (`running?`/`url`) is projected into canonical `:state*` via dispatch for
-  introspection, while the integrant system instance/handle **and the per-launch
-  `token`** stay in the extension's own atom/system — never the core state atom
-  (AF-2, AF-4). The status-projection mutation is itself a **first-class
+  (`running?`/token-less base `url`) is projected into **system/runtime-scoped**
+  canonical `:state*` via dispatch for introspection — the dev-http server is a
+  process-wide **singleton**, so its status is system-scoped like `[:runtime
+  :nrepl]` / OAuth login status (`system_scope(¬agent_session_scope)`), not
+  invoking-session-scoped, and is dispatched so it lands in system/runtime scope
+  rather than via the slash-command's session-rebound implicit `:mutate` /
+  `:mutate-session` (AF-7). Meanwhile the integrant system instance/handle **and
+  the per-launch `token`** stay in the extension's own atom/system — never the
+  core state atom (AF-2, AF-4). The status-projection mutation is itself a **first-class
   `psi.extension/*` dispatch-routed mutation declared in `:allowed-events`**
   (AF-6), exactly like the choice-submit mutation: the extension never dispatches
   the core-owned nREPL projection event (`:session/set-nrepl-runtime`); the nREPL
@@ -300,14 +371,16 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   only.
 - **Replay fidelity / log membership (INC-3).** Exactly **two** dev-http mutation
   classes are event-sourced and enter the log: (1) **status-projection
-  mutations** (lifecycle `start`/`stop` projecting `running?`/`url` into
-  `:state*`), and (2) **interaction-result mutations** (choice submits → user
+  mutations** (lifecycle `start`/`stop` projecting `running?`/token-less base
+  `url` into `:state*` — INC-8), and (2) **interaction-result mutations** (choice submits → user
   message). Everything else — page GET rendering, route registration, vendored
   asset serving — is **presentation/out-of-band** and excluded from the log (same
-  posture as TUI/RPC input being event sources). The non-deterministic `url` that
-  enters the log via class (1) is precedented (nREPL endpoint metadata is
-  likewise non-deterministic in the log); the secret `token` is **excluded** from
-  both classes and never enters the log (AF-4).
+  posture as TUI/RPC input being event sources). The non-deterministic
+  **token-less base** `url` that enters the log via class (1) is precedented
+  (nREPL endpoint metadata is likewise non-deterministic in the log); the secret
+  `token` is **excluded** from both classes and never enters the log — the
+  token-embedded copy-pasteable URL exists only as a render-time reconstruction
+  for `status`/the dev log line, never in canonical state (AF-4, INC-8).
 - **Determinism boundary.** The live server **process/handle** and runtime
   fn-route registration are side-effecting dev resources outside the
   deterministic core; this is accepted precisely because the extension is
@@ -325,8 +398,9 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   from the extension-local `extensions/dev-http/dev/`, session-route registry +
   dispatch subtree, and server-status projection into `:state*`.
 - The `dev-present` tool + `register-route!` REPL fn.
-- The built-in declarative renderer set plus the hiccup/file raw-handler render
-  helpers (escape hatches reached via `register-route!` only — INC-5).
+- The built-in declarative renderer set plus the raw-handler render helpers: the
+  hiccup/file escape hatches and the choices interaction helper, reached via
+  `register-route!` only (INC-5/INC-7).
 - The choice interaction loop back into the originating session via mutation,
   including the small extension-facing mutation wrapping
   `:session/submit-synthetic-user-prompt` (immediate-turn feedback).
@@ -371,8 +445,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   ephemeral OS-assigned port (not user-configurable; O3/AMB-5) and reports its
   URL via `status`; `stop` cleanly halts it (integrant `halt!`), with no
   orphaned server on reload/restart.
-- AC-2 A persisted route defined under `extensions/dev-http/dev/` is served by
-  the running server.
+- AC-2 A persisted route defined under `extensions/dev-http/dev/` and contributed
+  through the conventional entry var (AMB-13) is collected at integrant
+  `init`/reload and served by the running server.
 - AC-3 The agent can call `dev-present` to register a session route from content
   data and receives back a URL that renders the content with the selected
   renderer.
@@ -380,9 +455,10 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   reach it at its URL.
 - AC-5 Each declarative renderer (`:markdown`, `:table`, `:vega`, `:mermaid`,
   `:choices`) produces the expected response for representative input (per the
-  AMB-10 content shapes), and the two raw-handler render helpers (hiccup, file)
-  — invoked from a `register-route!` handler fn, not `dev-present` (INC-5) —
-  produce the expected response for representative input.
+  AMB-10 content shapes), and the raw-handler render helpers (the hiccup and
+  file escape hatches plus the choices interaction helper — INC-7) — invoked from
+  a `register-route!` handler fn, not `dev-present` (INC-5) — produce the expected
+  response for representative input.
 - AC-6 Submitting a `:choices` form posts the selection, which is injected as a
   mid-conversation **user** message into the originating session and drives the
   agent's next turn.
@@ -478,3 +554,34 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
 - **Token-gating scope (INC-6)** — AC-7 reworded to require the token for
   **dynamic content routes** (HTML pages, choice POST, file serving) and to
   **exempt vendored static JS/CSS assets** (aligns with the AMB-1 resolution).
+- **Status-projection scope (AF-7)** — the dev-http server is a process-wide
+  **singleton**, so its status (`running?`/token-less base `url`) projects into
+  **system/runtime-scoped** canonical state (queryable system-wide like
+  `[:runtime :nrepl]` / OAuth login status, both `system_scope`), dispatched so
+  it lands in system/runtime scope — **not** the slash-command's session-rebound
+  implicit `:mutate` / `:mutate-session`. Scope asymmetry made explicit: status
+  is system-scoped, the choice-submit mutation is session-scoped.
+- **Stop/status when not running (AMB-12)** — `/dev-http stop` against a stopped
+  server is a **no-op success** ("not running", no error); `/dev-http status`
+  when stopped reports **`running? false`** with no `url`/`token` (and the
+  projected canonical status is `running? false` with no `url`). Symmetric with
+  AMB-9's idempotent `start`.
+- **Persisted-route discovery (AMB-13)** — persisted routes are collected via a
+  **single conventional entry var** (e.g. `dev-http.routes/routes`) returning a
+  reitit route-data vector, `require`d/rebuilt at integrant `init`/reload; **no
+  namespace auto-scan / marker convention**. AC-2 reworded to reference the entry
+  var.
+- **register-route! choice feedback (INC-7)** — the platform exposes a third
+  raw-handler **choices interaction helper** (alongside the hiccup/file
+  escape-hatch helpers) that emits a platform-wired choice form bound to the
+  route's `:session-id` (AMB-4); it reuses the platform choice-POST + first-class
+  `psi.extension/*` mutation + single-shot (AMB-11) / liveness (AMB-8) machinery.
+  `:choices` is thus reachable declaratively via `dev-present` and imperatively
+  via `register-route!`; `register-route!`'s `:session-id` is no longer
+  vestigial. (hiccup/file remain `register-route!`-only escape hatches.)
+- **`url` term disambiguation (INC-8)** — the **token-less base URL** is the
+  value projected into canonical `:state*` and written to the event-log
+  (AF-4/INC-3); the **token-embedded copy-pasteable URL** (base + `?token=…`) is
+  reconstructed at render time from the base URL + external token and shown only
+  in the `status` output / dev start-up log line. Projecting/logging `url`
+  therefore cannot leak the token.

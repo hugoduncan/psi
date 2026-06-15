@@ -465,3 +465,59 @@ without divergence; confirmed AF-6 ownership wording is consistent with the AF-3
 choice-submit mutation posture (both first-class `psi.extension/*`, both in
 `:allowed-events`, neither reaching a core projection event). All five
 design-steps marked done. No blocked/skipped items.
+
+### design-review · follow-up (round 4, this pass)
+
+Evidence rule applied. Previous design-follow-up completion = `3f5cfed76`
+(executed AF-6, AMB-10/11, INC-5/6). The contiguous latest review-batch segment
+since then is the three round-4 review commits (`90cf9d0cd` architecture,
+`724304ac9` ambiguity, `ecb21c82e` inconsistency). Baseline = parent of the
+oldest segment commit (`90cf9d0cd^`) = `3f5cfed76` (confirmed). `git diff
+3f5cfed76..HEAD -- …/design-steps.md` shows exactly five diff-added unchecked
+checklist items: AF-7, AMB-12, AMB-13, INC-7, INC-8 — all still present and
+unchecked at follow-up start → candidate work set = those five. No
+predating/stale/steps items in scope; prior `[x]` lines appear only as unchanged
+diff context, correctly excluded.
+
+Verified precedents before editing: doc/architecture.md State-boundary table —
+nREPL `[:runtime :nrepl]` and OAuth login status are **system-scoped** runtime
+handles; doc/extension-api.md — slash-command implicit `(:mutate api)` is rebound
+to the invoking session, with `:mutate-session` for explicit/background work.
+
+Resolutions written into design.md (and added under "Design-review follow-up
+resolutions"):
+
+- AF-7 → status projection is **system/runtime-scoped** (singleton server;
+  matches `[:runtime :nrepl]` / OAuth `system_scope`), dispatched so it lands in
+  system/runtime scope — not the session-rebound implicit `:mutate` /
+  `:mutate-session`. Explicit scope asymmetry: status = system-scoped,
+  choice-submit = session-scoped. Updated the Lifecycle status-projection bullet
+  and the Architectural-constraints status/externality bullet.
+- AMB-12 → `/dev-http stop` when stopped = no-op success (no error); `/dev-http
+  status` when stopped = `running? false`, no url/token (canonical status mirrors
+  this). New Lifecycle bullet, symmetric with AMB-9.
+- AMB-13 → persisted routes collected via a **single conventional entry var**
+  (e.g. `dev-http.routes/routes`) returning a reitit route-data vector,
+  required/rebuilt at integrant init/reload; no auto-scan/marker. New
+  "Persisted-route discovery contract" paragraph; AC-2 reworded.
+- INC-7 → added a third raw-handler **choices interaction helper** (beside the
+  hiccup/file escape-hatch helpers) emitting a platform-wired choice form bound to
+  the route's `:session-id` (AMB-4); reuses the platform choice-POST + mutation +
+  single-shot/liveness machinery. `:choices` now reachable from both registration
+  paths; `register-route!`'s `:session-id` no longer vestigial. Updated the
+  Renderers helper list + framing, the `register-route!` description, the AMB-4
+  Interaction paragraph, AC-5, and the Scope in-scope line.
+- INC-8 → distinguished the **token-less base `url`** (projected into `:state*` /
+  event-log per AF-4/INC-3) from the **token-embedded copy-pasteable URL**
+  (reconstructed at render time from base + external token; shown only in
+  `status`/dev log line). Updated the AMB-1 token-transport bullet, the Server
+  bullet, the status-projection bullet, and the INC-3 log-membership constraint.
+
+Cross-item coherence checks: AF-7 + INC-8 jointly keep canonical/system-scoped
+projection token-less (no secret, no session-scope drift); INC-7's choices helper
+revises INC-5's "two helpers" to "two escape-hatch + one interaction helper"
+without contradicting INC-5 (escape hatches stay hiccup/file, register-route!-only)
+and is consistent with AMB-4's `:session-id`; AMB-12 is symmetric with the AMB-9
+idempotent-start resolution; AMB-13's single-entry-var contract leaves AMB-8
+session-registry behavior and AMB-2 route-id assignment untouched. All five
+design-steps marked done. No blocked/skipped items.
