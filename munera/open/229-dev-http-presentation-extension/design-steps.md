@@ -17,14 +17,14 @@
   `:allowed-events`) — an explicit extension-API contract update, not a bridge
   into the internal-only `:session/submit-synthetic-user-prompt` event.
 
-- [ ] AF-4 Reconsider projecting the per-launch `token` into canonical
+- [x] AF-4 Reconsider projecting the per-launch `token` into canonical
   `:state*`. Per the OAuth credential-externality precedent (State-boundary
   table: credential store stays external, only login status projected), keep the
   token in the extension-local handle and project only `running?`/`url`,
   surfacing the live token via the `status`/log path — avoiding a secret in the
   replayable event-log / dispatch-trace. Or document why the dev-grade token is
   deliberately placed in canonical state.
-- [ ] AF-5 Specify that the `psi.extension/*` choice-submit mutation triggers
+- [x] AF-5 Specify that the `psi.extension/*` choice-submit mutation triggers
   `:session/submit-synthetic-user-prompt` via a `:runtime/dispatch-event`
   follow-on effect (pure handler → effects-as-data), not an imperative
   in-handler dispatch, to honor the Dispatch sequencing contract.
@@ -46,14 +46,14 @@
 - [x] AMB-6 Clarify whether SSE (slicing slice 4) is in scope for this task;
   align the slicing section and the "In scope" list.
 
-- [ ] AMB-7 Define how a `:choices` selection maps to the injected synthetic
+- [x] AMB-7 Define how a `:choices` selection maps to the injected synthetic
   user-message: the choice option schema (label vs value), single- vs
   multi-select, and the exact string that becomes the user prompt (AC-6).
-- [ ] AMB-8 Define choice-submit behavior when the target session has
+- [x] AMB-8 Define choice-submit behavior when the target session has
   ended/closed (target liveness, not just identity), and clarify whether the
   session-route registry is cleared on server-halt only or also when the
   invoking agent session ends ("die with the server/session").
-- [ ] AMB-9 Define `/dev-http start` behavior when the server is already running
+- [x] AMB-9 Define `/dev-http start` behavior when the server is already running
   (no-op / return existing url+token / restart / error), since the command
   surface has no `restart` and AC-1 only addresses no-orphan-on-reload/restart.
 
@@ -67,11 +67,11 @@
   framing with its renderer set: decide whether the model-callable tool may
   target the `:hiccup` raw-HTML and `:file` arbitrary-disk-file escape hatches,
   or restrict those to the REPL `register-route!` path.
-- [ ] INC-3 Reconcile the "Replay fidelity" (*only interaction-result mutations
+- [x] INC-3 Reconcile the "Replay fidelity" (*only interaction-result mutations
   enter the log*) and "Determinism boundary" (*live server outside the
   deterministic core*) constraints with the AF-2 status-projection dispatch
   mutation (which enters the log and writes non-deterministic `url`/`token` into
   canonical `:state*`); state precisely which mutation classes enter the log.
-- [ ] INC-4 Reconcile the `:mermaid` renderer's "(and/or Graphviz)" claim with
+- [x] INC-4 Reconcile the `:mermaid` renderer's "(and/or Graphviz)" claim with
   O5 / Client-assets vendoring only Vega-Lite + Mermaid JS: either drop the
   Graphviz claim or add a vendored Graphviz/viz.js asset.

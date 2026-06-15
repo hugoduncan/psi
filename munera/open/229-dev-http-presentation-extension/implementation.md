@@ -183,3 +183,58 @@ follow-up resolutions"):
   `:file` escape hatches via `register-route!` only.
 
 All 11 design-steps marked done. No blocked/skipped items.
+
+### design-review · follow-up (round 2, this pass)
+
+Evidence rule applied. Previous design-follow-up completion = `9c4e18c7a`
+(executed AF-1..3, AMB-1..6, INC-1..2). The contiguous latest review-batch
+segment since then is the three round-2 review commits (`88755092e`
+architecture, `67b8a615d` ambiguity, `5464c40df` inconsistency). Baseline =
+parent of oldest segment commit (`88755092e^`) = `9c4e18c7a` (confirmed via
+`git rev-parse`). `git diff 9c4e18c7a..HEAD -- …/design-steps.md` shows exactly
+seven diff-added unchecked checklist items: AF-4, AF-5, AMB-7, AMB-8, AMB-9,
+INC-3, INC-4 — all still present and unchecked at follow-up start → candidate
+work set = those seven. No predating/stale/steps items in scope; the AF-1..3 /
+AMB-1..6 / INC-1..2 lines are present in the diff only as unchanged context
+(already `[x]`), correctly excluded.
+
+Resolutions written into design.md (and added under "Design-review follow-up
+resolutions"):
+
+- AF-4 → **token kept external**. The per-launch token is a credential-class
+  secret; per the OAuth credential-externality precedent it is NOT projected into
+  canonical `:state*`. Only `running?`/`url` project via dispatch; the token
+  stays in the extension-local handle and is surfaced live via `status`/log.
+  Updated the Lifecycle status-projection bullet, the Architectural-constraints
+  "Status projection, handle + secret externality" bullet, and the AF-2
+  resolution entry.
+- AF-5 → the `psi.extension/*` choice mutation's **pure handler emits a
+  `:runtime/dispatch-event` follow-on effect** (effects-as-data) targeting
+  `:session/submit-synthetic-user-prompt`, not an imperative in-handler dispatch
+  (Dispatch sequencing contract). Updated the AF-3 Interaction-contract
+  paragraph (now AF-3, AF-5).
+- AMB-7 → choice option = `{:label, :value?}` (value defaults to label);
+  single-select default with optional `:multi? true`; injected user message =
+  selected `:value`(s) joined by `", "` for multi-select, optionally prefixed by
+  a `:prompt`. New "Choice selection → user-message content" paragraph.
+- AMB-8 → submit to an ended/closed target session is **dropped** (mutation
+  no-ops; browser told "session no longer active"); the session-route registry is
+  cleared on **server halt only**, not on agent-session end — "die with the
+  server/session" disambiguated to "die with the server". New paragraph; also
+  reworded the Session-routes model bullet.
+- AMB-9 → `/dev-http start` is **idempotent**: already-running start is a no-op
+  returning the existing url+token (no second server, no restart, no error); no
+  `restart` command. New Lifecycle bullet.
+- INC-3 → stated precisely that **exactly two mutation classes enter the log**
+  (status projection `running?`/`url`; interaction results), all else is
+  out-of-band; reconciled with AF-4 (token excluded from the log) and clarified
+  the Determinism boundary covers the live handle, not the event-sourced status
+  metadata. Rewrote the Replay-fidelity and Determinism-boundary constraints.
+- INC-4 → dropped the `:mermaid` "(and/or Graphviz)" claim to match the vendored
+  Vega-Lite + Mermaid asset set (O5). Updated the renderer description.
+
+Cross-item coherence checks: AF-4 and INC-3 jointly settle log/state membership
+(token never projected, never logged; url/running? projected and logged);
+verified no stale "running?/url/token" projection wording remained (the Scope
+"server-status projection" line stays generic and correct). All seven
+design-steps marked done. No blocked/skipped items.

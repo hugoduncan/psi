@@ -41,7 +41,8 @@ Two route sources feed one router:
    published jar.
 2. **Session routes** — registered at runtime into a registry atom, reached
    through a single stable dispatch subtree (e.g. `/s/:route-id`). Throwaway;
-   they die with the server/session. This avoids rebuilding the immutable reitit
+   they live with the **server** — the registry is cleared on server halt, not
+   on agent-session end (AMB-8). This avoids rebuilding the immutable reitit
    router on every registration.
 
 ## Capability surface
@@ -73,7 +74,8 @@ Built-in declarative renderers, plus escape hatches:
 - `:markdown` — rendered via the existing commonmark dep.
 - `:table` — tabular data.
 - `:vega` — Vega-Lite spec → chart (client-side lib).
-- `:mermaid` — Mermaid (and/or Graphviz) diagram source → diagram.
+- `:mermaid` — Mermaid diagram source → diagram. **Mermaid only; no Graphviz**
+  — the vendored client-asset set is Vega-Lite + Mermaid only (O5/INC-4).
 - `:choices` — a choice form (the interaction primitive; see D3).
 - `:hiccup` — raw hiccup escape hatch for arbitrary HTML. **Escape hatch:
   REPL `register-route!` only; not reachable from the `dev-present` tool**
@@ -103,16 +105,18 @@ genuine user input) and **drives the agent's next turn immediately**. This
 targets the `:session/submit-synthetic-user-prompt` path (the same mechanism the
 scheduler uses for delayed prompts), not the append-only `append-message` path.
 
-**Extension-API contract for the wrapping mutation (AF-3).** The submission path
-(`:session/submit-synthetic-user-prompt`) is currently dispatched only
+**Extension-API contract for the wrapping mutation (AF-3, AF-5).** The submission
+path (`:session/submit-synthetic-user-prompt`) is currently dispatched only
 internally. Rather than reach into that internal event as a back-door, this task
 adds a **first-class `psi.extension/*` mutation** (e.g.
 `psi.extension/dev-http-submit-choice`) reached through the extension
 `:mutate-session` API. It is dispatch-routed and **declared in the extension's
-`:allowed-events`**; its handler internally dispatches
-`:session/submit-synthetic-user-prompt`. This is an explicit, documented
-extension-API contract update (one-way / no shim, untrusted-extension posture),
-not an internal-event bridge.
+`:allowed-events`**. Its **pure handler does not imperatively dispatch** the
+follow-on event; instead it emits a **`:runtime/dispatch-event` follow-on
+effect** (effects-as-data) targeting `:session/submit-synthetic-user-prompt`,
+honoring the Dispatch sequencing contract (pure handler → effects → boundary
+executes) (AF-5). This is an explicit, documented extension-API contract update
+(one-way / no shim, untrusted-extension posture), not an internal-event bridge.
 
 **Mid-turn / busy submit behavior (AMB-3).** Because the choice mutation rides
 the synthetic-user-prompt path, the session statechart governs turn admission
@@ -132,10 +136,41 @@ there is nowhere to deliver the user message).
 Routes target the **invoking session only**; multi-session targeting is out of
 scope.
 
+**Choice selection → user-message content (AMB-7).** A `:choices` renderer is
+given an ordered list of options; each option is a map with a required
+human-readable **`:label`** and an optional **`:value`** (the string delivered to
+the agent; defaults to `:label` when omitted). Selection is **single-select** by
+default (radio); an optional **`:multi? true`** on the choices spec switches to
+multi-select (checkboxes). On submit, the injected synthetic **user message** is
+exactly the selected option's `:value` (single-select), or, for multi-select,
+the selected `:value`s joined by `", "` in option order. An optional **`:prompt`**
+string on the choices spec, when present, is prefixed as `"{prompt}: {value(s)}"`
+so the agent receives self-describing context. No other framing is added — the
+delivered string is deterministic from the option spec + selection (AC-6).
+
+**Target liveness + registry lifetime (AMB-8).** AMB-4 fixes the feedback target
+*identity*; this fixes its *liveness*. At choice-submit time the target session
+may have ended/closed. If the target session is **no longer live**, the
+submission is **dropped** (the wrapping mutation no-ops — nothing is injected) and
+the browser receives a clear "session no longer active" response. Registry
+lifetime is tied to the **server**, not the invoking agent session: the
+session-route registry lives in the extension's integrant system and is cleared
+only on server **halt** (`/dev-http stop` / reload), **not** when an invoking
+agent session ends. A route whose target session has ended therefore remains
+served but becomes effectively presentation-only (feedback dropped per above).
+"Die with the server/session" thus means *die with the server* (registry =
+server lifetime); feedback delivery is independently gated on per-target-session
+liveness.
+
 ## Lifecycle (D4 + integrant)
 
 - Explicit command surface modeled on `project-nrepl`:
   `/dev-http start | status | stop`.
+- **Double-`start` (AMB-9)**: `/dev-http start` is **idempotent**. When the
+  server is already running, `start` is a **no-op that returns the existing
+  `url` + `token`** (and reports "already running"); it does **not** start a
+  second server, restart, or error. There is **no `restart` command** — to
+  restart, `stop` then `start`. This upholds AC-1's no-orphaned-server guarantee.
 - **integrant** manages the extension-local system
   (`config → registry → router → server`), chosen for clean `halt!`/`init`
   reload ergonomics against the churny `dev/` routes.
@@ -154,11 +189,17 @@ scope.
   serving. **Vendored static JS/CSS assets are exempt** (inert, localhost-bound,
   no state access), keeping asset URLs simple. Server-rendered pages propagate
   the token into their own same-origin links and the choice POST.
-- **Status projection (AF-2)**: the observable server status — `running?`, the
-  resolved `url`, and the `token` — is projected into canonical `:state*` via a
-  dispatch mutation for EQL/psi-tool introspection, matching the nREPL
-  `[:runtime :nrepl]` / OAuth / workflow-progress precedent. Only this status
-  metadata is projected; the integrant **system instance/handle stays
+- **Status projection (AF-2, AF-4)**: the observable server status — `running?`
+  and the resolved `url` — is projected into canonical `:state*` via a dispatch
+  mutation for EQL/psi-tool introspection, matching the nREPL `[:runtime :nrepl]`
+  / OAuth / workflow-progress precedent. The **per-launch `token` is deliberately
+  NOT projected** into canonical state: per the OAuth credential-externality
+  precedent (the State-boundary table keeps the credential store external and
+  projects only login *status*), the token is a credential-class secret and must
+  not land in the replayable event-log / dispatch-trace. The token stays in the
+  extension-local handle and is surfaced live via the `status` output / log path
+  (which reads the external handle). Only `running?`/`url` status metadata is
+  projected; the integrant **system instance/handle (and the token) stay
   extension-local/external** (never in the core state atom), preserving the
   isolation boundary below.
 - **Route-id collisions**: re-registering an existing session route-id **replaces**
@@ -193,17 +234,31 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   `:allowed-events` for events it dispatches — including the first-class
   `psi.extension/*` choice-submit mutation that wraps
   `:session/submit-synthetic-user-prompt` (AF-3).
-- **Status projection, handle externality.** Server status (`running?`/`url`/
-  `token`) is projected into canonical `:state*` via dispatch for introspection,
-  while the integrant system instance/handle stays in the extension's own
-  atom/system — never the core state atom (AF-2). This mirrors the nREPL
-  `[:runtime :nrepl]` precedent.
-- **Replay fidelity.** Presentation is out-of-band and excluded from the event
-  log; only interaction-result mutations enter the log (same posture as TUI/RPC
-  input being event sources).
-- **Determinism boundary.** Runtime fn-route registration and the live server are
-  side-effecting dev resources outside the deterministic core; this is accepted
-  precisely because the extension is isolated and dev-only.
+- **Status projection, handle + secret externality.** Server status
+  (`running?`/`url`) is projected into canonical `:state*` via dispatch for
+  introspection, while the integrant system instance/handle **and the per-launch
+  `token`** stay in the extension's own atom/system — never the core state atom
+  (AF-2, AF-4). `running?`/`url` projection mirrors the nREPL `[:runtime :nrepl]`
+  precedent; token externality mirrors the OAuth credential-externality precedent
+  (secrets do not enter canonical/replayable state). The live token is surfaced
+  via `status`/log only.
+- **Replay fidelity / log membership (INC-3).** Exactly **two** dev-http mutation
+  classes are event-sourced and enter the log: (1) **status-projection
+  mutations** (lifecycle `start`/`stop` projecting `running?`/`url` into
+  `:state*`), and (2) **interaction-result mutations** (choice submits → user
+  message). Everything else — page GET rendering, route registration, vendored
+  asset serving — is **presentation/out-of-band** and excluded from the log (same
+  posture as TUI/RPC input being event sources). The non-deterministic `url` that
+  enters the log via class (1) is precedented (nREPL endpoint metadata is
+  likewise non-deterministic in the log); the secret `token` is **excluded** from
+  both classes and never enters the log (AF-4).
+- **Determinism boundary.** The live server **process/handle** and runtime
+  fn-route registration are side-effecting dev resources outside the
+  deterministic core; this is accepted precisely because the extension is
+  isolated and dev-only. The *status metadata* projected by class (1) above is
+  ordinary event-sourced state (like any other dispatch mutation), not part of
+  this non-deterministic boundary — only the live handle and the (excluded)
+  token sit outside canonical state.
 
 ## Scope
 
@@ -292,9 +347,10 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
 - **Persisted-route path (AF-1)** — extension-local `extensions/dev-http/dev/`
   via the extension's own `:dev` extra-path; not the project-global root `:dev`.
   Preserves strict extension isolation.
-- **Status projection (AF-2)** — project `running?`/`url`/`token` into `:state*`
-  via dispatch for EQL/psi-tool introspection (nREPL precedent); integrant
-  system handle stays extension-local.
+- **Status projection (AF-2, AF-4)** — project `running?`/`url` into `:state*`
+  via dispatch for EQL/psi-tool introspection (nREPL precedent); the integrant
+  system handle **and the secret `token`** stay extension-local/external (token
+  surfaced via `status`/log only — OAuth credential-externality precedent, AF-4).
 - **Choice mutation contract (AF-3)** — a first-class `psi.extension/*`
   dispatch-routed mutation declared in `:allowed-events` wraps
   `:session/submit-synthetic-user-prompt`; no internal-event back-door.
@@ -315,3 +371,27 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   independent of the Slice 2 renderer set.
 - **`dev-present` renderer restriction (INC-2)** — safe declarative renderers
   only; `:hiccup`/`:file` escape hatches via `register-route!` only.
+- **Token externality (AF-4)** — the per-launch `token` is a credential-class
+  secret kept in the extension-local handle, not projected into canonical
+  `:state*`; surfaced live via `status`/log only. Only `running?`/`url` project
+  (OAuth credential-externality precedent).
+- **Choice-mutation sequencing (AF-5)** — the `psi.extension/*` choice mutation's
+  pure handler emits a `:runtime/dispatch-event` follow-on effect targeting
+  `:session/submit-synthetic-user-prompt` (effects-as-data), not an imperative
+  in-handler dispatch (Dispatch sequencing contract).
+- **Choice selection content (AMB-7)** — option `{:label, :value?}`;
+  single-select default, optional `:multi?`; injected user message = selected
+  `:value`(s) (joined by `", "` for multi-select), optionally prefixed by a
+  `:prompt`.
+- **Target liveness + registry lifetime (AMB-8)** — submit to an ended/closed
+  target is dropped (no injection; browser told "session no longer active"); the
+  session-route registry is cleared on server halt only, not on agent-session
+  end. "Die with the server/session" = die with the server.
+- **Double-`start` (AMB-9)** — idempotent: already-running `start` is a no-op
+  returning the existing `url`+`token`; no second server, no restart, no error;
+  no `restart` command.
+- **Log membership (INC-3)** — exactly two mutation classes enter the log: status
+  projection (`running?`/`url`) and interaction results; presentation /
+  registration / asset serving are out-of-band; the `token` never enters the log.
+- **Mermaid renderer scope (INC-4)** — Mermaid only; the "(and/or Graphviz)"
+  claim is dropped to match the vendored Vega-Lite + Mermaid asset set (O5).
