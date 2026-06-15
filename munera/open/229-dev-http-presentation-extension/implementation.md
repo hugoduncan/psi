@@ -1072,3 +1072,31 @@ One new actionable architectural-fit misfit:
   Distinct from AF-8 (the location/ownership decision) and AF-9 (the
   status-*projection* surface) — AF-10 is the unlocated live-*handle* ownership
   surface/mechanism.
+
+### design-review · ambiguity (round 8, turn 2)
+
+Fresh ambiguity pass using the loaded design.md + architecture sources + the
+round-8 architecture reply (AF-10, an architecture item — not duplicated here).
+Targeted re-reads only (grep for token-rejection / 404 / malformed-content /
+error-tool-result wording). AMB-1..18 re-confirmed resolved. One new actionable
+ambiguity:
+
+- AMB-19 **Token-enforcement rejection response is undefined.** AMB-1 fixed token
+  *transport* (query param) and AMB-18 fixed the enforcement *layer* (uniform
+  platform middleware over the dynamic-route subtrees, so raw/persisted handlers
+  "never see an untokened request"), but neither defines **what a request with a
+  missing or invalid token actually receives** from that middleware. The design
+  pins every other browser-facing response precisely — AMB-8 "session no longer
+  active", AMB-11 "choice already submitted", AMB-15 "no selection" — yet the
+  token-failure response is unspecified across materially different
+  interpretations: `404 Not Found` (hide route existence), `401 Unauthorized`,
+  `403 Forbidden`, a `400`/`200` plain "missing or invalid token" page, or a
+  redirect. The choice matters behaviourally (404 hides that a route exists;
+  401/403 reveals it) and is exactly what the AC-7 token-enforcement tests must
+  assert (token present → served; token missing/invalid → *what?*). A planner
+  needs the rejection response (status + body) pinned for the token middleware and
+  the AC-7 tests. Applies uniformly to the gated dynamic routes — HTML page
+  routes, the choice POST endpoint, and `:file` serving (the static-asset subtree
+  is exempt, AMB-18). Distinct from AMB-1 (transport), AMB-18 (enforcement layer),
+  and INC-6 (static-asset exemption wording) — AMB-19 is the token-rejection
+  *response* gap.

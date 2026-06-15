@@ -203,6 +203,22 @@
   is the individual handler's responsibility — pinning which layer enforces AC-7
   for the router build and tests, with the static-asset path exempt. Distinct
   from AMB-1 (transport) and INC-6 (static-asset exemption wording).
+- [ ] AMB-19 Define the **token-enforcement rejection response**. AMB-1 fixed
+  token transport and AMB-18 fixed the enforcement layer (uniform platform
+  middleware over the dynamic-route subtrees, so raw/persisted handlers never see
+  an untokened request), but neither defines **what a request with a missing or
+  invalid token receives** from that middleware (status code + body) — unspecified
+  across materially different interpretations: `404` (hide route existence),
+  `401`, `403`, a plain "missing/invalid token" page, or a redirect. The design
+  pins every other browser-facing response precisely (AMB-8 "session no longer
+  active", AMB-11 "choice already submitted", AMB-15 "no selection"), so the
+  token-failure response should be pinned too — it is exactly what the AC-7 tests
+  must assert (token present → served; missing/invalid → *what?*), and the 404-vs-
+  401/403 choice has behavioural consequences (hiding vs revealing route
+  existence). Specify the rejection response for the gated dynamic routes (HTML
+  pages, choice POST, `:file` serving; static-asset subtree exempt per AMB-18).
+  Distinct from AMB-1 (transport), AMB-18 (enforcement layer), and INC-6
+  (static-asset exemption wording).
 
 ## Inconsistency follow-ups
 
