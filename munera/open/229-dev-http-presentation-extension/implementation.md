@@ -1477,3 +1477,33 @@ One new actionable ambiguity:
   (not-running edge), and AMB-19 (token rejection).
 
 design-steps.md: added AMB-21 (one unchecked item). No blocked/skipped items.
+
+### design-review · inconsistency (round 10, turn 3)
+
+Fresh inconsistency pass (third turn of the shared design-review session) using
+the already-loaded design.md + architecture sources + round-10 architecture (no
+new misfit) and ambiguity (AMB-21) replies — architecture/ambiguity items not
+duplicated here. AMB-21 is a new *gap* (design unchanged), so not yet a
+contradiction source. Targeted re-reads only, aimed at resolution-introduced
+staleness/contradiction:
+- Stale handle-location wording (grep `own atom` / `extension-local hidden` /
+  `mcp-tasks-run` / `work-on`): every hit is inside the AF-8 resolution that
+  **explicitly supersedes/contextualizes** the old "extension's own atom" framing
+  (lines 375–380, 970–971); no uncorrected stale wording. AF-1's "extension's own
+  `:dev` extra-path" (851) is correct.
+- Token-projection wording (grep `token.*project` / `running?/url/token` /
+  `url+token`): uniformly "token-less base url projected, token external"; the
+  stopped-status line reports "no url and no token"; no leftover
+  "running?/url/token projected" staleness. AF-4 invariant intact.
+- Determinism-boundary bullet vs INC-3's non-deterministic-url admission:
+  reconcilable — the bullet's "not part of this non-deterministic boundary" is a
+  *canonical-state membership* statement (only the live handle + excluded token
+  sit outside canonical state), while INC-3 separately admits the projected
+  token-less base `url`'s *value* is non-deterministic-but-precedented (nREPL
+  parallel). Membership-vs-value, already reconciled by INC-3; no contradiction.
+
+INC-1..13 re-confirmed resolved and coherent (slicing INC-11/INC-13, log-scope
+split INC-12, AMB-17 race-loser journaled-no-op reconciliation, URL-form
+journaled-vs-non-journaled principle all internally consistent).
+
+Conclusion: **no new actionable inconsistency.** No design-steps added this pass.
