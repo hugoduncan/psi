@@ -313,3 +313,25 @@
   `register-route!` (+ hiccup/file helpers) to a slice and note that slice 1's
   registry/dispatch is exercised by that surface. Distinct from INC-1 (slice-1
   demo-output example vs renderer-set ordering).
+
+- [ ] INC-12 Reconcile **INC-3's "both mutation classes enter the log" with the
+  AF-7/AF-9 scope split**. INC-3 ("Replay fidelity / log membership") frames the
+  two event-sourced classes — (1) status-projection and (2) message-producing
+  choice submits — as members of one replayable journal ("the token-less base
+  url that enters the log via class (1)"; "nREPL endpoint metadata is likewise in
+  the log"), under a single "replay fidelity" heading. But AF-7/AF-9 make class
+  (1) **system/runtime-scoped**, dispatched with **no invoking session-id**,
+  landing in `[:runtime :dev-http]` (the `[:runtime :nrepl]` / OAuth
+  `system_scope(¬agent_session_scope)` scope), while class (2) is **session-
+  scoped** (`:mutate-session` against the feedback session). The dispatch
+  event-log/trace is agent-session-owned and per-session-replayable, and the cited
+  system-scoped projections are not members of any one session's replayable
+  conversation log — so a no-session system-scoped status projection and a
+  session-scoped, replay-critical choice submit cannot both "enter the log" in the
+  same sense. State which journal/scope each class enters (class (2) → the
+  feedback session's replayable event-log, replay-relevant; class (1) → the
+  system/runtime dispatch record, not a per-session conversation-replay member),
+  and adjust INC-3's "replay fidelity / the log" framing (and the "nREPL endpoint
+  metadata is likewise in the log" claim) accordingly. Distinct from INC-3
+  (which classes are event-sourced, written pre-scope-split), AF-7 (the scope
+  decision), and AF-9 (the realizing surface).

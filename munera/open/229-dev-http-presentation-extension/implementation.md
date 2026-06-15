@@ -1100,3 +1100,44 @@ ambiguity:
   is exempt, AMB-18). Distinct from AMB-1 (transport), AMB-18 (enforcement layer),
   and INC-6 (static-asset exemption wording) — AMB-19 is the token-rejection
   *response* gap.
+
+### design-review · inconsistency (round 8, turn 3)
+
+Fresh inconsistency pass using the loaded design.md + architecture sources + the
+round-8 architecture (AF-10) and ambiguity (AMB-19) replies (architecture/
+ambiguity items, not duplicated here). Targeted re-reads: the INC-3
+log-membership paragraph, the AF-7/AF-9 status-scope bullets, and
+doc/architecture.md's State-boundary + dispatch-log description. INC-1..11
+re-confirmed resolved. One new actionable inconsistency:
+
+- INC-12 **INC-3's "both mutation classes enter the log" conflates two different
+  scopes/journals after the AF-7/AF-9 scope split.** INC-3 ("Replay fidelity /
+  log membership") states **exactly two** dev-http mutation classes are
+  event-sourced and "enter **the log**" — (1) status-projection mutations and
+  (2) message-producing choice submits — framing both as members of one
+  replayable journal (it even says the class-(1) token-less base `url` "enters the
+  log" and that "nREPL endpoint metadata is likewise ... in the log"), and ties
+  the whole paragraph to **replay fidelity**. But AF-7/AF-9 make class (1)
+  **system/runtime-scoped**, dispatched on a **non-session-rebound path carrying
+  no invoking session-id**, landing in `[:runtime :dev-http]` — explicitly the
+  same scope as the system-scoped `[:runtime :nrepl]` / OAuth precedents — while
+  class (2) is **session-scoped** (`:mutate-session` against the AMB-4 feedback
+  session, line 476). The architecture's dispatch event-log / trace is
+  agent-session-owned and per-session-replayable ("replay suppresses effects"),
+  and the cited system-scoped nREPL/OAuth projections are `system_scope
+  (¬agent_session_scope)` — i.e. **not** members of any one session's replayable
+  conversation log the way the session-scoped injected user message (class 2)
+  must be. So INC-3's single undifferentiated "the log" is internally
+  inconsistent with AF-7/AF-9: a no-invoking-session-id system-scoped status
+  projection and a session-scoped, replay-critical choice submit do **not** enter
+  the same per-session replayable journal, yet INC-3 lists them together as the
+  two classes that "enter the log" under one "replay fidelity" frame. Reconcile by
+  distinguishing the journals/scopes: class (2) session-scoped → the feedback
+  session's replayable event-log (replay-relevant for that conversation); class
+  (1) system-scoped → the system/runtime dispatch record (nREPL/OAuth precedent),
+  which is not a per-session conversation-replay member — and adjust INC-3's
+  "replay fidelity / the log" framing (and the "nREPL endpoint metadata is
+  likewise in the log" claim) to name **which** log/scope each class enters.
+  Distinct from INC-3 (which classes are event-sourced, pre-scope-split), AF-7
+  (the scope decision), and AF-9 (the realizing surface) — INC-12 is the
+  unreconciled log-membership-vs-scope conflation INC-3 now carries.
