@@ -219,6 +219,34 @@
   pages, choice POST, `:file` serving; static-asset subtree exempt per AMB-18).
   Distinct from AMB-1 (transport), AMB-18 (enforcement layer), and INC-6
   (static-asset exemption wording).
+- [ ] AMB-20 Define the **unknown / unregistered route-id browser-facing
+  response** and its **precedence against the AMB-18 token middleware**. The
+  design pins every other browser-facing response precisely (AMB-8 "session no
+  longer active", AMB-11 "choice already submitted", AMB-15 "no selection",
+  AMB-19 `403` for a missing/invalid token on a *gated existing* route), but
+  never defines what a GET to an **unknown `/s/:route-id`** (or an unknown
+  persisted `dev/` path) returns. This is a real, expected case: AMB-8 clears the
+  session-route registry on server halt and AMB-16 forbids a pre-server staging
+  registry, so a developer reopening a stale tab/link after `/dev-http
+  stop`+`start` (new per-launch token, cleared registry) hits a route-id that no
+  longer exists. Two materially different gaps: (1) the response itself — a
+  reitit/ring default `404` with a default body vs a pinned plain-text "no such
+  route" body matching the design's pinned-response posture; and (2) the
+  **precedence** between the AMB-18 token middleware (over the dynamic-route
+  subtree) and route resolution — for an **untokened** request to an unknown
+  route-id, is it `403` (token checked at the subtree boundary first) or `404`
+  (route resolution first, unmatched → default handler with no token check), and
+  for a **valid-token** request to an unknown route-id, what is returned?
+  Under reitit semantics middleware typically runs only for *matched* routes, so
+  an unmatched `/s/<stale>` may bypass the token middleware and return `404`,
+  diverging from the `403` an untokened *known* route returns — an
+  unaddressed behavioural distinction (also a mild existent-vs-nonexistent
+  signal, which AMB-19 deemed acceptable to reveal on a loopback dev server, but
+  did not pin here). A planner needs the unknown-route response and the
+  token-vs-route precedence defined for the router build and the AC-7 tests.
+  Distinct from AMB-19 (token rejection on a gated *existing* route), AMB-8
+  (a *known live* route whose *target session* ended), and AMB-16 (the
+  registration *call* while the server is stopped).
 
 ## Inconsistency follow-ups
 

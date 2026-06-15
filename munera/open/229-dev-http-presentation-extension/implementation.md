@@ -1274,3 +1274,27 @@ Conclusion: **no new actionable architectural-fit misfit.** The design's
 architectural fit is complete and coherent across the VSM layers and the
 State/Dispatch/managed-services boundaries; AF-1..10 resolve every fit concern
 with cited precedents. No design-steps added this pass.
+
+### design-review · ambiguity (round 9, turn 2)
+
+Fresh ambiguity pass (second turn of the shared design-review session) using the
+already-loaded design.md + architecture sources + the round-9 architecture reply
+(no new architecture misfit — not duplicated here). One targeted re-read
+(grep for 404 / not-found / unknown-route / precedence wording) confirmed the gap
+below is unfiled. AMB-1..19 re-confirmed resolved. One new actionable ambiguity:
+
+- AMB-20 **Unknown / unregistered route-id browser-facing response + token-
+  middleware-vs-route-resolution precedence is undefined.** The design pins every
+  other browser-facing response precisely (AMB-8, AMB-11, AMB-15, AMB-19) but
+  never defines what a GET to an unknown `/s/:route-id` (or unknown persisted
+  `dev/` path) returns — a real, expected case after AMB-8 (registry cleared on
+  halt) + AMB-16 (no pre-server staging registry): a stale tab/link reopened after
+  `/dev-http stop`+`start` hits a no-longer-registered route-id. Two gaps: (1) the
+  response (reitit/ring default `404` vs a pinned "no such route" body matching
+  the design's pinned-response posture); (2) the precedence between the AMB-18
+  token middleware (`403`) and route resolution (`404`) for an untokened request
+  to an unknown route — under reitit, middleware on matched routes may let an
+  unmatched path bypass the token check and return `404`, diverging from the `403`
+  an untokened *known* route returns. Distinct from AMB-19 (token rejection on a
+  gated existing route), AMB-8 (a known live route whose target session ended),
+  and AMB-16 (the registration call while stopped).
