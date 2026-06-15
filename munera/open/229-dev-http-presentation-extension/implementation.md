@@ -620,3 +620,78 @@ and is consistent with AMB-4's `:session-id`; AMB-12 is symmetric with the AMB-9
 idempotent-start resolution; AMB-13's single-entry-var contract leaves AMB-8
 session-registry behavior and AMB-2 route-id assignment untouched. All five
 design-steps marked done. No blocked/skipped items.
+
+### design-review · follow-up (round 5, this pass)
+
+Evidence rule applied. Previous design-follow-up completion = `1ae973438`
+(executed round-4 follow-ups AF-7, AMB-12/13, INC-7/8). The contiguous latest
+review-batch segment since then is the three round-5 review commits (`1d5011aa9`
+architecture-fit, `2a7c7c5dd` ambiguity, `c107d8c41` inconsistency). Baseline =
+parent of the oldest segment commit (`1d5011aa9^`) = `1ae973438` (confirmed via
+`git rev-parse`). `git diff 1ae973438..HEAD -- …/design-steps.md` shows exactly
+four diff-added unchecked checklist items: AF-8, AMB-14, AMB-15, INC-9 — all
+still present and unchecked at follow-up start → candidate work set = those four.
+No predating/stale/steps items in scope; prior `[x]` lines appear only as
+unchanged diff context, correctly excluded.
+
+Verified precedents before editing: META.md lines 24–25 (managed-services
+principle: "psi runtime owns process-scoped managed services on ctx … keyed by
+logical identity … rather than extension-local hidden state"); doc/extensions.md
+"Managed services" surface (`:ensure-service`/`:stop-service`/`:service-request`,
+`:type :subprocess`, protocol-agnostic lifecycle, psi-as-client transport).
+
+Resolutions written into design.md (and added under "Design-review follow-up
+resolutions"):
+
+- AF-8 → the live integrant system/server/registry handle is a **runtime-owned
+  managed handle on `ctx` keyed by logical identity** (e.g. `:dev-http/server`),
+  not extension-local hidden state and not the core `:state*` atom — reconciling
+  the live-handle location with the managed-services principle and the
+  process-wide-singleton runtime-handle precedents (nREPL `[:runtime :nrepl]`,
+  project-nrepl registry) that AF-7's system-scoping points to. integrant keeps
+  the in-extension `init`/`halt!` lifecycle under that handle; holding it on
+  `ctx` keyed by logical identity makes it survive extension reload and forbids
+  orphan/duplicate (reinforcing AC-1 — the exact failure the principle prevents).
+  Token stays external (AF-4) alongside the handle. Noted that the managed-service
+  *transport* surface (`:type :subprocess` request/response) is psi-as-client
+  subprocess RPC and is **not** adopted for an inbound in-process HTTP host; AF-8
+  adopts the ownership/location principle only (the concrete ctx-handle mechanism
+  is a planning detail). Updated the Lifecycle Boundary bullet (split into
+  scoped-integrant-code + a new "Live server-handle location (AF-8)" bullet), the
+  status-projection bullet, and the Architectural-constraints handle-externality
+  bullet (all "extension's own atom/system" framings now read runtime-owned-on-ctx).
+- AMB-14 → registration-call return URL form follows the
+  journaled-vs-non-journaled principle: `dev-present` (journaled tool result)
+  returns the **token-less base URL** (developer gets an openable link via
+  `/dev-http status`); `register-route!` (non-journaled REPL return) returns the
+  **token-embedded copy-pasteable URL** directly. New "Registration-call return
+  URL form (AMB-14)" paragraph under Registration; AC-3 reworded to the token-less
+  base URL.
+- AMB-15 → empty/no-selection `:choices` submit (zero options) is **rejected as a
+  no-op**: nothing injected (no `:prompt`-only message), browser told "no
+  selection", AMB-11 single shot **not consumed** (route stays live); single-select
+  radios render with no default-checked option. Mirrors AMB-8's
+  drop-doesn't-consume; the shot is reserved for a genuine decision. New
+  "Empty / no-selection submit (AMB-15)" paragraph under Interaction; AC-6
+  augmented.
+- INC-9 → the idempotent `/dev-http start` return is a **non-journaled human-facing
+  command-output surface** (same class as `status` output / log line), so it
+  carries the token-embedded copy-pasteable URL legitimately. Replaced INC-8's
+  closed "only status + log line" enumeration with the **journaled-vs-non-journaled
+  principle**, under which the `start` return and the `register-route!` REPL return
+  (AMB-14) are admitted non-journaled token-embedded surfaces. Rewrote the Token-
+  transport bullet into the principle, updated the AMB-9 Double-`start` bullet and
+  its resolution entry, and updated the INC-8 resolution entry.
+
+Cross-item coherence checks: INC-8/INC-9/AMB-14 now share one
+journaled-vs-non-journaled principle (token-less in `:state*`/log/`dev-present`
+result; token-embedded in status/log-line/`start`-return/`register-route!`-return)
+— no fixed-list/closed-enumeration contradiction remains; verified the AF-4/INC-3
+token-never-in-replayable-state invariant still holds under every enumerated
+surface. AF-8 keeps the handle out of the core `:state*` atom (AF-2/AF-4 "never in
+core state atom" preserved) while changing its location from extension-private to
+runtime-owned-on-ctx; the `mcp-tasks-run`/`work-on` precedent is superseded for
+this singleton (those are session/extension-scoped; AF-7 made dev-http a
+system-scoped singleton). AMB-15 is symmetric with AMB-8 (non-decision does not
+burn the single shot) and consistent with AMB-7/AMB-11. All four design-steps
+marked done. No blocked/skipped items.

@@ -46,7 +46,7 @@
   asymmetry explicit (status = system-scoped; choice-submit = session-scoped).
   Distinct from AF-2/AF-4 (what projects) and AF-6 (event ownership).
 
-- [ ] AF-8 Reconcile the **live singleton server/registry handle's
+- [x] AF-8 Reconcile the **live singleton server/registry handle's
   location/ownership** with META.md's managed-services principle ("psi runtime
   owns process-scoped managed services on ctx for long-lived subprocesses …";
   "managed services are keyed by logical identity … rather than extension-local
@@ -112,7 +112,7 @@
   reload story are unambiguous for the planner. Distinct from AMB-8 (session
   registry lifetime) and AMB-2 (route-id assignment).
 
-- [ ] AMB-14 Specify the **URL form returned by the registration calls**: which
+- [x] AMB-14 Specify the **URL form returned by the registration calls**: which
   of INC-8's two forms (token-less base vs token-embedded copy-pasteable) the
   `dev-present` tool result (AC-3) and `register-route!` return value carry, and
   how the developer obtains a directly-openable link. A `dev-present` tool result
@@ -122,7 +122,7 @@
   status`). Distinct from AMB-1 (transport) and INC-8 (projected-vs-status URL
   forms; neither names the tool-result/return surface).
 
-- [ ] AMB-15 Define **empty / no-selection choice-submit** behavior: a `:choices`
+- [x] AMB-15 Define **empty / no-selection choice-submit** behavior: a `:choices`
   POST with zero options selected (unchecked multi-select, or a radio with no
   default-checked option) — whether it is a "successful POST" that consumes the
   AMB-11 single shot and injects an empty (or `:prompt`-only) user message, or is
@@ -172,7 +172,7 @@
   (reconstructed from the base url + the external token at render time), so
   projecting/logging `url` cannot leak the token. Distinct from AF-4 (token
   externality) and INC-3 (log membership).
-- [ ] INC-9 Reconcile the **token-embedded surface enumeration** with the
+- [x] INC-9 Reconcile the **token-embedded surface enumeration** with the
   `/dev-http start` return. INC-8 says the token-embedded copy-pasteable URL is
   shown **only** in the `status` output and the dev start-up log line, but AMB-9
   says an already-running `start` is a no-op **returning the existing

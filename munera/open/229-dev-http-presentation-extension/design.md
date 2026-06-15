@@ -85,6 +85,27 @@ and re-registering an existing id **replaces** the prior entry (O4,
 last-write-wins). When omitted, the platform **generates a unique id**
 (collision-free). Both registration paths share this single id model.
 
+**Registration-call return URL form (AMB-14).** The two registration calls return
+**different URL forms**, governed by the journaled-vs-non-journaled principle
+under Lifecycle/INC-8:
+
+- **`dev-present`** is a model-callable tool whose result is **journaled into the
+  replayable session conversation**, so it returns the **token-less base URL**
+  only — returning a token-embedded URL would leak the credential-class token
+  into replayable state (AF-4/INC-3/INC-8). The model hands the developer an
+  openable link by directing them to `/dev-http status` (which renders the
+  token-embedded copy-pasteable URL from the base URL + the external token); the
+  tool result may include that hint. The token is never journaled.
+- **`register-route!`** is a REPL/dev fn whose **return value is not journaled**
+  into session state (it is an ordinary REPL evaluation result), so it returns the
+  **token-embedded copy-pasteable URL** directly — a convenient directly-openable
+  link with no journal leak, consistent with the non-journaled REPL-local surface
+  class (AMB-14/INC-9).
+
+This keeps the asymmetry principled: the journaled surface (`dev-present` result)
+carries the token-less base URL; the non-journaled REPL surface
+(`register-route!` return) carries the token-embedded copy-pasteable URL.
+
 ### Renderers (D2)
 
 The **declarative renderer keywords** are the safe, data-driven set selectable
@@ -238,15 +259,37 @@ user message. (Distinct from AMB-3's mid-turn *timing* and AMB-8's target
 once.) To present a fresh decision, register a new route. A submission that is
 *dropped* for target-liveness (AMB-8) does **not** consume the single shot.
 
+**Empty / no-selection submit (AMB-15).** A `:choices` POST carrying **zero
+selected options** — reachable for an unchecked multi-select form, and for
+single-select radios (which are rendered with **no default-checked option** so
+the developer must make an explicit choice) — is **rejected as a no-op that
+injects nothing and does NOT consume the AMB-11 single shot**. No synthetic user
+message is injected (not even a `:prompt`-only message: the `:prompt` is
+contextual framing for a real selection per AMB-7, not a standalone message), the
+browser is told **"no selection — please choose an option,"** and the route stays
+**live/un-submitted** so a subsequent valid selection is still accepted. This
+mirrors the AMB-8 liveness-drop posture (a non-decision does not burn the single
+shot) and keeps the single-shot guarantee tied to a **genuine decision**: a
+choice route yields at most one user message, and that message always carries a
+real selection (AC-6). Distinct from AMB-3 (mid-turn timing), AMB-8 (target
+liveness), and AMB-11 (repeat of a *selected* submission).
+
 ## Lifecycle (D4 + integrant)
 
 - Explicit command surface modeled on `project-nrepl`:
   `/dev-http start | status | stop`.
 - **Double-`start` (AMB-9)**: `/dev-http start` is **idempotent**. When the
   server is already running, `start` is a **no-op that returns the existing
-  `url` + `token`** (and reports "already running"); it does **not** start a
+  server URL** (and reports "already running"); it does **not** start a
   second server, restart, or error. There is **no `restart` command** — to
   restart, `stop` then `start`. This upholds AC-1's no-orphaned-server guarantee.
+  The `start` command return is a **non-journaled human-facing command-output
+  surface** (same class as `/dev-http status` output and the dev start-up log
+  line), so it carries the **token-embedded copy-pasteable URL** per the
+  journaled-vs-non-journaled principle (INC-9) — directly resolving INC-9's
+  enumeration gap: the `start` return is one of the enumerated non-journaled
+  token-embedded surfaces, not a token leak into replayable state. (The fresh
+  start-up case likewise surfaces the same token-embedded URL via this channel.)
 - **Stop / status when not running (AMB-12)**: the no-server-running edges are
   defined symmetrically with the idempotent `start`. `/dev-http stop` against a
   server that is **not running** is a **no-op success** (reports "not running";
@@ -258,10 +301,41 @@ once.) To present a fresh decision, register a new route. A submission that is
 - **integrant** manages the extension-local system
   (`config → registry → router → server`), chosen for clean `halt!`/`init`
   reload ergonomics against the churny `dev/` routes.
-- **Boundary**: integrant is scoped strictly inside the `dev-http` extension. It
-  does not touch core state, dispatch, `system-bootstrap`, or any other
-  component. The server instance/registry live in the extension's own atom/system
-  (as `mcp-tasks-run`, `work-on` already do), never in the core state atom.
+- **Boundary**: integrant is scoped strictly inside the `dev-http` extension —
+  the integrant system *definition* and its `init`/`halt!` lifecycle code live in
+  the extension; no core namespace (`system-bootstrap`, dispatch, core state)
+  gains any dev-http-specific integrant code. integrant does not touch core
+  state, dispatch, `system-bootstrap`, or any other component.
+- **Live server-handle location (AF-8)**: the running integrant
+  system/server/registry handle is held as a **runtime-owned managed handle on
+  `ctx`, keyed by a logical identity** (e.g. `:dev-http/server`) — **not** in
+  extension-private hidden mutable state, and **not** in the core `:state*` atom.
+  This reconciles the live-handle location with META.md's managed-services
+  principle ("psi runtime owns process-scoped managed services on ctx for
+  long-lived subprocesses and similar runtime resources … keyed by logical
+  identity … rather than extension-local hidden state") and matches the
+  process-wide-**singleton** runtime-handle precedents the AF-7 system-scoping
+  points to (nREPL `[:runtime :nrepl]`, the project-nrepl registry). The earlier
+  `mcp-tasks-run`/`work-on` citation is the precedent for **session/extension-
+  scoped** handles; AF-7 established dev-http is a process-wide singleton, which
+  is the **managed-service-on-ctx** shape, not extension-local hidden state.
+  Holding the live handle on `ctx` under a logical key means it **survives
+  extension reload, cannot be orphaned or duplicated** (one keyed reuse within
+  ctx), directly reinforcing AC-1's no-orphaned-server-on-reload/restart
+  guarantee — the exact failure the managed-services principle prevents. The
+  per-launch **`token` stays external** (AF-4): it is held alongside this
+  runtime-owned handle, never projected into canonical `:state*`/log. Note: the
+  documented managed-service *transport* surface (`:service-request` /
+  `:service-notify`, `:type :subprocess`) is built for **psi-as-client**
+  subprocess RPC and does **not** fit an inbound in-process HTTP host (the
+  developer's browser is the client, not psi); AF-8 adopts the
+  **ownership/location principle** (runtime-owned, on `ctx`, keyed by logical
+  identity, reused-not-hidden), with integrant owning the in-extension
+  `init`/`halt!` lifecycle under that handle. Whether the extension reaches this
+  via `:ensure-service`/`:stop-service` with a non-subprocess type or a narrower
+  runtime ctx-handle mechanism is a planning/implementation detail; the *design
+  decision* is the live handle's **location/ownership = runtime-owned-on-`ctx`**,
+  not extension-local-hidden-state.
 - **Server**: http-kit, bound to `127.0.0.1` only. **Ephemeral port** (OS-assigned
   at start; not user-configurable — see O3). A **per-launch token** is required
   for access (dev-grade, not auth); the **token-embedded copy-pasteable URL**
@@ -272,14 +346,25 @@ once.) To present a fresh decision, register a new route. A submission that is
   a **URL query param** (`?token=…`), so the URL surfaced in the `status` output
   and the dev start-up log line is copy-pasteable and opens directly in a
   browser. **Two URL forms are distinguished (INC-8)** to keep AMB-1's
-  copy-pasteable surface from colliding with AF-4/INC-3 token-externality: the
-  **token-less base URL** (`http://127.0.0.1:<port>/…`) is the value projected
-  into canonical `:state*` and written to the event-log (AF-4/INC-3) — it
-  **never** carries the token; the **token-embedded copy-pasteable URL** (base +
-  `?token=…`) is **reconstructed at render time** from the base URL plus the
-  external token and is shown only in the human-facing `status` output and the
-  dev start-up log line. Projecting/logging the canonical `url` therefore cannot
-  leak the token. The token gates **all dynamic
+  copy-pasteable surface from colliding with AF-4/INC-3 token-externality. The
+  distinction is governed by a single **journaled-vs-non-journaled principle**
+  (INC-8/INC-9/AMB-14), not a fixed surface list:
+  - The **token-less base URL** (`http://127.0.0.1:<port>/…`) is the form used in
+    **every surface that is journaled into replayable session state or canonical
+    state** — canonical `:state*`, the event-log (AF-4/INC-3), and the
+    **`dev-present` tool result** (AMB-14, since a tool result is journaled into
+    the replayable conversation). It **never** carries the token.
+  - The **token-embedded copy-pasteable URL** (base + `?token=…`) is
+    **reconstructed at render time** from the base URL plus the external token and
+    appears **only in non-journaled human-facing / REPL-local surfaces**: the
+    `/dev-http status` output, the dev start-up log line, the idempotent
+    `/dev-http start` command return (INC-9), and the `register-route!` REPL
+    return value (AMB-14). None of these enter the replayable journal or canonical
+    state, so the token never lands in replayable/canonical state.
+
+  Projecting/logging the canonical `url` therefore cannot leak the token, and a
+  developer obtains a directly-openable link from any non-journaled surface (e.g.
+  `/dev-http status`). The token gates **all dynamic
   content routes** — HTML page routes, the choice POST endpoint, and `:file`
   serving. **Vendored static JS/CSS assets are exempt** (inert, localhost-bound,
   no state access), keeping asset URLs simple. Server-rendered pages propagate
@@ -315,9 +400,11 @@ once.) To present a fresh decision, register a new route. A submission that is
   scope asymmetry explicit: **server status = system-scoped**, while the
   **choice-submit mutation = session-scoped** (`:mutate-session` against the
   AMB-4 feedback target). Only `running?`/`url` status metadata is
-  projected; the integrant **system instance/handle (and the token) stay
-  extension-local/external** (never in the core state atom), preserving the
-  isolation boundary below.
+  projected into canonical `:state*`; the integrant **system instance/handle (and
+  the token)** live as a **runtime-owned managed handle on `ctx` keyed by logical
+  identity** (AF-8) — never in the core `:state*` atom — preserving the isolation
+  boundary below while reconciling the live-handle location with the
+  managed-services principle.
 - **Route-id collisions**: re-registering an existing session route-id **replaces**
   the prior entry (last-write-wins; least surprising for a dev tool).
 - **Client assets**: Vega-Lite / Mermaid client JS is **vendored** and served by
@@ -360,8 +447,11 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   invoking-session-scoped, and is dispatched so it lands in system/runtime scope
   rather than via the slash-command's session-rebound implicit `:mutate` /
   `:mutate-session` (AF-7). Meanwhile the integrant system instance/handle **and
-  the per-launch `token`** stay in the extension's own atom/system — never the
-  core state atom (AF-2, AF-4). The status-projection mutation is itself a **first-class
+  the per-launch `token`** live as a **runtime-owned managed handle on `ctx`
+  keyed by logical identity** (AF-8) — never the core `:state*` atom (AF-2, AF-4)
+  — reconciling the live-handle location with the managed-services principle
+  while keeping it out of canonical replayable state. The status-projection
+  mutation is itself a **first-class
   `psi.extension/*` dispatch-routed mutation declared in `:allowed-events`**
   (AF-6), exactly like the choice-submit mutation: the extension never dispatches
   the core-owned nREPL projection event (`:session/set-nrepl-runtime`); the nREPL
@@ -380,7 +470,9 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   (nREPL endpoint metadata is likewise non-deterministic in the log); the secret
   `token` is **excluded** from both classes and never enters the log — the
   token-embedded copy-pasteable URL exists only as a render-time reconstruction
-  for `status`/the dev log line, never in canonical state (AF-4, INC-8).
+  for the non-journaled human-facing/REPL-local surfaces (status output, dev log
+  line, `/dev-http start` return, `register-route!` REPL return — INC-9/AMB-14),
+  never in canonical/replayable state (AF-4, INC-8).
 - **Determinism boundary.** The live server **process/handle** and runtime
   fn-route registration are side-effecting dev resources outside the
   deterministic core; this is accepted precisely because the extension is
@@ -449,8 +541,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   through the conventional entry var (AMB-13) is collected at integrant
   `init`/reload and served by the running server.
 - AC-3 The agent can call `dev-present` to register a session route from content
-  data and receives back a URL that renders the content with the selected
-  renderer.
+  data and receives back the route's **token-less base URL** (AMB-14; the
+  token-embedded openable link is obtained via `/dev-http status`), which — opened
+  with the token — renders the content with the selected renderer.
 - AC-4 A dev can register an arbitrary ring handler fn via `register-route!` and
   reach it at its URL.
 - AC-5 Each declarative renderer (`:markdown`, `:table`, `:vega`, `:mermaid`,
@@ -459,9 +552,10 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   file escape hatches plus the choices interaction helper — INC-7) — invoked from
   a `register-route!` handler fn, not `dev-present` (INC-5) — produce the expected
   response for representative input.
-- AC-6 Submitting a `:choices` form posts the selection, which is injected as a
-  mid-conversation **user** message into the originating session and drives the
-  agent's next turn.
+- AC-6 Submitting a `:choices` form with a selection posts it, and the selection
+  is injected as a mid-conversation **user** message into the originating session
+  and drives the agent's next turn. An empty / no-selection submit (AMB-15) is
+  rejected as a no-op (nothing injected; the single shot is not consumed).
 - AC-7 Access to **dynamic content routes** (HTML page routes, the choice POST
   endpoint, and file serving) requires the per-launch token; **vendored static
   JS/CSS assets are exempt** (inert, localhost-bound — AMB-1). The server binds to
@@ -526,8 +620,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   session-route registry is cleared on server halt only, not on agent-session
   end. "Die with the server/session" = die with the server.
 - **Double-`start` (AMB-9)** — idempotent: already-running `start` is a no-op
-  returning the existing `url`+`token`; no second server, no restart, no error;
-  no `restart` command.
+  returning the existing server URL (token-embedded copy-pasteable form via the
+  non-journaled command-output channel, per INC-9); no second server, no restart,
+  no error; no `restart` command.
 - **Log membership (INC-3)** — exactly two mutation classes enter the log: status
   projection (`running?`/`url`) and interaction results; presentation /
   registration / asset serving are out-of-band; the `token` never enters the log.
@@ -580,8 +675,47 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   via `register-route!`; `register-route!`'s `:session-id` is no longer
   vestigial. (hiccup/file remain `register-route!`-only escape hatches.)
 - **`url` term disambiguation (INC-8)** — the **token-less base URL** is the
-  value projected into canonical `:state*` and written to the event-log
-  (AF-4/INC-3); the **token-embedded copy-pasteable URL** (base + `?token=…`) is
-  reconstructed at render time from the base URL + external token and shown only
-  in the `status` output / dev start-up log line. Projecting/logging `url`
-  therefore cannot leak the token.
+  value used in every journaled/canonical surface (canonical `:state*`,
+  event-log per AF-4/INC-3, and the `dev-present` tool result per AMB-14); the
+  **token-embedded copy-pasteable URL** (base + `?token=…`) is reconstructed at
+  render time from the base URL + external token and appears only in non-journaled
+  human-facing/REPL-local surfaces (status output, dev start-up log line,
+  `/dev-http start` return per INC-9, `register-route!` REPL return per AMB-14).
+  Governed by the journaled-vs-non-journaled principle, not a fixed list, so
+  projecting/logging `url` cannot leak the token.
+- **Live server-handle location/ownership (AF-8)** — the running integrant
+  system/server/registry handle is held as a **runtime-owned managed handle on
+  `ctx` keyed by logical identity** (e.g. `:dev-http/server`), **not**
+  extension-local hidden state and **not** the core `:state*` atom — reconciling
+  the live-handle location with META.md's managed-services principle and the
+  process-wide-singleton runtime-handle precedents (nREPL `[:runtime :nrepl]`,
+  project-nrepl registry) that AF-7's system-scoping points to. integrant still
+  owns the in-extension `init`/`halt!` lifecycle under that handle; holding it on
+  `ctx` keyed by logical identity makes it survive extension reload and forbids
+  orphan/duplicate (reinforcing AC-1). The token stays external (AF-4) alongside
+  the handle. The managed-service *transport* surface (`:type :subprocess`
+  request/response) is built for psi-as-client subprocess RPC and is not adopted
+  for an inbound in-process HTTP host; AF-8 adopts the ownership/location
+  principle only. Supersedes the earlier "extension's own atom/system (as
+  mcp-tasks-run/work-on)" framing (those are session/extension-scoped precedents;
+  dev-http is a system-scoped singleton).
+- **Registration-call return URL form (AMB-14)** — `dev-present` (journaled tool
+  result) returns the **token-less base URL** (token-embedded would leak the
+  token into replayable state; the developer obtains an openable link via
+  `/dev-http status`); `register-route!` (non-journaled REPL return) returns the
+  **token-embedded copy-pasteable URL** directly. Governed by the
+  journaled-vs-non-journaled principle (INC-8).
+- **Empty / no-selection choice submit (AMB-15)** — a `:choices` POST with zero
+  options selected is **rejected as a no-op**: nothing injected (no `:prompt`-only
+  message either), browser told "no selection", and the AMB-11 single shot is
+  **not consumed** (route stays live). Single-select radios render with no
+  default-checked option so an explicit choice is required. Mirrors AMB-8's
+  drop-doesn't-consume; the single shot is reserved for a genuine decision (AC-6).
+- **Token-embedded surface enumeration vs `start` return (INC-9)** — the
+  idempotent `/dev-http start` return (AMB-9) is a **non-journaled human-facing
+  command-output surface** (same class as `status` output / the log line), so it
+  carries the **token-embedded copy-pasteable URL** legitimately. INC-8's closed
+  "only status + log line" enumeration is replaced by the
+  journaled-vs-non-journaled **principle**, under which the `start` return and the
+  `register-route!` REPL return (AMB-14) are admitted non-journaled token-embedded
+  surfaces without leaking the token into replayable/canonical state.
