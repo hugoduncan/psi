@@ -1385,3 +1385,67 @@ INC-13 leaves the AF-9/AF-10 resolutions themselves untouched (only Scope/Slicin
 now name them as in-scope generic core additions) and keeps the Lifecycle
 Boundary intact (the additions are generic, not dev-http-specific). Both
 design-steps marked done. No blocked/skipped items.
+
+### design-review · architecture (round 10, turn 1)
+
+Fresh architecture-fit pass (first turn of a new shared design-review session)
+over the fully-resolved design (AF-1..10 resolved; rounds 6 and 9 architecture
+passes each concluded no new misfit; round 7 = AF-9, round 8 = AF-10). Sources
+re-consulted: AGENTS.md (VSM S1–S5, `system_scope(¬agent_session_scope)`,
+capability gating, shims/adapters one-way, state read-via-resolvers /
+write-via-mutations), META.md (managed-services on `ctx` keyed by logical
+identity, reused-not-hidden; core owns canonical projections; interactive
+projections use invalidation not polling), doc/architecture.md (State-boundary
+runtime-handles table — every listed handle is core/runtime-placed with a
+core-owned projection; Dispatch sequencing contract `:runtime/dispatch-event`;
+dispatch event-log one-entry-per-dispatch), doc/extensions.md (managed-service
+surface — documented only `:type :subprocess`; protocol-agnostic-core +
+multi-integration-justification guidance, lines 330–345), doc/extension-api.md
+(only session-scoped `(:mutate api)` rebound-to-invoking-session and
+`(:mutate-session api)` explicit-session, lines 155–168; `psi.extension/*`
+ext-scoped mutate).
+
+Verified the two load-bearing precedents directly this pass:
+- doc/extension-api.md confirms both documented extension mutate surfaces are
+  session-scoped (no no-session-id dispatch path), so AF-9's non-session-rebound
+  system-scoped dispatch surface is a genuinely required contract addition, not
+  redundant.
+- doc/extensions.md confirms the managed-service core documents only
+  `:type :subprocess` and admits generic core additions with multi-integration
+  justification, so AF-10's generic `:type :managed-handle` is a precedent-fitting
+  contract addition (not protocol-specific behaviour in the core).
+
+AF-1..10 re-confirmed genuinely resolved and precedent-accurate: extension-local
+`dev/` (AF-1); project `running?`/token-less base url only, token external per
+OAuth credential-externality (AF-2/AF-4); first-class `psi.extension/*`
+dispatch-routed mutations in `:allowed-events` for choice-submit (AF-3) and
+status (AF-6); effects-as-data follow-on (AF-5); system-scoped status vs
+session-scoped choice-submit (AF-7); live handle runtime-owned on `ctx` keyed by
+logical identity (AF-8) realized via the generic `:type :managed-handle` (AF-10);
+system-scoped projection realized via a non-session-rebound dispatch surface
+writing `[:runtime :dev-http]` directly (AF-9).
+
+Angles checked and dismissed (not new actionable misfits):
+- Journaled `dev-present` tool result carrying the non-deterministic
+  ephemeral-port token-less base URL — a recorded tool output replayed verbatim
+  from the journal (effects suppressed on replay), the standard recorded-output
+  pattern; the non-deterministic url is precedented (`[:runtime :nrepl]`) and the
+  token is excluded (AF-4/INC-8). No replay-fidelity misfit.
+- `register-route!` REPL fn reaching the runtime-owned `ctx` handle (AF-8/AF-10)
+  — an in-process dev/REPL escape hatch by design (non-journaled, throwaway);
+  this is a registration-surface mechanics/ambiguity concern, not an
+  architecture-fit boundary violation (it does not reach core `:state*` or a
+  core-owned event).
+- Off-thread HTTP-handler `:mutate-session` against the AMB-4 target — precedented
+  by the scheduler delayed-prompt path (rounds 6/8/9 dismissal holds).
+- Pull-based status (no projection-invalidation effects) — mirrors the pull-only
+  `[:runtime :nrepl]` precedent (rounds 6/9 dismissal holds).
+- AF-9/AF-10 core additions driven by a dev-only extension — admitted by the
+  managed-services multi-integration guidance and `addition > modification` /
+  `open_slot > closed_dispatch`; re-weighing would relitigate AF-10's resolved
+  judgment, not surface a new misfit (round 9 reasoning holds).
+
+Conclusion: **no new actionable architectural-fit misfit.** The design's
+architectural fit is complete and coherent across the VSM layers and the
+State/Dispatch/managed-services boundaries; AF-1..10 resolve every fit concern
+with cited, this-pass-verified precedents. No design-steps added this pass.
