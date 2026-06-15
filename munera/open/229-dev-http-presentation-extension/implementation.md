@@ -753,3 +753,33 @@ resolved. One new actionable ambiguity:
   defined for the `dev-present` tool handler and `register-route!` fn, and for
   AC-3/AC-4 tests. Distinct from AMB-9 (start-command idempotency) and AMB-12
   (stop/status-command edges) — AMB-16 is the *registration-call* not-running edge.
+
+### design-review · inconsistency (round 6, turn 3)
+
+Fresh inconsistency pass using in-context design.md + architecture sources +
+round-6 architecture (no new misfit) and ambiguity (AMB-16) replies. INC-1..9
+re-confirmed resolved; AMB-16 is an ambiguity item, not duplicated here. One new
+actionable inconsistency (resolution-introduced, across sections):
+
+- INC-10 **No-op choice submit: dispatched-and-logged vs out-of-band.** The
+  round-5 AMB-8 (dead target) and AMB-15 (empty selection) resolutions describe a
+  no-message submit as "**the wrapping mutation no-ops** — nothing is injected" /
+  "rejected as a no-op that injects nothing" — wording that has the
+  `psi.extension/*` wrapping mutation *dispatched* (running and no-oping). But
+  INC-3 states **exactly two** mutation classes enter the event log — class (2)
+  being "interaction-result mutations (choice submits → **user message**)" — and
+  "everything else ... is presentation/out-of-band and **excluded from the log**."
+  A dropped/empty submit produces no user message, so it is not class (2); yet
+  per doc/architecture.md the dispatch journal keeps **one summarized entry per
+  dispatch** (including `blocked?`/no-op dispatches), so a *dispatched* wrapping
+  mutation cannot be "excluded from the log." The two readings conflict: either
+  (a) the no-op submit is short-circuited by a pre-dispatch guard in the HTTP
+  handler before any wrapping mutation is dispatched (nothing event-sourced —
+  consistent with INC-3, but then AMB-8/AMB-15's "the wrapping mutation no-ops"
+  mis-describes it as a mutation run), or (b) the wrapping mutation is dispatched
+  and no-ops (necessarily logged — contradicting INC-3's "only message-producing
+  interaction results enter the log"). The design must reconcile whether
+  dropped/empty choice submits are event-sourced. Distinct from AMB-8 (liveness
+  behavior), AMB-15 (empty-selection behavior), and INC-3 (which classes enter
+  the log) — INC-10 is the unreconciled no-op-submit log-membership/dispatch
+  point.

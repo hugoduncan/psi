@@ -193,3 +193,17 @@
   withheld) in that state. Distinct from AMB-9 (start-command idempotency) and
   AMB-12 (stop/status-command edges); AMB-16 is the registration-call not-running
   edge.
+
+- [ ] INC-10 Reconcile **no-op choice-submit log membership / dispatch** across
+  AMB-8, AMB-15, and INC-3. AMB-8/AMB-15 describe a dropped (dead-target) or
+  empty-selection submit as "the wrapping mutation no-ops" (implying a dispatched
+  `psi.extension/*` mutation), but INC-3 admits only message-producing
+  interaction-result mutations to the log and excludes "everything else" as
+  out-of-band — while the dispatch journal records one entry per dispatch
+  (including no-ops). State whether a dropped/empty submit (i) is short-circuited
+  by a pre-dispatch guard in the HTTP handler (no wrapping mutation dispatched,
+  nothing event-sourced) — then fix AMB-8/AMB-15 wording away from "the wrapping
+  mutation no-ops", or (ii) dispatches the wrapping mutation that no-ops (and is
+  therefore logged) — then amend INC-3's class-(2) definition to admit no-message
+  no-op interaction mutations. Distinct from AMB-8 (liveness), AMB-15
+  (empty-selection), and INC-3 (log classes).
