@@ -78,7 +78,7 @@
   realizable on the extension-API contract. Distinct from AF-6 (event ownership)
   and AF-7 (the scope decision); AF-9 is the unlocated projection surface/mechanism.
 
-- [ ] AF-10 Locate AF-8's **runtime-owned-on-`ctx` live-handle ownership on a
+- [x] AF-10 Locate AF-8's **runtime-owned-on-`ctx` live-handle ownership on a
   concrete extension-API surface** (symmetric to AF-9, but for the handle, not the
   status projection). AF-8 decided the live integrant system/server/registry
   handle is a runtime-owned managed handle on `ctx` keyed by logical identity —
@@ -203,7 +203,7 @@
   is the individual handler's responsibility — pinning which layer enforces AC-7
   for the router build and tests, with the static-asset path exempt. Distinct
   from AMB-1 (transport) and INC-6 (static-asset exemption wording).
-- [ ] AMB-19 Define the **token-enforcement rejection response**. AMB-1 fixed
+- [x] AMB-19 Define the **token-enforcement rejection response**. AMB-1 fixed
   token transport and AMB-18 fixed the enforcement layer (uniform platform
   middleware over the dynamic-route subtrees, so raw/persisted handlers never see
   an untokened request), but neither defines **what a request with a missing or
@@ -314,7 +314,7 @@
   registry/dispatch is exercised by that surface. Distinct from INC-1 (slice-1
   demo-output example vs renderer-set ordering).
 
-- [ ] INC-12 Reconcile **INC-3's "both mutation classes enter the log" with the
+- [x] INC-12 Reconcile **INC-3's "both mutation classes enter the log" with the
   AF-7/AF-9 scope split**. INC-3 ("Replay fidelity / log membership") frames the
   two event-sourced classes — (1) status-projection and (2) message-producing
   choice submits — as members of one replayable journal ("the token-less base

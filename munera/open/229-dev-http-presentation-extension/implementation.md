@@ -1141,3 +1141,81 @@ re-confirmed resolved. One new actionable inconsistency:
   Distinct from INC-3 (which classes are event-sourced, pre-scope-split), AF-7
   (the scope decision), and AF-9 (the realizing surface) — INC-12 is the
   unreconciled log-membership-vs-scope conflation INC-3 now carries.
+
+### design-review · round-8 follow-up execution (AF-10, AMB-19, INC-12)
+
+Evidence rule applied. Previous design-follow-up completion = `c5618bbf9`
+(execute round-7 follow-ups AF-9, AMB-17, AMB-18, INC-11). The contiguous latest
+review-batch segment since then is the round-8 batch — `c564c4eef`
+(architecture-fit r8, AF-10), `1d2ba4f13` (ambiguity r8, AMB-19), `b2023601b`
+(inconsistency r8, INC-12). Parent of the oldest segment commit (`c564c4eef^`) =
+`c5618bbf9` (the round-7 follow-up commit), confirmed via `git rev-parse`, so
+that is the batch baseline. `git diff c5618bbf9..HEAD -- design-steps.md` added
+exactly three unchecked checklist items — AF-10, AMB-19, INC-12 — all still
+unchecked at follow-up start and the entire candidate work set. Prior `[x]`
+lines appear only as unchanged diff context, correctly excluded; no
+predating/edited/stale/steps.md items in scope.
+
+Verified precedents before editing: doc/architecture.md State-boundary table
+(`[:runtime :nrepl]` is a system-scoped runtime-handle projection) + the
+dispatch event-log description ("the coarse-grained dispatch journal: one
+summarized entry per dispatch"); doc/extensions.md managed-service surface
+(`:ensure-service`/`:stop-service`/`:service-request`, documented only
+`:type :subprocess`; guidance: keep the managed-service core protocol-agnostic,
+do not add protocol-specific behaviour without multi-integration justification).
+
+- **AF-10 — live-handle realizing surface.** AF-8 fixed the handle's
+  location/ownership (runtime-owned-on-`ctx`, keyed by logical identity) but left
+  the realizing extension-API surface unpinned; the only documented runtime-ctx-
+  handle surface (managed-service `:ensure-service`/`:stop-service`) documents
+  only `:type :subprocess`, a runtime-spawned subprocess unfit for an
+  extension-provided in-process integrant lifecycle. Resolved to **option (a)**: a
+  **generic, non-subprocess managed-handle lifecycle `:type`** (e.g.
+  `:type :managed-handle`) whose runtime-owned `:ensure-service`/`:stop-service`
+  owns the `ctx` slot keyed by logical identity and delegates start/stop to the
+  extension-provided in-process `init`/`halt!`. Generic lifecycle ownership (not
+  dev-http protocol behaviour) → respects the managed-service-core
+  protocol-agnostic guidance with multi-integration justification; integrant
+  definition/config/lifecycle stays in the extension (Lifecycle Boundary upheld);
+  explicit extension-API contract addition in the AF-3/AF-6/AF-9 lineage (one-way,
+  no shim). The `:type :subprocess` transport surface is not adopted. Updated the
+  AF-8 Lifecycle bullet's deferred-mechanism sentence to point to AF-10, added a
+  new "Live server-handle realizing surface (AF-10)" Lifecycle bullet, and added a
+  resolved-decision.
+
+- **AMB-19 — token-enforcement rejection response.** AMB-1 fixed transport and
+  AMB-18 fixed the enforcement layer, but the missing/invalid-token response was
+  undefined. Resolved to **`403 Forbidden`** + plain-text body `"dev-http:
+  missing or invalid token"` (naming `/dev-http status` as the remedy). `403`
+  (server refuses) fits a query-param token with no HTTP auth-challenge protocol,
+  so `401` is rejected; `404` route-existence-hiding is considered and rejected
+  because the token is dev-grade/localhost-bound and developer debuggability of a
+  stale link outweighs hiding existence on a loopback dev server. Applies
+  uniformly to the gated dynamic routes; static-asset subtree exempt (AMB-18).
+  Added a "Token-enforcement rejection response (AMB-19)" Lifecycle bullet,
+  strengthened AC-7 to assert the `403` + body, and added a resolved-decision.
+
+- **INC-12 — log-membership scope split.** INC-3 framed both event-sourced
+  classes as members of one "the log" under a single replay-fidelity heading, but
+  AF-7/AF-9 made class (1) system/runtime-scoped (no invoking session-id →
+  `[:runtime :dev-http]`) and class (2) session-scoped (feedback session). Both
+  dispatch, so both appear as one entry in the coarse-grained dispatch event-log
+  (one entry per dispatch), but they differ in scope/replay-relevance: class (2)
+  is the feedback session's per-session conversation-replay state (the injected
+  user message), while class (1) is a system/runtime projection (same scope as
+  `[:runtime :nrepl]` / OAuth `system_scope`) recorded in the dispatch journal but
+  not a member of any one session's conversational replay. Rewrote the INC-3
+  constraint heading (now INC-3, INC-12), added the two-scope/journal distinction,
+  refined the "nREPL endpoint metadata is likewise in the log" claim to a
+  system/runtime projection in the dispatch journal (not a per-session
+  conversation-replay member), and added a resolved-decision.
+
+Cross-item coherence checks: AF-10 keeps the handle out of the core `:state*`
+atom and out of extension-local hidden state (AF-2/AF-4/AF-8 preserved) and is
+consistent with the AF-9 "locate the concrete surface" standard; AMB-19 sits
+beside AMB-18 (enforcement layer) and AMB-1 (transport) without altering the
+exempt static-asset subtree; INC-12 leaves the AF-4/INC-8 token-never-in-
+canonical/replayable invariant intact (token excluded from both scopes/journals)
+and is consistent with the AMB-17 race-loser journaled-no-op clause (class (2)
+session-scoped journal). All three design-steps marked done. No blocked/skipped
+items.

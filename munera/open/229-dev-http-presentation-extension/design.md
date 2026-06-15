@@ -390,11 +390,44 @@ reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
   developer's browser is the client, not psi); AF-8 adopts the
   **ownership/location principle** (runtime-owned, on `ctx`, keyed by logical
   identity, reused-not-hidden), with integrant owning the in-extension
-  `init`/`halt!` lifecycle under that handle. Whether the extension reaches this
-  via `:ensure-service`/`:stop-service` with a non-subprocess type or a narrower
-  runtime ctx-handle mechanism is a planning/implementation detail; the *design
-  decision* is the live handle's **location/ownership = runtime-owned-on-`ctx`**,
-  not extension-local-hidden-state.
+  `init`/`halt!` lifecycle under that handle. The *design decision* is the live
+  handle's **location/ownership = runtime-owned-on-`ctx`**, not
+  extension-local-hidden-state; the concrete realizing extension-API surface is
+  pinned by **AF-10** below (a generic non-subprocess managed-handle lifecycle
+  `:type` whose runtime-owned `:ensure-service`/`:stop-service` delegates
+  start/stop to the extension's in-process integrant `init`/`halt!`).
+- **Live server-handle realizing surface (AF-10)**: AF-8 fixes the live handle's
+  *location/ownership* (runtime-owned-on-`ctx`, keyed by logical identity) but —
+  symmetric to AF-9's status-projection-surface gap — the only documented
+  extension-API runtime-ctx-handle surface is the managed-service
+  `:ensure-service`/`:stop-service` lifecycle, whose documented `:type
+  :subprocess` hosts a **runtime-owned subprocess** the runtime spawns/kills (and
+  whose `:service-request`/`:service-notify` psi-as-client transport the design
+  rejects as unfit). dev-http instead needs a runtime ctx handle whose
+  **start/stop lifecycle is extension-provided in-process integrant
+  `init`/`halt!`** — a shape no documented surface realizes, and which
+  doc/extensions.md's "keep the managed-service core protocol-agnostic … do not
+  add protocol-specific behavior" guidance makes a consequential contract choice.
+  Resolution — **option (a)**: add a **generic, non-subprocess managed-handle
+  lifecycle `:type`** (e.g. `:type :managed-handle`) to the managed-service
+  surface, whose runtime-owned `:ensure-service`/`:stop-service` **owns the `ctx`
+  slot keyed by logical identity and delegates start/stop to extension-provided
+  in-process functions** (here, the extension's integrant `init`/`halt!`). This
+  type is **generic lifecycle ownership, not dev-http-specific protocol
+  behaviour**, so it respects the managed-service-core protocol-agnostic guidance
+  (the dev-http integrant *definition*, config, and `init`/`halt!` stay in the
+  extension; the Lifecycle Boundary's no-core-dev-http-code constraint holds) and
+  carries the **multi-integration justification** the guidance requires (any
+  extension hosting an in-process server/engine needs a runtime-owned ctx handle
+  with extension-provided lifecycle, not a runtime-spawned subprocess). It is an
+  explicit extension-API **contract addition** in the AF-3/AF-6/AF-9 lineage
+  (one-way / no shim), realizing AF-8's runtime-owned-on-`ctx` +
+  extension-owned-in-process-lifecycle + no-core-dev-http-code +
+  no-extension-local-hidden-state quadrilemma on the documented contract. The
+  managed-service `:type :subprocess` *transport* surface is **not** adopted;
+  only the generic lifecycle-ownership / ctx-handle mechanism is. Distinct from
+  AF-8 (the location/ownership decision) and AF-9 (the status-*projection*
+  surface) — AF-10 is the live-*handle* ownership surface/mechanism.
 - **Server**: http-kit, bound to `127.0.0.1` only. **Ephemeral port** (OS-assigned
   at start; not user-configurable — see O3). A **per-launch token** is required
   for access (dev-grade, not auth); the **token-embedded copy-pasteable URL**
@@ -444,6 +477,25 @@ reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
   (platform middleware over whole route subtrees), so category classification of
   an opaque handler's output is never required. Distinct from AMB-1 (token
   *transport*) and INC-6 (static-asset *exemption wording*).
+- **Token-enforcement rejection response (AMB-19)**: a request to a gated dynamic
+  route (HTML page routes, the choice POST endpoint, `:file` serving — the
+  static-asset subtree is exempt, AMB-18) with a **missing or invalid token** is
+  rejected by the platform token middleware with **HTTP `403 Forbidden`** and a
+  short plain-text body — **`"dev-http: missing or invalid token"`** — naming how
+  to obtain a valid link (`/dev-http status`). `403` (server understood the
+  request but refuses it) is the correct semantic for a query-param token with **no
+  HTTP auth-challenge protocol**, so `401 Unauthorized` (which implies a
+  `WWW-Authenticate` challenge psi does not use) is **not** chosen. `404 Not
+  Found` (route-existence hiding) is **considered and rejected**: the token is
+  **dev-grade, localhost-bound, not auth** (Server bullet), so developer
+  debuggability of a stale/untokened link outweighs hiding route existence on a
+  loopback-only dev server; a clear `403` tells the developer exactly why the link
+  failed. This pins the AC-7 token-enforcement assertion (token present → served;
+  token missing/invalid → `403` + the named body) and matches the design's posture
+  of pinning every browser-facing response precisely (AMB-8 "session no longer
+  active", AMB-11 "choice already submitted", AMB-15 "no selection"). Distinct
+  from AMB-1 (token *transport*), AMB-18 (enforcement *layer*), and INC-6
+  (static-asset *exemption wording*) — AMB-19 is the token-rejection *response*.
 - **Status projection (AF-2, AF-4, AF-6, AF-7)**: the observable server status —
   `running?` and the resolved **token-less base** `url` (INC-8) — is projected into canonical `:state*` via a
   **first-class `psi.extension/*` dispatch-routed mutation declared in the
@@ -561,12 +613,34 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   externality mirrors the OAuth credential-externality precedent (secrets do not
   enter canonical/replayable state). The live token is surfaced via `status`/log
   only.
-- **Replay fidelity / log membership (INC-3).** Exactly **two** dev-http mutation
-  classes are event-sourced and enter the log: (1) **status-projection
-  mutations** (lifecycle `start`/`stop` projecting `running?`/token-less base
-  `url` into `:state*` — INC-8), and (2) **interaction-result mutations** —
-  **only message-producing** choice submits (a genuine, live-target, non-empty,
-  first-shot selection → user message). A **no-op submit** (dead target — AMB-8,
+- **Replay fidelity / log membership (INC-3, INC-12).** Exactly **two** dev-http
+  mutation classes are event-sourced: (1) **status-projection mutations**
+  (lifecycle `start`/`stop` projecting `running?`/token-less base `url` into
+  `:state*` — INC-8), and (2) **interaction-result mutations** — **only
+  message-producing** choice submits (a genuine, live-target, non-empty,
+  first-shot selection → user message). **The two classes enter different
+  scopes/journals (INC-12).** Both go through `dispatch!`, so both produce one
+  coarse-grained entry in the **dispatch event-log** (the journal keeps one
+  summarized entry per dispatch), but they differ in *scope* and *replay
+  relevance* after the AF-7/AF-9 scope split:
+  - **Class (2) is session-scoped** (`:mutate-session` against the AMB-4 feedback
+    session): it writes that session's **canonical conversation state** (the
+    injected synthetic user message) and is **replay-critical for that
+    conversation** — a member of the feedback session's per-session replayable
+    event-log.
+  - **Class (1) is system/runtime-scoped** (AF-7/AF-9): dispatched on the
+    **non-session-rebound path carrying no invoking session-id**, it writes
+    `[:runtime :dev-http]` — exactly the `[:runtime :nrepl]` / OAuth
+    `system_scope(¬agent_session_scope)` scope. It is a member of the
+    **system/runtime dispatch record** (the same dispatch event-log/journal), but
+    it is **not** a member of any one session's conversational replay: it carries
+    no session-id and projects system-wide infrastructure status, like the
+    pull-only `[:runtime :nrepl]` projection.
+
+  So the two classes do not "enter the log" in the same sense — class (2) is
+  per-session conversation-replay state; class (1) is a system/runtime projection
+  recorded in the dispatch journal but outside any single session's replay. A
+  **no-op submit** (dead target — AMB-8,
   empty / no selection — AMB-15, or an already-submitted single-shot route —
   AMB-11) is **short-circuited by a pre-dispatch guard in the HTTP choice-POST
   handler**: **no wrapping `psi.extension/*` mutation is dispatched**, so no
@@ -585,9 +659,11 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   Everything else — page GET rendering, route registration, vendored
   asset serving — is **presentation/out-of-band** and excluded from the log (same
   posture as TUI/RPC input being event sources). The non-deterministic
-  **token-less base** `url` that enters the log via class (1) is precedented
-  (nREPL endpoint metadata is likewise non-deterministic in the log); the secret
-  `token` is **excluded** from both classes and never enters the log — the
+  **token-less base** `url` that class (1) projects is precedented — the
+  system-scoped nREPL endpoint metadata is likewise a non-deterministic
+  **system/runtime projection** recorded in the dispatch journal (not a
+  per-session conversation-replay member); the secret `token` is **excluded**
+  from both classes and never enters either scope/journal — the
   token-embedded copy-pasteable URL exists only as a render-time reconstruction
   for the non-journaled human-facing/REPL-local surfaces (status output, dev log
   line, `/dev-http start` return, `register-route!` REPL return — INC-9/AMB-14),
@@ -702,7 +778,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   `/s/:route-id` session-route subtree and the persisted `dev/` route subtree), so
   `register-route!` raw handlers and persisted `dev/` handlers are auto-gated and
   never see an untokened request; the vendored static-asset subtree is the sole
-  exempt path (AMB-18). The server binds to `127.0.0.1` only.
+  exempt path (AMB-18). A request to a gated route with a **missing or invalid
+  token** is rejected with **`403 Forbidden`** and the body `"dev-http: missing or
+  invalid token"` (AMB-19). The server binds to `127.0.0.1` only.
 - AC-8 No HTTP handler reads or writes core state except through the extension
   `:query`/`:mutate` API; integrant usage stays inside the extension.
 - AC-9 Docs + changelog updated; extension tests pass (Scry) and clj-kondo clean.
@@ -938,3 +1016,41 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   deliverable alongside `dev-present`; the choices helper stays in slice 3. Every
   slice now delivers an exercisable end-to-end behaviour. Distinct from INC-1
   (slice-1 demo-output example vs renderer-set ordering).
+- **Live server-handle realizing surface (AF-10)** — AF-8's runtime-owned-on-`ctx`
+  live handle is located on a concrete extension-API surface via **option (a)**: a
+  **generic, non-subprocess managed-handle lifecycle `:type`** (e.g. `:type
+  :managed-handle`) added to the managed-service `:ensure-service`/`:stop-service`
+  surface, whose **runtime owns the `ctx` slot keyed by logical identity and
+  delegates start/stop to extension-provided in-process functions** (the
+  extension's integrant `init`/`halt!`). Generic lifecycle ownership (not
+  dev-http-specific protocol behaviour), so the managed-service-core
+  protocol-agnostic guidance holds and the dev-http integrant definition/lifecycle
+  stays in the extension (Lifecycle Boundary upheld); an explicit extension-API
+  contract addition in the AF-3/AF-6/AF-9 lineage (one-way / no shim). The
+  `:type :subprocess` transport surface is **not** adopted. Distinct from AF-8
+  (location/ownership decision) and AF-9 (status-projection surface).
+- **Token-enforcement rejection response (AMB-19)** — a gated dynamic-route
+  request (HTML pages, choice POST, `:file` serving; static-asset subtree exempt
+  per AMB-18) with a **missing or invalid token** is rejected by the platform
+  token middleware with **`403 Forbidden`** and the plain-text body `"dev-http:
+  missing or invalid token"` (naming `/dev-http status` as the remedy). `403`
+  fits a query-param token with no HTTP auth-challenge protocol (so not `401`);
+  `404` route-existence-hiding is **rejected** because the token is dev-grade /
+  localhost-bound and developer debuggability outweighs hiding existence on a
+  loopback dev server. Pins the AC-7 token-enforcement assertion (present →
+  served; missing/invalid → `403` + named body). Distinct from AMB-1 (transport),
+  AMB-18 (enforcement layer), and INC-6 (static-asset exemption wording).
+- **Log-membership scope split (INC-12)** — INC-3's "both classes enter the log"
+  is reconciled with the AF-7/AF-9 scope split: both classes dispatch (so both
+  appear as one entry in the coarse-grained **dispatch event-log**, one entry per
+  dispatch), but **class (2) is session-scoped** — the feedback session's
+  canonical conversation state (injected user message), replay-critical for that
+  conversation — while **class (1) is system/runtime-scoped** (no invoking
+  session-id, writes `[:runtime :dev-http]`, the `[:runtime :nrepl]` / OAuth
+  `system_scope` scope), a member of the **system/runtime dispatch record** but
+  **not** of any one session's conversational replay. The "nREPL endpoint metadata
+  is likewise in the log" claim is refined to a **system/runtime projection in the
+  dispatch journal, not a per-session conversation-replay member**. The token is
+  excluded from both scopes/journals (AF-4/INC-8). Distinct from INC-3 (which
+  classes are event-sourced), AF-7 (the scope decision), and AF-9 (the realizing
+  surface).
