@@ -85,6 +85,25 @@ and re-registering an existing id **replaces** the prior entry (O4,
 last-write-wins). When omitted, the platform **generates a unique id**
 (collision-free). Both registration paths share this single id model.
 
+**Caller-supplied route-id constraints + invalid-id rejection (AMB-23).** A
+caller-supplied `:route-id` is used **verbatim** (AMB-2) as the single dynamic
+segment of `/s/:route-id`, so it MUST be a **valid single path segment**:
+**non-empty**, a **single segment** (no `/`), drawn from the **URL-safe charset
+`[A-Za-z0-9_-]+`**, and **not a reserved id** (it MUST NOT collide with the
+vendored static-asset subtree prefix or any platform-reserved path segment). A
+caller-supplied id violating these constraints — empty, containing `/` (two
+segments → never matches `/s/:route-id`), URL-unsafe characters, or a reserved
+value — is **rejected at registration time** in the AMB-16/AMB-21 posture:
+**nothing is registered and no route URL is returned**. `dev-present` surfaces
+this as an **error tool-result** naming the constraint (a journaled result
+carrying no URL/token); the REPL `register-route!` raises / returns an error value
+naming the constraint. **System-generated ids** (the omitted-`:route-id` path,
+AMB-2) always satisfy these constraints by construction. This forbids the
+silently-registered but unreachable always-`404` route, upholding the
+pin-every-edge / pinned-response posture (AMB-16/19/20/21). Distinct from AMB-2
+(assignment model), AMB-20 (the *unknown*-route browser response), and AMB-21
+(`:content` shape validation).
+
 **Registration-call return URL form (AMB-14).** The two registration calls return
 **different URL forms**, governed by the journaled-vs-non-journaled principle
 under Lifecycle/INC-8:
@@ -239,6 +258,27 @@ disabled — there is nowhere to deliver the user message).
 Routes target the **invoking session only**; multi-session targeting is out of
 scope.
 
+**Persisted `dev/` routes + the choice-feedback loop (AMB-22).** Persisted `dev/`
+routes are a **third raw-handler class** (full-power Clojure handlers loaded at
+integrant `init`, slice 1) with **no registration-time invoking session and no
+`:session-id` argument**. A persisted handler is an ordinary raw ring handler, so
+it **may call the same platform choices helper (INC-7)** the `register-route!`
+path uses — but the helper's contract is unchanged: it renders a feedback-wired
+choice form **only when given an explicit feedback `:session-id`** (AMB-4), and
+the platform provides **no implicit or per-request session-id source** for
+persisted routes (no query-param/header session binding is defined — it would be
+an unauthenticated cross-session injection vector). A persisted route therefore
+has **no session-id to supply at load time**, so absent an explicit session-id the
+choices helper renders a **presentation-only** form (feedback disabled), exactly
+mirroring `register-route!` without `:session-id`. In practice persisted `dev/`
+routes are **presentation-only for choices**; the choice-feedback loop stays bound
+to the two session-aware registration classes (`dev-present`'s invoking-session
+default and `register-route!`'s explicit `:session-id`, AMB-4). This pins the
+choices-helper contract (explicit `:session-id` required; no implicit/per-request
+source) and its slice-1 (persisted load) / slice-3 (choices helper) AC coverage.
+Distinct from AMB-4 (the `register-route!` explicit session-id), INC-7 (the
+helper's existence/wiring), and AMB-8 (target liveness).
+
 **Choice selection → user-message content (AMB-7).** A `:choices` renderer is
 given an ordered list of options; each option is a map with a required
 human-readable **`:label`** and an optional **`:value`** (the string delivered to
@@ -270,12 +310,15 @@ liveness.
 
 **Repeat submission (AMB-11).** A `:choices` route is **single-shot**: the
 **first** successful POST injects exactly one synthetic user message and marks the
-route **submitted** (a flag on the registry entry). Subsequent POSTs to the same
-live route are **short-circuited by the same pre-dispatch handler guard**
-(reading the registry-entry submitted flag): **no wrapping mutation is
-dispatched** (INC-10), nothing is injected, and they return a clear "choice
-already submitted" response; the rendered page likewise reflects the submitted
-state on reload. This makes accidental re-submission (double-click, reopening the page,
+route **submitted** by adding its route-id to a **canonical `:state*`
+feedback-session-scoped submitted-route-id set** — the **registry entry holds
+only the route *definition***, not the submitted flag, and the authoritative mark
+is set inside the dispatch-serialized choice-submit mutation's pure handler
+(AMB-17). Subsequent POSTs to the same live route are **short-circuited by the
+same pre-dispatch handler guard** (reading that canonical submitted-route-id set
+via `:query-session`): **no wrapping mutation is dispatched** (INC-10), nothing is
+injected, and they return a clear "choice already submitted" response; the
+rendered page likewise reflects the submitted state on reload. This makes accidental re-submission (double-click, reopening the page,
 changing a pick) safe and deterministic — one choice route yields at most one
 user message. (Distinct from AMB-3's mid-turn *timing* and AMB-8's target
 *liveness*: even a single, well-timed, live-target submission is accepted only
@@ -1059,8 +1102,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   the **registration-call** not-running edge.
 - **No-op choice-submit log membership / dispatch (INC-10)** — adopts option
   (i): the HTTP choice-POST handler applies a **pre-dispatch guard** (reading
-  target-session liveness via `:query-session` and the registry-entry
-  selection/single-shot flags) and dispatches the wrapping `psi.extension/*`
+  target-session liveness and the **canonical `:state*` feedback-session-scoped
+  submitted-route-id set** via `:query-session` — the registry entry holds only
+  the route *definition*, AMB-17) and dispatches the wrapping `psi.extension/*`
   choice-submit mutation **only for a genuine, live-target, non-empty, first-shot
   selection**. A dropped (dead-target — AMB-8), empty / no-selection (AMB-15), or
   already-submitted (AMB-11) POST is **short-circuited before any dispatch**: no
@@ -1199,3 +1243,39 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   declarative content shape and thus **no analogous call-time validation**. Pins
   the AC-3 negative path and AC-5 per-renderer coverage. Distinct from AMB-10
   (valid shapes), AMB-16 (not-running edge), and AMB-19 (token rejection).
+- **Persisted `dev/` routes + choice feedback (AMB-22)** — persisted `dev/`
+  routes (raw handlers loaded at integrant `init`, no registration-time session)
+  are **presentation-only for choices**: a persisted handler may call the same
+  choices helper (INC-7), but the helper requires an **explicit feedback
+  `:session-id`** (AMB-4) and the platform defines **no implicit/per-request
+  session-id source** for persisted routes (a per-request binding would be an
+  unauthenticated cross-session injection vector), so absent an explicit
+  session-id the helper renders a presentation-only (feedback-disabled) form,
+  mirroring `register-route!` without `:session-id`. The choice-feedback loop
+  stays bound to the two session-aware registration classes; pins the
+  choices-helper contract and its slice-1/slice-3 AC coverage. Distinct from AMB-4
+  (the `register-route!` explicit session-id), INC-7 (helper existence/wiring),
+  and AMB-8 (target liveness).
+- **Caller-supplied route-id constraints + invalid-id rejection (AMB-23)** — a
+  caller-supplied `:route-id` (used verbatim, AMB-2) MUST be a **valid single path
+  segment**: non-empty, single-segment (no `/`), URL-safe charset `[A-Za-z0-9_-]+`,
+  and not a reserved id (no collision with the static-asset subtree prefix or a
+  platform-reserved path). A violating id is **rejected at registration time**
+  (registers nothing, returns no URL) in the AMB-16/AMB-21 posture: `dev-present`
+  returns an error tool-result naming the constraint, `register-route!`
+  raises/returns an error value. System-generated ids always satisfy the
+  constraints by construction. Forbids the silently-registered unreachable
+  always-`404` route, upholding the pin-every-edge posture (AMB-16/19/20/21).
+  Distinct from AMB-2 (assignment model), AMB-20 (unknown-route response), and
+  AMB-21 (`:content` shape validation).
+- **Single-shot flag location/guard-source reconciliation (INC-14)** — the stale
+  AMB-11 and INC-10 wording (submitted flag "on the registry entry"; guard reads
+  "the registry-entry submitted/selection flags") is reconciled to **AMB-17**: the
+  submitted flag is a **canonical `:state*` feedback-session-scoped
+  submitted-route-id set** (the registry entry holds only the route *definition*,
+  AF-8), the **authoritative mark is set inside the dispatch-serialized
+  choice-submit mutation's pure handler**, and the **pre-dispatch guard reads that
+  canonical flag via `:query-session`** (best-effort fast path). Removes the
+  contradictory registry-entry-flag storage and guard-source descriptions.
+  Distinct from AMB-17 (the relocation resolution itself) and INC-10 (no-op log
+  membership / pre-dispatch short-circuit).

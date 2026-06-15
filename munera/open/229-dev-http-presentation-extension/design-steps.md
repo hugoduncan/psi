@@ -268,7 +268,7 @@
   content shapes), AMB-16 (the *not-running* registration edge), and AMB-19 (the
   *token* rejection response).
 
-- [ ] AMB-22 Define whether **persisted `dev/` routes can participate in the
+- [x] AMB-22 Define whether **persisted `dev/` routes can participate in the
   choice-feedback loop**, and if so **where their feedback session-id comes
   from**. The design routes choice feedback to exactly two registration classes —
   the `dev-present` tool (defaults to its invoking session, AMB-4) and the REPL
@@ -287,7 +287,7 @@
   slice-3 AC coverage. Distinct from AMB-4 (the `register-route!` explicit
   session-id), INC-7 (the helper's existence/wiring), and AMB-8 (target liveness).
 
-- [ ] AMB-23 Define the **caller-supplied `:route-id` validity / format
+- [x] AMB-23 Define the **caller-supplied `:route-id` validity / format
   constraints and the invalid-id rejection response**. AMB-2 fixes the route-id
   *assignment model* (optional caller-supplied id used **verbatim**,
   replace-on-collision; else a system-generated unique id) but never constrains
@@ -447,7 +447,7 @@
   internal slice ordering + `register-route!` sliced) and INC-12 (log-membership
   scope split).
 
-- [ ] INC-14 Reconcile the **single-shot "submitted" flag location/guard-source**
+- [x] INC-14 Reconcile the **single-shot "submitted" flag location/guard-source**
   wording across AMB-11, INC-10, and AMB-17. AMB-17 relocated the authoritative
   single-shot state to a **canonical `:state*` flag** (a feedback-session-scoped
   submitted-route-id set), read by the best-effort pre-dispatch guard via

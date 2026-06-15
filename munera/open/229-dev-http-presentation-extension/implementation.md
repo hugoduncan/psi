@@ -1674,3 +1674,46 @@ resolved. One new actionable inconsistency:
   AMB-17 (the relocation resolution itself) and INC-10 (no-op log membership /
   pre-dispatch short-circuit) — INC-14 is the residual unreconciled
   flag-location/guard-source contradiction in the AMB-11 and INC-10 text.
+
+---
+
+## Round-11 design-review follow-up execution (2026-06-15)
+
+Batch baseline = parent of oldest round-11 review commit (`9847dca3b^` =
+`2667c744d`, the round-10 follow-up execution). `git diff 2667c744d..HEAD --
+design-steps.md` added exactly three unchecked items: **AMB-22**, **AMB-23**
+(ambiguity round 11), **INC-14** (inconsistency round 11). Architecture round 11
+added no new misfit. All three still unchecked at follow-up start → executed.
+
+- **AMB-22 (persisted `dev/` routes + choice feedback).** Resolved to **option
+  (a) presentation-only**: persisted routes are raw handlers loaded at integrant
+  `init` with no registration-time session; they may call the choices helper
+  (INC-7), but the helper requires an explicit feedback `:session-id` (AMB-4) and
+  the platform defines **no implicit/per-request session-id source** (a
+  per-request binding would be an unauthenticated cross-session injection
+  vector), so absent an explicit id the helper renders a presentation-only
+  (feedback-disabled) form, mirroring `register-route!` without `:session-id`.
+  Choice-feedback loop stays bound to the two session-aware classes. Added body
+  paragraph after AMB-4 + resolved-decision entry. Pins choices-helper contract +
+  slice-1/slice-3 AC coverage.
+
+- **AMB-23 (caller-supplied route-id constraints + invalid-id rejection).**
+  Constraints: non-empty, single-segment (no `/`), URL-safe charset
+  `[A-Za-z0-9_-]+`, not a reserved id (no static-asset-subtree / reserved-path
+  collision). Violating id rejected at registration time (registers nothing, no
+  URL) in the AMB-16/AMB-21 posture (`dev-present` error tool-result;
+  `register-route!` error value). System-generated ids satisfy constraints by
+  construction. Forbids the silently-registered unreachable always-`404` route.
+  Added body paragraph after AMB-2 + resolved-decision entry.
+
+- **INC-14 (single-shot flag location/guard-source reconciliation).** Reconciled
+  the stale AMB-11 body and INC-10 resolved-decision wording (submitted flag "on
+  the registry entry"; guard reads "registry-entry submitted/selection flags") to
+  AMB-17: the submitted flag is a canonical `:state*` feedback-session-scoped
+  submitted-route-id set (registry entry = route definition only), the
+  authoritative mark is set inside the dispatch-serialized mutation, and the
+  pre-dispatch guard reads that canonical flag via `:query-session`. Edited both
+  stale passages + added an INC-14 resolved-decision entry recording the
+  reconciliation.
+
+All three marked `[x]` in design-steps.md.
