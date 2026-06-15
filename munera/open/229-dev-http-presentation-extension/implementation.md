@@ -56,3 +56,17 @@ design.md + architecture sources + AF notes. Six new actionable ambiguities:
   OS-assigned" leaves it ambiguous whether a port-config override exists.
 - AMB-6 SSE appears as slicing slice 4 but is absent from the "In scope" list;
   whether SSE is a deliverable of this task is ambiguous.
+
+### design-review · inconsistency (turn 3)
+
+Inconsistency pass (¬correctness, ¬architecture, ¬ambiguity). Used in-context
+design.md + architecture + AF/AMB notes. Two new actionable inconsistencies.
+Port (AC-1 vs Lifecycle/O3) and SSE (slicing vs In-scope) inconsistencies are
+already captured under AMB-5/AMB-6; not duplicated here.
+
+- INC-1 Slice 1 demo route renders "something real (e.g. a benchmark table)"
+  but the renderer set (incl. `:table`) is introduced in Slice 2; the slice-1
+  example presupposes a later-slice mechanism.
+- INC-2 `dev-present` is described as "safe, replay-friendly, model-driven" yet
+  its target renderer set includes the `:hiccup` raw-HTML escape hatch and
+  `:file` arbitrary-disk-file serving, contradicting the "safe" framing.

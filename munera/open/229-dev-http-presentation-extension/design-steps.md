@@ -33,3 +33,14 @@
   "configurable/ephemeral" with the Lifecycle/O3 ephemeral-OS-assigned model.
 - [ ] AMB-6 Clarify whether SSE (slicing slice 4) is in scope for this task;
   align the slicing section and the "In scope" list.
+
+## Inconsistency follow-ups
+
+- [ ] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")
+  with renderer-set ordering: state that the slice-1 persisted route uses
+  platform-only/hand-rolled handler output, or reorder so its example output
+  does not depend on the Slice 2 renderer set.
+- [ ] INC-2 Reconcile `dev-present`'s "safe, replay-friendly, model-driven"
+  framing with its renderer set: decide whether the model-callable tool may
+  target the `:hiccup` raw-HTML and `:file` arbitrary-disk-file escape hatches,
+  or restrict those to the REPL `register-route!` path.
