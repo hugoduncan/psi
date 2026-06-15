@@ -95,3 +95,14 @@
 - [x] INC-4 Reconcile the `:mermaid` renderer's "(and/or Graphviz)" claim with
   O5 / Client-assets vendoring only Vega-Lite + Mermaid JS: either drop the
   Graphviz claim or add a vendored Graphviz/viz.js asset.
+
+- [ ] INC-5 Reconcile `register-route!`'s fn-based definition ("an arbitrary
+  ring handler fn") with its billing as "the only path to the `:hiccup`/`:file`
+  escape hatches" (declarative renderers per AC-5): either state that
+  `register-route!` also accepts a declarative renderer spec (full renderer set
+  incl. `:hiccup`/`:file`), or reframe `:hiccup`/`:file` as raw-handler idioms
+  (not selectable renderers) and adjust AC-5 accordingly.
+- [ ] INC-6 Reconcile AC-7's blanket "Access requires the per-launch token" with
+  the AMB-1/Lifecycle static-asset exemption: reword AC-7 to scope the token
+  requirement to dynamic content routes (HTML pages, choice POST, `:file`),
+  noting vendored static JS/CSS assets are exempt.

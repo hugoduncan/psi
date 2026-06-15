@@ -182,6 +182,28 @@ inconsistencies:
   O5 / Client-assets vendor only Vega-Lite + Mermaid JS (no Graphviz/viz.js
   asset), so Graphviz rendering is unsupported by the declared vendored assets.
 
+### design-review · inconsistency (round 3, turn 3)
+
+Fresh inconsistency pass over the post-resolution design (INC-1..4 resolved).
+Used in-context design.md + architecture sources + round-3 architecture (AF-6)
+and ambiguity (AMB-10/11) replies. INC-1..4 confirmed resolved. Two new
+actionable inconsistencies:
+
+- INC-5 `register-route!` is defined as **fn-based** (registers "an arbitrary
+  ring handler fn"), yet is also called "the only path to the `:hiccup` and
+  `:file` escape hatches", which are declarative **renderers** (AC-5 lists
+  `:hiccup`/`:file` as renderers producing "the expected response for
+  representative input"). A fn-only registration has no renderer-spec channel:
+  either `register-route!` also accepts a declarative renderer spec (unstated),
+  or `:hiccup`/`:file` are raw-handler idioms rather than selectable renderers.
+  Internal contradiction across the Renderers section, the `register-route!`
+  description, and AC-5. Distinct from INC-2 (dev-present "safe" framing).
+- INC-6 AC-7 states "Access requires the per-launch token" (blanket), but the
+  AMB-1 resolution / Lifecycle "Token transport" bullet exempts "Vendored static
+  JS/CSS assets". AC-7's wording was not reconciled with the AMB-1 resolution
+  (AMB-5 reworded AC-1 but AC-7 was untouched), so the acceptance criterion
+  contradicts the token-gating scope it is meant to verify.
+
 ### design-review · follow-up (this pass)
 
 Evidence rule applied. No previous design-follow-up exists; the review-batch
