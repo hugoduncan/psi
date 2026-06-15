@@ -1219,3 +1219,58 @@ canonical/replayable invariant intact (token excluded from both scopes/journals)
 and is consistent with the AMB-17 race-loser journaled-no-op clause (class (2)
 session-scoped journal). All three design-steps marked done. No blocked/skipped
 items.
+
+### design-review · architecture (round 9, turn 1)
+
+Fresh architecture-fit pass (first turn of a new shared design-review session)
+over the fully-resolved design (AF-1..10 resolved; round-6 no-new-misfit;
+round-7 AF-9; round-8 AF-10). Sources re-consulted: AGENTS.md (VSM S1–S5,
+`system_scope(¬agent_session_scope)`, capability gating, shims/adapters one-way),
+META.md (managed-services on `ctx` keyed by logical identity, reused-not-hidden;
+core owns canonical projections; interactive-projection invalidation vs polling),
+doc/architecture.md (State-boundary runtime-handles table — every listed handle
+is core/runtime-placed with a core-owned projection; Dispatch sequencing contract
+`:runtime/dispatch-event`; dispatch event-log one-entry-per-dispatch),
+doc/extensions.md (managed-service surface `:ensure-service`/`:stop-service`,
+documented only `:type :subprocess`; protocol-agnostic-core + multi-integration
+guidance), doc/extension-api.md (only session-scoped `(:mutate api)`
+rebound-to-invoking-session / `(:mutate-session api)` explicit-session;
+`psi.extension/*` ext-scoped mutate).
+
+AF-1..10 re-confirmed genuinely resolved and precedent-accurate:
+extension-local `dev/` (AF-1); status projection of `running?`/token-less base
+url only, token external per OAuth credential-externality (AF-2/AF-4);
+first-class `psi.extension/*` dispatch-routed mutations in `:allowed-events` for
+choice-submit (AF-3) and status (AF-6); effects-as-data follow-on (AF-5);
+system-scoped status vs session-scoped choice-submit (AF-7); live handle
+runtime-owned on `ctx` keyed by logical identity (AF-8); system-scoped
+projection realized via a non-session-rebound dispatch path whose pure handler
+writes `[:runtime :dev-http]` directly (AF-9 — verified the documented mutate
+surfaces are both session-scoped, so the contract addition is genuinely needed,
+not redundant); generic non-subprocess `:type :managed-handle` realizing AF-8
+(AF-10).
+
+Angles checked and dismissed (not new actionable misfits):
+- AF-9 surface redundancy — verified via doc/extension-api.md that neither
+  `(:mutate api)` nor `(:mutate-session api)` dispatches with no invoking
+  session-id, so AF-7's system-scoped projection genuinely needs the AF-9
+  contract addition; not over-engineering.
+- AF-10 core `:type :managed-handle` addition driven by a dev-only extension —
+  the managed-services guidance explicitly admits core additions with
+  multi-integration justification, which AF-10 supplies (generic in-process
+  managed-handle lifecycle, not dev-http protocol behaviour; integrant
+  definition/lifecycle stays in the extension; Lifecycle Boundary upheld).
+  `addition > modification` / `open_slot > closed_dispatch` favour this shape.
+  Re-weighing the strength of that justification would relitigate AF-10's
+  resolved judgment, not surface a new misfit.
+- HTTP-handler off-thread `:mutate-session` against the AMB-4 target — precedented
+  by the scheduler delayed-prompt path (round-6/8 dismissal holds).
+- Pull-based status (no projection-invalidation effects) — mirrors the pull-only
+  `[:runtime :nrepl]` precedent (round-6 dismissal holds).
+- Reads-via-`:query-session` / writes-via-dispatched-mutation, minimal capability
+  + `:allowed-events`, replay/determinism boundary — all conform.
+
+Conclusion: **no new actionable architectural-fit misfit.** The design's
+architectural fit is complete and coherent across the VSM layers and the
+State/Dispatch/managed-services boundaries; AF-1..10 resolve every fit concern
+with cited precedents. No design-steps added this pass.
