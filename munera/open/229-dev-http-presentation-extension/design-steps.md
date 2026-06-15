@@ -331,6 +331,32 @@
   URL). Distinct from AMB-2 (assignment model), AMB-20 (the *unknown*-route
   browser response), and AMB-21 (`:content` shape validation).
 
+- [ ] AMB-24 Disambiguate what **"reload" means** for (a) the live server
+  handle/process, (b) the session-route registry, (c) the persisted-route router,
+  and (d) the canonical `running?`/`url` status projection. The design uses
+  "reload" in at least three senses without pinning them: AF-8 says the on-`ctx`
+  live handle **survives extension reload** ("cannot be orphaned or duplicated");
+  AMB-8 lists **"reload"** alongside `/dev-http stop` as a **registry-clearing
+  server halt** ("registry cleared only on server halt (`/dev-http stop` /
+  reload)"); AMB-13 says integrant **`init`/reload** re-`require`s the entry
+  namespace and **rebuilds the (persisted-route) router** from the returned vector
+  ("editing a `dev/` route and reloading picks it up"). These are materially
+  different operations with conflicting effects on the **session-route registry**:
+  does a persisted-route reload (AMB-13 router rebuild) also **clear all live
+  session routes** (AMB-8's "reload" clears the registry → a dev editing one
+  `dev/` route loses every live `dev-present`/`register-route!` session route), or
+  does it **rebuild only the persisted-route subtree while preserving the
+  session-route registry**? Relatedly, since the status projection is driven by
+  the `/dev-http start`/`stop` command handler (AF-7) and a reload is **neither
+  command**, **who re-projects** the canonical `running?`/`url` status across a
+  reload (or is it left stale), and does the handle **surviving** extension reload
+  (AF-8) vs. the registry being **cleared on** reload (AMB-8) refer to the **same**
+  reload or two different notions (extension-code reload vs integrant
+  route-reload/router-rebuild vs server halt+restart)? Specify the distinct reload
+  notions and, for each, its effect on (a)–(d). Distinct from AMB-8 (registry
+  lifetime tied to server halt), AMB-9/AMB-12 (start/stop/status command edges),
+  and AMB-13 (persisted-route discovery contract).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

@@ -1752,3 +1752,28 @@ and/or distinct S2 capability gating) so the two new system-scoped surfaces
 preserve the untrusted-extension isolation posture. Distinct from AF-6 (event
 ownership), AF-7 (scope decision), AF-9/AF-10 (the realizing surfaces) — AF-11 is
 the system-scoped-write/ctx-slot **authority-bounding / isolation** concern.
+
+---
+
+## Round-12 design-review ambiguity (2026-06-15)
+
+Second turn of the shared `design-review` session (ambiguity only), using the
+already-loaded design.md + architecture context; targeted re-read of every
+"reload" occurrence in design.md to confirm the candidate.
+
+AMB-1..AMB-23 remain resolved. **One new actionable ambiguity (AMB-24):** the
+term **"reload"** is used in (at least) three materially different senses with
+conflicting effects, none pinned: AF-8 says the on-`ctx` live handle **survives
+extension reload**; AMB-8 lists **"reload"** alongside `/dev-http stop` as a
+**registry-clearing server halt**; AMB-13 says integrant **`init`/reload**
+re-`require`s the entry namespace and **rebuilds the (persisted-route) router**
+("editing a `dev/` route and reloading picks it up"). So it is undefined whether
+a persisted-route reload (AMB-13 router rebuild) also **clears all live session
+routes** (AMB-8 → a dev editing one `dev/` route would lose every
+`dev-present`/`register-route!` session route) or rebuilds only the
+persisted-route subtree while **preserving the session-route registry**, and who
+**re-projects canonical `running?`/`url` status** across a reload (status
+projection is `/dev-http start`/`stop` command-driven per AF-7, but a reload is
+neither command). Filed AMB-24. Distinct from AMB-8 (registry lifetime),
+AMB-9/AMB-12 (start/stop/status command edges), and AMB-13 (persisted-route
+discovery contract).
