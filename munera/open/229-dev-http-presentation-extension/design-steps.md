@@ -37,6 +37,15 @@
   `:session/set-nrepl-runtime` is core-owned, so the precedent governs *shape*,
   not the dispatching event's ownership).
 
+- [ ] AF-7 Specify the **canonical-state scope** of the status-projection
+  mutation (`running?`/`url`): the dev-http server is a process-wide singleton,
+  so project its status into **system/runtime-scoped** state queryable
+  system-wide (matching the system-scoped nREPL `[:runtime :nrepl]` and OAuth
+  precedents), dispatched via the system-scoped `:mutate` surface — not the
+  invoking-session-rebound implicit mutate / `:mutate-session`. Keep the
+  asymmetry explicit (status = system-scoped; choice-submit = session-scoped).
+  Distinct from AF-2/AF-4 (what projects) and AF-6 (event ownership).
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)

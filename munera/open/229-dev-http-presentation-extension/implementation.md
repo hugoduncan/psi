@@ -87,6 +87,39 @@ actionable misfit:
   token) and from AF-3 (which fixed only the *choice-submit* mutation's
   ownership).
 
+### design-review · architecture (round 4, turn 1)
+
+Fresh architecture-fit pass over the fully-resolved design (AF-1..6 all
+resolved). Sources: AGENTS.md (S2 OAuth `system_scope(¬agent_session_scope)`),
+META model, doc/architecture.md (State-boundary table; runtime-handles table;
+nREPL `[:runtime :nrepl]` precedent), doc/extension-api.md (`:query`/`:mutate`
+ambient-vs-`:query-session`/`:mutate-session` explicit-session boundary).
+AF-1..6 confirmed genuinely resolved and precedent-accurate. The choice-submit
+mutation is correctly session-scoped (`:mutate-session` against the AMB-4
+feedback target — the proper surface for the deferred/background HTTP-handler
+context, which has no ambient session focus). One new actionable misfit:
+
+- AF-7 The **status-projection mutation's canonical-state scope**
+  (system/runtime vs agent-session) is unspecified. The dev-http server is a
+  process-wide **singleton** (one server shared across all sessions), and the
+  two cited projection precedents — nREPL `[:runtime :nrepl]` endpoint metadata
+  and OAuth login status — are **both system-scoped** (AGENTS.md S2: OAuth
+  `system_scope(¬agent_session_scope)`; nREPL is a system runtime handle in the
+  State-boundary runtime-handles table). AF-2/AF-4 fixed *what* projects
+  (`running?`/`url`, not the token) and AF-6 fixed event *ownership* (first-class
+  `psi.extension/*` in `:allowed-events`), but neither pins the *scope*. Because
+  a slash-command handler's implicit `(:mutate api)` is rebound to the invoking
+  session (doc/extension-api.md), a naive `/dev-http` status projection would
+  land in the **invoking session's** scope — wrong for a singleton (duplicated/
+  divergent status across sessions, ambiguous ownership, no system-wide answer
+  to "is the server up?"). Conforming choice: project server status into
+  **system/runtime-scoped** canonical state, queryable system-wide like
+  `[:runtime :nrepl]`, and dispatch it via the system-scoped `:mutate` surface
+  (not the session-rebound implicit mutate / `:mutate-session`) — keeping the
+  asymmetry explicit: status is system-scoped, the choice-submit is
+  session-scoped. Distinct from AF-2/AF-4 (what projects) and AF-6 (event
+  ownership).
+
 ### design-review · ambiguity (turn 2)
 
 Ambiguity pass (¬correctness, ¬architecture, ¬inconsistency). Used in-context
