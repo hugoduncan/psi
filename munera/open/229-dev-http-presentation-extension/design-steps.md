@@ -363,3 +363,29 @@
   metadata is likewise in the log" claim) accordingly. Distinct from INC-3
   (which classes are event-sourced, written pre-scope-split), AF-7 (the scope
   decision), and AF-9 (the realizing surface).
+- [ ] INC-13 Reconcile the **Scope ("In scope") and Slicing sections with the
+  AF-9 / AF-10 core extension-API contract additions** the design's own
+  resolutions require. AF-9 resolves the system-scoped status projection onto a
+  **non-session-rebound, system-scoped extension dispatch surface** described as
+  "an explicit extension-API contract addition in the AF-3/AF-6 lineage", and
+  AF-10 resolves the live-handle ownership onto a **generic, non-subprocess
+  `:type :managed-handle` managed-service lifecycle type** added to the core
+  managed-service `:ensure-service`/`:stop-service` surface — also "an explicit
+  extension-API contract addition". Both are **core/platform** changes outside
+  the `dev-http` extension's own namespaces. But the "In scope" list enumerates
+  only extension-local deliverables ("the `dev-http` extension platform … the
+  `dev-present` tool + `register-route!` … renderer set … choice loop … demo
+  route … docs/changelog/tests") and never lists these two core extension-API
+  contract additions; the Slicing section likewise never names them as slice
+  deliverables (though slice 1 implicitly needs both: the on-`ctx` handle via
+  AF-10 and the status projection via AF-9). The framing "the `dev-http`
+  extension platform" plus the Lifecycle Boundary ("no core namespace gains any
+  dev-http-specific integrant code; integrant does not touch core … dispatch")
+  can even be read to *exclude* core changes, contradicting AF-9/AF-10's required
+  generic core additions. State explicitly in Scope (and assign in Slicing) that
+  the AF-9 system-scoped dispatch surface and the AF-10 `:type :managed-handle`
+  managed-service type are in-scope core extension-API contract additions
+  (generic, non-dev-http-specific, so the Boundary still holds), so the Scope
+  statement matches the resolved architecture. Distinct from INC-11 (dev-http
+  internal slice ordering + `register-route!` sliced) and INC-12 (log-membership
+  scope split).

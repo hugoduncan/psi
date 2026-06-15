@@ -1298,3 +1298,29 @@ below is unfiled. AMB-1..19 re-confirmed resolved. One new actionable ambiguity:
   an untokened *known* route returns. Distinct from AMB-19 (token rejection on a
   gated existing route), AMB-8 (a known live route whose target session ended),
   and AMB-16 (the registration call while stopped).
+
+### design-review · inconsistency (round 9, turn 3)
+
+Fresh inconsistency pass (third turn of the shared design-review session) using
+the already-loaded design.md + architecture sources + the round-9 architecture
+(no new misfit) and ambiguity (AMB-20) replies — architecture/ambiguity items not
+duplicated here. One targeted re-read (the Scope "In scope" + Slicing sections,
+grepped for managed-handle / system-scoped / contract-addition / core wording)
+confirmed the gap below is unfiled. INC-1..12 re-confirmed resolved. One new
+actionable inconsistency:
+
+- INC-13 **Scope/Slicing vs the AF-9/AF-10 core extension-API contract
+  additions.** AF-9 (non-session-rebound system-scoped extension dispatch
+  surface) and AF-10 (generic `:type :managed-handle` managed-service lifecycle
+  type) both resolve to **explicit core extension-API contract additions** outside
+  the dev-http extension's own namespaces, but the "In scope" list enumerates only
+  extension-local deliverables and never lists them, and Slicing never assigns
+  them (despite slice 1 implicitly needing both). The "the dev-http extension
+  platform" framing plus the Lifecycle Boundary ("no core namespace gains
+  dev-http-specific integrant code; integrant does not touch core … dispatch") can
+  even read as excluding core changes, contradicting AF-9/AF-10's required generic
+  core additions. Reconcile by stating in Scope (and assigning in Slicing) that the
+  AF-9 dispatch surface and AF-10 `:type :managed-handle` are in-scope generic
+  (non-dev-http-specific) core extension-API additions. Distinct from INC-11
+  (dev-http internal slice ordering + register-route! sliced) and INC-12
+  (log-membership scope split).
