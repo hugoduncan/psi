@@ -783,3 +783,40 @@ actionable inconsistency (resolution-introduced, across sections):
   behavior), AMB-15 (empty-selection behavior), and INC-3 (which classes enter
   the log) — INC-10 is the unreconciled no-op-submit log-membership/dispatch
   point.
+
+### design-review · round-6 follow-up execution (AMB-16, INC-10)
+
+Batch baseline established via the evidence rule: oldest round-6 review commit is
+`1d7da3cc8` (architecture-fit round 6); its parent `078b90296` (execute round-5
+follow-ups) is the batch baseline. `git diff 078b90296..HEAD -- design-steps.md`
+added exactly two unchecked items — AMB-16 (ambiguity round 6) and INC-10
+(inconsistency round 6); architecture-fit round 6 added no actionable item. Both
+were still unchecked at follow-up start and are the entire candidate work set.
+
+- **AMB-16 — registration when the server is not running.** Resolved to
+  **error, no implicit auto-start, no pre-server staging registry**. Rationale:
+  auto-start conflicts with the explicit `/dev-http start` command surface and
+  AMB-9 idempotency; a pre-server registry violates AF-8 ("no live registry off
+  `ctx` when stopped") and AMB-8 ("registry = server lifetime"). Both
+  registration calls require a running server (URL is formed from the
+  ephemeral-port base; registry lives on the `ctx`-held integrant system). While
+  stopped, `dev-present` returns an error tool-result and `register-route!`
+  raises/returns an error value, both naming the remedy ("start the server
+  first"); nothing registered, no URL returned. Added a Registration-section body
+  paragraph, a Resolved-decisions entry, and not-running notes on AC-3/AC-4.
+
+- **INC-10 — no-op choice-submit log membership / dispatch.** Resolved to
+  **option (i): a pre-dispatch guard in the HTTP choice-POST handler**. The
+  handler reads target-session liveness (`:query-session`) and registry-entry
+  selection/single-shot flags, and dispatches the wrapping `psi.extension/*`
+  choice-submit mutation **only** for a genuine, live-target, non-empty,
+  first-shot selection. Dropped (AMB-8), empty (AMB-15), and already-submitted
+  (AMB-11) POSTs are short-circuited before any dispatch — no wrapping mutation
+  is dispatched, so no no-op choice mutation is event-sourced or recorded in the
+  dispatch journal. This keeps INC-3 class (2) cleanly "message-producing
+  interaction-result mutations only" (no class-(2) amendment). Corrected
+  AMB-8/AMB-11/AMB-15 wording away from "the wrapping mutation no-ops" to
+  "short-circuited by a pre-dispatch handler guard"; tightened the INC-3
+  constraint paragraph; added a Resolved-decisions entry.
+
+Both design-steps items marked done. No blocked/skipped items.

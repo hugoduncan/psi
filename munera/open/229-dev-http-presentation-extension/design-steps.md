@@ -183,7 +183,7 @@
   (url-term conflation), AF-4 (token externality), and AMB-14 (registration-call
   return URL form).
 
-- [ ] AMB-16 Define **registration-call behavior when the server is not
+- [x] AMB-16 Define **registration-call behavior when the server is not
   running**: what `dev-present` (AC-3) and `register-route!` (AC-4) do when
   invoked while `/dev-http` is stopped (no running server → no ephemeral-port
   base URL and, per AF-8, no live registry on `ctx`). Specify one of: error with
@@ -194,7 +194,7 @@
   AMB-12 (stop/status-command edges); AMB-16 is the registration-call not-running
   edge.
 
-- [ ] INC-10 Reconcile **no-op choice-submit log membership / dispatch** across
+- [x] INC-10 Reconcile **no-op choice-submit log membership / dispatch** across
   AMB-8, AMB-15, and INC-3. AMB-8/AMB-15 describe a dropped (dead-target) or
   empty-selection submit as "the wrapping mutation no-ops" (implying a dispatched
   `psi.extension/*` mutation), but INC-3 admits only message-producing

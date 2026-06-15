@@ -106,6 +106,24 @@ This keeps the asymmetry principled: the journaled surface (`dev-present` result
 carries the token-less base URL; the non-journaled REPL surface
 (`register-route!` return) carries the token-embedded copy-pasteable URL.
 
+**Registration when the server is not running (AMB-16).** Both registration
+calls require a **running** server: a registered route's URL is formed from the
+ephemeral-port base URL, and the session-route registry lives inside the running
+integrant system held as a runtime-owned handle on `ctx` (AF-8) — while
+`/dev-http` is **stopped** neither exists. Invoking `dev-present` (AC-3) or
+`register-route!` (AC-4) while stopped therefore **fails with a clear "dev-http
+server is not running; start it with `/dev-http start`" error**: nothing is
+registered and **no route URL is returned** (there is no base URL to form one).
+There is **no implicit auto-start** (it would conflict with the explicit
+`/dev-http start` command surface and AMB-9's start idempotency) and **no
+pre-server staging registry** (it would violate AF-8's "no live registry off
+`ctx` when stopped" and AMB-8's "registry = server lifetime"). The `dev-present`
+tool surfaces this as an **error tool-result** naming the remedy (a journaled
+result carrying no URL/token); the REPL `register-route!` raises / returns an
+error value naming the remedy. This is distinct from AMB-9 (already-**running**
+`start` idempotency) and AMB-12 (stop/status command edges) — AMB-16 is the
+**registration-call** not-running edge.
+
 ### Renderers (D2)
 
 The **declarative renderer keywords** are the safe, data-driven set selectable
@@ -236,8 +254,11 @@ delivered string is deterministic from the option spec + selection (AC-6).
 **Target liveness + registry lifetime (AMB-8).** AMB-4 fixes the feedback target
 *identity*; this fixes its *liveness*. At choice-submit time the target session
 may have ended/closed. If the target session is **no longer live**, the
-submission is **dropped** (the wrapping mutation no-ops — nothing is injected) and
-the browser receives a clear "session no longer active" response. Registry
+submission is **dropped by a pre-dispatch guard in the HTTP choice-POST handler**
+(which checks target-session liveness via `:query-session` before dispatching):
+**no wrapping `psi.extension/*` choice-submit mutation is dispatched, so nothing
+is event-sourced or logged** (INC-10), and the browser receives a clear "session
+no longer active" response. Registry
 lifetime is tied to the **server**, not the invoking agent session: the
 session-route registry lives in the extension's integrant system and is cleared
 only on server **halt** (`/dev-http stop` / reload), **not** when an invoking
@@ -250,9 +271,11 @@ liveness.
 **Repeat submission (AMB-11).** A `:choices` route is **single-shot**: the
 **first** successful POST injects exactly one synthetic user message and marks the
 route **submitted** (a flag on the registry entry). Subsequent POSTs to the same
-live route are **no-ops that inject nothing** and return a clear "choice already
-submitted" response; the rendered page likewise reflects the submitted state on
-reload. This makes accidental re-submission (double-click, reopening the page,
+live route are **short-circuited by the same pre-dispatch handler guard**
+(reading the registry-entry submitted flag): **no wrapping mutation is
+dispatched** (INC-10), nothing is injected, and they return a clear "choice
+already submitted" response; the rendered page likewise reflects the submitted
+state on reload. This makes accidental re-submission (double-click, reopening the page,
 changing a pick) safe and deterministic — one choice route yields at most one
 user message. (Distinct from AMB-3's mid-turn *timing* and AMB-8's target
 *liveness*: even a single, well-timed, live-target submission is accepted only
@@ -262,8 +285,11 @@ once.) To present a fresh decision, register a new route. A submission that is
 **Empty / no-selection submit (AMB-15).** A `:choices` POST carrying **zero
 selected options** — reachable for an unchecked multi-select form, and for
 single-select radios (which are rendered with **no default-checked option** so
-the developer must make an explicit choice) — is **rejected as a no-op that
-injects nothing and does NOT consume the AMB-11 single shot**. No synthetic user
+the developer must make an explicit choice) — is **rejected by the same
+pre-dispatch handler guard** (which checks for a non-empty selection before
+dispatching): **no wrapping `psi.extension/*` mutation is dispatched, nothing is
+event-sourced or logged** (INC-10), nothing is injected, and the AMB-11 single
+shot is **not consumed**. No synthetic user
 message is injected (not even a `:prompt`-only message: the `:prompt` is
 contextual framing for a real selection per AMB-7, not a standalone message), the
 browser is told **"no selection — please choose an option,"** and the route stays
@@ -462,8 +488,16 @@ The extension-local `deps.edn` also declares its own `:dev` alias
 - **Replay fidelity / log membership (INC-3).** Exactly **two** dev-http mutation
   classes are event-sourced and enter the log: (1) **status-projection
   mutations** (lifecycle `start`/`stop` projecting `running?`/token-less base
-  `url` into `:state*` — INC-8), and (2) **interaction-result mutations** (choice submits → user
-  message). Everything else — page GET rendering, route registration, vendored
+  `url` into `:state*` — INC-8), and (2) **interaction-result mutations** —
+  **only message-producing** choice submits (a genuine, live-target, non-empty,
+  first-shot selection → user message). A **no-op submit** (dead target — AMB-8,
+  empty / no selection — AMB-15, or an already-submitted single-shot route —
+  AMB-11) is **short-circuited by a pre-dispatch guard in the HTTP choice-POST
+  handler**: **no wrapping `psi.extension/*` mutation is dispatched**, so no
+  no-op choice mutation is ever event-sourced or recorded in the dispatch
+  journal (INC-10). Class (2) therefore never admits a no-message no-op mutation;
+  the log records exactly the message-producing submits.
+  Everything else — page GET rendering, route registration, vendored
   asset serving — is **presentation/out-of-band** and excluded from the log (same
   posture as TUI/RPC input being event sources). The non-deterministic
   **token-less base** `url` that enters the log via class (1) is precedented
@@ -543,9 +577,12 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
 - AC-3 The agent can call `dev-present` to register a session route from content
   data and receives back the route's **token-less base URL** (AMB-14; the
   token-embedded openable link is obtained via `/dev-http status`), which — opened
-  with the token — renders the content with the selected renderer.
+  with the token — renders the content with the selected renderer. Called while
+  the server is **not running** (AMB-16), `dev-present` returns an error
+  tool-result ("start the server first") and registers nothing.
 - AC-4 A dev can register an arbitrary ring handler fn via `register-route!` and
-  reach it at its URL.
+  reach it at its URL. Called while the server is **not running** (AMB-16),
+  `register-route!` errors ("start the server first") and registers nothing.
 - AC-5 Each declarative renderer (`:markdown`, `:table`, `:vega`, `:mermaid`,
   `:choices`) produces the expected response for representative input (per the
   AMB-10 content shapes), and the raw-handler render helpers (the hiccup and
@@ -719,3 +756,31 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   journaled-vs-non-journaled **principle**, under which the `start` return and the
   `register-route!` REPL return (AMB-14) are admitted non-journaled token-embedded
   surfaces without leaking the token into replayable/canonical state.
+- **Registration when the server is not running (AMB-16)** — `dev-present`
+  (AC-3) and `register-route!` (AC-4) invoked while `/dev-http` is stopped
+  **fail with a clear "dev-http server is not running; start it with `/dev-http
+  start`" error**; nothing is registered and **no route URL is returned** (no
+  ephemeral-port base URL and, per AF-8, no live `ctx`-keyed registry exist while
+  stopped). No **implicit auto-start** (it would conflict with the explicit
+  `/dev-http start` command surface and AMB-9's idempotency) and no pre-server
+  staging registry (it would break AF-8's "no live registry off `ctx` when
+  stopped" and AMB-8's "registry = server lifetime"). The `dev-present` tool
+  returns an **error tool-result** naming the remedy (a tool result is journaled,
+  so it carries no URL/token); `register-route!` raises / returns an error value
+  naming the remedy. Distinct from AMB-9 (already-**running** `start`
+  idempotency) and AMB-12 (stop/status command edges when stopped) — AMB-16 is
+  the **registration-call** not-running edge.
+- **No-op choice-submit log membership / dispatch (INC-10)** — adopts option
+  (i): the HTTP choice-POST handler applies a **pre-dispatch guard** (reading
+  target-session liveness via `:query-session` and the registry-entry
+  selection/single-shot flags) and dispatches the wrapping `psi.extension/*`
+  choice-submit mutation **only for a genuine, live-target, non-empty, first-shot
+  selection**. A dropped (dead-target — AMB-8), empty / no-selection (AMB-15), or
+  already-submitted (AMB-11) POST is **short-circuited before any dispatch**: no
+  wrapping mutation is dispatched, so no no-op choice mutation is event-sourced or
+  recorded in the dispatch journal. INC-3's class (2) stays cleanly
+  **message-producing interaction-result mutations only** (no class-(2)
+  amendment needed); AMB-8/AMB-11/AMB-15 wording is corrected away from "the
+  wrapping mutation no-ops" to "short-circuited by a pre-dispatch handler guard".
+  Distinct from AMB-8 (liveness), AMB-15 (empty selection), AMB-11 (repeat), and
+  INC-3 (log classes).
