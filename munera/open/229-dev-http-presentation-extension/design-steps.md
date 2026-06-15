@@ -268,6 +268,43 @@
   content shapes), AMB-16 (the *not-running* registration edge), and AMB-19 (the
   *token* rejection response).
 
+- [ ] AMB-22 Define whether **persisted `dev/` routes can participate in the
+  choice-feedback loop**, and if so **where their feedback session-id comes
+  from**. The design routes choice feedback to exactly two registration classes —
+  the `dev-present` tool (defaults to its invoking session, AMB-4) and the REPL
+  `register-route!` fn (explicit `:session-id`, AMB-4/INC-7) — but persisted
+  `dev/` routes are a **third raw-handler class** (full-power Clojure handlers
+  loaded at integrant `init`, slice 1) with **no registration-time invoking
+  session and no `:session-id` argument**. A persisted handler is a raw ring
+  handler that could call the same platform **choices interaction helper**
+  (INC-7), yet the design never states whether persisted routes may use it nor
+  what feedback session-id it would target (none exists at load time; a
+  per-request source such as a query param is undefined). Specify one of: (a)
+  persisted routes are **presentation-only** for choices (the helper is
+  unavailable to them / requires a session-id they cannot supply), or (b)
+  persisted routes **may** use the choices helper via a defined per-request
+  session-id mechanism — pinning the choices-helper contract and the slice-1 /
+  slice-3 AC coverage. Distinct from AMB-4 (the `register-route!` explicit
+  session-id), INC-7 (the helper's existence/wiring), and AMB-8 (target liveness).
+
+- [ ] AMB-23 Define the **caller-supplied `:route-id` validity / format
+  constraints and the invalid-id rejection response**. AMB-2 fixes the route-id
+  *assignment model* (optional caller-supplied id used **verbatim**,
+  replace-on-collision; else a system-generated unique id) but never constrains
+  the **format/charset/validity** of a caller-supplied id against the
+  **single-segment `/s/:route-id`** dispatch subtree. A caller-supplied id
+  containing a `/` (two segments → never matches `/s/:route-id`), an empty string,
+  URL-unsafe characters, or a value colliding with the static-asset subtree / a
+  reserved path therefore has **undefined behaviour** — most likely a
+  silently-registered but **unreachable always-`404`** route, contradicting the
+  design's pin-every-edge / pinned-response posture (AMB-16/19/20/21). Specify the
+  caller-supplied route-id constraints (allowed charset / single-segment
+  requirement / non-empty / reserved-prefix exclusion) and the **rejection
+  response** for an invalid id at registration time — most consistently an **error
+  tool-result / error return** in the AMB-21/AMB-16 posture (registers nothing, no
+  URL). Distinct from AMB-2 (assignment model), AMB-20 (the *unknown*-route
+  browser response), and AMB-21 (`:content` shape validation).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

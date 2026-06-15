@@ -1592,3 +1592,51 @@ State/Dispatch/managed-services/interceptor boundaries; AF-1..10 resolve every
 fit concern with cited, this-pass-verified precedents (including the live
 interceptor-chain semantics for the AF-9 no-session-id surface). No design-steps
 added this pass.
+
+### design-review · ambiguity (round 11, turn 2)
+
+Fresh ambiguity pass (second turn of the shared design-review session) using the
+already-loaded design.md + architecture sources + the round-11 architecture reply
+(no new architecture misfit — not duplicated here). Targeted re-reads only (grep:
+persisted/choices-helper/session-id, and route-id/verbatim/generate) to confirm
+the two gaps below are unfiled. AMB-1..21 re-confirmed resolved. Two new
+actionable ambiguities:
+
+- AMB-22 **Persisted `dev/` routes and the choice-feedback loop is undefined.**
+  The design routes choice feedback to exactly two registration classes — the
+  `dev-present` tool (defaults to its invoking session, AMB-4) and the REPL
+  `register-route!` fn (explicit `:session-id`, AMB-4/INC-7) — but persisted
+  `dev/` routes are a **third raw-handler class** (full-power Clojure handlers
+  loaded at integrant `init`, slice 1) with **no registration-time invoking
+  session and no `:session-id` argument**. A persisted handler is a raw ring
+  handler with access to the same platform helpers, so it could call the
+  **choices interaction helper** (INC-7) — yet the design never states whether
+  persisted routes may participate in the choice loop, and if so **where their
+  feedback session-id comes from** (none exists at load time; a per-request
+  source such as a query param is undefined). Two materially different readings:
+  (a) persisted routes are **presentation-only** for choices (the helper is
+  unavailable / requires a session-id they cannot supply), or (b) persisted
+  routes **can** use the choices helper via some per-request session-id mechanism
+  the design must define. The design pins every other interaction edge precisely,
+  so the persisted-route choice-loop availability + session-id source should be
+  pinned for the choices-helper contract and the slice-1/slice-3 AC coverage.
+  Distinct from AMB-4 (the `register-route!` explicit session-id), INC-7 (the
+  helper's existence/wiring), and AMB-8 (target liveness).
+
+- AMB-23 **Caller-supplied `:route-id` validity / format constraints are
+  undefined.** AMB-2 fixes the route-id *assignment model* (optional
+  caller-supplied id used **verbatim**, replace-on-collision; else a
+  system-generated unique id) but never constrains the **format/charset/validity**
+  of a caller-supplied id against the **single-segment `/s/:route-id`** dispatch
+  subtree. A caller-supplied id containing a `/` (two segments → never matches
+  `/s/:route-id`), an empty string, URL-unsafe characters, or a value colliding
+  with the static-asset subtree / a reserved path therefore has **undefined
+  behaviour** — most likely a silently-registered but **unreachable always-`404`
+  route**, contradicting the design's pin-every-edge / pinned-response posture
+  (AMB-16/19/20/21). Specify the caller-supplied route-id constraints (allowed
+  charset / single-segment requirement / non-empty / reserved-prefix exclusion)
+  and the **rejection response** for an invalid id at registration time — most
+  consistently an **error tool-result / error return** in the AMB-21/AMB-16
+  posture (registers nothing, no URL). Distinct from AMB-2 (assignment model),
+  AMB-20 (the *unknown*-route browser response), and AMB-21 (`:content` shape
+  validation).
