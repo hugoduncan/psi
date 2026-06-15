@@ -1717,3 +1717,38 @@ added no new misfit. All three still unchecked at follow-up start → executed.
   reconciliation.
 
 All three marked `[x]` in design-steps.md.
+
+---
+
+## Round-12 architecture review (2026-06-15)
+
+First turn of the shared `design-review` session (architecture-fit only).
+Re-read design.md against AGENTS.md (VSM S2 untrusted-extension /
+capability-gating posture, `protect: ¬direct_atom_access(extensions)`),
+META.md (managed-services principle), doc/extensions.md (managed-service-core
+guidance), and doc/extension-api.md (`:mutate`/`:mutate-session` surfaces).
+
+AF-1..AF-10 (persisted-route isolation, status-projection ownership/scope,
+choice-mutation contract/sequencing, token/handle externality, runtime-owned-
+on-`ctx` live handle, AF-9 system-scoped dispatch surface, AF-10
+`:type :managed-handle`) remain sound and well-fitted; no regression found.
+
+**One new actionable architecture-fit misfit (AF-11):** the design resolves AF-9
+into a *generic, non-dev-http-specific* (INC-13) system-scoped extension dispatch
+surface whose pure handler writes `[:runtime :dev-http]` directly, and AF-10 into
+a generic runtime-owned `ctx`-slot keyed by logical identity — both authorized
+only by `:allowed-events` declaration (the AF-3/AF-6 session-scoped lineage). But
+system/runtime-scoped writes are strictly broader authority than the existing
+session-scoped `:mutate`/`:mutate-session` surfaces, and the design never bounds
+*which* `[:runtime <key>]` state key (AF-9) or *which* logical `ctx`-slot identity
+(AF-10) an untrusted extension may target. As specified, the generic surfaces let
+an untrusted extension write/claim the core-owned `[:runtime :nrepl]` / OAuth slot
+or a peer extension's slot — circumventing **at the state-write/ctx-slot level**
+the very core-owned-projection protection AF-6 establishes **at the event level**
+(AF-6 forbids dispatching `:session/set-nrepl-runtime`, yet an unconfined
+system-scoped write could clobber `[:runtime :nrepl]` directly). Filed AF-11:
+specify the authority-bounding (ext-path-derived/namespaced key confinement
+and/or distinct S2 capability gating) so the two new system-scoped surfaces
+preserve the untrusted-extension isolation posture. Distinct from AF-6 (event
+ownership), AF-7 (scope decision), AF-9/AF-10 (the realizing surfaces) — AF-11 is
+the system-scoped-write/ctx-slot **authority-bounding / isolation** concern.

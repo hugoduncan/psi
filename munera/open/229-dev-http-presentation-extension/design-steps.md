@@ -111,6 +111,32 @@
   status-*projection* surface) — AF-10 is the unlocated live-*handle* ownership
   surface/mechanism.
 
+- [ ] AF-11 Bound the **authority of the two new system-scoped core
+  extension-API contract additions** (AF-9 system-scoped dispatch surface; AF-10
+  generic `:type :managed-handle` runtime-owned `ctx`-slot) for an untrusted
+  extension. Both are resolved as **generic, non-dev-http-specific** (INC-13) and
+  authorized only by `:allowed-events` declaration (the AF-3/AF-6 session-scoped
+  lineage), but a system/runtime-scoped write is strictly broader authority than
+  the session-scoped `:mutate`/`:mutate-session` surfaces, and the design never
+  bounds **which** `[:runtime <key>]` state key (AF-9) or **which** logical
+  `ctx`-slot identity (AF-10) an extension may target. As specified the generic
+  surfaces let an untrusted extension write/claim the **core-owned**
+  `[:runtime :nrepl]` / OAuth slot or a **peer extension's** slot — circumventing
+  at the state-write / ctx-slot level the very core-owned-projection protection
+  AF-6 establishes at the event level (AF-6 forbids dispatching
+  `:session/set-nrepl-runtime`, yet an unconfined system-scoped write could
+  clobber `[:runtime :nrepl]` directly), weakening the VSM S2 untrusted-extension
+  isolation posture (`protect: ¬direct_atom_access(extensions)` /
+  capability-gating). Specify the authority-bounding: confine each surface to a
+  key/slot **derived from / namespaced under the extension's `:ext-path`** (so
+  dev-http can only write its own `[:runtime :dev-http]`-class state and claim its
+  own `ctx` slot, not core or peer slots) and/or require **S2 capability gating
+  distinct from session-scoped `:allowed-events`** for system-scoped writes —
+  so the two new system-scoped surfaces preserve the untrusted-extension
+  isolation posture. Distinct from AF-6 (event ownership), AF-7 (scope decision),
+  and AF-9/AF-10 (the realizing surfaces) — AF-11 is the system-scoped-write /
+  ctx-slot authority-bounding / isolation concern.
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)
