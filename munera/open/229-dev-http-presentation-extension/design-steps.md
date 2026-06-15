@@ -112,6 +112,24 @@
   reload story are unambiguous for the planner. Distinct from AMB-8 (session
   registry lifetime) and AMB-2 (route-id assignment).
 
+- [ ] AMB-14 Specify the **URL form returned by the registration calls**: which
+  of INC-8's two forms (token-less base vs token-embedded copy-pasteable) the
+  `dev-present` tool result (AC-3) and `register-route!` return value carry, and
+  how the developer obtains a directly-openable link. A `dev-present` tool result
+  is journaled into replayable session state, so a token-embedded return URL
+  would leak the credential-class token (AF-4/INC-3/INC-8); a token-less return
+  needs a defined path for the developer to obtain the token (e.g. via `/dev-http
+  status`). Distinct from AMB-1 (transport) and INC-8 (projected-vs-status URL
+  forms; neither names the tool-result/return surface).
+
+- [ ] AMB-15 Define **empty / no-selection choice-submit** behavior: a `:choices`
+  POST with zero options selected (unchecked multi-select, or a radio with no
+  default-checked option) — whether it is a "successful POST" that consumes the
+  AMB-11 single shot and injects an empty (or `:prompt`-only) user message, or is
+  rejected/no-op (browser told "no selection"; single shot not consumed) — so
+  AC-6 and its tests are unambiguous. Distinct from AMB-3 (mid-turn timing),
+  AMB-8 (target liveness), and AMB-11 (repeat of a selected submission).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

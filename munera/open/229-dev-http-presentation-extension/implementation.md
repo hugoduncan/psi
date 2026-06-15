@@ -158,6 +158,39 @@ actionable misfit:
   *location/ownership* decision, currently resolved by precedent-citation
   without engaging the managed-services principle.
 
+### design-review · ambiguity (round 5, turn 2)
+
+Fresh ambiguity pass over the fully-resolved design (AMB-1..13 resolved). Used
+in-context design.md + architecture sources + round-5 architecture reply (AF-8,
+an architecture item, not duplicated here). AMB-1..13 confirmed resolved. Two
+new actionable ambiguities:
+
+- AMB-14 The **URL form returned by the registration calls** (`dev-present` tool
+  result / `register-route!` return value) is unspecified. INC-8 distinguished
+  the token-less base URL (projected/logged) from the token-embedded
+  copy-pasteable URL but enumerated the token-embedded surfaces as **only** the
+  `status` output + dev start-up log line; the `dev-present` "returns its URL"
+  (AC-3) and `register-route!` return are a third, unspecified surface. This is
+  load-bearing: a `dev-present` tool result is journaled into replayable session
+  state, so returning the token-embedded URL would leak the credential-class
+  token into the conversation journal (violating AF-4/INC-3/INC-8), while
+  returning the token-less base URL leaves the model unable to hand the developer
+  a directly-openable link (it must separately fetch the token via `/dev-http
+  status`). The design must state which URL form each registration call returns
+  and how the developer obtains an openable link without journaling the token.
+  Distinct from AMB-1 (transport) and INC-8 (projected-vs-status URL forms;
+  neither names the tool-result/return surface).
+
+- AMB-15 The **empty / no-selection choice submit** is undefined. AMB-7 maps
+  *selected* `:value`(s) to the injected message and AMB-11 covers *repeat*
+  submission, but a POST with **zero** options selected (reachable for unchecked
+  multi-select checkboxes, and for radios rendered with no default-checked
+  option) is unspecified: whether it is a "successful POST" that consumes the
+  AMB-11 single shot and injects an empty (or prompt-only) user message, or is
+  rejected/no-op (browser told "no selection"; shot not consumed). AC-6 and its
+  tests need the defined behavior. Distinct from AMB-3 (mid-turn timing), AMB-8
+  (target liveness), and AMB-11 (repeat of a *selected* submission).
+
 ### design-review · inconsistency (round 4, turn 3)
 
 Fresh inconsistency pass over the fully-resolved design (INC-1..6 resolved).
