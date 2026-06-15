@@ -39,7 +39,7 @@
                            :output :final-llm-reply}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task identified by {{input}} after a plan review. Independently inspect that specific task's artifacts, especially plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the plan review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a plan review. Independently inspect that specific task's artifacts, especially plan.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the plan review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
      :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "review-task-plan",
  :description
