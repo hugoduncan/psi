@@ -10,7 +10,9 @@ skills:
   - work-independently
   - task-design
 ---
-For the Munera task identified by {{input}}, review the task plan and steps for inconsistencies. Work independently. Read the task artifacts, especially plan.md, steps.md, and implementation.md, plus any referenced code/tests/docs. Focus on inconsistency across task files. Then:
+For the Munera task identified by {{input}}, run the inconsistency review as the second turn of the shared `plan-review` multi-prompt session. Work independently. Use the already-loaded task plan.md, steps.md, implementation.md, and ambiguity-review reply from the shared session context by default. Perform only targeted re-reads for specific missing or stale referenced material needed to decide an inconsistency; do not unconditionally re-read the whole task plan and referenced source set.
+
+Review the task plan and steps for inconsistencies, focusing on inconsistency across task files. Then:
 
 1. append a terse review note to the task's implementation.md
 2. add unchecked follow-up items to steps.md for every new actionable inconsistency you found
