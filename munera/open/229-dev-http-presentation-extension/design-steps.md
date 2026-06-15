@@ -86,6 +86,17 @@
   subsequent submit). Distinct from AMB-3 (mid-turn timing) and AMB-8 (target
   liveness).
 
+- [ ] AMB-12 Define lifecycle command behavior when the server is **not
+  running**: `/dev-http stop` against a stopped server (no-op success vs error)
+  and what `/dev-http status` reports when stopped (`running? false`, no
+  url/token). Distinct from AMB-9 (start-side idempotency).
+- [ ] AMB-13 Define the **persisted-route discovery/aggregation contract**: how
+  the platform collects `extensions/dev-http/dev/` reitit route-data + handler
+  namespaces into the router at integrant `init`/reload (conventional entry
+  namespace/var vs auto-scan vs explicit register call), so AC-2 and the
+  reload story are unambiguous for the planner. Distinct from AMB-8 (session
+  registry lifetime) and AMB-2 (route-id assignment).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

@@ -182,6 +182,36 @@ AMB-1..9 confirmed resolved. Two new actionable ambiguities:
   target *liveness*, but neither covers re-submission of the same live route
   (e.g. dev opens the page twice / changes their pick / double-clicks submit).
 
+### design-review · ambiguity (round 4, turn 2)
+
+Fresh ambiguity pass over the fully-resolved design (AMB-1..11 resolved). Used
+in-context design.md + architecture sources + round-4 architecture reply (AF-7).
+AMB-1..11 confirmed resolved; AF-7 (status-projection scope) is an
+architecture-fit item, not duplicated here. Two new actionable ambiguities:
+
+- AMB-12 **Lifecycle behavior when the server is not running** is undefined.
+  AMB-9 fixed double-`start` (idempotent no-op returning existing url+token),
+  but the symmetric edges are unspecified: `/dev-http stop` when no server is
+  running (no-op success vs error) and what `/dev-http status` reports when
+  stopped (`running? false` shape, absent url/token). AC-1 only says "`stop`
+  cleanly halts it … no orphaned server on reload/restart"; it does not address
+  stop/status against an already-stopped server. A planner needs the defined
+  no-server-running behavior for both commands. Distinct from AMB-9 (start-side
+  idempotency).
+- AMB-13 The **persisted-route discovery/aggregation contract** is ambiguous.
+  The design says persisted routes are "reitit route-data + handler namespaces
+  under … `extensions/dev-http/dev/`" that are "reloadable", and integrant was
+  chosen for "clean `halt!`/`init` reload ergonomics against the churny `dev/`
+  routes" — but how the platform *collects* those route definitions into the
+  reitit router at integrant init/reload is open to several materially different
+  interpretations (a single conventional entry namespace/var exposing a route
+  vector; auto-scanning all namespaces under `dev/` for a marker; an explicit
+  dev-time `register`/`require` call). AC-2 ("a persisted route defined under
+  `extensions/dev-http/dev/` is served") does not pin the discovery convention.
+  A planner must define this contract before implementing the router/integrant
+  `init` and the reload story. Distinct from session-route registry behavior
+  (AMB-8) and route-id assignment (AMB-2).
+
 ### design-review · inconsistency (turn 3)
 
 Inconsistency pass (¬correctness, ¬architecture, ¬ambiguity). Used in-context
