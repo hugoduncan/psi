@@ -1777,3 +1777,36 @@ projection is `/dev-http start`/`stop` command-driven per AF-7, but a reload is
 neither command). Filed AMB-24. Distinct from AMB-8 (registry lifetime),
 AMB-9/AMB-12 (start/stop/status command edges), and AMB-13 (persisted-route
 discovery contract).
+
+---
+
+## Round-12 design-review inconsistency (2026-06-15)
+
+Third turn of the shared `design-review` session (inconsistency only), using the
+already-loaded design.md + architecture context + this round's
+architecture/ambiguity replies; targeted re-read of the Slicing section (slices
+1–2) to confirm the token-enforcement scope-vs-slice candidate.
+
+INC-1..INC-14 remain resolved. The one direct contradiction I would otherwise
+flag — AF-8 ("on-`ctx` live handle **survives extension reload**") vs AMB-8
+("registry cleared on ... **reload**") — is **already captured by this round's
+AMB-24** (reload-semantics disambiguation, which names both AF-8 and AMB-8), so
+not re-filed (no duplicate).
+
+**One new actionable inconsistency (INC-15):** the **token-enforcement
+middleware (AMB-18)** is assigned **wholesale to slice 1**, but AMB-18's
+enforcement scope is the *dynamic-route subtrees* — the **`/s/:route-id`
+session-route subtree** (deferred to **slice 2** by INC-11) and the persisted
+`dev/` subtree — plus, per AMB-1/AMB-19/AC-7, the **choice-POST endpoint**
+(introduced in **slice 3**) and `:file` serving. Slice 1 contains only the
+persisted `dev/` subtree ("No session-route registry yet — deferred to slice
+2"), so a slice-1 "token-enforcement middleware (AMB-18)" deliverable cannot gate
+the `/s/:route-id` subtree or choice-POST endpoint that do not yet exist, and
+**slices 2 and 3 never restate the token-gating obligation** for the dynamic
+routes they introduce. Filed INC-15: scope slice 1's token middleware to the
+persisted `dev/` subtree (the only dynamic subtree present in slice 1) and assign
+gating of each later-introduced dynamic route to its slice (or state the platform
+token middleware auto-covers each dynamic subtree as it is added to the router).
+Distinct from AMB-18 (the slice-agnostic enforcement-layer resolution) and INC-11
+(which placed the session-route subtree in slice 2 without reconciling AMB-18's
+slice-1 token-middleware assignment).

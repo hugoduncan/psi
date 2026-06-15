@@ -518,3 +518,27 @@
   AMB-17 (the relocation resolution itself) and INC-10 (no-op log membership /
   pre-dispatch short-circuit) — INC-14 is the residual unreconciled
   flag-location / guard-source contradiction in the AMB-11 and INC-10 text.
+
+- [ ] INC-15 Reconcile the **slice-1 "token-enforcement middleware (AMB-18)"
+  deliverable** with AMB-18's enforcement scope and INC-11's slice placement.
+  AMB-18 makes token validation uniform platform middleware over the
+  **dynamic-route subtrees** — the **`/s/:route-id` session-route subtree** and
+  the persisted `dev/` subtree — and AMB-1/AMB-19/AC-7 add the **choice-POST
+  endpoint** and `:file` serving as gated dynamic routes. But the Slicing section
+  assigns "token-enforcement middleware (AMB-18)" **wholesale to slice 1**, whose
+  only dynamic subtree is the persisted `dev/` route subtree ("No session-route
+  registry yet — deferred to slice 2"); the `/s/:route-id` session-route subtree
+  is a **slice-2** deliverable (INC-11) and the choice-POST endpoint is a
+  **slice-3** deliverable. So slice 1 cannot gate the `/s/:route-id` subtree or
+  the choice-POST endpoint (they do not exist yet), and **slices 2 and 3 never
+  restate the token-gating obligation** for the dynamic routes they introduce —
+  leaving the per-slice enforcement coverage of AC-7 internally inconsistent.
+  Reconcile by scoping slice 1's token middleware to the persisted `dev/` subtree
+  (the only slice-1 dynamic subtree) and assigning token-gating of each
+  later-introduced dynamic route to its slice (slice 2: the `/s/:route-id`
+  session-route subtree; slice 3: the choice-POST endpoint), or by stating that
+  the platform token middleware auto-covers each dynamic subtree as it is added to
+  the router so the obligation is satisfied incrementally. Distinct from AMB-18
+  (the slice-agnostic enforcement-layer/response resolution) and INC-11 (which
+  placed the session-route subtree in slice 2 without reconciling AMB-18's slice-1
+  token-middleware assignment).
