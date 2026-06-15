@@ -182,3 +182,14 @@
   the same `status`-output channel so INC-8's "only" holds. Distinct from INC-8
   (url-term conflation), AF-4 (token externality), and AMB-14 (registration-call
   return URL form).
+
+- [ ] AMB-16 Define **registration-call behavior when the server is not
+  running**: what `dev-present` (AC-3) and `register-route!` (AC-4) do when
+  invoked while `/dev-http` is stopped (no running server → no ephemeral-port
+  base URL and, per AF-8, no live registry on `ctx`). Specify one of: error with
+  a "start the server first" message; auto-start then register; register into a
+  pre-server registry and bind lazily on start; or gate the capability/fn as
+  unavailable while stopped — and state how the returned route URL is formed (or
+  withheld) in that state. Distinct from AMB-9 (start-command idempotency) and
+  AMB-12 (stop/status-command edges); AMB-16 is the registration-call not-running
+  edge.

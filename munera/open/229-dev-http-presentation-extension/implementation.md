@@ -730,3 +730,26 @@ Candidate angles checked and dismissed (not new actionable misfits):
 Conclusion: **no new actionable architectural-fit misfit.** The design's
 architectural fit is complete across the VSM layers and the State/Dispatch/
 managed-services boundaries. No design-steps added this pass.
+
+### design-review · ambiguity (round 6, turn 2)
+
+Fresh ambiguity pass using in-context design.md + architecture sources +
+round-6 architecture reply (no new architecture misfit). AMB-1..15 re-confirmed
+resolved. One new actionable ambiguity:
+
+- AMB-16 **Registration-call behavior when the server is not running** is
+  undefined. AMB-9 fixed double-`start` and AMB-12 fixed `/dev-http stop`/`status`
+  against a stopped server, but both are *lifecycle commands*. The *registration
+  calls* — `dev-present` (AC-3) and `register-route!` (AC-4) — both return a route
+  URL, which requires the running server's ephemeral-port base URL and a live
+  registry (which per AF-8 lives in the integrant system on `ctx`, present only
+  while the server runs). Yet both registration surfaces are registered at
+  extension load, independent of the `/dev-http start` lifecycle, so each is
+  invokable while the server is stopped. The behavior is unspecified across
+  several materially different interpretations: error with a clear "start the
+  server first" message; auto-start the server then register; register into a
+  pre-server registry and lazily bind on start; or make the `dev-present`
+  capability/`register-route!` unavailable while stopped. A planner needs this
+  defined for the `dev-present` tool handler and `register-route!` fn, and for
+  AC-3/AC-4 tests. Distinct from AMB-9 (start-command idempotency) and AMB-12
+  (stop/status-command edges) — AMB-16 is the *registration-call* not-running edge.
