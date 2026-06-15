@@ -111,7 +111,7 @@
   status-*projection* surface) — AF-10 is the unlocated live-*handle* ownership
   surface/mechanism.
 
-- [ ] AF-11 Bound the **authority of the two new system-scoped core
+- [x] AF-11 Bound the **authority of the two new system-scoped core
   extension-API contract additions** (AF-9 system-scoped dispatch surface; AF-10
   generic `:type :managed-handle` runtime-owned `ctx`-slot) for an untrusted
   extension. Both are resolved as **generic, non-dev-http-specific** (INC-13) and
@@ -331,7 +331,7 @@
   URL). Distinct from AMB-2 (assignment model), AMB-20 (the *unknown*-route
   browser response), and AMB-21 (`:content` shape validation).
 
-- [ ] AMB-24 Disambiguate what **"reload" means** for (a) the live server
+- [x] AMB-24 Disambiguate what **"reload" means** for (a) the live server
   handle/process, (b) the session-route registry, (c) the persisted-route router,
   and (d) the canonical `running?`/`url` status projection. The design uses
   "reload" in at least three senses without pinning them: AF-8 says the on-`ctx`
@@ -519,7 +519,7 @@
   pre-dispatch short-circuit) — INC-14 is the residual unreconciled
   flag-location / guard-source contradiction in the AMB-11 and INC-10 text.
 
-- [ ] INC-15 Reconcile the **slice-1 "token-enforcement middleware (AMB-18)"
+- [x] INC-15 Reconcile the **slice-1 "token-enforcement middleware (AMB-18)"
   deliverable** with AMB-18's enforcement scope and INC-11's slice placement.
   AMB-18 makes token validation uniform platform middleware over the
   **dynamic-route subtrees** — the **`/s/:route-id` session-route subtree** and

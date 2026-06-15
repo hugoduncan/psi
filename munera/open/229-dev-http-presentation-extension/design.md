@@ -301,7 +301,9 @@ is event-sourced or logged** (INC-10), and the browser receives a clear "session
 no longer active" response. Registry
 lifetime is tied to the **server**, not the invoking agent session: the
 session-route registry lives in the extension's integrant system and is cleared
-only on server **halt** (`/dev-http stop` / reload), **not** when an invoking
+only on server **halt** (`/dev-http stop`, or the halt half of a stop+`start`
+restart — the **server-halt** reload notion of AMB-24, **not** a persisted-route
+router rebuild, which preserves the registry), **not** when an invoking
 agent session ends. A route whose target session has ended therefore remains
 served but becomes effectively presentation-only (feedback dropped per above).
 "Die with the server/session" thus means *die with the server* (registry =
@@ -471,6 +473,54 @@ reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
   only the generic lifecycle-ownership / ctx-handle mechanism is. Distinct from
   AF-8 (the location/ownership decision) and AF-9 (the status-*projection*
   surface) — AF-10 is the live-*handle* ownership surface/mechanism.
+- **Reload semantics (AMB-24)**: "reload" is used in the design in **three
+  materially distinct senses**; each has a defined effect on (a) the live server
+  handle/process, (b) the session-route registry, (c) the persisted-route router
+  subtree, and (d) the canonical `running?`/`url` status projection. They are
+  **not** the same operation and must not be conflated:
+  - **(1) Extension-code reload** (psi reloads the `dev-http` extension's
+    code/manifest — the AF-8 "survives extension reload" notion). **(a)** The live
+    integrant system/server handle **survives**: it is the runtime-owned managed
+    handle on `ctx` keyed by logical identity (AF-8/AF-10), so the runtime
+    **reuses** the existing handle rather than re-initialising it — the server is
+    **not** halted, **not** orphaned, **not** duplicated. **(b)** Registry
+    **preserved** (it lives under the surviving handle). **(c)** Persisted-route
+    subtree **unchanged** (a code reload does not by itself re-`require` the
+    persisted entry var or rebuild the router — that is notion (2)). **(d)** Status
+    **unchanged** and needs **no re-projection** (same `running?=true`, same
+    `url`/port/token — nothing changed). This is the failure the on-`ctx`
+    managed-handle prevents (AC-1: no orphaned/duplicated server on reload).
+  - **(2) Persisted-route reload / router rebuild** (the AMB-13 `init`/reload that
+    re-`require`s the conventional entry var and rebuilds the router from the
+    returned vector — "editing a `dev/` route and reloading picks it up").
+    Scoped to the **persisted-route subtree only**. **(a)** Server handle/process
+    **preserved** — the bound server is **not** halted; only the persisted-route
+    subtree of the live router is swapped. **(b)** Session-route registry
+    **preserved** — a persisted-route reload does **not** clear live
+    `dev-present`/`register-route!` session routes (editing one `dev/` route must
+    not destroy every live session route). **(c)** Persisted-route subtree
+    **rebuilt** from the re-`require`d entry var. **(d)** Status **unchanged**, no
+    re-projection (same server, same `running?`/`url`/port/token). This resolves
+    the AMB-8-vs-AMB-13 conflict: AMB-13's reload is notion (2) and does **not**
+    clear the registry.
+  - **(3) Server halt + restart** (`/dev-http stop`, or `stop` then `start`). This
+    is the **server-halt** notion AMB-8 lists alongside `/dev-http stop`. **(a)**
+    Handle/process **halted** (integrant `halt!`); a fresh handle/server is created
+    on the next `start`. **(b)** Session-route registry **cleared** — it dies with
+    the server (AMB-8: registry = server lifetime). **(c)** Persisted-route subtree
+    **rebuilt** on the next `start`'s `init`. **(d)** Status **re-projected** by the
+    `/dev-http` command handler (AF-7/AF-9): `stop` projects `running? false` (no
+    `url`); `start` projects `running? true` + a new token-less base `url` (new
+    ephemeral port, new per-launch token).
+
+  Because status `running?`/`url` only changes under notion (3) — which is
+  command-driven and self-re-projects — notions (1) and (2) leave the canonical
+  status **valid and current** with **no re-projection needed**, so a reload never
+  leaves the projection stale. AMB-8's "registry cleared on … reload" refers
+  **only** to notion (3) (server halt), **not** notions (1) or (2). Distinct from
+  AMB-8 (registry lifetime tied to server halt), AMB-9/AMB-12 (start/stop/status
+  command edges), and AMB-13 (persisted-route discovery contract — which is
+  notion (2)'s mechanism).
 - **Server**: http-kit, bound to `127.0.0.1` only. **Ephemeral port** (OS-assigned
   at start; not user-configurable — see O3). A **per-launch token** is required
   for access (dev-grade, not auth); the **token-embedded copy-pasteable URL**
@@ -726,6 +776,51 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   externality mirrors the OAuth credential-externality precedent (secrets do not
   enter canonical/replayable state). The live token is surfaced via `status`/log
   only.
+- **System-scoped surface authority-bounding (AF-11).** The two generic core
+  extension-API contract additions the resolved architecture introduces — the
+  **AF-9 system-scoped dispatch surface** (writes a `[:runtime <key>]` `:state*`
+  key with no invoking session-id) and the **AF-10 generic `:type
+  :managed-handle` runtime-owned `ctx`-slot** (claims a `ctx` slot keyed by
+  logical identity) — grant **system/runtime-scoped authority that is strictly
+  broader** than the session-scoped `:mutate`/`:mutate-session` surfaces, so
+  `:allowed-events` declaration alone (the AF-3/AF-6 session-scoped authorization)
+  does **not** suffice to bound them for an **untrusted** extension. Without
+  bounding, a generic system-scoped write could clobber the **core-owned**
+  `[:runtime :nrepl]` / OAuth slot or a **peer extension's** `[:runtime <other>]`
+  slot — circumventing **at the state-write / ctx-slot level** the very
+  core-owned-projection protection AF-6 establishes **at the event level** (AF-6
+  forbids dispatching `:session/set-nrepl-runtime`, yet an unconfined system-scoped
+  write could overwrite `[:runtime :nrepl]` directly), weakening the VSM S2
+  untrusted-extension isolation posture (`protect: ¬direct_atom_access(extensions)`
+  / capability gating). **Resolution (structural confinement + capability gate):**
+  - **Ext-path-derived namespace confinement (primary; `unreachable > forbidden`).**
+    Both generic surfaces confine the targetable identity to a key/slot **derived
+    from the calling extension's own identity** (its `:ext-path` / extension key),
+    so the extension can target **only** its own namespace and targeting a foreign
+    slot is **structurally unrepresentable**, not merely rejected. The AF-9
+    surface lets an extension write **only** `[:runtime <ext-key>]` (dev-http →
+    `[:runtime :dev-http]`) — never `[:runtime :nrepl]`, the OAuth slot, or a peer
+    extension's `[:runtime <other>]`. The AF-10 managed-handle surface lets an
+    extension claim **only** a `ctx` slot whose logical identity is namespaced
+    under its own extension key (dev-http → `:dev-http/server`) — never a
+    core-owned or peer-owned `ctx` slot. The surfaces **derive** the target from
+    the authenticated calling extension rather than accepting an arbitrary
+    caller-supplied `[:runtime <key>]` / slot id, so the confinement is enforced by
+    construction at the one chokepoint.
+  - **S2 capability gating for the system-scoped surfaces (authorization).** Use
+    of these system-scoped surfaces additionally requires an **S2 capability
+    distinct from the session-scoped `:allowed-events`** authorization — a
+    system-scoped write is gated by an explicit capability the extension must hold,
+    not implied by an event declaration — so an extension cannot reach the broader
+    authority merely by declaring an event.
+
+  Together these keep the two new system-scoped surfaces **isolation-preserving**:
+  an untrusted extension can write/claim **only its own** `[:runtime <ext-key>]`
+  state and `ctx` slot, never core or peer slots, restoring at the
+  state-write/ctx-slot level the protection AF-6 gives at the event level.
+  Distinct from AF-6 (event ownership), AF-7 (scope decision), and AF-9/AF-10 (the
+  realizing surfaces) — AF-11 is the **system-scoped-write / ctx-slot
+  authority-bounding / isolation** decision.
 - **Replay fidelity / log membership (INC-3, INC-12).** Exactly **two** dev-http
   mutation classes are event-sourced: (1) **status-projection mutations**
   (lifecycle `start`/`stop` projecting `running?`/token-less base `url` into
@@ -844,9 +939,24 @@ first slice that delivers a session-route behaviour and a registration surface �
 route never touches the session-route registry, and no registration surface
 exists until slice 2).
 
+**Token-enforcement is per-subtree-incremental (INC-15).** The AMB-18 platform
+token middleware gates the **dynamic-route subtrees**, but those subtrees are
+**introduced across slices** (persisted `dev/` in slice 1; the `/s/:route-id`
+session-route subtree in slice 2; the choice-POST endpoint in slice 3). So the
+**platform token middleware auto-covers each dynamic subtree as that subtree is
+mounted on the router**: slice 1's token middleware gates only the persisted
+`dev/` subtree it actually introduces, and each later slice mounts the dynamic
+subtree it introduces **under the same platform token middleware** — the gating
+obligation is satisfied **incrementally**, never assigned to a slice for routes
+that do not yet exist (the static-asset subtree stays exempt throughout, AMB-18).
+
 1. **Platform + persisted route** (D5): lifecycle (`start/status/stop`) +
-   integrant system + http-kit server (localhost+token) + token-enforcement
-   middleware (AMB-18) + status projection + reitit router + one persisted demo
+   integrant system + http-kit server (localhost+token) + the **platform
+   token-enforcement middleware (AMB-18) scoped in this slice to the persisted
+   `dev/` route subtree** (the only dynamic subtree present in slice 1; the
+   `/s/:route-id` and choice-POST subtrees are gated by the same middleware as
+   they are introduced in slices 2/3 — INC-15) + status projection + reitit router
+   + one persisted demo
    route under `extensions/dev-http/dev/`. This slice also delivers the **two
    generic core extension-API contract additions it depends on (INC-13)**: the
    **AF-10 `:type :managed-handle`** managed-service lifecycle type (to host the
@@ -866,11 +976,16 @@ exists until slice 2).
    markdown/table/vega/mermaid) and the REPL **`register-route!` fn** (registers
    an arbitrary ring handler fn, plus the **hiccup/file raw-handler escape-hatch
    helpers**, reachable via `register-route!` only — INC-2/INC-5). Both surfaces
-   exercise the registry/dispatch introduced in this slice. Complete behaviour:
-   register and open a session route from both paths.
+   exercise the registry/dispatch introduced in this slice. The new
+   **`/s/:route-id` session-route subtree is mounted under the same platform token
+   middleware** (AMB-18), so it is token-gated from introduction (INC-15).
+   Complete behaviour: register and open a session route from both paths.
 3. **Choice interaction loop** (`:choices` renderer + the raw-handler **choices
    helper** (INC-7) + POST → first-class `psi.extension/*` mutation →
-   synthetic-user-prompt → user message into originating session).
+   synthetic-user-prompt → user message into originating session). The new
+   **choice-POST endpoint (under `/s/:route-id`) is likewise mounted under the
+   platform token middleware** (AMB-18), so it is token-gated from introduction
+   (INC-15).
 
 Out-of-scope future enhancement (not a slice of this task, per AMB-6):
 
@@ -1279,3 +1394,49 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   contradictory registry-entry-flag storage and guard-source descriptions.
   Distinct from AMB-17 (the relocation resolution itself) and INC-10 (no-op log
   membership / pre-dispatch short-circuit).
+- **System-scoped surface authority-bounding (AF-11)** — the two generic
+  system-scoped core extension-API additions (AF-9 system-scoped dispatch surface;
+  AF-10 `:type :managed-handle` runtime-owned `ctx`-slot) grant authority strictly
+  broader than the session-scoped `:mutate`/`:mutate-session` surfaces, so
+  `:allowed-events` declaration alone does not bound them for an untrusted
+  extension. Bounded two ways: (a) **ext-path-derived namespace confinement**
+  (primary, structural / `unreachable > forbidden`) — each surface derives the
+  targetable identity from the calling extension's own `:ext-path`/extension key,
+  so dev-http can write **only** `[:runtime :dev-http]` and claim **only**
+  `:dev-http/server`, never the core-owned `[:runtime :nrepl]`/OAuth slot or a peer
+  extension's slot (foreign targets are structurally unrepresentable, not merely
+  rejected); (b) **distinct S2 capability gating** for system-scoped use (a
+  capability beyond session-scoped `:allowed-events`). Restores at the
+  state-write/ctx-slot level the protection AF-6 gives at the event level,
+  preserving the untrusted-extension isolation posture. Distinct from AF-6 (event
+  ownership), AF-7 (scope decision), and AF-9/AF-10 (the realizing surfaces).
+- **Reload semantics disambiguation (AMB-24)** — "reload" is pinned to **three
+  distinct notions**, each with a defined effect on (a) the live server
+  handle/process, (b) the session-route registry, (c) the persisted-route router
+  subtree, and (d) the canonical `running?`/`url` status projection: **(1)
+  extension-code reload** (AF-8) — handle **survives** (reused on `ctx` by logical
+  identity), registry **preserved**, persisted subtree **unchanged**, status
+  **unchanged/no re-projection**; **(2) persisted-route reload / router rebuild**
+  (AMB-13) — server handle **preserved** (not halted), registry **preserved** (only
+  the persisted subtree swapped), persisted subtree **rebuilt** from the
+  re-`require`d entry var, status **unchanged**; **(3) server halt+restart**
+  (`/dev-http stop` [+ `start`]) — handle **halted**/recreated, registry
+  **cleared** (dies with the server, AMB-8), persisted subtree **rebuilt** on the
+  next `start`, status **re-projected** by the command handler (AF-7/AF-9: `stop` →
+  `running? false`; `start` → `running? true` + new url/token). AMB-8's "registry
+  cleared on … reload" is **only** notion (3); status changes only under (3)
+  (command-driven, self-re-projecting), so (1)/(2) never leave the projection
+  stale. Distinct from AMB-8 (registry lifetime), AMB-9/AMB-12 (command edges), and
+  AMB-13 (persisted-route discovery contract = notion (2)'s mechanism).
+- **Per-slice token-enforcement coverage (INC-15)** — the AMB-18 platform token
+  middleware gates the dynamic-route subtrees, which are introduced **across
+  slices**, so gating is satisfied **incrementally, per subtree as it is mounted**:
+  slice 1's token middleware is scoped to the **persisted `dev/` subtree** (its
+  only dynamic subtree); the **`/s/:route-id` session-route subtree** (slice 2) and
+  the **choice-POST endpoint** (slice 3) are each **mounted under the same platform
+  token middleware** as they are introduced (the static-asset subtree stays exempt
+  throughout). Removes the contradiction of assigning whole-AMB-18 token
+  enforcement to slice 1 (which lacks the `/s/:route-id` and choice-POST subtrees)
+  and the silent gap of slices 2/3 not restating the gating obligation. Distinct
+  from AMB-18 (the slice-agnostic enforcement-layer/response resolution) and INC-11
+  (which placed the session-route subtree in slice 2).

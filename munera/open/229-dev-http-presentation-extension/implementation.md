@@ -1810,3 +1810,60 @@ token middleware auto-covers each dynamic subtree as it is added to the router).
 Distinct from AMB-18 (the slice-agnostic enforcement-layer resolution) and INC-11
 (which placed the session-route subtree in slice 2 without reconciling AMB-18's
 slice-1 token-middleware assignment).
+
+---
+
+## Execute round-12 design-review follow-ups (AF-11, AMB-24, INC-15) (2026-06-15)
+
+Batch baseline established by the evidence rule: previous design-follow-up
+completion = `2259b52aa` (execute round-11). The immediately-preceding review
+batch is the three round-12 commits (`0aebe9513` architecture/AF-11,
+`4ab3f0e10` ambiguity/AMB-24, `ed789f4aa` inconsistency/INC-15). Parent of the
+oldest (`0aebe9513^` = `2259b52aa`) is the baseline; `git diff
+2259b52aa..HEAD -- design-steps.md` added exactly the AF-11/AMB-24/INC-15
+unchecked items, all still present and unchecked → candidate work set = those
+three. Executed all three.
+
+**AF-11 (architecture-fit) — system-scoped surface authority-bounding.** Added a
+new Architectural-constraints bullet bounding the AF-9/AF-10 generic system-scoped
+surfaces for an untrusted extension. Primary mechanism = **ext-path-derived
+namespace confinement** (structural; `unreachable > forbidden`): each surface
+derives the targetable identity from the calling extension's own
+`:ext-path`/extension key, so dev-http can write only `[:runtime :dev-http]` and
+claim only `:dev-http/server` — targeting the core-owned `[:runtime :nrepl]`/OAuth
+slot or a peer's slot is structurally unrepresentable, not merely rejected.
+Secondary = **distinct S2 capability gating** for system-scoped use (beyond
+session-scoped `:allowed-events`). Restores at the state-write/ctx-slot level the
+core-owned-projection protection AF-6 gives at the event level. Resolution bullet
+added.
+
+**AMB-24 (ambiguity) — reload semantics.** Pinned "reload" to three distinct
+notions, each with defined effects on (a) handle/process, (b) session-route
+registry, (c) persisted-route subtree, (d) `running?`/`url` status: (1)
+extension-code reload (AF-8 — handle survives on `ctx`, registry preserved,
+subtree unchanged, status unchanged); (2) persisted-route reload / router rebuild
+(AMB-13 — server preserved, registry preserved, persisted subtree rebuilt, status
+unchanged); (3) server halt+restart (`/dev-http stop`[+`start`] — handle
+halted/recreated, registry cleared, subtree rebuilt on next start, status
+re-projected by the command handler). Reconciled the AF-8-vs-AMB-8 surface
+contradiction: AMB-8's "registry cleared on … reload" is **only** notion (3);
+status changes only under (3) (command-driven, self-re-projecting), so (1)/(2)
+never leave the projection stale. Edited the AMB-8 registry-lifetime sentence to
+say "the halt half of a stop+start restart … not a persisted-route router
+rebuild" and added a Lifecycle "Reload semantics (AMB-24)" subsection. Resolution
+bullet added.
+
+**INC-15 (inconsistency) — per-slice token-enforcement coverage.** AMB-18's token
+middleware gates dynamic-route subtrees that are introduced across slices, so the
+prior whole-AMB-18 assignment to slice 1 (which lacks the `/s/:route-id` and
+choice-POST subtrees) was inconsistent and slices 2/3 never restated the
+obligation. Reconciled by making token-enforcement **per-subtree-incremental**:
+added a Slicing intro paragraph and scoped slice 1's middleware to the persisted
+`dev/` subtree, with slice 2 (the `/s/:route-id` subtree) and slice 3 (the
+choice-POST endpoint) each mounted under the same platform token middleware as
+introduced; static-asset subtree exempt throughout. Resolution bullet added.
+
+No blocked items. All three marked `[x]` in design-steps.md; design.md updated
+(Lifecycle reload subsection + AMB-8 wording, Architectural-constraints AF-11
+bullet, Slicing INC-15 intro + slices 1–3, three resolution bullets). plan.md and
+steps.md untouched (do not exist for this design-only task).
