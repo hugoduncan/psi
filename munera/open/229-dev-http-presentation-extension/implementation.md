@@ -120,6 +120,48 @@ context, which has no ambient session focus). One new actionable misfit:
   session-scoped. Distinct from AF-2/AF-4 (what projects) and AF-6 (event
   ownership).
 
+### design-review · inconsistency (round 4, turn 3)
+
+Fresh inconsistency pass over the fully-resolved design (INC-1..6 resolved).
+Used in-context design.md + architecture sources + round-4 architecture (AF-7)
+and ambiguity (AMB-12/13) replies. INC-1..6 confirmed resolved; AF-7 / AMB-12 /
+AMB-13 are architecture/ambiguity items, not duplicated here. Two new actionable
+inconsistencies (both resolution-introduced, across sections):
+
+- INC-7 **register-route! choice feedback vs `:choices` being dev-present-only.**
+  INC-5 (round 3) reframed the declarative renderer set as
+  `:markdown`/`:table`/`:vega`/`:mermaid`/`:choices` and limited
+  `register-route!` raw-handler helpers to **hiccup + file only** (no choices
+  helper). But the AMB-4 (round 2) Choice-feedback paragraph still says the REPL
+  `register-route!` route "takes an explicit `:session-id` … if omitted, the
+  route is presentation-only (its **`:choices`/POST feedback** is disabled)",
+  attributing `:choices`/POST interaction to a `register-route!` raw-handler
+  route. Post-INC-5 there is no documented path for a raw handler fn to emit a
+  platform-wired choice form (no choice helper listed beside hiccup/file), so
+  either the platform's choice-POST interaction mechanism is available to
+  `register-route!` routes (and a helper/contract is missing), or
+  `register-route!`'s `:session-id` and its "`:choices`/POST feedback" are
+  vestigial after INC-5. Internal contradiction across Renderers/INC-5, the
+  `register-route!` description, and the AMB-4 Interaction paragraph. Distinct
+  from INC-5 (which only reframed hiccup/file).
+
+- INC-8 **The `url` term conflates a token-embedded surfaced value with a
+  token-less projected/logged value.** AMB-1 says the per-launch token is a URL
+  query param "so the URL surfaced in `status`/log is copy-pasteable and opens
+  directly in a browser" (token embedded), and the Server bullet says "both the
+  resolved URL and token are surfaced." But AF-4/INC-3 require the projected
+  canonical `url` (and the logged class-1 value) to **exclude** the token (token
+  never enters `:state*`/log). The single term `url`/"resolved URL" therefore
+  denotes two different values — a token-embedded copy-pasteable surface string
+  and a token-less projected/logged value — and the design never states the
+  projected/logged `url` is the token-less base while the surfaced/log URL is
+  token-embedded (reconstructed from base url + external token at render time).
+  Taken literally, projecting the copy-pasteable `url` would leak the token into
+  canonical state/log, violating AF-4/INC-3. Internal contradiction between AMB-1
+  / the Server-bullet surfacing text and the AF-4/INC-3 token-externality
+  constraints. Distinct from AF-4 (token externality *principle*) and INC-3 (log
+  membership) — INC-8 is the unreconciled single-term `url` conflation.
+
 ### design-review · ambiguity (turn 2)
 
 Ambiguity pass (¬correctness, ¬architecture, ¬inconsistency). Used in-context

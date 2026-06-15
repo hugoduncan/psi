@@ -126,3 +126,16 @@
   the AMB-1/Lifecycle static-asset exemption: reword AC-7 to scope the token
   requirement to dynamic content routes (HTML pages, choice POST, `:file`),
   noting vendored static JS/CSS assets are exempt.
+
+- [ ] INC-7 Reconcile `register-route!` choice feedback with INC-5's
+  dev-present-only `:choices`: either expose a platform choice-POST mechanism /
+  helper for `register-route!` raw handlers (defining how a raw handler emits a
+  platform-wired choice form bound to its `:session-id`), or drop the AMB-4
+  "`:choices`/POST feedback" + `:session-id` framing for `register-route!` as
+  vestigial after INC-5. Distinct from INC-5 (hiccup/file reframing).
+- [ ] INC-8 Reconcile the `url` term: state explicitly that the projected/logged
+  canonical `url` (AF-4/INC-3) is the **token-less base** URL, while the
+  surfaced/`status`/log copy-pasteable URL (AMB-1) is **token-embedded**
+  (reconstructed from the base url + the external token at render time), so
+  projecting/logging `url` cannot leak the token. Distinct from AF-4 (token
+  externality) and INC-3 (log membership).
