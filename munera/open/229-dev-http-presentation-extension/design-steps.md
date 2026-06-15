@@ -17,6 +17,18 @@
   `:allowed-events`) — an explicit extension-API contract update, not a bridge
   into the internal-only `:session/submit-synthetic-user-prompt` event.
 
+- [ ] AF-4 Reconsider projecting the per-launch `token` into canonical
+  `:state*`. Per the OAuth credential-externality precedent (State-boundary
+  table: credential store stays external, only login status projected), keep the
+  token in the extension-local handle and project only `running?`/`url`,
+  surfacing the live token via the `status`/log path — avoiding a secret in the
+  replayable event-log / dispatch-trace. Or document why the dev-grade token is
+  deliberately placed in canonical state.
+- [ ] AF-5 Specify that the `psi.extension/*` choice-submit mutation triggers
+  `:session/submit-synthetic-user-prompt` via a `:runtime/dispatch-event`
+  follow-on effect (pure handler → effects-as-data), not an imperative
+  in-handler dispatch, to honor the Dispatch sequencing contract.
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)

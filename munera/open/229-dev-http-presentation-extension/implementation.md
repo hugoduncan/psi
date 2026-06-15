@@ -36,6 +36,32 @@ Actionable architectural misfits:
   untrusted-extension posture), not an internal-event back-door. Design states
   it is in scope but does not locate it on the extension-API contract.
 
+### design-review · architecture (round 2, turn 1)
+
+Fresh architecture-fit pass over the post-resolution design (AF-1..3 already
+resolved into design.md). Sources: AGENTS.md, META.md, doc/architecture.md
+(State boundary table; Dispatch sequencing contract). AF-1..3 confirmed
+genuinely resolved (extension-local `dev/`, status projection, first-class
+`psi.extension/*` mutation). Two new actionable misfits:
+
+- AF-4 AF-2's resolution projects `running?`/`url`/**`token`** into canonical
+  `:state*` via dispatch, modeled on the nREPL endpoint-metadata precedent. But
+  the State-boundary table keeps the OAuth credential store *external* and
+  projects only login *status*; secrets do not enter canonical state. The
+  per-launch token is a credential-class secret — projecting it also lands it in
+  the replayable event-log + dispatch-trace summaries. Conforming choice: keep
+  the token in the extension-local handle, project only `running?`/`url`, and
+  surface the live token via the `status`/log path (reads the external handle).
+  `url`/port non-determinism is already precedented (nREPL); the token's
+  *secrecy* is the distinguishing misfit. Not covered by AF-1..3.
+- AF-5 D3 says the wrapping mutation's "handler internally dispatches
+  `:session/submit-synthetic-user-prompt`". The Dispatch sequencing contract
+  sanctions follow-on dispatch only via the `:runtime/dispatch-event` effect
+  (pure handler → effects-as-data). Imperative in-handler dispatch violates the
+  pure-handler boundary. Conforming mechanism: the wrapping mutation emits a
+  `:runtime/dispatch-event` follow-on effect targeting the synthetic-user-prompt
+  event. Distinct from AF-3 (contract surface + `:allowed-events`).
+
 ### design-review · ambiguity (turn 2)
 
 Ambiguity pass (¬correctness, ¬architecture, ¬inconsistency). Used in-context
