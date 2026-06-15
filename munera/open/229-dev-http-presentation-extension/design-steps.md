@@ -29,6 +29,14 @@
   follow-on effect (pure handler → effects-as-data), not an imperative
   in-handler dispatch, to honor the Dispatch sequencing contract.
 
+- [ ] AF-6 Specify the **event-ownership** of the status-projection mutation
+  (lifecycle `start`/`stop` projecting `running?`/`url` into `:state*`): state
+  that it is a first-class `psi.extension/*` dispatch-routed mutation declared in
+  `:allowed-events`, consistent with AF-3's untrusted-extension posture — not a
+  reach into a core/internal projection event (the cited nREPL precedent
+  `:session/set-nrepl-runtime` is core-owned, so the precedent governs *shape*,
+  not the dispatching event's ownership).
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)

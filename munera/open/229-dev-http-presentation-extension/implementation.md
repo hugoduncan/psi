@@ -62,6 +62,31 @@ genuinely resolved (extension-local `dev/`, status projection, first-class
   `:runtime/dispatch-event` follow-on effect targeting the synthetic-user-prompt
   event. Distinct from AF-3 (contract surface + `:allowed-events`).
 
+### design-review · architecture (round 3, turn 1)
+
+Fresh architecture-fit pass over the post-resolution design (AF-1..5 resolved).
+Sources: AGENTS.md, META.md, doc/architecture.md (State boundary table line
+156–174; Dispatch sequencing contract line 204–236, `:runtime/dispatch-event`
+follow-on). AF-1..5 confirmed genuinely resolved and precedent-accurate
+(extension-local `dev/`; running?/url projected + token external per OAuth
+credential-externality; first-class `psi.extension/*` choice mutation in
+`:allowed-events` emitting a `:runtime/dispatch-event` follow-on). One new
+actionable misfit:
+
+- AF-6 The **status-projection mutation** (lifecycle `start`/`stop` projecting
+  `running?`/`url` into `:state*`) has **unspecified event-ownership**. It is
+  dispatched **by the extension** (driven by its `/dev-http` command handler),
+  but AF-2/AF-4 frame it only as "via dispatch ... matching the nREPL precedent"
+  — and that precedent (`:session/set-nrepl-runtime`) is a **core-owned** event.
+  An untrusted extension dispatching a core projection event is exactly the AF-3
+  anti-pattern (internal-event reach). Conforming choice: state that the
+  status-projection mutation is a **first-class `psi.extension/*` dispatch-routed
+  mutation declared in `:allowed-events`**, consistent with AF-3's
+  untrusted-extension posture — not a reach into a core/internal projection
+  event. Distinct from AF-2/AF-4 (which fixed *what* projects: running?/url, not
+  token) and from AF-3 (which fixed only the *choice-submit* mutation's
+  ownership).
+
 ### design-review · ambiguity (turn 2)
 
 Ambiguity pass (¬correctness, ¬architecture, ¬inconsistency). Used in-context
