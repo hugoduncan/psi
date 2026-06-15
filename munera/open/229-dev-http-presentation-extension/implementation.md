@@ -118,6 +118,25 @@ already captured under AMB-5/AMB-6; not duplicated here.
   its target renderer set includes the `:hiccup` raw-HTML escape hatch and
   `:file` arbitrary-disk-file serving, contradicting the "safe" framing.
 
+### design-review · inconsistency (round 2, turn 3)
+
+Fresh inconsistency pass over the post-resolution design (INC-1/INC-2 already
+resolved). Used in-context design.md + architecture sources + round-2
+architecture (AF-4/AF-5) and ambiguity (AMB-7/8/9) replies. Focus: internal
+contradictions, esp. resolution-introduced ones. Two new actionable
+inconsistencies:
+
+- INC-3 "Replay fidelity" says *only interaction-result mutations enter the log*
+  and "Determinism boundary" puts the live server *outside the deterministic
+  core*, but the AF-2 resolution projects `running?`/`url`/`token` into canonical
+  `:state*` via a dispatch mutation — which enters the event log and writes
+  non-deterministic per-launch values into canonical state. The doc contradicts
+  itself on log membership / determinism. (Inconsistency facet; distinct from
+  AF-4's secret-externality recommendation.)
+- INC-4 The `:mermaid` renderer is described as "Mermaid (and/or Graphviz)", but
+  O5 / Client-assets vendor only Vega-Lite + Mermaid JS (no Graphviz/viz.js
+  asset), so Graphviz rendering is unsupported by the declared vendored assets.
+
 ### design-review · follow-up (this pass)
 
 Evidence rule applied. No previous design-follow-up exists; the review-batch

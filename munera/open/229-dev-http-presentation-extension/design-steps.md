@@ -67,3 +67,11 @@
   framing with its renderer set: decide whether the model-callable tool may
   target the `:hiccup` raw-HTML and `:file` arbitrary-disk-file escape hatches,
   or restrict those to the REPL `register-route!` path.
+- [ ] INC-3 Reconcile the "Replay fidelity" (*only interaction-result mutations
+  enter the log*) and "Determinism boundary" (*live server outside the
+  deterministic core*) constraints with the AF-2 status-projection dispatch
+  mutation (which enters the log and writes non-deterministic `url`/`token` into
+  canonical `:state*`); state precisely which mutation classes enter the log.
+- [ ] INC-4 Reconcile the `:mermaid` renderer's "(and/or Graphviz)" claim with
+  O5 / Client-assets vendoring only Vega-Lite + Mermaid JS: either drop the
+  Graphviz claim or add a vendored Graphviz/viz.js asset.
