@@ -1006,3 +1006,69 @@ work set. No predating/edited/checked/steps.md items included.
   added a resolved-decision.
 
 All four design-steps items marked done. No blocked/skipped items.
+
+### design-review · architecture (round 8, turn 1)
+
+Fresh architecture-fit pass over the fully-resolved design (AF-1..9 resolved;
+round-6 found no new misfit, round-7 found AF-9). Sources re-consulted: AGENTS.md
+(VSM S1–S3, `system_scope`, shims/adapters one-way), META.md (managed-services on
+ctx keyed by logical identity, *reused within ctx rather than extension-local
+hidden state*; core owns canonical projections), doc/architecture.md
+(State-boundary runtime-handles table — every listed ctx handle is core/runtime-
+placed; Dispatch sequencing `:runtime/dispatch-event`), doc/extensions.md
+(managed-service surface: `:ensure-service`/`:stop-service`/`:service-request`,
+documented `:type :subprocess`; guidance "do not expand the generic
+managed-service core with protocol-specific behavior … prefer integration-local
+adapters"), doc/extension-api.md (only session-scoped `(:mutate api)` /
+`:mutate-session`).
+
+Angles checked and dismissed (not new actionable misfits):
+- AF-9 system-scoped status-projection surface — resolved (non-session-rebound
+  dispatch path writing `[:runtime :dev-http]`); precedent-accurate.
+- Choice-submit follow-on `:runtime/dispatch-event` → core `:session/submit-
+  synthetic-user-prompt` — covered by AF-3/AF-5 (declared first-class wrapping
+  mutation, effects-as-data, runtime-executed follow-on); not extension-gated
+  reach. No new misfit.
+- Pull-based status (no projection-invalidation effects) — round-6 dismissal
+  holds; mirrors pull-only `[:runtime :nrepl]` precedent.
+- HTTP-handler reads via `:query-session`, writes via dispatched mutation —
+  conforms to reads-via-resolvers / writes-via-mutations.
+
+One new actionable architectural-fit misfit:
+
+- AF-10 **AF-8's runtime-owned-on-`ctx` live handle has no located extension-API
+  ownership surface** — symmetric to the AF-9 gap, but for the *handle* not the
+  *status projection*. AF-8 decided the live integrant system/server/registry
+  handle is a runtime-owned managed handle on `ctx` keyed by logical identity —
+  explicitly **not** extension-local hidden state and **not** core `:state*` —
+  while the Lifecycle Boundary constraint forbids any **core** namespace gaining
+  dev-http-specific integrant code (integrant `init`/`halt!` lives in the
+  extension). But the only documented extension-API runtime-ctx-handle surface is
+  the managed-service `:ensure-service`/`:stop-service` lifecycle, whose
+  documented `:type :subprocess` hosts a **runtime-owned subprocess** lifecycle
+  (runtime spawns/kills the process) and whose transport surface the design
+  itself rejects as psi-as-client and unfit. dev-http instead needs a runtime
+  ctx handle whose **start/stop lifecycle is extension-provided in-process
+  integrant `init`/`halt!`** — a shape no documented extension surface realizes,
+  and which doc/extensions.md's guidance ("do not expand the generic
+  managed-service core … prefer integration-local adapters") makes a consequential
+  contract choice, not a free implementation detail. AF-8 consciously defers the
+  realizing mechanism ("whether via `:ensure-service` with a non-subprocess type
+  or a narrower runtime ctx-handle mechanism is a planning/implementation
+  detail"), but by the AF-9 standard already applied in this task — locate the
+  concrete extension-API surface when the documented surfaces don't realize the
+  decision — the surface must be pinned at design time: AF-8's
+  runtime-owned-on-`ctx` + extension-owned-in-process-lifecycle + no-core-dev-http-
+  code + no-extension-local-hidden-state quadrilemma is otherwise unrealizable on
+  the documented contract (any realization collapses into extension-local hidden
+  state, which AF-8 forbids, or core dev-http code, which the Boundary forbids).
+  Conforming choice: (a) define/identify a generic **non-subprocess managed-handle
+  lifecycle type** whose runtime-owned `:ensure-service`/`:stop-service` delegates
+  start/stop to the extension-provided in-process `init`/`halt!` (a contract
+  addition in the AF-3/AF-6/AF-9 lineage), or (b) confirm and document that a
+  narrower runtime ctx-handle extension surface already hosts an
+  extension-provided-lifecycle handle keyed by logical identity, or (c) justify an
+  alternative host that still satisfies all four AF-8/Boundary constraints.
+  Distinct from AF-8 (the location/ownership decision) and AF-9 (the
+  status-*projection* surface) — AF-10 is the unlocated live-*handle* ownership
+  surface/mechanism.

@@ -78,6 +78,39 @@
   realizable on the extension-API contract. Distinct from AF-6 (event ownership)
   and AF-7 (the scope decision); AF-9 is the unlocated projection surface/mechanism.
 
+- [ ] AF-10 Locate AF-8's **runtime-owned-on-`ctx` live-handle ownership on a
+  concrete extension-API surface** (symmetric to AF-9, but for the handle, not the
+  status projection). AF-8 decided the live integrant system/server/registry
+  handle is a runtime-owned managed handle on `ctx` keyed by logical identity —
+  explicitly **not** extension-local hidden state and **not** core `:state*` —
+  while the Lifecycle Boundary forbids any **core** namespace gaining dev-http-
+  specific integrant code (integrant `init`/`halt!` lives in the extension). But
+  the only documented extension-API runtime-ctx-handle surface is the
+  managed-service `:ensure-service`/`:stop-service` lifecycle, whose documented
+  `:type :subprocess` hosts a **runtime-owned subprocess** lifecycle (runtime
+  spawns/kills the process) and whose transport the design itself rejects as
+  psi-as-client and unfit; dev-http instead needs a runtime ctx handle whose
+  start/stop lifecycle is **extension-provided in-process integrant
+  `init`/`halt!`** — a shape no documented surface realizes, and which
+  doc/extensions.md's "do not expand the generic managed-service core … prefer
+  integration-local adapters" guidance makes a consequential contract choice, not
+  a free implementation detail. AF-8 defers the mechanism ("whether via
+  `:ensure-service` with a non-subprocess type or a narrower runtime ctx-handle
+  mechanism is a planning/implementation detail"), but by the AF-9 standard
+  applied in this task the realizing surface must be pinned at design time, since
+  AF-8's runtime-owned-on-`ctx` + extension-owned-in-process-lifecycle +
+  no-core-dev-http-code + no-extension-local-hidden-state quadrilemma is otherwise
+  unrealizable on the documented contract. Specify one of: (a) define/identify a
+  generic **non-subprocess managed-handle lifecycle type** whose runtime-owned
+  `:ensure-service`/`:stop-service` delegates start/stop to the extension-provided
+  in-process `init`/`halt!` (a contract addition in the AF-3/AF-6/AF-9 lineage);
+  (b) confirm and document that a narrower runtime ctx-handle extension surface
+  already hosts an extension-provided-lifecycle handle keyed by logical identity;
+  or (c) justify an alternative host satisfying all four AF-8/Boundary
+  constraints. Distinct from AF-8 (the location/ownership decision) and AF-9 (the
+  status-*projection* surface) — AF-10 is the unlocated live-*handle* ownership
+  surface/mechanism.
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)
