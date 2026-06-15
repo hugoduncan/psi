@@ -1449,3 +1449,31 @@ Conclusion: **no new actionable architectural-fit misfit.** The design's
 architectural fit is complete and coherent across the VSM layers and the
 State/Dispatch/managed-services boundaries; AF-1..10 resolve every fit concern
 with cited, this-pass-verified precedents. No design-steps added this pass.
+
+### design-review · ambiguity (round 10, turn 2)
+
+Fresh ambiguity pass (second turn of the shared design-review session) using the
+already-loaded design.md + architecture sources + round-10 architecture reply
+(no new architecture misfit — not duplicated here). One targeted re-read (grep
+for malformed / invalid-content / not-accepted / validation / reject wording)
+confirmed every "reject" in design.md is about the token (AMB-19), empty
+selection (AMB-15), not-running registration (AMB-16), or choice edges — none
+covers `dev-present` content-shape violation. AMB-1..20 re-confirmed resolved.
+One new actionable ambiguity:
+
+- AMB-21 **`dev-present` malformed / shape-violating content handling + the
+  per-renderer validation boundary is undefined.** AMB-10 fixes the canonical
+  per-renderer `:content` shapes and says non-canonical `:table` variants are
+  "not accepted (no shape detection)", but never defines what a `dev-present`
+  call carrying shape-violating content *receives* (error tool-result vs
+  throw vs broken render), nor *where* validation happens — server-checkable
+  shapes (`:table`/`:markdown`/`:mermaid`/`:choices`) can be rejected at
+  call time, but `:vega` content is opaque (handed to the vendored client lib)
+  and can only fail at browser render time, so the validation boundary differs
+  by renderer and is unstated. The design pins every other error/edge response
+  precisely (AMB-8/11/15/16/19/20), so the malformed-content rejection response
+  and the call-time-vs-render-time boundary need pinning for the tool handler and
+  AC-3/AC-5 negative-path tests. Distinct from AMB-10 (valid shapes), AMB-16
+  (not-running edge), and AMB-19 (token rejection).
+
+design-steps.md: added AMB-21 (one unchecked item). No blocked/skipped items.

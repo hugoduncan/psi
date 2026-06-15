@@ -248,6 +248,26 @@
   (a *known live* route whose *target session* ended), and AMB-16 (the
   registration *call* while the server is stopped).
 
+- [ ] AMB-21 Define **`dev-present` malformed / shape-violating content handling
+  and the per-renderer validation boundary**. AMB-10 fixes the canonical
+  per-renderer `:content` shapes and states non-canonical `:table` variants are
+  "not accepted (one-way; no shape detection)", but the design never defines
+  **what happens when a `dev-present` call carries content violating the AMB-10
+  shape**: whether it is rejected at tool-call time with an **error tool-result**
+  (parallel to AMB-16's not-running error and AMB-19's pinned token rejection),
+  what that result says, and **where validation occurs per renderer** — the
+  server-checkable shapes (`:table` `{:headers :rows}`, `:markdown`/`:mermaid`
+  strings, `:choices` spec) can be validated at call time, but `:vega` (and
+  arguably `:mermaid`) content is **opaque, passed to the vendored client lib**
+  and can only fail at **browser render time**, so the validation boundary
+  genuinely differs by renderer and is unstated. The design pins every other
+  error/edge response precisely (AMB-8/11/15/16/19/20), so the malformed-content
+  rejection response (status/tool-result + message) and the call-time-vs-render-
+  time validation boundary should be pinned for the `dev-present` tool handler
+  and the AC-3/AC-5 negative-path tests. Distinct from AMB-10 (the *valid*
+  content shapes), AMB-16 (the *not-running* registration edge), and AMB-19 (the
+  *token* rejection response).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")
