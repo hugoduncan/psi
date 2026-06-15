@@ -702,6 +702,50 @@ workflow can enter `design-review` at most six total times including the initial
 pass; the workflow runtime counts `:max-iterations` as total target-step entries,
 including the initial entry.
 
+## Batch plan review
+
+`review-task-plan` reviews a Munera task `plan.md`/`steps.md` along two aspects in
+one shared `plan-review` multi-prompt session step:
+
+1. **ambiguity** — plan and steps ambiguity
+2. **inconsistency** — inconsistency across task files
+
+The two prompts run as back-to-back turns in the same workflow-owned child
+session. The first ambiguity turn reads the task `plan.md`, `steps.md`, and
+`implementation.md` plus any referenced code/tests/docs needed for the batch
+review. The later inconsistency turn uses that already-loaded plan context and
+the ambiguity reply by default, performing only targeted re-reads for missing or
+stale facts.
+
+Like `review-task-design`, this is a **batch-review-then-follow-up** topology.
+The earlier version interleaved review and follow-up per aspect
+(`ambiguity review → ambiguity follow-up → inconsistency review →
+inconsistency follow-up → clarity-status`). The current workflow instead runs the
+whole two-prompt review batch against the same pre-follow-up plan, then routes
+once after the queue drains:
+
+```text
+plan-review --DONE--> final-summary
+plan-review --REPEAT--> plan-follow-up
+plan-follow-up --DONE, :max-iterations 5--> plan-review
+```
+
+Post-drain routing uses the deterministic `workflow/pass-feedback-routing`
+operation over the two per-prompt final replies, addressed through refs such as
+`{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}`. The router
+validates every supplied reply with the review `PASS_STATUS` grammar (exactly one
+`PASS_STATUS: ACTIONABLE_FEEDBACK` or `PASS_STATUS: REVIEW_COMPLETE` line);
+missing, duplicate, malformed, or implementation-only statuses fail the workflow.
+When all replies are valid, the pass routes `REPEAT` iff any prompt returned
+`ACTIONABLE_FEEDBACK`; otherwise it routes `DONE`. The separate `clarity-status`
+invoke step is no longer needed: the pass-feedback judge attaches directly to
+`plan-review`.
+
+A clean batch goes to `final-summary`, which recovers both phases' text through
+the same per-prompt `:output` refs. A feedback batch runs one `plan-follow-up`
+step and then starts another full `plan-review` batch. The workflow can enter
+`plan-review` at most five total times including the initial pass.
+
 ## Shared review follow-up steps
 
 The review workflows (`review-task-design`, `review-task-plan`, and the
@@ -710,44 +754,47 @@ run follow-up steps that execute the unchecked items the preceding review pass
 just added, update the in-scope task artifacts, mark completed items done, leave
 blocked items unchecked with a terse `implementation.md` reason, and commit.
 
-That follow-up behaviour is shared across hosts via **two** profile follow-up
+That follow-up behaviour is shared across hosts via **three** profile follow-up
 `.md` files, referenced with `:prompt-workflow`. A profile is chosen by *which*
 file a host references — there is no per-step parameter to get wrong:
 
-| Profile  | File                         | Items file        | Writable artifacts                                  | Forbidden / read-only            |
-| -------- | ---------------------------- | ----------------- | --------------------------------------------------- | -------------------------------- |
-| `design` | `review-follow-up-design.md` | `design-steps.md` | `design.md`, `design-steps.md`, `implementation.md` | `plan.md`/`steps.md` (forbidden) |
-| `steps`  | `review-follow-up-steps.md`  | `steps.md`        | `plan.md`, `steps.md`, `implementation.md`, plus referenced code/tests/docs | `design.md` (read-only context)  |
+| Profile  | File                         | Items file        | Scope            | Writable artifacts                                  | Forbidden / read-only            |
+| -------- | ---------------------------- | ----------------- | ---------------- | --------------------------------------------------- | -------------------------------- |
+| `design` | `review-follow-up-design.md` | `design-steps.md` | batch            | `design.md`, `design-steps.md`, `implementation.md` | `plan.md`/`steps.md` (forbidden) |
+| `plan`   | `review-follow-up-plan.md`   | `steps.md`        | batch            | `plan.md`, `steps.md`, `implementation.md`, plus referenced code/tests/docs | `design.md` (read-only context)  |
+| `steps`  | `review-follow-up-steps.md`  | `steps.md`        | single review    | `plan.md`, `steps.md`, `implementation.md`, plus referenced code/tests/docs | `design.md` (read-only context)  |
 
 - `review-task-design` references the `design` profile from its single
-  `design-follow-up` step after the whole three-prompt review batch.
-- `review-task-plan` and `review-step` reference the `steps` profile from their
-  per-aspect/per-review follow-up steps; `review-task-implementation` inherits it
-  transitively via `review-step`.
+  `design-follow-up` step after the whole multi-prompt review batch.
+- `review-task-plan` references the `plan` profile from its single
+  `plan-follow-up` step after the whole two-prompt review batch.
+- `review-step` references the `steps` profile from its per-review follow-up
+  step; `review-task-implementation` inherits it transitively via `review-step`.
 
-For `review-task-design`, "preceding review pass" means the immediately
-preceding whole `design-review` batch, not one prompt within it. The design
-follow-up executes only unchecked `design-steps.md` items newly added by that
-batch. It identifies them from task-scoped git history and a `design-steps.md`
-diff from the batch baseline to current `HEAD`, then matches the added checklist
-lines to currently unchecked items. Pre-existing unchecked items, checked items,
-stale edited items, and unattributable/ambiguous items are left untouched; the
-follow-up records a terse blocking note in `implementation.md` rather than
-guessing.
+For both batch profiles (`design` and `plan`), "preceding review pass" means the
+immediately preceding whole review batch, not one prompt within it. The
+follow-up executes only unchecked items newly added by that batch
+(`design-steps.md` for `design`, `steps.md` for `plan`). It identifies them from
+task-scoped git history and an items-file diff from the batch baseline to current
+`HEAD`, then matches the added checklist lines to currently unchecked items.
+Pre-existing unchecked items, checked items, stale edited items, and
+unattributable/ambiguous items are left untouched; the follow-up records a terse
+blocking note in `implementation.md` rather than guessing.
 
-The `steps` profile hosts both plan review and *implementation* review. When it
-hosts implementation review (via `review-step`), follow-up items routinely
-require editing the actual code, tests, and docs they reference — so the
-`steps`-profile follow-up explicitly permits writing those referenced source
-artifacts, not just the task files. For plan review there are simply no
-code/test items to edit, so the broader scope is harmless.
+The `plan` and `steps` profiles host plan review and *implementation* review
+respectively. When the `steps` profile hosts implementation review (via
+`review-step`), follow-up items routinely require editing the actual code, tests,
+and docs they reference — so both profiles explicitly permit writing those
+referenced source artifacts, not just the task files. For plan review there are
+typically no code/test items to edit, so the broader scope is harmless.
 
 Host routing owns repetition; only the follow-up step *body* is shared.
-`review-task-plan` finishes every phase in the current pass before the
-deterministic `clarity-status` invoke step decides whether to restart another
-full pass from the first phase, and can enter `ambiguity-review` at most five
-total times. `review-step` loops back to its `review` step (`REPEAT → review`)
-with `:max-iterations 10`, so implementation-review profiles delegated through
+`review-task-plan` runs the whole two-prompt review batch, then its single
+`plan-follow-up` step decides nothing about routing — the post-drain
+`pass-feedback-routing` judge restarts another full batch on actionable feedback,
+and `review-task-plan` can enter `plan-review` at most five total times.
+`review-step` loops back to its `review` step (`REPEAT → review`) with
+`:max-iterations 10`, so implementation-review profiles delegated through
 `review-task-implementation` can enter the review step at most ten total times
 (the initial review plus up to nine follow-up-driven re-reviews). The workflow
 runtime counts `:max-iterations` as total target-step entries, including the

@@ -64,6 +64,7 @@
                 "review-task-plan.edn"
                 "review-task-plan-ambiguity-review.md"
                 "review-task-plan-inconsistency-review.md"
+                "review-follow-up-plan.md"
                 "review-follow-up-steps.md"
                 "implement-task.edn"
                 "implement-task-implement-pass.md"

@@ -1,60 +1,46 @@
 {:steps
- [{:name "ambiguity-review",
+ [{:name "plan-review",
    :type :session,
-   :prompt-workflow "review-task-plan-ambiguity-review.md",
-   :judge
-   {:type :invoke,
-    :operation "workflow/pass-status-routing",
-    :args {:text {:from {:step "ambiguity-review", :output :final-llm-reply}},
-           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
-   :on {"REPEAT" {:goto "ambiguity-follow-up"},
-        "DONE" {:goto "inconsistency-review"}}}
-  {:name "ambiguity-follow-up",
-   :type :session,
-   :prompt-workflow "review-follow-up-steps.md",
-   :judge {:type :invoke,
-           :operation "workflow/constant-routing",
-           :args {:route "DONE"}},
-   :on {"DONE" {:goto "inconsistency-review"}}}
-  {:name "inconsistency-review",
-   :type :session,
-   :prompt-workflow "review-task-plan-inconsistency-review.md",
-   :judge
-   {:type :invoke,
-    :operation "workflow/pass-status-routing",
-    :args {:text {:from {:step "inconsistency-review", :output :final-llm-reply}},
-           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
-   :on {"REPEAT" {:goto "inconsistency-follow-up"},
-        "DONE" {:goto "clarity-status"}}}
-  {:name "inconsistency-follow-up",
-   :type :session,
-   :prompt-workflow "review-follow-up-steps.md",
-   :judge {:type :invoke,
-           :operation "workflow/constant-routing",
-           :args {:route "DONE"}},
-   :on {"DONE" {:goto "clarity-status"}}}
-  {:name "clarity-status",
-   :type :invoke,
-   :operation "workflow/constant-routing",
-   :args {:route "DONE"},
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently" "task-design"],
+   :prompts
+   [{:name "ambiguity",
+     :prompt-workflow "review-task-plan-ambiguity-review.md"}
+    {:name "inconsistency",
+     :prompt-workflow "review-task-plan-inconsistency-review.md"}],
    :judge
    {:type :invoke,
     :operation "workflow/pass-feedback-routing",
-    :args {:ambiguity-text {:from {:step "ambiguity-review", :output :final-llm-reply}},
-           :inconsistency-text {:from {:step "inconsistency-review", :output :final-llm-reply}}}},
-   :on {"REPEAT" {:goto "ambiguity-review", :max-iterations 5},
+    :args {:ambiguity-text {:from {:step "plan-review",
+                                   :prompt "ambiguity",
+                                   :output :final-llm-reply}},
+           :inconsistency-text {:from {:step "plan-review",
+                                       :prompt "inconsistency",
+                                       :output :final-llm-reply}}}},
+   :on {"REPEAT" {:goto "plan-follow-up"},
         "DONE" {:goto "final-summary"}}}
+  {:name "plan-follow-up",
+   :type :session,
+   :prompt-workflow "review-follow-up-plan.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "plan-review" :max-iterations 5}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
    :contributions
    [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "ambiguity-review", :yield :text}}
-    {:type :source, :from {:step "inconsistency-review", :yield :text}}
+    {:type :source, :from {:step "plan-review"
+                           :prompt "ambiguity"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "plan-review"
+                           :prompt "inconsistency"
+                           :output :final-llm-reply}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task identified by {{input}}. Independently inspect that specific task's artifacts, especially plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a plan review. Independently inspect that specific task's artifacts, especially plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the plan review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
      :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "review-task-plan",
  :description
- "Repeatedly review a Munera task plan and steps for ambiguities and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains"}
+ "Repeatedly review a Munera task plan and steps for ambiguities and inconsistencies in one shared multi-prompt review batch, record terse notes, execute batched follow-up steps, and loop until no actionable feedback remains"}

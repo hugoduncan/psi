@@ -658,6 +658,7 @@
                           "create-task-plan-create-plan.md"
                           "review-task-plan-ambiguity-review.md"
                           "review-task-plan-inconsistency-review.md"
+                          "review-follow-up-plan.md"
                           "review-follow-up-steps.md"
                           "implement-task-implement-pass.md"]]
     (with-workflow-dir
