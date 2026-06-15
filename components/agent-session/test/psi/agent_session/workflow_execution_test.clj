@@ -334,7 +334,7 @@
         result (execute!)
         run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
     (is (= :failed (:status result)))
-    (is (= "Delegated workflow definition not found"
+    (is (= "Delegated workflow definition not found: missing-workflow"
            (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
     (is (= :workflow/execution-failure-recorded
            (get-in run [:history (dec (count (:history run))) :event])))))
@@ -350,7 +350,7 @@
         result (execute!)
         run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
     (is (= :failed (:status result)))
-    (is (= "Delegated workflow definition not found"
+    (is (= "Delegated workflow definition not found: builder"
            (get-in run [:step-runs "run-selected-workflow" :attempts 0 :execution-error :message])))
     (is (= :workflow/execution-failure-recorded
            (get-in run [:history (dec (count (:history run))) :event])))))
