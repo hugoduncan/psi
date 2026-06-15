@@ -695,3 +695,38 @@ this singleton (those are session/extension-scoped; AF-7 made dev-http a
 system-scoped singleton). AMB-15 is symmetric with AMB-8 (non-decision does not
 burn the single shot) and consistent with AMB-7/AMB-11. All four design-steps
 marked done. No blocked/skipped items.
+
+### design-review · architecture (round 6, turn 1)
+
+Fresh architecture-fit pass over the fully-resolved design (AF-1..8 all
+resolved). Sources: AGENTS.md (VSM S1–S3, capability gating, `system_scope`),
+META.md (managed-services on ctx; interactive-projection invalidation vs
+polling), doc/architecture.md (State-boundary runtime-handles table; Dispatch
+sequencing contract `:runtime/dispatch-event`), doc/extensions.md (managed-service
+surface `:ensure-service`/`:type :subprocess`), doc/extension-api.md
+(`:query`/`:mutate` ambient vs `:query-session`/`:mutate-session` explicit;
+`psi.extension/*` ext-scoped mutate). AF-1..8 re-confirmed genuinely resolved and
+precedent-accurate: extension-local `dev/` (AF-1); status projection of
+`running?`/token-less base url only (AF-2/AF-4); first-class `psi.extension/*`
+dispatch-routed mutations in `:allowed-events` for both choice-submit (AF-3) and
+status-projection (AF-6); effects-as-data follow-on for the synthetic-user-prompt
+(AF-5); system-scoped status vs session-scoped choice-submit (AF-7); live handle
+as runtime-owned managed handle on `ctx` keyed by logical identity (AF-8).
+
+Candidate angles checked and dismissed (not new actionable misfits):
+- Off-thread HTTP-handler → `:mutate-session` is precedented by the scheduler's
+  delayed-prompt path; AMB-3 statechart turn admission governs it.
+- `dev-present` tool capability + `:allowed-events` gating is the standard
+  extension capability surface, already covered by the minimal-surface constraint
+  and AF-3/AF-6.
+- Projection-invalidation effects (META.md: interactive projections use semantic
+  invalidation, not polling): dev-http status is **pull-based introspection
+  state** modeled explicitly on the `[:runtime :nrepl]` endpoint-metadata
+  precedent (queried via `/dev-http status` + EQL), not an interactive UI
+  projection with subscribers. The mirrored nREPL precedent is itself pull-only
+  and emits no interactive-projection invalidation, so consistency requires none
+  here.
+
+Conclusion: **no new actionable architectural-fit misfit.** The design's
+architectural fit is complete across the VSM layers and the State/Dispatch/
+managed-services boundaries. No design-steps added this pass.
