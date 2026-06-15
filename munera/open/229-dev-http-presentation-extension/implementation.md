@@ -1541,3 +1541,54 @@ per-renderer structural-violation rejection clause, and an AMB-21 entry in the
 resolved-decisions log. design-steps.md: AMB-21 marked `[x]`.
 
 No blocked/skipped items.
+
+### design-review · architecture (round 11, turn 1)
+
+Fresh architecture-fit pass (first turn of a new shared design-review session)
+over the fully-resolved design (AF-1..10 resolved; architecture passes rounds 6,
+9, 10 each concluded no new misfit). Sources re-consulted this pass: AGENTS.md
+(VSM S1–S5, `system_scope(¬agent_session_scope)`, untrusted-extension posture,
+shims/adapters one-way, reads-via-resolvers/writes-via-mutations), META.md
+(managed-services on `ctx` keyed by logical identity, reused-not-hidden), and —
+verified directly this pass — doc/architecture.md's **live default interceptor
+chain** (`:permission :log :statechart :handler :effects
+:trim-effects-on-replay :validate :apply`), the Dispatch sequencing contract
+(`:runtime/dispatch-event` follow-on runs synchronously from `:effects` after
+apply), the dispatch event-log being one-summarized-entry-per-dispatch carrying
+**`ext id` + `origin`**, and doc/extension-api.md confirming both documented
+extension mutate surfaces (`(:mutate api)` rebound-to-invoking-session,
+`(:mutate-session api)` explicit-session) are session-scoped.
+
+New angles examined this pass (none a new actionable misfit):
+- **AF-9 no-session-id system-scoped dispatch through the live interceptor
+  chain.** Probed how `:permission` (extension `:allowed-events`), `:statechart`,
+  and capability-gating treat a dispatch carrying no invoking session-id. Resolved
+  cleanly: permission enforcement is keyed on the **ext-id** (carried in every
+  dispatch per the event-log `ext id`/`origin` fields), not on a session, so a
+  declared `psi.extension/*` event is permission-checkable without a session;
+  system-scoped events are simply **not statechart-claimed** (the `[:runtime
+  :nrepl]`/OAuth `system_scope` precedent), and capability-gating is not in the
+  live default chain. No fit conflict; AF-9's "explicit extension-API contract
+  addition carrying no session-id" sits within the existing chain semantics.
+- **Extension pure handler writing the core `[:runtime :dev-http]` key.** The
+  declared `psi.extension/*` status mutation's pure handler emits a
+  `:root-state-update` into `[:runtime :dev-http]` — the sanctioned dispatch write
+  path, mirroring the `[:runtime :nrepl]` scope, already located by AF-7/AF-9; not
+  an untrusted-extension boundary breach (no reach into a core-owned event, no
+  direct atom access).
+- **Two generic core additions (AF-9 surface, AF-10 `:type :managed-handle`)
+  driven by a dev-only extension.** Admitted by the managed-services
+  multi-integration guidance and `addition > modification` / `open_slot >
+  closed_dispatch`; re-weighing would relitigate AF-10's resolved judgment
+  (rounds 9/10 reasoning holds).
+- Off-thread HTTP-handler `:mutate-session` (scheduler delayed-prompt precedent),
+  pull-based status with no projection-invalidation effects (pull-only `[:runtime
+  :nrepl]` precedent), AF-5 effects-as-data follow-on (Dispatch sequencing
+  contract) — all conform; dismissals from prior rounds hold.
+
+Conclusion: **no new actionable architectural-fit misfit.** The design's
+architectural fit is complete and coherent across the VSM layers and the
+State/Dispatch/managed-services/interceptor boundaries; AF-1..10 resolve every
+fit concern with cited, this-pass-verified precedents (including the live
+interceptor-chain semantics for the AF-9 no-session-id surface). No design-steps
+added this pass.
