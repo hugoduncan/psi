@@ -147,6 +147,30 @@
   AC-6 and its tests are unambiguous. Distinct from AMB-3 (mid-turn timing),
   AMB-8 (target liveness), and AMB-11 (repeat of a selected submission).
 
+- [ ] AMB-17 Define **concurrent first-shot choice-submission atomicity** and
+  **where the single-shot `submitted` flag is set**. AMB-11 makes a `:choices`
+  route single-shot and INC-10 adds a pre-dispatch guard that reads the
+  registry-entry submitted flag, but the design never specifies when/where the
+  flag flips (in the HTTP handler pre-dispatch vs inside the dispatch-serialized
+  `psi.extension/*` mutation) nor how the read-check-mark is atomic — so two
+  simultaneous valid first-shot POSTs can both pass the guard before either marks
+  submitted (TOCTOU), leaving the "at most one user message per choice route"
+  guarantee (AMB-11/AC-6) undefined under concurrency. Specify the authoritative
+  single-shot mechanism (e.g. mark inside the dispatch-serialized mutation with
+  the pre-dispatch guard as a best-effort fast path that the mutation re-checks/
+  no-ops, or a handler-level compare-and-set). Distinct from AMB-11 (sequential
+  repeat), AMB-3 (timing), AMB-8 (liveness), AMB-15 (empty selection).
+- [ ] AMB-18 Define the **token-enforcement boundary** for `register-route!`
+  raw-handler routes and persisted `dev/` routes. AMB-1/INC-6 gate "dynamic
+  content routes" by content category, but a raw handler fn (and a persisted
+  `dev/` handler) emits arbitrary ring responses the platform cannot classify a
+  priori. State whether token validation is uniform platform middleware over the
+  whole `/s/:route-id` session-route subtree and the persisted `dev/` route
+  subtree (raw/persisted handlers auto-gated, never see an untokened request) or
+  is the individual handler's responsibility — pinning which layer enforces AC-7
+  for the router build and tests, with the static-asset path exempt. Distinct
+  from AMB-1 (transport) and INC-6 (static-asset exemption wording).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

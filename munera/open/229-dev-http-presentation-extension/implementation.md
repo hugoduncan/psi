@@ -863,3 +863,48 @@ re-confirmed genuinely resolved and precedent-accurate. One new actionable misfi
   extension-API contract. Distinct from AF-6 (event ownership) and AF-7 (the
   scope decision); AF-9 is the unlocated system-scoped projection *surface/
   mechanism*.
+
+### design-review · ambiguity (round 7, turn 2)
+
+Fresh ambiguity pass using in-context design.md + architecture sources +
+round-7 architecture reply (AF-9, an architecture item — not duplicated here).
+AMB-1..16 re-confirmed resolved. Two new actionable ambiguities:
+
+- AMB-17 **Concurrent first-shot choice-submission atomicity / where the
+  single-shot `submitted` flag is set** is undefined. AMB-11 makes a `:choices`
+  route single-shot and INC-10 adds a *pre-dispatch* guard in the HTTP
+  choice-POST handler that "reads the registry-entry submitted flag" and
+  dispatches the wrapping mutation only for a first-shot selection — but the
+  design never says *when/where the flag flips to submitted* (in the HTTP handler
+  before dispatch, or inside the dispatched `psi.extension/*` mutation, which
+  serializes through dispatch) nor how the read-check-mark is made atomic. Under
+  two simultaneous valid first-shot POSTs, both can pass the pre-dispatch
+  flag-read before either marks the route submitted (a TOCTOU window), so the
+  "at most one user message per choice route" guarantee (AMB-11/AC-6) is
+  unspecified under concurrency — exactly the class of race that task 224's
+  at-most-once funnel had to make atomic. A planner needs the defined mechanism:
+  e.g. the authoritative single-shot mark happens inside the dispatch-serialized
+  mutation (the pre-dispatch guard is a best-effort fast path that may admit a
+  duplicate dispatch, with the mutation re-checking and no-oping the second), or
+  the registry-entry mark is a handler-level compare-and-set, etc. Distinct from
+  AMB-11 (sequential repeat), AMB-3 (mid-turn timing), AMB-8 (target liveness),
+  and AMB-15 (empty selection) — AMB-17 is the *concurrent* first-shot
+  atomicity/flag-set-point gap.
+
+- AMB-18 **Token-enforcement boundary for `register-route!` raw-handler routes
+  and persisted `dev/` routes** is undefined. AMB-1/INC-6 say the token gates
+  "all dynamic content routes — HTML page routes, the choice POST endpoint, and
+  `:file` serving" and exempts vendored static assets, but the enforcement is
+  enumerated by *content category*, not by *route boundary*. A `register-route!`
+  raw handler fn emits arbitrary ring responses the platform cannot classify a
+  priori, and persisted `dev/` routes are full-power handlers too; the design
+  does not state whether token validation is applied as uniform platform
+  middleware over the whole `/s/:route-id` session-route subtree and the
+  persisted `dev/` route subtree (so raw/persisted handlers are auto-gated and
+  never see an untokened request) or is the individual handler's responsibility
+  (so a raw handler could accidentally serve untokened dynamic content). AC-7 and
+  AC-8 do not pin which layer enforces the token. A planner needs the defined
+  enforcement point (recommended: platform middleware gating the dynamic-route
+  subtrees uniformly, with the static-asset path exempt) for the router build and
+  the AC-7 tests. Distinct from AMB-1 (token *transport*) and INC-6 (static-asset
+  *exemption wording*) — AMB-18 is the *enforcement-layer/responsibility* gap.
