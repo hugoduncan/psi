@@ -65,6 +65,18 @@
   (no-op / return existing url+token / restart / error), since the command
   surface has no `restart` and AC-1 only addresses no-orphan-on-reload/restart.
 
+- [ ] AMB-10 Specify the `dev-present` per-renderer content-data shape for the
+  declarative renderers — in particular the `:table` input shape
+  (vector-of-maps vs vector-of-vectors vs `{:headers :rows}`), and confirm the
+  implied shapes for `:markdown` (string), `:vega` (Vega-Lite spec map), and
+  `:mermaid` (source string) — so the `dev-present` content contract is
+  unambiguous for AC-3/AC-5.
+- [ ] AMB-11 Define repeat-submission behavior for a `:choices` route: whether
+  multiple POSTs to the same live route each inject a fresh user message, or the
+  route is single-shot after the first submission (and what the browser sees on a
+  subsequent submit). Distinct from AMB-3 (mid-turn timing) and AMB-8 (target
+  liveness).
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

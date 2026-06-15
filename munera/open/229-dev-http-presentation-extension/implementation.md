@@ -129,6 +129,26 @@ Used in-context design.md + architecture sources + round-2 architecture reply
   no-orphan-on-reload/restart but not explicit double-`start` semantics, and the
   command surface has no `restart`.
 
+### design-review · ambiguity (round 3, turn 2)
+
+Fresh ambiguity pass over the post-resolution design (AMB-1..9 resolved). Used
+in-context design.md + architecture sources + round-3 architecture reply (AF-6).
+AMB-1..9 confirmed resolved. Two new actionable ambiguities:
+
+- AMB-10 The `dev-present` per-renderer **content-data shape** is specified only
+  for `:choices` (AMB-7); the other declarative renderers' input shapes are
+  asymmetric/under-specified, notably `:table` ("tabular data" — vector-of-maps
+  vs vector-of-vectors vs `{:headers :rows}`?). `:markdown` (string), `:vega`
+  (Vega-Lite spec map), `:mermaid` (source string) are reasonably implied, but
+  `:table` is genuinely ambiguous and a planner needs the concrete `dev-present`
+  content schema. Distinct from AMB-7 (selection→message content, not input
+  shape).
+- AMB-11 **Repeat choice submission** is undefined: whether a `:choices` route
+  accepts multiple POSTs (each injecting a fresh user message) or is single-shot
+  after the first submission. AMB-3 covered mid-turn *timing* and AMB-8 covered
+  target *liveness*, but neither covers re-submission of the same live route
+  (e.g. dev opens the page twice / changes their pick / double-clicks submit).
+
 ### design-review · inconsistency (turn 3)
 
 Inconsistency pass (¬correctness, ¬architecture, ¬ambiguity). Used in-context
