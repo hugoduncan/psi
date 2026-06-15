@@ -35,3 +35,24 @@ Actionable architectural misfits:
   `:allowed-events` — an explicit contract update (one-way/no-shim,
   untrusted-extension posture), not an internal-event back-door. Design states
   it is in scope but does not locate it on the extension-API contract.
+
+### design-review · ambiguity (turn 2)
+
+Ambiguity pass (¬correctness, ¬architecture, ¬inconsistency). Used in-context
+design.md + architecture sources + AF notes. Six new actionable ambiguities:
+
+- AMB-1 Token transport (query param/header/cookie) and which routes the token
+  gates (HTML / vendored JS assets / choice POST / `:file`) are unspecified.
+- AMB-2 Route-id assignment model (caller-supplied vs system-generated) is
+  unclear and differs implicitly between `dev-present` and `register-route!`;
+  O4 replace semantics presume caller-controlled ids.
+- AMB-3 "drives the agent's next turn immediately" is undefined when the
+  originating session is mid-turn/busy at choice-submit time (queue/reject/
+  interrupt).
+- AMB-4 Choice feedback targets "the invoking session," but `register-route!`
+  is a REPL fn with no invoking agent session; the feedback target session for
+  REPL-registered routes is undefined.
+- AMB-5 AC-1 "configurable/ephemeral port" vs Lifecycle/O3 "ephemeral
+  OS-assigned" leaves it ambiguous whether a port-config override exists.
+- AMB-6 SSE appears as slicing slice 4 but is absent from the "In scope" list;
+  whether SSE is a deliverable of this task is ambiguous.

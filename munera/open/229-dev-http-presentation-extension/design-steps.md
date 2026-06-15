@@ -16,3 +16,20 @@
   first-class `psi.extension/*` mutation (dispatch-routed, declared in
   `:allowed-events`) — an explicit extension-API contract update, not a bridge
   into the internal-only `:session/submit-synthetic-user-prompt` event.
+
+## Ambiguity follow-ups
+
+- [ ] AMB-1 Specify the access token transport (query param / header / cookie)
+  and exactly which routes it gates (HTML routes, vendored JS assets, choice
+  POST, `:file` serving).
+- [ ] AMB-2 Define the route-id assignment model: caller-supplied vs
+  system-generated, for both `dev-present` and `register-route!`, consistent
+  with O4 replace/last-write-wins.
+- [ ] AMB-3 Define choice-submit behavior when the originating session is
+  mid-turn/busy (queue vs reject vs interrupt); clarify what "immediately" means.
+- [ ] AMB-4 Define the choice-feedback target session for routes registered via
+  the REPL `register-route!` (which has no invoking agent session).
+- [ ] AMB-5 Resolve whether the port is user-configurable: reconcile AC-1
+  "configurable/ephemeral" with the Lifecycle/O3 ephemeral-OS-assigned model.
+- [ ] AMB-6 Clarify whether SSE (slicing slice 4) is in scope for this task;
+  align the slicing section and the "In scope" list.
