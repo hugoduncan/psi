@@ -820,3 +820,46 @@ were still unchecked at follow-up start and are the entire candidate work set.
   constraint paragraph; added a Resolved-decisions entry.
 
 Both design-steps items marked done. No blocked/skipped items.
+
+### design-review · architecture (round 7, turn 1)
+
+Fresh architecture-fit pass over the fully-resolved design (AF-1..8 resolved;
+round-6 architecture concluded no new misfit). Sources: AGENTS.md (S2
+`system_scope(¬agent_session_scope)`, capability gating), META.md
+(managed-services on ctx; core owns canonical projection models), doc/
+architecture.md (State-boundary runtime-handles table — all listed system/runtime
+projections are core-owned; Dispatch sequencing contract `:runtime/dispatch-event`),
+doc/extension-api.md + doc/extensions.md (extension mutate surfaces). AF-1..8
+re-confirmed genuinely resolved and precedent-accurate. One new actionable misfit:
+
+- AF-9 **AF-7's required system-scoped status projection has no located
+  extension-API surface.** AF-7 decided the singleton server's status projects
+  into **system/runtime-scoped** canonical state and explicitly excludes both the
+  `/dev-http` slash-command's session-rebound implicit `(:mutate api)` *and*
+  `:mutate-session` as session-scoped — but it never names the concrete surface
+  that *realizes* a system-scoped projection. The documented extension mutate
+  surfaces are **only** session-scoped: `(:mutate api)` is rebound to the
+  invoking session inside a slash-command handler (doc/extension-api.md), and
+  `(:mutate-session api)` is explicit-session. The cited `[:runtime :nrepl]` /
+  OAuth-login-status precedents are **core-owned** projections (dispatched by core
+  events like `:session/set-nrepl-runtime`, not reached through the extension
+  API); doc/extensions.md states runtime-scoped canonical data is core-owned. So
+  the design requires a system-scoped projection from an untrusted extension but
+  the only documented extension dispatch paths land in session scope — the
+  AF-3-class gap ("in scope but not located on the extension-API contract"),
+  unresolved for the status-projection surface. AF-6 fixed event *ownership*
+  (first-class `psi.extension/*` in `:allowed-events`) and AF-7 fixed the scope
+  *decision* (system vs session), but neither locates the *mechanism*: how a
+  `psi.extension/dev-http-set-status` mutation, triggered from the
+  session-rebound `/dev-http` command handler, escapes session scope to write a
+  system/runtime-scoped `:state*` key. Conforming choice: either (a) identify/
+  define a system-scoped extension dispatch surface (a contract addition, as
+  AF-3/AF-6 added first-class mutations) under which the `psi.extension/*`
+  status mutation's pure handler writes a system/runtime-scoped key independent
+  of any invoking session, or (b) confirm and document that a dispatch-routed
+  `psi.extension/*` mutation's pure handler can write the system/runtime-scoped
+  key directly regardless of the session-rebound triggering surface — making
+  AF-7's "system-scoped, not session-rebound" decision realizable on the
+  extension-API contract. Distinct from AF-6 (event ownership) and AF-7 (the
+  scope decision); AF-9 is the unlocated system-scoped projection *surface/
+  mechanism*.

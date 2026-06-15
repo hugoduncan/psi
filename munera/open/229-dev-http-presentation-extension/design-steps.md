@@ -61,6 +61,23 @@
   (what projects), AF-6 (event ownership), and AF-7 (projection scope) — AF-8 is
   the live-handle location/ownership decision.
 
+- [ ] AF-9 Locate AF-7's **system/runtime-scoped status projection on a concrete
+  extension-API surface**. AF-7 requires the singleton server's status to project
+  into system/runtime-scoped canonical state and excludes both the `/dev-http`
+  command handler's session-rebound implicit `(:mutate api)` and `:mutate-session`
+  as session-scoped — but the documented extension mutate surfaces are only those
+  two (both session-scoped), and the cited `[:runtime :nrepl]` / OAuth precedents
+  are core-owned projections not reached through the extension API. Specify the
+  realizing mechanism: either (a) define/identify a system-scoped extension
+  dispatch surface (a contract addition, as AF-3/AF-6 added first-class
+  `psi.extension/*` mutations) whose pure handler writes a system/runtime-scoped
+  `:state*` key independent of any invoking session, or (b) confirm and document
+  that a dispatch-routed `psi.extension/*` status mutation's pure handler writes
+  the system/runtime-scoped key directly regardless of the session-rebound
+  triggering surface — so AF-7's "system-scoped, not session-rebound" decision is
+  realizable on the extension-API contract. Distinct from AF-6 (event ownership)
+  and AF-7 (the scope decision); AF-9 is the unlocated projection surface/mechanism.
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)
