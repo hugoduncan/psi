@@ -300,6 +300,39 @@ choice route yields at most one user message, and that message always carries a
 real selection (AC-6). Distinct from AMB-3 (mid-turn timing), AMB-8 (target
 liveness), and AMB-11 (repeat of a *selected* submission).
 
+**Concurrent first-shot atomicity + single-shot mark location (AMB-17).** AMB-11
+makes a `:choices` route single-shot and INC-10's pre-dispatch HTTP guard reads
+the submitted flag, but the design must say **where the flag flips** and how the
+read-check-mark is atomic — otherwise two simultaneous valid first-shot POSTs
+could both pass a pre-dispatch flag-read before either marks the route submitted
+(a TOCTOU window), leaving the "at most one user message per choice route"
+guarantee undefined under concurrency. Resolution, following **task 224's
+at-most-once funnel**: the **authoritative single-shot mark is set inside the
+dispatch-serialized `psi.extension/*` choice-submit mutation's pure handler — not
+in the HTTP handler**. The submitted state is a **canonical `:state*` flag** (a
+submitted-route-id set under the feedback-session scope), so atomicity comes from
+**dispatch serialization on the single-source-of-truth atom** — no test-and-set
+on external state. The mutation's pure handler reads the flag: if the route-id is
+**absent**, it adds it (`:root-state-update`) **and** emits the
+`:runtime/dispatch-event` follow-on effect targeting
+`:session/submit-synthetic-user-prompt` (both-or-neither, per AF-5); if
+**present**, it **no-ops** (no state change, no follow-on, no message). The
+**INC-10 pre-dispatch HTTP guard is a best-effort fast path** (reads the same
+canonical flag via `:query-session`) that short-circuits the
+*deterministically-known* no-ops (dead target — AMB-8, empty selection — AMB-15,
+already-submitted-and-observed — AMB-11) before any dispatch; under a concurrent
+first-shot race it may admit two dispatches, but the dispatch-serialized handler
+accepts only the **first** — the loser's handler no-ops. This guarantees **at
+most one synthetic user message per choice route** under concurrency
+(AMB-11/AC-6). The registry entry (off-`ctx`, AF-8) holds the route
+*definition*; the *submitted decision state* is **canonical event-sourced
+state**, consistent with INC-3 class (2) (a first-shot submit is
+message-producing and event-sourced). The one residual log subtlety — the rare
+concurrent race-loser dispatches and is therefore journaled as a no-op — is
+reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
+(timing), AMB-8 (liveness), and AMB-15 (empty selection) — AMB-17 is the
+*concurrent* first-shot atomicity / flag-set-point decision.
+
 ## Lifecycle (D4 + integrant)
 
 - Explicit command surface modeled on `project-nrepl`:
@@ -395,6 +428,22 @@ liveness), and AMB-11 (repeat of a *selected* submission).
   serving. **Vendored static JS/CSS assets are exempt** (inert, localhost-bound,
   no state access), keeping asset URLs simple. Server-rendered pages propagate
   the token into their own same-origin links and the choice POST.
+- **Token-enforcement boundary (AMB-18)**: token validation is enforced as
+  **uniform platform middleware** wrapping the **dynamic-route subtrees** — the
+  whole `/s/:route-id` session-route subtree and the persisted `dev/` route
+  subtree — **not** the individual handler's responsibility. So `register-route!`
+  raw-handler routes and persisted `dev/` handlers (both full-power handlers
+  emitting arbitrary ring responses the platform cannot classify a priori) are
+  **auto-gated by the platform and never see an untokened request** — a raw
+  handler cannot accidentally serve untokened dynamic content. The **vendored
+  static-asset subtree is the sole exempt path**, served by separate un-gated
+  middleware. This pins the enforcement layer for the router build and the AC-7
+  tests: the platform router composes the token middleware over the dynamic
+  subtrees and excludes the static-asset subtree. AMB-1/INC-6 enumerate token
+  enforcement by *content category*; AMB-18 fixes the *enforcement layer*
+  (platform middleware over whole route subtrees), so category classification of
+  an opaque handler's output is never required. Distinct from AMB-1 (token
+  *transport*) and INC-6 (static-asset *exemption wording*).
 - **Status projection (AF-2, AF-4, AF-6, AF-7)**: the observable server status —
   `running?` and the resolved **token-less base** `url` (INC-8) — is projected into canonical `:state*` via a
   **first-class `psi.extension/*` dispatch-routed mutation declared in the
@@ -431,6 +480,29 @@ liveness), and AMB-11 (repeat of a *selected* submission).
   identity** (AF-8) — never in the core `:state*` atom — preserving the isolation
   boundary below while reconciling the live-handle location with the
   managed-services principle.
+- **System-scoped projection surface (AF-9)**: AF-7 requires the singleton's
+  status to land in **system/runtime** scope, but the documented extension mutate
+  surfaces are both **session-scoped** — `(:mutate api)` is rebound to the
+  invoking session inside a slash-command handler (doc/extension-api.md) and
+  `(:mutate-session api)` is explicit-session — so AF-7's "dispatched, not
+  session-rebound" decision needs a concrete realizing surface on the
+  extension-API contract. Resolution: the extension projects status by dispatching
+  its first-class `psi.extension/dev-http-set-status` event through a
+  **non-session-rebound, system-scoped dispatch path** — an explicit
+  extension-API contract addition in the AF-3/AF-6 first-class-mutation lineage —
+  i.e. **not** the slash-command-rebound implicit `(:mutate api)` and **not**
+  `(:mutate-session api)`, but a dispatch that carries **no invoking session-id**.
+  Its **pure handler writes the system/runtime-scoped `[:runtime :dev-http]`
+  `:state*` key directly**, independent of any invoking session, exactly the scope
+  the core-owned `[:runtime :nrepl]` projection lands in (AF-7 borrows the
+  projected *shape*; AF-9 supplies the extension-side dispatch surface that lands
+  it in system scope). The session-rebound `/dev-http` command handler that
+  triggers the projection therefore uses **this explicit system-scoped surface**,
+  not the ambient session-rebound mutate. This locates AF-7's "system-scoped, not
+  session-rebound" decision on a concrete extension-API contract while keeping the
+  AF-6 posture (no reach into a core-owned projection event like
+  `:session/set-nrepl-runtime`). Distinct from AF-6 (event ownership) and AF-7
+  (the scope decision) — AF-9 is the realizing projection surface/mechanism.
 - **Route-id collisions**: re-registering an existing session route-id **replaces**
   the prior entry (last-write-wins; least surprising for a dev tool).
 - **Client assets**: Vega-Lite / Mermaid client JS is **vendored** and served by
@@ -472,7 +544,11 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   :nrepl]` / OAuth login status (`system_scope(¬agent_session_scope)`), not
   invoking-session-scoped, and is dispatched so it lands in system/runtime scope
   rather than via the slash-command's session-rebound implicit `:mutate` /
-  `:mutate-session` (AF-7). Meanwhile the integrant system instance/handle **and
+  `:mutate-session` (AF-7). The realizing surface is a **non-session-rebound,
+  system-scoped extension dispatch path** (explicit extension-API contract
+  addition, AF-3/AF-6 lineage) carrying no invoking session-id, whose pure handler
+  writes the system/runtime-scoped `[:runtime :dev-http]` key directly (AF-9).
+  Meanwhile the integrant system instance/handle **and
   the per-launch `token`** live as a **runtime-owned managed handle on `ctx`
   keyed by logical identity** (AF-8) — never the core `:state*` atom (AF-2, AF-4)
   — reconciling the live-handle location with the managed-services principle
@@ -495,8 +571,17 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   AMB-11) is **short-circuited by a pre-dispatch guard in the HTTP choice-POST
   handler**: **no wrapping `psi.extension/*` mutation is dispatched**, so no
   no-op choice mutation is ever event-sourced or recorded in the dispatch
-  journal (INC-10). Class (2) therefore never admits a no-message no-op mutation;
-  the log records exactly the message-producing submits.
+  journal (INC-10). Class (2) therefore admits no *deterministically-known*
+  no-op mutation; the log records the message-producing submits. The **single
+  exception** is the rare **concurrent first-shot race-loser** (AMB-17): when two
+  simultaneous first-shot POSTs both pass the best-effort pre-dispatch guard, the
+  loser's dispatch-serialized choice mutation **is** journaled but **no-ops in
+  its handler** (adds nothing to the submitted set, produces no message, emits no
+  follow-on effect) — the at-most-once funnel rejecting the duplicate,
+  precedented by task 224's serialized guarded handler. Every
+  *deterministically-known* no-op (dead target, empty, already-submitted-and-
+  observed) is still short-circuited pre-dispatch and never event-sourced
+  (INC-10); only the unavoidable concurrency-race loser is a journaled no-op.
   Everything else — page GET rendering, route registration, vendored
   asset serving — is **presentation/out-of-band** and excluded from the log (same
   posture as TUI/RPC input being event sources). The non-deterministic
@@ -548,17 +633,34 @@ The extension-local `deps.edn` also declares its own `:dev` alias
 
 ## Slicing (vertical, behaviour-first)
 
-1. **Platform end-to-end** (D5): lifecycle (`start/status/stop`) + integrant
-   system + http-kit server (localhost+token) + status projection + reitit
-   router + session-route registry dispatch + one persisted demo route under
-   `extensions/dev-http/dev/`. The slice-1 demo route uses **platform-only,
-   hand-rolled handler output** (a full-power Clojure handler emitting its own
-   HTML directly), independent of the Slice 2 declarative renderer set (INC-1).
-2. **`dev-present` tool + renderer set** (markdown/table/vega/mermaid; `:file`
-   and `:hiccup` escape hatches reachable via `register-route!` only — INC-2).
-3. **Choice interaction loop** (`:choices` renderer + POST → first-class
-   `psi.extension/*` mutation → synthetic-user-prompt → user message into
-   originating session).
+Each slice delivers an **exercisable end-to-end behaviour**; no slice ships a
+mechanism with nothing to exercise it (INC-11). The **session-route registry +
+`/s/:route-id` dispatch subtree** is therefore introduced in **slice 2** — the
+first slice that delivers a session-route behaviour and a registration surface —
+**not** slice 1, where it would be an unexercisable mechanism (a persisted `dev/`
+route never touches the session-route registry, and no registration surface
+exists until slice 2).
+
+1. **Platform + persisted route** (D5): lifecycle (`start/status/stop`) +
+   integrant system + http-kit server (localhost+token) + token-enforcement
+   middleware (AMB-18) + status projection + reitit router + one persisted demo
+   route under `extensions/dev-http/dev/`. The slice-1 demo route uses
+   **platform-only, hand-rolled handler output** (a full-power Clojure handler
+   emitting its own HTML directly), independent of the Slice 2 declarative
+   renderer set (INC-1). Complete behaviour: open the persisted route in a
+   browser. (No session-route registry yet — deferred to slice 2, where it is
+   first exercised.)
+2. **Session-route registration + renderer set**: the **session-route registry +
+   `/s/:route-id` dispatch subtree**, introduced together with its first two
+   registration surfaces — the **`dev-present` tool** (declarative renderer set:
+   markdown/table/vega/mermaid) and the REPL **`register-route!` fn** (registers
+   an arbitrary ring handler fn, plus the **hiccup/file raw-handler escape-hatch
+   helpers**, reachable via `register-route!` only — INC-2/INC-5). Both surfaces
+   exercise the registry/dispatch introduced in this slice. Complete behaviour:
+   register and open a session route from both paths.
+3. **Choice interaction loop** (`:choices` renderer + the raw-handler **choices
+   helper** (INC-7) + POST → first-class `psi.extension/*` mutation →
+   synthetic-user-prompt → user message into originating session).
 
 Out-of-scope future enhancement (not a slice of this task, per AMB-6):
 
@@ -595,8 +697,12 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   rejected as a no-op (nothing injected; the single shot is not consumed).
 - AC-7 Access to **dynamic content routes** (HTML page routes, the choice POST
   endpoint, and file serving) requires the per-launch token; **vendored static
-  JS/CSS assets are exempt** (inert, localhost-bound — AMB-1). The server binds to
-  `127.0.0.1` only.
+  JS/CSS assets are exempt** (inert, localhost-bound — AMB-1). Token enforcement
+  is **uniform platform middleware** over the dynamic-route subtrees (the
+  `/s/:route-id` session-route subtree and the persisted `dev/` route subtree), so
+  `register-route!` raw handlers and persisted `dev/` handlers are auto-gated and
+  never see an untokened request; the vendored static-asset subtree is the sole
+  exempt path (AMB-18). The server binds to `127.0.0.1` only.
 - AC-8 No HTTP handler reads or writes core state except through the extension
   `:query`/`:mutate` API; integrant usage stays inside the extension.
 - AC-9 Docs + changelog updated; extension tests pass (Scry) and clj-kondo clean.
@@ -783,4 +889,52 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   amendment needed); AMB-8/AMB-11/AMB-15 wording is corrected away from "the
   wrapping mutation no-ops" to "short-circuited by a pre-dispatch handler guard".
   Distinct from AMB-8 (liveness), AMB-15 (empty selection), AMB-11 (repeat), and
-  INC-3 (log classes).
+  INC-3 (log classes). (Refined by AMB-17 for the concurrent first-shot race: the
+  pre-dispatch guard is best-effort and the authoritative single-shot mark moves
+  into the dispatch-serialized mutation; a rare race-loser may dispatch and
+  no-op.)
+- **System-scoped status-projection surface (AF-9)** — AF-7's system/runtime-
+  scoped projection is realized by dispatching the first-class
+  `psi.extension/dev-http-set-status` event through a **non-session-rebound,
+  system-scoped extension dispatch surface** (an explicit extension-API contract
+  addition in the AF-3/AF-6 lineage, carrying no invoking session-id), whose pure
+  handler writes the system/runtime-scoped `[:runtime :dev-http]` `:state*` key
+  directly — **not** the slash-command-rebound `(:mutate api)` nor
+  `(:mutate-session api)` (both session-scoped). The session-rebound `/dev-http`
+  command handler uses this explicit system-scoped surface to trigger the
+  projection. Locates AF-7's "system-scoped, not session-rebound" decision on a
+  concrete extension-API contract without reaching into a core-owned projection
+  event (AF-6 upheld). Distinct from AF-6 (event ownership) and AF-7 (scope
+  decision).
+- **Concurrent first-shot atomicity + single-shot mark location (AMB-17)** —
+  following task 224's at-most-once funnel, the **authoritative single-shot mark
+  is set inside the dispatch-serialized `psi.extension/*` choice-submit mutation's
+  pure handler**, not the HTTP handler: the submitted state is a **canonical
+  `:state*` flag** (submitted-route-id set, feedback-session-scoped), so
+  atomicity comes from **dispatch serialization** (no test-and-set). The handler
+  reads the flag — absent → add id + emit the `:runtime/dispatch-event` follow-on
+  (both-or-neither); present → no-op. The INC-10 pre-dispatch HTTP guard is a
+  **best-effort fast path** for the deterministically-known no-ops; under a
+  concurrent first-shot race it may admit two dispatches, but only the first
+  produces a message — guaranteeing **at most one user message per choice route**
+  (AMB-11/AC-6). The rare race-loser is the one journaled no-op (reconciled in
+  INC-3). Distinct from AMB-11 (sequential repeat), AMB-3 (timing), AMB-8
+  (liveness), AMB-15 (empty selection).
+- **Token-enforcement boundary (AMB-18)** — token validation is **uniform
+  platform middleware** over the dynamic-route subtrees (the `/s/:route-id`
+  session-route subtree and the persisted `dev/` route subtree), so
+  `register-route!` raw handlers and persisted `dev/` handlers are auto-gated and
+  **never see an untokened request** (enforcement is not the individual handler's
+  responsibility); the vendored static-asset subtree is the sole exempt path.
+  Pins the AC-7 enforcement layer for the router build/tests; classification of an
+  opaque handler's output is never required. Distinct from AMB-1 (transport) and
+  INC-6 (static-asset exemption wording).
+- **Slicing behaviour-first + `register-route!` sliced (INC-11)** — the
+  **session-route registry + `/s/:route-id` dispatch** moves out of slice 1
+  (where it was an unexercisable mechanism — a persisted `dev/` route never
+  touches it and no registration surface existed) into **slice 2**, introduced
+  together with its first registration surfaces. **`register-route!`** (+ the
+  hiccup/file raw-handler escape-hatch helpers) is now an explicit **slice-2**
+  deliverable alongside `dev-present`; the choices helper stays in slice 3. Every
+  slice now delivers an exercisable end-to-end behaviour. Distinct from INC-1
+  (slice-1 demo-output example vs renderer-set ordering).

@@ -61,7 +61,7 @@
   (what projects), AF-6 (event ownership), and AF-7 (projection scope) — AF-8 is
   the live-handle location/ownership decision.
 
-- [ ] AF-9 Locate AF-7's **system/runtime-scoped status projection on a concrete
+- [x] AF-9 Locate AF-7's **system/runtime-scoped status projection on a concrete
   extension-API surface**. AF-7 requires the singleton server's status to project
   into system/runtime-scoped canonical state and excludes both the `/dev-http`
   command handler's session-rebound implicit `(:mutate api)` and `:mutate-session`
@@ -147,7 +147,7 @@
   AC-6 and its tests are unambiguous. Distinct from AMB-3 (mid-turn timing),
   AMB-8 (target liveness), and AMB-11 (repeat of a selected submission).
 
-- [ ] AMB-17 Define **concurrent first-shot choice-submission atomicity** and
+- [x] AMB-17 Define **concurrent first-shot choice-submission atomicity** and
   **where the single-shot `submitted` flag is set**. AMB-11 makes a `:choices`
   route single-shot and INC-10 adds a pre-dispatch guard that reads the
   registry-entry submitted flag, but the design never specifies when/where the
@@ -160,7 +160,7 @@
   the pre-dispatch guard as a best-effort fast path that the mutation re-checks/
   no-ops, or a handler-level compare-and-set). Distinct from AMB-11 (sequential
   repeat), AMB-3 (timing), AMB-8 (liveness), AMB-15 (empty selection).
-- [ ] AMB-18 Define the **token-enforcement boundary** for `register-route!`
+- [x] AMB-18 Define the **token-enforcement boundary** for `register-route!`
   raw-handler routes and persisted `dev/` routes. AMB-1/INC-6 gate "dynamic
   content routes" by content category, but a raw handler fn (and a persisted
   `dev/` handler) emits arbitrary ring responses the platform cannot classify a
@@ -249,7 +249,7 @@
   no-op interaction mutations. Distinct from AMB-8 (liveness), AMB-15
   (empty-selection), and INC-3 (log classes).
 
-- [ ] INC-11 Reconcile the **Slicing section** with the "vertical,
+- [x] INC-11 Reconcile the **Slicing section** with the "vertical,
   behaviour-first" principle and the Capability surface. Slice 1 ships the
   session-route registry + `/s/:route-id` dispatch mechanism, but its only
   slice-1 behaviour is a **persisted** demo route (which never touches the

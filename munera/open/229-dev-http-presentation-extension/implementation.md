@@ -944,3 +944,65 @@ correction note quoting old wording). One new actionable inconsistency:
   helpers) to a slice and noting that slice 1's registry/dispatch is exercised by
   that registration surface. Distinct from INC-1 (slice-1 demo-output example vs
   renderer-set ordering).
+
+### design-review · round-7 follow-up execution (AF-9, AMB-17, AMB-18, INC-11)
+
+Batch baseline established via the evidence rule: the contiguous latest
+review-batch segment since the previous design-follow-up (`4b901e128`, execute
+round-6 follow-ups) is the round-7 batch — `9c4f2bf99` (architecture-fit r7),
+`e62679080` (ambiguity r7), `d5e5c116f` (inconsistency r7). The parent of the
+oldest segment commit (`9c4f2bf99^`) is `4b901e128` (the round-6 follow-up
+commit itself), so that is the batch baseline. `git diff 4b901e128..HEAD --
+design-steps.md` added exactly four unchecked items — AF-9, AMB-17, AMB-18,
+INC-11 — all still unchecked at follow-up start. They are the entire candidate
+work set. No predating/edited/checked/steps.md items included.
+
+- **AF-9 — system-scoped status-projection surface.** AF-7 requires the
+  singleton's status in system/runtime scope, but the documented extension
+  mutate surfaces (`(:mutate api)` session-rebound in slash-command handlers;
+  `(:mutate-session api)` explicit-session) are both session-scoped, so AF-7's
+  "dispatched, not session-rebound" decision lacked a realizing surface.
+  Resolved: dispatch the first-class `psi.extension/dev-http-set-status` event
+  through a **non-session-rebound, system-scoped dispatch path** (explicit
+  extension-API contract addition, AF-3/AF-6 lineage, carrying no invoking
+  session-id) whose pure handler writes the system/runtime-scoped
+  `[:runtime :dev-http]` `:state*` key directly — not the rebound `(:mutate api)`
+  nor `(:mutate-session api)`. Keeps the AF-6 posture (no reach into the
+  core-owned `:session/set-nrepl-runtime`). Added a Status-projection bullet, an
+  architectural-constraints note, and a resolved-decision.
+
+- **AMB-17 — concurrent first-shot atomicity / single-shot mark location.**
+  Resolved via task 224's at-most-once funnel: the **authoritative single-shot
+  mark is set inside the dispatch-serialized choice-submit mutation's pure
+  handler**, not the HTTP handler; the submitted state is a **canonical `:state*`
+  flag** (feedback-session-scoped submitted-route-id set), so atomicity is from
+  dispatch serialization (no test-and-set). Handler: absent → add id + emit the
+  `:runtime/dispatch-event` follow-on (both-or-neither, AF-5); present → no-op.
+  The INC-10 pre-dispatch HTTP guard becomes a **best-effort fast path** for the
+  deterministically-known no-ops; a concurrent first-shot race may admit two
+  dispatches but only the first produces a message (at most one user message per
+  route, AMB-11/AC-6). Reconciled INC-3's "no no-op is ever event-sourced" by
+  admitting the rare race-loser as the one journaled no-op (task-224 precedent),
+  while keeping all deterministically-known no-ops short-circuited pre-dispatch.
+  Added an Interaction-section paragraph, an INC-3 constraint clause, an INC-10
+  refinement note, and a resolved-decision.
+
+- **AMB-18 — token-enforcement boundary.** Resolved to **uniform platform
+  middleware** over the dynamic-route subtrees (the `/s/:route-id` session-route
+  subtree and the persisted `dev/` route subtree), so `register-route!` raw
+  handlers and persisted `dev/` handlers are auto-gated and never see an
+  untokened request; the vendored static-asset subtree is the sole exempt path.
+  Enforcement is the platform's, not the individual handler's — so a priori
+  classification of an opaque handler's output is never required. Added a
+  Token-transport bullet, strengthened AC-7, and added a resolved-decision.
+
+- **INC-11 — slicing behaviour-first + `register-route!` sliced.** Moved the
+  **session-route registry + `/s/:route-id` dispatch** out of slice 1 (where it
+  was an unexercisable mechanism) into **slice 2**, introduced together with its
+  first registration surfaces; assigned **`register-route!`** (+ hiccup/file
+  escape-hatch helpers) explicitly to slice 2 alongside `dev-present`, with the
+  choices helper in slice 3. Every slice now delivers an exercisable end-to-end
+  behaviour. Rewrote the Slicing section, added a behaviour-first preamble, and
+  added a resolved-decision.
+
+All four design-steps items marked done. No blocked/skipped items.
