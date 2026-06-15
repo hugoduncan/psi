@@ -24,7 +24,7 @@
   (let [target-name (resolve-delegate-target-name workflow-run target)
         definition (registry/workflow-definition @(:state* ctx) target-name)]
     (when-not definition
-      (throw (ex-info "Delegated workflow definition not found"
+      (throw (ex-info (str "Delegated workflow definition not found: " target-name)
                       {:target target-name
                        :delegate-target target})))
     {:target-name target-name
