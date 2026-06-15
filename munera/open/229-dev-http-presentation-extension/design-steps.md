@@ -248,7 +248,7 @@
   (a *known live* route whose *target session* ended), and AMB-16 (the
   registration *call* while the server is stopped).
 
-- [ ] AMB-21 Define **`dev-present` malformed / shape-violating content handling
+- [x] AMB-21 Define **`dev-present` malformed / shape-violating content handling
   and the per-renderer validation boundary**. AMB-10 fixes the canonical
   per-renderer `:content` shapes and states non-canonical `:table` variants are
   "not accepted (one-way; no shape detection)", but the design never defines

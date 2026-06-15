@@ -521,6 +521,51 @@ reconciled under INC-3 below. Distinct from AMB-11 (sequential repeat), AMB-3
   route whose *target session* ended → "session no longer active"), and AMB-16
   (the registration *call* while the server is stopped) — AMB-20 is the
   unknown-route *response + token/route precedence*.
+- **`dev-present` malformed / shape-violating content + per-renderer validation
+  boundary (AMB-21)**: a `dev-present` call carries a `:renderer` keyword and a
+  `:content` value whose shape is fixed per renderer (AMB-10). The resolution
+  splits validation into two tiers by **what the platform can check**, and pins
+  the malformed-content response to match the design's pinned-response posture
+  (AMB-8/11/15/16/19/20):
+  - **Call-time structural validation (server-checkable shapes).** The
+    `dev-present` tool handler validates, **before registering anything**, that
+    `:renderer` is one of the declarative keywords
+    (`:markdown`/`:table`/`:vega`/`:mermaid`/`:choices`) and that `:content`
+    matches the AMB-10 **structural** shape for that renderer: `:markdown`/
+    `:mermaid` → a **string**; `:table` → a **map `{:headers [string …] :rows
+    [[cell …] …]}`** with `:headers` a vector and `:rows` equal-length vectors;
+    `:vega` → a **map** (a Vega-Lite spec container); `:choices` → the **AMB-7
+    choices spec**. A violation is **rejected at tool-call time with an error
+    tool-result** — same posture as AMB-16's not-running error and AMB-19's token
+    rejection — naming the renderer and the expected shape (e.g. `"dev-http:
+    :table content must be {:headers [...] :rows [[...] ...]}"`); **nothing is
+    registered and no route URL is returned** (identical to AMB-16's
+    nothing-registered/no-URL outcome). This shape check is a per-`:renderer`
+    malli schema (a multi/dispatch schema keyed on `:renderer`).
+  - **Render-time opaque validation (client-side).** Beyond the structural shape,
+    the **semantic validity of opaque content is not validated at call time**: a
+    `:vega` `:content` that is structurally a map but an invalid Vega-Lite spec,
+    or `:mermaid`/`:markdown` `:content` that is a valid string but invalid
+    diagram/markup, is **passed through to the vendored client lib (Vega-Lite /
+    Mermaid) or the commonmark renderer**, and any failure surfaces **at browser
+    render time** — the client lib renders its own error into the page; the route
+    is **still registered and served** and its URL is returned normally. The
+    platform does **not** parse the Vega-Lite / Mermaid grammars server-side.
+
+  So the validation boundary differs by renderer along a principled
+  **structural-vs-semantic** axis, not arbitrarily: every renderer's structural
+  container shape is call-time-checked (string-ness, the `:table` map shape,
+  map-ness for `:vega`, the choices spec), while the opaque interior of `:vega`/
+  `:mermaid`/`:markdown` content is render-time-only and never produces a
+  tool-result error. `register-route!` carries no declarative content shape (it
+  registers an **arbitrary ring handler fn**, INC-5), so it has **no analogous
+  call-time content validation** — its handler owns whatever it emits. This pins
+  the AC-3 negative path (a shape-violating `dev-present` call returns an error
+  tool-result and registers nothing) and the AC-5 per-renderer coverage (each
+  renderer accepts its canonical AMB-10 shape; a structural violation is rejected
+  at call time). Distinct from AMB-10 (the *valid* content shapes), AMB-16 (the
+  *not-running* registration edge — same error-tool-result posture, different
+  cause), and AMB-19 (the *token* rejection response).
 - **Status projection (AF-2, AF-4, AF-6, AF-7)**: the observable server status —
   `running?` and the resolved **token-less base** `url` (INC-8) — is projected into canonical `:state*` via a
   **first-class `psi.extension/*` dispatch-routed mutation declared in the
@@ -803,7 +848,13 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   token-embedded openable link is obtained via `/dev-http status`), which — opened
   with the token — renders the content with the selected renderer. Called while
   the server is **not running** (AMB-16), `dev-present` returns an error
-  tool-result ("start the server first") and registers nothing.
+  tool-result ("start the server first") and registers nothing. A call carrying
+  content **violating the AMB-10 structural shape** (e.g. a `:table` whose
+  `:content` is not `{:headers … :rows …}`, or a `:markdown` whose `:content` is
+  not a string) is **rejected at call time with an error tool-result** naming the
+  renderer and expected shape (AMB-21), and registers nothing; opaque-interior
+  failures (an invalid `:vega` spec / `:mermaid` source) are **not** call-time
+  errors — the route is served and the failure surfaces at browser render time.
 - AC-4 A dev can register an arbitrary ring handler fn via `register-route!` and
   reach it at its URL. Called while the server is **not running** (AMB-16),
   `register-route!` errors ("start the server first") and registers nothing.
@@ -812,7 +863,9 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   AMB-10 content shapes), and the raw-handler render helpers (the hiccup and
   file escape hatches plus the choices interaction helper — INC-7) — invoked from
   a `register-route!` handler fn, not `dev-present` (INC-5) — produce the expected
-  response for representative input.
+  response for representative input. A `dev-present` call whose `:content`
+  **violates the renderer's AMB-10 structural shape** is rejected at call time
+  with an error tool-result and registers nothing (AMB-21).
 - AC-6 Submitting a `:choices` form with a selection posts it, and the selection
   is injected as a mid-conversation **user** message into the originating session
   and drives the agent's next turn. An empty / no-selection submit (AMB-15) is
@@ -1129,3 +1182,20 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   framing + the Lifecycle Boundary as excluding the required generic core
   additions. Distinct from INC-11 (dev-http internal slice ordering +
   `register-route!` sliced) and INC-12 (log-membership scope split).
+- **`dev-present` malformed content + per-renderer validation boundary
+  (AMB-21)** — validation splits along a **structural-vs-semantic** axis. The
+  `dev-present` tool handler **structurally validates `:content` against the
+  AMB-10 per-renderer shape at call time** (per-`:renderer` malli dispatch
+  schema: string for `:markdown`/`:mermaid`, the `{:headers :rows}` map for
+  `:table`, a map for `:vega`, the AMB-7 choices spec for `:choices`); a
+  violation is **rejected with an error tool-result** naming the renderer +
+  expected shape and **registers nothing / returns no URL** (same posture as
+  AMB-16). The **opaque interior** of `:vega`/`:mermaid`/`:markdown` content
+  (invalid spec/diagram/markup that is structurally well-typed) is **not**
+  call-time-validated — it is passed to the vendored client lib / commonmark and
+  fails only at **browser render time**; the route is still served. So every
+  renderer's structural container is call-time-checked while opaque interiors are
+  render-time-only. `register-route!` (arbitrary handler fn, INC-5) has no
+  declarative content shape and thus **no analogous call-time validation**. Pins
+  the AC-3 negative path and AC-5 per-renderer coverage. Distinct from AMB-10
+  (valid shapes), AMB-16 (not-running edge), and AMB-19 (token rejection).

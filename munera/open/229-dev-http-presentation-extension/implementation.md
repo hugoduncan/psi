@@ -1507,3 +1507,37 @@ split INC-12, AMB-17 race-loser journaled-no-op reconciliation, URL-form
 journaled-vs-non-journaled principle all internally consistent).
 
 Conclusion: **no new actionable inconsistency.** No design-steps added this pass.
+
+### design-review · execute round-10 follow-ups (AMB-21)
+
+Batch baseline established per the evidence rule: previous design-follow-up
+completion was `4ae12b11f` (round-9 follow-ups); the immediately preceding
+review batch is round 10 — architecture (`845113c18`, no new misfit), ambiguity
+(`a2ace999a`, filed AMB-21), inconsistency (`d9141a7a2`, no new inconsistency).
+Baseline = parent of the oldest batch commit = `845113c18^` = `4ae12b11f`.
+`git diff 845113c18^..HEAD -- design-steps.md` added exactly one unchecked
+checklist item: **AMB-21** (architecture/inconsistency passes added none). It
+remained unchecked at follow-up start. Candidate work set = {AMB-21}.
+
+Resolved AMB-21 by pinning the `dev-present` malformed-content response and the
+per-renderer validation boundary along a **structural-vs-semantic** axis:
+- **Call-time structural validation** — the `dev-present` handler validates
+  `:content` against the AMB-10 per-renderer structural shape (per-`:renderer`
+  malli dispatch schema) *before registering*; a violation → **error tool-result**
+  naming renderer + expected shape, **nothing registered, no URL** (mirrors
+  AMB-16's not-running posture and AMB-19's pinned-rejection posture).
+- **Render-time opaque validation** — the opaque interior of `:vega`/`:mermaid`/
+  `:markdown` content (structurally well-typed but semantically invalid) is *not*
+  call-time-checked; it is handed to the vendored client lib / commonmark and
+  fails only at **browser render time**; the route is still served. The platform
+  never parses Vega-Lite/Mermaid grammars server-side.
+- `register-route!` (arbitrary handler fn, INC-5) has **no analogous call-time
+  content validation** — no declarative content shape exists.
+
+design.md edits: new AMB-21 decision bullet in the edge-case decision section
+(after AMB-20), AC-3 negative path (shape-violating call → error tool-result,
+registers nothing; opaque failures are render-time, not tool errors), AC-5
+per-renderer structural-violation rejection clause, and an AMB-21 entry in the
+resolved-decisions log. design-steps.md: AMB-21 marked `[x]`.
+
+No blocked/skipped items.
