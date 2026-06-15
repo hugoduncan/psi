@@ -46,6 +46,17 @@
 - [x] AMB-6 Clarify whether SSE (slicing slice 4) is in scope for this task;
   align the slicing section and the "In scope" list.
 
+- [ ] AMB-7 Define how a `:choices` selection maps to the injected synthetic
+  user-message: the choice option schema (label vs value), single- vs
+  multi-select, and the exact string that becomes the user prompt (AC-6).
+- [ ] AMB-8 Define choice-submit behavior when the target session has
+  ended/closed (target liveness, not just identity), and clarify whether the
+  session-route registry is cleared on server-halt only or also when the
+  invoking agent session ends ("die with the server/session").
+- [ ] AMB-9 Define `/dev-http start` behavior when the server is already running
+  (no-op / return existing url+token / restart / error), since the command
+  surface has no `restart` and AC-1 only addresses no-orphan-on-reload/restart.
+
 ## Inconsistency follow-ups
 
 - [x] INC-1 Reconcile Slice 1's demo-route example (e.g. "benchmark table")

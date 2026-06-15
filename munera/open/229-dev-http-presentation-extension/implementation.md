@@ -83,6 +83,27 @@ design.md + architecture sources + AF notes. Six new actionable ambiguities:
 - AMB-6 SSE appears as slicing slice 4 but is absent from the "In scope" list;
   whether SSE is a deliverable of this task is ambiguous.
 
+### design-review · ambiguity (round 2, turn 2)
+
+Fresh ambiguity pass over the post-resolution design (AMB-1..6 already resolved).
+Used in-context design.md + architecture sources + round-2 architecture reply
+(AF-4/AF-5). AMB-1..6 confirmed resolved. Three new actionable ambiguities:
+
+- AMB-7 The interaction loop (AC-6) does not define how a `:choices` selection
+  maps to the injected synthetic user-message text: the choice option schema
+  (label vs value), single- vs multi-select, and exactly what string becomes the
+  user prompt are unspecified. AMB-3/AMB-4 covered submit *timing* and target
+  *identity*, not selection *content shape*.
+- AMB-8 AMB-4 fixes the feedback target *identity* but not its *liveness*:
+  behavior when a choice is submitted after the target session has
+  ended/closed is undefined. Relatedly "throwaway; they die with the
+  server/session" conflates server-lifecycle vs invoking-agent-session-lifecycle
+  for when the session-route registry is cleared.
+- AMB-9 Lifecycle `start` behavior when the server is already running (no-op /
+  return existing url+token / restart / error) is unspecified; AC-1 covers
+  no-orphan-on-reload/restart but not explicit double-`start` semantics, and the
+  command surface has no `restart`.
+
 ### design-review · inconsistency (turn 3)
 
 Inconsistency pass (¬correctness, ¬architecture, ¬ambiguity). Used in-context
