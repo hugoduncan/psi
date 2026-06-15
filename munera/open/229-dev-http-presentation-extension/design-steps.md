@@ -46,6 +46,21 @@
   asymmetry explicit (status = system-scoped; choice-submit = session-scoped).
   Distinct from AF-2/AF-4 (what projects) and AF-6 (event ownership).
 
+- [ ] AF-8 Reconcile the **live singleton server/registry handle's
+  location/ownership** with META.md's managed-services principle ("psi runtime
+  owns process-scoped managed services on ctx for long-lived subprocesses …";
+  "managed services are keyed by logical identity … rather than extension-local
+  hidden state"). The design keeps the integrant system handle in
+  extension-local hidden state (citing `mcp-tasks-run`/`work-on`) without
+  engaging that principle or the nREPL/project-nrepl runtime-handle-on-ctx
+  precedents — yet AF-7 establishes the server is a process-wide singleton
+  (system-scoped), which fits the managed-service-on-ctx model. Either model the
+  server as a runtime-owned managed service on `ctx` keyed by logical identity,
+  or explicitly justify why the untrusted-extension isolation posture overrides
+  the managed-services principle for this singleton. Distinct from AF-2/AF-4
+  (what projects), AF-6 (event ownership), and AF-7 (projection scope) — AF-8 is
+  the live-handle location/ownership decision.
+
 ## Ambiguity follow-ups
 
 - [x] AMB-1 Specify the access token transport (query param / header / cookie)

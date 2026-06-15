@@ -120,6 +120,44 @@ context, which has no ambient session focus). One new actionable misfit:
   session-scoped. Distinct from AF-2/AF-4 (what projects) and AF-6 (event
   ownership).
 
+### design-review · architecture (round 5, turn 1)
+
+Fresh architecture-fit pass over the fully-resolved design (AF-1..7 all
+resolved). Sources: AGENTS.md, META.md (managed-services bullets), doc/
+architecture.md (State-boundary runtime-handles table; nREPL `[:runtime :nrepl]`
++ project-nrepl-registry precedents), doc/extension-api.md (`:mutate-session`
+for background/HTTP-handler context). AF-1..7 confirmed genuinely resolved and
+precedent-accurate; the choice-submit `:mutate-session` session-scoping is the
+right surface for the ambient-session-less HTTP-handler thread. One new
+actionable misfit:
+
+- AF-8 The **live singleton server/registry handle's location** is unreconciled
+  with the managed-services principle. AF-2/4/6/7 settle the *status projection*
+  (what projects, event ownership, system scope) and correctly keep the handle
+  out of the core `:state*` atom — but none addresses *where the live handle
+  lives*. The design commits the integrant system/server handle to
+  **extension-local hidden state** ("the extension's own atom/system, as
+  `mcp-tasks-run`/`work-on`"), citing only those extension precedents. It never
+  engages META.md's explicit principle — "psi runtime owns process-scoped
+  managed services on ctx for long-lived subprocesses and similar runtime
+  resources" and "managed services are keyed by logical identity and reused
+  within ctx rather than extension-local hidden state" — nor the closest
+  runtime-handle precedents (nREPL server, project-nrepl registry), which are
+  runtime-owned managed handles on `ctx` (not the `:state*` atom, but not
+  extension-local hidden state either). AF-7's own finding that the server is a
+  process-wide **singleton** strengthens the misfit: a system-scoped singleton
+  long-lived subprocess is exactly the managed-service-on-ctx shape (like nREPL/
+  project-nrepl), whereas `mcp-tasks-run`/`work-on` are the precedent for
+  session/extension-scoped handles. Conforming choice: either model the dev-http
+  server as a **runtime-owned managed service on `ctx` keyed by logical
+  identity** (matching the managed-services principle + nREPL/project-nrepl
+  singleton precedent), or explicitly justify why the untrusted-extension
+  isolation posture overrides the managed-services principle for this singleton
+  (keeping it extension-local). Distinct from AF-2/AF-4 (what projects), AF-6
+  (event ownership), and AF-7 (projection scope) — AF-8 is the live-handle
+  *location/ownership* decision, currently resolved by precedent-citation
+  without engaging the managed-services principle.
+
 ### design-review · inconsistency (round 4, turn 3)
 
 Fresh inconsistency pass over the fully-resolved design (INC-1..6 resolved).
