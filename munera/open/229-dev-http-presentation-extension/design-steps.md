@@ -446,3 +446,23 @@
   statement matches the resolved architecture. Distinct from INC-11 (dev-http
   internal slice ordering + `register-route!` sliced) and INC-12 (log-membership
   scope split).
+
+- [ ] INC-14 Reconcile the **single-shot "submitted" flag location/guard-source**
+  wording across AMB-11, INC-10, and AMB-17. AMB-17 relocated the authoritative
+  single-shot state to a **canonical `:state*` flag** (a feedback-session-scoped
+  submitted-route-id set), read by the best-effort pre-dispatch guard via
+  `:query-session`, with the **registry entry holding only the route
+  *definition***. But AMB-11's body still says the first POST "marks the route
+  submitted (a flag on the **registry entry**)" and the guard reads "the
+  **registry-entry submitted flag**", and the INC-10 resolved-decision still says
+  the pre-dispatch guard reads "the **registry-entry** selection/single-shot
+  flags." The design therefore describes the single-shot flag's storage two
+  contradictory ways (registry-entry flag vs canonical `:state*` flag, not on the
+  registry) and the guard's read source two ways (registry-entry flag vs canonical
+  flag via `:query-session`). Reconcile the stale AMB-11 and INC-10 wording to
+  AMB-17: the submitted flag is a canonical `:state*` feedback-session-scoped
+  submitted-route-id set (registry entry = route definition only), and the
+  pre-dispatch guard reads that canonical flag via `:query-session`. Distinct from
+  AMB-17 (the relocation resolution itself) and INC-10 (no-op log membership /
+  pre-dispatch short-circuit) — INC-14 is the residual unreconciled
+  flag-location / guard-source contradiction in the AMB-11 and INC-10 text.

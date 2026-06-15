@@ -1640,3 +1640,37 @@ actionable ambiguities:
   posture (registers nothing, no URL). Distinct from AMB-2 (assignment model),
   AMB-20 (the *unknown*-route browser response), and AMB-21 (`:content` shape
   validation).
+
+### design-review · inconsistency (round 11, turn 3)
+
+Fresh inconsistency pass (third turn of the shared design-review session) using
+the already-loaded design.md + architecture sources + round-11 architecture (no
+new misfit) and ambiguity (AMB-22, AMB-23) replies — architecture/ambiguity items
+not duplicated here. AMB-22/AMB-23 are new *gaps* (design unchanged), so not yet
+contradiction sources. Targeted re-reads only (the AMB-11 / AMB-17 single-shot
+region and the INC-10 resolved-decision guard wording). INC-1..13 re-confirmed
+resolved. One new actionable inconsistency:
+
+- INC-14 **Single-shot "submitted" flag location: AMB-11/INC-10 (registry-entry
+  flag) vs AMB-17 (canonical `:state*` flag).** AMB-17 relocated the authoritative
+  single-shot state to a **canonical `:state*` flag** (a feedback-session-scoped
+  submitted-route-id set), read by the best-effort pre-dispatch guard via
+  `:query-session`, and explicitly states the **registry entry holds only the
+  route *definition*** (the submitted *decision* state is canonical
+  event-sourced state). But the earlier AMB-11 body still says the first POST
+  "marks the route **submitted** (a flag on the **registry entry**)" and the guard
+  short-circuits by "reading the **registry-entry submitted flag**", and the
+  INC-10 resolved-decision still says the pre-dispatch guard reads "the
+  **registry-entry** selection/single-shot flags." So the design describes the
+  single-shot flag's storage two contradictory ways — **on the registry entry**
+  (AMB-11/INC-10) vs **canonical `:state*`, not on the registry** (AMB-17) — and
+  the guard's read source two ways (registry-entry flag vs canonical flag via
+  `:query-session`). AMB-17 is the later authoritative refinement (INC-10's own
+  tail note acknowledges "the authoritative single-shot mark moves into the
+  dispatch-serialized mutation"), so reconcile the stale AMB-11 and INC-10 wording
+  to AMB-17: the submitted flag is a canonical `:state*` feedback-session-scoped
+  submitted-route-id set (registry entry = route definition only), and the
+  pre-dispatch guard reads that canonical flag via `:query-session`. Distinct from
+  AMB-17 (the relocation resolution itself) and INC-10 (no-op log membership /
+  pre-dispatch short-circuit) — INC-14 is the residual unreconciled
+  flag-location/guard-source contradiction in the AMB-11 and INC-10 text.
