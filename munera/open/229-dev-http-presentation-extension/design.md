@@ -58,8 +58,10 @@ Two route sources feed one router:
   path, preserving the "safe, model-driven" framing.
 - **`register-route!` (REPL/dev, fn-based)**: dev registers an arbitrary ring
   handler fn into the registry for full-power session routes. In-process,
-  throwaway, not persisted/replayed. This is the only path to the `:hiccup` and
-  `:file` escape hatches.
+  throwaway, not persisted/replayed. Because the handler is a raw fn (not a
+  renderer spec), it is the only path to the **hiccup** and **file** render
+  helpers (raw-handler idioms, not `dev-present` renderer keywords — INC-5); the
+  handler fn calls those helpers to build its ring response.
 
 **Route-id assignment (AMB-2).** Both `dev-present` and `register-route!` accept
 an **optional caller-supplied `:route-id`**. When supplied, it is used verbatim
@@ -69,7 +71,8 @@ last-write-wins). When omitted, the platform **generates a unique id**
 
 ### Renderers (D2)
 
-Built-in declarative renderers, plus escape hatches:
+The **declarative renderer keywords** are the safe, data-driven set selectable
+by the `dev-present` tool (one keyword per route):
 
 - `:markdown` — rendered via the existing commonmark dep.
 - `:table` — tabular data.
@@ -77,13 +80,40 @@ Built-in declarative renderers, plus escape hatches:
 - `:mermaid` — Mermaid diagram source → diagram. **Mermaid only; no Graphviz**
   — the vendored client-asset set is Vega-Lite + Mermaid only (O5/INC-4).
 - `:choices` — a choice form (the interaction primitive; see D3).
-- `:hiccup` — raw hiccup escape hatch for arbitrary HTML. **Escape hatch:
-  REPL `register-route!` only; not reachable from the `dev-present` tool**
-  (INC-2).
-- `:file` — serve an arbitrary file artifact from disk (HTML/SVG/PNG/PDF/…),
-  for content produced out-of-band (e.g. a benchmark report). **Escape hatch:
-  REPL `register-route!` only; not reachable from the `dev-present` tool**
-  (INC-2).
+
+The **escape hatches are raw-handler idioms, not declarative renderer keywords**
+(INC-5). Because `register-route!` registers an **arbitrary ring handler fn**
+(not a renderer spec), there is no renderer-keyword channel for them; instead the
+platform exposes two **render helper fns** that such a handler fn may call to
+build its ring response:
+
+- **hiccup helper** — renders arbitrary HTML from a hiccup form (the raw-HTML
+  escape hatch).
+- **file helper** — serves an arbitrary file artifact from disk
+  (HTML/SVG/PNG/PDF/…) produced out-of-band (e.g. a benchmark report).
+
+Both helpers are reachable **only from a `register-route!` handler fn** (not from
+the `dev-present` tool — INC-2). They are not entries in the `dev-present`
+`:renderer` vocabulary; they are functions a full-power handler invokes.
+
+**`dev-present` content-data shapes (AMB-10).** A `dev-present` call carries a
+`:renderer` keyword and a `:content` value; the `:content` shape is fixed
+per-renderer so the tool contract is unambiguous for AC-3/AC-5:
+
+- `:markdown` — `:content` is a **string** (CommonMark source).
+- `:table` — `:content` is a **map `{:headers [string …] :rows [[cell …] …]}`**:
+  `:headers` is a vector of column-header strings and `:rows` is a vector of
+  equal-length row vectors (cells stringified for display). This single explicit
+  shape is canonical — vector-of-maps / vector-of-vectors variants are **not**
+  accepted (one-way; no shape detection).
+- `:vega` — `:content` is a **Vega-Lite spec map** (passed to the vendored
+  Vega-Lite client lib as data).
+- `:mermaid` — `:content` is a **string** (Mermaid diagram source).
+- `:choices` — `:content` is the choices spec defined under Interaction/AMB-7
+  (`{:options [{:label, :value?} …], :multi? false, :prompt?}`).
+
+`:hiccup` and `:file` are not `dev-present` renderers (INC-2/INC-5); their input
+shapes belong to the `register-route!` raw-handler path.
 
 ### Interaction (D3)
 
@@ -162,6 +192,18 @@ served but becomes effectively presentation-only (feedback dropped per above).
 server lifetime); feedback delivery is independently gated on per-target-session
 liveness.
 
+**Repeat submission (AMB-11).** A `:choices` route is **single-shot**: the
+**first** successful POST injects exactly one synthetic user message and marks the
+route **submitted** (a flag on the registry entry). Subsequent POSTs to the same
+live route are **no-ops that inject nothing** and return a clear "choice already
+submitted" response; the rendered page likewise reflects the submitted state on
+reload. This makes accidental re-submission (double-click, reopening the page,
+changing a pick) safe and deterministic — one choice route yields at most one
+user message. (Distinct from AMB-3's mid-turn *timing* and AMB-8's target
+*liveness*: even a single, well-timed, live-target submission is accepted only
+once.) To present a fresh decision, register a new route. A submission that is
+*dropped* for target-liveness (AMB-8) does **not** consume the single shot.
+
 ## Lifecycle (D4 + integrant)
 
 - Explicit command surface modeled on `project-nrepl`:
@@ -189,10 +231,18 @@ liveness.
   serving. **Vendored static JS/CSS assets are exempt** (inert, localhost-bound,
   no state access), keeping asset URLs simple. Server-rendered pages propagate
   the token into their own same-origin links and the choice POST.
-- **Status projection (AF-2, AF-4)**: the observable server status — `running?`
-  and the resolved `url` — is projected into canonical `:state*` via a dispatch
-  mutation for EQL/psi-tool introspection, matching the nREPL `[:runtime :nrepl]`
-  / OAuth / workflow-progress precedent. The **per-launch `token` is deliberately
+- **Status projection (AF-2, AF-4, AF-6)**: the observable server status —
+  `running?` and the resolved `url` — is projected into canonical `:state*` via a
+  **first-class `psi.extension/*` dispatch-routed mutation declared in the
+  extension's `:allowed-events`** (e.g. `psi.extension/dev-http-set-status`),
+  driven by the `/dev-http` lifecycle command handler on `start`/`stop`. The
+  nREPL `[:runtime :nrepl]` / OAuth / workflow-progress precedent governs the
+  *shape* of the projected status, **not** the dispatching event's ownership: the
+  cited nREPL projection event (`:session/set-nrepl-runtime`) is **core-owned**,
+  so the untrusted extension must **not** dispatch it — projecting its own status
+  through its own declared `psi.extension/*` mutation keeps the AF-3
+  untrusted-extension posture (no reach into a core/internal projection event)
+  (AF-6). The **per-launch `token` is deliberately
   NOT projected** into canonical state: per the OAuth credential-externality
   precedent (the State-boundary table keeps the credential store external and
   projects only login *status*), the token is a credential-class secret and must
@@ -233,15 +283,21 @@ The extension-local `deps.edn` also declares its own `:dev` alias
 - **Untrusted-extension posture.** Minimal declared capability surface; declare
   `:allowed-events` for events it dispatches — including the first-class
   `psi.extension/*` choice-submit mutation that wraps
-  `:session/submit-synthetic-user-prompt` (AF-3).
+  `:session/submit-synthetic-user-prompt` (AF-3) **and the first-class
+  `psi.extension/*` status-projection mutation** that projects `running?`/`url`
+  into `:state*` (AF-6). Neither reaches into a core-owned projection event.
 - **Status projection, handle + secret externality.** Server status
   (`running?`/`url`) is projected into canonical `:state*` via dispatch for
   introspection, while the integrant system instance/handle **and the per-launch
   `token`** stay in the extension's own atom/system — never the core state atom
-  (AF-2, AF-4). `running?`/`url` projection mirrors the nREPL `[:runtime :nrepl]`
-  precedent; token externality mirrors the OAuth credential-externality precedent
-  (secrets do not enter canonical/replayable state). The live token is surfaced
-  via `status`/log only.
+  (AF-2, AF-4). The status-projection mutation is itself a **first-class
+  `psi.extension/*` dispatch-routed mutation declared in `:allowed-events`**
+  (AF-6), exactly like the choice-submit mutation: the extension never dispatches
+  the core-owned nREPL projection event (`:session/set-nrepl-runtime`); the nREPL
+  `[:runtime :nrepl]` precedent governs only the projected status *shape*. Token
+  externality mirrors the OAuth credential-externality precedent (secrets do not
+  enter canonical/replayable state). The live token is surfaced via `status`/log
+  only.
 - **Replay fidelity / log membership (INC-3).** Exactly **two** dev-http mutation
   classes are event-sourced and enter the log: (1) **status-projection
   mutations** (lifecycle `start`/`stop` projecting `running?`/`url` into
@@ -269,7 +325,8 @@ The extension-local `deps.edn` also declares its own `:dev` alias
   from the extension-local `extensions/dev-http/dev/`, session-route registry +
   dispatch subtree, and server-status projection into `:state*`.
 - The `dev-present` tool + `register-route!` REPL fn.
-- The built-in renderer set incl. hiccup escape hatch and arbitrary-file serving.
+- The built-in declarative renderer set plus the hiccup/file raw-handler render
+  helpers (escape hatches reached via `register-route!` only — INC-5).
 - The choice interaction loop back into the originating session via mutation,
   including the small extension-facing mutation wrapping
   `:session/submit-synthetic-user-prompt` (immediate-turn feedback).
@@ -321,13 +378,18 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   renderer.
 - AC-4 A dev can register an arbitrary ring handler fn via `register-route!` and
   reach it at its URL.
-- AC-5 Each renderer (`:markdown`, `:table`, `:vega`, `:mermaid`, `:choices`,
-  `:hiccup`, `:file`) produces the expected response for representative input.
+- AC-5 Each declarative renderer (`:markdown`, `:table`, `:vega`, `:mermaid`,
+  `:choices`) produces the expected response for representative input (per the
+  AMB-10 content shapes), and the two raw-handler render helpers (hiccup, file)
+  — invoked from a `register-route!` handler fn, not `dev-present` (INC-5) —
+  produce the expected response for representative input.
 - AC-6 Submitting a `:choices` form posts the selection, which is injected as a
   mid-conversation **user** message into the originating session and drives the
   agent's next turn.
-- AC-7 Access requires the per-launch token; the server binds to `127.0.0.1`
-  only.
+- AC-7 Access to **dynamic content routes** (HTML page routes, the choice POST
+  endpoint, and file serving) requires the per-launch token; **vendored static
+  JS/CSS assets are exempt** (inert, localhost-bound — AMB-1). The server binds to
+  `127.0.0.1` only.
 - AC-8 No HTTP handler reads or writes core state except through the extension
   `:query`/`:mutate` API; integrant usage stays inside the extension.
 - AC-9 Docs + changelog updated; extension tests pass (Scry) and clj-kondo clean.
@@ -395,3 +457,24 @@ Out-of-scope future enhancement (not a slice of this task, per AMB-6):
   registration / asset serving are out-of-band; the `token` never enters the log.
 - **Mermaid renderer scope (INC-4)** — Mermaid only; the "(and/or Graphviz)"
   claim is dropped to match the vendored Vega-Lite + Mermaid asset set (O5).
+- **Status-projection mutation ownership (AF-6)** — the lifecycle
+  `start`/`stop` status projection (`running?`/`url` → `:state*`) is a
+  **first-class `psi.extension/*` dispatch-routed mutation declared in
+  `:allowed-events`**, like the choice-submit mutation; the nREPL precedent
+  governs only the projected *shape*, and the extension never dispatches the
+  core-owned `:session/set-nrepl-runtime` event (AF-3 posture upheld).
+- **`dev-present` content shapes (AMB-10)** — fixed per-renderer `:content`
+  shapes: `:markdown`/`:mermaid` = string, `:vega` = Vega-Lite spec map,
+  `:table` = canonical `{:headers [..] :rows [[..] ..]}` (single shape, no
+  detection), `:choices` = the AMB-7 choices spec.
+- **Repeat choice submission (AMB-11)** — a `:choices` route is **single-shot**:
+  the first successful POST injects one user message and marks the route
+  submitted; later POSTs no-op with "choice already submitted". A liveness-dropped
+  submit (AMB-8) does not consume the shot. New decision presents a new route.
+- **Escape-hatch reframing (INC-5)** — `:hiccup`/`:file` are **raw-handler
+  render helpers** (functions a `register-route!` handler fn calls), not
+  declarative `dev-present` renderer keywords; the declarative renderer set is
+  `:markdown`/`:table`/`:vega`/`:mermaid`/`:choices`. AC-5 split accordingly.
+- **Token-gating scope (INC-6)** — AC-7 reworded to require the token for
+  **dynamic content routes** (HTML pages, choice POST, file serving) and to
+  **exempt vendored static JS/CSS assets** (aligns with the AMB-1 resolution).

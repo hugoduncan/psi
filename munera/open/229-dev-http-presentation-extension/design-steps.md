@@ -29,7 +29,7 @@
   follow-on effect (pure handler → effects-as-data), not an imperative
   in-handler dispatch, to honor the Dispatch sequencing contract.
 
-- [ ] AF-6 Specify the **event-ownership** of the status-projection mutation
+- [x] AF-6 Specify the **event-ownership** of the status-projection mutation
   (lifecycle `start`/`stop` projecting `running?`/`url` into `:state*`): state
   that it is a first-class `psi.extension/*` dispatch-routed mutation declared in
   `:allowed-events`, consistent with AF-3's untrusted-extension posture — not a
@@ -65,13 +65,13 @@
   (no-op / return existing url+token / restart / error), since the command
   surface has no `restart` and AC-1 only addresses no-orphan-on-reload/restart.
 
-- [ ] AMB-10 Specify the `dev-present` per-renderer content-data shape for the
+- [x] AMB-10 Specify the `dev-present` per-renderer content-data shape for the
   declarative renderers — in particular the `:table` input shape
   (vector-of-maps vs vector-of-vectors vs `{:headers :rows}`), and confirm the
   implied shapes for `:markdown` (string), `:vega` (Vega-Lite spec map), and
   `:mermaid` (source string) — so the `dev-present` content contract is
   unambiguous for AC-3/AC-5.
-- [ ] AMB-11 Define repeat-submission behavior for a `:choices` route: whether
+- [x] AMB-11 Define repeat-submission behavior for a `:choices` route: whether
   multiple POSTs to the same live route each inject a fresh user message, or the
   route is single-shot after the first submission (and what the browser sees on a
   subsequent submit). Distinct from AMB-3 (mid-turn timing) and AMB-8 (target
@@ -96,13 +96,13 @@
   O5 / Client-assets vendoring only Vega-Lite + Mermaid JS: either drop the
   Graphviz claim or add a vendored Graphviz/viz.js asset.
 
-- [ ] INC-5 Reconcile `register-route!`'s fn-based definition ("an arbitrary
+- [x] INC-5 Reconcile `register-route!`'s fn-based definition ("an arbitrary
   ring handler fn") with its billing as "the only path to the `:hiccup`/`:file`
   escape hatches" (declarative renderers per AC-5): either state that
   `register-route!` also accepts a declarative renderer spec (full renderer set
   incl. `:hiccup`/`:file`), or reframe `:hiccup`/`:file` as raw-handler idioms
   (not selectable renderers) and adjust AC-5 accordingly.
-- [ ] INC-6 Reconcile AC-7's blanket "Access requires the per-launch token" with
+- [x] INC-6 Reconcile AC-7's blanket "Access requires the per-launch token" with
   the AMB-1/Lifecycle static-asset exemption: reword AC-7 to scope the token
   requirement to dynamic content routes (HTML pages, choice POST, `:file`),
   noting vendored static JS/CSS assets are exempt.

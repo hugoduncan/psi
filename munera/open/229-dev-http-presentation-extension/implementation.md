@@ -305,3 +305,58 @@ Cross-item coherence checks: AF-4 and INC-3 jointly settle log/state membership
 verified no stale "running?/url/token" projection wording remained (the Scope
 "server-status projection" line stays generic and correct). All seven
 design-steps marked done. No blocked/skipped items.
+
+### design-review · follow-up (round 3, this pass)
+
+Evidence rule applied. Previous design-follow-up completion = `1a541ff90`
+(executed AF-4, AF-5, AMB-7, AMB-8, AMB-9, INC-3, INC-4). The contiguous latest
+review-batch segment since then is the three round-3 review commits (`4b7f85ec9`
+architecture, `6d16cc0ad` ambiguity, `373ac17a3` inconsistency). Baseline =
+parent of the oldest segment commit (`4b7f85ec9^`) = `1a541ff90` (confirmed via
+`git rev-parse`). `git diff 1a541ff90..HEAD -- …/design-steps.md` shows exactly
+five diff-added unchecked checklist items: AF-6, AMB-10, AMB-11, INC-5, INC-6 —
+all still present and unchecked at follow-up start → candidate work set = those
+five. No predating/stale/steps items in scope; the prior `[x]` lines appear only
+as unchanged diff context, correctly excluded.
+
+Resolutions written into design.md (and added under "Design-review follow-up
+resolutions"):
+
+- AF-6 → the **status-projection mutation** (lifecycle `start`/`stop` projecting
+  `running?`/`url` into `:state*`) is a **first-class `psi.extension/*`
+  dispatch-routed mutation declared in `:allowed-events`** (e.g.
+  `psi.extension/dev-http-set-status`), driven by the `/dev-http` command
+  handler. The nREPL precedent governs only the projected *shape*; the
+  core-owned `:session/set-nrepl-runtime` event is never dispatched by the
+  extension. Updated the Lifecycle status-projection bullet, the
+  Architectural-constraints status/externality bullet, and the
+  untrusted-extension-posture bullet (now lists both first-class
+  `psi.extension/*` mutations).
+- AMB-10 → fixed per-renderer `dev-present` `:content` shapes: `:markdown` /
+  `:mermaid` = string, `:vega` = Vega-Lite spec map, `:table` = canonical
+  `{:headers [..] :rows [[..] ..]}` (single explicit shape, no detection),
+  `:choices` = the AMB-7 choices spec. New "`dev-present` content-data shapes"
+  paragraph under Renderers.
+- AMB-11 → a `:choices` route is **single-shot**: first successful POST injects
+  one user message and marks the route submitted; later POSTs no-op with "choice
+  already submitted". A liveness-dropped submit (AMB-8) does not consume the
+  shot; a fresh decision needs a new route. New "Repeat submission" paragraph
+  under Interaction.
+- INC-5 → reframed `:hiccup`/`:file` as **raw-handler render helpers** (functions
+  a `register-route!` handler fn calls to build its ring response), **not**
+  declarative `dev-present` renderer keywords. The declarative renderer set is
+  `:markdown`/`:table`/`:vega`/`:mermaid`/`:choices`. Rewrote the Renderers
+  section split, the `register-route!` description, the Scope in-scope line, and
+  split AC-5 into declarative-renderers + render-helpers clauses.
+- INC-6 → reworded AC-7 to require the token for **dynamic content routes** (HTML
+  pages, choice POST, file serving) and to **exempt vendored static JS/CSS
+  assets**, aligning the acceptance criterion with the AMB-1 token-gating scope.
+
+Cross-item coherence checks: confirmed no remaining text calls `:hiccup`/`:file`
+declarative renderers in a way that contradicts INC-5 (dev-present bullet,
+Slicing slice 2, and resolution list all frame them as register-route!-only
+escape hatches); confirmed AMB-10's `:choices` shape references the AMB-7 spec
+without divergence; confirmed AF-6 ownership wording is consistent with the AF-3
+choice-submit mutation posture (both first-class `psi.extension/*`, both in
+`:allowed-events`, neither reaching a core projection event). All five
+design-steps marked done. No blocked/skipped items.
