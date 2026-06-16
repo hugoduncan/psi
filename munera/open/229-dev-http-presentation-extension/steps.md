@@ -573,7 +573,7 @@ the next begins.
 
 ## Test review follow-ups (round 5)
 
-- [ ] Cover the public `register-sse-route!` REPL/dev fn
+- [x] Cover the public `register-sse-route!` REPL/dev fn
       (`extensions/dev-http/src/extensions/dev_http.clj`). It is a documented
       Slice 4 surface (design §SSE "a route may expose an SSE feed"; plan/steps
       Slice 4 "`register-sse-route!` REPL fn registers arbitrary live feeds as
@@ -597,3 +597,17 @@ the next begins.
       registered, and that the feed is token-gated like any session route. Also
       assert it returns `nil` when the server is not running (the documented
       not-running contract shared with `register-route!`).
+      Done: added `^:integration register-sse-route!-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`). Before `start!`
+      it asserts `register-sse-route!` returns `nil` (the not-running contract);
+      after `init`+`start!` it calls
+      `(sut/register-sse-route! "feed" (fn [send! close!] (send! "tick") (close!)))`,
+      asserts the returned URL is non-nil, that `/s/feed` is 403 without the
+      token (token-gated like any session route, AC-8), and that fetching
+      `/s/feed?token=…` over the ephemeral-port server returns 200
+      `text/event-stream` carrying `data: open` + `data: tick` — proving the
+      `emit-fn` was wrapped via `sse/make-handler` and registered through
+      `register-route!`. Focused integration test green (1 test / 7 assertions);
+      full dev-http suite green (17 unit / 118 + 6 integration / 61); clj-kondo
+      clean. (The unrelated `psi.rpc-smoke-test` handshake timeout reappears only
+      when OR-focusing all `:integration` tests, per prior rounds.)

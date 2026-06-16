@@ -619,3 +619,32 @@ again overstates coverage at the surface granularity — `register-sse-route!` i
 a planned, documented public dev surface left wholly unexercised, the same class
 of gap the prior four test-review rounds each found and closed. Coverage gap,
 not a behaviour defect.
+
+## Test review (round 5) follow-up executed — 2026-06-15
+
+Closed the round-5 untested-public-surface gap (test-only; no production
+change). Added `^:integration register-sse-route!-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`):
+
+- Before `start!`: asserts `(sut/register-sse-route! …)` returns `nil` (the
+  documented not-running contract shared with `register-route!`).
+- After `init`+`start!`: registers a feed via
+  `(sut/register-sse-route! "feed" (fn [send! close!] (send! "tick") (close!)))`,
+  asserts the returned URL is non-nil, that `/s/feed` is 403 without the token
+  (token-gated like any session route, AC-8), and that
+  `/s/feed?token=…` over the real ephemeral-port server returns 200
+  `text/event-stream` carrying `data: open` + `data: tick`. This is the first
+  test to drive `register-sse-route!`'s `sse/make-handler` wrap + delegation to
+  `register-route!` — `sse-live-feed-test` and the auto `register-demo-feeds!`
+  both use `register-route!` directly, bypassing it. A regression (raw emit-fn
+  bound without the wrap, swapped arg order, or lost delegation) now fails.
+
+No production code touched — the wiring was already correct; this adds the
+missing proof.
+
+Verification: focused `register-sse-route!-test` green (1 test / 7 assertions);
+full dev-http unit suite green (17 tests / 118 assertions); dev-http integration
+tests green (6 tests / 61 assertions); clj-kondo clean on the test file. The
+unrelated `psi.rpc-smoke-test/rpc-smoke-handshake-test` handshake timeout
+reappears only when OR-focusing all `:integration` tests (consistent with prior
+rounds), not related to this change.

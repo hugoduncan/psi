@@ -641,3 +641,35 @@
               (is (re-find #"data: routes 2" body)))))
         (finally
           (sut/stop!))))))
+
+(deftest ^:integration register-sse-route!-test
+  ;; Exercises the public Slice 4 `register-sse-route!` REPL/dev surface end to
+  ;; end: it must wrap an arbitrary `emit-fn` via `sse/make-handler`, register it
+  ;; through `register-route!` as a token-gated session route, and return its
+  ;; URL — none of which the `register-route!`-based feed tests cover.
+  (let [{:keys [api]} (nullable/create-nullable-extension-api
+                       {:path "/test/dev_http.clj"})]
+    (sut/init api)
+    (testing "returns nil when the server is not running"
+      (is (nil? (sut/register-sse-route!
+                 "feed" (fn [send! _close!] (send! "tick"))))))
+    (let [server (sut/start!)
+          base   (str "http://" (:host server) ":" (:port server))
+          token  (:token server)]
+      (try
+        (let [url (sut/register-sse-route!
+                   "feed" (fn [send! close!] (send! "tick") (close!)))]
+          (testing "returns the registered route URL"
+            (is (some? url)))
+          (testing "AC-8: the registered feed is token-gated like any session route"
+            (is (= 403 (get-status (str base "/s/feed")))))
+          (testing "the wrapped emit-fn streams data: open + data: tick over the server"
+            (let [resp @(http-client/get (str base "/s/feed?token=" token))]
+              (is (= 200 (:status resp)))
+              (is (re-find #"text/event-stream"
+                           (str (get-in resp [:headers :content-type]))))
+              (let [body (body-str resp)]
+                (is (re-find #"data: open" body))
+                (is (re-find #"data: tick" body))))))
+        (finally
+          (sut/stop!))))))
