@@ -1025,3 +1025,42 @@ implementation-coupled assertion) in
       the integration tests prove the stored api drives `start!`/`status-text`.
       Renamed the deftest's top `testing` label to "init wires the runtime
       ExtensionAPI into the extension" (the private internal-atom reach is gone).
+
+## Test review follow-ups (round 14) — test-shaper (consistent test abstractions / naming)
+
+Distinct from rounds 12–13's shaping items (which extracted
+`make-choices-handler`, `server-base`, `with-running-server`, `nullable-api`):
+these are *remaining* shaping gaps in
+`extensions/dev-http/test/extensions/dev_http_test.clj` that those rounds left
+untouched.
+
+- [ ] Reconcile the two encodings of "build a router ring handler". The same
+      concept has two forms in the file: the `build-test-handler` helper
+      (`reg`/`token` → `router/build-handler {…:persisted-routes
+      (routes/load-persisted-routes)}`, used by `token-gating-test` and
+      `session-route-dispatch-test`, lines ~77/~97) **and** an inline
+      `(router/build-handler {:registry reg :token "tok" :persisted-routes []})`
+      hand-built in `asset-route-is-ungated-test` (~248) and
+      `sse-route-is-token-gated-test` (~476). test-shaper
+      `consistent(test_abstractions)` / economy: a router-shape change (a new
+      `build-handler` key, a renamed option) must be kept in sync across the
+      helper and two inline copies, and a reader sees two ways to construct the
+      same handler. Same class as the round-12/13 helper extractions. Generalize
+      `build-test-handler` to take the persisted-routes (e.g.
+      `([reg token] (build-test-handler reg token (routes/load-persisted-routes)))`
+      / `([reg token persisted] …)`) so the two `:persisted-routes []` sites call
+      `(build-test-handler reg "tok" [])` and all four router-handler
+      constructions flow through one helper. Low — the duplication is mechanical
+      and currently correct.
+
+- [ ] (Low) Rename `init-captures-api-test` to match its round-13-reshaped
+      behaviour (~line 37). Round 13 dropped the `(identical? api (:api
+      @@#'sut/state))` internal-atom capture assertion and reshaped the test to
+      assert the observable `/dev-http`-command registration, even renaming the
+      inner `testing` label to "init wires the runtime ExtensionAPI into the
+      extension" — but the `deftest` is still named `init-captures-api-test`,
+      after the removed capture assertion. test-shaper `consistent(naming)` /
+      clarity: the deftest name now describes a check the test no longer makes.
+      Rename it (e.g. `init-registers-command-test` /
+      `init-wires-api-test`) to match the surviving observable concern. Low —
+      cosmetic, no behaviour change.

@@ -977,3 +977,16 @@ Verification: extensions (unit) suite green (18 tests / 137 assertions — one
 fewer than round 12's 138, the removed internal-atom `identical?` assertion);
 integration suite green (6 tests / 61 assertions, identical to the round-12
 baseline — behaviour preserved); clj-kondo clean (0/0); cljfmt clean.
+
+## Test review (round 14) — test-shaper — 2026-06-15 — ACTIONABLE_FEEDBACK
+
+test-shaper pass over `extensions/dev-http/test/extensions/dev_http_test.clj`
+(coverage class closed in rounds 1–11; shaping in 12–13). Two remaining shaping
+follow-ups filed (round 14): (1) router-ring-handler construction has two
+encodings — the `build-test-handler` helper vs an inline `router/build-handler
+{… :persisted-routes []}` in two tests (`consistent(test_abstractions)`); (2 low)
+`init-captures-api-test`'s name no longer matches its round-13-reshaped
+behaviour (`consistent(naming)`).
+
+Non-compliance noted: the requested task slug `229-dev-http-lifecycle` does not
+exist; the only matching task is `229-dev-http-presentation-extension` (reviewed).
