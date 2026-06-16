@@ -158,3 +158,23 @@ Append-only local memory of in-flight decisions and discoveries.
   GET-form → POST-choice → captured mutation → single-shot loop) + agent-session
   `submit-synthetic-prompt-mutation-test` (1 test / 6 assertions) all green;
   clj-kondo clean.
+
+## Slice 4 — SSE live-updates (2026-06-16)
+
+- **`dev_http/sse.clj`** uses http-kit `as-channel` (the 2.8 async-channel API;
+  `with-channel` is legacy). `make-handler` opens the stream in `:on-open`,
+  sends an initial ring-response map (`content-type: text/event-stream`) whose
+  body is a `data: open` event — http-kit treats the first `send!` of a response
+  map as the header-setting send — then invokes `(emit-fn send! close!)`.
+- **Demonstrated feed `/sse/registry`** lives in the token-gated subtree
+  (router `gated-root`), emits one `data: routes N` snapshot of the current
+  registry count, then closes (so a non-streaming client request completes —
+  keeps the integration test deterministic with no sleeps/hangs).
+  `register-sse-route!` (entry-point) registers arbitrary live feeds as throwaway
+  session routes via the existing `register-route!`.
+- **Testing note:** `as-channel` needs the real http-kit server connection, so
+  the SSE handler is exercised only via the integration boot (token gating is
+  unit-tested because the 403 short-circuits in middleware before `as-channel`).
+- Verification: extensions suite 14 tests / 77 assertions; integration suite
+  3 tests / 34 assertions (incl. real SSE connect → snapshot read); clj-kondo
+  clean.

@@ -128,14 +128,19 @@ the next begins.
 
 ## Slice 4 — SSE live-updates
 
-- [ ] `dev_http/sse.clj`: `text/event-stream` endpoint within the token-gated
-      subtree using http-kit async channels.
-- [ ] One demonstrated live feed (e.g. registry/route data evolving) pushed to
-      subscribed pages via `EventSource`.
-- [ ] Tests: SSE endpoint is token-gated; a connected client receives a pushed
-      update (integration, ephemeral port).
-- [ ] Focused Scry green; clj-kondo clean.
-- [ ] Commit: `⚒ 229: SSE live-updates`.
+- [x] `dev_http/sse.clj`: `text/event-stream` endpoint within the token-gated
+      subtree using http-kit `as-channel`/`send!`/`close`. `make-handler`
+      `(emit-fn send! close!)` opens the stream, sends an initial `open` event
+      (sets headers), then hands `send!`/`close!` to the feed.
+- [x] One demonstrated live feed: `/sse/registry` (token-gated) emits a snapshot
+      of the current session-route count then closes; `register-sse-route!` REPL
+      fn registers arbitrary live feeds as session routes.
+- [x] Tests: SSE event formatting; `/sse/registry` token-gated (403 without
+      token, unit); integration — connected client over the real server receives
+      `data: open` + `data: routes N` reflecting registry state (AC-8 token
+      required).
+- [x] Focused Scry green; clj-kondo clean.
+- [x] Commit: `⚒ 229: SSE live-updates`.
 
 ## Close-out (cross-cutting)
 

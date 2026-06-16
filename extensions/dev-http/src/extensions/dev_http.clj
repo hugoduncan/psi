@@ -13,6 +13,7 @@
    [extensions.dev-http.choices :as choices]
    [extensions.dev-http.registry :as registry]
    [extensions.dev-http.renderers :as renderers]
+   [extensions.dev-http.sse :as sse]
    [extensions.dev-http.system :as system]
    [extensions.dev-http.tool :as tool]
    [integrant.core :as ig]))
@@ -109,6 +110,14 @@
                            :api        (:api @state)
                            :content    content})
     (fn [_request] (renderers/render content))))
+
+(defn register-sse-route!
+  "Register an SSE live feed as a throwaway session route under `route-id`.
+   `emit-fn` is invoked `(emit-fn send! close!)` when a client connects (see
+   `extensions.dev-http.sse/make-handler`). Returns the route URL, or throws if
+   the server is not running."
+  [route-id emit-fn]
+  (register-route! route-id (sse/make-handler emit-fn)))
 
 (defn register-content-route!
   "Register a declarative `content` map (`{:renderer … :data … :session-id …}`)

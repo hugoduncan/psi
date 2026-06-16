@@ -9,6 +9,7 @@
    [extensions.dev-http.renderers :as renderers]
    [extensions.dev-http.router :as router]
    [extensions.dev-http.routes :as routes]
+   [extensions.dev-http.sse :as sse]
    [extensions.dev-http.tool :as tool]
    [org.httpkit.client :as http-client]
    [psi.extension-test-helpers.nullable-api :as nullable]))
@@ -278,6 +279,21 @@
         (is (= 400 (:status (handler2 {:request-method :post :body ""}))))))))
 
 ;; ---------------------------------------------------------------------------
+;; SSE live-updates (Slice 4)
+;; ---------------------------------------------------------------------------
+
+(deftest sse-event-format-test
+  (testing "an SSE event is a data: block terminated by a blank line"
+    (is (= "data: hello\n\n" (sse/event "hello")))))
+
+(deftest sse-route-is-token-gated-test
+  (testing "the /sse/registry feed sits inside the token-gated subtree"
+    (let [reg     (registry/create-registry)
+          handler (router/build-handler {:registry reg :token "tok" :persisted-routes []})]
+      (testing "no token → 403 (never reaches the event stream)"
+        (is (= 403 (:status (handler {:request-method :get :uri "/sse/registry"}))))))))
+
+;; ---------------------------------------------------------------------------
 ;; lifecycle (integration — real ephemeral-port http-kit server)
 ;; ---------------------------------------------------------------------------
 
@@ -383,3 +399,27 @@
             (is (= 1 (count muts))))))
       (finally
         (sut/stop!)))))
+
+(deftest ^:integration sse-live-feed-test
+  ;; Connects to the real SSE feed over the ephemeral-port server and reads the
+  ;; pushed snapshot, which reflects current registry state.
+  (let [{:keys [api]} (nullable/create-nullable-extension-api
+                       {:path "/test/dev_http.clj"})]
+    (sut/init api)
+    (let [server (sut/start!)
+          base   (str "http://" (:host server) ":" (:port server))
+          token  (:token server)]
+      (try
+        (testing "AC-8: the SSE feed requires the token"
+          (is (= 403 (get-status (str base "/sse/registry")))))
+        (testing "a connected client receives a pushed snapshot event"
+          (sut/register-route! "live-1" (fn [_] {:status 200 :body "x"}))
+          (let [resp @(http-client/get (str base "/sse/registry?token=" token))]
+            (is (= 200 (:status resp)))
+            (is (re-find #"text/event-stream"
+                         (str (get-in resp [:headers :content-type]))))
+            (let [body (body-str resp)]
+              (is (re-find #"data: open" body))
+              (is (re-find #"data: routes 1" body)))))
+        (finally
+          (sut/stop!))))))
