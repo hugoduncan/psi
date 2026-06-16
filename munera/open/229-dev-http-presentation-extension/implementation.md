@@ -212,3 +212,20 @@ defects.
 - Verification: extensions suite (14/77) + integration (3/34) + agent-session
   `submit-synthetic-prompt-mutation-test` (1/6) green; clj-kondo clean across
   all touched files.
+
+## Implementation review (round 2) — 2026-06-15
+
+Re-verified green: extensions suite (14/77), integration (3/34), agent-session
+`submit-synthetic-prompt-mutation-test` (1/6); clj-kondo clean across extension
+src/dev/test + touched core mutation. Code matches design and follows the
+architecture (reads via api `:query`, writes only via `:mutate-session`; live
+integrant system + registry held in the extension's own atom; one sanctioned
+core touch = the thin `submit-synthetic-prompt` mutation; every dynamic subtree
+token-gated; assets ungated by documented decision). Docs/changelog/README
+present. The `:choices`-handled-at-route-layer-not-renderer-map split is a
+documented, justified deviation, not a defect.
+
+Three new quality/consistency follow-ups filed in steps.md (round 2): a
+swap-side-effect in `claim-answer!`; the `/s/<id>?token=` path shape encoded in
+three places; and start-status formatting duplicated between `handle-command`
+and `status-text`. All are non-behavioural; no correctness defect found.

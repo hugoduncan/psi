@@ -188,3 +188,27 @@ the next begins.
       branch is unreachable. Either drop the param (always `:extension`) or
       declare and wire it through a caller. Dropped the param; `:source` is
       always `:extension`.
+
+## Implementation review follow-ups (round 2)
+
+- [ ] `claim-answer!` (`extensions/dev-http/src/extensions/dev_http/choices.clj`)
+      performs a side effect inside the `swap!` update fn: it `reset!`s an
+      external `won` atom from within the function passed to `swap!`. This is the
+      documented swap-side-effect anti-pattern (`swap!` may retry its fn). It
+      happens to converge here because every invocation re-`reset!`s `won`, but
+      it violates the "update fn is pure" idiom. Rewrite using `swap-vals!` and
+      derive the win from the returned old/new state, e.g.
+      `(let [[old _] (swap-vals! reg (fn [m] …))] (not (:answered? (get old route-id))))`,
+      removing the inner `won` atom.
+- [ ] Duplicate session-route URL path shape `"/s/" <route-id> "?token=" <token>`
+      is hand-built in two places — `route-url` (`dev_http.clj`, with base-url)
+      and `render-form`'s form `action` (`choices.clj`, relative). The reitit
+      template `/s/:route-id` (`router.clj`) is the third encoding of the same
+      dispatch path. A path change must be made in all three. Extract the
+      relative session-route path (`"/s/" route-id`) into one shared helper used
+      by both URL builders so the dispatch path has a single source of truth.
+- [ ] `handle-command`'s `"start"` branch (`dev_http.clj`) hand-builds a
+      `"dev-http started\n  url:   …\n  token: …"` string that duplicates the
+      url/token formatting already produced by `status-text`. Reuse a single
+      formatting helper (or have `start` log `status-text` after starting) so the
+      running-status presentation has one source.
