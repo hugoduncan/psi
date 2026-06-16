@@ -719,3 +719,20 @@ the next begins.
       form)` passthrough branch distinct from the existing string-tag coercion
       assertion. Focused `extensions` suite green (18 tests / 129 assertions);
       clj-kondo clean.
+
+## Test review follow-ups (round 8)
+
+- [ ] (Low) Cover the headerless `:table` branch of `renderers/render-table`
+      (`extensions/dev-http/src/extensions/dev_http/renderers.clj`). The renderer
+      conditionally emits the `<thead>` only `(when (seq headers) …)`, so a
+      `:table` content map with `:rows` but no `:headers` (or empty `:headers`)
+      renders a `<tbody>`-only table with no header row. Both `:table` assertions
+      in `renderers-test` supply `:headers` (`{:headers ["a" "b"] :rows …}` and
+      `{"headers" ["a"] "rows" …}`), so the `(seq headers)` *false* branch — a
+      real, documented renderer path (headers are optional) — has no regression
+      guard: a change that always emitted (or never emitted) the `<thead>`, or
+      that broke the `when` guard, would pass the suite. Same untested-branch
+      regression-guard class as the round-2 jar-safety, round-6 map-option, and
+      round-7 hiccup-passthrough / urlencoded-decode gaps. Add a `:table`
+      assertion with rows-only data (e.g. `{:rows [[1 2]]}`, no `:headers`)
+      asserting the body renders the `<td>` cells but no `<thead>`/`<th>`.

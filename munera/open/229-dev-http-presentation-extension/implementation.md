@@ -714,3 +714,20 @@ existing JSON string-tag coercion case.
 
 Verification: focused `extensions` suite green (18 tests / 129 assertions);
 clj-kondo clean on the test file. No remaining open round-7 follow-ups.
+
+## Test review (round 8) — 2026-06-15
+
+One actionable coverage gap filed (steps.md "Test review follow-ups (round 8)"),
+the same untested-branch regression-guard class as the round-2/6/7 gaps: the
+headerless `:table` branch (`render-table`'s `(when (seq headers) …)`) is
+unguarded — both `:table` assertions supply `:headers`, leaving the optional
+rows-only / no-`<thead>` path with no test. Low severity, no behaviour defect.
+
+Non-compliance worth flagging: the round-7 implementation review's "All
+AC-1..AC-10 covered" framing again slightly overstates AC-5 ("each renderer
+produces the expected response for representative input") — the `:table`
+renderer's documented optional-headers variation is one representative input
+left unexercised, the eighth such surface/branch gap the prior test-review
+rounds have each surfaced. Tests are otherwise well-formed and uniformly use the
+sanctioned nullable extension API + ctx seams (no infra-dep mocks/stubs; the
+round-6 de-mock closed the last spy/interaction test).
