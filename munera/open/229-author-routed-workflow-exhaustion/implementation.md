@@ -533,3 +533,41 @@ breakage, but it sits in the review-task-plan test surface Slice 3 rewrites, so
 it is reconciled there (update stale assertions to the authored #177 content; no
 workflow-content change). Recorded so the AC-7 green-suite gate is met by
 Slice 3, not silently.
+
+---
+
+## Slice 3 implementation (2026-06-16)
+
+Symmetric plan-review handback + lifecycle plan gate.
+
+- **review-task-plan.edn**: `plan-follow-up` `:on` gains
+  `:on-max-iterations "final-summary-not-converged"` (max-iterations 5 kept); new
+  `final-summary-not-converged` before converged `final-summary` (DI-2); both
+  explicit-terminal; DI-4 single-final-PASS_STATUS contract
+  (REVIEW_COMPLETE / ACTIONABLE_FEEDBACK, DI-3 no count, anti-echo without literal
+  token).
+- **task-lifecycle.edn**: `check-plan-review-status` invoke-gate immediately after
+  `review-task-plan` (DONE→`implement-task`,
+  REPEAT→`final-summary-plan-not-converged`); `final-summary-plan-not-converged`
+  appended last (`:goto :done`, no extraction).
+- **workflow_definitions_test.clj**: `review-task-plan-test` (4-step order,
+  `:on-max-iterations`, both terminal, DI-4 template text, not-converged sources);
+  `task-lifecycle-test` 11→13 (plan gate + plan handback assertions, `repeat 13`).
+- **workflow_delegate_review_step_live_test.clj**: DI-2 plan-review
+  converged-standalone runtime test mirroring the design one.
+
+DEVIATION RESOLVED (#177 test-debt): updated the pre-existing RED
+`review-task-plan-test` plan-follow-up text assertions (steps.md →
+`design-steps.md`; `git diff …/steps.md` → `…/design-steps.md`; dropped the
+`(not design-steps.md)` assertion) and rewrote the
+`review-task-prompt-artifact-targets-test` plan block to assert plan-review
+prompts target the shared `design-steps.md` (per #177
+"route plan-review follow-ups through shared design-steps.md"), keeping a
+`review-follow-up-steps.md`-owns-steps.md check. Test-only, matched authored
+workflow content; no workflow-content change.
+
+Pre-existing unrelated failure (NOT 229): the live
+`delegate-review-task-implementation-completes-with-nullable-local-model-test`
+in the same ns fails identically with my changes stashed (terminates :failed —
+environmental/local-model dependency). Out of scope; left as-is. My two new DI-2
+tests in that ns pass (they stub the turn and drive the synchronous mutation).

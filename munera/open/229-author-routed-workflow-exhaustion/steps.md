@@ -77,24 +77,28 @@ Slices are independently committable; keep each commit `small`.
 
 ## Slice 3 — review-task-plan handback + lifecycle plan gate (symmetric)
 
-- [ ] `review-task-plan.edn`: `plan-follow-up` `:on-max-iterations`; new
+- [x] `review-task-plan.edn`: `plan-follow-up` `:on-max-iterations`; new
       `final-summary-not-converged` placed **before** converged `final-summary`
       (DI-2); both explicit-terminal; DI-4 contract
       (`PASS_STATUS: REVIEW_COMPLETE` converged / `ACTIONABLE_FEEDBACK`
       not-converged, keep (a)/rewrite (b), sole line); **DI-3: no literal
-      iteration count** in not-converged wording
-- [ ] `task-lifecycle.edn`: `check-plan-review-status` gate after
+      iteration count**
+- [x] `task-lifecycle.edn`: `check-plan-review-status` gate after
       `review-task-plan` (DONE→`implement-task`,
       REPEAT→`final-summary-plan-not-converged`) + `final-summary-plan-not-converged`
-- [ ] `workflow_definitions_test.clj` `review-task-plan-test`: step-order incl.
-      not-converged before converged; `:on-max-iterations`; DI-4 template-text
-      authority (sole exact-form `PASS_STATUS:` line per summary)
-- [ ] **converged standalone result-text runtime test (DI-2)** for plan review
-- [ ] task-lifecycle coverage: **update existing `task-lifecycle-test` in place**
-      (count 11→13, name/type vectors, positional `nth`, `repeat` counts) for the
-      plan gate + handback; new `229` test additive-only (R3/DI-5)
-- [ ] focused workflow-loader Scry green; clj-kondo clean
-- [ ] commit `⚒ workflows: route unconverged plan review to lifecycle handback`
+      appended last
+- [x] `workflow_definitions_test.clj` `review-task-plan-test`: step-order incl.
+      not-converged before converged; `:on-max-iterations`; both terminal; DI-4
+      template-text authority (sole exact-form `PASS_STATUS:` line per summary)
+- [x] **converged standalone result-text runtime test (DI-2)** for plan review
+- [x] task-lifecycle coverage: **updated existing `task-lifecycle-test` in place**
+      (count 11→13, name/type vectors, plan gate + handback assertions,
+      `repeat 13`); delegate-step selection already name/type-filtered (DI-5)
+- [x] **resolved pre-existing #177 test-debt** in `review-task-plan-test` +
+      `review-task-prompt-artifact-targets-test` (stale "steps.md"-only vs
+      authored shared `design-steps.md`) — test-only, matched authored content
+- [x] focused workflow-loader Scry green; clj-kondo clean
+- [x] commit `⚒ workflows: route unconverged plan review to lifecycle handback`
 
 ## Slice 4 — docs + coherence
 

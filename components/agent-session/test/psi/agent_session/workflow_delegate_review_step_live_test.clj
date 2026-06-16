@@ -218,3 +218,54 @@
               (context/shutdown-context! ctx))))
         (finally
           (.delete (java.io.File. models-path)))))))
+
+(deftest review-task-plan-converged-standalone-surfaces-review-complete-result-test
+  ;; DI-2 (Slice 3): mirrors the design-review test for plan review — the
+  ;; converged final-summary, ordered last per DI-2, is the step whose yielded
+  ;; text surfaces via the standalone (last :step-order) path. Wording is locked
+  ;; by the definition-level review-task-plan-test; here the reply is stubbed.
+  (testing "converged review-task-plan surfaces the converged final-summary text as standalone result"
+    (let [models-path (write-temp-models!
+                       {:version 1
+                        :providers {"local"
+                                    {:base-url "http://localhost:8080/v1"
+                                     :api :openai-completions
+                                     :models [{:id "test-model"}]}}})]
+      (try
+        (model-registry/init! {:user-models-path models-path})
+        (let [[ctx session-id]
+              (workflow-test-support/create-tui-context+session
+               mutations/all-mutations
+               {:session-defaults {:model {:provider "local" :id "test-model" :reasoning false}}})]
+          (workflow-test-support/init-built-in-workflow! ctx session-id)
+          (try
+            (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                          (fn [_ctx _child-session-id prompt]
+                            (let [reply (if (str/includes? prompt "Produce the user-facing final result")
+                                          "Plan review completed cleanly.\n\nPASS_STATUS: REVIEW_COMPLETE"
+                                          "PASS_STATUS: REVIEW_COMPLETE")]
+                              {:execution-result/assistant-message
+                               {:role "assistant"
+                                :content [{:type :text :text reply}]
+                                :stop-reason :stop}}))]
+              (cwf-mutations/create-workflow-run
+               {} {:psi/agent-session-ctx ctx
+                   :definition-id "review-task-plan"
+                   :workflow-input {:input "munera/open/229-author-routed-workflow-exhaustion"}
+                   :run-id "run-plan-converged"})
+              (let [result (cwf-mutations/execute-workflow-run
+                            {} {:psi/agent-session-ctx ctx
+                                :session-id session-id
+                                :run-id "run-plan-converged"})
+                    run (workflow-runtime/workflow-run-in @(:state* ctx) "run-plan-converged")
+                    result-text (:psi.workflow/result result)]
+                (is (= :completed (:psi.workflow/status result)) (pr-str run))
+                (is (= "final-summary" (last (:step-order (:effective-definition run))))
+                    "converged final-summary must be ordered last (DI-2)")
+                (is (string? result-text))
+                (is (= 1 (count-substring result-text "PASS_STATUS: REVIEW_COMPLETE"))
+                    "standalone result text is the converged final-summary's single REVIEW_COMPLETE line")))
+            (finally
+              (context/shutdown-context! ctx))))
+        (finally
+          (.delete (java.io.File. models-path)))))))
