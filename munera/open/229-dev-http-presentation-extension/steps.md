@@ -486,3 +486,36 @@ the next begins.
       lookup. Added `routes-from-resource-jar-safety-test` asserting `[]` for
       `nil` and for a `jar:file:/…!/…` URL (non-`file` protocol). Unit suite
       green (17 tests, 118 assertions); clj-kondo clean.
+
+## Test review follow-ups (round 3)
+
+- [ ] Cover the `/dev-http` command handler's subcommand dispatch
+      (`handle-command`, `extensions/dev-http/src/extensions/dev_http.clj`). AC-1
+      and design §Lifecycle define the user-facing surface as the
+      `/dev-http start | status | stop` command, yet **no test invokes the
+      registered command handler**. `init-captures-api-test` asserts only that
+      the command is *present* (`contains? (:commands @state) "dev-http"`); the
+      integration `lifecycle-and-serving-test` drives `sut/start!`/`sut/stop!`/
+      `sut/status-text` directly, bypassing `handle-command`'s arg-parse +
+      `case` subcommand routing and the unknown-subcommand usage fallback. A
+      regression in the command surface — wrong subcommand routing, a broken
+      `(str/split #"\s+")` parse, a lost/garbled usage message, or `start` not
+      logging the running status — would pass the entire suite. Add a test that
+      resolves the handler from the nullable state
+      (`(get-in @state [:commands "dev-http" :handler])`) and invokes it with
+      `"status"` (before start ⇒ logs "dev-http not running"), `"start"`,
+      `"status"` again, `"stop"` (⇒ "dev-http stopped"), and an unknown
+      subcommand (⇒ the `usage: /dev-http start | status | stop` line), asserting
+      on the captured log lines (`nullable/drain-log!` / `:log-lines`) and the
+      running/stopped server state. Same untested-surface regression-guard class
+      as the round-1 dev-present-wiring, round-2 jar-safety, and round-5/6
+      coverage gaps.
+- [ ] (Low) Assert the running-status url/token presentation, not just the
+      "dev-http running" header. The integration test asserts only
+      `(re-find #"dev-http running" (sut/status-text))`; the indented
+      `  url:   …` / `  token: …` block produced by the round-2-dedup
+      `url-token-lines` helper (shared by `status-text` and the `start` command
+      branch) is never asserted, so a regression dropping or garbling the
+      url/token lines passes. Fold into the round-3 command-handler test above:
+      after `start`, assert the `status` command's logged output contains the
+      base URL and the live token.

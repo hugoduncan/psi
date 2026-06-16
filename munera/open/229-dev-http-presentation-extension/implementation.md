@@ -533,3 +533,16 @@ Both round-2 findings resolved.
 Verification: integration suite green (4 tests / 40 assertions), extensions/unit
 suite green (17 tests / 118 assertions); clj-kondo clean across the touched
 src + test files.
+
+## Test review (round 3) — 2026-06-15
+
+One actionable coverage gap filed (steps.md "Test review follow-ups (round 3)"),
+untested-surface regression-guard class. Non-compliance worth flagging: the
+round-7 implementation review's "All AC-1..AC-10 covered" and round-1/round-2
+test-review "all ACs covered" claims overstate AC-1's command surface — the
+`/dev-http start|status|stop` command handler (`handle-command`) is never
+invoked by any test (tests call `start!`/`stop!`/`status-text` directly), so its
+subcommand dispatch and usage fallback have no regression guard; relatedly the
+running-status url/token lines are asserted nowhere. Test-only coverage gap, not
+a behaviour defect. Tests are otherwise well-formed and use the sanctioned
+nullable extension API (no mocks/stubs of infra deps).
