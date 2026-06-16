@@ -98,6 +98,55 @@ plan.md / design.md (steps.md is read-only review context).
       being last) — and state the resulting ordered name/type vectors the
       updated `task-lifecycle-test` must assert.
 
+- [ ] **DI-2 converged-standalone result-text test conflates the synthetic
+      proof harness with the real loaded `.edn`, leaving the test's own
+      construction ambiguous (Slice 2/3, DI-2).** DI-2's test note says to "drive
+      `review-task-design` (resp. `review-task-plan`) standalone to a converged
+      terminal via the `workflow_review_step_routing_test` harness (stub
+      `psi.agent-session.turn/prompt-execution-result-in!` to return
+      `REVIEW_COMPLETE` for the review step, then the converged summary text), run
+      it through `execute-workflow-run`, and assert `:psi.workflow/result`
+      contains `PASS_STATUS: REVIEW_COMPLETE`". Verified against code, that
+      instruction is ambiguous on three coupled points, and the most natural
+      reading does **not** prove what the test claims to prove:
+      (a) **Which definition?** The named harness drives *synthetic* proof
+      definitions (`conditional-review-design-definition` /
+      `-plan-definition`, registered as `review-task-design-proof` etc.) whose
+      converged `final-summary` is just `{:type :template :text "final-summary"}`
+      — it carries no `PASS_STATUS:` line. The test's stated purpose is to lock
+      that the **DI-4 template wording** in the *real* `.psi/workflows/
+      review-task-design.edn` / `review-task-plan.edn` converged `final-summary`
+      yields `PASS_STATUS: REVIEW_COMPLETE`. Only the **real loaded `.edn`**
+      definition (via workflow-loader) can lock that; the synthetic harness
+      definition cannot. The note does not say which to use.
+      (b) **Which execution entry point?** `:psi.workflow/result` is produced by
+      the `canonical_workflows/execute-workflow-run` mutation, but the harness's
+      `execute-conditional-review-proof!` / `execute-run!` path does not go
+      through that mutation (it calls `workflow-execution/execute-run!` with a
+      custom `:workflow-execute-actor-turn-fn`). "via the harness … run it through
+      `execute-workflow-run`" names two different mechanisms without saying how
+      the harness's actor stub plugs into the mutation path (or whether the test
+      should bypass the harness entirely and stub at `prompt-execution-result-in!`
+      under `execute-workflow-run`).
+      (c) **Multi-prompt convergence underspecified.** "stub … to return
+      `REVIEW_COMPLETE` for the review step" treats the review step as a single
+      turn, but the real `design-review` is a 3-prompt (resp. `plan-review` a
+      2-prompt) step judged by `workflow/pass-feedback-routing`, which routes DONE
+      only when **every** per-prompt `:final-llm-reply` carries exactly one
+      `PASS_STATUS: REVIEW_COMPLETE` line. The stub must therefore supply a
+      convergent `PASS_STATUS: REVIEW_COMPLETE` reply for **each** per-prompt turn
+      (keyed by per-prompt prompt text, per the existing
+      `design-review-full-pass-routing-test` pattern), then the converged
+      `final-summary` text — not one combined `REVIEW_COMPLETE`.
+      Resolve in plan.md: specify that the converged-standalone result-text test
+      loads the **real** `review-task-design.edn` / `review-task-plan.edn`
+      definitions and drives them through `execute-workflow-run` (stubbing the
+      per-prompt actor turns to all-`REVIEW_COMPLETE` plus the converged summary
+      text), rather than reusing the synthetic `conditional-review-*` proof
+      definitions; or, if a synthetic definition is intended, state that the
+      synthetic converged `final-summary` template must replicate the DI-4
+      `PASS_STATUS: REVIEW_COMPLETE` wording for the assertion to be meaningful.
+
 ## Inconsistency review
 
 - [x] **Plan assumes a green `review-task-design-test` baseline, but it is

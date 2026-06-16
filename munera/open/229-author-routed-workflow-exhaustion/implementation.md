@@ -181,3 +181,24 @@ and stays excluded/BLOCKED.
   unchecked rather than editing an out-of-bounds file. Needs a human decision:
   authorize a design.md edit (or a design-review/design-follow-up pass) to
   reconcile items 6/7 with the superseding plan.md DI-4 contract.
+
+## Plan-review ambiguity pass — loop 4 (2026-06-16)
+
+ACTIONABLE. 1 new ambiguity → design-steps.md. DI-2's converged-standalone
+result-text test note conflates the synthetic `workflow_review_step_routing_test`
+proof harness with the real loaded `.edn`: (a) the harness drives synthetic
+`conditional-review-design/plan-definition`s whose converged `final-summary` is a
+bare `"final-summary"` template (no PASS_STATUS), so it cannot lock the DI-4 real
+template wording the test claims to prove — only the real loaded
+`review-task-design.edn`/`review-task-plan.edn` can; (b) `:psi.workflow/result`
+comes from `canonical_workflows/execute-workflow-run`, but the harness path uses
+`execute-run!` with a custom actor-turn fn, so "via the harness … run through
+execute-workflow-run" names two non-composed mechanisms; (c) "return
+REVIEW_COMPLETE for the review step" underspecifies the multi-prompt
+`pass-feedback-routing` convergence (every per-prompt reply must carry
+`PASS_STATUS: REVIEW_COMPLETE`). Verified against code (harness uses synthetic
+proof defs at :393-447/:524+; `execute-workflow-run` at canonical_workflows.clj;
+`design-review-full-pass-routing-test` shows the per-prompt all-REVIEW_COMPLETE
+pattern). Prior loop-1..3 items (DI-2 ordering, DI-3, DI-4, DI-5, stale baseline,
+positional task-lifecycle-test) remain resolved; steps.md-sync + design.md item
+6/7 inconsistencies still open/BLOCKED — not duplicated.
