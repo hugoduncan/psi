@@ -662,3 +662,39 @@ the next begins.
       paths) are unchanged. Focused Scry green (1 test / 21 assertions); full
       dev-http unit ns green (17 / 118); `:extensions` suite green
       (245 / 906); clj-kondo clean.
+
+## Test review follow-ups (round 7)
+
+- [ ] Cover the URL-decode round-trip of a submitted `:choices` value
+      (`mw/urlencoded-param`'s `decode` / `URLDecoder/decode` path,
+      `extensions/dev-http/src/extensions/dev_http/middleware.clj`). Every
+      choices test posts scalar values with no percent/`+` encoding
+      (`choice=A`/`choice=B`/`choice=y`), and `request-token-test` only parses
+      unencoded `token=abc`, so the `decode` step that turns a browser-submitted
+      `choice=yes+please` / `choice=a%2Fb` back into `"yes please"` / `"a/b"` is
+      unverified. A `:choices` `{:label … :value …}` option may carry an
+      arbitrary value (design §Interaction), the form renders it as
+      `value="<value>"`, and the browser URL-encodes it on submit — so the
+      injected **user message** depends on this decode. A regression dropping
+      `decode` (or `+`→space handling) would inject the raw encoded string yet
+      pass the entire suite — the same untested-branch regression-guard class as
+      the round-2 jar-safety, round-5 tool-wiring, and round-6 map-option gaps.
+      Add a `choices-handler`/`render-form` test with a value needing decoding
+      (e.g. option value `"a b"` or `"a/b"`): assert the GET form renders the
+      raw value attribute, and that a POST of the URL-encoded body
+      (`choice=a+b` / `choice=a%2Fb`) injects the **decoded** value as the
+      single user message. A `mw/urlencoded-param` unit assertion over an
+      encoded body is an acceptable lighter alternative if the handler-level
+      round-trip is impractical.
+- [ ] (Low) Cover the idiomatic keyword-tag `:hiccup` passthrough branch of
+      `renderers/coerce-hiccup`
+      (`extensions/dev-http/src/extensions/dev_http/renderers.clj`). The
+      `:hiccup` renderer test (`renderers-test`) feeds only a JSON-decoded
+      string-tag tree (`["div" {} ["h1" "X"]]`), exercising the string-tag→
+      keyword coercion branch; the documented "passes idiomatic hiccup through
+      unchanged" branch (`(vector? form) (mapv coerce-hiccup form)`, reached when
+      `:hiccup` content arrives from the REPL/`register-route!` path with
+      keyword tags like `[:div {} [:h1 "X"]]`) is untested. A regression in that
+      branch would break REPL-supplied hiccup yet pass the suite. Add a small
+      assertion rendering an idiomatic keyword-tag tree to the same
+      `<div><h1>X</h1></div>` HTML.

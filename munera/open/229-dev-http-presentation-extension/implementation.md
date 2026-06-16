@@ -680,3 +680,17 @@ unknown renderer (`empty? entries`, replacing `(= :unchanged @captured)`).
 Tool-result output assertions unchanged. No production change. Focused
 1/21, dev-http unit ns 17/118, `:extensions` suite 245/906 green; clj-kondo
 clean. Closes the round-6 finding; no remaining open follow-ups.
+
+## Test review (round 7) — 2026-06-15
+
+Two actionable coverage gaps filed (steps.md "Test review follow-ups
+(round 7)"); both are untested-behaviour regression-guard gaps, no behaviour
+defect. (1) The `mw/urlencoded-param` `URLDecoder/decode` path is unverified —
+every choices/token test uses unencoded values, so the decode the submitted-
+choice→injected-user-message round-trip depends on (a `{:label :value}` value
+with a space/special char) has no guard. (2) The idiomatic keyword-tag branch of
+`renderers/coerce-hiccup` (REPL/`register-route!` `:hiccup` path) is untested;
+only the JSON string-tag branch is. No non-compliance with the review
+instructions to note; all existing tests are well-formed and use the sanctioned
+nullable api + ctx seams (the round-6 de-mock closed the last spy/interaction
+test).
