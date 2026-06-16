@@ -235,7 +235,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Docs review follow-ups — pass 3 (2026-06-16)
 
-- [ ] Document the **not-converged standalone** `/delegate review-task-design` /
+- [x] Document the **not-converged standalone** `/delegate review-task-design` /
       `/delegate review-task-plan` result-text behaviour change. Both
       `CHANGELOG.md` (`[Unreleased]` → Changed) and `doc/workflows.md` document
       only the **converged** standalone change ("converged final summaries now

@@ -892,3 +892,21 @@ documented nowhere. Design D5 "known degradation". Verified absent from
 reference + workflows.md prose + CHANGELOG `:on-max-iterations`/handback entries
 match the EDN (design 3, plan 5, step names, PASS_STATUS strings, anchor link);
 README has no references to touch.
+
+## Docs review pass 3 follow-up execution (2026-06-16)
+
+DONE. Documented the not-converged standalone result-text behaviour change in
+both user-facing surfaces (design D5 "known degradation"):
+- `CHANGELOG.md` `[Unreleased]` → Changed: extended the existing
+  converged-standalone `PASS_STATUS` entry with the not-converging standalone
+  case — handback summary (`final-summary-not-converged`,
+  `PASS_STATUS: ACTIONABLE_FEEDBACK`) surfaces only via the `task-lifecycle`
+  gate; standalone non-converging runs now yield empty result text instead of
+  the prior `:reason :iteration-exhausted` hard failure.
+- `doc/workflows.md` `Author-routed loop exhaustion` section: added a
+  "Standalone non-converging output" paragraph explaining the step ordering
+  (not-converged summary before converged `final-summary`), why `(last
+  :step-order)` reads the never-run converged summary → empty result text, the
+  replaced hard-fail behaviour, and that the handback summary is observable
+  under `task-lifecycle`.
+Docs-only edit; no code/test impact.
