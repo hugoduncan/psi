@@ -173,6 +173,10 @@ Built-in extensions that ship with this repo (activated via
   conversation context.
 - **commit-checks** — run project-local checks after a local commit and feed
   failures back into the session.
+- **dev-http** — dev-time localhost HTTP side channel (`/dev-http`,
+  `dev-present`) for presenting markdown/tables/Vega/Mermaid/files/hiccup and
+  choice prompts in a browser, with choices flowing back as user input. See
+  [`doc/dev-http.md`](doc/dev-http.md).
 - **edit-clj** — structural Clojure/EDN editing tool that replaces whole forms
   by structural equality (`edit-clj`).
 - **mementum** — git-based memory protocol: memories, knowledge, and

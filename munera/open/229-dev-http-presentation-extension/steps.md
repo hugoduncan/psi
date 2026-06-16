@@ -144,12 +144,14 @@ the next begins.
 
 ## Close-out (cross-cutting)
 
-- [ ] Verify no HTTP handler reads/writes core state except via
+- [x] Verify no HTTP handler reads/writes core state except via
       `:query`/`:mutate`; integrant + live handle stay inside the extension
-      (AC-9).
-- [ ] Docs: add `doc/dev-http.md` (lifecycle, renderers, choices, SSE, token,
-      dev-only posture) and link from the docs index.
-- [ ] Changelog: `[Unreleased]` Added entry for the dev-http extension.
-- [ ] Update `mementum/state.md` capabilities section to mention dev-http.
-- [ ] Full Scry suite green; clj-kondo clean across extension + touched core.
-- [ ] Commit: `⚒ 229: docs + changelog + coherence`.
+      (AC-9). HTTP handlers touch state only via `(:mutate-session api)` (choices
+      submit); renderers are pure; the integrant system + registry live in the
+      extension atom only.
+- [x] Docs: add `doc/dev-http.md` (lifecycle, renderers, choices, SSE, token,
+      dev-only posture) and link from README extensions list.
+- [x] Changelog: `[Unreleased]` Added entry for the dev-http extension.
+- [x] Update `mementum/state.md` capabilities section to mention dev-http.
+- [x] Full Scry suite green; clj-kondo clean across extension + touched core.
+- [x] Commit: `⚒ 229: docs + changelog + coherence`.
