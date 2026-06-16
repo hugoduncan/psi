@@ -65,6 +65,23 @@
   (is (.endsWith ^String text (str "\nPASS_STATUS: " token))
       (str "template should end with the sole column-0 PASS_STATUS: " token " line")))
 
+(defn- assert-review-summary-handback
+  "Shared assertions for a review workflow's converged `final-summary` and its
+   `final-summary-not-converged` handback (DI-1/DI-4): both explicit-terminal,
+   each template body carries its sole final PASS_STATUS line, and the
+   not-converged summary sources the same per-prompt review outputs."
+  [final-step not-converged-step source-refs]
+  (is (= (constant-routing-judge "DONE") (:judge final-step)))
+  (is (= {"DONE" {:goto :done}} (:on final-step)))
+  (is (= (constant-routing-judge "DONE") (:judge not-converged-step)))
+  (is (= {"DONE" {:goto :done}} (:on not-converged-step)))
+  (assert-sole-final-pass-status-line (step-template-text final-step) "REVIEW_COMPLETE")
+  (assert-sole-final-pass-status-line (step-template-text not-converged-step) "ACTIONABLE_FEEDBACK")
+  (doseq [source-ref source-refs]
+    (is (some #(= {:type :source :from source-ref} %)
+              (:contributions not-converged-step))
+        (str "final-summary-not-converged should include " source-ref))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -162,24 +179,12 @@
                                (contains? (:from %) :yield))
                          (filter #(= :source (:type %)) (:contributions final-step)))
                "final-summary must not use per-prompt :yield refs"))
-         (testing "both summaries are explicitly terminal (DI-1)"
-           (is (= (constant-routing-judge "DONE") (:judge final-step)))
-           (is (= {"DONE" {:goto :done}} (:on final-step)))
-           (is (= (constant-routing-judge "DONE") (:judge not-converged-step)))
-           (is (= {"DONE" {:goto :done}} (:on not-converged-step))))
-         (testing "summary templates carry the exact sole final PASS_STATUS line (DI-4 point 4)"
-           (assert-sole-final-pass-status-line
-            (step-template-text final-step) "REVIEW_COMPLETE")
-           (assert-sole-final-pass-status-line
-            (step-template-text not-converged-step) "ACTIONABLE_FEEDBACK"))
-         (testing "not-converged summary sources the same per-prompt review outputs"
-           (is (some? not-converged-step))
-           (doseq [source-ref [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
-                               {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
-                               {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]]
-             (is (some #(= {:type :source :from source-ref} %)
-                       (:contributions not-converged-step))
-                 (str "final-summary-not-converged should include " source-ref))))
+         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
+           (assert-review-summary-handback
+            final-step not-converged-step
+            [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
+             {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
+             {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]))
          (testing "removed per-phase topology step names are absent"
            (doseq [removed ["architecture-review" "architecture-follow-up"
                             "ambiguity-review" "ambiguity-follow-up"
@@ -250,8 +255,7 @@
                            :on-max-iterations "final-summary-not-converged"}}
                   (:on plan-follow-up)))
            (let [text (step-template-text plan-follow-up)]
-             ;; #177 routes plan-review follow-ups through the shared
-             ;; design-steps.md artifact (treating steps.md as read-only).
+             ;; #177 routes plan-review follow-ups through shared design-steps.md.
              (is (.contains text "design-steps.md"))
              (is (.contains text "immediately preceding whole `plan-review` batch"))
              (is (.contains text "git diff <baseline>..HEAD -- <task>/design-steps.md"))
@@ -270,23 +274,11 @@
                                (contains? (:from %) :yield))
                          (filter #(= :source (:type %)) (:contributions final-step)))
                "final-summary must not use per-prompt :yield refs"))
-         (testing "both summaries are explicitly terminal (DI-1)"
-           (is (= (constant-routing-judge "DONE") (:judge final-step)))
-           (is (= {"DONE" {:goto :done}} (:on final-step)))
-           (is (= (constant-routing-judge "DONE") (:judge not-converged-step)))
-           (is (= {"DONE" {:goto :done}} (:on not-converged-step))))
-         (testing "summary templates carry the exact sole final PASS_STATUS line (DI-4 point 4)"
-           (assert-sole-final-pass-status-line
-            (step-template-text final-step) "REVIEW_COMPLETE")
-           (assert-sole-final-pass-status-line
-            (step-template-text not-converged-step) "ACTIONABLE_FEEDBACK"))
-         (testing "not-converged summary sources the same per-prompt review outputs"
-           (is (some? not-converged-step))
-           (doseq [source-ref [{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}
-                               {:step "plan-review" :prompt "inconsistency" :output :final-llm-reply}]]
-             (is (some #(= {:type :source :from source-ref} %)
-                       (:contributions not-converged-step))
-                 (str "final-summary-not-converged should include " source-ref))))
+         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
+           (assert-review-summary-handback
+            final-step not-converged-step
+            [{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}
+             {:step "plan-review" :prompt "inconsistency" :output :final-llm-reply}]))
          (testing "removed per-phase topology step names are absent"
            (doseq [removed ["ambiguity-review" "ambiguity-follow-up"
                             "inconsistency-review" "inconsistency-follow-up"
@@ -298,10 +290,8 @@
 ;;; review task prompt artifact targets
 
 (deftest review-task-prompt-artifact-targets-test
-  ;; Tests review prompt artifact ownership. Per #177 ("route plan-review
-  ;; follow-ups through shared design-steps.md"), both design review and plan
-  ;; review write their follow-up items to the shared design-steps.md artifact
-  ;; while treating steps.md as read-only task context.
+  ;; Artifact ownership: per #177 both design and plan review write follow-up
+  ;; items to the shared design-steps.md (steps.md is read-only task context).
   (testing "design review prompts target design-steps.md"
     (doseq [filename ["review-task-design-architecture-review.md"
                       "review-task-design-ambiguity-review.md"
