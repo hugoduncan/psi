@@ -689,3 +689,42 @@ three-field varying axis; (2) the DI-6 author-target routing integration test
 locks only negatives (no positive terminal-outcome assertion), weakening failure
 signal vs its `:failed`-asserting sibling; (3) `count-substring` duplicated
 across two component test namespaces. Details in steps.md.
+
+## Test-shaper review follow-up execution (2026-06-16)
+
+Executed all three test-shaper-review batch follow-ups (test-only; no
+production/EDN/doc change).
+
+- **Item 1 (dedupe converged-standalone live tests) — DONE.** Extracted
+  `assert-converged-standalone-surfaces-review-complete` in
+  `workflow_delegate_review_step_live_test.clj` carrying the shared
+  models-path/context/`with-redefs`/create+execute ceremony + assertions; each
+  `deftest` now expresses only the single varying axis (`definition-id` /
+  `run-id` / converged `reply-prefix`). ~100 duplicated lines → one helper + two
+  3-line call sites.
+- **Item 2 (strengthen DI-6 routing test) — DONE.** Replaced the negative-only
+  assertions in `review-pass-loop-on-max-iterations-routes-to-author-target-test`
+  (`workflow_review_step_routing_test.clj`) with positive terminal-outcome shape
+  mirroring the `:failed`-asserting sibling: `(= :completed (:status result))`,
+  `(= :completed (:status run))`, and the handback's
+  `[:step-runs "final-summary-not-converged" :accepted-result]` `some?` (an
+  accepted result, not bare step existence). A regression routing exhaustion to
+  a non-failed-but-wrong terminal (`:blocked`, stuck `:running`) now fails.
+- **Item 3 (count-substring cross-ns duplicate) — DONE.** Folded the live test's
+  only `count-substring` use into the new item-1 helper via
+  `(count (re-seq #"PASS_STATUS: REVIEW_COMPLETE" result-text))` (the literal has
+  no regex metachars) and removed the live test's standalone `count-substring`
+  def. `count-substring` now exists in a single namespace
+  (`workflow_definitions_test.clj`, substantive use in
+  `assert-sole-final-pass-status-line`). Chose folding over hoisting to a shared
+  util: the two namespaces are in different components (agent-session vs
+  workflow-loader), so hoisting a trivial 8-line helper would add a
+  cross-component test-support dependency edge — heavier than the duplication it
+  removes.
+
+Verification: `clj-paren-repair` + `clj-kondo` clean on both edited files.
+`workflow-review-step-routing-test` 114/0 (incl. the strengthened DI-6 test).
+`workflow-delegate-review-step-live-test`: both refactored DI-2 tests pass; the
+sole failure is the documented pre-existing 229-independent
+`delegate-…-nullable-local-model-test` (`:reason :missing-pass-status`,
+environmental). `.scry-results/` confirmed gitignored.

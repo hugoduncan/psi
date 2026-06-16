@@ -750,10 +750,10 @@
                                  "ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                  "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"}
                                 {:kind :design-on-max-iterations})]
-      (is (not= :failed (:status result))
-          "author-routed exhaustion must not mark the run failed")
-      (is (not= :failed (:status run)))
+      (is (= :completed (:status result))
+          "author-routed exhaustion completes at the handback, not failed/blocked/stuck")
+      (is (= :completed (:status run)))
       (is (not= :iteration-exhausted (:reason (:terminal-outcome run)))
           "author-routed exhaustion must not terminate with :iteration-exhausted")
-      (is (some? (get-in run [:step-runs "final-summary-not-converged"]))
-          "the :on-max-iterations author target (handback) must have run"))))
+      (is (some? (get-in run [:step-runs "final-summary-not-converged" :accepted-result]))
+          "the :on-max-iterations author target (handback) must have run to an accepted result"))))

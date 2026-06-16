@@ -124,7 +124,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Test-shaper review follow-ups (2026-06-16)
 
-- [ ] Deduplicate the two near-identical converged-standalone live tests in
+- [x] Deduplicate the two near-identical converged-standalone live tests in
       `workflow_delegate_review_step_live_test.clj`
       (`review-task-design-converged-standalone-surfaces-review-complete-result-test`
       and `review-task-plan-converged-standalone-surfaces-review-complete-result-test`):
@@ -135,7 +135,7 @@ Slices are independently committable; keep each commit `small`.
       expresses only the single varying axis (test-shaper: economical /
       helpers_that_compress / minimal incidental variation).
 
-- [ ] Strengthen `review-pass-loop-on-max-iterations-routes-to-author-target-test`
+- [x] Strengthen `review-pass-loop-on-max-iterations-routes-to-author-target-test`
       (`workflow_review_step_routing_test.clj`): it asserts only negatives
       (`not= :failed`, `not= :iteration-exhausted`) plus a `some?` existence
       check, so a regression routing exhaustion to a non-failed-but-wrong
@@ -146,7 +146,7 @@ Slices are independently committable; keep each commit `small`.
       handback step's accepted-result — for meaningful failure signal
       (test-shaper: meaningful_failures / behavior_focused).
 
-- [ ] (minor) `count-substring` is copy-pasted identically into
+- [x] (minor) `count-substring` is copy-pasted identically into
       `workflow_definitions_test.clj` and `workflow_delegate_review_step_live_test.clj`
       (different components). Consider hoisting to a shared test-support util, or
       fold its single use into the live-test helper above, to remove the
