@@ -12,7 +12,11 @@ skills:
 ---
 For the Munera task identified by {{input}}, run the ambiguity review as the second turn of the shared `design-review` multi-prompt session. Work independently. Use the already-loaded task design.md, architecture sources, and architecture-review reply from the shared session context by default. Perform only targeted re-reads when specific referenced material is missing from context, ambiguous, or plausibly stale; do not unconditionally re-read the whole task design and architecture source set.
 
-Review the task design for ambiguities. Do not review plan.md or steps.md. Then:
+Review the task design for ambiguities. Do not review plan.md or steps.md.
+
+**Scope is frozen.** Treat the design's stated scope boundary (its scope sections — e.g. "What this slice does", "Scope (in)"/"Scope (out)", or any explicit frozen-boundary statement) as fixed for this review. Do not file follow-ups that widen, narrow, or re-draw that boundary, and never resolve a finding by changing scope. If you conclude the scope boundary itself is wrong, do not edit it: add exactly one follow-up item prefixed `SCOPE_QUESTION:` stating the concern for a human to decide, and do not raise further variants of that same boundary concern in this or any later pass. A `SCOPE_QUESTION:` item counts as actionable feedback.
+
+Then:
 
 1. append a terse review note on the outcome of the review to the task's implementation.md
 1a. Do not note compliance with these instructions; only note any non-compliance

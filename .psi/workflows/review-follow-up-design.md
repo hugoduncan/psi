@@ -22,3 +22,5 @@ Use this evidence rule for batch review workflows:
 5. If the review-batch segment or baseline cannot be identified confidently, or if a diff-added checklist item cannot be matched unambiguously to a current unchecked item, leave the item unchecked and record the blocking reason tersely in implementation.md rather than guessing.
 
 Read and update the task's design.md, design-steps.md, and implementation.md as needed. Complete any newly added unchecked design-steps when possible, updating design.md as you work. If a design-step is completed, mark it done in design-steps.md. Do not touch plan.md or steps.md. Commit when done.
+
+**Do not execute `SCOPE_QUESTION:` items.** A follow-up item prefixed `SCOPE_QUESTION:` raises a concern about the design's scope boundary itself, which only a human may decide. Leave every such item unchecked, do not change the design's scope boundary in response to it, and record tersely in implementation.md that the scope question is deferred to the user.

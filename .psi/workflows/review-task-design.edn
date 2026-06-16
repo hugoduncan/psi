@@ -32,7 +32,7 @@
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
-   :on {"DONE" {:goto "design-review" :max-iterations 6}}}
+   :on {"DONE" {:goto "design-review" :max-iterations 3}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
