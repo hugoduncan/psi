@@ -795,3 +795,18 @@ Out of scope (pre-existing, untouched): in the same namespace,
 fails 3 assertions identically at HEAD (verified via `git stash`) — unrelated to
 this follow-up item (which targets only the converged-standalone helper); not
 addressed here.
+
+## Test-shaper review pass 4 (2026-06-16)
+
+REVIEW_COMPLETE — no new actionable test issues. Re-examined the DI-6 routing
+test, the converged-standalone live helper, and the definition-level
+review/lifecycle tests against the test-shaper lens (economical, meaningful
+failures, behavior-focused, deterministic). Prior passes 1–3 resolved the
+substantive items (live-test dedup, folded `count-substring`, positive
+terminal-outcome + exhaustion-at-cap routing assertions, and the
+result-text↔`reply-prefix` tie). Remaining engine/definition/live coverage is
+narrow and behaviour-focused; no duplication of prior follow-ups. The marginal
+"assert converged final-summary was bypassed in the on-max test" is structurally
+guaranteed by the handback's `:goto :done` and already pinned by `:completed` +
+not-`:iteration-exhausted` + handback-accepted — judged over-specification, not
+added.
