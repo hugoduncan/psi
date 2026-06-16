@@ -802,7 +802,7 @@ the next begins.
 
 ## Test review follow-ups (round 10)
 
-- [ ] (Low) Cover the `:file` renderer's string-keyed (JSON-tool) `{"path" …}`
+- [x] (Low) Cover the `:file` renderer's string-keyed (JSON-tool) `{"path" …}`
       data variant (`renderers/render-file`,
       `extensions/dev-http/src/extensions/dev_http/renderers.clj`:
       `(kget data :path "path")`). The renderers ns docstring promises "data may
@@ -826,3 +826,14 @@ the next begins.
       `file-renderer-test` assertion rendering `{:renderer :file :data {"path"
       <tempfile>}}` and asserting the file is served (200 + content-type),
       mirroring the keyword-keyed case.
+      Done: added a `:file reads the string-keyed (JSON-tool) {"path" …} variant`
+      `testing` block to `file-renderer-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`). It writes a temp
+      `.svg`, renders `{:renderer :file :data {"path" <abs-path>}}` (string key,
+      as the `dev-present` JSON tool threads it), and asserts the same 200 +
+      `image/svg+xml` content-type + file body as the keyword-keyed case —
+      exercising `render-file`'s `(kget data :path "path")` string-key fallback
+      directly for `:file`. A regression to `(:path data)` would break the
+      JSON-tool `:file` path and now fails. Focused kaocha
+      (`--focus extensions.dev-http-test/file-renderer-test`) green
+      (1 test / 16 assertions); clj-kondo clean.

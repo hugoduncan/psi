@@ -807,3 +807,24 @@ Non-compliance worth flagging: the round-7 implementation review's
 unverified, while `:table` and `:choices` map-options both cover their string-key
 (JSON-tool) variant per the renderers-ns "accessors read both" contract. Parallel
 to the round-9 `:mermaid` AC-5 overstatement.
+
+## Test review follow-up (round 10) — executed — 2026-06-16
+
+Closed the lone round-10 (Low) gap: the `:file` renderer's string-keyed
+(JSON-tool) `{"path" …}` data variant was unverified — `file-renderer-test`
+exercised only the keyword `{:path …}` variant, leaving `render-file`'s
+`(kget data :path "path")` string-key fallback (the live AC-3 `dev-present`
+JSON-tool `:file` surface) without a `:file`-specific regression guard.
+
+Added a `:file reads the string-keyed (JSON-tool) {"path" …} variant` `testing`
+block to `file-renderer-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`): writes a temp `.svg`,
+renders `{:renderer :file :data {"path" <abs-path>}}`, asserts 200 +
+`image/svg+xml` content-type + file body, mirroring the keyword-keyed case. A
+regression swapping `(kget data :path "path")` for `(:path data)` now fails the
+JSON-tool `:file` path. Closed the round-7-implementation-review/round-9
+`:file` AC-5 overstatement noted above.
+
+Verification: focused kaocha `--focus extensions.dev-http-test/file-renderer-test`
+green — 1 test / 16 assertions / 0 failures; clj-kondo clean on the touched test
+file. No remaining unchecked follow-ups in steps.md.

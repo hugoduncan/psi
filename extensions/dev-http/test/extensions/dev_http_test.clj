@@ -185,6 +185,15 @@
           (is (= "image/svg+xml" (get-in resp [:headers "content-type"])))
           (is (= f (:body resp))))
         (finally (.delete f))))
+    (testing ":file reads the string-keyed (JSON-tool) {\"path\" …} variant"
+      (let [f (java.io.File/createTempFile "dev-http" ".svg")]
+        (try
+          (spit f "<svg></svg>")
+          (let [resp (renderers/render {:renderer :file :data {"path" (.getAbsolutePath f)}})]
+            (is (= 200 (:status resp)))
+            (is (= "image/svg+xml" (get-in resp [:headers "content-type"])))
+            (is (= f (:body resp))))
+          (finally (.delete f)))))
     (testing "a missing file yields a 404"
       (let [resp (renderers/render {:renderer :file :data {:path "/no/such/artifact.png"}})]
         (is (= 404 (:status resp)))))
