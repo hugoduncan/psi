@@ -371,3 +371,24 @@ One new actionable test-coverage gap filed (round 5): the `dev-present` tool's
 model-callable `:choices` surface (AC-6) — is unverified (tool test passes empty
 opts; the choices integration test bypasses the tool via `register-content-route!`).
 No correctness/behaviour defect found in the implementation itself.
+
+## Round 5 follow-up executed — 2026-06-15
+
+Closed the round-5 test-coverage gap. Added two `testing` blocks to
+`dev-present-tool-test` (`extensions/dev-http/test/extensions/dev_http_test.clj`):
+
+- `opts {:session-id "sess-x"}` + `renderer "choices"` → asserts the captured
+  content carries `[:content :renderer] :choices` and `[:content :session-id]
+  "sess-x"`. Proves the model-callable surface threads the invoking session into
+  the registered content map (the invoking-session-only mechanism for AC-6).
+- empty `opts {}` → asserts the content map *contains* the `:session-id` key but
+  with value `nil` (no fabricated session-id).
+
+No production code change — the wiring (`:session-id (:session-id opts)` in
+`tool.clj`) was already correct; this only adds the missing proof.
+
+Verification: focused kaocha `--focus extensions.dev-http-test/dev-present-tool-test`
+green (1 test / 21 assertions); full `extensions.dev-http-test` unit ns green
+(18 tests / 128 assertions); clj-kondo clean on the test file. (An unrelated
+`psi.rpc-smoke-test/rpc-smoke-handshake-test` handshake timeout appears only when
+OR-focusing all `:integration` tests; not related to this change.)

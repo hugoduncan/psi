@@ -215,6 +215,19 @@
           (is (false? (:is-error result)))
           (is (string? (:route-id @captured)))
           (is (re-find #"^r-" (:route-id @captured)))))
+      (testing "opts :session-id threads into the registered content (invoking session only)"
+        (let [result (execute {"renderer" "choices"
+                               "data"     {"prompt" "Pick" "options" ["a" "b"]}
+                               "route-id" "c"}
+                              {:session-id "sess-x"})]
+          (is (false? (:is-error result)))
+          (is (= :choices (get-in @captured [:content :renderer])))
+          (is (= "sess-x" (get-in @captured [:content :session-id])))))
+      (testing "absent opts :session-id threads nil (no fabricated session)"
+        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "n"} {})]
+          (is (false? (:is-error result)))
+          (is (contains? (get-in @captured [:content]) :session-id))
+          (is (nil? (get-in @captured [:content :session-id])))))
       (testing "unknown renderer → error, no registration"
         (reset! captured :unchanged)
         (let [result (execute {"renderer" "bogus" "data" "x"} {})]

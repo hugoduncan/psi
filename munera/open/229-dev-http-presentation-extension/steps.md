@@ -318,7 +318,7 @@ the next begins.
 
 ## Implementation review follow-ups (round 5)
 
-- [ ] Add test coverage for the `dev-present` tool threading `:session-id` from
+- [x] Add test coverage for the `dev-present` tool threading `:session-id` from
       its `:execute` `opts` into the registered content map
       (`extensions/dev-http/src/extensions/dev_http/tool.clj` line ~66:
       `:session-id (:session-id opts)`). This wiring is the mechanism that makes
@@ -334,3 +334,11 @@ the next begins.
       `opts {:session-id "sess-x"}` and assert the captured content carries
       `:session-id "sess-x"` (ideally with `renderer "choices"`), and that an
       absent opts session-id threads `nil` rather than fabricating one.
+      Done: added two `testing` blocks to `dev-present-tool-test`. The first
+      executes with `opts {:session-id "sess-x"}` and `renderer "choices"`,
+      asserting the captured content carries `[:content :renderer] :choices`
+      and `[:content :session-id] "sess-x"` — proving the model-callable surface
+      threads the invoking session into the content map. The second executes
+      with empty `opts {}` and asserts the content map *contains* the
+      `:session-id` key but threads `nil` (no fabricated session). Focused Scry
+      (kaocha `--focus`) green: 21 assertions; clj-kondo clean.
