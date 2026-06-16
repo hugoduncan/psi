@@ -799,3 +799,30 @@ the next begins.
       invocation that mounts the spec). A regression dropping the base script or
       the `vegaEmbed` call now fails. Covered by the same focused
       `renderers-test` run (22 assertions, 0 failures); clj-kondo clean.
+
+## Test review follow-ups (round 10)
+
+- [ ] (Low) Cover the `:file` renderer's string-keyed (JSON-tool) `{"path" …}`
+      data variant (`renderers/render-file`,
+      `extensions/dev-http/src/extensions/dev_http/renderers.clj`:
+      `(kget data :path "path")`). The renderers ns docstring promises "data may
+      arrive with keyword keys (REPL/`register-route!`) or string keys (JSON from
+      the `dev-present` tool); accessors below read both", and `:file` is the
+      AC-3 model-callable surface: `dev-present {"renderer":"file","data":{"path":…}}`
+      threads `data` straight through, so a tool-driven `:file` content map
+      arrives with the **string** key `"path"`. Every other map-keyed renderer
+      covers both key sources — `:table` has a string-keyed assertion
+      (`{"headers" … "rows" …}`) and `:choices` map-options cover the string-keyed
+      `{"label" … "value" …}` (JSON-tool) variant — but `file-renderer-test`
+      exercises only the keyword `{:path …}` variant, so the `kget` string-key
+      fallback for `:file` is unverified at the renderer level. A `:file`-specific
+      regression (e.g. `(:path data)` replacing `(kget data :path "path")`) would
+      break the JSON-tool `:file` path yet pass the suite. Same untested-branch /
+      JSON-tool-input regression-guard class as the round-2 jar-safety, round-6
+      map-option, round-7 urlencoded-decode/hiccup-passthrough, and round-8
+      headerless-table gaps. Marginal severity (kget's string-key fallback is
+      already proven by the `:table` string-keyed assertion, so a shared-`kget`
+      regression is caught), but the `:file`-specific accessor has no guard. Add a
+      `file-renderer-test` assertion rendering `{:renderer :file :data {"path"
+      <tempfile>}}` and asserting the file is served (200 + content-type),
+      mirroring the keyword-keyed case.

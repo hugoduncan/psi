@@ -790,3 +790,20 @@ Executed both round-9 items (one actionable + one low) in `renderers-test`
 Verification: focused kaocha `--focus extensions.dev-http-test/renderers-test`
 green — 1 test / 22 assertions / 0 failures (was 18 assertions). clj-kondo
 clean on the touched test file. No remaining unchecked follow-ups in steps.md.
+
+## Test review (round 10) — 2026-06-15
+
+One (Low) coverage gap filed (steps.md "Test review follow-ups (round 10)").
+Tests are well-formed, green (extensions 246/923, dev-http integration green;
+the lone `rpc-smoke-handshake-test` :integration failure is the documented
+pre-existing unrelated flake), and uniformly back infra deps with the sanctioned
+nullable extension API + ctx seams (no mocks/stubs/spies — rounds 1/6 already
+de-mocked the choices/dev-present unit tests).
+
+Non-compliance worth flagging: the round-7 implementation review's
+"each renderer produces the expected response" / AC-5 framing slightly overstates
+`:file` completeness — `:file` is the only map-keyed renderer whose string-keyed
+(JSON-tool) representative input, the live AC-3 `dev-present` surface, is
+unverified, while `:table` and `:choices` map-options both cover their string-key
+(JSON-tool) variant per the renderers-ns "accessors read both" contract. Parallel
+to the round-9 `:mermaid` AC-5 overstatement.
