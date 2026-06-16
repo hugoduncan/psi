@@ -26,6 +26,27 @@ restart/reload never leaves an orphaned server. The running system is an
 (`config → registry → router → server`) held in the extension's own atom — not
 in psi core state.
 
+## Discovery and control via psi-tool
+
+Besides the `/dev-http` slash command, the extension registers deterministic
+operations, so the server is discoverable and controllable through the canonical
+psi-tool `operation` surface (and `/operations` / `/operation`):
+
+| operation | effect | returns |
+|-----------|--------|---------|
+| `dev-http/status` | none (discovery) | `{:running? …}`, plus `:url` `:token` `:route-count` when running |
+| `dev-http/start`  | start the server (idempotent) | the running snapshot (`:running? :url :token :route-count`) |
+| `dev-http/stop`   | stop the server (idempotent) | `{:running? false}` |
+
+```
+psi-tool operation op=list                      ; discover available operations
+psi-tool operation op=invoke operation-id="dev-http/status"
+psi-tool operation op=invoke operation-id="dev-http/start"
+```
+
+The operation handlers wrap the same shared lifecycle the slash command uses, so
+the two surfaces never drift.
+
 ## Presenting content: the `dev-present` tool
 
 The model can call the `dev-present` tool to register a session route from

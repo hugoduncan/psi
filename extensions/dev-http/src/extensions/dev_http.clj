@@ -100,6 +100,41 @@
     (str "dev-http running\n" (url-token-lines server))
     "dev-http not running"))
 
+(defn server-info
+  "Structured discovery snapshot of the running server (or `{:running? false}`).
+   Single source for the psi-tool `dev-http/*` deterministic operations."
+  []
+  (if-let [server (server-component)]
+    {:running?    true
+     :url         (base-url)
+     :token       (:token server)
+     :route-count (count (registry/entries (registry-component)))}
+    {:running? false}))
+
+;; ---------------------------------------------------------------------------
+;; deterministic operations (psi-tool discovery + lifecycle control)
+;;
+;; Registered via the extension API `:register-operation` so the server is
+;; discoverable and controllable through the canonical psi-tool `operation`
+;; surface (op: list|invoke) and `/operations` / `/operation`, not only the
+;; `/dev-http` slash command. Handlers wrap the same shared lifecycle fns the
+;; slash command uses and act on this extension's own atom (no args needed).
+;; ---------------------------------------------------------------------------
+
+(defn- status-operation
+  [_invocation]
+  (server-info))
+
+(defn- start-operation
+  [_invocation]
+  (start!)
+  (server-info))
+
+(defn- stop-operation
+  [_invocation]
+  (stop!)
+  (server-info))
+
 ;; ---------------------------------------------------------------------------
 ;; runtime route registration (REPL/dev, fn-based)
 ;; ---------------------------------------------------------------------------
@@ -174,4 +209,17 @@
     :handler     handle-command})
   ((:register-tool api)
    (tool/dev-present-tool register-content-route!))
+  (when-let [register-operation (:register-operation api)]
+    (register-operation
+     {:id          "dev-http/status"
+      :description "Report dev-http server state (running?/url/token/route-count). No side effect."
+      :handler     status-operation})
+    (register-operation
+     {:id          "dev-http/start"
+      :description "Start the dev-http localhost server (idempotent); returns its url/token/state."
+      :handler     start-operation})
+    (register-operation
+     {:id          "dev-http/stop"
+      :description "Stop the dev-http localhost server (idempotent); returns its state."
+      :handler     stop-operation}))
   nil)

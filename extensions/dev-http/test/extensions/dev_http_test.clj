@@ -45,6 +45,48 @@
       (testing "registers the /dev-http command"
         (is (contains? (:commands @state) "dev-http"))))))
 
+(defn- op-capturing-api
+  "Nullable ExtensionAPI augmented with :register-operation capture (the default
+   nullable does not provide that slot). Returns {:api :state :ops}."
+  []
+  (let [{:keys [api state]} (nullable-api)
+        ops (atom [])]
+    {:api   (assoc api :register-operation (fn [op] (swap! ops conj op) nil))
+     :state state
+     :ops   ops}))
+
+(deftest registers-psi-tool-operations-test
+  (testing "init registers dev-http discovery + lifecycle deterministic operations"
+    (let [{:keys [api ops]} (op-capturing-api)]
+      (sut/init api)
+      (is (= #{"dev-http/status" "dev-http/start" "dev-http/stop"}
+             (set (map :id @ops)))
+          "status (discovery) + start/stop (lifecycle) are psi-tool-invocable")
+      (is (every? (comp fn? :handler) @ops))
+      (is (every? (comp string? :description) @ops)))))
+
+(deftest operation-handlers-report-and-control-lifecycle-test
+  (testing "the registered operation handlers wrap the shared lifecycle"
+    (let [{:keys [api ops]} (op-capturing-api)
+          _        (sut/init api)
+          by-id    (into {} (map (juxt :id :handler)) @ops)
+          status   (get by-id "dev-http/status")
+          start    (get by-id "dev-http/start")
+          stop     (get by-id "dev-http/stop")]
+      (testing "status before start → not running, no side effect"
+        (is (= {:running? false} (status {})))
+        (is (= {:running? false} (sut/server-info))))
+      (testing "start → running with discoverable url/token/route-count"
+        (let [r (start {})]
+          (is (true? (:running? r)))
+          (is (string? (:url r)))
+          (is (string? (:token r)))
+          (is (int? (:route-count r)))
+          (is (= r (status {})) "status mirrors start's structured snapshot")))
+      (testing "stop → not running"
+        (is (= {:running? false} (stop {})))
+        (is (= {:running? false} (status {})))))))
+
 ;; ---------------------------------------------------------------------------
 ;; registry — last-write-wins
 ;; ---------------------------------------------------------------------------
