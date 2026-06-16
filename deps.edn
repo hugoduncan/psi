@@ -394,6 +394,7 @@
                         "extensions/logprobs/src"
                         "extensions/metrics/src"
                         "extensions/dev-http/src"
+                        "extensions/dev-http/dev"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
                         nrepl/nrepl                {:mvn/version "1.5.1"}

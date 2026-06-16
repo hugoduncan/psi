@@ -29,34 +29,37 @@ the next begins.
 
 ## Slice 1 — Platform end-to-end
 
-- [ ] `dev_http/config.clj`: build config (host `127.0.0.1`, port `0`,
-      generate per-launch token, persisted-route source dir, api map).
-- [ ] `dev_http/registry.clj`: session-route registry atom + `register-entry!`
-      (last-write-wins by route-id), `get-entry`, `entries`, `route-url`.
-- [ ] `dev_http/router.clj`: reitit-ring router builder combining persisted
+- [x] `dev_http/config.clj`: build config (host `127.0.0.1`, port `0`,
+      generate per-launch token, api map). `route-url` lives in the entry-point
+      ns (needs the live server's resolved port/token), not config.
+- [x] `dev_http/registry.clj`: session-route registry atom + `register-entry!`
+      (last-write-wins by route-id), `get-entry`, `entries`.
+- [x] `dev_http/router.clj`: reitit-ring router builder combining persisted
       routes + the stable `/s/:route-id` dispatch subtree (looks up registry at
-      request time); `not-found` handler.
-- [ ] `dev_http/middleware.clj`: token middleware (read token from query
-      param/header; mismatch → 403); applied at each dynamic subtree root.
-- [ ] `dev_http/system.clj`: integrant `init-key`/`halt-key!` for
+      request time); `create-default-handler` 404.
+- [x] `dev_http/middleware.clj`: token middleware (read token from query
+      string/header; mismatch → 403); applied at each dynamic subtree root.
+- [x] `dev_http/system.clj`: integrant `init-key`/`halt-key!` for
       `:dev-http/config`, `:dev-http/registry`, `:dev-http/router`,
       `:dev-http/server` (http-kit start/stop); `:server` exposes resolved
-      port/URL.
-- [ ] Persisted-route loader: scan extension-local `dev/` for route-defining
-      namespaces; require + collect their reitit route-data at router-build time.
-- [ ] One persisted demo route under
-      `extensions/dev-http/dev/extensions/dev_http/dev/` rendering something real
-      (e.g. EQL graph or a benchmark table via the platform).
-- [ ] `init`: register `/dev-http` command (handler parses `start|status|stop`);
+      port/URL/token.
+- [x] Persisted-route loader (`dev_http/routes.clj`): scan extension-local `dev/`
+      for `extensions.dev-http.dev.*` namespaces; require + collect their `routes`
+      var (reitit route-data) at router-build time.
+- [x] One persisted demo route under
+      `extensions/dev-http/dev/extensions/dev_http/dev/demo.clj` (hiccup HTML page).
+- [x] `init`: register `/dev-http` command (handler parses `start|status|stop`);
       `start` = idempotent integrant init (halt prior `:system` first); `status`
       = running?/URL/token; `stop` = `ig/halt!`.
-- [ ] Declare minimal `:allowed-events` for the extension (resolve gating per R8).
-- [ ] Tests: registry last-write-wins; router dispatch for persisted + `/s/`
+- [x] Declare minimal `:allowed-events`: none required this slice — Slice 1
+      dispatches no core events (uses api-level `:register-command`/`:log` only).
+      Revisit at Slice 3 (synthetic-prompt path, R8).
+- [x] Tests: registry last-write-wins; router dispatch for persisted + `/s/`
       routes (pure ring handler, no socket); token middleware 403 on each subtree;
       integration boot on ephemeral port → request demo route 200 (AC-2),
       `start`/`status`/`stop` lifecycle with no orphaned server on restart
       (AC-1), `127.0.0.1` bind + token required (AC-8).
-- [ ] Focused Scry green; clj-kondo clean.
+- [x] Focused Scry green; clj-kondo clean.
 - [ ] Commit: `⚒ 229: platform end-to-end (lifecycle + server + router + registry + demo route)`.
 
 ## Slice 2 — `dev-present` tool + renderer set
