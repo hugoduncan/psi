@@ -102,10 +102,13 @@ Slices are independently committable; keep each commit `small`.
 
 ## Slice 4 — docs + coherence
 
-- [ ] `doc/workflows.md`: `:on-max-iterations` key + design/plan non-convergence
-      handback behaviour
-- [ ] `CHANGELOG.md` `[Unreleased]`: Added (`:on-max-iterations`) + Changed
-      (lifecycle stops/hands back on unconverged design/plan review)
-- [ ] `mementum/state.md` workflow-routing bullet if warranted
-- [ ] coherence re-read of edited files (`sync`); full focused suites green
-- [ ] commit `⚒ docs: :on-max-iterations + review-handback lifecycle behaviour`
+- [x] `doc/workflows.md`: new "Author-routed loop exhaustion (`:on-max-iterations`)"
+      section; design/plan review sections show the exhaustion edge + 6→3 fix;
+      task-lifecycle design/plan gate handback documented
+- [x] `CHANGELOG.md` `[Unreleased]`: Added (`:on-max-iterations`) + Changed
+      (lifecycle stops/hands back on unconverged design/plan review + standalone
+      PASS_STATUS line)
+- [x] `mementum/state.md` workflow-routing bullet updated
+- [x] coherence re-read of edited files (`sync`); full focused suites green
+      (666 assertions / 66 tests + 2 DI-2 live tests)
+- [x] commit `⚒ docs: :on-max-iterations + review-handback lifecycle behaviour`

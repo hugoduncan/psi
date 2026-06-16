@@ -677,7 +677,8 @@ then routes once after the queue drains:
 ```text
 design-review --DONE--> final-summary
 design-review --REPEAT--> design-follow-up
-design-follow-up --DONE, :max-iterations 6--> design-review
+design-follow-up --DONE, :max-iterations 3--> design-review
+design-follow-up --:on-max-iterations--> final-summary-not-converged
 ```
 
 Post-drain routing uses the deterministic `workflow/pass-feedback-routing`
@@ -696,11 +697,18 @@ layering, extension isolation, effects-as-data, and the "no silent
 shims/adapters/compatibility layers" rule — rather than correctness, clarity, or
 completeness.
 
-A clean batch goes to `final-summary`. A feedback batch runs one
+A clean batch goes to `final-summary` (which emits a final
+`PASS_STATUS: REVIEW_COMPLETE` line). A feedback batch runs one
 `design-follow-up` step and then starts another full `design-review` batch. The
-workflow can enter `design-review` at most six total times including the initial
+workflow can enter `design-review` at most three total times including the initial
 pass; the workflow runtime counts `:max-iterations` as total target-step entries,
 including the initial entry.
+
+If the design never converges within that limit, the `design-follow-up`
+directive's `:on-max-iterations` target routes the exhausted loop to a clean
+`final-summary-not-converged` step (emitting `PASS_STATUS: ACTIONABLE_FEEDBACK`)
+instead of hard-failing the run. See
+[Author-routed exhaustion](#author-routed-loop-exhaustion-on-max-iterations).
 
 ## Batch plan review
 
@@ -728,6 +736,7 @@ once after the queue drains:
 plan-review --DONE--> final-summary
 plan-review --REPEAT--> plan-follow-up
 plan-follow-up --DONE, :max-iterations 5--> plan-review
+plan-follow-up --:on-max-iterations--> final-summary-not-converged
 ```
 
 Post-drain routing uses the deterministic `workflow/pass-feedback-routing`
@@ -742,9 +751,43 @@ invoke step is no longer needed: the pass-feedback judge attaches directly to
 `plan-review`.
 
 A clean batch goes to `final-summary`, which recovers both phases' text through
-the same per-prompt `:output` refs. A feedback batch runs one `plan-follow-up`
+the same per-prompt `:output` refs and emits a final
+`PASS_STATUS: REVIEW_COMPLETE` line. A feedback batch runs one `plan-follow-up`
 step and then starts another full `plan-review` batch. The workflow can enter
 `plan-review` at most five total times including the initial pass.
+
+If the plan never converges within that limit, the `plan-follow-up` directive's
+`:on-max-iterations` target routes the exhausted loop to a clean
+`final-summary-not-converged` step (emitting `PASS_STATUS: ACTIONABLE_FEEDBACK`)
+instead of hard-failing the run. See
+[Author-routed exhaustion](#author-routed-loop-exhaustion-on-max-iterations).
+
+## Author-routed loop exhaustion (`:on-max-iterations`)
+
+A judged routing directive that carries `:max-iterations` may also declare an
+optional `:on-max-iterations` target. It names where the loop should go when the
+iteration limit is reached, instead of the default hard failure:
+
+```clojure
+:on {"DONE" {:goto "design-review"
+             :max-iterations 3
+             :on-max-iterations "final-summary-not-converged"}}
+```
+
+- Without `:on-max-iterations`, an exhausted judged loop hard-fails the run with
+  `:reason :iteration-exhausted` (the original behaviour).
+- With `:on-max-iterations`, the exhausted loop routes to the named target
+  (`:next`/`:previous`/`:done`/step-name, resolved like `:goto`) and the run
+  continues with `:status :running` — it is never marked failed.
+- `:on-max-iterations` is only valid alongside `:max-iterations`; declaring it
+  without `:max-iterations` is rejected at schema validation (a footgun guard, so
+  a typo'd-away limit cannot silently disable exhaustion routing).
+
+This is a generic routing primitive. The concrete target step, summary wording,
+and `PASS_STATUS` strings are authored policy in the workflow `.edn` and prompts,
+not in the runtime. `review-task-design`/`review-task-plan` use it to route a
+non-converging review to a clean `final-summary-not-converged` summary, which
+`task-lifecycle` consumes as a design/plan-stage handback (below).
 
 ## Shared review follow-up steps
 
@@ -830,6 +873,19 @@ are skipped. Producing zero entries is a successful outcome.
 When entries pass those filters, the workflow writes mementum memories or
 knowledge pages and commits them autonomously using the mementum commit
 conventions; it does not request human approval.
+
+`task-lifecycle` also gates its design and plan stages. After
+`review-task-design` it runs a `check-design-review-status` invoke gate
+(mirroring the implementation-review gate) over the review's yielded
+`PASS_STATUS` line: `REVIEW_COMPLETE` (converged) proceeds to
+`create-task-plan`, while `ACTIONABLE_FEEDBACK` (the non-convergence handback
+from the review's `:on-max-iterations` summary) routes to a
+`final-summary-design-not-converged` step that stops the lifecycle at the design
+stage and hands back to the human — without proceeding to plan and without
+hard-failing. After `review-task-plan` an analogous `check-plan-review-status`
+gate proceeds to `implement-task` on `REVIEW_COMPLETE` or routes to
+`final-summary-plan-not-converged` on `ACTIONABLE_FEEDBACK`. Neither handback
+extracts knowledge.
 
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the
