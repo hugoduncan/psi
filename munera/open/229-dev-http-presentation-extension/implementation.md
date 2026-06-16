@@ -428,3 +428,24 @@ green (1 test / 16 assertions); all three choices unit tests
 (`choices-handler-test`, `choices-failed-injection-releases-claim-test`,
 `choices-map-option-test`) green (3 tests / 42 assertions); clj-kondo clean on
 the test file.
+
+## Implementation review (round 7) — 2026-06-15
+
+Re-verified green: extensions suite (16 tests / 110 assertions), integration
+(3 tests / 34 assertions); clj-kondo clean across extension src/dev/test + the
+core `submit-synthetic-prompt` mutation. Independent full-source pass (every
+`extensions/dev-http` ns + the core mutation + tests + docs/changelog/README/
+state): code matches design and follows the architecture (extension-owned
+integrant system/registry atom — no core state, no managed-service surface; the
+one sanctioned core touch is the thin `submit-synthetic-prompt` mutation whose
+user-message record shape matches the scheduler's `scheduled-user-message`
+canonical shape; reads never touch core, the only write is `:mutate-session`;
+every dynamic subtree token-gated, `/assets` ungated by documented decision;
+router is pure platform mechanism). No new abstraction, no
+duplicated-existing-pattern, no structural performance issue. All ACs covered by
+unit + integration tests. The remaining open characteristics (`:file` arbitrary
+disk read, non-constant-time token compare) are explicit documented
+dev-only/localhost/token-gated design decisions, not defects.
+
+No new actionable findings — the six prior review rounds' dedup/consistency/
+robustness/coverage follow-ups are all resolved. Review complete.
