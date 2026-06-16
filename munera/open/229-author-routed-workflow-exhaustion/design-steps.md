@@ -67,7 +67,7 @@ plan.md / design.md (steps.md is read-only review context).
       `:max-iterations` cap (e.g. 3 / 5), source an actual count if one is
       available, or drop the count from the template wording.
 
-- [ ] **`task-lifecycle.edn` insertion position / fall-through of the new
+- [x] **`task-lifecycle.edn` insertion position / fall-through of the new
       gate + handback steps is unspecified, and the DI-1 fall-through hazard is
       not addressed for the lifecycle (Slice 2/3).** DI-1/DI-2/R1 reason about
       `:next` fall-through (`statechart.clj` `next-step-target` /

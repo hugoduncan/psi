@@ -146,6 +146,70 @@ asserts the converged `final-summary` yields a single `PASS_STATUS: REVIEW_COMPL
 line; that test is the runtime lock that the DI-4 template wording produces a
 parser-accepted status.
 
+## Implementation decision — lifecycle step placement & fall-through (DI-5)
+
+DI-1/DI-2/R1 reason about `:next` fall-through
+(`statechart.clj` `next-step-target` / `compile-leaf-step`
+`:actor/done → next-step-target`) **only** for the `review-task-design.edn` /
+`review-task-plan.edn` summary steps. The identical hazard applies to
+`task-lifecycle.edn`: its `:delegate` steps are non-judged leaf steps that route
+`:actor/done` to the **next step in `:steps` order**, and the four new lifecycle
+steps (two gates + two handbacks) must be positioned so no converged path silently
+falls through into a not-converged handback.
+
+Resolution (the authored insertion positions, decided here):
+
+1. **Each gate immediately follows its delegate.** `check-design-review-status`
+   is inserted **immediately after** `review-task-design`, and
+   `check-plan-review-status` **immediately after** `review-task-plan`, so the
+   delegate's `:actor/done` falls through into its gate, and the gate's explicit
+   `:on {"DONE" {:goto …}}` continues the main flow (design gate
+   DONE→`create-task-plan`; plan gate DONE→`implement-task`).
+2. **Both handbacks are appended after the existing terminal summaries.**
+   `final-summary-design-not-converged` and `final-summary-plan-not-converged`
+   are appended **last**, after `final-summary-after-extraction` and
+   `final-summary-without-extraction` (mirroring `final-summary-without-extraction`
+   already being last). Every step that precedes them terminates explicitly via a
+   judge + `:on {"DONE" {:goto :done}}` (the two existing summaries and, in
+   Slice 3, the Slice-2 `final-summary-design-not-converged`), so no preceding
+   leaf step can fall through into a handback. Each handback is itself
+   explicit-terminal (`:goto :done`); the last one is additionally `:completed`
+   by order.
+
+Resulting ordered `:steps` vectors the updated `task-lifecycle-test` MUST assert:
+
+- **After Slice 2 (9 → 11 steps).** Names, in order:
+  `["review-task-design" "check-design-review-status" "create-task-plan"
+    "review-task-plan" "implement-task" "review-task-implementation"
+    "check-implementation-review-status" "extract-task-knowledge"
+    "final-summary-after-extraction" "final-summary-without-extraction"
+    "final-summary-design-not-converged"]`.
+  Types, in order:
+  `(concat [:delegate :invoke] (repeat 4 :delegate) [:invoke :delegate]
+           (repeat 3 :session))`
+  = `[:delegate :invoke :delegate :delegate :delegate :delegate :invoke :delegate
+      :session :session :session]`.
+  Index shifts vs the current test: `check-implementation-review-status`
+  5 → 6, `extract-task-knowledge` 6 → 7, `final-summary-after-extraction` 7 → 8,
+  `final-summary-without-extraction` 8 → 9; `repeat 9 {}` → `repeat 11 {}`.
+- **After Slice 3 (11 → 13 steps).** Names, in order:
+  `["review-task-design" "check-design-review-status" "create-task-plan"
+    "review-task-plan" "check-plan-review-status" "implement-task"
+    "review-task-implementation" "check-implementation-review-status"
+    "extract-task-knowledge" "final-summary-after-extraction"
+    "final-summary-without-extraction" "final-summary-design-not-converged"
+    "final-summary-plan-not-converged"]`.
+  Types, in order:
+  `[:delegate :invoke :delegate :delegate :invoke :delegate :delegate :invoke
+    :delegate :session :session :session :session]`
+  = `(concat [:delegate :invoke :delegate :delegate :invoke :delegate :delegate
+              :invoke :delegate] (repeat 4 :session))`.
+  Index shifts vs Slice 2: `check-plan-review-status` inserts at 4, so
+  `implement-task` 4 → 5, `review-task-implementation` 5 → 6,
+  `check-implementation-review-status` 6 → 7, `extract-task-knowledge` 7 → 8, the
+  two existing summaries 8/9 → 9/10, `final-summary-design-not-converged`
+  10 → 11; `repeat 11 {}` → `repeat 13 {}`.
+
 ## Slice 1 — `:on-max-iterations` engine primitive (inert)
 
 Files:
@@ -213,17 +277,20 @@ Files:
     `PASS_STATUS: ACTIONABLE_FEEDBACK` line per the **DI-4** contract (same
     single-line/anti-echo/reconciliation rules, ACTIONABLE_FEEDBACK token);
     explicit-terminal judge + `:on` (DI-1).
-- `.psi/workflows/task-lifecycle.edn`:
-  - New `check-design-review-status` invoke-step after `review-task-design`,
-    mirroring `check-implementation-review-status`:
+- `.psi/workflows/task-lifecycle.edn` (insertion positions per **DI-5**):
+  - New `check-design-review-status` invoke-step inserted **immediately after**
+    `review-task-design` (`:steps` index 1, so `review-task-design` falls through
+    into the gate), mirroring `check-implementation-review-status`:
     `:operation "workflow/constant-routing" :args {:route "DONE"}`,
     `:judge {:type :invoke :operation "workflow/pass-status-routing"
              :args {:text {:from {:step "review-task-design" :yield :text}}
                     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}`,
     `:on {"DONE" {:goto "create-task-plan"}
           "REPEAT" {:goto "final-summary-design-not-converged"}}`.
-  - New `final-summary-design-not-converged` session step (mirrors
-    `final-summary-without-extraction`): contributions from `:workflow-original`
+  - New `final-summary-design-not-converged` session step **appended last**
+    (after both existing terminal summaries, per **DI-5**, so no preceding leaf
+    step falls through into it), mirroring `final-summary-without-extraction`:
+    contributions from `:workflow-original`
     + `review-task-design` yield; template explains the lifecycle stopped at the
     design stage because design review did not converge, hands back to the human,
     does not extract knowledge; `:on {"DONE" {:goto :done}}`.
@@ -259,7 +326,9 @@ Tests:
   of these, so the existing `task-lifecycle-test` **MUST be updated in this
   slice** (R3): bump count 9→11, insert the two new step names/types at their
   positions, fix the `nth` indices, and update the `repeat` counts (e.g.
-  `repeat 9 {}`→`repeat 11 {}`). It must assert the `check-design-review-status`
+  `repeat 9 {}`→`repeat 11 {}`) — assert the exact 11-element ordered name and
+  type vectors pinned in **DI-5** (Slice-2 vectors). It must assert the
+  `check-design-review-status`
   gate routes DONE→`create-task-plan` and REPEAT→`final-summary-design-not-converged`,
   and that `final-summary-design-not-converged` terminates with `:goto :done`.
   A separate `229` definition test is **additive-only**, never a substitute for
@@ -284,10 +353,14 @@ Mirror Slice 2 for the plan review:
   `final-summary` so the converged summary stays last in `:steps` (DI-2), sourced
   from the two `plan-review` per-prompt replies, wording with no literal iteration
   count (DI-3) + `PASS_STATUS: ACTIONABLE_FEEDBACK` per DI-4 + explicit-terminal.
-- `.psi/workflows/task-lifecycle.edn`: new `check-plan-review-status` gate after
-  `review-task-plan` → `{"DONE" {:goto "implement-task"}
+- `.psi/workflows/task-lifecycle.edn` (insertion positions per **DI-5**): new
+  `check-plan-review-status` gate inserted **immediately after**
+  `review-task-plan` (`:steps` index 4, so `review-task-plan` falls through into
+  the gate) → `{"DONE" {:goto "implement-task"}
   "REPEAT" {:goto "final-summary-plan-not-converged"}}`; new
-  `final-summary-plan-not-converged` handback step (`:goto :done`).
+  `final-summary-plan-not-converged` handback step **appended last** (after
+  `final-summary-design-not-converged`, so no preceding leaf falls through into
+  it) with explicit-terminal `:goto :done`.
 - Tests:
   - `review-task-plan-test` step-order + routing updates (include
     `final-summary-not-converged` ordered before the converged `final-summary`;
@@ -299,7 +372,8 @@ Mirror Slice 2 for the plan review:
   - `task-lifecycle-test` **MUST be updated again in this slice** (R3): adding
     `check-plan-review-status` + `final-summary-plan-not-converged` bumps the
     step count 11→13; update the name/type vectors, positional `nth` indices, and
-    `repeat` counts accordingly, and assert the plan gate routes
+    `repeat` counts accordingly to the exact 13-element ordered name and type
+    vectors pinned in **DI-5** (Slice-3 vectors), and assert the plan gate routes
     DONE→`implement-task` and REPEAT→`final-summary-plan-not-converged`, with
     `final-summary-plan-not-converged` terminating `:goto :done`. A separate
     `229` test remains additive-only.
@@ -320,8 +394,13 @@ Exit: focused workflow-loader suites green; clj-kondo clean.
 
 ## Risks
 
-- **R1 — terminal fall-through (DI-1).** Mitigated by making both summaries
-  explicitly terminal; locked by definition tests asserting termination.
+- **R1 — terminal fall-through (DI-1, DI-5).** Mitigated by making both review
+  summaries explicitly terminal (DI-1) and, in `task-lifecycle.edn`, by the DI-5
+  insertion positions (each gate immediately after its delegate; both handbacks
+  appended last after the already-terminal summaries) so no converged leaf step
+  falls through into a not-converged handback. Locked by the `task-lifecycle-test`
+  ordered name/type vectors (DI-5) and review-workflow definition termination
+  assertions.
 - **R2 — PASS_STATUS reliability / echo.** The gate parses an LLM-produced
   `PASS_STATUS:` line. Mitigated: each summary template hardcodes exactly one
   required status string (structurally determined by which step ran, D1), and

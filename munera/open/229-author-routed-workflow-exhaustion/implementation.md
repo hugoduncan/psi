@@ -144,3 +144,40 @@ point 3 directly. Distinct from the resolved loop-2 ambiguity item (hardened
 plan only). Prior inconsistency items (stale baseline, positional test resolved;
 steps.md-sync open/BLOCKED) and the loop-3 ambiguity item (task-lifecycle
 placement) not duplicated.
+
+## Plan-review loop-3 follow-up execution (2026-06-16)
+
+Batch baseline: `d1fce01cf` (parent of the oldest loop-3 commit `5d6341803`; the
+previous plan-follow-up completion). HEAD `bf8468207`. `git diff d1fce01cf..HEAD`
+on design-steps.md added exactly two unchecked checklist items — the loop-3
+ambiguity item (task-lifecycle.edn placement) and the loop-3 inconsistency item
+(design.md item 6 vs DI-4). Those two are the candidate work set. The earlier
+steps.md-sync inconsistency item predates this batch (added loop-2, `ff2653f72`)
+and stays excluded/BLOCKED.
+
+- **Ambiguity-loop3 (task-lifecycle.edn placement) — RESOLVED in plan.md.**
+  Added DI-5 "lifecycle step placement & fall-through": each gate inserted
+  immediately after its delegate (`check-design-review-status` after
+  `review-task-design`, index 1; `check-plan-review-status` after
+  `review-task-plan`, index 4) so the delegate falls through into the gate and
+  the gate's DONE goto continues the main flow; both
+  `final-summary-*-not-converged` handbacks appended last after the already
+  explicit-terminal summaries so no converged leaf falls through into them.
+  Pinned the exact resulting ordered name + type vectors the updated
+  `task-lifecycle-test` must assert after Slice 2 (9→11) and Slice 3 (11→13),
+  including the index shifts and `repeat` count bumps. Cross-referenced DI-5 from
+  Slice 2/3 task-lifecycle bullets and test bullets, and widened R1 to cover the
+  lifecycle fall-through. Verified the current 9-step order/types against
+  `.psi/workflows/task-lifecycle.edn` before pinning. Marked [x].
+
+- **Inconsistency-loop3 (design.md item 6/7 vs DI-4) — BLOCKED, left unchecked.**
+  The item's resolution is to edit `design.md` items 6/7 (drop the "replaces the
+  existing instruction" phrasing / point at DI-4). Both alternatives touch
+  `design.md`, which this plan-profile follow-up (`review-follow-up-plan`)
+  explicitly treats as read-only ("read the task's steps.md and design.md as
+  read-only context"; "Do not touch steps.md or design.md beyond read-only
+  context"). Resolving it in plan.md alone does not satisfy the item, which
+  targets the design authority. Per the batch evidence/disposition rule, left
+  unchecked rather than editing an out-of-bounds file. Needs a human decision:
+  authorize a design.md edit (or a design-review/design-follow-up pass) to
+  reconcile items 6/7 with the superseding plan.md DI-4 contract.
