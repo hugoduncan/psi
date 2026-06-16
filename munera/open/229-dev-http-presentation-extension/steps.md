@@ -437,3 +437,36 @@ the next begins.
       Done: added a data-driven `testing` block to `file-renderer-test` asserting
       `renderers/content-type-for` over html/png/jpg/pdf/json/css/js/txt plus the
       `application/octet-stream` fallback for an unknown `.xyz` extension.
+
+## Test review follow-ups (round 2)
+
+- [ ] AC-1 "no orphaned server on reload/restart" is asserted in name only. The
+      `lifecycle-and-serving-test` "AC-1: restart leaves no orphaned server"
+      block starts `s1`, asserts it serves, starts `s2`, then asserts only that
+      `s2` serves on a positive port — it never asserts that `s1`'s prior server
+      was actually halted. A regression where `start!` stopped halting the prior
+      `:system` (R2 — the orphaned-server risk this AC exists to guard) would
+      leave `s1` still listening on its old port yet the test would still pass,
+      because nothing checks the old server is gone. Strengthen the block so the
+      orphan claim is real: capture `(:port s1)`, and after the second `start!`
+      assert either `(= (:port s1) (:port s2))` (the old port was freed and
+      re-bound — itself proof the prior server released it) **or**, when the
+      ports differ, that a request to `s1`'s old `…:port1/demo?token=…` URL no
+      longer succeeds (connection refused / non-200). Without one of these the
+      AC-1 no-orphan behaviour has no regression guard.
+
+- [ ] (Low) `routes/load-persisted-routes` jar-safety / absent-dev-path branch
+      is untested. The function's documented robustness behaviour — "Returns an
+      empty vector when the dev source path is absent (e.g. running from a jar)"
+      / "never ships in a published jar" — is the `:else` branch of
+      `(if (and url (= "file" (.getProtocol url))) … [])`. Only the present-file
+      path (`persisted-routes-loaded-test` finds `/demo`) is covered; the
+      absent/non-`file`-protocol branch returning `[]` has no test, so a
+      regression that dropped the protocol guard (and then threw or scanned
+      inside a jar at load time) would pass the suite — the same untested-branch
+      regression-guard class as the round-5/round-6 gaps. The branch is not
+      directly reachable because the resource lookup is hardcoded; extract the
+      resource → routes decision into a pure helper (e.g.
+      `(routes-from-resource url)` taking the resolved `URL`/nil) and assert it
+      returns `[]` for `nil` and for a non-`file` (e.g. `jar:`) URL, while
+      `load-persisted-routes` keeps the real `io/resource` lookup.

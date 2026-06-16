@@ -494,3 +494,14 @@ change):
 Verification: extensions suite green (16 tests / 116 assertions), integration
 green (4 tests / 39 assertions); clj-kondo clean on the test file. No production
 code touched.
+
+## Test review (round 2) — 2026-06-15
+
+Two actionable findings filed (steps.md "Test review follow-ups (round 2)"), both
+the untested-branch regression-guard class. Non-compliance worth flagging: the
+round-7 implementation review and round-1 test review claim "all ACs covered" /
+"All AC-1..AC-10 covered" overstates AC-1 — the restart test labelled "AC-1:
+restart leaves no orphaned server" asserts only that the *new* server serves, not
+that the prior server was halted, so the no-orphan behaviour (the whole point of
+AC-1's reload clause and R2) has no regression guard. Both findings are
+test-coverage gaps, not behaviour defects.
