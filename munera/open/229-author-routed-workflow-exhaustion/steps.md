@@ -154,7 +154,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Test-shaper review follow-ups — pass 2 (2026-06-16)
 
-- [ ] Lock exhaustion-at-cap in
+- [x] Lock exhaustion-at-cap in
       `review-pass-loop-on-max-iterations-routes-to-author-target-test`
       (`workflow_review_step_routing_test.clj`). The test now asserts the
       positive terminal outcome (`:completed` + handback `:accepted-result`) but

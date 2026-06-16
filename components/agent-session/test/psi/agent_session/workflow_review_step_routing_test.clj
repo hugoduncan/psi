@@ -755,5 +755,7 @@
       (is (= :completed (:status run)))
       (is (not= :iteration-exhausted (:reason (:terminal-outcome run)))
           "author-routed exhaustion must not terminate with :iteration-exhausted")
+      (is (= 2 (count (get-in run [:step-runs "design-follow-up" :attempts])))
+          "the judged loop must iterate to its configured :max-iterations cap (2) before routing to the handback — proves exhaustion-at-cap, not a premature :on-max-iterations route")
       (is (some? (get-in run [:step-runs "final-summary-not-converged" :accepted-result]))
           "the :on-max-iterations author target (handback) must have run to an accepted result"))))

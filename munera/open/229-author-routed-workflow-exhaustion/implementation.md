@@ -738,3 +738,24 @@ but not that the loop iterated to `:max-iterations` first, so premature
 `:on-max-iterations` routing would pass. No other new test issues; engine-layer,
 definition-level, and live tests remain narrow, behaviour-focused, and economical
 after the prior dedup/strengthening passes.
+
+## Test-shaper review follow-up — pass 2 execution (2026-06-16)
+
+Executed the one test-shaper pass-2 follow-up (test-only; no production/EDN/doc
+change).
+
+- **Exhaustion-at-cap lock — DONE.** Added an attempt-count assertion to
+  `review-pass-loop-on-max-iterations-routes-to-author-target-test`
+  (`workflow_review_step_routing_test.clj`) mirroring the sibling
+  `review-pass-loop-iteration-limit-failure-test`'s
+  `(= N (count (get-in run [:step-runs "design-follow-up" :attempts])))` shape:
+  `(= 2 …)` against the on-max proof's configured cap
+  (`conditional-review-design-on-max-iterations-definition` sets
+  `design-follow-up` `:max-iterations 2`). Proves the judged loop iterated to the
+  cap *before* routing to the handback — a premature `:on-max-iterations` route
+  (e.g. firing on the first follow-up) would now fail rather than passing on the
+  `:completed` + accepted-handback positives alone.
+
+Verification: `clj-paren-repair` + `clj-kondo` clean. Focused var passes
+(5/0/0, was 4 assertions). Full `workflow-review-step-routing-test` namespace
+green (115 assertions / 12 tests, +1 assertion).
