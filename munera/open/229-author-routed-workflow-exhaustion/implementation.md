@@ -825,3 +825,35 @@ its `:max-iterations`-required constraint. Verified `git grep` finds
 CHANGELOG entries are accurate and consistent with the EDN (design `:max-iterations 3`,
 plan `5`, step names, PASS_STATUS strings, anchor link all match); no other
 docs-review gaps found.
+
+## Docs review follow-up execution (2026-06-16)
+
+Executed the one docs-review batch follow-up (docs-only; no production/test/EDN
+change). Added `:on-max-iterations` to the canonical grammar/IR **reference**
+docs (Slice 4 had touched only the `doc/workflows.md` prose guide + CHANGELOG):
+
+- **`doc/workflow-grammar.md`**: extended the `transition-map` production with an
+  `on-max-iterations-clause?` and added the `on-max-iterations-clause ::=
+  :on-max-iterations goto-target` production with the "only valid alongside
+  `:max-iterations`" constraint inline.
+- **`doc/workflow-ir.md`**: (1) added a "Transition directives inside `:on`
+  additionally use" note listing transition-local `:max-iterations` +
+  `:on-max-iterations`; (2) showed `:on-max-iterations "summary"` in the
+  illustrative directive shape; (3) added two routing rules — the
+  `:max-iterations`-required constraint (directive without `:max-iterations`
+  rejected) and the exhaustion semantics (present → route + `:status :running`;
+  absent → hard-fail `:reason :iteration-exhausted`); (4) extended the formal
+  `transition-map` production with `:on-max-iterations? goto-target` + constraint
+  comment.
+- **`doc/workflow-grammar-concepts.md`** (optional per the item): added a
+  paragraph after the §`:max-iterations` note describing the optional
+  `:on-max-iterations` companion key (valued like `:goto`), its exhaustion-routing
+  purpose, and the `:max-iterations`-required constraint.
+
+Placement of `:on-max-iterations` as **transition-local** (inside the `:on`
+directive / `transition-map`), not a step-level `control-flow` key, matches the
+code: it lives in `routing-directive-schema` (model.clj/ir.clj), valued like
+`:goto` (`:next | :previous | :done | step-name`), `:and`-guarded by
+`on-max-iterations-requires-max-iterations?`. The item's "control-flow block"
+mention is satisfied by documenting the key where it actually belongs
+(transition-map) rather than mis-placing it at step level.

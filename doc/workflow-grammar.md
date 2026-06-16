@@ -73,9 +73,14 @@ invoke-judge ::= {:type :invoke
 outcome-map ::= {outcome transition-map}+
 
 transition-map ::= {:goto goto-target
-                    max-iterations-clause?}
+                    max-iterations-clause?
+                    on-max-iterations-clause?}
 
 max-iterations-clause ::= :max-iterations pos-int
+
+on-max-iterations-clause ::= :on-max-iterations goto-target
+;; optional; only valid alongside :max-iterations. Names the target a judged
+;; loop routes to when it exhausts :max-iterations, instead of hard failing.
 
 goto-target ::= :next | :previous | :done | step-name
 

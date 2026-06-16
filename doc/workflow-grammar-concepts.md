@@ -66,6 +66,8 @@ Control flow is orthogonal to step execution form, so invoke, session, and deleg
 
 The transition-local form uses the literal key `:max-iterations`; the earlier `:max-iterations?` spelling in the docs was only an imprecise optionality notation and not a distinct authored field name.
 
+A transition-local `:max-iterations` bound may carry an optional companion key `:on-max-iterations`, valued like `:goto` (`:next | :previous | :done | step-name`). It names an author-chosen target the judged loop routes to when it exhausts `:max-iterations`, instead of hard-failing with `:reason :iteration-exhausted`. `:on-max-iterations` is only valid alongside transition-local `:max-iterations`; supplying it without `:max-iterations` is rejected.
+
 ## Execution forms
 
 The grammar has three step execution forms:

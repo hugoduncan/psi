@@ -195,7 +195,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Docs review follow-ups (2026-06-16)
 
-- [ ] Document the new `:on-max-iterations` routing-directive key in the
+- [x] Document the new `:on-max-iterations` routing-directive key in the
       grammar/IR **reference** docs, not just the `doc/workflows.md` prose guide.
       The authored grammar (`model.clj`) and IR (`ir.clj`)
       `routing-directive-schema` now carry an optional `:on-max-iterations`
