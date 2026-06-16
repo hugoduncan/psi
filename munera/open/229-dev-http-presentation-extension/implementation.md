@@ -462,3 +462,35 @@ bypasses the tool via `register-content-route!`), and the unique unit-only
 nullable-api ns says to avoid (testing-without-mocks / task-test-review
 `¬mock ∧ ¬stub`). Findings are test-methodology/coverage gaps, not behaviour
 defects.
+
+## Test review follow-ups (round 1) executed — 2026-06-15
+
+Resolved all three round-1 test-review follow-ups (test-only; no production
+change):
+
+- **Choices unit tests de-mocked.** Deleted the bespoke `capturing-api`/
+  `result-api` spy maps. `choices-handler-test` and `choices-map-option-test`
+  build the handler with the default `nullable/create-nullable-extension-api`
+  (its `submit-synthetic-prompt` handler returns
+  `{:psi.extension/prompt-submitted? true}` and records into `:mutations`) and
+  assert the rendered page first, then a new private `submit-prompt-mutations`
+  helper over `(:mutations @state)`. `choices-failed-injection-releases-claim-test`
+  supplies the falsey/throwing seam via the sanctioned `:mutate-fn` override and
+  asserts the rendered failure page + the registry `:answered?` claim state
+  (state/output, not interaction count). Switched the choices session-id to
+  `"nullable-session"` to match the nullable's session.
+- **Model-callable `dev-present` tool covered end-to-end.** Added
+  `^:integration dev-present-tool-renders-over-server-test`: `init` + `start!`,
+  resolve the tool from `(:tools @state)`, execute it, parse the URL from the
+  tool result (`Open: (\S+)`), fetch over the real server, assert
+  `<h1>Tool Live</h1>`. Exercises the full `init`→`register-tool`→
+  `register-content-route!`→render wiring the unit (stubbed seam) and the direct
+  `register-content-route!` integration path both bypassed.
+- **`:file` content-type coverage broadened.** Added a data-driven `testing`
+  block to `file-renderer-test` asserting `renderers/content-type-for` across
+  html/png/jpg/pdf/json/css/js/txt plus the `application/octet-stream` fallback
+  for an unknown `.xyz` extension.
+
+Verification: extensions suite green (16 tests / 116 assertions), integration
+green (4 tests / 39 assertions); clj-kondo clean on the test file. No production
+code touched.

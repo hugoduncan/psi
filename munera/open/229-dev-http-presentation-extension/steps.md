@@ -375,7 +375,7 @@ the next begins.
 
 ## Test review follow-ups (round 1)
 
-- [ ] Back the unit `:choices` handler tests with the sanctioned nullable
+- [x] Back the unit `:choices` handler tests with the sanctioned nullable
       extension API instead of bespoke spy maps. `choices-handler-test`,
       `choices-failed-injection-releases-claim-test`, and
       `choices-map-option-test`
@@ -395,7 +395,19 @@ the next begins.
       recorded mutation call (interaction) — the deeper state-based proof of the
       injection already lives in the core
       `submit-synthetic-prompt-injects-user-message-test`.
-- [ ] Add end-to-end coverage for the model-callable `dev-present` tool path
+      Done: deleted the bespoke `capturing-api`/`result-api` maps. All three
+      tests now build the choices handler with the nullable
+      `create-nullable-extension-api` api. The two happy-path tests
+      (`choices-handler-test`, `choices-map-option-test`) use the default
+      nullable (its `submit-synthetic-prompt` handler returns
+      `{:psi.extension/prompt-submitted? true}` and records into `:mutations`)
+      and assert the rendered page first plus a new
+      `submit-prompt-mutations` helper over `(:mutations @state)`. The two
+      failure cases in `choices-failed-injection-releases-claim-test` now supply
+      the failing/throwing seam via the sanctioned `:mutate-fn` override and
+      assert the rendered failure page + the registry `:answered?` claim state
+      (state/output signals, not the recorded-call interaction).
+- [x] Add end-to-end coverage for the model-callable `dev-present` tool path
       (AC-3 "the agent can call `dev-present` … and receives back a URL that
       renders the content"). The tool's render path is only exercised either as
       a unit with a stubbed `register-content!` seam (`dev-present-tool-test`)
@@ -407,10 +419,21 @@ the next begins.
       wrong register fn) or a tool-shaped-input → real-render break would pass.
       Execute the tool resolved from the nullable state `:tools` against a
       running server and assert the returned URL renders the content.
-- [ ] (Low) Broaden `:file` renderer content-type coverage. `file-renderer-test`
+      Done: added `^:integration dev-present-tool-renders-over-server-test`. It
+      `init`s + `start!`s the real server, resolves the tool from
+      `(get-in @state [:tools "dev-present"])`, executes it with
+      `{"renderer" "markdown" "data" "# Tool Live" …}` + `opts {:session-id …}`,
+      parses the URL out of the tool result (`Open: (\S+)`), fetches it over the
+      ephemeral-port http-kit server, and asserts `<h1>Tool Live</h1>` renders —
+      proving the full `init`→`register-tool`→`register-content-route!`→render
+      wiring, not the stubbed seam.
+- [x] (Low) Broaden `:file` renderer content-type coverage. `file-renderer-test`
       verifies only `.svg` → `image/svg+xml` plus the missing-file 404; the rest
       of `extension->content-type` (html/png/jpg/pdf/json/css/js/txt) and the
       `application/octet-stream` default are unverified, so an edited or swapped
       mapping would pass — the same regression-guard class as the round-6
       map-option gap. Add a small data-driven assertion over a representative
       subset incl. the octet-stream fallback for an unknown extension.
+      Done: added a data-driven `testing` block to `file-renderer-test` asserting
+      `renderers/content-type-for` over html/png/jpg/pdf/json/css/js/txt plus the
+      `application/octet-stream` fallback for an unknown `.xyz` extension.
