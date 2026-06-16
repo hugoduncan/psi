@@ -340,5 +340,25 @@ the next begins.
       and `[:content :session-id] "sess-x"` — proving the model-callable surface
       threads the invoking session into the content map. The second executes
       with empty `opts {}` and asserts the content map *contains* the
-      `:session-id` key but threads `nil` (no fabricated session). Focused Scry
+      `:session-id` key but threads `nil` (no fabricated session).
+
+## Implementation review follow-ups (round 6)
+
+- [ ] Add test coverage for the `:choices` map-option (label≠value) code path
+      (`extensions/dev-http/src/extensions/dev_http/choices.clj`
+      `normalize-option`). The map branch
+      (`(kget o :value "value" :label "label")` / `(kget o :label "label" …)`)
+      is a real feature: a choice option given as `{:label … :value …}` renders
+      the **label** as the button text but submits the **value**, and the
+      submitted value (not the label) is the user message injected into the
+      origin session. Every choices test (`choices-handler-test`,
+      `choices-failed-injection-releases-claim-test`, integration
+      `choices-interaction-loop-test`) uses only scalar options (`["A" "B"]`)
+      where label==value, so the distinction is unverified — a regression (label
+      and value swapped, or the label submitted instead of the value) would pass
+      all current tests. Add a `render-form`/handler test with options
+      `[{:label "Yes please" :value "y"} {:label "No" :value "n"}]` asserting the
+      button displays the label, the form posts `choice=<value>`, and submitting
+      injects the **value** (`"y"`) as the user message. Also cover the
+      string-keyed (JSON-tool) variant `{"label" … "value" …}`. Focused Scry
       (kaocha `--focus`) green: 21 assertions; clj-kondo clean.

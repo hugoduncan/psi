@@ -392,3 +392,19 @@ green (1 test / 21 assertions); full `extensions.dev-http-test` unit ns green
 (18 tests / 128 assertions); clj-kondo clean on the test file. (An unrelated
 `psi.rpc-smoke-test/rpc-smoke-handshake-test` handshake timeout appears only when
 OR-focusing all `:integration` tests; not related to this change.)
+
+## Implementation review (round 6) — 2026-06-15
+
+Re-verified green: extensions suite (15 tests / 94 assertions), integration
+(3/34), agent-session `submit-synthetic-prompt-mutation-test` green; clj-kondo
+clean across extension src/dev/test + the core mutation. Code matches design and
+follows the architecture (reads via api, writes only via `:mutate-session`; live
+integrant system + registry in the extension's own atom; one sanctioned core
+touch; every dynamic subtree token-gated, assets ungated by documented
+decision). Docs/changelog/README present and coherent.
+
+One new actionable test-coverage gap filed (round 6): the `:choices` map-option
+label≠value path (`choices/normalize-option`) is unverified — all choices tests
+use scalar options where label==value, so the label-displayed / value-submitted
+distinction (and which one is injected) has no regression guard. No
+correctness/behaviour defect found in the implementation itself.
