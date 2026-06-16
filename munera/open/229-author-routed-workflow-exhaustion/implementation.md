@@ -594,3 +594,29 @@ Committed an outstanding test-shaper dedup: extracted shared
 `assert-review-summary-handback` helper in `workflow_definitions_test.clj`
 (both `review-task-design-test` and `review-task-plan-test` shared the identical
 terminal/DI-4-PASS_STATUS/shared-source assertions) — lint clean, suite green.
+
+---
+
+## Implementation review pass (2026-06-16)
+
+ACTIONABLE (1 → steps.md). A transient scry test-output artifact
+(`.scry-results/…nullable-local-model-test.edn`) was committed in `19b41b2ea`;
+`.scry-results/` is not gitignored, so the run output leaked into the tree.
+
+Independently re-verified the claimed pre-existing/unrelated failure: ran
+`delegate-review-task-implementation-completes-with-nullable-local-model-test`
+with the five 229 production sources + three workflow `.edn`s reverted to the
+pre-Slice-1 baseline (`9a07db27e`) — it fails identically (4 passed / 3 failed,
+terminates `:failed` under the nullable local model). Confirms it is independent
+of the 229 change set (deftest predates 229, added in `be16dd244`); the 229
+runtime edits are behaviour-inert for any directive without `:on-max-iterations`.
+
+Engine/EDN/docs reviewed: `evaluate-routing` governing-site edit, the shared
+`resolve-goto-acting-target` extraction, schema D3 cross-field guard, the DI-2
+not-converged-before-converged ordering, and the lifecycle gates are coherent
+with design. Confirmed the delegate-gate handback resolves order-independently:
+the delegate success payload is `terminal-result-envelope` (prefers
+`:terminal-outcome :result-envelope`, else reverse-scans `:accepted-result`), so
+the not-converged summary's `PASS_STATUS: ACTIONABLE_FEEDBACK` surfaces to
+`check-design/plan-review-status` even though the converged `final-summary` is
+ordered last. Focused workflow-runtime/judge/loader suites green; clj-kondo clean.

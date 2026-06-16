@@ -112,3 +112,12 @@ Slices are independently committable; keep each commit `small`.
 - [x] coherence re-read of edited files (`sync`); full focused suites green
       (666 assertions / 66 tests + 2 DI-2 live tests)
 - [x] commit `⚒ docs: :on-max-iterations + review-handback lifecycle behaviour`
+
+## Implementation review follow-ups (2026-06-16)
+
+- [ ] Remove the stray transient test-output artifact committed in `19b41b2ea`:
+      `.scry-results/psi.agent-session.workflow-delegate-review-step-live-test__delegate-review-task-implementation-completes-with-nullable-local-model-test.edn`.
+      `git rm` it and add `.scry-results/` to `.gitignore` so scry run outputs
+      are never tracked. (Scry writes failures under `.scry-results/` per
+      `bb.edn`; the dir is currently un-ignored and one file leaked into the
+      tree.)
