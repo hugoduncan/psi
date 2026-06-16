@@ -837,3 +837,71 @@ the next begins.
       JSON-tool `:file` path and now fails. Focused kaocha
       (`--focus extensions.dev-http-test/file-renderer-test`) green
       (1 test / 16 assertions); clj-kondo clean.
+
+## Test review follow-ups (round 12) — test-shaper (clarity/consistency/economy)
+
+Distinct from the round 1–11 *coverage* gaps: these are test-*shaping* issues
+(consistent test abstractions, economical setup, meaningful failures, clarity)
+in `extensions/dev-http/test/extensions/dev_http_test.clj`.
+
+- [ ] Reuse the `submit-prompt-mutations` helper in the integration
+      `choices-interaction-loop-test` instead of re-inlining its predicate.
+      The unit tests funnel the mutation lookup through the
+      `submit-prompt-mutations` helper (line ~313), but
+      `choices-interaction-loop-test` hand-inlines the *identical* predicate
+      `(filter #(= 'psi.extension/submit-synthetic-prompt (:op %)) (:mutations @state))`
+      twice (lines ~683, ~692). Inconsistent test abstraction
+      (test-shaper `consistent(test_abstractions)`): the same concept has two
+      encodings, and a change to the recorded-mutation shape must be made in two
+      places. Reuse `submit-prompt-mutations` in the integration test (it reads
+      `(:mutations @state)` the same way) so the mutation-filter has one source.
+
+- [ ] Extract a `make-choices-handler` test helper to compress the repeated
+      `:choices` setup ceremony. The five choices unit assertions
+      (`choices-handler-test`, the two branches of
+      `choices-failed-injection-releases-claim-test`, `choices-map-option-test`,
+      `choices-urlencoded-decode-test`) each repeat the same ~6-line arrange:
+      `create-nullable-extension-api {:path "/test/dev_http.clj"}` →
+      `registry/create-registry` → a `content` map hardcoding
+      `:renderer :choices` + `:session-id "nullable-session"` →
+      `choices/make-handler` with a 5-key map that re-states `route-id "c1"` /
+      `session-id "nullable-session"` → `registry/register-entry! reg "c1" {}`.
+      The magic strings `"c1"`, `"nullable-session"`, and `"/test/dev_http.clj"`
+      are duplicated ~5–15× each. test-shaper `economical` /
+      `minimal_incidental_setup` / `helpers_that_compress(ceremony)`: introduce a
+      helper (e.g. `(make-choices-handler {:options … :api … :reg …})` returning
+      `{:handler … :state … :reg …}` and registering the entry) so each test
+      states only what differs (the option shape, the failing seam). Keep it a
+      compressor of ceremony, not a hider of intent — the GET/POST assertions
+      stay inline.
+
+- [ ] (Low) Rename the `str`-shadowing local in `renderers-test`. The `:table`
+      block binds `str (renderers/render {…})` (line ~138), shadowing
+      `clojure.core/str`. Harmless today only because `str` is never called as a
+      fn inside that `let`, but it is a clarity hazard (a reader/maintainer
+      adding a `(str …)` call there would silently invoke the ring-response map).
+      Rename to a non-core name (e.g. `str-resp` / `string-keyed`) to match the
+      sibling `kw` binding without shadowing a core fn.
+
+- [ ] (Low) Remove the tautological assertion in the AC-1 restart same-port
+      branch (`lifecycle-and-serving-test`, lines ~572-575). The branch
+      `(if (= (:port s1) (:port s2)) (is (= (:port s1) (:port s2)) …) (is (not= 200 …)))`
+      asserts, in the equal branch, exactly the `if` condition that selected it —
+      a tautology that can never fail and so carries no signal
+      (test-shaper `meaningful_failures`). The genuine no-orphan evidence for the
+      same-port case already lives in the earlier `(is (= 200 (get-status …s2…)))`
+      assertion (s2 could not have bound s1's port unless s1 released it). Either
+      drop the vacuous `is` (let the differing-port branch carry the regression
+      guard and the prior serve-200 assertion carry the same-port evidence) or
+      add an explicit comment that the assertion is a branch marker, not a check —
+      so a maintainer doesn't read it as a real guard.
+
+- [ ] (Low) Extract a `server-base` helper for the integration tests. The
+      base-URL construction `(str "http://" (:host server) ":" (:port server))`
+      is hand-built in four integration tests (lines ~519, ~557/563, ~706, ~737)
+      with the host/port spelled out each time. test-shaper
+      `consistent(structure)` / economy: a `(server-base server)` helper (and an
+      optional `(token-url server path)` companion mirroring the existing
+      `get-status`/`body-str`/`post-form` helper set) would remove the repeated
+      URL assembly so a host/port-shape change has one source. Low — the
+      duplication is mechanical and currently correct.

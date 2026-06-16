@@ -879,3 +879,21 @@ fallback) is incidental defensive code, not a documented design behaviour
 (design specifies scalar or `{:label :value}` options), and sits below the
 severity floor of the prior Low coverage items — not filed. No non-compliance to
 report. No new steps.md follow-ups added.
+
+## Test review (round 12) — test-shaper — 2026-06-15 — ACTIONABLE_FEEDBACK
+
+test-shaper pass (clarity/consistency/economy/meaningful-failures) over
+`extensions/dev-http/test/extensions/dev_http_test.clj`. Rounds 1–11 closed the
+*coverage* class; this pass targets *shaping*. Five follow-ups filed in steps.md
+round 12: (1) integration `choices-interaction-loop-test` re-inlines the
+`submit-prompt-mutations` predicate instead of the existing helper; (2) the five
+`:choices` unit tests repeat the same nullable-api+registry+content+handler+
+register setup and magic strings — extract a `make-choices-handler` helper; (3
+low) `renderers-test` shadows `clojure.core/str` with a local; (4 low) the AC-1
+same-port restart branch asserts the `if` condition itself (tautology, no
+signal); (5 low) base-URL assembly duplicated across four integration tests.
+
+Note (instruction non-compliance): the requested task slug
+`229-dev-http-lifecycle` does not exist; the only matching task is
+`229-dev-http-presentation-extension`, which was reviewed (its design §Lifecycle
+covers the dev-http lifecycle surface).
