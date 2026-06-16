@@ -449,3 +449,16 @@ dev-only/localhost/token-gated design decisions, not defects.
 
 No new actionable findings — the six prior review rounds' dedup/consistency/
 robustness/coverage follow-ups are all resolved. Review complete.
+
+## Test review (round 1) — 2026-06-15
+
+Test-quality review (task-test-review). Three actionable findings filed in
+steps.md ("Test review follow-ups (round 1)"). Non-compliance worth flagging:
+the round-7 implementation-review claim "all ACs covered by unit + integration
+tests" is overstated — the model-callable `dev-present` tool path (AC-3's core
+claim) is never exercised end-to-end (unit stubs the register seam; integration
+bypasses the tool via `register-content-route!`), and the unique unit-only
+`:choices` coverage relies on the spy/stub api pattern the project's own
+nullable-api ns says to avoid (testing-without-mocks / task-test-review
+`¬mock ∧ ¬stub`). Findings are test-methodology/coverage gaps, not behaviour
+defects.

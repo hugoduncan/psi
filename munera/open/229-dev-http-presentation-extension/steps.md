@@ -372,3 +372,45 @@ the next begins.
       user message into the origin session. Focused kaocha `--focus` green
       (16 assertions in the new deftest; 42 across all three choices unit
       tests); clj-kondo clean.
+
+## Test review follow-ups (round 1)
+
+- [ ] Back the unit `:choices` handler tests with the sanctioned nullable
+      extension API instead of bespoke spy maps. `choices-handler-test`,
+      `choices-failed-injection-releases-claim-test`, and
+      `choices-map-option-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`) inject
+      hand-rolled `capturing-api`/`result-api` maps whose `:mutate-session`
+      records calls into an atom and returns canned results — the spy/stub
+      pattern the project's own `psi.extension-test-helpers.nullable-api`
+      docstring explicitly says to avoid, and contrary to task-test-review's
+      `∀d ∈ infra_deps. nullable ∧ ¬mock ∧ ¬stub`. The happy-path tests can use
+      `nullable/create-nullable-extension-api` (already used by the integration
+      tests; its default `submit-synthetic-prompt` handler returns
+      `{:psi.extension/prompt-submitted? true}` and records into `:mutations`)
+      and assert on `(:mutations @state)`. The two failure-path cases that need
+      a failing mutate seam should inject it through the sanctioned `:mutate-fn`
+      override rather than a separate bespoke map. Relatedly, prefer asserting
+      the observable rendered page (output) as the primary signal over the
+      recorded mutation call (interaction) — the deeper state-based proof of the
+      injection already lives in the core
+      `submit-synthetic-prompt-injects-user-message-test`.
+- [ ] Add end-to-end coverage for the model-callable `dev-present` tool path
+      (AC-3 "the agent can call `dev-present` … and receives back a URL that
+      renders the content"). The tool's render path is only exercised either as
+      a unit with a stubbed `register-content!` seam (`dev-present-tool-test`)
+      or by calling `register-content-route!` directly, bypassing the tool, in
+      the integration `lifecycle-and-serving-test` AC-3 block. No test drives the
+      actual registered tool (`init` wires `tool/dev-present-tool` →
+      `register-content-route!`, `dev_http.clj:176`) through to a URL that
+      renders over the real server, so a wiring regression (tool bound to the
+      wrong register fn) or a tool-shaped-input → real-render break would pass.
+      Execute the tool resolved from the nullable state `:tools` against a
+      running server and assert the returned URL renders the content.
+- [ ] (Low) Broaden `:file` renderer content-type coverage. `file-renderer-test`
+      verifies only `.svg` → `image/svg+xml` plus the missing-file 404; the rest
+      of `extension->content-type` (html/png/jpg/pdf/json/css/js/txt) and the
+      `application/octet-stream` default are unverified, so an edited or swapped
+      mapping would pass — the same regression-guard class as the round-6
+      map-option gap. Add a small data-driven assertion over a representative
+      subset incl. the octet-stream fallback for an unknown extension.
