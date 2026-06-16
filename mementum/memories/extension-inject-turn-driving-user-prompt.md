@@ -1,0 +1,5 @@
+💡 To make an extension inject a mid-conversation USER message that drives the session's next turn immediately, dispatch the `:session/submit-synthetic-user-prompt` path (the same mechanism the scheduler uses for delayed prompts) — NOT the append-only `append-message` path. Wrap the text in the canonical user-message record `{:role "user" :content [{:type :text :text …}] :timestamp (Instant/now) :source :extension}`, mirroring the scheduler's `scheduled-user-message` shape, and dispatch with `{:origin :mutations}`.
+
+The extension reaches this via the api `:mutate-session` (a Pathom mutation, e.g. `psi.extension/submit-synthetic-prompt`), not an extension-origin event. Key permission fact: the permission interceptor gates ONLY `:origin :extension` dispatches. Because the api mutation's inner dispatch carries `:origin :mutations`, the synthetic-prompt path is not permission-gated, so the extension needs NO `:allowed-events` declaration for it.
+
+(Complements explicit-extension-session-targeting: use `:mutate-session`/`:query-session` for the specific source session.)
