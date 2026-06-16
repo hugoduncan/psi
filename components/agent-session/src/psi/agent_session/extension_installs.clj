@@ -101,7 +101,9 @@
    'psi/work-on {:psi/init 'extensions.work-on/init
                  :source-policies {:installed {:local/root "extensions/work-on"}}}
    'psi/metrics {:psi/init 'psi.metrics.extension/init
-                 :source-policies {:installed {:local/root "extensions/metrics"}}}})
+                 :source-policies {:installed {:local/root "extensions/metrics"}}}
+   'psi/dev-http {:psi/init 'extensions.dev-http/init
+                  :source-policies {:installed {:local/root "extensions/dev-http"}}}})
 
 (defn- catalog-entry
   [lib]
