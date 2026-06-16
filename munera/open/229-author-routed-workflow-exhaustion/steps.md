@@ -219,7 +219,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Docs review follow-ups — pass 2 (2026-06-16)
 
-- [ ] Fix the stale `review-task-design` loop-cap count in `CHANGELOG.md`
+- [x] Fix the stale `review-task-design` loop-cap count in `CHANGELOG.md`
       `[Unreleased]` → Changed. The "Implementation review profiles …" entry
       states `review-task-design` "now repeats full architecture/ambiguity/
       inconsistency passes up to **6** total passes", but the authored cap in

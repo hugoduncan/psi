@@ -871,3 +871,11 @@ grammar/IR-reference follow-up is resolved (`doc/workflow-grammar.md`,
 `:on-max-iterations`), and `doc/workflows.md` + CHANGELOG `:on-max-iterations`/
 handback entries match the EDN (design 3, plan 5, step names, PASS_STATUS
 strings, anchor link).
+
+## Docs review pass 2 follow-up execution (2026-06-16)
+
+DONE. Changed `CHANGELOG.md` `[Unreleased]` → Changed: `review-task-design`
+"up to 6 total passes" → "up to 3 total passes" (matching authored
+`:max-iterations 3` and `doc/workflows.md` "at most three total times").
+`review-task-plan` "5 total passes" left intact (matches `:max-iterations 5`).
+Docs-only edit; no code/test impact.
