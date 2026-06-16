@@ -1,6 +1,7 @@
 (ns extensions.dev-http-test
   (:require
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.dev-http :as sut]
    [extensions.dev-http.choices :as choices]
@@ -521,6 +522,60 @@
             (is (re-find #"<h1>Tool Live</h1>" (body-str resp))))))
       (finally
         (sut/stop!)))))
+
+(defn- live-token
+  "Extract the running server's live token from a session-route URL."
+  []
+  (second (re-find #"token=(\S+)" (sut/route-url "probe"))))
+
+(deftest ^:integration dev-http-command-handler-test
+  ;; AC-1 + design §Lifecycle: the user-facing surface is the
+  ;; `/dev-http start | status | stop` command. The other tests drive
+  ;; `start!`/`status-text`/`stop!` directly, bypassing `handle-command`'s
+  ;; arg-parse + subcommand `case` routing and its unknown-subcommand usage
+  ;; fallback. Drive the *registered* command handler — resolved from the
+  ;; nullable state `:commands` (wired in `init`) — and assert on the captured
+  ;; log lines + the running/stopped server state, including the running-status
+  ;; url/token presentation.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/dev_http.clj"})]
+    (sut/init api)
+    (let [handler (get-in @state [:commands "dev-http" :handler])]
+      (is (fn? handler) "init registered a /dev-http command handler")
+      (testing "status before start reports not running"
+        (handler "status")
+        (is (= "dev-http not running" (nullable/drain-log! state)))
+        (is (= "dev-http not running" (sut/status-text))))
+      (try
+        (testing "start launches the server and logs the running url/token"
+          (handler "start")
+          (let [started (nullable/drain-log! state)
+                token   (live-token)]
+            (is (re-find #"dev-http started" started))
+            (is (re-find #"http://127\.0\.0\.1:\d+" started)
+                "started output carries the base URL")
+            (is (str/includes? started token)
+                "started output carries the live token")
+            (is (some? (sut/route-url "probe")) "server is running after start")))
+        (testing "status after start logs the running header + live url/token"
+          (handler "status")
+          (let [status (nullable/drain-log! state)
+                token  (live-token)]
+            (is (re-find #"dev-http running" status))
+            (is (re-find #"http://127\.0\.0\.1:\d+" status)
+                "status logs the base URL")
+            (is (str/includes? status token) "status logs the live token")))
+        (testing "stop halts the server and logs stopped"
+          (handler "stop")
+          (is (= "dev-http stopped" (nullable/drain-log! state)))
+          (is (= "dev-http not running" (sut/status-text)))
+          (is (nil? (sut/route-url "probe")) "server is gone after stop"))
+        (testing "an unknown subcommand logs the usage line"
+          (handler "wat")
+          (is (= "usage: /dev-http start | status | stop"
+                 (nullable/drain-log! state))))
+        (finally
+          (sut/stop!))))))
 
 (defn- post-form
   [url body]

@@ -489,7 +489,7 @@ the next begins.
 
 ## Test review follow-ups (round 3)
 
-- [ ] Cover the `/dev-http` command handler's subcommand dispatch
+- [x] Cover the `/dev-http` command handler's subcommand dispatch
       (`handle-command`, `extensions/dev-http/src/extensions/dev_http.clj`). AC-1
       and design §Lifecycle define the user-facing surface as the
       `/dev-http start | status | stop` command, yet **no test invokes the
@@ -510,7 +510,18 @@ the next begins.
       running/stopped server state. Same untested-surface regression-guard class
       as the round-1 dev-present-wiring, round-2 jar-safety, and round-5/6
       coverage gaps.
-- [ ] (Low) Assert the running-status url/token presentation, not just the
+      Done: added `^:integration dev-http-command-handler-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`). It `init`s with
+      the nullable api, resolves the registered handler from
+      `(get-in @state [:commands "dev-http" :handler])`, and invokes it with
+      `"status"` before start (⇒ logs `dev-http not running`), `"start"`,
+      `"status"`, `"stop"` (⇒ `dev-http stopped`), and an unknown subcommand
+      `"wat"` (⇒ `usage: /dev-http start | status | stop`), asserting on the
+      drained log lines (`nullable/drain-log!`) plus the running/stopped server
+      state (`sut/route-url`/`sut/status-text`). This exercises the arg-parse +
+      `case` subcommand routing and the usage fallback that the direct
+      `start!`/`status-text`/`stop!` tests bypassed.
+- [x] (Low) Assert the running-status url/token presentation, not just the
       "dev-http running" header. The integration test asserts only
       `(re-find #"dev-http running" (sut/status-text))`; the indented
       `  url:   …` / `  token: …` block produced by the round-2-dedup
@@ -519,3 +530,8 @@ the next begins.
       url/token lines passes. Fold into the round-3 command-handler test above:
       after `start`, assert the `status` command's logged output contains the
       base URL and the live token.
+      Done: folded into `dev-http-command-handler-test`. The post-`start`
+      `status` branch asserts the logged output contains the base URL
+      (`http://127.0.0.1:<port>`) and the live token (extracted from
+      `sut/route-url` via `live-token`), and the `start` branch likewise asserts
+      its `dev-http started` output carries the base URL + live token.

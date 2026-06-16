@@ -546,3 +546,29 @@ subcommand dispatch and usage fallback have no regression guard; relatedly the
 running-status url/token lines are asserted nowhere. Test-only coverage gap, not
 a behaviour defect. Tests are otherwise well-formed and use the sanctioned
 nullable extension API (no mocks/stubs of infra deps).
+
+## Test review (round 3) follow-ups executed — 2026-06-15
+
+Closed the round-3 command-surface coverage gap (test-only; no production
+change). Added `^:integration dev-http-command-handler-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`):
+
+- Resolves the *registered* handler from the nullable state
+  `(get-in @state [:commands "dev-http" :handler])` and drives it through
+  `status` (pre-start ⇒ `dev-http not running`), `start`, `status`, `stop`
+  (⇒ `dev-http stopped`), and an unknown subcommand `wat`
+  (⇒ `usage: /dev-http start | status | stop`), asserting on the drained log
+  lines (`nullable/drain-log!`) and the running/stopped server state. This is
+  the first test to exercise `handle-command`'s arg-parse + `case` subcommand
+  routing and the usage fallback (other tests call `start!`/`status-text`/
+  `stop!` directly).
+- Folds in the low round-3 item: the post-`start` `status` (and the `start`)
+  log output is asserted to contain the base URL (`http://127.0.0.1:<port>`) and
+  the live token (extracted from `sut/route-url` via a small `live-token`
+  helper), guarding the round-2-dedup `url-token-lines` presentation.
+
+Added `[clojure.string :as str]` to the test ns (for `str/includes?` on the
+url-safe base64 token, which avoids regex-special-char issues). Verification:
+focused `dev-http-command-handler-test` green (1 test / 14 assertions);
+extension integration suite green (5 tests / 54 assertions); unit suite green
+(17 tests / 118 assertions); clj-kondo clean on the test file.
