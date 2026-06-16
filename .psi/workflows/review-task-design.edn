@@ -33,7 +33,7 @@
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
    :on {"DONE" {:goto "design-review"
-                :max-iterations 3
+                :max-iterations 6
                 :on-max-iterations "final-summary-not-converged"}}}
   {:name "final-summary-not-converged",
    :type :session,
