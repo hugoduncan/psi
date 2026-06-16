@@ -58,4 +58,14 @@
         (is (= 1 (count user-msgs)))
         (is (= :extension (:source (first user-msgs))))
         (is (= "I choose option A"
-               (get-in (first user-msgs) [:content 0 :text])))))))
+               (get-in (first user-msgs) [:content 0 :text])))))
+    (testing "drives the next turn to a downstream assistant message (AC-6)"
+      ;; The injected user message must not merely sit in the journal — it must
+      ;; drive the agent's next turn immediately. The :execute-prepared-request-fn
+      ;; seam returns a stub assistant "ack"; assert that turn actually ran by
+      ;; finding the resulting assistant message in the journal.
+      (let [assistant-msgs (filter #(= "assistant" (:role %))
+                                   (journal-messages ctx session-id))]
+        (is (= 1 (count assistant-msgs)))
+        (is (= "ack"
+               (get-in (first assistant-msgs) [:content 0 :text])))))))

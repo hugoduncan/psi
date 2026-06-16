@@ -538,7 +538,7 @@ the next begins.
 
 ## Test review follow-ups (round 4)
 
-- [ ] Assert the synthetic-prompt mutation actually **drives the next turn**, not
+- [x] Assert the synthetic-prompt mutation actually **drives the next turn**, not
       just that a user message was injected. AC-6 / design §Interaction require
       the choice submission to be injected as a mid-conversation user message
       *and* "drive the agent's next turn immediately". The only test with a real
@@ -561,3 +561,12 @@ the next begins.
       unused `:execute-prepared-request-fn` seam (and the `:text "ack"`) so the
       test setup matches what it verifies. Same dead-setup / untested-behaviour
       class as the prior coverage-gap rounds.
+      Done: added a third `testing` block to
+      `submit-synthetic-prompt-injects-user-message-test` asserting the
+      downstream turn actually ran — exactly one `"assistant"` journal message
+      whose `[:content 0 :text]` is the seam's `"ack"`. This converts the
+      previously-dead `:execute-prepared-request-fn` "ack" wiring into a real
+      regression guard for AC-6's "drives the agent's next turn immediately"
+      clause (the injected user message must produce a downstream assistant
+      turn, not merely sit in the journal). Focused Scry green (8 assertions,
+      was 6); clj-kondo clean.

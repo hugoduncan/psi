@@ -587,3 +587,18 @@ asserted nowhere. The one real-ctx test
 the injected user message + submit-event log entries, never the resulting
 assistant turn; the integration loop uses the nullable, which records the
 mutate call without driving a turn. Test-coverage gap, not a behaviour defect.
+
+## Test review (round 4) follow-ups executed — 2026-06-15
+
+Closed the round-4 turn-drive coverage/dead-setup gap (test-only; no production
+change). Extended `submit-synthetic-prompt-injects-user-message-test`
+(`components/agent-session/test/psi/agent_session/submit_synthetic_prompt_mutation_test.clj`)
+with a third `testing` block asserting AC-6's "drives the agent's next turn
+immediately" clause: after the synthetic prompt is injected, the journal now
+contains exactly one `"assistant"` message whose `[:content 0 :text]` is the
+`:execute-prepared-request-fn` seam's stub `"ack"`. Previously the seam's `"ack"`
+return was dead setup — the test wired it to "complete a turn deterministically"
+but never asserted the resulting assistant turn, leaving the turn-drive half of
+AC-6 unguarded. Now a regression where the synthetic prompt failed to drive the
+downstream turn would fail this test. Verification: focused Scry green
+(8 assertions, up from 6); clj-kondo clean on the test file.
