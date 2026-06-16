@@ -1109,3 +1109,19 @@ Documented the `:choices` map-option (`{:label … :value …}`) variant:
   submitted/injected).
 Documented surface now matches the implemented + tested behaviour
 (`normalize-option` in `choices.clj`; `choices-map-option-test`). clj-kondo clean.
+
+## Docs review (round 2) — review-task-docs — REVIEW_COMPLETE
+
+Re-reviewed user-facing docs (README extensions entry, `doc/dev-http.md`,
+CHANGELOG `[Unreleased]`) against the implemented extension. All accurate,
+complete, and consistent:
+- Renderer set, `dev-present` tool surface + `data` shapes, optional `route-id`
+  / last-write-wins, and the `:choices` map-option (`{:label … :value …}`,
+  round-1 fix) match `renderers.clj`/`tool.clj`/`choices.clj`.
+- Lifecycle (`/dev-http start|status|stop`, idempotent halt), token gating
+  (`token` query param + `x-dev-http-token` header, 403), ungated `/assets`,
+  `r-` route-id, persisted `/demo`, single-shot + failed-injection-retry, and
+  SSE-as-session-route `/s/registry` all match source.
+- No stale `/sse/` references (round-4 `/sse/registry` → `/s/registry` rename
+  fully propagated to docs + CHANGELOG).
+No new actionable docs findings; no follow-up items added.
