@@ -828,3 +828,32 @@ JSON-tool `:file` path. Closed the round-7-implementation-review/round-9
 Verification: focused kaocha `--focus extensions.dev-http-test/file-renderer-test`
 green — 1 test / 16 assertions / 0 failures; clj-kondo clean on the touched test
 file. No remaining unchecked follow-ups in steps.md.
+
+## Implementation review pass — 2026-06-16 — REVIEW_COMPLETE
+
+Full implementation-review pass over the dev-http extension src
+(`dev_http.clj` + the 11 platform nss + `dev/demo.clj`), the one sanctioned core
+touch (`psi.extension/submit-synthetic-prompt` in
+`components/agent-session/.../mutations/prompts.clj`), docs (`doc/dev-http.md`,
+README, CHANGELOG), and the test suites.
+
+Verified: design/AC fit; extension-isolation posture (integrant system + server
++ registry held only in the extension atom; HTTP handlers touch core state only
+via `:mutate-session`; no `:query` core reads needed); the
+`submit-synthetic-prompt` message shape (`:role "user"` / `:content` /
+`:timestamp` / `:source :extension`) mirrors the scheduler's
+`scheduled-user-message` and dispatches the same
+`:session/submit-synthetic-user-prompt` path with `:origin :mutations`; renderer
+/ router / registry / middleware / sse / util / tool / config code quality and
+single-source dedups (`util` response builders, `session-route-path`,
+`url-token-lines`); single-shot robustness (claim→inject→release ordering,
+synchronous `halt-key!` deref); the deliberate `:file` arbitrary-path vs
+`/assets` `..`-rejecting asymmetry (intended escape hatch per design); the
+platform-thin router (no content route hardcoded; `/s/registry` registered as a
+session route at `start!`).
+
+Outcome: extensions unit suite 18 tests / 138 assertions / 0 failures;
+integration 6 / 61 / 0; clj-kondo clean. No new actionable implementation-level
+issues found — the prior 6 implementation-review and 10 test-review rounds have
+resolved the dedup, robustness, and coverage classes. No non-compliance with the
+review instructions to report. No new steps.md follow-ups added.
