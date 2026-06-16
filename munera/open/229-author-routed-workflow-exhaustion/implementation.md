@@ -773,3 +773,25 @@ statechart/workflow-judge), definition-level handback/lifecycle, and the DI-6
 routing integration test remain narrow, behaviour-focused, and economical after
 the prior dedup/strengthening/exhaustion-at-cap passes; prior pass-1/pass-2
 follow-ups are not duplicated.
+
+## Test-shaper review pass 3 — follow-up executed (2026-06-16)
+
+Resolved the pass-3 item. Added to `assert-converged-standalone-surfaces-review-complete`
+(`workflow_delegate_review_step_live_test.clj`):
+`(is (str/includes? result-text reply-prefix) …)`. The `reply-prefix` is unique
+to the converged `final-summary` stub reply (non-final-summary stub replies are
+bare `PASS_STATUS: REVIEW_COMPLETE`), so the assertion now proves
+`:psi.workflow/result` carries the converged final-summary's text — giving the
+ordering/plumbing claim meaningful failure signal and matching the helper's
+docstring contract. The previously-unasserted `reply-prefix` axis now carries
+assertion meaning.
+
+Verification: `clj-paren-repair` + `clj-kondo` clean. Both call-site tests pass
+(`review-task-design-converged-…` 5/0/0, `review-task-plan-converged-…` 5/0/0;
++1 assertion each).
+
+Out of scope (pre-existing, untouched): in the same namespace,
+`delegate-review-task-implementation-completes-with-nullable-local-model-test`
+fails 3 assertions identically at HEAD (verified via `git stash`) — unrelated to
+this follow-up item (which targets only the converged-standalone helper); not
+addressed here.

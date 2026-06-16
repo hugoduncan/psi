@@ -173,7 +173,7 @@ Slices are independently committable; keep each commit `small`.
 
 ## Test-shaper review follow-ups — pass 3 (2026-06-16)
 
-- [ ] Tie the standalone result text to the converged `final-summary` step in
+- [x] Tie the standalone result text to the converged `final-summary` step in
       `assert-converged-standalone-surfaces-review-complete`
       (`workflow_delegate_review_step_live_test.clj`). The helper injects a
       per-call `reply-prefix` into the `final-summary` stub reply

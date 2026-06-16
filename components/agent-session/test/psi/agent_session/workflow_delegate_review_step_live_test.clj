@@ -75,7 +75,9 @@
                   "converged final-summary must be ordered last (DI-2)")
               (is (string? result-text))
               (is (= 1 (count (re-seq #"PASS_STATUS: REVIEW_COMPLETE" result-text)))
-                  "standalone result text is the converged final-summary's single REVIEW_COMPLETE line")))
+                  "standalone result text is the converged final-summary's single REVIEW_COMPLETE line")
+              (is (str/includes? result-text reply-prefix)
+                  "standalone result text is the converged final-summary's reply (prefix unique to that step), not some other step's bare REVIEW_COMPLETE")))
           (finally
             (context/shutdown-context! ctx))))
       (finally
