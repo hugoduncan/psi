@@ -68,9 +68,14 @@ a browser. An optional `route-id` gives a stable URL; re-registering an existing
 | `table`     | `{:headers [...] :rows [[...] ...]}` | an HTML table |
 | `vega`      | a Vega-Lite spec map | a chart (vendored Vega-Lite JS) |
 | `mermaid`   | a Mermaid source string | a diagram (vendored Mermaid JS) |
-| `hiccup`    | a hiccup tree — a vector/array or seq of elements (a bare string/scalar errors loudly, since hiccup would otherwise render it as literal text) | raw HTML (escape hatch) |
+| `hiccup`    | a hiccup tree — a vector/array or seq of elements | raw HTML (escape hatch) |
 | `file`      | `{:path "/abs/path"}` | the file served with a content-type by extension |
 | `choices`   | `{:prompt "…" :options ["A" "B"]}` (an option may also be a map `{:label "Shown" :value "submitted"}`) | a choice form (see below) |
+
+Each renderer **fails loud** on wrong-shaped `:data`: passing the wrong type
+(e.g. a Clojure-syntax string where a `hiccup` tree is meant) returns a `400`
+naming the renderer, the expected shape, and the actual type — rather than
+silently rendering literal text, an empty table, or a broken chart.
 
 Vega-Lite and Mermaid client JS are **vendored** and served locally from the
 extension (offline-safe; no CDN/network dependency).

@@ -2,7 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing use-fixtures]]
+   [clojure.test :refer [are deftest is testing use-fixtures]]
    [extensions.dev-http :as sut]
    [extensions.dev-http.choices :as choices]
    [extensions.dev-http.middleware :as mw]
@@ -243,6 +243,20 @@
         (is (re-find #"graph TD; A--&gt;B" (:body resp)))))
     (testing "an unknown renderer yields a 400"
       (is (= 400 (:status (renderers/render {:renderer :nope :data 1})))))))
+
+(deftest renderers-fail-loud-on-wrong-data-shape-test
+  (testing "each renderer rejects wrong-shaped data with a type-naming 400 rather than silent degradation"
+    (are [renderer data expected-type]
+         (let [resp (renderers/render {:renderer renderer :data data})]
+           (and (= 400 (:status resp))
+                (str/includes? (:body resp) (str ":" (name renderer)))
+                (str/includes? (:body resp) (str "got " expected-type))))
+      :markdown [:not "a string"]            "vector"
+      :table    "not a map"                  "string"
+      :vega     "not a map"                  "string"
+      :mermaid  [:not "a string"]            "vector"
+      :file     "not a map"                  "string"
+      :hiccup   "[:div]"                     "string")))
 
 (deftest file-renderer-test
   (testing ":file serves a disk artifact with a content-type from its extension"

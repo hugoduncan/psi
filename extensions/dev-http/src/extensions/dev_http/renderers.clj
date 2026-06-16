@@ -37,6 +37,39 @@
          (into [:body] body)])))
 
 ;;; ---------------------------------------------------------------------------
+;;; input validation — fail loud, never silently degrade
+;;;
+;;; Each renderer has an expected `data` shape. Passing the wrong shape (e.g. a
+;;; Clojure-syntax string where a hiccup tree is meant) must produce a loud,
+;;; type-naming 400 rather than empty/garbage/literal output that hides the
+;;; mistake.
+;;; ---------------------------------------------------------------------------
+
+(defn- value-type-name
+  [x]
+  (cond
+    (nil? x)     "nil"
+    (string? x)  "string"
+    (keyword? x) "keyword"
+    (number? x)  "number"
+    (boolean? x) "boolean"
+    (vector? x)  "vector"
+    (map? x)     "map"
+    :else        (.getName (class x))))
+
+(defn- value-preview
+  [x]
+  (let [s (pr-str x)]
+    (if (> (count s) 200) (str (subs s 0 200) "…") s)))
+
+(defn- type-error-response
+  [renderer-kw expected data]
+  (util/text-response
+   400
+   (str "400 :" (name renderer-kw) " data must be " expected ", got "
+        (value-type-name data) ": " (value-preview data))))
+
+;;; ---------------------------------------------------------------------------
 ;;; markdown
 ;;; ---------------------------------------------------------------------------
 
@@ -49,7 +82,9 @@
 
 (defn- render-markdown
   [{:keys [data]}]
-  (util/html-response (page "markdown" (h/raw (markdown->html data)))))
+  (if (string? data)
+    (util/html-response (page "markdown" (h/raw (markdown->html data))))
+    (type-error-response :markdown "a string" data)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; table
@@ -57,16 +92,18 @@
 
 (defn- render-table
   [{:keys [data]}]
-  (let [headers (kget data :headers "headers")
-        rows    (kget data :rows "rows")]
-    (util/html-response
-     (page "table"
-           [:table {:border "1" :cellpadding "4" :cellspacing "0"}
-            (when (seq headers)
-              [:thead [:tr (for [h headers] [:th (str h)])]])
-            [:tbody
-             (for [row rows]
-               [:tr (for [cell row] [:td (str cell)])])]]))))
+  (if-not (map? data)
+    (type-error-response :table "a map of {:headers [...] :rows [[...]]}" data)
+    (let [headers (kget data :headers "headers")
+          rows    (kget data :rows "rows")]
+      (util/html-response
+       (page "table"
+             [:table {:border "1" :cellpadding "4" :cellspacing "0"}
+              (when (seq headers)
+                [:thead [:tr (for [h headers] [:th (str h)])]])
+              [:tbody
+               (for [row rows]
+                 [:tr (for [cell row] [:td (str cell)])])]])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; hiccup escape hatch
@@ -85,34 +122,14 @@
 
     :else form))
 
-(defn- value-type-name
-  [x]
-  (cond
-    (nil? x)     "nil"
-    (string? x)  "string"
-    (keyword? x) "keyword"
-    (number? x)  "number"
-    (boolean? x) "boolean"
-    (map? x)     "map"
-    :else        (.getName (class x))))
-
-(defn- value-preview
-  [x]
-  (let [s (pr-str x)]
-    (if (> (count s) 200) (str (subs s 0 200) "…") s)))
-
 (defn- render-hiccup
   [{:keys [data]}]
   ;; A bare string/scalar is never a hiccup tree — hiccup would silently render
-  ;; it as a literal text node. Fail loud instead (e.g. a Clojure-syntax string
-  ;; passed by mistake). `sequential?` accepts vectors and seqs (a `for`
+  ;; it as a literal text node. `sequential?` accepts vectors and seqs (a `for`
   ;; result), rejects strings/maps/scalars.
   (if (sequential? data)
     (util/html-response (str (h/html (coerce-hiccup data))))
-    (util/text-response
-     400
-     (str "400 :hiccup data must be a hiccup tree (vector/array), got "
-          (value-type-name data) ": " (value-preview data)))))
+    (type-error-response :hiccup "a hiccup tree (vector/array or seq of elements)" data)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; file artifact
@@ -140,13 +157,15 @@
 
 (defn- render-file
   [{:keys [data]}]
-  (let [path (kget data :path "path")
-        f    (io/file (str path))]
-    (if (.isFile f)
-      {:status  200
-       :headers {"content-type" (content-type-for path)}
-       :body    f}
-      (util/text-response 404 (str "404 file not found: " path)))))
+  (if-not (map? data)
+    (type-error-response :file "a map of {:path \"/abs/path\"}" data)
+    (let [path (kget data :path "path")
+          f    (io/file (str path))]
+      (if (.isFile f)
+        {:status  200
+         :headers {"content-type" (content-type-for path)}
+         :body    f}
+        (util/text-response 404 (str "404 file not found: " path))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; vega-lite (vendored client JS)
@@ -154,15 +173,17 @@
 
 (defn- render-vega
   [{:keys [data]}]
-  (util/html-response
-   (page "vega"
-         [:div {:id "vega-view"}]
-         [:script {:src (str asset-prefix "/vega.min.js")}]
-         [:script {:src (str asset-prefix "/vega-lite.min.js")}]
-         [:script {:src (str asset-prefix "/vega-embed.min.js")}]
-         [:script
-          (h/raw
-           (str "vegaEmbed('#vega-view', " (json/generate-string data) ");"))])))
+  (if-not (map? data)
+    (type-error-response :vega "a Vega-Lite spec map" data)
+    (util/html-response
+     (page "vega"
+           [:div {:id "vega-view"}]
+           [:script {:src (str asset-prefix "/vega.min.js")}]
+           [:script {:src (str asset-prefix "/vega-lite.min.js")}]
+           [:script {:src (str asset-prefix "/vega-embed.min.js")}]
+           [:script
+            (h/raw
+             (str "vegaEmbed('#vega-view', " (json/generate-string data) ");"))]))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; mermaid (vendored client JS)
@@ -170,11 +191,13 @@
 
 (defn- render-mermaid
   [{:keys [data]}]
-  (util/html-response
-   (page "mermaid"
-         [:pre {:class "mermaid"} (str data)]
-         [:script {:src (str asset-prefix "/mermaid.min.js")}]
-         [:script (h/raw "mermaid.initialize({startOnLoad:true});")])))
+  (if-not (string? data)
+    (type-error-response :mermaid "a Mermaid diagram source string" data)
+    (util/html-response
+     (page "mermaid"
+           [:pre {:class "mermaid"} data]
+           [:script {:src (str asset-prefix "/mermaid.min.js")}]
+           [:script (h/raw "mermaid.initialize({startOnLoad:true});")]))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; dispatch
