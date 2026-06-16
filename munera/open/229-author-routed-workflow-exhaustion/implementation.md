@@ -879,3 +879,16 @@ DONE. Changed `CHANGELOG.md` `[Unreleased]` → Changed: `review-task-design`
 `:max-iterations 3` and `doc/workflows.md` "at most three total times").
 `review-task-plan` "5 total passes" left intact (matches `:max-iterations 5`).
 Docs-only edit; no code/test impact.
+
+## Docs review pass 3 (2026-06-16)
+
+ACTIONABLE (1 → steps.md). User-facing docs document only the *converged*
+standalone `/delegate review-task-design`/`-plan` result-text change; the
+*not-converged* standalone case (now empty result text — `final-summary-not-converged`
+is ordered before the never-run converged `final-summary`, which the
+`(last :step-order)` standalone path reads; previously a hard-fail) is
+documented nowhere. Design D5 "known degradation". Verified absent from
+`CHANGELOG.md` + `doc/workflows.md`. No other docs gaps: grammar/IR/concepts
+reference + workflows.md prose + CHANGELOG `:on-max-iterations`/handback entries
+match the EDN (design 3, plan 5, step names, PASS_STATUS strings, anchor link);
+README has no references to touch.

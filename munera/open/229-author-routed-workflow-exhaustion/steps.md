@@ -232,3 +232,31 @@ Slices are independently committable; keep each commit `small`.
       total passes" (the `review-task-plan` "5 total passes" in the same sentence
       is correct — EDN `:max-iterations 5` — and stays). Docs-review item 3
       (changelog accuracy) + item 5 (consistency).
+
+## Docs review follow-ups — pass 3 (2026-06-16)
+
+- [ ] Document the **not-converged standalone** `/delegate review-task-design` /
+      `/delegate review-task-plan` result-text behaviour change. Both
+      `CHANGELOG.md` (`[Unreleased]` → Changed) and `doc/workflows.md` document
+      only the **converged** standalone change ("converged final summaries now
+      also emit a `PASS_STATUS: REVIEW_COMPLETE` line, which changes their
+      standalone `/delegate` result text"). They omit the user-visible change to
+      the non-converging standalone case: the new
+      `final-summary-not-converged` step is ordered **before** the converged
+      `final-summary` (DI-2), so the standalone result-text path —
+      `execute-workflow-run`'s `(last :step-order)` — reads the never-run
+      converged `final-summary` and surfaces **empty** result text. Previously a
+      non-converging standalone review hard-failed with
+      `:reason :iteration-exhausted`; now it produces silent/empty output. This
+      is the design D5 "known degradation" (the non-convergence handback is a
+      lifecycle-only concern, consumed via the order-independent delegate-gate
+      reverse-scan), but it is documented nowhere user-facing — a user running a
+      standalone non-converging review gets no error and no summary. Add a brief
+      note (CHANGELOG Changed entry and/or the
+      `Author-routed loop exhaustion` / batch-review sections of
+      `doc/workflows.md`) that the `:on-max-iterations` handback summary surfaces
+      via the lifecycle gate, and that standalone non-converging
+      `review-task-design`/`-plan` runs currently yield empty result text.
+      Docs-review item 1 (changed behaviours reflected) + item 5 (consistency
+      with implementation / design D5). Distinct from the resolved converged
+      standalone items (tests + CHANGELOG converged-PASS_STATUS line).
