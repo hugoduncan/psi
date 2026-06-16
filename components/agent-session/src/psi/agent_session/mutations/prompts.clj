@@ -145,6 +145,28 @@
     {:psi.extension/prompt-accepted? accepted
      :psi.extension/prompt-delivery  delivery}))
 
+(pco/defmutation submit-synthetic-prompt
+  "Inject a mid-conversation user message into `session-id` and drive its next
+   turn immediately — the same canonical path the scheduler uses for delayed
+   prompts (`:session/submit-synthetic-user-prompt`), distinct from the
+   `send-prompt` delivery path. `user-msg` is plain text; this wraps it in a
+   canonical user message record. Intended for extension-driven genuine user
+   input (e.g. a dev-http choice submission)."
+  [_ {:keys [psi/agent-session-ctx session-id user-msg source]}]
+  {::pco/op-name 'psi.extension/submit-synthetic-prompt
+   ::pco/params  [:psi/agent-session-ctx :session-id :user-msg]
+   ::pco/output  [:psi.extension/prompt-submitted?]}
+  (let [message {:role      "user"
+                 :content   [{:type :text :text (str user-msg)}]
+                 :timestamp (java.time.Instant/now)
+                 :source    (or source :extension)}
+        {:keys [submitted?]}
+        (dispatch/dispatch! agent-session-ctx
+                            :session/submit-synthetic-user-prompt
+                            {:session-id session-id :user-msg message}
+                            {:origin :mutations})]
+    {:psi.extension/prompt-submitted? (boolean submitted?)}))
+
 (def all-mutations
   [add-prompt-template
    reload-prompts
@@ -152,4 +174,5 @@
    register-prompt-contribution
    update-prompt-contribution
    unregister-prompt-contribution
-   send-prompt])
+   send-prompt
+   submit-synthetic-prompt])
