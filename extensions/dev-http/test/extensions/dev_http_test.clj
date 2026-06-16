@@ -112,6 +112,13 @@
           paths  (map first loaded)]
       (is (some #{"/demo"} paths)))))
 
+(deftest routes-from-resource-jar-safety-test
+  (testing "absent dev source path (nil resource) yields no routes"
+    (is (= [] (routes/routes-from-resource nil))))
+  (testing "non-file (jar:) URL yields no routes — never scans inside a jar"
+    (is (= [] (routes/routes-from-resource
+               (java.net.URL. "jar:file:/tmp/app.jar!/extensions/dev_http/dev"))))))
+
 ;; ---------------------------------------------------------------------------
 ;; renderers (Slice 2) — pure content-map → ring response
 ;; ---------------------------------------------------------------------------
@@ -465,14 +472,26 @@
     (testing "stop halts the server"
       (is (= "dev-http not running" (sut/status-text))))
     (testing "AC-1: restart leaves no orphaned server"
-      (let [s1 (sut/start!)]
+      (let [s1   (sut/start!)
+            url1 (str "http://" (:host s1) ":" (:port s1)
+                      "/demo?token=" (:token s1))]
         (try
-          (is (= 200 (get-status (str "http://" (:host s1) ":" (:port s1)
-                                      "/demo?token=" (:token s1)))))
+          (is (= 200 (get-status url1)))
           (let [s2 (sut/start!)]
             (is (pos? (:port s2)))
             (is (= 200 (get-status (str "http://" (:host s2) ":" (:port s2)
-                                        "/demo?token=" (:token s2))))))
+                                        "/demo?token=" (:token s2)))))
+            ;; The prior server must actually be gone — not merely supplanted.
+            ;; If the new launch re-bound the *same* ephemeral port, that itself
+            ;; proves the old server released it. Otherwise the old URL must no
+            ;; longer serve (its listening socket was closed by synchronous
+            ;; halt). Without one of these, a regression that stopped halting the
+            ;; prior `:system` would leave s1 still listening yet pass the suite.
+            (if (= (:port s1) (:port s2))
+              (is (= (:port s1) (:port s2))
+                  "old ephemeral port was freed and re-bound — prior server released it")
+              (is (not= 200 (get-status url1))
+                  "prior server halted — its old URL no longer serves")))
           (finally
             (sut/stop!)))))))
 

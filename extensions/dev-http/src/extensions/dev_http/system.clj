@@ -48,4 +48,9 @@
 (defmethod ig/halt-key! :dev-http/server
   [_ {:keys [server]}]
   (when server
-    (http/server-stop! server)))
+    ;; `server-stop!` returns a promise delivered once the server thread
+    ;; completes (and the listening socket is released). Deref it so halt is
+    ;; synchronous: a restart cannot leave the prior server still bound to its
+    ;; port (AC-1, no orphaned server).
+    (when-let [stopped (http/server-stop! server)]
+      @stopped)))

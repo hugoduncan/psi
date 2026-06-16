@@ -440,7 +440,7 @@ the next begins.
 
 ## Test review follow-ups (round 2)
 
-- [ ] AC-1 "no orphaned server on reload/restart" is asserted in name only. The
+- [x] AC-1 "no orphaned server on reload/restart" is asserted in name only. The
       `lifecycle-and-serving-test` "AC-1: restart leaves no orphaned server"
       block starts `s1`, asserts it serves, starts `s2`, then asserts only that
       `s2` serves on a positive port — it never asserts that `s1`'s prior server
@@ -454,8 +454,17 @@ the next begins.
       ports differ, that a request to `s1`'s old `…:port1/demo?token=…` URL no
       longer succeeds (connection refused / non-200). Without one of these the
       AC-1 no-orphan behaviour has no regression guard.
+      Done: strengthened the block — captured `s1`'s `url1`, and after the
+      second `start!` it asserts the disjunction (same re-bound port ⇒ released;
+      else the old `url1` no longer serves 200). For the differing-port branch
+      to be deterministic the prior server must be fully released *before* the
+      assertion, so `:dev-http/server` `halt-key!` now derefs the
+      `server-stop!` promise (delivered once the server thread completes and the
+      listening socket closes) — making halt synchronous and genuinely
+      strengthening the AC-1 no-orphan guarantee, not just the test. Integration
+      suite green (4 tests, 40 assertions).
 
-- [ ] (Low) `routes/load-persisted-routes` jar-safety / absent-dev-path branch
+- [x] (Low) `routes/load-persisted-routes` jar-safety / absent-dev-path branch
       is untested. The function's documented robustness behaviour — "Returns an
       empty vector when the dev source path is absent (e.g. running from a jar)"
       / "never ships in a published jar" — is the `:else` branch of
@@ -470,3 +479,10 @@ the next begins.
       `(routes-from-resource url)` taking the resolved `URL`/nil) and assert it
       returns `[]` for `nil` and for a non-`file` (e.g. `jar:`) URL, while
       `load-persisted-routes` keeps the real `io/resource` lookup.
+      Done: extracted the resource → routes decision into a pure public
+      `routes/routes-from-resource` taking the resolved `URL`/nil;
+      `load-persisted-routes` is now just
+      `(routes-from-resource (io/resource dev-resource-root))`, keeping the real
+      lookup. Added `routes-from-resource-jar-safety-test` asserting `[]` for
+      `nil` and for a `jar:file:/…!/…` URL (non-`file` protocol). Unit suite
+      green (17 tests, 118 assertions); clj-kondo clean.

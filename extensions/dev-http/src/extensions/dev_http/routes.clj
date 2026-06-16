@@ -34,16 +34,24 @@
     (let [r @v]
       (when (seq r) r))))
 
+(defn routes-from-resource
+  "Given a resolved dev-source-root `url` (or `nil`), require each route
+   namespace under it and return a flat vector of reitit routes (each
+   `[path data]`). Returns an empty vector when `url` is `nil` or does not use
+   the `file` protocol (e.g. a `jar:` URL when running from a published jar),
+   so route loading never scans or throws inside a jar."
+  [url]
+  (if (and url (= "file" (.getProtocol ^java.net.URL url)))
+    (let [root-dir (io/file (.toURI url))]
+      (->> (clj-files root-dir)
+           (map (fn [f] (file->ns-sym root-dir f)))
+           (mapcat ns-routes)
+           vec))
+    []))
+
 (defn load-persisted-routes
   "Scan the extension-local `dev/` source path, require each route namespace,
    and return a flat vector of reitit routes (each `[path data]`). Returns an
    empty vector when the dev source path is absent (e.g. running from a jar)."
   []
-  (let [url (io/resource dev-resource-root)]
-    (if (and url (= "file" (.getProtocol url)))
-      (let [root-dir (io/file (.toURI url))]
-        (->> (clj-files root-dir)
-             (map (fn [f] (file->ns-sym root-dir f)))
-             (mapcat ns-routes)
-             vec))
-      [])))
+  (routes-from-resource (io/resource dev-resource-root)))

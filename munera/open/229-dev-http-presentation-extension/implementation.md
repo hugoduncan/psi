@@ -505,3 +505,31 @@ restart leaves no orphaned server" asserts only that the *new* server serves, no
 that the prior server was halted, so the no-orphan behaviour (the whole point of
 AC-1's reload clause and R2) has no regression guard. Both findings are
 test-coverage gaps, not behaviour defects.
+
+## Test review (round 2) follow-ups executed — 2026-06-15
+
+Both round-2 findings resolved.
+
+- **AC-1 no-orphan claim now has a real regression guard.** Strengthened the
+  `lifecycle-and-serving-test` "AC-1: restart leaves no orphaned server" block:
+  it captures `s1`'s URL and, after the second `start!`, asserts the disjunction
+  — either the same ephemeral port was re-bound (proof the prior server released
+  it) or, when the ports differ, `s1`'s old URL no longer serves 200. For the
+  differing-port branch to be deterministic the prior listening socket must be
+  closed *before* the assertion runs. The async fire-and-forget halt made that
+  flaky, so `:dev-http/server` `halt-key!` now derefs the `server-stop!` promise
+  (http-kit 2.8.0: "a Promise delivered once server thread actually completes").
+  This makes halt synchronous — a restart cannot leave the prior server bound —
+  which genuinely strengthens the AC-1 guarantee, not merely the test. The same
+  synchronous halt also removes any restart race in `start!` (which calls
+  `stop!` first).
+- **`load-persisted-routes` jar-safety branch now tested.** Extracted the
+  resource → routes decision into pure public `routes/routes-from-resource`
+  (takes the resolved `URL`/nil); `load-persisted-routes` keeps the real
+  `io/resource` lookup and delegates. New `routes-from-resource-jar-safety-test`
+  asserts `[]` for `nil` and for a `jar:file:…` URL (non-`file` protocol),
+  guarding the documented "never scans inside a jar" behaviour.
+
+Verification: integration suite green (4 tests / 40 assertions), extensions/unit
+suite green (17 tests / 118 assertions); clj-kondo clean across the touched
+src + test files.
