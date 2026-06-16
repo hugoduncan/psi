@@ -315,3 +315,22 @@ the next begins.
       and counts alongside the added `live-1`). Docs (`doc/dev-http.md`),
       CHANGELOG, and `plan.md` Slice 4 updated to `/s/registry` and the
       platform/content split note.
+
+## Implementation review follow-ups (round 5)
+
+- [ ] Add test coverage for the `dev-present` tool threading `:session-id` from
+      its `:execute` `opts` into the registered content map
+      (`extensions/dev-http/src/extensions/dev_http/tool.clj` line ~66:
+      `:session-id (:session-id opts)`). This wiring is the mechanism that makes
+      a model-registered `:choices` route target the **invoking session only**
+      (AC-6 "the originating session"; design §Interaction "Routes target the
+      invoking session only"). It is currently untested: `dev-present-tool-test`
+      passes `{}` as `opts` and asserts `[:content :renderer]`/`[:content :data]`/
+      `:route-id` but never `[:content :session-id]`, and the choices integration
+      test (`choices-interaction-loop-test`) calls `register-content-route!`
+      directly with an explicit `:session-id`, bypassing the tool. So no test
+      proves the model-callable surface routes a choice back to the originating
+      session. Extend `dev-present-tool-test` to execute with
+      `opts {:session-id "sess-x"}` and assert the captured content carries
+      `:session-id "sess-x"` (ideally with `renderer "choices"`), and that an
+      absent opts session-id threads `nil` rather than fabricating one.

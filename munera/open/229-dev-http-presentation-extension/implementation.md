@@ -353,3 +353,21 @@ Resolved both round-4 dedup/consistency + platform/content follow-ups:
   green (3 tests / 34 assertions); clj-kondo clean across extension src/test.
   No behaviour change beyond the feed URL (`/sse/registry` → `/s/registry`) and
   the self-counting snapshot.
+
+## Implementation review (round 5) — 2026-06-15
+
+Re-verified green: extensions suite (15 tests / 88 assertions), integration
+(3/34); clj-kondo clean across extension src/dev/test + the core
+`submit-synthetic-prompt` mutation. Code matches design and follows the
+architecture (reads via api, writes only via `:mutate-session`; live integrant
+system + registry in the extension's own atom; one sanctioned core touch; every
+dynamic subtree token-gated, assets ungated by documented decision). Verified
+the core mutation's user-message record shape matches the scheduler's
+`scheduled-user-message` canonical shape (`:role`/`:content`/`:timestamp`/
+`:source`). Docs/changelog/README/state present.
+
+One new actionable test-coverage gap filed (round 5): the `dev-present` tool's
+`:session-id`-from-`opts` threading — the invoking-session-only mechanism for the
+model-callable `:choices` surface (AC-6) — is unverified (tool test passes empty
+opts; the choices integration test bypasses the tool via `register-content-route!`).
+No correctness/behaviour defect found in the implementation itself.
