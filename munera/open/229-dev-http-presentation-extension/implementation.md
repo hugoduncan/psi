@@ -266,3 +266,36 @@ handler claims the single-shot flag before the `:mutate-session` injection and
 ignores its result, unconditionally showing a success page — latent
 zero-injection-on-failure / false-success gap touching AC-6. Non-blocking,
 dev-only severity; details and mitigation options in steps.md.
+
+## Implementation review follow-ups (round 3) executed — 2026-06-15
+
+Resolved the one round-3 robustness follow-up (choice-submit result/ordering gap):
+
+- **`choices.clj` POST branch is now result-aware.** Replaced the
+  fire-and-forget `(:mutate-session …)` + unconditional success page with
+  `inject-choice!` (try-wrapped; returns true only for a truthy
+  `:psi.extension/prompt-submitted?`, false on throw or falsey result). On
+  failure the handler calls the new `release-claim!` (reverts the single-shot
+  `:answered?`/`:answer` on the registry entry) and renders `failed-page`
+  ("Could not record your choice — please try again.").
+- **Ordering trade-off resolved, not merely documented.** Kept claim-first
+  ordering (so concurrent in-flight submissions still see "already answered" per
+  AC-7) but made it *reversible on failure*: a submission that injects zero user
+  messages no longer consumes the single-shot. Net invariants:
+  AC-6 — a "Recorded" page now implies a real injection; AC-7 — only a
+  *successful* injection latches the answered flag, so at most one user message
+  is ever injected per prompt; a failed attempt is retryable.
+- **Nullable api now models the real mutation contract.** `default-mutate-fn`
+  returned `{}` for unhandled mutations, so a result-aware handler would have
+  read `prompt-submitted?` as nil over the real server. Added
+  `'psi.extension/submit-synthetic-prompt → {:psi.extension/prompt-submitted? true}`
+  to `mutation-handlers` (`components/extension-test-helpers`), so the integration
+  loop test exercises the success path accurately (recording into `:mutations`
+  is unchanged — it happens before the handler runs).
+- **Tests:** new unit `choices-failed-injection-releases-claim-test` covers the
+  falsey-result path (failure page + claim released → a subsequent submission
+  succeeds and latches) and the throwing-mutation path (failure page + claim
+  released). Existing AC-6/AC-7 unit + integration loop unchanged.
+- Verification: extensions suite green (15 tests / 88 assertions), integration
+  green (3 tests / 34 assertions), nullable-api-test green (3/6); clj-kondo clean
+  across `choices.clj`, the test ns, and the nullable api.

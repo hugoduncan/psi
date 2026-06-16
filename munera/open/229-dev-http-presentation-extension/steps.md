@@ -223,7 +223,7 @@ the next begins.
 
 ## Implementation review follow-ups (round 3)
 
-- [ ] Choice-submit result/ordering robustness gap
+- [x] Choice-submit result/ordering robustness gap
       (`extensions/dev-http/src/extensions/dev_http/choices.clj`,
       `make-handler` POST branch). The handler commits the single-shot
       answered flag via `claim-answer!` **before** calling
@@ -244,3 +244,16 @@ the next begins.
       page plus claim-before-effect ordering is a latent robustness gap. If the
       claim-first ordering is retained deliberately (favouring AC-7), document
       that trade-off and the accepted failure mode at the call site.
+      Done: the POST branch now inspects the mutation result via `inject-choice!`
+      (try-wrapped; throw or falsey `:psi.extension/prompt-submitted?` ⇒ false)
+      and, on failure, calls `release-claim!` to revert the single-shot flag and
+      renders a `failed-page` ("try again") instead of a false success. A failed
+      injection therefore injects zero user messages **and** does not consume the
+      single-shot (preserving AC-6: a success page implies a real injection; and
+      AC-7: only a successful injection latches the answered flag, so at most one
+      user message is ever injected). The nullable extension api now models the
+      real mutation contract (`submit-synthetic-prompt` →
+      `{:psi.extension/prompt-submitted? true}`) so the result-aware handler is
+      exercised over the real server. New unit tests cover the falsey-result
+      (claim released → retry succeeds) and throwing-mutation (claim released)
+      paths.

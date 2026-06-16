@@ -78,6 +78,37 @@
                                          (assoc entry :answered? true :answer answer))))))]
     (not (:answered? (get old route-id)))))
 
+(defn- release-claim!
+  "Revert a won-but-uninjected claim on `route-id` so the choice can be retried.
+   Called only when the synthetic-prompt injection failed, so the single-shot is
+   not consumed by a submission that injected zero user messages (AC-6/AC-7)."
+  [registry-atom route-id]
+  (swap! registry-atom
+         (fn [m]
+           (if-let [entry (get m route-id)]
+             (assoc m route-id (dissoc entry :answered? :answer))
+             m))))
+
+(defn- inject-choice!
+  "Inject the won choice into the origin session via the
+   `psi.extension/submit-synthetic-prompt` mutation. Returns true iff the
+   mutation reports the prompt was submitted; a throw or falsey
+   `:psi.extension/prompt-submitted?` ⇒ false so the caller can release the
+   single-shot claim and surface a failure page instead of a false success."
+  [api session-id answer]
+  (try
+    (boolean
+     (:psi.extension/prompt-submitted?
+      ((:mutate-session api) session-id
+                             'psi.extension/submit-synthetic-prompt
+                             {:user-msg answer})))
+    (catch Throwable _ false)))
+
+(defn- failed-page
+  []
+  (renderers/page "choices"
+                  [:p "Could not record your choice — please try again."]))
+
 (defn make-handler
   "Build the ring handler for a `:choices` route. Closes over the `registry`
    atom, `route-id`, origin `session-id`, the api map (`:mutate-session`), and
@@ -92,11 +123,14 @@
            :body "400 missing choice"}
 
           (claim-answer! registry route-id answer)
-          (do
-            ((:mutate-session api) session-id
-                                   'psi.extension/submit-synthetic-prompt
-                                   {:user-msg answer})
-            (text-response (thanks-page answer)))
+          (if (inject-choice! api session-id answer)
+            (text-response (thanks-page answer))
+            (do
+              ;; Injection failed → the route injected zero user messages, so
+              ;; do not consume the single-shot: release the claim so the choice
+              ;; can be retried, and report failure rather than a false success.
+              (release-claim! registry route-id)
+              (text-response (failed-page))))
 
           :else
           (text-response (answered-page answer))))

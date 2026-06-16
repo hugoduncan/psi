@@ -97,9 +97,12 @@ browser. On submission:
    `:session/submit-synthetic-user-prompt`) — which drives the agent's next turn
    immediately.
 
-A `:choices` route is **single-shot**: once a decision is submitted, further
-submissions are rejected ("already answered"), and exactly one user message is
-injected per prompt. Choices target the **invoking session only**.
+A `:choices` route is **single-shot**: once a decision is *successfully*
+submitted, further submissions are rejected ("already answered"), and exactly
+one user message is injected per prompt. If the injection fails (the mutation
+throws or reports it was not submitted) no user message is injected, the page
+reports the failure, and the choice can be retried — a failed submission does
+not consume the single-shot. Choices target the **invoking session only**.
 
 Presentation is out-of-band (like logging/UI projection) and excluded from the
 event log; only the choice-submission mutation enters the log, preserving replay

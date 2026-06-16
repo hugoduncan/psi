@@ -278,6 +278,59 @@
                                             :content    content})]
         (is (= 400 (:status (handler2 {:request-method :post :body ""}))))))))
 
+(defn- result-api
+  "A `:mutate-session` api that records the call and returns `result-fn`'s value
+   (or throws when `result-fn` throws)."
+  [submitted result-fn]
+  {:mutate-session (fn [session-id op params]
+                     (swap! submitted conj {:session-id session-id :op op :params params})
+                     (result-fn))})
+
+(deftest choices-failed-injection-releases-claim-test
+  ;; AC-6/AC-7 robustness: a failed synthetic-prompt injection must NOT consume
+  ;; the single-shot (zero user messages were injected) and must NOT report a
+  ;; false success. The claim is released so the choice can be retried.
+  (let [content {:renderer   :choices
+                 :data       {:prompt "Pick one" :options ["A" "B"]}
+                 :session-id "sess-1"}]
+    (testing "a falsey prompt-submitted? renders a failure page and releases the claim"
+      (let [reg       (registry/create-registry)
+            submitted (atom [])
+            outcome   (atom {:psi.extension/prompt-submitted? false})
+            handler   (choices/make-handler {:registry   reg
+                                             :route-id   "c1"
+                                             :session-id "sess-1"
+                                             :api        (result-api submitted (fn [] @outcome))
+                                             :content    content})]
+        (registry/register-entry! reg "c1" {})
+        (let [resp (handler {:request-method :post :body "choice=A"})]
+          (is (= 200 (:status resp)))
+          (is (re-find #"try again" (:body resp)))
+          (is (not (re-find #"Recorded" (:body resp))))
+          (is (= 1 (count @submitted)))
+          (testing "claim released → not marked answered, retry can succeed"
+            (is (not (:answered? (registry/get-entry reg "c1"))))
+            (reset! outcome {:psi.extension/prompt-submitted? true})
+            (let [resp2 (handler {:request-method :post :body "choice=A"})]
+              (is (re-find #"Recorded" (:body resp2)))
+              (is (= 2 (count @submitted)))
+              (is (:answered? (registry/get-entry reg "c1"))))))))
+    (testing "a throwing mutation renders a failure page and releases the claim"
+      (let [reg       (registry/create-registry)
+            submitted (atom [])
+            handler   (choices/make-handler {:registry   reg
+                                             :route-id   "c1"
+                                             :session-id "sess-1"
+                                             :api        (result-api
+                                                          submitted
+                                                          (fn [] (throw (ex-info "boom" {}))))
+                                             :content    content})]
+        (registry/register-entry! reg "c1" {})
+        (let [resp (handler {:request-method :post :body "choice=A"})]
+          (is (= 200 (:status resp)))
+          (is (re-find #"try again" (:body resp)))
+          (is (not (:answered? (registry/get-entry reg "c1")))))))))
+
 ;; ---------------------------------------------------------------------------
 ;; SSE live-updates (Slice 4)
 ;; ---------------------------------------------------------------------------
