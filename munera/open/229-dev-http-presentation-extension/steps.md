@@ -94,28 +94,37 @@ the next begins.
 
 ## Slice 3 — Choice interaction loop
 
-- [ ] Core mutation: add `psi.extension/submit-synthetic-prompt` in
+- [x] Core mutation: add `psi.extension/submit-synthetic-prompt` in
       `components/agent-session` mutations (thin wrapper dispatching
       `:session/submit-synthetic-user-prompt` with `{:session-id … :user-msg …}`,
       returning `{:psi.extension/prompt-submitted? …}`); add to `all-mutations`.
-      Keep it minimal — no new semantics (R4).
-- [ ] Core mutation test (agent-session): wrapper injects a mid-conversation
-      **user** message into the target session and reports submitted? (mirror the
-      scheduler/prompt-lifecycle test style).
-- [ ] `dev_http/choices.clj`: `:choices` renderer emits a token-gated form
-      POSTing the selection to the route's submit endpoint.
-- [ ] Submit handler: read via `:query-session`, write via `:mutate-session`
-      calling `psi.extension/submit-synthetic-prompt`; capture origin session-id
-      from the registry entry (invoking-session-only).
-- [ ] Single-shot guard: store `{:answered? true :answer …}` in the registry
-      entry on first successful submit; second submit → "already answered" page,
-      no second injection.
-- [ ] Tests: submitting a `:choices` form injects exactly one user message into
-      the originating session and drives its next turn (AC-6); second submission
-      rejected, at most one injection (AC-7); handler uses only `:query`/`:mutate`
-      api (AC-9).
-- [ ] Focused Scry green; clj-kondo clean.
-- [ ] Commit: `⚒ 229: choice interaction loop (submit-synthetic mutation + single-shot)`.
+      Wraps plain text in a canonical user message record; dispatches with
+      `:origin :mutations`. Kept minimal — no new semantics (R4).
+- [x] Core mutation test (agent-session): wrapper injects a mid-conversation
+      **user** message into the target session and reports submitted? (drives the
+      downstream turn deterministically via the `:execute-prepared-request-fn`
+      ctx seam — no network).
+- [x] `dev_http/choices.clj`: `:choices` renderer emits a token-gated form
+      POSTing the selection back to `/s/:route-id` (method-dispatched handler).
+- [x] Submit handler: write via `:mutate-session` calling
+      `psi.extension/submit-synthetic-prompt`; origin session-id captured at
+      registration time (from the `dev-present` tool `opts`/`register-content!`,
+      invoking-session-only).
+- [x] Single-shot guard: store `{:answered? true :answer …}` in the registry
+      entry on first successful submit (atomic `claim-answer!`); second submit →
+      "already answered" page, no second injection.
+- [x] Tests: submitting a `:choices` form injects exactly one user message into
+      the originating session (AC-6); second submission rejected, at most one
+      injection (AC-7); handler writes only via `:mutate-session` (AC-9). Unit
+      handler test + real-server integration loop (nullable api records the
+      mutation).
+- [x] Focused Scry green; clj-kondo clean.
+- [x] Commit: `⚒ 229: choice interaction loop (submit-synthetic mutation + single-shot)`.
+
+  Note (R8 resolved): no `:allowed-events` declaration needed — the submit path
+  is a Pathom mutation (`:mutate-session`), and its inner core dispatch uses
+  `:origin :mutations`; the permission interceptor only gates `:origin :extension`
+  dispatches.
 
 ## Slice 4 — SSE live-updates
 

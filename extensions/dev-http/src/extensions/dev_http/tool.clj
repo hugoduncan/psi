@@ -7,9 +7,14 @@
    [extensions.dev-http.renderers :as renderers]
    [psi.tool-runtime.call-summary :as call-summary]))
 
+(def ^:private supported-renderers
+  "Renderers the model may target: the pure render set plus the interactive
+   `:choices` primitive (rendered/handled per-request at the route layer)."
+  (conj renderers/renderer-keys :choices))
+
 (defn- renderer-names
   []
-  (sort (map name renderers/renderer-keys)))
+  (sort (map name supported-renderers)))
 
 (def ^:private parameters
   {:type       "object"
@@ -21,7 +26,8 @@
                                               "table → {headers, rows}; "
                                               "vega → a Vega-Lite spec; "
                                               "hiccup → a hiccup tree; "
-                                              "file → {path}.")}
+                                              "file → {path}; "
+                                              "choices → {prompt, options}.")}
                 "route-id" {:type        "string"
                             :description "Optional stable route id; re-registering replaces it"}}
    :required   ["renderer" "data"]})
@@ -43,19 +49,21 @@
    :parameters     parameters
    :format-request (call-summary/text-key-format-request "dev-present" "renderer")
    :execute
-   (fn [args _opts]
+   (fn [args opts]
      (let [renderer (some-> (get args "renderer") str/trim not-empty keyword)
            data     (get args "data")
            route-id (or (not-empty (str/trim (str (get args "route-id"))))
                         (gen-route-id))]
        (cond
-         (not (contains? renderers/renderer-keys renderer))
+         (not (contains? supported-renderers renderer))
          {:content  (str "Unknown renderer: " (pr-str (get args "renderer"))
                          ". Supported: " (str/join ", " (renderer-names)) ".")
           :is-error true}
 
          :else
-         (if-let [url (register-content! route-id {:renderer renderer :data data})]
+         (if-let [url (register-content! route-id {:renderer   renderer
+                                                   :data       data
+                                                   :session-id (:session-id opts)})]
            {:content  (str "Registered route '" route-id "'. Open: " url)
             :is-error false}
            {:content  "dev-http server is not running; run /dev-http start first."

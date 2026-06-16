@@ -108,3 +108,53 @@ Append-only local memory of in-flight decisions and discoveries.
   (11 tests / 60 assertions) and `… integration …` (1 test / 20 assertions,
   real boot incl. AC-3 content route + AC-5 ungated wire fetch) both green;
   clj-kondo clean across src/test.
+
+## Slice 3 — Choice interaction loop (2026-06-16)
+
+- **Core mutation (the one sanctioned core touch):**
+  `psi.extension/submit-synthetic-prompt` added to
+  `components/agent-session/.../mutations/prompts.clj` + `all-mutations`. It
+  wraps plain `user-msg` text in a canonical user message record
+  (`{:role "user" :content [{:type :text :text …}] :timestamp (Instant/now)
+  :source :extension}`) and dispatches `:session/submit-synthetic-user-prompt`
+  with `{:origin :mutations}`, returning `{:psi.extension/prompt-submitted? …}`.
+  Distinct from `send-prompt` (which uses the `deliver-extension-prompt!` path).
+- **R8 resolved — no `:allowed-events` needed.** The permission interceptor
+  (`dispatch.clj`) gates only `:origin :extension` dispatches. The extension
+  reaches the mutation through the api `:mutate-session` (a Pathom mutation, not
+  an extension-origin event), and the mutation's inner dispatch carries
+  `:origin :mutations`. So the synthetic-prompt path is not permission-gated and
+  the extension needs no event-permission declaration.
+- **Core mutation test** drives the *downstream* AI turn through the
+  `:execute-prepared-request-fn` ctx seam (testing-without-mocks: inject a
+  nullable executor on ctx, not a `with-redefs` of the boundary var) returning a
+  canonical stub assistant message — deterministic, no network. Asserts exactly
+  one injected `user`/`:extension` message with the submitted text + canonical
+  lifecycle events in the event log.
+- **`dev_http/choices.clj`:** one method-dispatched ring handler per choices
+  route. GET renders a token-gated `<form method=post action="/s/<id>?token=…">`
+  (token read per-request via `mw/request-token`); POST parses `choice=` from the
+  urlencoded body, runs the single-shot `claim-answer!`, and on first win calls
+  `((:mutate-session api) session-id 'psi.extension/submit-synthetic-prompt
+  {:user-msg answer})`.
+- **Single-shot guard (LOCKED design choice):** the answered flag lives in the
+  session-route **registry entry** (`{:answered? true :answer …}`), set
+  atomically inside one `swap!` on the registry atom. Second submit → "already
+  answered" page, no second injection. (Localhost single-user; R6 accepted.)
+- **Origin session-id capture:** the `dev-present` tool reads `(:session-id opts)`
+  from its `:execute` opts (confirmed `execute-tool-runtime-in!` threads
+  `:session-id` into tool opts) and threads it into the content map; the
+  entry-point `content-handler` builds the choices handler closing over it
+  (invoking-session-only).
+- **`body-string` accepts String *or* InputStream** — `slurp` on a raw String
+  treats it as a filename, which broke the unit handler test; the real http-kit
+  body is an InputStream. Guarded both.
+- **`:choices` is in the tool's supported set but NOT in `renderers/render`** —
+  it is interactive and needs per-request context (token/route-id/session-id), so
+  it is handled at the route layer (`content-handler` branch), not the pure
+  renderer map. `tool/supported-renderers` = `renderers/renderer-keys ∪ {:choices}`.
+- Verification: `clojure -M:test extensions --focus extensions.dev-http-test`
+  (12 tests / 75 assertions) + `… integration …` (2 tests / 29 assertions, real
+  GET-form → POST-choice → captured mutation → single-shot loop) + agent-session
+  `submit-synthetic-prompt-mutation-test` (1 test / 6 assertions) all green;
+  clj-kondo clean.

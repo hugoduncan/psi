@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.dev-http :as sut]
+   [extensions.dev-http.choices :as choices]
    [extensions.dev-http.middleware :as mw]
    [extensions.dev-http.registry :as registry]
    [extensions.dev-http.renderers :as renderers]
@@ -226,6 +227,57 @@
       (is (re-find #"not running" (:content result))))))
 
 ;; ---------------------------------------------------------------------------
+;; choice interaction loop (Slice 3) — handler in isolation
+;; ---------------------------------------------------------------------------
+
+(defn- capturing-api
+  [submitted]
+  {:mutate-session (fn [session-id op params]
+                     (swap! submitted conj {:session-id session-id :op op :params params})
+                     {:psi.extension/prompt-submitted? true})})
+
+(deftest choices-handler-test
+  (let [reg       (registry/create-registry)
+        submitted (atom [])
+        content   {:renderer   :choices
+                   :data       {:prompt "Pick one" :options ["A" "B"]}
+                   :session-id "sess-1"}
+        handler   (choices/make-handler {:registry   reg
+                                         :route-id   "c1"
+                                         :session-id "sess-1"
+                                         :api        (capturing-api submitted)
+                                         :content    content})]
+    (registry/register-entry! reg "c1" {})
+    (testing "GET renders a token-gated form posting back to the route"
+      (let [resp (handler {:request-method :get :query-string "token=tok"})]
+        (is (= 200 (:status resp)))
+        (is (re-find #"Pick one" (:body resp)))
+        (is (re-find #"action=\"/s/c1\?token=tok\"" (:body resp)))
+        (is (re-find #"value=\"A\"" (:body resp)))
+        (is (re-find #"value=\"B\"" (:body resp)))))
+    (testing "AC-6: a submission injects exactly one user message into the origin session"
+      (let [resp (handler {:request-method :post :body "choice=A"})]
+        (is (= 200 (:status resp)))
+        (is (re-find #"Recorded" (:body resp)))
+        (is (= 1 (count @submitted)))
+        (is (= "sess-1" (:session-id (first @submitted))))
+        (is (= 'psi.extension/submit-synthetic-prompt (:op (first @submitted))))
+        (is (= "A" (:user-msg (:params (first @submitted)))))))
+    (testing "AC-7: single-shot — a second submission is rejected, no second injection"
+      (let [resp (handler {:request-method :post :body "choice=B"})]
+        (is (= 200 (:status resp)))
+        (is (re-find #"Already answered" (:body resp)))
+        (is (= 1 (count @submitted)))))
+    (testing "a blank choice is a 400"
+      (let [reg2     (registry/create-registry)
+            handler2 (choices/make-handler {:registry   reg2
+                                            :route-id   "c2"
+                                            :session-id "sess-1"
+                                            :api        (capturing-api (atom []))
+                                            :content    content})]
+        (is (= 400 (:status (handler2 {:request-method :post :body ""}))))))))
+
+;; ---------------------------------------------------------------------------
 ;; lifecycle (integration — real ephemeral-port http-kit server)
 ;; ---------------------------------------------------------------------------
 
@@ -292,3 +344,42 @@
                                         "/demo?token=" (:token s2))))))
           (finally
             (sut/stop!)))))))
+
+(defn- post-form
+  [url body]
+  @(http-client/post url {:headers {"content-type" "application/x-www-form-urlencoded"}
+                          :body    body}))
+
+(deftest ^:integration choices-interaction-loop-test
+  ;; Drives the choice loop over the real http-kit server: GET form → POST
+  ;; choice → mutate-session (captured by the nullable api) → single-shot guard.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/dev_http.clj"})]
+    (sut/init api)
+    (sut/start!)
+    (try
+      (let [url (sut/register-content-route! "ch" {:renderer   :choices
+                                                   :data       {:prompt  "Pick one"
+                                                                :options ["A" "B"]}
+                                                   :session-id "nullable-session"})]
+        (testing "the choices form is served"
+          (let [resp @(http-client/get url)]
+            (is (= 200 (:status resp)))
+            (is (re-find #"Pick one" (body-str resp)))))
+        (testing "AC-6: submitting injects one user message into the origin session"
+          (let [resp (post-form url "choice=A")
+                muts (filter #(= 'psi.extension/submit-synthetic-prompt (:op %))
+                             (:mutations @state))]
+            (is (= 200 (:status resp)))
+            (is (re-find #"Recorded" (body-str resp)))
+            (is (= 1 (count muts)))
+            (is (= "A" (:user-msg (:params (first muts)))))
+            (is (= "nullable-session" (:session-id (:params (first muts)))))))
+        (testing "AC-7: a second submission is rejected with no further injection"
+          (let [resp (post-form url "choice=B")
+                muts (filter #(= 'psi.extension/submit-synthetic-prompt (:op %))
+                             (:mutations @state))]
+            (is (re-find #"Already answered" (body-str resp)))
+            (is (= 1 (count muts))))))
+      (finally
+        (sut/stop!)))))

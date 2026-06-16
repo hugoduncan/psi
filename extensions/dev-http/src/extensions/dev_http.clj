@@ -10,6 +10,7 @@
    `init`; the extension never reaches into core namespaces."
   (:require
    [clojure.string :as str]
+   [extensions.dev-http.choices :as choices]
    [extensions.dev-http.registry :as registry]
    [extensions.dev-http.renderers :as renderers]
    [extensions.dev-http.system :as system]
@@ -96,14 +97,28 @@
       (route-url route-id))
     (throw (ex-info "dev-http server not running; call start! first" {}))))
 
+(defn- content-handler
+  "Build the ring handler for a declarative `content` map. `:choices` is
+   interactive (per-request form + single-shot submit); every other renderer is
+   a pure content → response render."
+  [reg route-id content]
+  (if (= :choices (:renderer content))
+    (choices/make-handler {:registry   reg
+                           :route-id   route-id
+                           :session-id (:session-id content)
+                           :api        (:api @state)
+                           :content    content})
+    (fn [_request] (renderers/render content))))
+
 (defn register-content-route!
-  "Register a declarative `content` map (`{:renderer … :data …}`) as a session
-   route under `route-id` whose handler renders the content. Returns the route
-   URL, or nil when the server is not running (last-write-wins on collision)."
+  "Register a declarative `content` map (`{:renderer … :data … :session-id …}`)
+   as a session route under `route-id` whose handler renders the content.
+   Returns the route URL, or nil when the server is not running (last-write-wins
+   on collision)."
   [route-id content]
   (when-let [reg (registry-component)]
     (registry/register-entry! reg route-id
-                              {:handler (fn [_request] (renderers/render content))})
+                              {:handler (content-handler reg route-id content)})
     (route-url route-id)))
 
 ;; ---------------------------------------------------------------------------
