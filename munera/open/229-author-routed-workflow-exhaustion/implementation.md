@@ -54,3 +54,15 @@ psi-main code before resolving:
 Batch baseline: b9114c8f6 (parent of oldest commit e6ea17538 in the
 ambiguity+inconsistency plan-review segment); HEAD 82a62be6f. design-steps.md was
 created within the batch, so all 4 items attributable to the just-finished batch.
+
+## Plan-review ambiguity pass — loop 2 (2026-06-16)
+
+ACTIONABLE. 1 new ambiguity → design-steps.md. Summary-template PASS_STATUS
+emission underspecified: `parse-pass-status-routing` errors on >1 `PASS_STATUS:`
+line and requires exact `PASS_STATUS: <TOKEN>` format, yet both summary steps'
+contributions include the review per-prompt replies which each end with a
+PASS_STATUS line; plan removes the anti-echo guard ("Do not output REPEAT/DONE")
+and the converged templates carry *two* anti-control-token sentences, so "replace
+the instruction" is ambiguous and risks echo → ambiguous-pass-status → lifecycle
+hard-fail. Prior batch items (DI-2 terminal-yield, DI-3 N-count, stale baseline,
+positional task-lifecycle-test) remain resolved; no duplication.

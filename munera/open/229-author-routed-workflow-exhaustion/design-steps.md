@@ -5,6 +5,39 @@ plan.md / design.md (steps.md is read-only review context).
 
 ## Ambiguity review
 
+- [ ] **Summary-template PASS_STATUS emission is underspecified vs. the strict
+      parser and the PASS_STATUS-bearing contributions (Slice 2/3, D1/DI-1).**
+      The lifecycle gates read each summary's `:yield :text` through
+      `workflow/pass-status-routing`
+      (`agent_session/workflow/routing.clj` `parse-pass-status-routing`), which
+      is strict: it errors `:ambiguous-pass-status` when **more than one** line
+      begins with `PASS_STATUS:`, and only treats a line as a valid status when
+      it is *exactly* `PASS_STATUS:<space><TOKEN>` (column 0, single space, bare
+      token, nothing else — `exact-known?` = `(= raw-value (str " " trimmed))`).
+      Both summary steps' `:contributions` include the design-review (resp.
+      plan-review) per-prompt `:final-llm-reply` outputs, and every review prompt
+      (`review-task-design-ambiguity-review.md` etc.) ends with its own
+      `PASS_STATUS: …` line — so the summary LLM's context contains 3 (design) /
+      2 (plan) PASS_STATUS lines. The plan says to "emit a required PASS_STATUS
+      line, **replacing** the existing 'do not output REPEAT/DONE/control tokens'
+      instruction", but (a) the converged `final-summary` templates contain *two*
+      anti-control-token guards ("Respond with a concise summary …, not an
+      internal control token" **and** "Do not output REPEAT or DONE unless
+      quoting prior workflow behavior") and "replace the instruction" is
+      ambiguous about which/both, and keeping the first while mandating a
+      PASS_STATUS line is self-contradictory; and (b) removing the anti-echo
+      guard while feeding the LLM context that contains PASS_STATUS lines invites
+      the summary to echo/quote them, yielding >1 PASS_STATUS line → gate
+      `:ambiguous-pass-status` error → lifecycle hard-fail (the very failure mode
+      this task removes). Resolve in plan.md: specify the exact required line
+      format the parser accepts (single `PASS_STATUS: <TOKEN>` line, column 0,
+      sole occurrence, placed last), explicitly retain an anti-echo instruction
+      so the summary never reproduces the contributed review replies' PASS_STATUS
+      lines, and reconcile both existing anti-control-token sentences with the
+      new mandatory line. Applies to the converged `final-summary` and the new
+      `final-summary-not-converged` in **both** `review-task-design.edn` and
+      `review-task-plan.edn`.
+
 - [x] **Terminal-yield resolution for two summary steps is underspecified
       (Slice 2/3, DI-1).** DI-1 makes both `final-summary` and
       `final-summary-not-converged` explicitly terminal, which fixes internal
