@@ -620,3 +620,11 @@ the delegate success payload is `terminal-result-envelope` (prefers
 the not-converged summary's `PASS_STATUS: ACTIONABLE_FEEDBACK` surfaces to
 `check-design/plan-review-status` even though the converged `final-summary` is
 ordered last. Focused workflow-runtime/judge/loader suites green; clj-kondo clean.
+
+## Implementation-review follow-up (2026-06-16)
+
+Removed the stray transient Scry artifact committed in `19b41b2ea`
+(`.scry-results/…nullable-local-model-test.edn`) via `git rm`, and added
+`.scry-results/` to `.gitignore` so future focused-Scry run outputs (written
+under `.scry-results/` per `bb.edn`) are never tracked. Verified with
+`git check-ignore`. No production/test/doc behaviour change.
