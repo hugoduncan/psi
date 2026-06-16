@@ -810,3 +810,18 @@ narrow and behaviour-focused; no duplication of prior follow-ups. The marginal
 guaranteed by the handback's `:goto :done` and already pinned by `:completed` +
 not-`:iteration-exhausted` + handback-accepted — judged over-specification, not
 added.
+
+## Docs review pass (2026-06-16)
+
+ACTIONABLE (1 → steps.md). Slice 4 updated only `doc/workflows.md` (prose guide)
++ CHANGELOG, per design AC-7. But `:on-max-iterations` is a new
+`routing-directive-schema` key in both `model.clj` (authored grammar) and
+`ir.clj` (IR); the canonical grammar/IR **reference** docs
+(`doc/workflow-grammar.md` + `doc/workflow-ir.md` `transition-map` productions,
+the IR key list, and routing-rules) still document only `:max-iterations`, so a
+workflow author reading the reference cannot discover the new directive key or
+its `:max-iterations`-required constraint. Verified `git grep` finds
+`on-max-iterations` in neither reference doc. `doc/workflows.md` prose +
+CHANGELOG entries are accurate and consistent with the EDN (design `:max-iterations 3`,
+plan `5`, step names, PASS_STATUS strings, anchor link all match); no other
+docs-review gaps found.

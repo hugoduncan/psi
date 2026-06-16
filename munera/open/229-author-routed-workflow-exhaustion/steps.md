@@ -192,3 +192,27 @@ Slices are independently committable; keep each commit `small`.
       meaning and the ordering/plumbing claim has meaningful failure signal
       (test-shaper: meaningful_failures / behavior_focused; assertion matches the
       helper's stated contract).
+
+## Docs review follow-ups (2026-06-16)
+
+- [ ] Document the new `:on-max-iterations` routing-directive key in the
+      grammar/IR **reference** docs, not just the `doc/workflows.md` prose guide.
+      The authored grammar (`model.clj`) and IR (`ir.clj`)
+      `routing-directive-schema` now carry an optional `:on-max-iterations`
+      target (valued like `:goto`) with a cross-field constraint that it is only
+      valid alongside `:max-iterations`, but the canonical reference productions
+      still document only `:max-iterations`:
+      - `doc/workflow-grammar.md`: `transition-map ::= {:goto goto-target
+        max-iterations-clause?}` (and the `control-flow` block) omit
+        `:on-max-iterations`.
+      - `doc/workflow-ir.md`: the IR `transition-map ::= {:goto goto-target
+        :max-iterations? pos-int}` production, the "The IR uses:" key list
+        (`:judge`/`:on`/`:max-iterations`), and the Routing-rules section omit
+        `:on-max-iterations` and its exhaustion-routing semantics
+        (present → route to target with `:status :running`; absent → hard-fail
+        `:reason :iteration-exhausted`).
+      Add the optional key + the `:max-iterations`-required constraint to both
+      reference grammars so a workflow author reading the grammar/IR reference
+      can discover the directive. (Optionally note it in
+      `doc/workflow-grammar-concepts.md` §`:max-iterations`, which currently
+      describes only the iteration bound.)
