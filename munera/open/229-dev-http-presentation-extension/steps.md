@@ -535,3 +535,29 @@ the next begins.
       (`http://127.0.0.1:<port>`) and the live token (extracted from
       `sut/route-url` via `live-token`), and the `start` branch likewise asserts
       its `dev-http started` output carries the base URL + live token.
+
+## Test review follow-ups (round 4)
+
+- [ ] Assert the synthetic-prompt mutation actually **drives the next turn**, not
+      just that a user message was injected. AC-6 / design §Interaction require
+      the choice submission to be injected as a mid-conversation user message
+      *and* "drive the agent's next turn immediately". The only test with a real
+      session ctx —
+      `submit-synthetic-prompt-injects-user-message-test`
+      (`components/agent-session/test/psi/agent_session/submit_synthetic_prompt_mutation_test.clj`)
+      — wires the `:execute-prepared-request-fn` ctx seam returning a stub
+      assistant `"ack"` message expressly so the synthetic prompt "completes a
+      turn deterministically", but then asserts only (a) `:prompt-submitted?
+      true`, (b) the `:session/submit-synthetic-user-prompt` /
+      `:session/prompt-submit` log entries, and (c) exactly one injected `user`
+      message. It never asserts the seam's effect — that the next turn ran to a
+      downstream assistant message — so the `"ack"` setup is dead wiring and the
+      "drives the next turn" half of AC-6 has no regression guard. (The
+      integration `choices-interaction-loop-test` cannot fill the gap: its
+      nullable api only *records* the `mutate-session` call and does not drive a
+      real turn.) Either assert the turn completed — e.g. that the journal now
+      contains an `"assistant"` message with the `"ack"` text from the seam —
+      or, if turn-drive is intentionally out of scope for this unit, drop the
+      unused `:execute-prepared-request-fn` seam (and the `:text "ack"`) so the
+      test setup matches what it verifies. Same dead-setup / untested-behaviour
+      class as the prior coverage-gap rounds.

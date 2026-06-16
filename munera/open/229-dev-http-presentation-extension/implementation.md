@@ -572,3 +572,18 @@ url-safe base64 token, which avoids regex-special-char issues). Verification:
 focused `dev-http-command-handler-test` green (1 test / 14 assertions);
 extension integration suite green (5 tests / 54 assertions); unit suite green
 (17 tests / 118 assertions); clj-kondo clean on the test file.
+
+## Test review (round 4) — 2026-06-15
+
+One actionable coverage/dead-setup finding filed (steps.md "Test review
+follow-ups (round 4)"). Tests are otherwise well-formed and use the sanctioned
+nullable extension API + ctx seams throughout (no mocks/stubs of infra deps).
+Non-compliance worth flagging: the round-7 implementation review's "All
+AC-1..AC-10 covered" and the round-1/2/3 test-review "all ACs covered" claims
+overstate AC-6 — its "drives the agent's next turn immediately" clause is
+asserted nowhere. The one real-ctx test
+(`submit-synthetic-prompt-injects-user-message-test`) wires the
+`:execute-prepared-request-fn` "ack" seam to complete a turn but asserts only
+the injected user message + submit-event log entries, never the resulting
+assistant turn; the integration loop uses the nullable, which records the
+mutate call without driving a turn. Test-coverage gap, not a behaviour defect.
