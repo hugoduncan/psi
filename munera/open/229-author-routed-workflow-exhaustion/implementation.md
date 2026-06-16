@@ -130,3 +130,17 @@ reintroduced in the lifecycle. Distinct from the existing positional
 `task-lifecycle-test` item (test mechanics, presupposes known positions).
 Prior batch items (DI-2/DI-3/DI-4, stale baseline, positional test) remain
 resolved; steps.md-sync inconsistency item still open/BLOCKED — not duplicated.
+
+## Plan-review inconsistency pass — loop 3 (2026-06-16)
+
+ACTIONABLE. 1 new inconsistency → design-steps.md. `design.md` scope item 6
+(and item 7) still says the summary change "replaces the existing 'do not output
+REPEAT/DONE/control tokens' instruction … with a single required PASS_STATUS
+line", but `plan.md` DI-4 explicitly supersedes that and mandates the opposite
+("do not replace; keep sentence (a), rewrite sentence (b)"). DI-4 reconciled
+`plan.md` but `design.md` (authority for what/why) was never updated → the two
+files prescribe contradictory template edits. Verified item-6/7 text and DI-4
+point 3 directly. Distinct from the resolved loop-2 ambiguity item (hardened
+plan only). Prior inconsistency items (stale baseline, positional test resolved;
+steps.md-sync open/BLOCKED) and the loop-3 ambiguity item (task-lifecycle
+placement) not duplicated.

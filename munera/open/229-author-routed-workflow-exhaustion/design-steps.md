@@ -155,3 +155,24 @@ plan.md / design.md (steps.md is read-only review context).
       explicit-terminal"). Resolve by updating `steps.md` Slice 2/3 to enumerate
       these four mandated sub-tasks so the execution checklist matches `plan.md`.
 
+
+- [ ] **`design.md` scope item 6 "replaces the instruction" contradicts the
+      superseding `plan.md` DI-4 "keep (a), rewrite (b)" contract (Slice 2/3).**
+      `design.md` scope item 6 (and item 7 by "identical treatment") states the
+      summary change "**replaces** the existing 'do not output
+      REPEAT/DONE/control tokens' instruction in those summaries with a single
+      required `PASS_STATUS:` line". `plan.md` DI-4 explicitly **supersedes** this
+      ("This DI supersedes the looser D1 phrasing … 'replacing the existing …
+      instruction'") and mandates the opposite mechanism: do **not** replace —
+      **keep** sentence (a) ("concise summary … not an internal control token")
+      and **rewrite** sentence (b) into the precise single-line + anti-echo rule.
+      `design.md` (the authority for *what/why*) was never reconciled, so it and
+      `plan.md` now prescribe contradictory template edits ("replace" vs
+      "keep+rewrite"); an implementer cross-referencing the authority gets the
+      wrong mechanism, risking removal of the anti-control-token guard the DI-4
+      contract requires. (Distinct from the resolved loop-2 ambiguity item, which
+      only hardened `plan.md` DI-4 and did not touch `design.md`.) Resolve by
+      updating `design.md` items 6/7 (per change_chain: intent/decision lives in
+      design) to drop the "replaces the existing instruction" phrasing and align
+      with DI-4 — or replace it with an explicit pointer to `plan.md` DI-4 as the
+      authoritative template-contract.
