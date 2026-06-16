@@ -1,0 +1,5 @@
+🎯 Hold an extension's live, stateful, side-effecting resources (integrant system, http server, route registry) in the EXTENSION's own `defonce ^:private state` atom — not in core state and not as a new core managed-service type. Precedent: `work-on`, `mcp-tasks-run`.
+
+This is a deliberate trade-off against META.md's managed-services principle ("psi runtime owns process-scoped managed services on ctx"). For a dev-only / isolated extension, adding generic core surface (system-scoped dispatch + a managed-handle service type) just to host a dev convenience disproportionately couples core to the tool. Extension-atom keeps blast radius inside the extension, consistent with the isolated-mini-VSM posture. integrant gives clean `halt!`/`init` reload ergonomics; make `halt-key!` synchronous (deref the http-kit `server-stop!` promise) so restarts can't leave an orphaned server bound.
+
+If a genuine non-dev managed-service need arises later, design that generic surface on its own merits — don't back into it via a dev tool.
