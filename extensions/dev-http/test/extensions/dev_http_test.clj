@@ -143,6 +143,12 @@
     (testing ":hiccup renders a JSON-decoded (string-tag) tree as elements"
       (let [resp (renderers/render {:renderer :hiccup :data ["div" {} ["h1" "X"]]})]
         (is (= "<div><h1>X</h1></div>" (:body resp)))))
+    (testing ":hiccup passes idiomatic keyword-tag hiccup through unchanged"
+      ;; REPL/register-route! supplies keyword tags ([:div … [:h1 …]]); this is
+      ;; the `(vector? form)` passthrough branch of coerce-hiccup, distinct from
+      ;; the string-tag coercion branch above.
+      (let [resp (renderers/render {:renderer :hiccup :data [:div {} [:h1 "X"]]})]
+        (is (= "<div><h1>X</h1></div>" (:body resp)))))
     (testing ":vega embeds the vendored client JS and the spec as JSON"
       (let [resp (renderers/render {:renderer :vega :data {"mark" "bar"}})]
         (is (re-find #"/assets/vega-lite\.min\.js" (:body resp)))
@@ -414,6 +420,41 @@
             (is (re-find #"Recorded" (:body resp)))
             (is (= 1 (count muts)))
             (is (= "y" (:user-msg (:params (first muts)))))))))))
+
+(deftest choices-urlencoded-decode-test
+  ;; A choice value is URL-encoded by the browser on POST; the handler must
+  ;; URL-decode it (mw/urlencoded-param's URLDecoder path, including +→space)
+  ;; before injecting it as the user message. The scalar/map tests post
+  ;; unencoded values (choice=A/B/y), so the decode step is unverified — a
+  ;; regression dropping `decode` (or +→space) would inject the raw encoded
+  ;; string yet pass them.
+  (doseq [[variant value encoded]
+          [["plus-space"    "a b" "choice=a+b"]
+           ["percent-slash" "a/b" "choice=a%2Fb"]]]
+    (testing variant
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/dev_http.clj"})
+            reg     (registry/create-registry)
+            content {:renderer   :choices
+                     :data       {:prompt  "Pick one"
+                                  :options [{:label "Opt" :value value}]}
+                     :session-id "nullable-session"}
+            handler (choices/make-handler {:registry   reg
+                                           :route-id   "c1"
+                                           :session-id "nullable-session"
+                                           :api        api
+                                           :content    content})]
+        (registry/register-entry! reg "c1" {})
+        (testing "the GET form renders the raw (decoded) value attribute"
+          (let [resp (handler {:request-method :get :query-string "token=tok"})]
+            (is (re-find (re-pattern (str "value=\"" value "\"")) (:body resp)))))
+        (testing "a POST of the URL-encoded body injects the decoded value"
+          (let [resp (handler {:request-method :post :body encoded})
+                muts (submit-prompt-mutations state)]
+            (is (= 200 (:status resp)))
+            (is (re-find #"Recorded" (:body resp)))
+            (is (= 1 (count muts)))
+            (is (= value (:user-msg (:params (first muts)))))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; SSE live-updates (Slice 4)

@@ -665,7 +665,7 @@ the next begins.
 
 ## Test review follow-ups (round 7)
 
-- [ ] Cover the URL-decode round-trip of a submitted `:choices` value
+- [x] Cover the URL-decode round-trip of a submitted `:choices` value
       (`mw/urlencoded-param`'s `decode` / `URLDecoder/decode` path,
       `extensions/dev-http/src/extensions/dev_http/middleware.clj`). Every
       choices test posts scalar values with no percent/`+` encoding
@@ -686,7 +686,20 @@ the next begins.
       single user message. A `mw/urlencoded-param` unit assertion over an
       encoded body is an acceptable lighter alternative if the handler-level
       round-trip is impractical.
-- [ ] (Low) Cover the idiomatic keyword-tag `:hiccup` passthrough branch of
+      Done: added `choices-handler`-level `choices-urlencoded-decode-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`), a `doseq` over
+      two encodings — `["plus-space" "a b" "choice=a+b"]` and
+      `["percent-slash" "a/b" "choice=a%2Fb"]`. Each builds a real
+      `choices/make-handler` over a `{:label "Opt" :value <value>}` map option
+      and a nullable api/state. It asserts the GET form renders the raw decoded
+      `value="<value>"` attribute, then POSTs the URL-encoded body and asserts
+      the **decoded** value (not the raw encoded string) is the single
+      `submit-synthetic-prompt` `:user-msg` injected — exercising
+      `mw/urlencoded-param`'s `URLDecoder/decode` path including `+`→space and
+      `%2F`→`/`. A regression dropping `decode` would inject `a+b`/`a%2Fb` and
+      fail. Focused `extensions` suite green (18 tests / 129 assertions);
+      clj-kondo clean.
+- [x] (Low) Cover the idiomatic keyword-tag `:hiccup` passthrough branch of
       `renderers/coerce-hiccup`
       (`extensions/dev-http/src/extensions/dev_http/renderers.clj`). The
       `:hiccup` renderer test (`renderers-test`) feeds only a JSON-decoded
@@ -698,3 +711,11 @@ the next begins.
       branch would break REPL-supplied hiccup yet pass the suite. Add a small
       assertion rendering an idiomatic keyword-tag tree to the same
       `<div><h1>X</h1></div>` HTML.
+      Done: added a `:hiccup passes idiomatic keyword-tag hiccup through
+      unchanged` `testing` block inside `renderers-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`) rendering
+      `{:renderer :hiccup :data [:div {} [:h1 "X"]]}` and asserting
+      `(= "<div><h1>X</h1></div>" (:body resp))` — exercising the `(vector?
+      form)` passthrough branch distinct from the existing string-tag coercion
+      assertion. Focused `extensions` suite green (18 tests / 129 assertions);
+      clj-kondo clean.

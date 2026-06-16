@@ -694,3 +694,23 @@ only the JSON string-tag branch is. No non-compliance with the review
 instructions to note; all existing tests are well-formed and use the sanctioned
 nullable api + ctx seams (the round-6 de-mock closed the last spy/interaction
 test).
+
+## Test review follow-ups (round 7) executed — 2026-06-15
+
+Both round-7 coverage gaps closed, test-only, no production change.
+
+(1) Added handler-level `choices-urlencoded-decode-test` — `doseq` over
+`["plus-space" "a b" "choice=a+b"]` and `["percent-slash" "a/b" "choice=a%2Fb"]`
+through a real `choices/make-handler` over a `{:label "Opt" :value <value>}`
+option + nullable api/state: GET renders the raw decoded `value="…"`, POST of the
+URL-encoded body injects the **decoded** value as the single
+`submit-synthetic-prompt` `:user-msg`. Guards `mw/urlencoded-param`'s
+`URLDecoder/decode` path (`+`→space, `%2F`→`/`).
+
+(2) Added an idiomatic keyword-tag `:hiccup` assertion inside `renderers-test`
+(`[:div {} [:h1 "X"]]` → `<div><h1>X</h1></div>`), exercising the `(vector?
+form)` passthrough branch of `renderers/coerce-hiccup` distinct from the
+existing JSON string-tag coercion case.
+
+Verification: focused `extensions` suite green (18 tests / 129 assertions);
+clj-kondo clean on the test file. No remaining open round-7 follow-ups.
