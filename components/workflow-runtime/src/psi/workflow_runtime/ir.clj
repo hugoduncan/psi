@@ -284,10 +284,22 @@
    [:llm llm-judge-schema]
    [:invoke invoke-judge-schema]])
 
+(defn- on-max-iterations-requires-max-iterations?
+  "Cross-field constraint: `:on-max-iterations` is only meaningful with
+  `:max-iterations` (D3). Reject `:on-max-iterations` without `:max-iterations`."
+  [directive]
+  (or (not (contains? directive :on-max-iterations))
+      (some? (:max-iterations directive))))
+
 (def routing-directive-schema
-  [:map
-   [:goto [:or [:enum :next :previous :done] step-name-schema]]
-   [:max-iterations {:optional true} [:maybe pos-int?]]])
+  [:and
+   [:map
+    [:goto [:or [:enum :next :previous :done] step-name-schema]]
+    [:max-iterations {:optional true} [:maybe pos-int?]]
+    [:on-max-iterations {:optional true}
+     [:or [:enum :next :previous :done] step-name-schema]]]
+   [:fn {:error/message ":on-max-iterations requires :max-iterations"}
+    on-max-iterations-requires-max-iterations?]])
 
 (def routing-table-schema
   [:map-of outcome-schema routing-directive-schema])

@@ -451,3 +451,39 @@ reuse. `design.md` reconciled:
 test; four mandated sub-tasks a–d; DI-2 ordering; DI-3 wording; DI-4 contract).
 All three previously-blocked `design-steps.md` items now `[x]`. design.md ↔
 plan.md ↔ steps.md are coherent; task is implementation-ready.
+
+---
+
+## Slice 1 implementation (2026-06-16)
+
+Landed `:on-max-iterations` engine primitive end-to-end, behaviour-inert (no
+shipped `.edn` authors it yet).
+
+- **model.clj / ir.clj**: added optional `:on-max-iterations` to
+  `routing-directive-schema` (valued like `:goto`; model `:string`, ir
+  `step-name-schema`), wrapped each directive map in
+  `[:and <map> [:fn on-max-iterations-requires-max-iterations?]]` so
+  `:on-max-iterations` without `:max-iterations` is rejected (D3). The schema is
+  now `:and`-wrapped — any consumer doing structural `[:map …]` introspection of
+  `routing-directive-schema` would need `(second schema)`; none found.
+- **target_ir_compiler.clj**: additive `cond->` clause threading
+  `:on-max-iterations` model→IR.
+- **statechart.clj**: extracted the inline goto→acting-state resolution to
+  private `resolve-goto-acting-target`; `compile-routing-transitions` now uses it
+  for both the success `:goto` target and the exhaustion target (author target
+  when `:on-max-iterations` present, else `:failed`). DI-6: this statechart
+  exhaustion guard is dead code at runtime for the review workflows; kept for
+  two-site coherence.
+- **workflow_judge.clj** (DI-6 governing edit): `evaluate-routing` on `:exhausted`
+  now routes via `resolve-goto-target` when the directive carries
+  `:on-max-iterations` (returns `:goto`/`:complete`), else unchanged `:fail`.
+
+Tests: model/ir accept+reject (D3); target_ir threading (AC-2); statechart
+author-target routing (`:step/handback.acting`, `:judge/record`, not `:failed`)
++ preserved `:failed`/`:iteration/exhausted` regression; workflow_judge unit
+(`:goto`/`:complete`/within-limit/absent); DI-6 integration in
+`workflow_review_step_routing_test` (real exhausting design loop with
+`:on-max-iterations` → handback, run not failed). All green; clj-kondo clean.
+
+Discovery: statechart acting-state ids are namespaced `:step/<name>.acting`
+(slash), not `:step.<name>.acting` — corrected the statechart test assertion.

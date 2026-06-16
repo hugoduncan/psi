@@ -120,7 +120,19 @@
     (is (not (m/validate workflow-model/routing-directive-schema {:max-iterations 3}))))
 
   (testing "invalid — zero max-iterations"
-    (is (not (m/validate workflow-model/routing-directive-schema {:goto :next :max-iterations 0})))))
+    (is (not (m/validate workflow-model/routing-directive-schema {:goto :next :max-iterations 0}))))
+
+  (testing "with on-max-iterations alongside max-iterations (D3)"
+    (is (m/validate workflow-model/routing-directive-schema
+                    {:goto "design-review" :max-iterations 3
+                     :on-max-iterations "final-summary-not-converged"}))
+    (is (m/validate workflow-model/routing-directive-schema
+                    {:goto "design-review" :max-iterations 3 :on-max-iterations :done})))
+
+  (testing "invalid — on-max-iterations without max-iterations (D3)"
+    (is (not (m/validate workflow-model/routing-directive-schema
+                         {:goto "design-review"
+                          :on-max-iterations "final-summary-not-converged"})))))
 
 ;;; Routing table schema
 

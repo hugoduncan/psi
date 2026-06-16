@@ -5,34 +5,35 @@ Slices are independently committable; keep each commit `small`.
 
 ## Slice 1 — `:on-max-iterations` engine primitive (inert)
 
-- [ ] `model.clj` `routing-directive-schema`: add optional `:on-max-iterations`
+- [x] `model.clj` `routing-directive-schema`: add optional `:on-max-iterations`
       + reject-without-`:max-iterations` cross-field constraint (D3)
-- [ ] `ir.clj` `routing-directive-schema`: same optional key + same reject
+      — `[:and [:map …] [:fn on-max-iterations-requires-max-iterations?]]`
+- [x] `ir.clj` `routing-directive-schema`: same optional key + same reject
       constraint (D3)
-- [ ] `target_ir_compiler.clj` `compile-routing-table`: thread
-      `:on-max-iterations` model→IR
-- [ ] `workflow_judge.clj` `evaluate-routing` (**governing site, DI-6**): when
+- [x] `target_ir_compiler.clj` `compile-routing-table`: thread
+      `:on-max-iterations` model→IR (additive `cond->` clause)
+- [x] `workflow_judge.clj` `evaluate-routing` (**governing site, DI-6**): when
       `check-iteration-limit` is `:exhausted` and the directive carries
       `:on-max-iterations`, return `{:action :goto/:complete}` via
       `resolve-goto-target` instead of `{:action :fail :reason :iteration-exhausted}`;
       absent → unchanged `:fail`
-- [ ] `statechart.clj`: extract goto→target resolution to a private helper; use
-      it for both `:goto` and the new `:on-max-iterations` exhaustion target in
-      `compile-routing-transitions` (parallel site); default exhaustion stays
-      `:failed`
-- [ ] `model_test.clj` / `ir_test.clj`: accept-with / reject-without
+- [x] `statechart.clj`: extracted goto→target resolution to private
+      `resolve-goto-acting-target`; used for both `:goto` and the new
+      `:on-max-iterations` exhaustion target in `compile-routing-transitions`;
+      default exhaustion stays `:failed`
+- [x] `model_test.clj` / `ir_test.clj`: accept-with / reject-without
       `:max-iterations`
-- [ ] `target_ir_compiler_test.clj`: threading assertion
-- [ ] `statechart_test.clj`: `:judge/signal` exhaustion→author target
-      (`:judge/record`, not failed) + regression-lock exhaustion→`:failed`
-      (`:iteration/exhausted`)
-- [ ] **integration test (DI-6)** (`workflow-judge` / review-step-routing): a
-      real exhausted judged loop with `:on-max-iterations` routes to the author
-      target with `:status :running` (not `:iteration-exhausted`); without it,
-      still hard-fails `:iteration-exhausted` — the pure-statechart test cannot
-      cover this path
-- [ ] focused workflow-runtime + workflow-judge Scry green; clj-kondo clean
-- [ ] commit `⚒ workflow-runtime: add :on-max-iterations author-routed exhaustion target`
+- [x] `target_ir_compiler_test.clj`: threading assertion (AC-2)
+- [x] `statechart_test.clj`: `:judge/signal` exhaustion→author target
+      (`:judge/record`, not failed; `:step/handback.acting`) + regression-lock
+      exhaustion→`:failed` (`:iteration/exhausted`) preserved
+- [x] **integration test (DI-6)** (`workflow_review_step_routing_test`): a
+      real exhausted design loop with `:on-max-iterations` routes to the author
+      target (`final-summary-not-converged`), run NOT `:failed`, terminal-outcome
+      not `:iteration-exhausted`; existing failure test (no key) is the
+      regression-lock — the pure-statechart test cannot cover this path
+- [x] focused workflow-runtime + workflow-judge + routing Scry green; clj-kondo clean
+- [x] commit `⚒ workflow-runtime: add :on-max-iterations author-routed exhaustion target`
 
 ## Slice 2 — review-task-design handback + lifecycle design gate
 

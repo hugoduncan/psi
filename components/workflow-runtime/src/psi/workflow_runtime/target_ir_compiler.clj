@@ -131,7 +131,10 @@
           (map (fn [[outcome transition]]
                  [outcome (cond-> {:goto (:goto transition)}
                             (contains? transition :max-iterations)
-                            (assoc :max-iterations (:max-iterations transition)))]))
+                            (assoc :max-iterations (:max-iterations transition))
+
+                            (contains? transition :on-max-iterations)
+                            (assoc :on-max-iterations (:on-max-iterations transition)))]))
           routing-table)))
 
 (defn- compile-session-profile-name
