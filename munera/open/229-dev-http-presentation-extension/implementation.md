@@ -925,3 +925,19 @@ All five round-12 test-shaping follow-ups in
 Verification: focused extensions suite green (18 tests / 138 assertions),
 integration suite green (6 tests / 61 assertions) — both identical to the
 pre-refactor baseline (behaviour preserved); clj-kondo clean (0/0).
+
+## Test review (round 13) — test-shaper — 2026-06-15 — ACTIONABLE_FEEDBACK
+
+test-shaper pass over `extensions/dev-http/test/extensions/dev_http_test.clj`
+targeting shaping gaps round 12 left open. Four follow-ups filed (round 13): a
+running-server arrange helper for the four init→start!→try/finally-stop!
+integration tests (round 12 only extracted `server-base`, not this wrapper); the
+`{:path "/test/dev_http.clj"}` literal duplicated across 10 sites; the lingering
+`"nullable-session"` string literals; and `init-captures-api-test`'s
+implementation-coupled `@@#'sut/state` capture assertion.
+
+Non-compliance noted: the round-12 implementation.md/steps note claims the loop
+test's `"nullable-session"` literal "was replaced with the `nullable-session`
+const", but only the *assertion* was changed — the `register-content-route!`
+*registration* literal (and the `dev-present` render test's `opts` literal)
+still hardcode the string. The round-12 done-claim overstated the change.

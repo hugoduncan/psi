@@ -930,3 +930,68 @@ in `extensions/dev-http/test/extensions/dev_http_test.clj`.
       (`lifecycle-and-serving-test` base + restart s1/s2 URLs, `sse-live-feed-test`,
       `register-sse-route!-test`) build their base URL through it. Skipped the
       optional `token-url` companion (out of scope, low marginal value).
+
+## Test review follow-ups (round 13) — test-shaper (economy/consistency/behaviour-focus)
+
+Distinct from round 12's shaping items: these are *new* shaping gaps (repeated
+integration arrange ceremony, lingering magic-string inconsistency, an
+implementation-coupled assertion) in
+`extensions/dev-http/test/extensions/dev_http_test.clj`.
+
+- [ ] Extract a running-server arrange helper for the integration tests. Four
+      `^:integration` tests — `dev-present-tool-renders-over-server-test`
+      (lines ~570-573), `choices-interaction-loop-test` (~651-654),
+      `sse-live-feed-test` (~683-686), and `register-sse-route!-test`
+      (~711-717) — each repeat the identical ~3-line arrange + teardown ceremony:
+      `(nullable/create-nullable-extension-api {:path "/test/dev_http.clj"})` →
+      `(sut/init api)` → `(sut/start!)` → `(try … (finally (sut/stop!)))`. This
+      is `minimal_incidental_setup` / `helpers_that_compress(ceremony)`: a
+      regression in the init→start→stop contract, or a teardown leak, must be
+      kept consistent by hand across four sites, and each test's *intent* (what
+      it does with the running server) is buried under boilerplate. Round 12
+      only extracted `server-base` (the URL-assembly fragment), not this
+      init/start/stop wrapper. Introduce a `with-running-server` helper/macro
+      yielding `{:server :state :api}` (handling `init`/`start!`/`finally stop!`)
+      so each test states only its server interaction. Exclude
+      `lifecycle-and-serving-test` (it tests start/status/stop directly so must
+      not hide them) and `dev-http-command-handler-test` (it starts via the
+      command handler, not `sut/start!`).
+
+- [ ] (Low) Centralize the duplicated `{:path "/test/dev_http.clj"}` nullable-api
+      arg. The literal `"/test/dev_http.clj"` is hand-written in 10
+      `create-nullable-extension-api` call sites (and inside
+      `make-choices-handler`). test-shaper `consistent` / `economical`: a
+      single `(nullable-api)`/`(test-api)` helper (or a `test-ext-path` const)
+      would give the fixture path one source. Folds naturally into the
+      round-13 `with-running-server` helper for the integration sites; the
+      remaining unit sites (`init-captures-api-test`, `make-choices-handler`,
+      the failure-seam apis) share the const. Low — mechanical and currently
+      correct.
+
+- [ ] (Low) Replace the lingering `"nullable-session"` string literals with the
+      existing `nullable-session` const. Round 12 added the const and claimed to
+      replace the loop-test literal, but two registration sites still hardcode
+      the string — `dev-present-tool-renders-over-server-test` `opts`
+      (`{:session-id "nullable-session"}`, line ~579) and
+      `choices-interaction-loop-test` `register-content-route!`
+      (`:session-id "nullable-session"`, line ~659) — while the corresponding
+      assertions (lines ~361, ~671) read the `nullable-session` const. Same
+      session-id is encoded two ways in the same test, so a value change must be
+      made in both the literal and the const. test-shaper `consistent` /
+      clarity: use the `nullable-session` const at the two registration sites.
+
+- [ ] (Low) Re-shape `init-captures-api-test`'s api-capture assertion to be
+      behaviour-focused. `(is (identical? api (:api @@#'sut/state)))` (line ~34)
+      reaches through the private `#'sut/state` var into the extension's
+      internal atom to assert the stored api — an implementation-detail / not
+      `behavior_focused` assertion (`assert(observable_outcomes) ∧
+      ¬assert(implementation_details)`) and not `locally_comprehensible`
+      (`@@#'…` double-deref of a private var). The observable proof that `init`
+      wired the captured api is already adjacent — the `/dev-http` command is
+      registered (`contains? (:commands @state) "dev-http"`) and the integration
+      tests prove the stored api drives `start!`/`status-text`. Either drop the
+      internal-atom `identical?` assertion in favour of the observable
+      command-registration signal it sits beside, or, if proving "the *same* api
+      instance is retained" is the genuine intent, assert it through a public
+      surface rather than `@@#'sut/state`. Low — the assertion is correct, only
+      coupled to internals.
