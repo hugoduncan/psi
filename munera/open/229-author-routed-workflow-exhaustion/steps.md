@@ -170,3 +170,25 @@ Slices are independently committable; keep each commit `small`.
       exhaustion at the cap*, not via an early route (test-shaper:
       meaningful_failures / behavior_focused). Distinct from the resolved
       positive-terminal-outcome item above, which did not pin iteration count.
+
+## Test-shaper review follow-ups — pass 3 (2026-06-16)
+
+- [ ] Tie the standalone result text to the converged `final-summary` step in
+      `assert-converged-standalone-surfaces-review-complete`
+      (`workflow_delegate_review_step_live_test.clj`). The helper injects a
+      per-call `reply-prefix` into the `final-summary` stub reply
+      (`"<prefix>\n\nPASS_STATUS: REVIEW_COMPLETE"`) but **no assertion references
+      `reply-prefix`** — so it is an unasserted varying axis (test-shaper:
+      minimal_incidental_variation). The only result-text assertion,
+      `(= 1 (count (re-seq #"PASS_STATUS: REVIEW_COMPLETE" result-text)))`, is
+      *also* satisfied by any review-prompt's bare `PASS_STATUS: REVIEW_COMPLETE`
+      reply, so the helper does not actually prove `:psi.workflow/result` is the
+      converged `final-summary`'s text (its docstring claims "the converged
+      `final-summary` … is the step whose yielded text surfaces as
+      `:psi.workflow/result`"). A regression surfacing some *other* step's
+      REVIEW_COMPLETE reply as the standalone result would still pass. Add
+      `(is (str/includes? result-text reply-prefix) …)` (the prefix is unique to
+      the final-summary reply) so the `reply-prefix` axis carries assertion
+      meaning and the ordering/plumbing claim has meaningful failure signal
+      (test-shaper: meaningful_failures / behavior_focused; assertion matches the
+      helper's stated contract).

@@ -759,3 +759,17 @@ change).
 Verification: `clj-paren-repair` + `clj-kondo` clean. Focused var passes
 (5/0/0, was 4 assertions). Full `workflow-review-step-routing-test` namespace
 green (115 assertions / 12 tests, +1 assertion).
+
+## Test-shaper review pass 3 (2026-06-16)
+
+ACTIONABLE (1 → steps.md). One new test-shaper issue: the deduped
+converged-standalone live helper (`assert-converged-standalone-surfaces-review-complete`)
+injects a per-call `reply-prefix` that no assertion checks, and its sole
+result-text assertion (`count REVIEW_COMPLETE = 1`) is also met by any
+review-prompt's bare REVIEW_COMPLETE reply — so it does not prove the converged
+`final-summary`'s text is what surfaces as `:psi.workflow/result`, contradicting
+the helper's docstring. No other new issues: engine-layer (ir/model/target-ir/
+statechart/workflow-judge), definition-level handback/lifecycle, and the DI-6
+routing integration test remain narrow, behaviour-focused, and economical after
+the prior dedup/strengthening/exhaustion-at-cap passes; prior pass-1/pass-2
+follow-ups are not duplicated.
