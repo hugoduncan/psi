@@ -628,3 +628,26 @@ Removed the stray transient Scry artifact committed in `19b41b2ea`
 `.scry-results/` to `.gitignore` so future focused-Scry run outputs (written
 under `.scry-results/` per `bb.edn`) are never tracked. Verified with
 `git check-ignore`. No production/test/doc behaviour change.
+
+## Implementation review pass 2 (2026-06-16)
+
+REVIEW_COMPLETE — no new actionable issues. Independently re-ran focused suites
+at HEAD `611712b7d`: workflow-definitions-test 270/0; ir+model+target-ir-compiler
++statechart+workflow-judge 280/0; workflow-review-step-routing-test 114/0 (incl.
+DI-6 integration exhaustion-routing); workflow-delegate-review-step-live-test —
+only the documented pre-existing `…nullable-local-model-test` fails (3 assertions,
+229-independent), both DI-2 standalone tests pass. clj-kondo clean; `.scry-results/`
+gitignored, none tracked; tree clean.
+
+Implementation matches design (D1–D5, DI-1–DI-6) and the workflow-runtime
+boundary (generic `:on-max-iterations` primitive in runtime; targets/wording/
+PASS_STATUS strings as authored `.edn`/prompt policy). Lifecycle gates mirror the
+existing `check-implementation-review-status` shape (no new pattern); the goto
+resolution is shared via `resolve-goto-acting-target` (no divergence).
+
+Non-actionable observations (no follow-up filed): (1) the cross-field predicate
+`on-max-iterations-requires-max-iterations?` is duplicated verbatim in model.clj
+and ir.clj — consistent with the pre-existing deliberate model/IR
+`routing-directive-schema` parallelism, not new debt. (2) The statechart
+`compile-routing-transitions` exhaustion edit is runtime-dead-code for the review
+loops by design (DI-6 two-site coherence) — intended and documented.
