@@ -651,3 +651,29 @@ and ir.clj — consistent with the pre-existing deliberate model/IR
 `routing-directive-schema` parallelism, not new debt. (2) The statechart
 `compile-routing-transitions` exhaustion edit is runtime-dead-code for the review
 loops by design (DI-6 two-site coherence) — intended and documented.
+
+## Test-review pass (2026-06-16)
+
+REVIEW_COMPLETE — no new actionable test issues. Verified the three
+task-test-review criteria over the 229 test delta (`git diff 9a07db27e..HEAD`):
+
+- **Coverage** matches the design's chosen verification strategy. AC-1 schema
+  accept/reject (ir_test, model_test, D3); AC-2 IR threading; AC-3 both exhaustion
+  sites — statechart default→`:failed` regression-lock
+  (`iteration-exhaustion-fires-action-test`) + author-target route, workflow_judge
+  unit (goto/complete/within-limit/absent), and the governing integration path
+  (`review-pass-loop-on-max-iterations-routes-to-author-target-test`) with the
+  no-key hard-fail regression-lock; AC-4/5/6 definition-level (4-step review
+  topology, `:on-max-iterations`, both summaries terminal + DI-4 sole-final
+  PASS_STATUS, 13-step lifecycle gates + handbacks); D5 converged-standalone live
+  tests. The synthetic-def-for-routing / real-def-for-template-text split is the
+  documented DI-2/DI-6 decision, not a gap.
+- **Well-formed**: assertions are on run/result state and template text, not on
+  interactions.
+
+Non-compliance / pre-existing (no follow-up filed): the two new converged-standalone
+live tests stub the turn boundary (`prompt-execution-result-in!`) via `with-redefs`
+— a stub of an infra dep, mildly at odds with the no-mocks standard — but it
+follows the established convention of the same namespace's pre-existing
+`delegate-…-nullable-local-model-test` (no nullable turn seam exists). Systemic,
+not new debt this task should rewrite; left as-is for namespace consistency.
