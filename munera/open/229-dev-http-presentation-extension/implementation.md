@@ -1056,3 +1056,34 @@ clj-paren-repair + clj-kondo clean. dev-http integration tests green via
 failure in the run is the pre-existing/unrelated
 `psi.rpc-smoke-test/rpc-smoke-handshake-test` 60s subprocess handshake timeout —
 not touched by this test-helper refactor).
+
+## Test review (round 16) — test-shaper — REVIEW_COMPLETE
+
+Fresh test-shaper pass over the full `extensions/dev-http` suite
+(`dev_http_test.clj`, 747 lines) re-read against all 12 source namespaces.
+Assessed clarity / consistency / economy / behaviour-focus / meaningful-failures
+/ determinism / single-concern. No new actionable issue.
+
+- Coverage class closed at round 11; renderer-branch / JSON-tool-input /
+  public-surface gaps are exhausted (all source branches reached: token gating,
+  `/s/:route-id` dispatch + 404, persisted-route nil/jar safety, every renderer
+  incl. headerless table + keyword/string hiccup + `:file` ext map + missing
+  file, asset `..`-reject/missing, choices map/scalar options + urlencoded
+  decode + single-shot + failed/throwing-injection claim release, SSE
+  format/feed/token-gating + `register-sse-route!` nil-and-live, lifecycle
+  start/status/stop + restart-no-orphan + command-routing usage fallback).
+- Consistency/dedup class (rounds 12–15) drove helper construction onto single
+  sources (`build-test-handler`, `http-get`/`post-form` + bounded
+  `http-timeout-ms`, `server-base`, `with-running-server`,
+  `submit-prompt-mutations`, `make-choices-handler`); no remaining same-class
+  duplication.
+- Considered and rejected as non-actionable: (a) `renderers-test` /
+  `dev-present-tool-test` umbrella deftests with nested `testing` blocks — a
+  settled, deliberately-grown structure giving meaningful per-branch failure
+  context; (b) the AC-6→AC-7 shared-state sequence in `choices-handler-test` —
+  intrinsic single-shot domain modelling (a second submission requires a first),
+  not incidental coupling; (c) layered unit+integration AC-6/AC-7 overlap —
+  intentional sociable/boundary coverage, `:integration`-tagged for isolation.
+
+clj-kondo clean (0/0). Remaining shaping items would be churn without clear
+quality gain.
