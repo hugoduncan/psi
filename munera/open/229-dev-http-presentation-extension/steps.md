@@ -749,7 +749,7 @@ the next begins.
 
 ## Test review follow-ups (round 9)
 
-- [ ] Assert the `:mermaid` renderer actually embeds the diagram **source**, not
+- [x] Assert the `:mermaid` renderer actually embeds the diagram **source**, not
       just the vendored client JS + the `class="mermaid"` shell
       (`renderers-test`, `extensions/dev-http/test/extensions/dev_http_test.clj`
       lines ~164-167; `render-mermaid` in
@@ -770,7 +770,17 @@ the next begins.
       HTML-escaping of `>`) so the source-embed has a regression guard. By
       contrast the sibling `:vega` assertion already covers its spec source
       (`#"\{\"mark\":\"bar\"\}"`), so this gap is `:mermaid`-only.
-- [ ] (Low) Broaden the `:vega` renderer assertion to cover the missing third
+      Done: added `(is (re-find #"graph TD; A--&gt;B" (:body resp)))` to the
+      `:mermaid` `testing` block in `renderers-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`). hiccup2
+      HTML-escapes the `>` in the `[:pre {:class "mermaid"} (str data)]` body, so
+      the embedded source renders as `graph TD; A--&gt;B`; the assertion proves
+      `render-mermaid` actually emits the `(str data)` source (not just the
+      vendored client JS + `class="mermaid"` shell). A regression dropping the
+      `(str data)` body renders an empty `<pre>` and now fails. Focused kaocha
+      (`--focus extensions.dev-http-test/renderers-test`) green (22 assertions);
+      clj-kondo clean.
+- [x] (Low) Broaden the `:vega` renderer assertion to cover the missing third
       vendored script and the embed invocation (`renderers-test`, lines ~157-161;
       `render-vega`). The renderer embeds three script srcs —
       `/assets/vega.min.js`, `/assets/vega-lite.min.js`,
@@ -782,3 +792,10 @@ the next begins.
       assertions for `#"/assets/vega\.min\.js"` and the `vegaEmbed('#vega-view'`
       invocation. Same representative-input AC-5 completeness class as the
       mermaid item above.
+      Done: extended the `:vega` `testing` block in `renderers-test` with
+      `(is (re-find #"/assets/vega\.min\.js" (:body resp)))` (the base
+      vega.min.js script, a required dependency of vega-embed) and
+      `(is (re-find #"vegaEmbed\('#vega-view'" (:body resp)))` (the embed
+      invocation that mounts the spec). A regression dropping the base script or
+      the `vegaEmbed` call now fails. Covered by the same focused
+      `renderers-test` run (22 assertions, 0 failures); clj-kondo clean.

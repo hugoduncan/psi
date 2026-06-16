@@ -767,3 +767,26 @@ overstates AC-5 for `:mermaid` — the renderer's source-embed (the expected
 response's substance) is unverified despite the test name asserting it. Tests
 are otherwise well-formed and uniformly use the sanctioned nullable extension
 API + ctx seams (no infra-dep mocks/stubs).
+
+## Test review follow-ups (round 9) executed — 2026-06-15
+
+Executed both round-9 items (one actionable + one low) in `renderers-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`).
+
+- `:mermaid` source-embed guard: added
+  `(is (re-find #"graph TD; A--&gt;B" (:body resp)))`. hiccup2 HTML-escapes the
+  `>` in the `[:pre {:class "mermaid"} (str data)]` body, so the embedded
+  diagram source renders as `graph TD; A--&gt;B` (verified empirically via the
+  focused run, not assumed). The assertion now guards `render-mermaid`'s core
+  job — embedding `(str data)` — so a regression rendering an empty
+  `<pre class="mermaid"></pre>` fails, and the test name ("…and the source") is
+  no longer a lie.
+- `:vega` completeness: added `(is (re-find #"/assets/vega\.min\.js" …))` (the
+  base vega.min.js script — a required dependency of vega-embed, previously
+  unasserted) and `(is (re-find #"vegaEmbed\('#vega-view'" …))` (the embed
+  invocation). A regression dropping the base script or the embed call now
+  fails.
+
+Verification: focused kaocha `--focus extensions.dev-http-test/renderers-test`
+green — 1 test / 22 assertions / 0 failures (was 18 assertions). clj-kondo
+clean on the touched test file. No remaining unchecked follow-ups in steps.md.

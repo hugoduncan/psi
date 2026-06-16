@@ -158,13 +158,20 @@
         (is (= "<div><h1>X</h1></div>" (:body resp)))))
     (testing ":vega embeds the vendored client JS and the spec as JSON"
       (let [resp (renderers/render {:renderer :vega :data {"mark" "bar"}})]
+        ;; all three scripts: vega.min.js is a required dependency of vega-embed.
+        (is (re-find #"/assets/vega\.min\.js" (:body resp)))
         (is (re-find #"/assets/vega-lite\.min\.js" (:body resp)))
         (is (re-find #"/assets/vega-embed\.min\.js" (:body resp)))
-        (is (re-find #"\{\"mark\":\"bar\"\}" (:body resp)))))
+        (is (re-find #"\{\"mark\":\"bar\"\}" (:body resp)))
+        ;; the embed invocation that mounts the spec into #vega-view.
+        (is (re-find #"vegaEmbed\('#vega-view'" (:body resp)))))
     (testing ":mermaid embeds the vendored client JS and the source"
       (let [resp (renderers/render {:renderer :mermaid :data "graph TD; A-->B"})]
         (is (re-find #"/assets/mermaid\.min\.js" (:body resp)))
-        (is (re-find #"class=\"mermaid\"" (:body resp)))))
+        (is (re-find #"class=\"mermaid\"" (:body resp)))
+        ;; the diagram source itself must be embedded in the <pre>; hiccup
+        ;; HTML-escapes `>` to `&gt;`, so the rendered source is `A--&gt;B`.
+        (is (re-find #"graph TD; A--&gt;B" (:body resp)))))
     (testing "an unknown renderer yields a 400"
       (is (= 400 (:status (renderers/render {:renderer :nope :data 1})))))))
 
