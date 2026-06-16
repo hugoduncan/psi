@@ -6,3 +6,6 @@
 /target/
 /target/coverage/
 /target/coverage-ai/
+
+# Scry structured test results (transient)
+/.scry-results/

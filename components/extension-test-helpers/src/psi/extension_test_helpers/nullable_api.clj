@@ -317,6 +317,8 @@
    'psi.extension/notify notify!
    'psi.extension/append-message append-message!
    'psi.extension/send-prompt send-prompt!
+   'psi.extension/submit-synthetic-prompt (fn [_state _params]
+                                            {:psi.extension/prompt-submitted? true})
    'psi.extension/schedule-event schedule-event!
    'psi.extension/register-post-tool-processor register-post-tool-processor!
    'psi.extension/ensure-service ensure-service!

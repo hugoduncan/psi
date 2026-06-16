@@ -17,6 +17,17 @@
   'org.hugoduncan/psi)
 
 (def psi-owned-extension-catalog
+  "Launcher psi-owned extension catalog: supplies startup classpath/basis
+   coordinates for psi-owned extensions declared via the concise `{psi/lib {}}`
+   manifest form, before the JVM/runtime starts.
+
+   MUST stay in sync with the runtime catalog
+   `psi.agent-session.extension-installs/psi-owned-extension-catalog` (same lib
+   keys, except `psi/workflow-loader`, which is launcher-only). Adding an
+   extension to one catalog but not the other makes the concise manifest form
+   silently no-op. Parity is asserted by
+   `psi-owned-extension-catalog-parity-with-launcher` in
+   `agent_session/extension_installs_test.clj`."
   {'psi/auto-session-name
    {:psi/init 'extensions.auto-session-name/init
     :source-policies
@@ -99,6 +110,13 @@
     :source-policies
     {:development {:local/root "extensions/work-on"}
      :installed   {:local/root "extensions/work-on"}
+     :jar         {:mvn/version :psi/release-version}}}
+
+   'psi/dev-http
+   {:psi/init 'extensions.dev-http/init
+    :source-policies
+    {:development {:local/root "extensions/dev-http"}
+     :installed   {:local/root "extensions/dev-http"}
      :jar         {:mvn/version :psi/release-version}}}
 
    'psi/workflow-loader

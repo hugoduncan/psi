@@ -78,6 +78,18 @@
                                     :data {:path (.getAbsolutePath ^java.io.File file)}})]}))))
 
 (def psi-owned-extension-catalog
+  "Runtime psi-owned extension catalog: maps each psi-owned lib to its
+   `:psi/init` and installed source policy. Used at runtime to recognize and
+   initialize extensions declared via the concise `{psi/lib {}}` manifest form.
+
+   MUST stay in sync with the launcher classpath catalog
+   `psi.launcher.extensions/psi-owned-extension-catalog` (same lib keys, except
+   `psi/workflow-loader`, which is launcher-only). Adding an extension to one
+   catalog but not the other makes the concise manifest form silently no-op
+   (classpath present but `init` never runs, or vice versa). Parity is asserted
+   by `psi-owned-extension-catalog-parity-with-launcher` in
+   `agent_session/extension_installs_test.clj` — run that suite when editing this
+   map."
   {'psi/auto-session-name {:psi/init 'extensions.auto-session-name/init
                            :source-policies {:installed {:local/root "extensions/auto-session-name"}}}
    'psi/commit-checks {:psi/init 'extensions.commit-checks/init
@@ -101,7 +113,9 @@
    'psi/work-on {:psi/init 'extensions.work-on/init
                  :source-policies {:installed {:local/root "extensions/work-on"}}}
    'psi/metrics {:psi/init 'psi.metrics.extension/init
-                 :source-policies {:installed {:local/root "extensions/metrics"}}}})
+                 :source-policies {:installed {:local/root "extensions/metrics"}}}
+   'psi/dev-http {:psi/init 'extensions.dev-http/init
+                  :source-policies {:installed {:local/root "extensions/dev-http"}}}})
 
 (defn- catalog-entry
   [lib]

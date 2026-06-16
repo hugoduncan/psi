@@ -45,6 +45,10 @@ Architecture follows a Viable System Model (see `AGENTS.md` → Architecture):
 - Gordian (`bb gordian`) provides architecture/coupling/complexity analysis used
   by the simplification workflows.
 - Project nREPL management (`/project-repl`, psi-tool `project-repl`).
+- **dev-http** dev-time extension: localhost HTTP side channel (`/dev-http`,
+  `dev-present` tool) presenting markdown/table/vega/mermaid/file/hiccup/choices
+  in a browser; choices post back as a mid-conversation user message via the
+  `psi.extension/submit-synthetic-prompt` core mutation. See `doc/dev-http.md`.
 
 ## Protocols
 

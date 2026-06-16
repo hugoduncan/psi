@@ -14,7 +14,9 @@
                    "extensions/work-on/src" "extensions/github/src"
                    "extensions/edit-clj/src"
                    "extensions/logprobs/src"
-                   "extensions/metrics/src"]
+                   "extensions/metrics/src"
+                   "extensions/dev-http/src"
+                   "extensions/dev-http/resources"]
     :ns-patterns [".*-test$"]
     :skip-meta [:integration]}
 
@@ -28,7 +30,8 @@
                  "extensions/github/test"
                  "extensions/edit-clj/test"
                  "extensions/logprobs/test"
-                 "extensions/metrics/test"]
+                 "extensions/metrics/test"
+                 "extensions/dev-http/test"]
     :source-paths ["extensions/auto-session-name/src"
                    "extensions/commit-checks/src"
                    "extensions/hello-ext/src"
@@ -42,7 +45,10 @@
                    "extensions/github/src"
                    "extensions/edit-clj/src"
                    "extensions/logprobs/src"
-                   "extensions/metrics/src"]
+                   "extensions/metrics/src"
+                   "extensions/dev-http/src"
+                   "extensions/dev-http/resources"
+                   "extensions/dev-http/dev"]
     :ns-patterns [".*-test$"]
     :skip-meta [:integration]}
 
@@ -56,7 +62,8 @@
                  "extensions/work-on/test" "extensions/github/test"
                  "extensions/edit-clj/test"
                  "extensions/logprobs/test"
-                 "extensions/metrics/test"]
+                 "extensions/metrics/test"
+                 "extensions/dev-http/test"]
     :source-paths ["bases/main/src" "bases/main/resources"
                    "components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
                    "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/rpc/src" "components/agent-core/src"
@@ -64,7 +71,7 @@
                    "extensions/auto-session-name/src" "extensions/commit-checks/src"
                    "extensions/hello-ext/src" "extensions/mcp-tasks-run/src" "extensions/mementum/src" "extensions/mementum/resources"
                    "extensions/munera/src" "extensions/munera/resources" "extensions/plan-state-learning/src" "extensions/work-on/src"
-                   "extensions/github/src" "extensions/edit-clj/src" "extensions/logprobs/src" "extensions/metrics/src" "components/extension-test-helpers/src"]
+                   "extensions/github/src" "extensions/edit-clj/src" "extensions/logprobs/src" "extensions/metrics/src" "extensions/dev-http/src" "extensions/dev-http/resources" "extensions/dev-http/dev" "components/extension-test-helpers/src"]
     :ns-patterns [".*-test$"]
     :focus-meta [:integration]}]
 
