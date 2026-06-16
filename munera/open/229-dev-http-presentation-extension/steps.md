@@ -1034,7 +1034,7 @@ these are *remaining* shaping gaps in
 `extensions/dev-http/test/extensions/dev_http_test.clj` that those rounds left
 untouched.
 
-- [ ] Reconcile the two encodings of "build a router ring handler". The same
+- [x] Reconcile the two encodings of "build a router ring handler". The same
       concept has two forms in the file: the `build-test-handler` helper
       (`reg`/`token` → `router/build-handler {…:persisted-routes
       (routes/load-persisted-routes)}`, used by `token-gating-test` and
@@ -1053,7 +1053,7 @@ untouched.
       constructions flow through one helper. Low — the duplication is mechanical
       and currently correct.
 
-- [ ] (Low) Rename `init-captures-api-test` to match its round-13-reshaped
+- [x] (Low) Rename `init-captures-api-test` to match its round-13-reshaped
       behaviour (~line 37). Round 13 dropped the `(identical? api (:api
       @@#'sut/state))` internal-atom capture assertion and reshaped the test to
       assert the observable `/dev-http`-command registration, even renaming the

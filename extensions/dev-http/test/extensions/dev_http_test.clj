@@ -34,7 +34,7 @@
   ([] (nullable-api nil))
   ([opts] (nullable/create-nullable-extension-api (merge {:path test-ext-path} opts))))
 
-(deftest init-captures-api-test
+(deftest init-wires-api-test
   (testing "init wires the runtime ExtensionAPI into the extension"
     (let [{:keys [api state]} (nullable-api)]
       (is (nil? (sut/init api)))
@@ -65,10 +65,12 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- build-test-handler
-  [reg token]
-  (router/build-handler {:registry         reg
-                         :token            token
-                         :persisted-routes (routes/load-persisted-routes)}))
+  ([reg token]
+   (build-test-handler reg token (routes/load-persisted-routes)))
+  ([reg token persisted]
+   (router/build-handler {:registry         reg
+                          :token            token
+                          :persisted-routes persisted})))
 
 (deftest token-gating-test
   (testing "every dynamic subtree is token-gated"
@@ -245,7 +247,7 @@
 (deftest asset-route-is-ungated-test
   (testing "the /assets subtree is reachable without a token (public static JS)"
     (let [reg     (registry/create-registry)
-          handler (router/build-handler {:registry reg :token "tok" :persisted-routes []})
+          handler (build-test-handler reg "tok" [])
           resp    (handler {:request-method :get
                             :uri            (str renderers/asset-prefix "/vega-embed.min.js")})]
       (is (= 200 (:status resp)))
@@ -473,7 +475,7 @@
 (deftest sse-route-is-token-gated-test
   (testing "an SSE feed registered as a session route sits inside the token-gated subtree"
     (let [reg     (registry/create-registry)
-          handler (router/build-handler {:registry reg :token "tok" :persisted-routes []})]
+          handler (build-test-handler reg "tok" [])]
       (registry/register-entry! reg "registry"
                                 {:handler (sse/registry-feed-handler reg)})
       (testing "no token → 403 (never reaches the event stream)"

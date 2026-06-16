@@ -990,3 +990,32 @@ behaviour (`consistent(naming)`).
 
 Non-compliance noted: the requested task slug `229-dev-http-lifecycle` does not
 exist; the only matching task is `229-dev-http-presentation-extension` (reviewed).
+
+## Round 14 follow-ups executed (test-shaper) — 2026-06-15
+
+Both round-14 test-shaping follow-ups in
+`extensions/dev-http/test/extensions/dev_http_test.clj` completed:
+
+- Generalized `build-test-handler` to a 2/3-arity fn: `([reg token]
+  (build-test-handler reg token (routes/load-persisted-routes)))` /
+  `([reg token persisted] (router/build-handler {… :persisted-routes
+  persisted}))`. The two inline `(router/build-handler {… :persisted-routes
+  []})` sites (`asset-route-is-ungated-test`, `sse-route-is-token-gated-test`)
+  now call `(build-test-handler reg "tok" [])`. All four router-handler
+  constructions flow through one helper; a router-shape change is now single-source.
+- Renamed `init-captures-api-test` → `init-wires-api-test` to match its
+  round-13-reshaped observable `/dev-http`-command-registration assertion
+  (the removed `identical?` internal-atom capture no longer named). The inner
+  `testing` label was already reshaped in round 13.
+
+Verification: full extensions suite green via `bb clojure:test:extensions`
+(925 assertions, 0 fail, 0 error; `:pass? true`). The lone scry-reported
+"unknown" is `psi.metrics.extension-test/summary-data-conforms-to-schema-after-events-test`
+— unrelated to dev-http and pre-existing. All four affected dev-http tests
+(`init-wires-api-test`, `asset-route-is-ungated-test`,
+`sse-route-is-token-gated-test`, `token-gating-test`) ran green. clj-kondo
+clean (0/0); cljfmt clean.
+
+Note (instruction non-compliance, unchanged): the requested task slug
+`229-dev-http-lifecycle` does not exist; the only matching task is
+`229-dev-http-presentation-extension`, executed here.
