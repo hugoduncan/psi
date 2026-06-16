@@ -220,3 +220,27 @@ the next begins.
       running-status presentation has one source.
       Done: extracted `url-token-lines` (private); both `status-text` and the
       `start` command branch render the indented url/token block through it.
+
+## Implementation review follow-ups (round 3)
+
+- [ ] Choice-submit result/ordering robustness gap
+      (`extensions/dev-http/src/extensions/dev_http/choices.clj`,
+      `make-handler` POST branch). The handler commits the single-shot
+      answered flag via `claim-answer!` **before** calling
+      `(:mutate-session api … 'psi.extension/submit-synthetic-prompt …)`, then
+      **ignores** the mutation's `:psi.extension/prompt-submitted?` return and
+      unconditionally renders the "Recorded your choice" success page.
+      Consequence: if the mutation throws (or ever returns `submitted? false`),
+      the route is already permanently marked answered (claim won) yet **zero**
+      user messages were injected and the route can never be retried; in the
+      non-throwing-false case the page would falsely report success. AC-6
+      requires the submission to actually inject a user message. Mitigation:
+      (a) inspect the mutation result and render a failure page when
+      `prompt-submitted?` is falsey, and/or (b) reconsider claim-then-inject
+      ordering so a failed injection does not consume the single-shot, while
+      still preserving AC-7's at-most-once guarantee. Low-severity given the
+      dev-only/localhost/single-user posture and that the current handler
+      contract always returns `submitted? true`, but the unconditional success
+      page plus claim-before-effect ordering is a latent robustness gap. If the
+      claim-first ordering is retained deliberately (favouring AC-7), document
+      that trade-off and the accepted failure mode at the call site.

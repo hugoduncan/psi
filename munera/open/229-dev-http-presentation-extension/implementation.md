@@ -247,3 +247,22 @@ Verification: extensions suite green (14/77), integration green (3/34);
 clj-kondo clean across extension src. No behaviour change; test assertions
 (`/s/<id>?token=`, `action="/s/c1?token=tok"`, `dev-http running`/`not running`)
 all preserved.
+
+## Implementation review (round 3) — 2026-06-15
+
+Re-verified green: extensions suite (14/77), integration (3/34), agent-session
+`submit-synthetic-prompt-mutation-test` (1/6); clj-kondo clean across extension
+src/dev + the core mutation. Code matches design and follows the architecture
+(reads via api, writes only via `:mutate-session`; live integrant system +
+registry in the extension's own atom; one sanctioned core touch; every dynamic
+subtree token-gated, assets ungated by documented decision). Verified the core
+`submit-synthetic-prompt` message record shape (`:role`/`:content`/`:timestamp`/
+`:source`) matches the scheduler's `scheduled-user-message` canonical shape that
+drives `:session/submit-synthetic-user-prompt`. Docs/changelog/README/state all
+present. No unnecessary abstraction or duplicated-existing-pattern found.
+
+One new actionable robustness follow-up filed (round 3): the choices POST
+handler claims the single-shot flag before the `:mutate-session` injection and
+ignores its result, unconditionally showing a success page — latent
+zero-injection-on-failure / false-success gap touching AC-6. Non-blocking,
+dev-only severity; details and mitigation options in steps.md.
