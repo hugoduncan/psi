@@ -216,3 +216,19 @@ Slices are independently committable; keep each commit `small`.
       can discover the directive. (Optionally note it in
       `doc/workflow-grammar-concepts.md` §`:max-iterations`, which currently
       describes only the iteration bound.)
+
+## Docs review follow-ups — pass 2 (2026-06-16)
+
+- [ ] Fix the stale `review-task-design` loop-cap count in `CHANGELOG.md`
+      `[Unreleased]` → Changed. The "Implementation review profiles …" entry
+      states `review-task-design` "now repeats full architecture/ambiguity/
+      inconsistency passes up to **6** total passes", but the authored cap in
+      `.psi/workflows/review-task-design.edn` is `:max-iterations 3`
+      (`design-follow-up` `:on "DONE"`), and `doc/workflows.md` (updated by this
+      task, Slice 4) correctly says `design-review` is entered "at most **three**
+      total times". The cap was lowered 6→3 (`de19cc5bf`) without updating the
+      CHANGELOG, so the CHANGELOG now contradicts both the implementation and the
+      prose guide this task edited. Change the CHANGELOG "6 total passes" to "3
+      total passes" (the `review-task-plan` "5 total passes" in the same sentence
+      is correct — EDN `:max-iterations 5` — and stays). Docs-review item 3
+      (changelog accuracy) + item 5 (consistency).

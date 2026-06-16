@@ -857,3 +857,17 @@ code: it lives in `routing-directive-schema` (model.clj/ir.clj), valued like
 `on-max-iterations-requires-max-iterations?`. The item's "control-flow block"
 mention is satisfied by documenting the key where it actually belongs
 (transition-map) rather than mis-placing it at step level.
+
+## Docs review pass 2 (2026-06-16)
+
+ACTIONABLE (1 → steps.md). `CHANGELOG.md` `[Unreleased]` Changed entry still
+says `review-task-design` repeats "up to 6 total passes", but the authored cap
+is `:max-iterations 3` and `doc/workflows.md` (Slice 4) says "at most three total
+times" — stale 6→3 (`de19cc5bf` lowered the cap without touching CHANGELOG),
+now contradicting both the EDN and this task's own prose guide. `review-task-plan`
+"5 total passes" in the same sentence is accurate. No other docs gaps: the prior
+grammar/IR-reference follow-up is resolved (`doc/workflow-grammar.md`,
+`doc/workflow-ir.md`, `doc/workflow-grammar-concepts.md` now carry
+`:on-max-iterations`), and `doc/workflows.md` + CHANGELOG `:on-max-iterations`/
+handback entries match the EDN (design 3, plan 5, step names, PASS_STATUS
+strings, anchor link).
