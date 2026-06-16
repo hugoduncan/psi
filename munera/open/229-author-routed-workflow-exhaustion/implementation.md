@@ -728,3 +728,13 @@ Verification: `clj-paren-repair` + `clj-kondo` clean on both edited files.
 sole failure is the documented pre-existing 229-independent
 `delegate-…-nullable-local-model-test` (`:reason :missing-pass-status`,
 environmental). `.scry-results/` confirmed gitignored.
+
+## Test-shaper review pass 2 (2026-06-16)
+
+ACTIONABLE (1 → steps.md). The DI-6 author-target routing integration test, after
+its prior positive-terminal-outcome strengthening, still omits an
+exhaustion-at-cap assertion: it proves the run reached the handback `:completed`
+but not that the loop iterated to `:max-iterations` first, so premature
+`:on-max-iterations` routing would pass. No other new test issues; engine-layer,
+definition-level, and live tests remain narrow, behaviour-focused, and economical
+after the prior dedup/strengthening passes.

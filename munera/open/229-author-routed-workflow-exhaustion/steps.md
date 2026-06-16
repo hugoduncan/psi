@@ -151,3 +151,22 @@ Slices are independently committable; keep each commit `small`.
       (different components). Consider hoisting to a shared test-support util, or
       fold its single use into the live-test helper above, to remove the
       cross-namespace duplicate.
+
+## Test-shaper review follow-ups — pass 2 (2026-06-16)
+
+- [ ] Lock exhaustion-at-cap in
+      `review-pass-loop-on-max-iterations-routes-to-author-target-test`
+      (`workflow_review_step_routing_test.clj`). The test now asserts the
+      positive terminal outcome (`:completed` + handback `:accepted-result`) but
+      never proves the judged loop actually iterated to its configured cap
+      (`:max-iterations 2`) before routing to the handback. A regression where
+      `:on-max-iterations` fires *prematurely* (e.g. on the first follow-up
+      instead of at exhaustion) would still surface `:completed` + an accepted
+      handback result and pass. Mirror the sibling
+      `review-pass-loop-iteration-limit-failure-test`'s attempt-count assertion
+      (`(= 6 (count (get-in run [:step-runs "design-follow-up" :attempts])))`) by
+      asserting the on-max run's `design-follow-up` attempt count equals the
+      configured cap (2) — so the test proves the handback was reached *via
+      exhaustion at the cap*, not via an early route (test-shaper:
+      meaningful_failures / behavior_focused). Distinct from the resolved
+      positive-terminal-outcome item above, which did not pin iteration count.
