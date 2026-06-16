@@ -272,3 +272,29 @@ blocked.
 Excluded items confirmed still excluded: steps.md-sync (BLOCKED, read-only) and
 design.md item-6/7 (BLOCKED, read-only) remain unchecked — both predate the
 loop-4 batch and both require editing files this follow-up treats as read-only.
+
+## Plan-review ambiguity pass — loop 5 (2026-06-16)
+
+ACTIONABLE. 2 new ambiguities → design-steps.md. (1) **Slice 1 engine gap:**
+runtime exhaustion is decided judge-side in `workflow-judge/evaluate-routing`
+(`{:action :fail :reason :iteration-exhausted}` → queued `:judge/failed` →
+`:judge/record` else-branch → status :failed), **not** by the statechart
+`:judge/signal` exhaustion guard the plan modifies. Verified against integration
+test `workflow_review_step_routing_test/review-pass-loop-iteration-limit-failure-test`
+(`:689`/`:703`): real exhausted run terminates `:reason :iteration-exhausted`,
+`:step-id "design-follow-up"` (the `:max-iterations`-bearing step) — the statechart
+`:iteration/exhausted`/`:iteration-limit-reached` action fires only in the
+isolated `statechart_test` that feeds `:judge/signal` directly. So the planned
+`compile-routing-transitions`-only change is dead code at runtime; `:on-max-iterations`
+must also thread through `evaluate-routing` (or the plan must prove statechart-only
+suffices via an integration exhaustion-routing test). Threatens AC-3/4/5/6.
+(2) **DI-2 test cannot lock DI-4 template wording:** the converged-standalone
+runtime test stubs `prompt-execution-result-in!` (the model reply), so the
+asserted `PASS_STATUS: REVIEW_COMPLETE` comes from the stub, not the template;
+loading the real `.edn` does not lock the wording (a synthetic def yields the
+same assertion). The runtime test locks ordering/plumbing only; the
+definition-level `review-task-design-test`/`-plan-test` must assert the exact
+DI-4 template text. Prior loop-1..4 items unchanged; the loop-4 DI-2 item
+(real-vs-synthetic def / entry point / multi-prompt convergence) is distinct and
+not duplicated; steps.md-sync + design.md item-6/7 inconsistencies remain
+open/BLOCKED.

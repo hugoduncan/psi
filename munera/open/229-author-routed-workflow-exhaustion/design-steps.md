@@ -147,6 +147,89 @@ plan.md / design.md (steps.md is read-only review context).
       synthetic converged `final-summary` template must replicate the DI-4
       `PASS_STATUS: REVIEW_COMPLETE` wording for the assertion to be meaningful.
 
+- [ ] **Slice 1 engine change is incomplete: runtime exhaustion is decided
+      judge-side in `workflow-judge/evaluate-routing`, not in the statechart
+      transition the plan modifies (Slice 1, D2).** The plan (design "Context",
+      Slice 1, D2) treats exhaustion routing as governed solely by
+      `statechart.clj` `compile-routing-transitions` (the `:judge/signal`
+      exhaustion transition guarded by `iter >= max`, target `:failed`, with
+      `judged-routing-transition` dispatching `:iteration/exhausted`), and
+      explicitly states "No change to `judged-routing-transition`" and changes
+      only `compile-routing-transitions`. But there is a **second, parallel
+      exhaustion decision** the plan never mentions:
+      `components/workflow-judge/src/psi/workflow_judge.clj` `evaluate-routing`
+      returns `{:action :fail :reason :iteration-exhausted :step-id target ...}`
+      when `check-iteration-limit` sees the target step's `:iteration-count` ≥
+      `:max-iterations`. In `statechart_runtime.clj` `:judge/enter`, that
+      `:action :fail` is queued as **`:judge/failed`** (not `:judge/signal`), and
+      the `compile-judged-step` `:judge/failed` transition runs `:judge/record`,
+      whose `else` branch marks the run `:status :failed`
+      `:reason :iteration-exhausted`. Verified against the **integration runtime**
+      test `workflow_review_step_routing_test/review-pass-loop-iteration-limit-failure-test`
+      (`:689`/`:703`): the real exhausted run terminates with
+      `:terminal-outcome {:reason :iteration-exhausted :step-id "design-follow-up"}`
+      — i.e. the judge-side path, keyed off the `:max-iterations`-bearing step,
+      **not** the statechart `:iteration/exhausted` action (whose reason is
+      `:iteration-limit-reached`, exercised only by the isolated
+      `statechart_test/iteration-exhaustion-fires-action-test`, which feeds
+      `:judge/signal` directly and bypasses `evaluate-routing`). Consequence: as
+      planned, redirecting the statechart `:judge/signal` exhaustion transition to
+      the `:on-max-iterations` target is **dead code at runtime** — the
+      `:judge/signal` exhaustion guard never fires for these review workflows
+      because `evaluate-routing` short-circuits to `:fail`→`:judge/failed` first,
+      so `review-task-design`/`-plan` would still hard-fail with
+      `:iteration-exhausted` and never reach `final-summary-not-converged`. AC-3
+      ("routes the exhaustion transition to the resolved `:on-max-iterations`
+      target") and AC-4/AC-5/AC-6 are not achievable from the planned change set.
+      Resolve in plan.md (and reconcile design "Context"/D2 in design.md): either
+      (a) spike-confirm which site governs runtime exhaustion and, if it is
+      `evaluate-routing` (as the runtime test shows), extend Slice 1 to thread
+      `:on-max-iterations` through `evaluate-routing` so judge-side exhaustion
+      returns `{:action :goto :target <on-max-iterations-target>}` instead of
+      `{:action :fail :reason :iteration-exhausted}` when the directive carries
+      `:on-max-iterations` (and confirm the resulting `:judge/signal`/`:judge/record`
+      path routes to the author target without marking the run failed); or
+      (b) explicitly document why the statechart-only change suffices end-to-end,
+      backed by an integration (not pure-statechart) test that drives a real
+      exhausting review loop through `execute-workflow-run` and asserts it reaches
+      the author target rather than `:status :failed`. The Slice 1 "exit:
+      focused workflow-runtime Scry green" criterion must include such an
+      integration-level exhaustion-routing assertion, since the existing
+      `statechart_test` cannot detect this gap.
+
+- [ ] **DI-2 converged-standalone runtime test cannot lock the DI-4 template
+      wording it claims to verify, because the model reply is stubbed (Slice
+      2/3, DI-2/DI-4).** DI-2 (loop-4 resolution) states the converged-standalone
+      result-text test "lock[s] that the **DI-4 template wording** in the real
+      `.psi/workflows/review-task-design.edn` / `review-task-plan.edn` converged
+      `final-summary` yields a parser-accepted `PASS_STATUS: REVIEW_COMPLETE`",
+      and uses that as the justification for loading the real `.edn` rather than a
+      synthetic def. But the prescribed mechanism stubs
+      `psi.agent-session.turn/prompt-execution-result-in!` (the **model
+      response**) for the converged `final-summary` turn — so the asserted
+      `PASS_STATUS: REVIEW_COMPLETE` line is whatever the **stub returns**, not
+      what the template instructs. The `final-summary` template text is the
+      *prompt* sent to the model, never the model's *output*; stubbing the output
+      bypasses the template entirely. Loading the real `.edn` therefore does not
+      lock the DI-4 wording at all (a synthetic def with a bare
+      `"final-summary"` template would yield the identical assertion, since the
+      stub supplies the PASS_STATUS line either way). What the runtime test
+      actually locks is the **ordering/plumbing** invariant: that the converged
+      `final-summary`, ordered last per DI-2, is the step whose yielded text
+      surfaces through the standalone `(last :step-order)` path as
+      `:psi.workflow/result`. Resolve in plan.md: (1) restate the DI-2 runtime
+      test's purpose to "lock summary-step ordering + that the converged
+      summary's yielded text surfaces via the standalone `(last :step-order)`
+      path" (not "lock the DI-4 template wording"); and (2) make the
+      **definition-level** `review-task-design-test`/`review-task-plan-test` the
+      authority that locks the DI-4 template **text** — assert the converged
+      `final-summary` template string contains exactly the required
+      `PASS_STATUS: REVIEW_COMPLETE` line in the DI-4 column-0/single-space/
+      sole-occurrence form (and the not-converged template
+      `PASS_STATUS: ACTIONABLE_FEEDBACK`), since the existing Slice 2/3 bullet's
+      vague "carry their PASS_STATUS lines" does not pin the exact DI-4 format
+      the strict `parse-pass-status-routing` requires.
+
 ## Inconsistency review
 
 - [x] **Plan assumes a green `review-task-design-test` baseline, but it is
