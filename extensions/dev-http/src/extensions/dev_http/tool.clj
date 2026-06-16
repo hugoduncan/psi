@@ -27,7 +27,10 @@
                                               "vega → a Vega-Lite spec; "
                                               "hiccup → a hiccup tree; "
                                               "file → {path}; "
-                                              "choices → {prompt, options}.")}
+                                              "choices → {prompt, options} where "
+                                              "each option is a scalar or a map "
+                                              "{label, value} (label is shown, "
+                                              "value is submitted/injected).")}
                 "route-id" {:type        "string"
                             :description "Optional stable route id; re-registering replaces it"}}
    :required   ["renderer" "data"]})

@@ -1115,7 +1115,7 @@ to the still-scattered HTTP client calls in
 
 ## Docs review follow-ups (round 1) — review-task-docs (README + doc/ + CHANGELOG accuracy/completeness)
 
-- [ ] Document the `:choices` **map-option** (`{:label … :value …}`) variant in
+- [x] Document the `:choices` **map-option** (`{:label … :value …}`) variant in
       `doc/dev-http.md` (and the `dev-present` tool's `data` param description in
       `extensions/dev-http/src/extensions/dev_http/tool.clj`, which says only
       `choices → {prompt, options}`). The `:choices` renderer

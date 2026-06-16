@@ -49,7 +49,7 @@ a browser. An optional `route-id` gives a stable URL; re-registering an existing
 | `mermaid`   | a Mermaid source string | a diagram (vendored Mermaid JS) |
 | `hiccup`    | a hiccup tree | raw HTML (escape hatch) |
 | `file`      | `{:path "/abs/path"}` | the file served with a content-type by extension |
-| `choices`   | `{:prompt "…" :options ["A" "B"]}` | a choice form (see below) |
+| `choices`   | `{:prompt "…" :options ["A" "B"]}` (an option may also be a map `{:label "Shown" :value "submitted"}`) | a choice form (see below) |
 
 Vega-Lite and Mermaid client JS are **vendored** and served locally from the
 extension (offline-safe; no CDN/network dependency).
@@ -88,7 +88,12 @@ The shipped `extensions.dev-http.dev.demo` route serves `/demo`.
 
 A `:choices` route is the interaction primitive. The agent registers a choice
 prompt, tells the developer the URL, and the developer picks an option in the
-browser. On submission:
+browser. Each entry in `:options` is either a bare scalar (used as both the
+button text and the submitted value) or a map `{:label "Shown" :value
+"submitted"}` where the **label** is the button text shown to the developer and
+the **value** is what gets submitted and injected as the user message into the
+originating session — so an option's displayed text can differ from the injected
+value. On submission:
 
 1. The selection is POSTed back to the route (inside the token-gated subtree).
 2. The handler injects the selection as a **mid-conversation user message** into

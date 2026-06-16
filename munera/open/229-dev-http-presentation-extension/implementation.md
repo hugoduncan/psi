@@ -1096,3 +1096,16 @@ against the implemented extension. README + CHANGELOG accurate and complete;
 `r-` route-id, lifecycle, SSE `/s/registry`, single-shot/failed-injection
 semantics all match source). One completeness gap (steps round 1): the `:choices`
 map-option `{:label … :value …}` variant is implemented + tested but undocumented.
+
+## Docs review follow-ups (round 1) — executed
+
+Documented the `:choices` map-option (`{:label … :value …}`) variant:
+- `doc/dev-http.md` renderers table `choices` row now notes an option may be a
+  map `{:label "Shown" :value "submitted"}`; the "choice interaction loop"
+  section explains that label is the shown button text and value is what is
+  submitted/injected (so displayed text can differ from injected value).
+- `dev-present` tool `data` description (`tool.clj`) now states each `choices`
+  option is a scalar or a `{label, value}` map (label shown, value
+  submitted/injected).
+Documented surface now matches the implemented + tested behaviour
+(`normalize-option` in `choices.clj`; `choices-map-option-test`). clj-kondo clean.
