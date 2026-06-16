@@ -22,3 +22,35 @@ plan Slice 2 presumes a green baseline. Confirmed via focused run
 (count/name/type vectors, nth indices, repeat-9 yields); plan's "extend OR add
 new 229 test" alternative leaves it failing — existing test must be updated in
 Slices 2 & 3. See design-steps.md.
+
+## Plan-review follow-up execution (2026-06-16)
+
+Executed all 4 plan-review batch follow-ups (ambiguity ×2 + inconsistency ×2),
+all resolved in plan.md (design.md untouched). Verified each claim against
+psi-main code before resolving:
+
+- **DI-2 (terminal-yield, ambiguity-1).** Confirmed two divergent consumers:
+  delegate-gate path `terminal_contract/terminal-result-envelope` reverse-scans
+  step-order for the actually-run terminal step (order-independent); standalone
+  `execute-workflow-run` (`canonical_workflows.clj:149`) + `terminal-yielded-text`
+  key off `(last :step-order)`. Resolution: order converged `final-summary` last,
+  `final-summary-not-converged` before it → converged text surfaces in *both*
+  paths. Not-converged standalone empty-text edge accepted as R5 (lifecycle uses
+  the order-independent path). Added converged-standalone result-text runtime
+  test note (feasible via `workflow_review_step_routing_test` stub harness).
+- **DI-3 (N count, ambiguity-2).** No runtime source for N plumbed to the
+  summary step; hardcoding the cap drifts. Decision: drop the numeric count from
+  both not-converged templates.
+- **Inconsistency-1 (stale design-test baseline).** Verified: edn
+  `:max-iterations 3` vs test asserts 6 (`workflow_definitions_test.clj:121`),
+  de19cc5bf is ancestor of psi-main → test already RED. Plan Slice 2 now requires
+  fixing 6→3 in the same edit. Checked siblings: `review-task-plan-test` (5=5) and
+  `review-step-test` (10=10) match their edns — no drift there.
+- **Inconsistency-2 (positional task-lifecycle-test).** Verified hard-coded
+  count/name/type/`nth`/`repeat-9` assertions (`:602`). Plan now mandates
+  updating the existing test in Slice 2 (9→11) and Slice 3 (11→13); separate 229
+  test is additive-only (R3 sharpened).
+
+Batch baseline: b9114c8f6 (parent of oldest commit e6ea17538 in the
+ambiguity+inconsistency plan-review segment); HEAD 82a62be6f. design-steps.md was
+created within the batch, so all 4 items attributable to the just-finished batch.

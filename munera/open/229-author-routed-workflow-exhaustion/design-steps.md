@@ -5,7 +5,7 @@ plan.md / design.md (steps.md is read-only review context).
 
 ## Ambiguity review
 
-- [ ] **Terminal-yield resolution for two summary steps is underspecified
+- [x] **Terminal-yield resolution for two summary steps is underspecified
       (Slice 2/3, DI-1).** DI-1 makes both `final-summary` and
       `final-summary-not-converged` explicitly terminal, which fixes internal
       `:next` fall-through — but it does not specify (a) the *relative order* of
@@ -26,7 +26,7 @@ plan.md / design.md (steps.md is read-only review context).
       `PASS_STATUS: REVIEW_COMPLETE` text in *both* paths. Add a test that locks
       the converged standalone result text (not just definition-level routing).
 
-- [ ] **`N follow-up iterations` source unspecified (Slice 2/3 not-converged
+- [x] **`N follow-up iterations` source unspecified (Slice 2/3 not-converged
       summaries).** The template is to say "design/plan review did not converge
       after N follow-up iterations", but no contribution/source for `N` is
       defined and the not-converged summary step's contributions list does not
@@ -36,7 +36,7 @@ plan.md / design.md (steps.md is read-only review context).
 
 ## Inconsistency review
 
-- [ ] **Plan assumes a green `review-task-design-test` baseline, but it is
+- [x] **Plan assumes a green `review-task-design-test` baseline, but it is
       already RED (Slice 2).** Verified: `review-task-design-test`
       (`workflow_definitions_test.clj:121`) asserts
       `{:goto "design-review" :max-iterations 6}` while the current
@@ -51,7 +51,7 @@ plan.md / design.md (steps.md is read-only review context).
       green to begin with. (Check `review-task-plan-test` / `review-step-test`
       `:max-iterations` assertions for the same drift while there.)
 
-- [ ] **`task-lifecycle-test` is positionally hard-coded; the plan's
+- [x] **`task-lifecycle-test` is positionally hard-coded; the plan's
       "extend OR add a new 229 test" alternative is insufficient (Slice 2/3).**
       `task-lifecycle-test` (`workflow_definitions_test.clj:602`) hard-asserts
       `(= 9 (count steps))`, the exact ordered `:name` vector, the exact `:type`

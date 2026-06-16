@@ -34,6 +34,64 @@ plus `:on {"DONE" {:goto :done}}` — so termination is order-independent. This
 also gives both summaries a judge turn, which is where the required
 `PASS_STATUS:` line (D1) is produced and read by the lifecycle gate.
 
+## Implementation decision — terminal-yield resolution for the two summaries (DI-2)
+
+DI-1 makes both summaries explicitly terminal, fixing the internal `:next`
+fall-through, but two distinct consumers read a completed review workflow's
+terminal `:yield :text` and resolve "the terminal step" *differently*:
+
+- **Lifecycle delegate-gate path** (`statechart_runtime/delegate.clj`
+  `terminal-step-result-envelope` → `terminal_contract/terminal-result-envelope`):
+  prefers `:terminal-outcome :result-envelope`, else *reverse-scans*
+  `:step-order` for the last step with an `:accepted-result` — i.e. the
+  **actually-executed** terminal step. Order-independent: surfaces whichever
+  summary actually ran (converged `final-summary` or `final-summary-not-converged`).
+- **Standalone `/delegate` result-text path**
+  (`agent_session/mutations/canonical_workflows.clj` `execute-workflow-run`, and
+  `terminal_contract/terminal-yielded-text`): keys strictly off
+  `(last (:step-order …))` — the **last-defined** step, regardless of whether it ran.
+
+Resolution (ordering, decided here): in both `review-task-design.edn` and
+`review-task-plan.edn`, place `final-summary-not-converged` **before** the
+converged `final-summary`, keeping the converged `final-summary` **last** in
+`:steps`. Consequences, per consumer:
+- **Converged run:** converged `final-summary` is both last-defined and
+  actually-run → **both** paths surface its `PASS_STATUS: REVIEW_COMPLETE` text.
+  (This is the guarantee the review item requires, and satisfies D5.)
+- **Not-converged run (lifecycle):** `task-lifecycle` consumes the handback only
+  through the delegate-gate path (reverse-scan), which surfaces
+  `final-summary-not-converged`'s `PASS_STATUS: ACTIONABLE_FEEDBACK` correctly,
+  independent of order.
+- **Not-converged run (standalone `/delegate review-task-design`/`-plan`):** the
+  strict `(last :step-order)` path resolves to the never-run converged
+  `final-summary` → empty result text. This degraded standalone-not-converged
+  edge is **accepted** (R5): the non-convergence handback is a lifecycle concern;
+  making `execute-workflow-run` resolve the last *executed* step would change the
+  shared standalone result-text behaviour for every workflow (broader blast
+  radius, out of this task's scope).
+
+Test (Slice 2/3): lock the **converged standalone result text**, not just
+definition-level routing — drive `review-task-design` (resp. `review-task-plan`)
+standalone to a converged terminal via the `workflow_review_step_routing_test`
+harness (stub `psi.agent-session.turn/prompt-execution-result-in!` to return
+`REVIEW_COMPLETE` for the review step, then the converged summary text), run it
+through `execute-workflow-run`, and assert `:psi.workflow/result` contains
+`PASS_STATUS: REVIEW_COMPLETE`.
+
+## Implementation decision — not-converged summary wording, no iteration count (DI-3)
+
+The not-converged summary templates must not claim a literal "after N follow-up
+iterations" count: the not-converged summary step's contributions do not include
+an iteration count, no runtime source for `N` is plumbed to that step, and
+sourcing one is out of scope (no new generic routing operations). Hardcoding the
+`:max-iterations` cap into the template wording would silently drift from the
+authored cap whenever it changes (it already moved 6→3 for design review).
+
+Resolution: **drop the numeric count** from both not-converged templates. Phrase
+the wording without a number, e.g. "design/plan review did not converge within
+the configured follow-up iteration limit". Slices 2/3 author this wording; no
+contribution/source for `N` is added.
+
 ## Slice 1 — `:on-max-iterations` engine primitive (inert)
 
 Files:
@@ -88,10 +146,12 @@ Files:
     (DI-1) and update its template to emit a required
     `PASS_STATUS: REVIEW_COMPLETE` line (replacing the current "do not output
     REPEAT/DONE/control tokens" instruction, D1/D5).
-  - New `final-summary-not-converged` session step: contributions sourced from
-    `:workflow-original` + the three `design-review` per-prompt
-    `:final-llm-reply` outputs; template produces a "design review did not
-    converge after N follow-up iterations" user summary and emits a required
+  - New `final-summary-not-converged` session step, placed **before** the
+    converged `final-summary` so the converged summary stays last in `:steps`
+    (DI-2): contributions sourced from `:workflow-original` + the three
+    `design-review` per-prompt `:final-llm-reply` outputs; template produces a
+    "design review did not converge within the configured follow-up iteration
+    limit" user summary (no literal iteration count, DI-3) and emits a required
     `PASS_STATUS: ACTIONABLE_FEEDBACK` line; explicit-terminal judge + `:on`
     (DI-1).
 - `.psi/workflows/task-lifecycle.edn`:
@@ -112,14 +172,39 @@ Files:
 Tests:
 - `components/workflow-loader/test/.../workflow_definitions_test.clj`
   `review-task-design-test`: update the step-order vector to include
-  `final-summary-not-converged`; assert `design-follow-up` `:on` now carries
+  `final-summary-not-converged` (ordered before the converged `final-summary`,
+  DI-2); assert `design-follow-up` `:on` now carries
   `:on-max-iterations "final-summary-not-converged"`; assert both summaries are
   explicitly terminal and carry their PASS_STATUS lines.
-- Add task-lifecycle definition coverage (extend the existing task-lifecycle
-  definition test, or add a `229` definition test under `workflow-loader/test`)
-  asserting the `check-design-review-status` gate routes DONE→`create-task-plan`
-  and REPEAT→`final-summary-design-not-converged`, and that
-  `final-summary-design-not-converged` terminates with `:goto :done`.
+  **Pre-existing RED baseline (must fix here):** this test currently asserts
+  `design-follow-up` `:on` = `{"DONE" {:goto "design-review" :max-iterations 6}}`
+  (`workflow_definitions_test.clj:121`) while the edn is `:max-iterations 3`
+  (post `de19cc5bf` "lower loop cap to 3") — so `review-task-design-test` is
+  already failing (`-6 +3`) before this slice. Correct the stale `6→3` assertion
+  as part of this same edit; the "focused workflow-loader Scry green" exit
+  criterion assumes that fix. (Verified: `review-task-plan-test` `:max-iterations
+  5` and `review-step-test` `:max-iterations 10` match their edns — no drift
+  there.)
+- Add a **converged standalone result-text** runtime test (DI-2): drive
+  `review-task-design` to a converged terminal via the
+  `workflow_review_step_routing_test` harness and assert `execute-workflow-run`'s
+  `:psi.workflow/result` contains `PASS_STATUS: REVIEW_COMPLETE` (locks the
+  yielded text, not just definition-level routing).
+- task-lifecycle definition coverage: the existing `task-lifecycle-test`
+  (`workflow_definitions_test.clj:602`) is **positionally hard-coded** —
+  `(= 9 (count steps))`, exact `:name` vector, the `:type` vector
+  `(concat (repeat 5 :delegate) [:invoke :delegate :session :session])`,
+  positional `(nth steps 5/6/7/8)`, `(repeat 6 …)` contexts, and
+  `(repeat 9 {})` for `:yields`/`:terminal-contract`. Adding
+  `check-design-review-status` + `final-summary-design-not-converged` breaks all
+  of these, so the existing `task-lifecycle-test` **MUST be updated in this
+  slice** (R3): bump count 9→11, insert the two new step names/types at their
+  positions, fix the `nth` indices, and update the `repeat` counts (e.g.
+  `repeat 9 {}`→`repeat 11 {}`). It must assert the `check-design-review-status`
+  gate routes DONE→`create-task-plan` and REPEAT→`final-summary-design-not-converged`,
+  and that `final-summary-design-not-converged` terminates with `:goto :done`.
+  A separate `229` definition test is **additive-only**, never a substitute for
+  updating `task-lifecycle-test`.
 - If a runtime routing test exists for the lifecycle gate pattern
   (`workflow_review_step_routing_test`), add a design-gate analogue; otherwise
   rely on definition-level coverage plus Slice 1 runtime coverage.
@@ -132,14 +217,29 @@ Mirror Slice 2 for the plan review:
 - `.psi/workflows/review-task-plan.edn`: `plan-follow-up` `:on` gains
   `:on-max-iterations "final-summary-not-converged"`; converged `final-summary`
   becomes explicit-terminal + `PASS_STATUS: REVIEW_COMPLETE`; new
-  `final-summary-not-converged` (sourced from the two `plan-review` per-prompt
-  replies) + `PASS_STATUS: ACTIONABLE_FEEDBACK` + explicit-terminal.
+  `final-summary-not-converged` placed **before** the converged `final-summary`
+  so the converged summary stays last in `:steps` (DI-2), sourced from the two
+  `plan-review` per-prompt replies, wording with no literal iteration count
+  (DI-3) + `PASS_STATUS: ACTIONABLE_FEEDBACK` + explicit-terminal.
 - `.psi/workflows/task-lifecycle.edn`: new `check-plan-review-status` gate after
   `review-task-plan` → `{"DONE" {:goto "implement-task"}
   "REPEAT" {:goto "final-summary-plan-not-converged"}}`; new
   `final-summary-plan-not-converged` handback step (`:goto :done`).
-- Tests: `review-task-plan-test` step-order + routing updates; task-lifecycle
-  plan-gate coverage.
+- Tests:
+  - `review-task-plan-test` step-order + routing updates (include
+    `final-summary-not-converged` ordered before the converged `final-summary`;
+    assert `plan-follow-up` `:on-max-iterations`; both summaries explicit-terminal
+    + PASS_STATUS lines). (`review-task-plan-test`'s `:max-iterations 5`
+    assertion already matches the edn — no stale-baseline fix needed here.)
+  - Converged standalone result-text runtime test for `review-task-plan` (DI-2),
+    mirroring Slice 2.
+  - `task-lifecycle-test` **MUST be updated again in this slice** (R3): adding
+    `check-plan-review-status` + `final-summary-plan-not-converged` bumps the
+    step count 11→13; update the name/type vectors, positional `nth` indices, and
+    `repeat` counts accordingly, and assert the plan gate routes
+    DONE→`implement-task` and REPEAT→`final-summary-plan-not-converged`, with
+    `final-summary-plan-not-converged` terminating `:goto :done`. A separate
+    `229` test remains additive-only.
 
 Exit: focused workflow-loader suites green; clj-kondo clean.
 
@@ -166,10 +266,23 @@ Exit: focused workflow-loader suites green; clj-kondo clean.
   silent. Same reliability profile as the existing implementation-review gate.
 - **R3 — definition-test drift.** Step-order assertions in
   `workflow_definitions_test.clj` are brittle to added steps; update them in the
-  same slice that changes each `.edn`.
+  same slice that changes each `.edn`. Concretely: `task-lifecycle-test` is
+  positionally hard-coded (count, name/type vectors, `nth` indices,
+  `repeat`-counts) and MUST be updated in both Slice 2 (9→11) and Slice 3
+  (11→13) — a separate `229` test is additive-only, never a substitute. Also note
+  the *pre-existing* RED `review-task-design-test` `:max-iterations` 6→3 drift,
+  corrected as part of the Slice 2 edit (see Slice 2 tests).
 - **R4 — standalone behaviour change (D5).** Standalone `/delegate
   review-task-design`/`-plan` now emits a `PASS_STATUS:` line. Accepted; noted in
   docs.
+- **R5 — degraded standalone not-converged result text (DI-2).** Because the
+  standalone result-text path reads `(last :step-order)` and the converged
+  `final-summary` is ordered last, a *standalone* non-converging
+  `/delegate review-task-design`/`-plan` run surfaces empty result text (the
+  not-converged summary is not last-defined). Accepted: the non-convergence
+  handback is consumed only via the order-independent lifecycle delegate-gate
+  path, which resolves correctly; fixing the shared `execute-workflow-run`
+  last-step resolution for all workflows is out of scope.
 
 ## Out of scope (restate)
 
