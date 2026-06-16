@@ -857,3 +857,25 @@ integration 6 / 61 / 0; clj-kondo clean. No new actionable implementation-level
 issues found — the prior 6 implementation-review and 10 test-review rounds have
 resolved the dedup, robustness, and coverage classes. No non-compliance with the
 review instructions to report. No new steps.md follow-ups added.
+
+## Test review (round 11) — 2026-06-15
+
+Full test review pass (task-test-review) over the dev-http extension suite
+(`extensions/dev-http/test/extensions/dev_http_test.clj`, 18 unit + 6
+integration) and the one sanctioned core mutation test
+(`submit_synthetic_prompt_mutation_test.clj`).
+
+Verified: tests well-formed and green (extensions suite 246/926, 0 fail/0 err;
+dev-http integration 150 assertions green — the lone `rpc-smoke-handshake-test`
+:integration failure is the documented pre-existing unrelated flake); every
+design behaviour AC-1..AC-10 has a covering test; all infra deps backed by the
+sanctioned nullable extension API + ctx seams (no mocks/stubs/spies remain after
+rounds 1/6). The renderer-branch / JSON-tool-input / untested-public-surface
+coverage class chased across rounds 2–10 is exhausted down to Low items.
+
+No new actionable test issues found. The one remaining untested branch
+(`choices/normalize-option`'s single-key `{:label}`-only / `{:value}`-only map
+fallback) is incidental defensive code, not a documented design behaviour
+(design specifies scalar or `{:label :value}` options), and sits below the
+severity floor of the prior Low coverage items — not filed. No non-compliance to
+report. No new steps.md follow-ups added.
