@@ -602,3 +602,20 @@ but never asserted the resulting assistant turn, leaving the turn-drive half of
 AC-6 unguarded. Now a regression where the synthetic prompt failed to drive the
 downstream turn would fail this test. Verification: focused Scry green
 (8 assertions, up from 6); clj-kondo clean on the test file.
+
+## Test review (round 5) — 2026-06-15
+
+One actionable coverage gap filed (steps.md "Test review follow-ups (round 5)"),
+untested-public-surface regression-guard class. The public Slice 4
+`register-sse-route!` REPL fn (design §SSE; plan/steps Slice 4) is invoked by no
+test — `sse-live-feed-test` and the auto `register-demo-feeds!` both use
+`register-route!`, bypassing it — so its `sse/make-handler` wrap + delegation
+have no regression guard. Tests are otherwise well-formed and use the sanctioned
+nullable extension API + ctx seams throughout (no infra-dep mocks/stubs).
+
+Non-compliance worth flagging: the round-7 implementation review's "All
+AC-1..AC-10 covered" and the round-1..4 test-review "all ACs covered" framing
+again overstates coverage at the surface granularity — `register-sse-route!` is
+a planned, documented public dev surface left wholly unexercised, the same class
+of gap the prior four test-review rounds each found and closed. Coverage gap,
+not a behaviour defect.

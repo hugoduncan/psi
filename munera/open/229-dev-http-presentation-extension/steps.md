@@ -570,3 +570,30 @@ the next begins.
       clause (the injected user message must produce a downstream assistant
       turn, not merely sit in the journal). Focused Scry green (8 assertions,
       was 6); clj-kondo clean.
+
+## Test review follow-ups (round 5)
+
+- [ ] Cover the public `register-sse-route!` REPL/dev fn
+      (`extensions/dev-http/src/extensions/dev_http.clj`). It is a documented
+      Slice 4 surface (design §SSE "a route may expose an SSE feed"; plan/steps
+      Slice 4 "`register-sse-route!` REPL fn registers arbitrary live feeds as
+      session routes") that wraps an arbitrary `emit-fn` via
+      `sse/make-handler` and registers it through `register-route!`, yet **no
+      test ever invokes it**. The integration `sse-live-feed-test` registers its
+      extra feed with `sut/register-route!` ("live-1") and the auto-registered
+      `/s/registry` feed is wired through the private `register-demo-feeds!` →
+      `register-route!` (`sse/registry-feed-handler`), so both bypass
+      `register-sse-route!`. A regression — e.g. it bound the raw `emit-fn` as a
+      ring handler without the `sse/make-handler` wrap, swapped the
+      `route-id`/`emit-fn` argument order, or stopped delegating to
+      `register-route!` — would pass the entire suite. Same untested-public-
+      surface regression-guard class as round-1 (dev-present wiring), round-2
+      (jar-safety), and round-3 (command handler). Add an `^:integration` test
+      that `init`/`start!`s the real server, calls
+      `(sut/register-sse-route! "feed" (fn [send! close!] (send! "tick") (close!)))`,
+      asserts the returned URL is non-nil, then fetches it (`?token=…`) over the
+      ephemeral-port server and asserts the response is `text/event-stream`
+      carrying `data: open` + `data: tick` — proving the emit-fn was wrapped and
+      registered, and that the feed is token-gated like any session route. Also
+      assert it returns `nil` when the server is not running (the documented
+      not-running contract shared with `register-route!`).
