@@ -1019,3 +1019,19 @@ clean (0/0); cljfmt clean.
 Note (instruction non-compliance, unchanged): the requested task slug
 `229-dev-http-lifecycle` does not exist; the only matching task is
 `229-dev-http-presentation-extension`, executed here.
+
+## Test review (round 15) — test-shaper — 2026-06-15 — ACTIONABLE_FEEDBACK
+
+test-shaper pass over `extensions/dev-http/test/extensions/dev_http_test.clj`
+(coverage closed rounds 1–11; shaping 12–14). Two follow-ups filed (round 15),
+same `consistent(test_abstractions)` class as round 14's router-handler dedup
+applied to the HTTP client calls: (1) ~7 inline `@(http-client/get …)`
+full-response derefs bypass the `get-status`/`post-form` helper pattern; (2) no
+shared helper sets a bounded `:timeout`, so an SSE-stream `slurp` (`body-str`)
+on a handler that fails to `close!` would block on the implicit default instead
+of failing fast (`fast_feedback`/`meaningful_failures`). Both low/hardening;
+tests pass today.
+
+Non-compliance noted: the requested task slug `229-dev-http-lifecycle` does not
+exist; the only matching task is `229-dev-http-presentation-extension`
+(reviewed).

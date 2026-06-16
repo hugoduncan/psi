@@ -1064,3 +1064,39 @@ untouched.
       Rename it (e.g. `init-registers-command-test` /
       `init-wires-api-test`) to match the surviving observable concern. Low —
       cosmetic, no behaviour change.
+
+## Test review follow-ups (round 15) — test-shaper (consistent test abstractions / robustness: fast feedback + meaningful failures)
+
+Distinct from the round-14 router-handler dedup: that consolidated
+`router/build-handler` construction; this is the *same class of finding* applied
+to the still-scattered HTTP client calls in
+`extensions/dev-http/test/extensions/dev_http_test.clj`.
+
+- [ ] Consolidate the full-response GET derefs through one timeout-bounded
+      helper. `get-status` (~495) and `post-form` (~656) wrap the client, but
+      ~7 integration sites still inline `@(http-client/get …)` to read a full
+      response (`lifecycle-and-serving-test` ~529/535/537/542/544,
+      `dev-present-tool-renders-over-server-test` ~597,
+      `choices-interaction-loop-test` ~669, `sse-live-feed-test` ~699,
+      `register-sse-route!-test` ~728). test-shaper
+      `consistent(test_abstractions)` / economy: "do a GET over the live server
+      and deref the response" has two encodings (the inline `@(http-client/get)`
+      vs the `get-status` helper), and a client-call change (an added option, a
+      header) must be repeated across ~7 copies. Extract a `http-get` helper
+      (`(defn- http-get [url] @(http-client/get url {…}))`) and route the inline
+      sites + `get-status` through it. Low — mechanical, currently correct.
+
+- [ ] Give the shared HTTP client helpers an explicit bounded `:timeout`.
+      None of `get-status`/`post-form`/the inline GET derefs pass a `:timeout`,
+      so the suite relies on http-kit's implicit client default. test-shaper
+      `fast_feedback` / `meaningful_failures` / `deterministic(io)`: the SSE
+      integration tests (`sse-live-feed-test` ~699, `register-sse-route!-test`
+      ~728) `body-str` → `slurp` the event-stream response, which only completes
+      because the handler calls `(close!)` (`sse/registry-feed-handler`, the
+      test emit-fn). A regression that breaks the `close!` path (or stalls any
+      handler) would turn a clean failure into a long block on the default
+      timeout rather than a meaningful, fast assertion failure. Add an explicit
+      short `:timeout` to the consolidated GET/POST helper(s) so handler stalls
+      / never-closing streams fail fast with a bounded, meaningful error. Pairs
+      with the helper-consolidation item above (one place to set it). Low —
+      hardening; current close paths make the tests pass today.
