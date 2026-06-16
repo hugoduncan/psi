@@ -341,3 +341,33 @@ plan.md / design.md (steps.md is read-only review context).
       noting they require restructuring away from the `take 5` positional
       assumption — not just index/`repeat`-count bumps — for both Slice 2 (gate at
       index 1) and Slice 3 (gate at index 4).
+
+- [ ] **`design.md` D5 "standalone output accepted as useful" contradicts
+      `plan.md` R5/DI-2 "not-converged standalone surfaces empty/degraded result
+      text" (Slice 2/3).** `design.md` D5 ("Standalone output") states that
+      "Adding the `PASS_STATUS:` line to the review-task-design / review-task-plan
+      final summaries also changes their output when run directly via `/delegate`.
+      **Accepted as useful**" — framed across **both** summaries (and scope item 6
+      repeats the D5 note that "this PASS_STATUS line also appears when
+      review-task-design is run standalone … accepted"). But `plan.md` DI-2 +
+      **R5** establish the opposite for the **not-converged** summary: because the
+      standalone result-text path keys off `(last :step-order)` (verified:
+      `canonical_workflows/execute-workflow-run` reads
+      `(last (:step-order …))`) and the converged `final-summary` is ordered last,
+      a standalone non-converging `/delegate review-task-design`/`-plan` run
+      surfaces **empty** result text — the `final-summary-not-converged`'s
+      `PASS_STATUS: ACTIONABLE_FEEDBACK` line never reaches the user, "Accepted" by
+      R5 as a **degradation** (the handback is a lifecycle-only concern), not a
+      useful standalone feature. So `design.md` (authority for what/why) tells an
+      implementer/reviewer that the not-converged standalone PASS_STATUS output is
+      useful, while `plan.md` says it is empty/degraded-and-accepted. The loop-1
+      DI-2 ambiguity item only reconciled the *converged* standalone case (by
+      ordering converged last); `design.md` D5 was never updated for the
+      not-converged degradation R5 introduces. (Distinct from the open
+      design.md item-6/7 inconsistency, which is about "replaces the instruction"
+      vs DI-4 keep+rewrite.) Resolve by reconciling `design.md` D5 (per
+      change_chain, intent/decision lives in design): scope "accepted as useful"
+      to the **converged** standalone summary, and record that the **not-converged**
+      standalone path surfaces empty result text (degraded, accepted) per R5 — or
+      replace D5's standalone framing with an explicit pointer to plan.md R5/DI-2
+      as the authoritative standalone-output contract.

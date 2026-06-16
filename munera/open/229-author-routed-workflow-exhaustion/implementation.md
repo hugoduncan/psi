@@ -298,3 +298,21 @@ DI-4 template text. Prior loop-1..4 items unchanged; the loop-4 DI-2 item
 (real-vs-synthetic def / entry point / multi-prompt convergence) is distinct and
 not duplicated; steps.md-sync + design.md item-6/7 inconsistencies remain
 open/BLOCKED.
+
+## Plan-review inconsistency pass — loop 5 (2026-06-16)
+
+ACTIONABLE. 1 new inconsistency → design-steps.md. `design.md` D5 ("standalone
+output … accepted as useful", framed across both summaries; echoed by scope item
+6's D5 note) contradicts `plan.md` R5/DI-2, which establish the **not-converged**
+standalone `/delegate` run surfaces **empty** result text (the converged summary
+is ordered last and `execute-workflow-run` reads `(last :step-order)`), accepted
+as a degradation rather than a useful feature. The loop-1 DI-2 item reconciled
+only the *converged* standalone case (ordering); design.md D5 was never updated
+for the not-converged degradation. Distinct from the open design.md item-6/7
+inconsistency ("replaces" vs DI-4 keep+rewrite). Verified D5/R5/DI-2 text and the
+`(last :step-order)` standalone path against loaded context + canonical_workflows.
+Loop-5 ambiguity items (judge-side evaluate-routing exhaustion site; DI-2
+stubbed-LLM template-wording) not re-raised here — the engine-site item already
+notes reconciling design "Context"/D2. Prior inconsistency items (stale baseline,
+positional task-lifecycle-test, (take 5 steps) restructuring resolved; steps.md
+sync + design.md item-6/7 open/BLOCKED) unchanged, not duplicated.
