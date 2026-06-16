@@ -938,7 +938,7 @@ integration arrange ceremony, lingering magic-string inconsistency, an
 implementation-coupled assertion) in
 `extensions/dev-http/test/extensions/dev_http_test.clj`.
 
-- [ ] Extract a running-server arrange helper for the integration tests. Four
+- [x] Extract a running-server arrange helper for the integration tests. Four
       `^:integration` tests — `dev-present-tool-renders-over-server-test`
       (lines ~570-573), `choices-interaction-loop-test` (~651-654),
       `sse-live-feed-test` (~683-686), and `register-sse-route!-test`
@@ -956,8 +956,18 @@ implementation-coupled assertion) in
       `lifecycle-and-serving-test` (it tests start/status/stop directly so must
       not hide them) and `dev-http-command-handler-test` (it starts via the
       command handler, not `sut/start!`).
+      Done: added a `with-running-server` **function** helper (not a macro — a
+      callback `(fn [{:keys [server state api]}] …)` stays fully clj-kondo-
+      analyzable, no `:lint-as`/hook needed for a destructured-binding macro). It
+      `init`s + `start!`s the extension against a real ephemeral-port server,
+      calls `f` with `{:server :state :api}`, and `stop!`s in a `finally`. All
+      four integration tests now pass a callback and state only their server
+      interaction. `register-sse-route!-test` keeps its pre-start "returns nil
+      when the server is not running" check as a separate `init`-only block
+      (the helper always starts, so the not-running contract can't run inside
+      it), then runs its running-server body through the helper.
 
-- [ ] (Low) Centralize the duplicated `{:path "/test/dev_http.clj"}` nullable-api
+- [x] (Low) Centralize the duplicated `{:path "/test/dev_http.clj"}` nullable-api
       arg. The literal `"/test/dev_http.clj"` is hand-written in 10
       `create-nullable-extension-api` call sites (and inside
       `make-choices-handler`). test-shaper `consistent` / `economical`: a
@@ -967,8 +977,15 @@ implementation-coupled assertion) in
       remaining unit sites (`init-captures-api-test`, `make-choices-handler`,
       the failure-seam apis) share the const. Low — mechanical and currently
       correct.
+      Done: added a `test-ext-path` const (`"/test/dev_http.clj"`) plus a
+      `nullable-api` helper (`([] …)`/`([opts] …)` merging `{:path
+      test-ext-path}` with overrides like the failure `:mutate-fn`). All
+      `create-nullable-extension-api` call sites now flow through it (the
+      `with-running-server` helper, `make-choices-handler`, both failure-seam
+      apis, `init-captures-api-test`, `lifecycle-and-serving-test`,
+      `dev-http-command-handler-test`); the path literal has one source.
 
-- [ ] (Low) Replace the lingering `"nullable-session"` string literals with the
+- [x] (Low) Replace the lingering `"nullable-session"` string literals with the
       existing `nullable-session` const. Round 12 added the const and claimed to
       replace the loop-test literal, but two registration sites still hardcode
       the string — `dev-present-tool-renders-over-server-test` `opts`
@@ -979,8 +996,14 @@ implementation-coupled assertion) in
       session-id is encoded two ways in the same test, so a value change must be
       made in both the literal and the const. test-shaper `consistent` /
       clarity: use the `nullable-session` const at the two registration sites.
+      Done: both registration sites now use the `nullable-session` const —
+      `dev-present-tool-renders-over-server-test`'s tool `opts` `{:session-id
+      nullable-session}` and `choices-interaction-loop-test`'s
+      `register-content-route!` `:session-id nullable-session`. The only
+      remaining string literal is the const definition itself; session-id has
+      one source per test.
 
-- [ ] (Low) Re-shape `init-captures-api-test`'s api-capture assertion to be
+- [x] (Low) Re-shape `init-captures-api-test`'s api-capture assertion to be
       behaviour-focused. `(is (identical? api (:api @@#'sut/state)))` (line ~34)
       reaches through the private `#'sut/state` var into the extension's
       internal atom to assert the stored api — an implementation-detail / not
@@ -995,3 +1018,10 @@ implementation-coupled assertion) in
       instance is retained" is the genuine intent, assert it through a public
       surface rather than `@@#'sut/state`. Low — the assertion is correct, only
       coupled to internals.
+      Done: dropped the `(is (identical? api (:api @@#'sut/state)))` internal-
+      atom assertion. `init-captures-api-test` now asserts only the observable
+      `init` wiring — `(nil? (sut/init api))` plus the registered `/dev-http`
+      command (`contains? (:commands @state) "dev-http"`) — with a comment noting
+      the integration tests prove the stored api drives `start!`/`status-text`.
+      Renamed the deftest's top `testing` label to "init wires the runtime
+      ExtensionAPI into the extension" (the private internal-atom reach is gone).

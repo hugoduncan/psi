@@ -941,3 +941,39 @@ test's `"nullable-session"` literal "was replaced with the `nullable-session`
 const", but only the *assertion* was changed — the `register-content-route!`
 *registration* literal (and the `dev-present` render test's `opts` literal)
 still hardcode the string. The round-12 done-claim overstated the change.
+
+## Round 13 follow-ups executed (test-shaper) — 2026-06-15
+
+All four round-13 test-shaping follow-ups in
+`extensions/dev-http/test/extensions/dev_http_test.clj` completed:
+
+- Added a `with-running-server` **function** helper (callback-style:
+  `(with-running-server (fn [{:keys [server state api]}] …))`). It `init`s +
+  `start!`s the extension against a real ephemeral-port server, invokes `f` with
+  `{:server :state :api}`, and `stop!`s in a `finally`. Adopted by the four
+  init→start→try/finally-stop integration tests
+  (`dev-present-tool-renders-over-server-test`, `choices-interaction-loop-test`,
+  `sse-live-feed-test`, `register-sse-route!-test`). Chose a fn over a macro so
+  clj-kondo fully analyzes the destructured callback binding (a macro with a
+  single destructured binding form + body has no matching `:lint-as` and would
+  need a hook — kondo flagged the macro's `{:keys [state]}`/`{:keys [server]}`
+  as unresolved). `register-sse-route!-test` keeps its pre-start not-running
+  contract assertion as a separate `init`-only block (the helper always starts).
+  Excluded `lifecycle-and-serving-test` and `dev-http-command-handler-test` per
+  the follow-up (they drive the lifecycle surface directly).
+- Added a `test-ext-path` const + `nullable-api` (`[]`/`[opts]`) helper; all
+  `create-nullable-extension-api` sites now flow through it (the fixture path has
+  one source; failure-seam sites pass `{:mutate-fn …}` as the override).
+- Both lingering `"nullable-session"` registration literals now use the
+  `nullable-session` const (tool `opts` in the render test; the
+  `register-content-route!` `:session-id` in the loop test) — the round-12
+  done-claim overstated; this closes it.
+- `init-captures-api-test`: dropped the implementation-coupled
+  `(is (identical? api (:api @@#'sut/state)))` internal-atom assertion in favour
+  of the adjacent observable `/dev-http`-command-registration signal; renamed the
+  top testing label accordingly.
+
+Verification: extensions (unit) suite green (18 tests / 137 assertions — one
+fewer than round 12's 138, the removed internal-atom `identical?` assertion);
+integration suite green (6 tests / 61 assertions, identical to the round-12
+baseline — behaviour preserved); clj-kondo clean (0/0); cljfmt clean.

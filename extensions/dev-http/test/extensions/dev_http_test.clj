@@ -26,12 +26,22 @@
 
 (def ^:private nullable-session "nullable-session")
 
+(def ^:private test-ext-path "/test/dev_http.clj")
+
+(defn- nullable-api
+  "Create the dev-http nullable ExtensionAPI fixture under the shared test
+   ext-path. `opts` adds overrides (e.g. a failing `:mutate-fn` seam)."
+  ([] (nullable-api nil))
+  ([opts] (nullable/create-nullable-extension-api (merge {:path test-ext-path} opts))))
+
 (deftest init-captures-api-test
-  (testing "init captures the runtime ExtensionAPI map into the extension atom"
-    (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/dev_http.clj"})]
+  (testing "init wires the runtime ExtensionAPI into the extension"
+    (let [{:keys [api state]} (nullable-api)]
       (is (nil? (sut/init api)))
-      (is (identical? api (:api @@#'sut/state)))
+      ;; The observable proof that init wired the captured api is the registered
+      ;; /dev-http command (the integration tests prove the stored api drives
+      ;; start!/status-text); assert that surface rather than reaching through
+      ;; the private internal atom.
       (testing "registers the /dev-http command"
         (is (contains? (:commands @state) "dev-http"))))))
 
@@ -327,8 +337,7 @@
     :or   {prompt     "Pick one"
            route-id   "c1"
            session-id nullable-session}}]
-  (let [created (when-not api
-                  (nullable/create-nullable-extension-api {:path "/test/dev_http.clj"}))
+  (let [created (when-not api (nullable-api))
         api     (or api (:api created))
         state   (:state created)
         reg     (or reg (registry/create-registry))
@@ -379,9 +388,7 @@
   ;; registry claim state are the assertion signals.
   (testing "a falsey prompt-submitted? renders a failure page and releases the claim"
     (let [outcome       (atom {:psi.extension/prompt-submitted? false})
-          {:keys [api]} (nullable/create-nullable-extension-api
-                         {:path      "/test/dev_http.clj"
-                          :mutate-fn (fn [_op _params] @outcome)})
+          {:keys [api]} (nullable-api {:mutate-fn (fn [_op _params] @outcome)})
           {:keys [handler reg]} (make-choices-handler {:options ["A" "B"]
                                                        :api     api})
           resp                  (handler {:request-method :post :body "choice=A"})]
@@ -395,9 +402,7 @@
           (is (re-find #"Recorded" (:body resp2)))
           (is (:answered? (registry/get-entry reg "c1")))))))
   (testing "a throwing mutation renders a failure page and releases the claim"
-    (let [{:keys [api]} (nullable/create-nullable-extension-api
-                         {:path      "/test/dev_http.clj"
-                          :mutate-fn (fn [_op _params] (throw (ex-info "boom" {})))})
+    (let [{:keys [api]} (nullable-api {:mutate-fn (fn [_op _params] (throw (ex-info "boom" {})))})
           {:keys [handler reg]} (make-choices-handler {:options ["A" "B"]
                                                        :api     api})
           resp                  (handler {:request-method :post :body "choice=A"})]
@@ -492,9 +497,19 @@
   (let [b (:body resp)]
     (if (instance? java.io.InputStream b) (slurp b) (str b))))
 
+(defn- with-running-server
+  "Init + start the dev-http extension against a real ephemeral-port server,
+   call `f` with `{:server :state :api}`, and always `stop!`. Not for tests
+   that drive the lifecycle surface directly (start/status/stop)."
+  [f]
+  (let [{:keys [api state]} (nullable-api)
+        server              (do (sut/init api) (sut/start!))]
+    (try
+      (f {:server server :state state :api api})
+      (finally (sut/stop!)))))
+
 (deftest ^:integration lifecycle-and-serving-test
-  (let [{:keys [api]} (nullable/create-nullable-extension-api
-                       {:path "/test/dev_http.clj"})]
+  (let [{:keys [api]} (nullable-api)]
     (sut/init api)
     (testing "not running before start"
       (is (= "dev-http not running" (sut/status-text))))
@@ -567,24 +582,19 @@
   ;; http-kit server. The unit `dev-present-tool-test` stubs the register seam
   ;; and `lifecycle-and-serving-test` calls `register-content-route!` directly,
   ;; so both bypass the tool→register wiring this test exercises end-to-end.
-  (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                             {:path "/test/dev_http.clj"})]
-    (sut/init api)
-    (sut/start!)
-    (try
+  (with-running-server
+    (fn [{:keys [state]}]
       (let [tool (get-in @state [:tools "dev-present"])]
         (is (some? tool) "init registered the dev-present tool")
         (let [result ((:execute tool)
                       {"renderer" "markdown" "data" "# Tool Live" "route-id" "tool-md"}
-                      {:session-id "nullable-session"})
+                      {:session-id nullable-session})
               url    (second (re-find #"Open: (\S+)" (str (:content result))))]
           (is (false? (:is-error result)))
           (is (string? url))
           (let [resp @(http-client/get url)]
             (is (= 200 (:status resp)))
-            (is (re-find #"<h1>Tool Live</h1>" (body-str resp))))))
-      (finally
-        (sut/stop!)))))
+            (is (re-find #"<h1>Tool Live</h1>" (body-str resp)))))))))
 
 (defn- live-token
   "Extract the running server's live token from a session-route URL."
@@ -600,8 +610,7 @@
   ;; nullable state `:commands` (wired in `init`) — and assert on the captured
   ;; log lines + the running/stopped server state, including the running-status
   ;; url/token presentation.
-  (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                             {:path "/test/dev_http.clj"})]
+  (let [{:keys [api state]} (nullable-api)]
     (sut/init api)
     (let [handler (get-in @state [:commands "dev-http" :handler])]
       (is (fn? handler) "init registered a /dev-http command handler")
@@ -648,15 +657,12 @@
 (deftest ^:integration choices-interaction-loop-test
   ;; Drives the choice loop over the real http-kit server: GET form → POST
   ;; choice → mutate-session (captured by the nullable api) → single-shot guard.
-  (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                             {:path "/test/dev_http.clj"})]
-    (sut/init api)
-    (sut/start!)
-    (try
+  (with-running-server
+    (fn [{:keys [state]}]
       (let [url (sut/register-content-route! "ch" {:renderer   :choices
                                                    :data       {:prompt  "Pick one"
                                                                 :options ["A" "B"]}
-                                                   :session-id "nullable-session"})]
+                                                   :session-id nullable-session})]
         (testing "the choices form is served"
           (let [resp @(http-client/get url)]
             (is (= 200 (:status resp)))
@@ -673,20 +679,15 @@
           (let [resp (post-form url "choice=B")
                 muts (submit-prompt-mutations state)]
             (is (re-find #"Already answered" (body-str resp)))
-            (is (= 1 (count muts))))))
-      (finally
-        (sut/stop!)))))
+            (is (= 1 (count muts)))))))))
 
 (deftest ^:integration sse-live-feed-test
   ;; Connects to the real SSE feed over the ephemeral-port server and reads the
   ;; pushed snapshot, which reflects current registry state.
-  (let [{:keys [api]} (nullable/create-nullable-extension-api
-                       {:path "/test/dev_http.clj"})]
-    (sut/init api)
-    (let [server (sut/start!)
-          base   (server-base server)
-          token  (:token server)]
-      (try
+  (with-running-server
+    (fn [{:keys [server]}]
+      (let [base  (server-base server)
+            token (:token server)]
         (testing "AC-8: the SSE feed (a session route registered at start!) requires the token"
           (is (= 403 (get-status (str base "/s/registry")))))
         (testing "a connected client receives a pushed snapshot event"
@@ -699,38 +700,33 @@
                          (str (get-in resp [:headers :content-type]))))
             (let [body (body-str resp)]
               (is (re-find #"data: open" body))
-              (is (re-find #"data: routes 2" body)))))
-        (finally
-          (sut/stop!))))))
+              (is (re-find #"data: routes 2" body)))))))))
 
 (deftest ^:integration register-sse-route!-test
   ;; Exercises the public Slice 4 `register-sse-route!` REPL/dev surface end to
   ;; end: it must wrap an arbitrary `emit-fn` via `sse/make-handler`, register it
   ;; through `register-route!` as a token-gated session route, and return its
   ;; URL — none of which the `register-route!`-based feed tests cover.
-  (let [{:keys [api]} (nullable/create-nullable-extension-api
-                       {:path "/test/dev_http.clj"})]
-    (sut/init api)
-    (testing "returns nil when the server is not running"
+  (testing "returns nil when the server is not running"
+    (let [{:keys [api]} (nullable-api)]
+      (sut/init api)
       (is (nil? (sut/register-sse-route!
-                 "feed" (fn [send! _close!] (send! "tick"))))))
-    (let [server (sut/start!)
-          base   (server-base server)
-          token  (:token server)]
-      (try
-        (let [url (sut/register-sse-route!
+                 "feed" (fn [send! _close!] (send! "tick")))))))
+  (with-running-server
+    (fn [{:keys [server]}]
+      (let [base  (server-base server)
+            token (:token server)
+            url   (sut/register-sse-route!
                    "feed" (fn [send! close!] (send! "tick") (close!)))]
-          (testing "returns the registered route URL"
-            (is (some? url)))
-          (testing "AC-8: the registered feed is token-gated like any session route"
-            (is (= 403 (get-status (str base "/s/feed")))))
-          (testing "the wrapped emit-fn streams data: open + data: tick over the server"
-            (let [resp @(http-client/get (str base "/s/feed?token=" token))]
-              (is (= 200 (:status resp)))
-              (is (re-find #"text/event-stream"
-                           (str (get-in resp [:headers :content-type]))))
-              (let [body (body-str resp)]
-                (is (re-find #"data: open" body))
-                (is (re-find #"data: tick" body))))))
-        (finally
-          (sut/stop!))))))
+        (testing "returns the registered route URL"
+          (is (some? url)))
+        (testing "AC-8: the registered feed is token-gated like any session route"
+          (is (= 403 (get-status (str base "/s/feed")))))
+        (testing "the wrapped emit-fn streams data: open + data: tick over the server"
+          (let [resp @(http-client/get (str base "/s/feed?token=" token))]
+            (is (= 200 (:status resp)))
+            (is (re-find #"text/event-stream"
+                         (str (get-in resp [:headers :content-type]))))
+            (let [body (body-str resp)]
+              (is (re-find #"data: open" body))
+              (is (re-find #"data: tick" body)))))))))
