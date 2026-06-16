@@ -191,7 +191,7 @@ the next begins.
 
 ## Implementation review follow-ups (round 2)
 
-- [ ] `claim-answer!` (`extensions/dev-http/src/extensions/dev_http/choices.clj`)
+- [x] `claim-answer!` (`extensions/dev-http/src/extensions/dev_http/choices.clj`)
       performs a side effect inside the `swap!` update fn: it `reset!`s an
       external `won` atom from within the function passed to `swap!`. This is the
       documented swap-side-effect anti-pattern (`swap!` may retry its fn). It
@@ -200,15 +200,23 @@ the next begins.
       derive the win from the returned old/new state, e.g.
       `(let [[old _] (swap-vals! reg (fn [m] …))] (not (:answered? (get old route-id))))`,
       removing the inner `won` atom.
-- [ ] Duplicate session-route URL path shape `"/s/" <route-id> "?token=" <token>`
+      Done: rewrote `claim-answer!` with `swap-vals!`; the update fn is now pure
+      (no inner `won` atom) and the win derives from `(not (:answered? (get old route-id)))`.
+- [x] Duplicate session-route URL path shape `"/s/" <route-id> "?token=" <token>`
       is hand-built in two places — `route-url` (`dev_http.clj`, with base-url)
       and `render-form`'s form `action` (`choices.clj`, relative). The reitit
       template `/s/:route-id` (`router.clj`) is the third encoding of the same
       dispatch path. A path change must be made in all three. Extract the
       relative session-route path (`"/s/" route-id`) into one shared helper used
       by both URL builders so the dispatch path has a single source of truth.
-- [ ] `handle-command`'s `"start"` branch (`dev_http.clj`) hand-builds a
+      Done: added `util/session-route-prefix` (`"/s"`) + `util/session-route-path`
+      (`<prefix>/<route-id>?token=<token>`). `route-url` and choices `render-form`
+      action both use `session-route-path`; `router` derives its reitit template
+      from `session-route-prefix`. All three encodings now flow from `util`.
+- [x] `handle-command`'s `"start"` branch (`dev_http.clj`) hand-builds a
       `"dev-http started\n  url:   …\n  token: …"` string that duplicates the
       url/token formatting already produced by `status-text`. Reuse a single
       formatting helper (or have `start` log `status-text` after starting) so the
       running-status presentation has one source.
+      Done: extracted `url-token-lines` (private); both `status-text` and the
+      `start` command branch render the indented url/token block through it.

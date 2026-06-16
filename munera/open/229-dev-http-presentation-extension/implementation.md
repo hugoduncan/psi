@@ -229,3 +229,21 @@ Three new quality/consistency follow-ups filed in steps.md (round 2): a
 swap-side-effect in `claim-answer!`; the `/s/<id>?token=` path shape encoded in
 three places; and start-status formatting duplicated between `handle-command`
 and `status-text`. All are non-behavioural; no correctness defect found.
+
+## Implementation review (round 2) follow-ups executed — 2026-06-15
+
+All three round-2 follow-ups completed (non-behavioural quality/consistency):
+
+- `claim-answer!` rewritten with `swap-vals!` — update fn now pure; win derived
+  from prior state `(not (:answered? (get old route-id)))`, inner `won` atom gone.
+- Session-route dispatch path single-sourced in `extensions.dev-http.util`:
+  `session-route-prefix` (`"/s"`) + `session-route-path` (`<prefix>/<id>?token=<token>`).
+  `route-url` (dev_http), choices `render-form` action, and the `router` reitit
+  template (`<prefix>/:route-id`) all derive from it.
+- Start/status url/token presentation single-sourced via private `url-token-lines`;
+  used by both `status-text` and the `start` command branch.
+
+Verification: extensions suite green (14/77), integration green (3/34);
+clj-kondo clean across extension src. No behaviour change; test assertions
+(`/s/<id>?token=`, `action="/s/c1?token=tok"`, `dev-http running`/`not running`)
+all preserved.

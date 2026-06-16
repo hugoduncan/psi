@@ -12,7 +12,7 @@
    [clojure.string :as str]
    [extensions.dev-http.middleware :as mw]
    [extensions.dev-http.renderers :as renderers]
-   [extensions.dev-http.util :refer [kget]]))
+   [extensions.dev-http.util :as util :refer [kget]]))
 
 (defn- normalize-option
   "Normalize an option to `{:label … :value …}`. A bare scalar becomes both."
@@ -42,7 +42,7 @@
   (let [data    (:data content)
         prompt  (kget data :prompt "prompt")
         options (map normalize-option (or (kget data :options "options") []))
-        action  (str "/s/" route-id "?token=" token)]
+        action  (util/session-route-path route-id token)]
     (renderers/page "choices"
                     [:form {:method "post" :action action}
                      (when prompt [:p prompt])
@@ -66,17 +66,17 @@
 (defn- claim-answer!
   "Atomically mark `route-id` answered with `answer` if not already answered.
    Returns true iff this call won the claim. Single-developer/localhost — the
-   accepted lightweight guard (design R6)."
+   accepted lightweight guard (design R6). Uses `swap-vals!` so the update fn is
+   pure and the win is derived from the returned prior state."
   [registry-atom route-id answer]
-  (let [won (atom false)]
-    (swap! registry-atom
-           (fn [m]
-             (let [entry (get m route-id)]
-               (if (:answered? entry)
-                 (do (reset! won false) m)
-                 (do (reset! won true)
-                     (assoc m route-id (assoc entry :answered? true :answer answer)))))))
-    @won))
+  (let [[old _] (swap-vals! registry-atom
+                            (fn [m]
+                              (let [entry (get m route-id)]
+                                (if (:answered? entry)
+                                  m
+                                  (assoc m route-id
+                                         (assoc entry :answered? true :answer answer))))))]
+    (not (:answered? (get old route-id)))))
 
 (defn make-handler
   "Build the ring handler for a `:choices` route. Closes over the `registry`

@@ -16,6 +16,7 @@
    [extensions.dev-http.sse :as sse]
    [extensions.dev-http.system :as system]
    [extensions.dev-http.tool :as tool]
+   [extensions.dev-http.util :as util]
    [integrant.core :as ig]))
 
 (defonce ^:private state
@@ -50,7 +51,7 @@
   "Build the full URL (including token) for a session `route-id`."
   [route-id]
   (when-let [server (server-component)]
-    (str (base-url) "/s/" route-id "?token=" (:token server))))
+    (str (base-url) (util/session-route-path route-id (:token server)))))
 
 ;; ---------------------------------------------------------------------------
 ;; lifecycle
@@ -74,13 +75,18 @@
     (swap! state assoc :system sys)
     (server-component)))
 
+(defn- url-token-lines
+  "Single source of the indented url/token presentation shared by the `status`
+   and `start` command output."
+  [server]
+  (str "  url:   " (base-url) "\n"
+       "  token: " (:token server)))
+
 (defn status-text
   "Human-readable status: running?/URL/token."
   []
   (if-let [server (server-component)]
-    (str "dev-http running\n"
-         "  url:   " (base-url) "\n"
-         "  token: " (:token server))
+    (str "dev-http running\n" (url-token-lines server))
     "dev-http not running"))
 
 ;; ---------------------------------------------------------------------------
@@ -137,9 +143,7 @@
   (let [sub (-> (or args "") str/trim (str/split #"\s+") first)]
     (case sub
       "start"  (let [server (start!)]
-                 (log! (str "dev-http started\n"
-                            "  url:   " (base-url) "\n"
-                            "  token: " (:token server))))
+                 (log! (str "dev-http started\n" (url-token-lines server))))
       "status" (log! (status-text))
       "stop"   (do (stop!) (log! "dev-http stopped"))
       (log! "usage: /dev-http start | status | stop"))))

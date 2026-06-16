@@ -11,6 +11,7 @@
    [extensions.dev-http.registry :as registry]
    [extensions.dev-http.renderers :as renderers]
    [extensions.dev-http.sse :as sse]
+   [extensions.dev-http.util :as util]
    [reitit.ring :as ring]))
 
 (defn- session-dispatch-handler
@@ -28,7 +29,8 @@
    and a vector of `:persisted-routes`. Every dynamic subtree is token-gated."
   [{:keys [registry token persisted-routes]}]
   (let [gated-root (into ["" {:middleware [[mw/wrap-token token]]}
-                          ["/s/:route-id" {:handler (session-dispatch-handler registry)}]
+                          [(str util/session-route-prefix "/:route-id")
+                           {:handler (session-dispatch-handler registry)}]
                           ;; Demonstrated SSE live feed (token-gated subtree).
                           ["/sse/registry" {:get (sse/registry-feed-handler registry)}]]
                          (or persisted-routes []))
