@@ -6,23 +6,24 @@ the next begins.
 
 ## Slice 0 — Scaffold + wiring
 
-- [ ] Create `extensions/dev-http/` dir tree (`src/extensions/`, `dev/`,
+- [x] Create `extensions/dev-http/` dir tree (`src/extensions/`, `dev/`,
       `resources/dev_http/vendor/`, `test/extensions/`).
-- [ ] Write `extensions/dev-http/deps.edn`: `:paths ["src"]`, deps
-      (`metosin/reitit-ring`, `http-kit`, `hiccup`, `integrant`, clojure, the
-      psi components the api/tests need), a scoped `:dev` alias adding the `dev`
-      extra-path, and a `:test` alias with `extension-test-helpers` + kaocha.
-- [ ] Add `psi/dev-http {:local/root "dev-http"}` to `extensions/deps.edn`
+- [x] Write `extensions/dev-http/deps.edn`: `:paths ["src"]`, deps
+      (`metosin/reitit-ring`, `http-kit`, `hiccup`, `integrant`, clojure,
+      `psi/agent-session`), a scoped `:dev` alias adding the `dev` extra-path,
+      and a `:test` alias with `extension-test-helpers` + kaocha.
+- [x] Add `psi/dev-http {:local/root "dev-http"}` to `extensions/deps.edn`
       `:deps` and `"dev-http/test"` to its `:test` `:extra-paths`.
-- [ ] Add `extensions/dev-http/src` to the relevant `:extra-paths` blocks in root
-      `deps.edn`.
-- [ ] Add `psi/dev-http {}` to `.psi/extensions.edn` `:deps`.
-- [ ] Create entry-point `extensions/dev-http/src/extensions/dev_http.clj` with
+- [x] Add `extensions/dev-http/src` to the relevant `:extra-paths` blocks in root
+      `deps.edn` (also `tests.edn` suite source/test paths; new deps added to root
+      `:deps`; launcher catalog `psi-owned-extension-catalog` entry).
+- [x] Add `psi/dev-http {}` to `.psi/extensions.edn` `:deps`.
+- [x] Create entry-point `extensions/dev-http/src/extensions/dev_http.clj` with
       ns `extensions.dev-http`, a `(defonce ^:private state (atom {…}))`, and a
       stub `(defn init [api] …)` capturing the api map into the atom.
-- [ ] Smoke: resolve deps + REPL-load the entry-point ns with no errors
+- [x] Smoke: resolve deps + REPL-load the entry-point ns with no errors
       (de-risk R1).
-- [ ] Add a minimal `dev_http_test` asserting `init` captures the api map
+- [x] Add a minimal `dev_http_test` asserting `init` captures the api map
       (nullable extension API). Focused Scry green; clj-kondo clean.
 - [ ] Commit: `⚒ 229: scaffold dev-http extension + wiring`.
 

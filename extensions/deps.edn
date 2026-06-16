@@ -16,7 +16,8 @@
         psi/munera                  {:local/root "munera"}
         psi/plan-state-learning     {:local/root "plan-state-learning"}
         psi/work-on                 {:local/root "work-on"}
-        psi/metrics                 {:local/root "metrics"}}
+        psi/metrics                 {:local/root "metrics"}
+        psi/dev-http                {:local/root "dev-http"}}
 
  :aliases
  {:test {:extra-paths ["auto-session-name/test"
@@ -25,6 +26,7 @@
                        "mcp-tasks-run/test"
                        "metrics/test"
                        "plan-state-learning/test"
-                       "work-on/test"]
+                       "work-on/test"
+                       "dev-http/test"]
          :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
          :main-opts   ["-m" "kaocha.runner"]}}}

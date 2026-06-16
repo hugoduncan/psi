@@ -7,4 +7,5 @@
   psi/mementum          {}
   psi/munera            {}
   psi/work-on           {}
-  psi/metrics           {}}}
+  psi/metrics           {}
+  psi/dev-http          {}}}

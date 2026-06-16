@@ -135,7 +135,18 @@ feed (e.g. registry/route data evolving), no general pub/sub framework.
   `extension-test-helpers`. (`malli`, `commonmark` already on classpath.)
 - `extensions/deps.edn`: add `psi/dev-http {:local/root "dev-http"}` and the
   test extra-path.
-- root `deps.edn`: add `extensions/dev-http/src` to the relevant extra-paths.
+- root `deps.edn`: add `extensions/dev-http/src` to the relevant extra-paths,
+  **and** add the four new mvn deps to root `:deps` (the monorepo classpath is
+  governed by root `deps.edn`; extension-local `deps.edn` is not merged into the
+  monorepo classpath). (Discovered Slice 0.)
+- `tests.edn`: add dev-http `:source-paths`/`:test-paths` to the `:unit`,
+  `:extensions`, and `:integration` suites — extension tests run through the
+  kaocha `:extensions` suite, which supplies the extension source-paths.
+  (Discovered Slice 0.)
+- launcher catalog (`bases/main/src/psi/launcher/extensions.clj`): add a
+  `psi/dev-http` entry to `psi-owned-extension-catalog` mapping
+  `:psi/init 'extensions.dev-http/init` with dev/installed/jar source policies —
+  required for the extension to be discovered. (Discovered Slice 0.)
 - `.psi/extensions.edn`: add `psi/dev-http {}` to enable install (dev-time).
 
 ### Architectural constraints honoured

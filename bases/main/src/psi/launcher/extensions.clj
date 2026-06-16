@@ -101,6 +101,13 @@
      :installed   {:local/root "extensions/work-on"}
      :jar         {:mvn/version :psi/release-version}}}
 
+   'psi/dev-http
+   {:psi/init 'extensions.dev-http/init
+    :source-policies
+    {:development {:local/root "extensions/dev-http"}
+     :installed   {:local/root "extensions/dev-http"}
+     :jar         {:mvn/version :psi/release-version}}}
+
    'psi/workflow-loader
    {:psi/init 'extensions.workflow-loader/init
     :source-policies
