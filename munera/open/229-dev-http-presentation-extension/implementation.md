@@ -1125,3 +1125,29 @@ complete, and consistent:
 - No stale `/sse/` references (round-4 `/sse/registry` → `/s/registry` rename
   fully propagated to docs + CHANGELOG).
 No new actionable docs findings; no follow-up items added.
+
+## Code-shaper review pass — 2026-06-15 — REVIEW_COMPLETE
+
+Fresh code-shaper pass (simplicity ∧ consistency ∧ robustness) over all 12
+`extensions/dev-http` namespaces + `dev/demo.clj`, the one sanctioned core touch
+(`psi.extension/submit-synthetic-prompt`, `mutations/prompts.clj`), and verified
+the synthetic-message shape against the scheduler's `scheduled-user-message`
+canonical (`:role "user"` / `:content [{:type :text :text …}]` / Instant
+`:timestamp` / `:source`).
+
+- Simplicity: per-ns single responsibility; renderers pure (only `:file` does
+  I/O); `content-handler` `:choices`-vs-pure dispatch is the only branch.
+- Consistency: single-sourced response builders (`util`), `session-route-path`,
+  `url-token-lines`, token gating, and the three registration fns' not-running
+  contract; new mutation mirrors the scheduler shape.
+- Robustness: claim→inject→release single-shot via `swap-vals!`, synchronous
+  `halt-key!` deref (no orphaned server), jar-safe `routes-from-resource`,
+  `..`-rejecting `/assets`, bounded HTTP test clients.
+
+No new actionable findings; no steps.md follow-ups added. The lone borderline
+note — `register-content-route!` re-implements the `when-let`/`register-entry!`/
+`route-url` body rather than delegating to `register-route!` as
+`register-sse-route!` does — is intentionally not filed: prior rounds examined
+the sibling registration fns (steps "not-running precondition" item) and
+delegation would double-resolve the registry atom for a ~2-line saving. No
+non-compliance to report.
