@@ -2,10 +2,11 @@
 
 ## Intent (why)
 
-Today, when a judged workflow loop exhausts its `:max-iterations`, the
-statechart hardcodes the exhaustion transition to `:failed`. The whole workflow
-run hard-fails. There is no way for a workflow author to say "if this loop never
-converges, route somewhere clean instead of crashing".
+Today, when a judged workflow loop exhausts its `:max-iterations`, the runtime
+hardcodes exhaustion to a hard failure: the judge's `evaluate-routing` returns
+`{:action :fail :reason :iteration-exhausted}`, which marks the run `:failed`.
+The whole workflow run dies. There is no way for a workflow author to say "if
+this loop never converges, route somewhere clean instead of crashing".
 
 Concretely: `review-task-design` loops `design-review ↔ design-follow-up` up to
 `:max-iterations 3`. If the design never converges, the run dies with a hard
@@ -37,12 +38,23 @@ Routing flows through four layers in `components/workflow-runtime`:
   `:max-iterations`).
 - `ir.clj` `routing-directive-schema` — IR schema: `{:goto <target>
   (:max-iterations N)?}`.
+- `workflow-judge.clj` `evaluate-routing` — **the runtime-governing exhaustion
+  site for judged loops** (DI-6 in plan.md). On `:judge/enter`, the matched
+  directive is evaluated here first: when the target step's iteration count ≥ the
+  directive's `:max-iterations` (`check-iteration-limit` → `:exhausted`), it
+  returns `{:action :fail :reason :iteration-exhausted}`, which is enqueued as
+  `:judge/failed` and marks the run `:status :failed`. This short-circuits
+  **before** any `:judge/signal` is enqueued, so for the review workflows this
+  task targets the statechart `:judge/signal` exhaustion guard (below) never
+  fires — `evaluate-routing` is the edit that actually governs runtime exhaustion.
 - `statechart.clj` `compile-routing-transitions` — when a directive has
   `:max-iterations`, it emits **two** guarded `:judge/signal` transitions for
   that signal: the success path (`iter-count < max`) to the goto target, and the
   exhaustion path (`iter-count >= max`) hardcoded to `:target :failed`.
   `judged-routing-transition` then detects the `:failed` target and dispatches
-  the `:iteration/exhausted` action.
+  the `:iteration/exhausted` action (`:reason :iteration-limit-reached`). This is
+  the second, parallel exhaustion site; it is dead code for the judged review
+  loops (see `evaluate-routing` above) but is kept coherent with `:on-max-iterations`.
 
 `pass-status-routing` (`components/agent-session/.../workflow/routing.clj`) maps
 a `PASS_STATUS:` line value to a `DONE`/`REPEAT` route via the `status->route`
@@ -57,7 +69,7 @@ prose summary and are explicitly told **not** to emit a control token / PASS_STA
 
 ## Scope
 
-In scope (single repo, `psi-main` worktree):
+In scope (single repo, `exhaustion-routing` worktree):
 
 ### A. Engine — author-routed exhaustion target
 
@@ -76,37 +88,53 @@ In scope (single repo, `psi-main` worktree):
 3. **`target_ir_compiler.clj`** `compile-routing-table` — thread
    `:on-max-iterations` from the authored directive into the IR directive when
    present.
-4. **`statechart.clj`** `compile-routing-transitions` — when a directive carries
-   `:max-iterations`, resolve the exhaustion-path target:
-   - if `:on-max-iterations` is present → resolve it via the same goto→target
-     resolution used for `:goto` (`:next`/`:previous`/`:done`/step-name) and
-     route the exhaustion transition there;
-   - else → preserve current behaviour (route to `:failed`).
-   **No change to `judged-routing-transition`** (D2 below): it already selects
-   the dispatch action purely from whether the transition target is `:failed`.
-   Exhaustion → `:failed` keeps dispatching `:iteration/exhausted` (which marks
-   the run `:status :failed`, `:reason :iteration-limit-reached`); exhaustion →
-   an author target (≠ `:failed`) naturally falls into the `:judge/record`
-   branch, routes to the summary, and never marks the run failed.
+4. **Runtime exhaustion routing — two sites (DI-6).** When a directive carries
+   `:max-iterations` and `:on-max-iterations`, resolve the author target via the
+   same goto→target resolution used for `:goto`
+   (`:next`/`:previous`/`:done`/step-name); when `:on-max-iterations` is absent,
+   preserve current hard-fail behaviour. This must be applied at **both** sites:
+   - **`workflow-judge.clj`** `evaluate-routing` (**runtime-governing** for
+     judged loops): when `check-iteration-limit` is `:exhausted` **and** the
+     matched directive carries `:on-max-iterations`, return
+     `{:action :goto :target …}` (or `{:action :complete}` for `:done`) via the
+     existing `resolve-goto-target` logic instead of
+     `{:action :fail :reason :iteration-exhausted}`. The non-`:fail` action is
+     enqueued as `:judge/signal` → `:judge/record` `:goto` branch → routes to the
+     author target with `:status :running` (never marked failed). Absent
+     `:on-max-iterations` → unchanged `{:action :fail :reason :iteration-exhausted}`.
+   - **`statechart.clj`** `compile-routing-transitions` (parallel site, kept
+     coherent): compute the same exhaustion-path target for the `:judge/signal`
+     exhaustion guard (author target when present, else `:target :failed`).
+   **No change to `judged-routing-transition`** (D2 below): it already selects the
+   dispatch action purely from whether the transition target is `:failed` —
+   `:failed` → `:iteration/exhausted`; an author target (≠ `:failed`) →
+   `:judge/record`.
 5. **Tests** for ir/model schema acceptance **and rejection** (D3), the
-   `target_ir_compiler` threading, and `statechart` routing (exhaustion → author
-   target dispatches `:judge/record` and reaches the target; exhaustion without
-   `:on-max-iterations` still reaches `:failed` + `:iteration/exhausted`),
-   extending existing `ir_test`, `model_test`, `target_ir_compiler_test`,
-   `statechart_test`.
+   `target_ir_compiler` threading, the `statechart` `:judge/signal` routing, and
+   — because the pure-statechart test bypasses `evaluate-routing` and so cannot
+   detect the governing path (DI-6) — an **integration-level** assertion that a
+   real exhausted judged loop with `:on-max-iterations` routes to the author
+   target with `:status :running` (not `:iteration-exhausted`), and without it
+   still hard-fails `:iteration-exhausted`. Extends `ir_test`, `model_test`,
+   `target_ir_compiler_test`, `statechart_test`, plus a `workflow-judge` /
+   review-step-routing integration test.
 
 ### B. Workflows — review-did-not-converge handback
 
 6. **`review-task-design.edn`** — `design-follow-up`'s `:on` gains
-   `:on-max-iterations` pointing at a new clean summary step (e.g.
-   `final-summary-not-converged`) that produces a "design review did not
+   `:on-max-iterations` pointing at a new clean summary step
+   (`final-summary-not-converged`) that produces a "design review did not
    converge" user-facing summary. Per D1, the converged `final-summary` emits a
    required `PASS_STATUS: REVIEW_COMPLETE` line and the not-converged summary
-   emits `PASS_STATUS: ACTIONABLE_FEEDBACK`; this **replaces** the existing
-   "do not output REPEAT/DONE/control tokens" instruction in those summaries
-   with a single required `PASS_STATUS:` line. Note (D5): this PASS_STATUS line
-   also appears when `review-task-design` is run standalone via
-   `/delegate review-task-design` — accepted.
+   emits `PASS_STATUS: ACTIONABLE_FEEDBACK`. The summary-template wording follows
+   the strict single-line PASS_STATUS contract in plan.md DI-4 — it does **not**
+   blanket-"replace" the existing anti-control-token guards: **keep** the
+   prose-body guard ("respond with a concise summary, not a control token") and
+   **rewrite** the anti-`PASS_STATUS` guard into the precise rule (end with
+   exactly one column-0 `PASS_STATUS: <TOKEN>` line, and do not echo the
+   `PASS_STATUS:` lines carried in the contributed review replies — avoiding the
+   `:ambiguous-pass-status` failure). Standalone-output behaviour is governed by
+   D5.
 7. **`review-task-plan.edn`** — identical treatment (`plan-follow-up`
    `:on-max-iterations` → not-converged summary; `PASS_STATUS: REVIEW_COMPLETE`
    on the converged summary, `PASS_STATUS: ACTIONABLE_FEEDBACK` on the
@@ -149,9 +177,12 @@ Out of scope:
 - **D2 — Exhaustion dispatch.** No change to `judged-routing-transition`. It
   already selects dispatch from whether the target is `:failed`: author-routed
   exhaustion (target ≠ `:failed`) uses `:judge/record` and does not mark the run
-  failed; default exhaustion (`:failed`) keeps `:iteration/exhausted`. The only
-  statechart edit is computing the exhaustion target in
-  `compile-routing-transitions`.
+  failed; default exhaustion (`:failed`) keeps `:iteration/exhausted`. The
+  **runtime-governing** edit is in `workflow-judge.clj` `evaluate-routing` (DI-6);
+  the parallel `compile-routing-transitions` edit keeps the statechart
+  `:judge/signal` site coherent. (Originally this decision read "the only
+  statechart edit"; that under-described the change set — corrected per DI-6. The
+  *decision* — `judged-routing-transition` untouched — is unchanged.)
 - **D3 — `:on-max-iterations` requires `:max-iterations`.** Reject at schema
   (both `model.clj` and `ir.clj`) via a cross-field `:fn` constraint, rather
   than silently ignoring it. Avoids a footgun where a typo'd-away
@@ -163,9 +194,19 @@ Out of scope:
   `final-summary-without-extraction`), because context availability differs per
   stage (no plan yet at the design stage). Rejected alternative: one shared
   lowest-common-denominator stop step.
-- **D5 — Standalone output.** Adding the `PASS_STATUS:` line to the
-  `review-task-design` / `review-task-plan` final summaries also changes their
-  output when run directly via `/delegate`. Accepted as useful.
+- **D5 — Standalone output.** Adding the `PASS_STATUS:` line changes the
+  standalone `/delegate review-task-design`/`-plan` output, and the two standalone
+  cases differ (the standalone result-text path reads `(last :step-order)`; the
+  converged `final-summary` is ordered last — see plan.md DI-2/R5):
+  - **Converged standalone** → surfaces the converged `final-summary`'s
+    `PASS_STATUS: REVIEW_COMPLETE`. Accepted as useful.
+  - **Not-converged standalone** → the never-run converged `final-summary` is
+    still last, so result text is **empty** (the `final-summary-not-converged`
+    `PASS_STATUS: ACTIONABLE_FEEDBACK` is not surfaced). Accepted as a known
+    **degradation**, not a feature: the non-convergence handback is a
+    lifecycle-only concern, consumed via the order-independent lifecycle
+    delegate-gate path (reverse-scan), which resolves correctly. Fixing the
+    shared `execute-workflow-run` last-step resolution is out of scope (plan.md R5).
 
 - **Workflow-runtime boundary (invariant).** `:on-max-iterations` is a generic
   parameterized primitive (an author-supplied goto-target for the exhaustion
@@ -181,9 +222,13 @@ Out of scope:
   `:max-iterations` is **rejected** by both schemas with a clear error (D3).
 - AC-2: `target_ir_compiler` threads `:on-max-iterations` from authored model to
   IR.
-- AC-3: `compile-routing-transitions` routes the exhaustion transition to the
-  resolved `:on-max-iterations` target when present, and to `:failed`
-  (current behaviour, dispatching `:iteration/exhausted`) when absent.
+- AC-3: Runtime exhaustion routes to the resolved `:on-max-iterations` target
+  when present, and hard-fails when absent, at **both** sites — the governing
+  `evaluate-routing` (`:exhausted` + `:on-max-iterations` → `:action :goto`/`:complete`,
+  `:status :running`; else `:action :fail :reason :iteration-exhausted`) and the
+  parallel `compile-routing-transitions` `:judge/signal` guard (author target,
+  else `:failed` + `:iteration/exhausted`) — verified at integration level for
+  the governing path (DI-6).
 - AC-4: `review-task-design` routes a non-converging design loop to a clean
   "design review did not converge" summary that emits a routable `PASS_STATUS`;
   no hard failure.

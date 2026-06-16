@@ -420,3 +420,34 @@ plan-profile follow-up):
 3. Context/D2 (loop-5 item-1 residual): note the judge-side `evaluate-routing`
    governing site (DI-6) so the Context current-behaviour description and the
    "only … edit" framing match the actual change set; D2's decision is unchanged.
+
+---
+
+## Design pass (post-move, 229 on `exhaustion-routing`)
+
+Executed the consolidated design pass the plan-review profile had deferred
+(design.md was read-only there). Verified DI-6 against the code first:
+`workflow_judge.clj` `evaluate-routing` returns
+`{:action :fail :reason :iteration-exhausted}` on `:exhausted` — confirmed the
+governing runtime exhaustion site, with `resolve-goto-target` already present for
+reuse. `design.md` reconciled:
+
+1. **Context + Intent + scope A.4 + AC-3 (DI-6).** Added the `evaluate-routing`
+   governing-site description; reframed exhaustion as two sites (governing judge
+   side + parallel statechart side); scope item 4 now mandates the
+   `evaluate-routing` `:on-max-iterations` edit (governing) alongside the
+   `compile-routing-transitions` edit (coherence); item 5 + AC-3 require
+   integration-level coverage of the governing path.
+2. **Scope item 6 (DI-4).** Dropped "replaces the existing instruction"; now
+   keep prose-guard (a) / rewrite anti-echo guard (b), sole column-0
+   `PASS_STATUS:` line.
+3. **D2.** Softened "the only statechart edit" → governing edit is
+   `evaluate-routing`; decision (`judged-routing-transition` untouched) unchanged.
+4. **D5.** Split standalone output: converged surfaces `REVIEW_COMPLETE`
+   (useful); not-converged empty/degraded via `(last :step-order)` (accepted,
+   lifecycle-only handback) per R5.
+
+`steps.md` Slices 1–3 re-synced to the hardened plan (DI-6 site + integration
+test; four mandated sub-tasks a–d; DI-2 ordering; DI-3 wording; DI-4 contract).
+All three previously-blocked `design-steps.md` items now `[x]`. design.md ↔
+plan.md ↔ steps.md are coherent; task is implementation-ready.

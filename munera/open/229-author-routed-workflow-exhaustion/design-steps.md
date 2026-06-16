@@ -265,8 +265,14 @@ plan.md / design.md (steps.md is read-only review context).
       indices, yields-repeat); a separate 229 test is additive-only, not a
       substitute.
 
-- [ ] **`steps.md` execution checklist is out of sync with the hardened
-      `plan.md` mandates (Slice 2/3).** Prior plan-review passes hardened
+- [x] **`steps.md` execution checklist is out of sync with the hardened
+      `plan.md` mandates (Slice 2/3).**
+      → **RESOLVED (design pass).** `steps.md` Slices 1–3 re-synced: added DI-6
+      `evaluate-routing` site + integration test (Slice 1); enumerated the four
+      sub-tasks — (a) RED `:max-iterations` 6→3 fix, (b) converged-standalone
+      DI-2 runtime test, (c) in-place `task-lifecycle-test` positional update
+      (9→11→13) + additive `229` test (R3/DI-5), (d) DI-3 no-literal-count
+      wording — plus DI-2 ordering and DI-4 template contract. Prior plan-review passes hardened
       `plan.md` with several MUST-do test items, but `steps.md` (the execution
       surface) was never re-synced, so an implementer ticking `steps.md` alone
       would omit mandatory work and produce an implementation that violates
@@ -288,8 +294,12 @@ plan.md / design.md (steps.md is read-only review context).
       these four mandated sub-tasks so the execution checklist matches `plan.md`.
 
 
-- [ ] **`design.md` scope item 6 "replaces the instruction" contradicts the
+- [x] **`design.md` scope item 6 "replaces the instruction" contradicts the
       superseding `plan.md` DI-4 "keep (a), rewrite (b)" contract (Slice 2/3).**
+      → **RESOLVED (design pass).** `design.md` item 6 reworded: dropped
+      "replaces the existing instruction"; now mandates keep prose-guard (a) /
+      rewrite anti-echo guard (b) with the sole column-0 `PASS_STATUS:` line, per
+      plan.md DI-4. Item 7 covers it by "identical treatment".
       `design.md` scope item 6 (and item 7 by "identical treatment") states the
       summary change "**replaces** the existing 'do not output
       REPEAT/DONE/control tokens' instruction in those summaries with a single
@@ -342,7 +352,7 @@ plan.md / design.md (steps.md is read-only review context).
       assumption — not just index/`repeat`-count bumps — for both Slice 2 (gate at
       index 1) and Slice 3 (gate at index 4).
 
-- [ ] **`design.md` D5 "standalone output accepted as useful" contradicts
+- [x] **`design.md` D5 "standalone output accepted as useful" contradicts
       `plan.md` R5/DI-2 "not-converged standalone surfaces empty/degraded result
       text" (Slice 2/3).** `design.md` D5 ("Standalone output") states that
       "Adding the `PASS_STATUS:` line to the review-task-design / review-task-plan
@@ -371,3 +381,9 @@ plan.md / design.md (steps.md is read-only review context).
       standalone path surfaces empty result text (degraded, accepted) per R5 — or
       replace D5's standalone framing with an explicit pointer to plan.md R5/DI-2
       as the authoritative standalone-output contract.
+      → **RESOLVED (design pass).** `design.md` D5 rewritten to split the two
+      standalone cases: converged → surfaces `PASS_STATUS: REVIEW_COMPLETE`
+      (accepted/useful); not-converged → empty/degraded result text via the
+      `(last :step-order)` path, accepted as a known degradation (handback is a
+      lifecycle-only concern via the order-independent delegate-gate path), per
+      plan.md R5/DI-2.
