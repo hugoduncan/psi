@@ -571,3 +571,26 @@ Pre-existing unrelated failure (NOT 229): the live
 in the same ns fails identically with my changes stashed (terminates :failed —
 environmental/local-model dependency). Out of scope; left as-is. My two new DI-2
 tests in that ns pass (they stub the turn and drive the synchronous mutation).
+
+---
+
+## Verification pass (2026-06-16)
+
+Confirmed all four slices committed (33ce93beb..f4ded07bb). Verified focused
+suites green at HEAD:
+- `workflow-definitions-test` (loader): 270 assertions, 11 tests, 0 fail.
+- `ir`/`model`/`target-ir-compiler`/`statechart`/`workflow-judge`: 280
+  assertions, 43 tests, 0 fail.
+- `workflow-review-step-routing` + `workflow-delegate-review-step-live`: 137
+  assertions, 16 tests pass; the lone failure
+  `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+  is the documented pre-existing environmental failure — it exercises
+  `review-task-implementation` (untouched by 229: `git log --name-only` over the
+  229 range shows no `review-task-implementation` edn/clj edit), terminates
+  `:failed` under the nullable local test model, and is independent of the 229
+  change set. Out of scope; left as-is.
+
+Committed an outstanding test-shaper dedup: extracted shared
+`assert-review-summary-handback` helper in `workflow_definitions_test.clj`
+(both `review-task-design-test` and `review-task-plan-test` shared the identical
+terminal/DI-4-PASS_STATUS/shared-source assertions) — lint clean, suite green.

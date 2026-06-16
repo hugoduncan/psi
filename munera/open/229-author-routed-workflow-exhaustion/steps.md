@@ -71,7 +71,7 @@ Slices are independently committable; keep each commit `small`.
       handback assertions, `repeat 9→11`)
 - [x] focused workflow-loader (design+lifecycle vars) + DI-2 runtime Scry green;
       clj-kondo clean
-- [ ] pre-existing RED `review-task-plan-test` / `review-task-prompt-artifact-targets-test`
+- [x] pre-existing RED `review-task-plan-test` / `review-task-prompt-artifact-targets-test`
       (stale "steps.md" vs authored #177 "design-steps.md") → resolved in Slice 3
 - [x] commit `⚒ workflows: route unconverged design review to lifecycle handback`
 
