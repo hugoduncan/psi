@@ -188,3 +188,27 @@ clean; all AC-1..AC-10 covered. Findings filed as follow-ups in steps.md
 registration fns; duplicated `kget`/urlencoded-parse helpers; dead `source`
 param on the core mutation). All are quality/consistency issues, not behaviour
 defects.
+
+## Implementation review follow-ups (round 1) — resolved 2026-06-16
+
+- **No-op subscription removed.** Deleted the `((:on api) "session_switch"
+  (fn [_ev] nil))` call from `init` — undocumented, no behaviour, no future hook
+  intended.
+- **Not-running idiom unified on nil.** `register-route!` now returns nil when
+  the server is not running (was `throw ex-info`); `register-sse-route!`
+  delegates to it so it is nil too; `register-content-route!` was already nil.
+  This matches the `register-content!` seam contract the `dev-present` tool
+  depends on (nil ⇒ "server not running" tool error). No test relied on the
+  throw.
+- **Shared helpers de-duplicated.** New `extensions.dev-http.util/kget` replaces
+  the two verbatim copies in `renderers.clj` and `choices.clj`. The urlencoded
+  `([^&=]+)=([^&]*)` parse is now `mw/urlencoded-param` (kept in middleware as
+  the HTTP-param concern); both `query-token` (query string) and `form-choice`
+  (POST body) call it. `form-choice` now also picks up middleware's
+  exception-safe URL decode (previously a bare `URLDecoder/decode`).
+- **Dead `source` param dropped.** `submit-synthetic-prompt` no longer
+  destructures `source`; `:source` is always `:extension` (the only reachable
+  value, since `source` was never in `::pco/params` nor supplied by any caller).
+- Verification: extensions suite (14/77) + integration (3/34) + agent-session
+  `submit-synthetic-prompt-mutation-test` (1/6) green; clj-kondo clean across
+  all touched files.

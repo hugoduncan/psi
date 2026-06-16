@@ -152,14 +152,14 @@
    `send-prompt` delivery path. `user-msg` is plain text; this wraps it in a
    canonical user message record. Intended for extension-driven genuine user
    input (e.g. a dev-http choice submission)."
-  [_ {:keys [psi/agent-session-ctx session-id user-msg source]}]
+  [_ {:keys [psi/agent-session-ctx session-id user-msg]}]
   {::pco/op-name 'psi.extension/submit-synthetic-prompt
    ::pco/params  [:psi/agent-session-ctx :session-id :user-msg]
    ::pco/output  [:psi.extension/prompt-submitted?]}
   (let [message {:role      "user"
                  :content   [{:type :text :text (str user-msg)}]
                  :timestamp (java.time.Instant/now)
-                 :source    (or source :extension)}
+                 :source    :extension}
         {:keys [submitted?]}
         (dispatch/dispatch! agent-session-ctx
                             :session/submit-synthetic-user-prompt

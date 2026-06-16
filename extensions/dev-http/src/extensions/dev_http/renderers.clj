@@ -12,6 +12,7 @@
    [cheshire.core :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [extensions.dev-http.util :refer [kget]]
    [hiccup2.core :as h])
   (:import
    (org.commonmark.parser Parser)
@@ -24,11 +25,6 @@
 (def vendor-resource-root
   "Classpath resource root holding the vendored client JS."
   "dev_http/vendor")
-
-(defn- kget
-  "Read a value from `m` under any of `ks` (keyword or string keys)."
-  [m & ks]
-  (some (fn [k] (when (contains? m k) (get m k))) ks))
 
 (defn- html-response
   [body]

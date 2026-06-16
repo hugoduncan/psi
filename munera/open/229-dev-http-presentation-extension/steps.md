@@ -158,26 +158,33 @@ the next begins.
 
 ## Implementation review follow-ups (round 1)
 
-- [ ] Remove the dead no-op subscription in `init`:
+- [x] Remove the dead no-op subscription in `init`:
       `((:on api) "session_switch" (fn [_ev] nil))`
       (`extensions/dev-http/src/extensions/dev_http.clj`). It was added in the
       Slice 1 commit, is documented nowhere (design/plan/steps/implementation),
       and registers a real session-event subscription that does nothing —
       incidental complexity. Delete it, or, if a future hook is genuinely
       intended, replace the no-op with the actual behaviour and document it.
-- [ ] Make the not-running precondition consistent across the sibling
-      registration fns in `dev_http.clj`. `register-route!` throws `ex-info`
-      while `register-content-route!` / `register-sse-route!` return `nil` for
-      the same "server not running" condition. Pick one idiom for the public
-      REPL/dev registration surface and apply it uniformly.
-- [ ] De-duplicate shared helpers:
+      Deleted (no future hook intended).
+- [x] Make the not-running precondition consistent across the sibling
+      registration fns in `dev_http.clj`. `register-route!` threw `ex-info`
+      while `register-content-route!` / `register-sse-route!` returned `nil` for
+      the same "server not running" condition. Unified on the nil idiom:
+      `register-route!` now returns nil when the server is not running
+      (`register-sse-route!` delegates to it, so it is nil too); this matches
+      the `register-content!` seam contract the `dev-present` tool relies on.
+- [x] De-duplicate shared helpers:
       `kget` is defined verbatim in both `renderers.clj` and `choices.clj`;
       the urlencoded key/value regex parse `([^&=]+)=([^&]*)` is duplicated
       between `middleware/query-token` and `choices/form-choice`. Extract each
-      into one shared location rather than copies.
-- [ ] Resolve the dead `source` param in the core `submit-synthetic-prompt`
+      into one shared location rather than copies. `kget` → new
+      `extensions.dev-http.util`; urlencoded parse → `mw/urlencoded-param`
+      (HTTP concern, in middleware) used by both `query-token` and
+      `form-choice`.
+- [x] Resolve the dead `source` param in the core `submit-synthetic-prompt`
       mutation (`components/agent-session/.../mutations/prompts.clj`): `source`
       is destructured and `(or source :extension)` is used, but `source` is not
       in `::pco/params` and no caller supplies it, so the non-`:extension`
       branch is unreachable. Either drop the param (always `:extension`) or
-      declare and wire it through a caller.
+      declare and wire it through a caller. Dropped the param; `:source` is
+      always `:extension`.

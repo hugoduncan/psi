@@ -11,11 +11,8 @@
   (:require
    [clojure.string :as str]
    [extensions.dev-http.middleware :as mw]
-   [extensions.dev-http.renderers :as renderers]))
-
-(defn- kget
-  [m & ks]
-  (some (fn [k] (when (contains? m k) (get m k))) ks))
+   [extensions.dev-http.renderers :as renderers]
+   [extensions.dev-http.util :refer [kget]]))
 
 (defn- normalize-option
   "Normalize an option to `{:label … :value …}`. A bare scalar becomes both."
@@ -38,11 +35,7 @@
 (defn- form-choice
   "Parse the submitted `choice` value from a urlencoded POST body."
   [request]
-  (->> (body-string (:body request))
-       (re-seq #"([^&=]+)=([^&]*)")
-       (some (fn [[_ k v]]
-               (when (= k "choice")
-                 (java.net.URLDecoder/decode (str v) "UTF-8"))))))
+  (mw/urlencoded-param (body-string (:body request)) "choice"))
 
 (defn- render-form
   [route-id token content]

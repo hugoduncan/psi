@@ -10,11 +10,17 @@
     (java.net.URLDecoder/decode (str s) "UTF-8")
     (catch Exception _ s)))
 
+(defn urlencoded-param
+  "Extract and URL-decode the value of `param` from a urlencoded string `s`
+   (a query string or form body), or nil when absent."
+  [s param]
+  (some->> s
+           (re-seq #"([^&=]+)=([^&]*)")
+           (some (fn [[_ k v]] (when (= k param) (decode v))))))
+
 (defn- query-token
   [request]
-  (some->> (:query-string request)
-           (re-seq #"([^&=]+)=([^&]*)")
-           (some (fn [[_ k v]] (when (= k "token") (decode v))))))
+  (urlencoded-param (:query-string request) "token"))
 
 (defn request-token
   "Extract the supplied token from the request query string or the

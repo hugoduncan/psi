@@ -89,14 +89,12 @@
 
 (defn register-route!
   "Register an arbitrary ring `handler` fn as a throwaway session route under
-   `route-id` (last-write-wins on collision). Returns the route URL. The server
-   must be running."
+   `route-id` (last-write-wins on collision). Returns the route URL, or nil when
+   the server is not running."
   [route-id handler]
-  (if-let [reg (registry-component)]
-    (do
-      (registry/register-entry! reg route-id {:handler handler})
-      (route-url route-id))
-    (throw (ex-info "dev-http server not running; call start! first" {}))))
+  (when-let [reg (registry-component)]
+    (registry/register-entry! reg route-id {:handler handler})
+    (route-url route-id)))
 
 (defn- content-handler
   "Build the ring handler for a declarative `content` map. `:choices` is
@@ -114,7 +112,7 @@
 (defn register-sse-route!
   "Register an SSE live feed as a throwaway session route under `route-id`.
    `emit-fn` is invoked `(emit-fn send! close!)` when a client connects (see
-   `extensions.dev-http.sse/make-handler`). Returns the route URL, or throws if
+   `extensions.dev-http.sse/make-handler`). Returns the route URL, or nil when
    the server is not running."
   [route-id emit-fn]
   (register-route! route-id (sse/make-handler emit-fn)))
@@ -161,7 +159,4 @@
     :handler     handle-command})
   ((:register-tool api)
    (tool/dev-present-tool register-content-route!))
-  ((:on api)
-   "session_switch"
-   (fn [_ev] nil))
   nil)
