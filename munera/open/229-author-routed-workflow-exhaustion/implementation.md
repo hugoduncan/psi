@@ -910,3 +910,21 @@ both user-facing surfaces (design D5 "known degradation"):
   replaced hard-fail behaviour, and that the handback summary is observable
   under `task-lifecycle`.
 Docs-only edit; no code/test impact.
+
+## Docs review pass 4 (2026-06-16)
+
+REVIEW_COMPLETE — no new actionable docs issues. Re-checked all user-facing
+surfaces against the implementation: `doc/workflows.md` (prose — review sections,
+`Author-routed loop exhaustion`, standalone non-converging output, task-lifecycle
+design/plan gates), the canonical `doc/workflow-grammar.md` /
+`doc/workflow-ir.md` / `doc/workflow-grammar-concepts.md` reference grammars (all
+now carry `:on-max-iterations` + the `:max-iterations`-required constraint), and
+`CHANGELOG.md` `[Unreleased]` (Added + Changed). Verified accuracy/consistency
+against the authored EDN: `:max-iterations` 3 (design) / 5 (plan), all step names
+(`final-summary-not-converged`, `final-summary-design/plan-not-converged`,
+`check-design/plan-review-status`), `PASS_STATUS` strings, `goto-target` value
+set, and anchor links all match. README has no references to touch. The converged
+final-summary `PASS_STATUS: REVIEW_COMPLETE` standalone change is covered in both
+prose (line ~700) and CHANGELOG; the not-converged standalone empty-result
+degradation is covered (pass 3). Prior passes 1–3 resolved the substantive gaps;
+no duplication.
