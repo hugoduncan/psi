@@ -928,3 +928,23 @@ final-summary `PASS_STATUS: REVIEW_COMPLETE` standalone change is covered in bot
 prose (line ~700) and CHANGELOG; the not-converged standalone empty-result
 degradation is covered (pass 3). Prior passes 1–3 resolved the substantive gaps;
 no duplication.
+
+## Code-shaper review pass (2026-06-16)
+
+REVIEW_COMPLETE — no new actionable code-shaper issues. Reviewed the 229
+production surface (statechart `resolve-goto-acting-target` extraction +
+`compile-routing-transitions` exhaustion target, judge `evaluate-routing`
+`:on-max-iterations` branch, model/ir schema guard, `target_ir_compiler`
+threading, the four authored DI-4 summary templates) against simple ∧ consistent
+∧ robust. The `resolve-goto-acting-target` extraction *improves* DRY and removes
+the `:goto`/`:on-max-iterations` divergence by construction; `evaluate-routing`
+reuses `resolve-goto-target` so a bad author target fails loud (robust);
+schema/threading edits are minimal and additive.
+
+Non-compliance: none. Three smells considered and deliberately not filed (each
+either scope-drift or already an accepted disposition, so filing would duplicate
+or re-litigate): (1) three parallel goto-resolvers with distinct return
+contracts/boundary semantics — implementation-review pass 2 already accepted this
+as non-divergent; (2) duplicated `:cond` let-bodies in
+`compile-routing-transitions` — pre-existing (#72), not 229; (3) model/ir
+predicate duplication — already recorded as accepted deliberate parallelism.
