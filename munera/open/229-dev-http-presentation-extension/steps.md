@@ -60,7 +60,7 @@ the next begins.
       `start`/`status`/`stop` lifecycle with no orphaned server on restart
       (AC-1), `127.0.0.1` bind + token required (AC-8).
 - [x] Focused Scry green; clj-kondo clean.
-- [ ] Commit: `⚒ 229: platform end-to-end (lifecycle + server + router + registry + demo route)`.
+- [x] Commit: `⚒ 229: platform end-to-end (lifecycle + server + router + registry + demo route)` (dc68345fc).
 
 ## Slice 2 — `dev-present` tool + renderer set
 
