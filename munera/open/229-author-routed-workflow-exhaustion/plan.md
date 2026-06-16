@@ -70,13 +70,55 @@ converged `final-summary`, keeping the converged `final-summary` **last** in
   shared standalone result-text behaviour for every workflow (broader blast
   radius, out of this task's scope).
 
-Test (Slice 2/3): lock the **converged standalone result text**, not just
-definition-level routing — drive `review-task-design` (resp. `review-task-plan`)
-standalone to a converged terminal via the `workflow_review_step_routing_test`
-harness (stub `psi.agent-session.turn/prompt-execution-result-in!` to return
-`REVIEW_COMPLETE` for the review step, then the converged summary text), run it
-through `execute-workflow-run`, and assert `:psi.workflow/result` contains
-`PASS_STATUS: REVIEW_COMPLETE`.
+Test (Slice 2/3) — converged-standalone result-text construction (resolves the
+loop-4 ambiguity that the original note conflated the synthetic proof harness
+with the real loaded `.edn`): lock the **converged standalone result text**, not
+just definition-level routing. The test MUST be built as follows, disambiguating
+the three coupled points the loop-4 review raised:
+
+- **(a) Definition — load the real `.edn`, not the synthetic proof def.** The
+  purpose of this test is to lock that the **DI-4 template wording** in the real
+  `.psi/workflows/review-task-design.edn` / `review-task-plan.edn` converged
+  `final-summary` yields a parser-accepted `PASS_STATUS: REVIEW_COMPLETE`. Only
+  the real loaded definition can prove that, so the test MUST load
+  `review-task-design.edn` (resp. `review-task-plan.edn`) via the workflow-loader
+  and register it for the run. It MUST NOT reuse the synthetic
+  `conditional-review-design-definition` / `-plan-definition`
+  (`review-task-design-proof` etc.) from `workflow_review_step_routing_test`,
+  whose converged `final-summary` is a bare `{:type :template :text
+  "final-summary"}` carrying no `PASS_STATUS:` line and therefore cannot lock the
+  DI-4 wording. (Only if a future change deliberately keeps a synthetic
+  definition would that synthetic converged `final-summary` template have to
+  replicate the DI-4 `PASS_STATUS: REVIEW_COMPLETE` wording verbatim for the
+  assertion to be meaningful — not the chosen path here.)
+- **(b) Execution entry point — drive through `execute-workflow-run`, stubbing at
+  `prompt-execution-result-in!`.** `:psi.workflow/result` is produced by the
+  `canonical_workflows/execute-workflow-run` mutation, whose
+  `:execute-workflow-run-fn` is `workflow-execution/execute-run!` (the default
+  real actor-turn path that calls `psi.agent-session.turn/prompt-execution-result-in!`).
+  The test MUST therefore bypass the harness's custom
+  `:workflow-execute-actor-turn-fn` (`execute-conditional-review-proof!`) entirely
+  and instead `with-redefs` `psi.agent-session.turn/prompt-execution-result-in!`
+  while invoking the `execute-workflow-run` mutation (or its
+  `:execute-workflow-run-fn`) so the produced `:psi.workflow/result` is exercised
+  on the real mutation path.
+- **(c) Multi-prompt convergence — stub every per-prompt turn.** The real
+  `design-review` is a 3-prompt step (`architecture-review`, `ambiguity-review`,
+  `inconsistency-review`) and `plan-review` a 2-prompt step
+  (`ambiguity-review`, `inconsistency-review`), judged by
+  `workflow/pass-feedback-routing`, which routes DONE only when **every**
+  per-prompt `:final-llm-reply` carries exactly one `PASS_STATUS: REVIEW_COMPLETE`
+  line. The stub MUST supply a convergent `PASS_STATUS: REVIEW_COMPLETE` reply for
+  **each** per-prompt turn (keyed by per-prompt prompt text, per the existing
+  `design-review-full-pass-routing-test` pattern in
+  `workflow_review_step_routing_test`), then the converged `final-summary` turn's
+  text — not one combined `REVIEW_COMPLETE`.
+
+Assertion: after the converged run via `execute-workflow-run`, assert
+`:psi.workflow/result` contains exactly one `PASS_STATUS: REVIEW_COMPLETE` line
+(the converged `final-summary`'s yielded text surfacing through the
+`(last :step-order)` standalone path, since the converged `final-summary` is
+ordered last per DI-2).
 
 ## Implementation decision — not-converged summary wording, no iteration count (DI-3)
 
@@ -210,6 +252,34 @@ Resulting ordered `:steps` vectors the updated `task-lifecycle-test` MUST assert
   two existing summaries 8/9 → 9/10, `final-summary-design-not-converged`
   10 → 11; `repeat 11 {}` → `repeat 13 {}`.
 
+**Additional `task-lifecycle-test` assertions that MUST be restructured (not just
+index/`repeat`-count bumped).** Beyond the count/name/type vectors, positional
+`nth`, and `repeat`-count edits enumerated above, the live `task-lifecycle-test`
+(`workflow_definitions_test.clj`) contains **three further assertions keyed off
+`(take 5 steps)`** that break once an `:invoke` gate is inserted at `:steps`
+index 1 (Slice 2) and index 4 (Slice 3) — because the gate steps carry **no**
+`:target`/`:prompt-string`/`:context`, so `(take 5 steps)` no longer yields five
+delegate steps:
+
+1. `(is (= first-five-targets (mapv :target (take 5 steps))))` (`:643`) —
+   `check-design-review-status` / `check-plan-review-status` have no `:target`.
+2. `(is (= (repeat 5 standard-prompt) (mapv :prompt-string (take 5 steps))))`
+   (`:645-646`) — the gate steps have no `:prompt-string`.
+3. `(is (= (repeat 6 [{:type :source :from :workflow-original}])
+   (mapv :context (concat (take 5 steps) [extraction-step]))))` (`:667-668`) —
+   the gate steps have no `:context`, and `extraction-step`'s `nth` index also
+   shifts (6 → 7 in Slice 2, 7 → 8 in Slice 3).
+
+These three MUST be **restructured away from the `(take 5 steps)` "first five are
+delegates" positional assumption** — e.g. select the delegate steps by name/type
+filter (or explicit per-name `nth`) rather than `take 5` — in **both** Slice 2
+(gate inserted at index 1) and Slice 3 (gate inserted at index 4). This is part
+of the in-place `task-lifecycle-test` update mandate (R3/DI-5), not a mechanical
+`nth`/`repeat` edit: the `first-five-targets` target vector, the
+`(repeat 5 standard-prompt)` prompt-string vector, and the `(repeat 6 …)` context
+vector must each be rewritten to assert only the delegate steps' targets/prompts/
+contexts (and the gate steps' distinct shape) under the new ordering.
+
 ## Slice 1 — `:on-max-iterations` engine primitive (inert)
 
 Files:
@@ -311,11 +381,17 @@ Tests:
   criterion assumes that fix. (Verified: `review-task-plan-test` `:max-iterations
   5` and `review-step-test` `:max-iterations 10` match their edns — no drift
   there.)
-- Add a **converged standalone result-text** runtime test (DI-2): drive
-  `review-task-design` to a converged terminal via the
-  `workflow_review_step_routing_test` harness and assert `execute-workflow-run`'s
-  `:psi.workflow/result` contains `PASS_STATUS: REVIEW_COMPLETE` (locks the
-  yielded text, not just definition-level routing).
+- Add a **converged standalone result-text** runtime test (DI-2), constructed
+  per the DI-2 "converged-standalone result-text construction" note: load the
+  **real** `review-task-design.edn` (not the synthetic `conditional-review-*`
+  proof def), `with-redefs` `psi.agent-session.turn/prompt-execution-result-in!`
+  to return `PASS_STATUS: REVIEW_COMPLETE` for **each** of the three
+  `design-review` per-prompt turns (keyed by per-prompt prompt text, per
+  `design-review-full-pass-routing-test`) plus the converged `final-summary`
+  text, drive it through the `execute-workflow-run` mutation (not the harness's
+  custom actor-turn fn), and assert `:psi.workflow/result` contains exactly one
+  `PASS_STATUS: REVIEW_COMPLETE` line (locks the yielded text, not just
+  definition-level routing).
 - task-lifecycle definition coverage: the existing `task-lifecycle-test`
   (`workflow_definitions_test.clj:602`) is **positionally hard-coded** —
   `(= 9 (count steps))`, exact `:name` vector, the `:type` vector
@@ -327,7 +403,12 @@ Tests:
   slice** (R3): bump count 9→11, insert the two new step names/types at their
   positions, fix the `nth` indices, and update the `repeat` counts (e.g.
   `repeat 9 {}`→`repeat 11 {}`) — assert the exact 11-element ordered name and
-  type vectors pinned in **DI-5** (Slice-2 vectors). It must assert the
+  type vectors pinned in **DI-5** (Slice-2 vectors). Additionally **restructure
+  the three `(take 5 steps)`-based assertions** (`first-five-targets` targets,
+  `(repeat 5 standard-prompt)` prompt-strings, `(repeat 6 …)` contexts) away from
+  the `take 5` positional assumption — the design gate at index 1 has no
+  `:target`/`:prompt-string`/`:context` — per DI-5's "Additional
+  `task-lifecycle-test` assertions" note. It must assert the
   `check-design-review-status`
   gate routes DONE→`create-task-plan` and REPEAT→`final-summary-design-not-converged`,
   and that `final-summary-design-not-converged` terminates with `:goto :done`.
@@ -368,12 +449,25 @@ Mirror Slice 2 for the plan review:
     + PASS_STATUS lines). (`review-task-plan-test`'s `:max-iterations 5`
     assertion already matches the edn — no stale-baseline fix needed here.)
   - Converged standalone result-text runtime test for `review-task-plan` (DI-2),
-    mirroring Slice 2.
+    mirroring Slice 2 and constructed per the DI-2 "converged-standalone
+    result-text construction" note: load the **real** `review-task-plan.edn` (not
+    the synthetic `conditional-review-*` proof def), `with-redefs`
+    `psi.agent-session.turn/prompt-execution-result-in!` to return
+    `PASS_STATUS: REVIEW_COMPLETE` for **each** of the two `plan-review`
+    per-prompt turns (keyed by per-prompt prompt text) plus the converged
+    `final-summary` text, drive it through the `execute-workflow-run` mutation,
+    and assert `:psi.workflow/result` contains exactly one
+    `PASS_STATUS: REVIEW_COMPLETE` line.
   - `task-lifecycle-test` **MUST be updated again in this slice** (R3): adding
     `check-plan-review-status` + `final-summary-plan-not-converged` bumps the
     step count 11→13; update the name/type vectors, positional `nth` indices, and
     `repeat` counts accordingly to the exact 13-element ordered name and type
-    vectors pinned in **DI-5** (Slice-3 vectors), and assert the plan gate routes
+    vectors pinned in **DI-5** (Slice-3 vectors), **and** re-apply the DI-5
+    restructuring of the three `(take 5 steps)`-based assertions
+    (`first-five-targets` targets, `(repeat 5 standard-prompt)` prompt-strings,
+    `(repeat 6 …)` contexts) — the plan gate at index 4 again has no
+    `:target`/`:prompt-string`/`:context`, so the delegate-only selection from
+    Slice 2 must hold under the Slice-3 ordering. Assert the plan gate routes
     DONE→`implement-task` and REPEAT→`final-summary-plan-not-converged`, with
     `final-summary-plan-not-converged` terminating `:goto :done`. A separate
     `229` test remains additive-only.
@@ -416,9 +510,16 @@ Exit: focused workflow-loader suites green; clj-kondo clean.
   same slice that changes each `.edn`. Concretely: `task-lifecycle-test` is
   positionally hard-coded (count, name/type vectors, `nth` indices,
   `repeat`-counts) and MUST be updated in both Slice 2 (9→11) and Slice 3
-  (11→13) — a separate `229` test is additive-only, never a substitute. Also note
-  the *pre-existing* RED `review-task-design-test` `:max-iterations` 6→3 drift,
-  corrected as part of the Slice 2 edit (see Slice 2 tests).
+  (11→13) — a separate `229` test is additive-only, never a substitute. The
+  enumerated count/name/type/`nth`/`repeat` edits are **not exhaustive**: three
+  further assertions keyed off `(take 5 steps)` (`first-five-targets` targets
+  `:643`, `(repeat 5 standard-prompt)` prompt-strings `:645-646`, `(repeat 6 …)`
+  contexts `:667-668`) also break — the inserted `:invoke` gates carry no
+  `:target`/`:prompt-string`/`:context` — and MUST be **restructured away from
+  the `take 5` positional assumption** (select delegate steps by name/type
+  filter), per DI-5's "Additional `task-lifecycle-test` assertions" note. Also
+  note the *pre-existing* RED `review-task-design-test` `:max-iterations` 6→3
+  drift, corrected as part of the Slice 2 edit (see Slice 2 tests).
 - **R4 — standalone behaviour change (D5).** Standalone `/delegate
   review-task-design`/`-plan` now emits a `PASS_STATUS:` line. Accepted; noted in
   docs.

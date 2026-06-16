@@ -219,3 +219,56 @@ task-lifecycle-test:602 still 9 steps). Distinct from the resolved positional-
 test item (which enumerated count/name/type/nth/yields only). Prior open items
 (steps.md sync, design.md 6/7) unchanged; loop-4 ambiguity (DI-2 test
 harness-vs-edn) not duplicated.
+
+## Plan-review loop-4 follow-up execution (2026-06-16)
+
+Batch baseline: `f76071201` (parent of the oldest loop-4 commit `3d2961483`; the
+previous plan-follow-up completion). HEAD `18a1b6931`. `git diff f76071201..HEAD`
+on design-steps.md added exactly two unchecked checklist items — the loop-4
+ambiguity item (DI-2 test harness-vs-real-edn) and the loop-4 inconsistency item
+(R3/DI-5 omits `(take 5 steps)` assertions). Those two are the candidate work
+set. The earlier steps.md-sync (loop-2, `ff2653f72`) and design.md item-6/7
+(loop-3, `bf8468207`) inconsistency items predate this batch and stay
+excluded/BLOCKED. Both candidate items resolve in plan.md (editable) — neither
+blocked.
+
+- **Ambiguity-loop4 (DI-2 test harness-vs-real-edn) — RESOLVED in plan.md.**
+  Verified against code first: the synthetic harness
+  (`workflow_review_step_routing_test`) drives `conditional-review-design/plan-definition`
+  whose converged `final-summary` is a bare `{:type :template :text
+  "final-summary"}` (no PASS_STATUS, lines 425-427/441-443) via `execute-run!`
+  with a custom `:workflow-execute-actor-turn-fn` (`execute-conditional-review-proof!`
+  :474-490); `:psi.workflow/result` comes from `canonical_workflows/execute-workflow-run`
+  (:126-167) whose `:execute-workflow-run-fn` is `workflow-execution/execute-run!`
+  (context.clj:228), the real path that calls
+  `psi.agent-session.turn/prompt-execution-result-in!`; the per-prompt
+  all-REVIEW_COMPLETE keyed-by-prompt-text pattern is `design-review-full-pass-routing-test`
+  (:573-581). Rewrote the DI-2 "Test (Slice 2/3)" note into a
+  "converged-standalone result-text construction" spec disambiguating all three
+  coupled points: (a) load the **real** `review-task-design.edn`/`review-task-plan.edn`
+  (not the synthetic proof def — only the real loaded def can lock the DI-4
+  wording); (b) drive through the `execute-workflow-run` mutation, stubbing at
+  `prompt-execution-result-in!` (bypass the harness custom actor-turn fn);
+  (c) stub **every** per-prompt turn (3 design / 2 plan) with a convergent
+  `PASS_STATUS: REVIEW_COMPLETE` keyed by per-prompt prompt text plus the
+  converged summary text, then assert `:psi.workflow/result` contains exactly one
+  `PASS_STATUS: REVIEW_COMPLETE` line. Synced the Slice 2 + Slice 3 DI-2 test
+  bullets to the same real-edn construction. Marked [x].
+
+- **Inconsistency-loop4 (R3/DI-5 omits `(take 5 steps)` assertions) — RESOLVED in
+  plan.md.** Verified the three live assertions in
+  `workflow_definitions_test.clj`: `(mapv :target (take 5 steps))` (:643),
+  `(repeat 5 standard-prompt)` prompt-strings (:646-647), `(repeat 6 …)` contexts
+  (:668-669) — the inserted `:invoke` gates have no
+  `:target`/`:prompt-string`/`:context`, so `take 5` no longer yields five
+  delegate steps. Extended DI-5 with an "Additional `task-lifecycle-test`
+  assertions that MUST be restructured" subsection enumerating the three and
+  mandating restructuring away from the `take 5` positional assumption (select
+  delegate steps by name/type filter) for both Slice 2 (gate at index 1) and
+  Slice 3 (gate at index 4). Sharpened R3 to flag the count/name/type/nth/repeat
+  list as non-exhaustive, and added the restructuring mandate to both the Slice 2
+  and Slice 3 task-lifecycle-test bullets. Marked [x].
+
+Excluded items confirmed still excluded: steps.md-sync (BLOCKED, read-only) and
+design.md item-6/7 (BLOCKED, read-only) remain unchecked — both predate the
+loop-4 batch and both require editing files this follow-up treats as read-only.

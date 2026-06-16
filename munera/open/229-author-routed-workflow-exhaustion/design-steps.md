@@ -98,7 +98,7 @@ plan.md / design.md (steps.md is read-only review context).
       being last) — and state the resulting ordered name/type vectors the
       updated `task-lifecycle-test` must assert.
 
-- [ ] **DI-2 converged-standalone result-text test conflates the synthetic
+- [x] **DI-2 converged-standalone result-text test conflates the synthetic
       proof harness with the real loaded `.edn`, leaving the test's own
       construction ambiguous (Slice 2/3, DI-2).** DI-2's test note says to "drive
       `review-task-design` (resp. `review-task-plan`) standalone to a converged
@@ -226,7 +226,7 @@ plan.md / design.md (steps.md is read-only review context).
       with DI-4 — or replace it with an explicit pointer to `plan.md` DI-4 as the
       authoritative template-contract.
 
-- [ ] **R3/DI-5's enumerated `task-lifecycle-test` update scope is incomplete —
+- [x] **R3/DI-5's enumerated `task-lifecycle-test` update scope is incomplete —
       it omits the `(take 5 steps)`-shaped assertions that also break (Slice
       2/3).** The resolved positional-`task-lifecycle-test` item and DI-5
       enumerate the assertions to update as "count, name vector, type vector,
