@@ -212,6 +212,19 @@
       ;; the string-tag coercion branch above.
       (let [resp (renderers/render {:renderer :hiccup :data [:div {} [:h1 "X"]]})]
         (is (= "<div><h1>X</h1></div>" (:body resp)))))
+    (testing ":hiccup fails loud on a non-tree (e.g. a Clojure-syntax string)"
+      ;; A bare string is not a hiccup tree; rendering it silently as a literal
+      ;; text node hides the mistake. It must 400 and name the actual type.
+      (let [resp (renderers/render {:renderer :hiccup :data "[:div [:h1 \"X\"]]"})]
+        (is (= 400 (:status resp)))
+        (is (str/includes? (:body resp) "hiccup tree"))
+        (is (str/includes? (:body resp) "got string"))
+        (is (str/includes? (:body resp) "[:div"))))
+    (testing ":hiccup accepts a seq of elements (e.g. a `for` result)"
+      (let [resp (renderers/render {:renderer :hiccup
+                                    :data (for [x ["a" "b"]] [:li x])})]
+        (is (= 200 (:status resp)))
+        (is (= "<li>a</li><li>b</li>" (:body resp)))))
     (testing ":vega embeds the vendored client JS and the spec as JSON"
       (let [resp (renderers/render {:renderer :vega :data {"mark" "bar"}})]
         ;; all three scripts: vega.min.js is a required dependency of vega-embed.

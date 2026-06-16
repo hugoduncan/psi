@@ -85,9 +85,34 @@
 
     :else form))
 
+(defn- value-type-name
+  [x]
+  (cond
+    (nil? x)     "nil"
+    (string? x)  "string"
+    (keyword? x) "keyword"
+    (number? x)  "number"
+    (boolean? x) "boolean"
+    (map? x)     "map"
+    :else        (.getName (class x))))
+
+(defn- value-preview
+  [x]
+  (let [s (pr-str x)]
+    (if (> (count s) 200) (str (subs s 0 200) "…") s)))
+
 (defn- render-hiccup
   [{:keys [data]}]
-  (util/html-response (str (h/html (coerce-hiccup data)))))
+  ;; A bare string/scalar is never a hiccup tree — hiccup would silently render
+  ;; it as a literal text node. Fail loud instead (e.g. a Clojure-syntax string
+  ;; passed by mistake). `sequential?` accepts vectors and seqs (a `for`
+  ;; result), rejects strings/maps/scalars.
+  (if (sequential? data)
+    (util/html-response (str (h/html (coerce-hiccup data))))
+    (util/text-response
+     400
+     (str "400 :hiccup data must be a hiccup tree (vector/array), got "
+          (value-type-name data) ": " (value-preview data)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; file artifact
