@@ -114,3 +114,19 @@ ambiguity item (summary PASS_STATUS emission) and the loop-2 inconsistency item
   evidence/disposition rule, left unchecked rather than guessing. Needs a human
   decision: either authorize a steps.md edit for plan-review sync, or restate the
   item to resolve the plan↔steps mandate sync within plan.md only.
+
+## Plan-review ambiguity pass — loop 3 (2026-06-16)
+
+ACTIONABLE. 1 new ambiguity → design-steps.md. DI-1/DI-2/R1 fall-through
+analysis is scoped only to review-task-design/-plan summary steps; the plan
+specifies the new task-lifecycle.edn gates' `:on` routing + test count bumps
+(9→11→13) but never pins the `:steps` insertion position of the four new
+lifecycle steps. Verified against code: lifecycle `:delegate` steps are
+non-judged leaf steps (`statechart.clj` `compile-leaf-step`:
+`:actor/done → next-step-target`), so e.g. placing
+`final-summary-design-not-converged` right after `create-task-plan` makes the
+converged path fall through into the handback — the DI-1 wrong-path bug
+reintroduced in the lifecycle. Distinct from the existing positional
+`task-lifecycle-test` item (test mechanics, presupposes known positions).
+Prior batch items (DI-2/DI-3/DI-4, stale baseline, positional test) remain
+resolved; steps.md-sync inconsistency item still open/BLOCKED — not duplicated.

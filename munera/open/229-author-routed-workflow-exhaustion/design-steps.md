@@ -67,6 +67,37 @@ plan.md / design.md (steps.md is read-only review context).
       `:max-iterations` cap (e.g. 3 / 5), source an actual count if one is
       available, or drop the count from the template wording.
 
+- [ ] **`task-lifecycle.edn` insertion position / fall-through of the new
+      gate + handback steps is unspecified, and the DI-1 fall-through hazard is
+      not addressed for the lifecycle (Slice 2/3).** DI-1/DI-2/R1 reason about
+      `:next` fall-through (`statechart.clj` `next-step-target` /
+      `compile-leaf-step` `:actor/done → next-step-target`) **only** for the
+      `review-task-design.edn` / `review-task-plan.edn` summary steps. But the
+      same hazard applies to `task-lifecycle.edn`: its `:delegate` steps
+      (`create-task-plan`, `review-task-plan`, `implement-task`, …) are
+      non-judged leaf steps that route `:actor/done` to the **next step in
+      `:steps` order**, and the plan (Slice 2 line ~216, Slice 3 line ~287)
+      specifies the new gates' `:on` routing and the test count bumps
+      (9→11→13) but never pins **where** `check-design-review-status`,
+      `final-summary-design-not-converged`, `check-plan-review-status`, and
+      `final-summary-plan-not-converged` are placed within `:steps`. The
+      placement is correctness-critical: e.g. if `final-summary-design-not-converged`
+      is inserted immediately after `create-task-plan`, then on the converged
+      (DONE) path `create-task-plan` falls through into the not-converged
+      handback summary — the exact silent wrong-path bug DI-1 fixes for the
+      review workflows, here reintroduced in the lifecycle. (This is distinct
+      from the existing positional-`task-lifecycle-test` follow-up, which is
+      about updating the *test* and presupposes the positions are already
+      known.) Resolve in plan.md: specify the exact `:steps` insertion
+      positions for all four new lifecycle steps — each gate immediately after
+      its delegate (`review-task-design` / `review-task-plan`) so the delegate
+      falls through into the gate and the gate's DONE goto continues the main
+      flow, and both `final-summary-*-not-converged` handbacks placed so no
+      preceding leaf step can fall through into them (e.g. appended after the
+      existing terminal summaries, mirroring `final-summary-without-extraction`
+      being last) — and state the resulting ordered name/type vectors the
+      updated `task-lifecycle-test` must assert.
+
 ## Inconsistency review
 
 - [x] **Plan assumes a green `review-task-design-test` baseline, but it is
