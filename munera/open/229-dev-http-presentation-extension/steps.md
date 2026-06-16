@@ -1112,3 +1112,24 @@ to the still-scattered HTTP client calls in
       sets the bound; a stalled/never-closing handler now fails fast with a
       bounded http-kit timeout error instead of blocking on the implicit
       default.
+
+## Docs review follow-ups (round 1) — review-task-docs (README + doc/ + CHANGELOG accuracy/completeness)
+
+- [ ] Document the `:choices` **map-option** (`{:label … :value …}`) variant in
+      `doc/dev-http.md` (and the `dev-present` tool's `data` param description in
+      `extensions/dev-http/src/extensions/dev_http/tool.clj`, which says only
+      `choices → {prompt, options}`). The `:choices` renderer
+      (`normalize-option`, `choices.clj`) accepts an option as either a bare
+      scalar **or** a map `{:label … :value …}` where the **label** is the button
+      text and the **value** is what gets submitted and injected as the user
+      message into the origin session — a real, tested feature (steps.md round 6
+      `choices-map-option-test`). The docs only show the scalar form: the
+      renderers table lists `choices` `:data` as `{:prompt "…" :options ["A"
+      "B"]}` and the "choice interaction loop" section never mentions label≠value
+      options. A developer reading the docs cannot discover that an option's
+      displayed text can differ from the injected value. Add the
+      `{:label … :value …}` option shape (and note label is shown, value is
+      injected) to the renderers table / choices section and to the tool's
+      `data` description, so the documented surface matches the implemented and
+      tested behaviour (skill checkpoint 1: new/changed behaviours reflected in
+      docs).

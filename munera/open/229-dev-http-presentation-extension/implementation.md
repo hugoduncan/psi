@@ -1087,3 +1087,12 @@ Assessed clarity / consistency / economy / behaviour-focus / meaningful-failures
 
 clj-kondo clean (0/0). Remaining shaping items would be churn without clear
 quality gain.
+
+## Docs review (round 1) — review-task-docs — ACTIONABLE_FEEDBACK
+
+Reviewed README.md extensions list, `doc/dev-http.md`, and CHANGELOG `[Unreleased]`
+against the implemented extension. README + CHANGELOG accurate and complete;
+`doc/dev-http.md` accurate (token header `x-dev-http-token`, `/assets` ungated,
+`r-` route-id, lifecycle, SSE `/s/registry`, single-shot/failed-injection
+semantics all match source). One completeness gap (steps round 1): the `:choices`
+map-option `{:label … :value …}` variant is implemented + tested but undocumented.
