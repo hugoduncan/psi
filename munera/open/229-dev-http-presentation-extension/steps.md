@@ -1072,7 +1072,7 @@ Distinct from the round-14 router-handler dedup: that consolidated
 to the still-scattered HTTP client calls in
 `extensions/dev-http/test/extensions/dev_http_test.clj`.
 
-- [ ] Consolidate the full-response GET derefs through one timeout-bounded
+- [x] Consolidate the full-response GET derefs through one timeout-bounded
       helper. `get-status` (~495) and `post-form` (~656) wrap the client, but
       ~7 integration sites still inline `@(http-client/get …)` to read a full
       response (`lifecycle-and-serving-test` ~529/535/537/542/544,
@@ -1085,8 +1085,13 @@ to the still-scattered HTTP client calls in
       header) must be repeated across ~7 copies. Extract a `http-get` helper
       (`(defn- http-get [url] @(http-client/get url {…}))`) and route the inline
       sites + `get-status` through it. Low — mechanical, currently correct.
+      Done: added `(defn- http-get [url] @(http-client/get url {:timeout
+      http-timeout-ms}))` as the single full-response GET source; `get-status`
+      now calls `(:status (http-get url))`, and all 7 inline `@(http-client/get
+      …)` integration sites now call `(http-get …)`. The only remaining
+      `http-client/get` literal is the one inside `http-get` itself.
 
-- [ ] Give the shared HTTP client helpers an explicit bounded `:timeout`.
+- [x] Give the shared HTTP client helpers an explicit bounded `:timeout`.
       None of `get-status`/`post-form`/the inline GET derefs pass a `:timeout`,
       so the suite relies on http-kit's implicit client default. test-shaper
       `fast_feedback` / `meaningful_failures` / `deterministic(io)`: the SSE
@@ -1100,3 +1105,10 @@ to the still-scattered HTTP client calls in
       / never-closing streams fail fast with a bounded, meaningful error. Pairs
       with the helper-consolidation item above (one place to set it). Low —
       hardening; current close paths make the tests pass today.
+      Done: added a single `http-timeout-ms` const (5000) carried by both
+      consolidated helpers — `http-get` passes `{:timeout http-timeout-ms}` (so
+      all GET sites, including the SSE `body-str`/`slurp` reads, are bounded) and
+      `post-form` adds `:timeout http-timeout-ms` to its POST opts. One place
+      sets the bound; a stalled/never-closing handler now fails fast with a
+      bounded http-kit timeout error instead of blocking on the implicit
+      default.

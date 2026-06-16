@@ -490,9 +490,21 @@
   [server]
   (str "http://" (:host server) ":" (:port server)))
 
+(def ^:private http-timeout-ms
+  "Bounded client timeout for the integration HTTP helpers so a stalled or
+   never-closing handler (e.g. a broken SSE `close!`) fails fast with a
+   meaningful error instead of blocking on http-kit's implicit default."
+  5000)
+
+(defn- http-get
+  "GET `url` over the live server and deref the full response with a bounded
+   timeout. The single source for full-response GETs in this suite."
+  [url]
+  @(http-client/get url {:timeout http-timeout-ms}))
+
 (defn- get-status
   [url]
-  (:status @(http-client/get url)))
+  (:status (http-get url)))
 
 (defn- body-str
   [resp]
@@ -526,23 +538,23 @@
           (is (= 403 (get-status (str base "/demo"))))
           (is (= 200 (get-status (str base "/demo?token=" (:token server))))))
         (testing "AC-2: persisted demo route is served"
-          (let [resp @(http-client/get (str base "/demo?token=" (:token server)))]
+          (let [resp (http-get (str base "/demo?token=" (:token server)))]
             (is (= 200 (:status resp)))
             (is (re-find #"dev-http demo" (body-str resp)))))
         (testing "AC-4 (partial): register-route! reachable, last-write-wins"
           (let [url1 (sut/register-route! "rt" (fn [_] {:status 200 :body "first"}))]
             (is (= 200 (get-status url1)))
-            (is (= "first" (body-str @(http-client/get url1))))
+            (is (= "first" (body-str (http-get url1))))
             (sut/register-route! "rt" (fn [_] {:status 200 :body "second"}))
-            (is (= "second" (body-str @(http-client/get (sut/route-url "rt")))))))
+            (is (= "second" (body-str (http-get (sut/route-url "rt")))))))
         (testing "AC-3: register-content-route! renders a content route"
           (let [url (sut/register-content-route! "md" {:renderer :markdown
                                                        :data     "# Live"})]
             (is (= 200 (get-status url)))
-            (is (re-find #"<h1>Live</h1>" (body-str @(http-client/get url))))))
+            (is (re-find #"<h1>Live</h1>" (body-str (http-get url))))))
         (testing "AC-5: vendored asset served locally and ungated over the wire"
-          (let [resp @(http-client/get (str base renderers/asset-prefix
-                                            "/vega-embed.min.js"))]
+          (let [resp (http-get (str base renderers/asset-prefix
+                                    "/vega-embed.min.js"))]
             (is (= 200 (:status resp)))
             (is (re-find #"javascript"
                          (str (get-in resp [:headers :content-type]))))))
@@ -594,7 +606,7 @@
               url    (second (re-find #"Open: (\S+)" (str (:content result))))]
           (is (false? (:is-error result)))
           (is (string? url))
-          (let [resp @(http-client/get url)]
+          (let [resp (http-get url)]
             (is (= 200 (:status resp)))
             (is (re-find #"<h1>Tool Live</h1>" (body-str resp)))))))))
 
@@ -654,7 +666,8 @@
 (defn- post-form
   [url body]
   @(http-client/post url {:headers {"content-type" "application/x-www-form-urlencoded"}
-                          :body    body}))
+                          :body    body
+                          :timeout http-timeout-ms}))
 
 (deftest ^:integration choices-interaction-loop-test
   ;; Drives the choice loop over the real http-kit server: GET form → POST
@@ -666,7 +679,7 @@
                                                                 :options ["A" "B"]}
                                                    :session-id nullable-session})]
         (testing "the choices form is served"
-          (let [resp @(http-client/get url)]
+          (let [resp (http-get url)]
             (is (= 200 (:status resp)))
             (is (re-find #"Pick one" (body-str resp)))))
         (testing "AC-6: submitting injects one user message into the origin session"
@@ -696,7 +709,7 @@
           ;; start! auto-registered the `registry` feed itself; add one more so
           ;; the snapshot reflects both session routes (the feed counts itself).
           (sut/register-route! "live-1" (fn [_] {:status 200 :body "x"}))
-          (let [resp @(http-client/get (str base "/s/registry?token=" token))]
+          (let [resp (http-get (str base "/s/registry?token=" token))]
             (is (= 200 (:status resp)))
             (is (re-find #"text/event-stream"
                          (str (get-in resp [:headers :content-type]))))
@@ -725,7 +738,7 @@
         (testing "AC-8: the registered feed is token-gated like any session route"
           (is (= 403 (get-status (str base "/s/feed")))))
         (testing "the wrapped emit-fn streams data: open + data: tick over the server"
-          (let [resp @(http-client/get (str base "/s/feed?token=" token))]
+          (let [resp (http-get (str base "/s/feed?token=" token))]
             (is (= 200 (:status resp)))
             (is (re-find #"text/event-stream"
                          (str (get-in resp [:headers :content-type]))))

@@ -1035,3 +1035,24 @@ tests pass today.
 Non-compliance noted: the requested task slug `229-dev-http-lifecycle` does not
 exist; the only matching task is `229-dev-http-presentation-extension`
 (reviewed).
+
+## Round-15 follow-up execution — 2026-06-15
+
+Executed both round-15 test-shaper follow-ups in
+`extensions/dev-http/test/extensions/dev_http_test.clj`:
+
+- Added `http-timeout-ms` const (5000) + `http-get` helper
+  (`@(http-client/get url {:timeout http-timeout-ms})`) as the single
+  full-response GET source. `get-status` → `(:status (http-get url))`; all 7
+  inline `@(http-client/get …)` integration sites → `(http-get …)`. Only the
+  `http-client/get` literal inside `http-get` remains.
+- `post-form` now also passes `:timeout http-timeout-ms`, so both consolidated
+  helpers share one bound; SSE `body-str`/`slurp` reads and a stalled/non-closing
+  handler now fail fast with a bounded error rather than blocking on the
+  http-kit default.
+
+clj-paren-repair + clj-kondo clean. dev-http integration tests green via
+`clojure -X:test scry.cli/run :runner :kaocha :suite :integration` (the only
+failure in the run is the pre-existing/unrelated
+`psi.rpc-smoke-test/rpc-smoke-handshake-test` 60s subprocess handshake timeout —
+not touched by this test-helper refactor).
