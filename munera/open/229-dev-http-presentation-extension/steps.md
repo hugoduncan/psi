@@ -344,7 +344,7 @@ the next begins.
 
 ## Implementation review follow-ups (round 6)
 
-- [ ] Add test coverage for the `:choices` map-option (label≠value) code path
+- [x] Add test coverage for the `:choices` map-option (label≠value) code path
       (`extensions/dev-http/src/extensions/dev_http/choices.clj`
       `normalize-option`). The map branch
       (`(kget o :value "value" :label "label")` / `(kget o :label "label" …)`)
@@ -362,3 +362,13 @@ the next begins.
       injects the **value** (`"y"`) as the user message. Also cover the
       string-keyed (JSON-tool) variant `{"label" … "value" …}`. Focused Scry
       (kaocha `--focus`) green: 21 assertions; clj-kondo clean.
+      Done: added `choices-map-option-test` (`extensions/dev-http/test/extensions/dev_http_test.clj`).
+      It runs both the keyword-keyed (`{:label "Yes please" :value "y"}`) and
+      string-keyed (`{"label" … "value" …}`) variants via `doseq`, asserting for
+      each that (a) the GET form renders the **label** as the button text
+      (`>Yes please</button>`) and the **value** as the submitted value
+      (`value="y"`), and never `value="Yes please"`; and (b) a POST of
+      `choice=y` injects the **value** `"y"` (not the label) as the single
+      user message into the origin session. Focused kaocha `--focus` green
+      (16 assertions in the new deftest; 42 across all three choices unit
+      tests); clj-kondo clean.

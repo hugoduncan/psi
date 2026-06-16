@@ -344,6 +344,43 @@
           (is (re-find #"try again" (:body resp)))
           (is (not (:answered? (registry/get-entry reg "c1")))))))))
 
+(deftest choices-map-option-test
+  ;; A choice option given as a `{:label … :value …}` map renders the *label*
+  ;; as the button text but submits the *value*; the submitted value (not the
+  ;; label) is the user message injected into the origin session. Scalar-only
+  ;; tests (label==value) leave this label/value distinction unverified, so a
+  ;; label/value swap would pass them. Cover both keyword-keyed (REPL) and
+  ;; string-keyed (JSON-tool) option maps.
+  (doseq [[variant options]
+          [["keyword-keyed" [{:label "Yes please" :value "y"}
+                             {:label "No" :value "n"}]]
+           ["string-keyed" [{"label" "Yes please" "value" "y"}
+                            {"label" "No" "value" "n"}]]]]
+    (testing variant
+      (let [reg       (registry/create-registry)
+            submitted (atom [])
+            content   {:renderer   :choices
+                       :data       {:prompt "Pick one" :options options}
+                       :session-id "sess-1"}
+            handler   (choices/make-handler {:registry   reg
+                                             :route-id   "c1"
+                                             :session-id "sess-1"
+                                             :api        (capturing-api submitted)
+                                             :content    content})]
+        (registry/register-entry! reg "c1" {})
+        (testing "the button displays the label and posts the value"
+          (let [resp (handler {:request-method :get :query-string "token=tok"})]
+            (is (= 200 (:status resp)))
+            (is (re-find #"value=\"y\"" (:body resp)))
+            (is (re-find #">Yes please</button>" (:body resp)))
+            (is (not (re-find #"value=\"Yes please\"" (:body resp))))))
+        (testing "submitting injects the value, not the label, as the user message"
+          (let [resp (handler {:request-method :post :body "choice=y"})]
+            (is (= 200 (:status resp)))
+            (is (re-find #"Recorded" (:body resp)))
+            (is (= 1 (count @submitted)))
+            (is (= "y" (:user-msg (:params (first @submitted)))))))))))
+
 ;; ---------------------------------------------------------------------------
 ;; SSE live-updates (Slice 4)
 ;; ---------------------------------------------------------------------------

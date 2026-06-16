@@ -408,3 +408,23 @@ label≠value path (`choices/normalize-option`) is unverified — all choices te
 use scalar options where label==value, so the label-displayed / value-submitted
 distinction (and which one is injected) has no regression guard. No
 correctness/behaviour defect found in the implementation itself.
+
+## Implementation review (round 6) follow-up — 2026-06-15
+
+Filled the round-6 test-coverage gap: added `choices-map-option-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`) covering the
+`choices/normalize-option` map-option (label≠value) path for both keyword-keyed
+(`{:label … :value …}`) and string-keyed (JSON-tool, `{"label" … "value" …}`)
+options. The test proves the **label** is rendered as button text while the
+**value** is the submitted/posted value and the value (not the label) is the
+user message injected into the origin session — closing the regression hole
+where a label/value swap would have passed all prior scalar-only choices tests.
+
+No production code change — `normalize-option`/`render-form`/`make-handler`
+already implement the behaviour; this only adds the missing proof.
+
+Verification: focused kaocha `--focus extensions.dev-http-test/choices-map-option-test`
+green (1 test / 16 assertions); all three choices unit tests
+(`choices-handler-test`, `choices-failed-injection-releases-claim-test`,
+`choices-map-option-test`) green (3 tests / 42 assertions); clj-kondo clean on
+the test file.
