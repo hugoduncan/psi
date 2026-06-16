@@ -92,6 +92,60 @@ the wording without a number, e.g. "design/plan review did not converge within
 the configured follow-up iteration limit". Slices 2/3 author this wording; no
 contribution/source for `N` is added.
 
+## Implementation decision — summary PASS_STATUS line contract (DI-4)
+
+The lifecycle gates read each summary's `:yield :text` through
+`workflow/pass-status-routing`
+(`agent_session/workflow/routing.clj` `parse-pass-status-routing`), which is
+**strict** on two axes: it errors `:ambiguous-pass-status` when **more than one**
+line begins with `PASS_STATUS:`, and it accepts a line as a valid status only
+when it is *exactly* `PASS_STATUS:<space><TOKEN>` — column 0, single space, bare
+token, nothing else on the line (`exact-known?` = `(= raw-value (str " " trimmed))`).
+Both summary steps' `:contributions` include the design-review (resp.
+plan-review) per-prompt `:final-llm-reply` outputs, and every review prompt
+(`review-task-design-ambiguity-review.md` etc.) ends with its own
+`PASS_STATUS: …` line — so the summary LLM's context already contains 3 (design)
+/ 2 (plan) `PASS_STATUS:` lines it could echo. This DI supersedes the looser D1
+phrasing "emit a required PASS_STATUS line, replacing the existing 'do not output
+REPEAT/DONE/control tokens' instruction"; Slices 2/3 author exactly the contract
+below.
+
+Resolution (the authored template contract, applied identically to the converged
+`final-summary` **and** the new `final-summary-not-converged` in **both**
+`review-task-design.edn` and `review-task-plan.edn`):
+
+1. **Required line format.** Each summary template MUST instruct the model to end
+   its response with exactly one line of the form `PASS_STATUS: <TOKEN>` — column
+   0, a single space after the colon, the bare token, nothing else on that line —
+   and this MUST be the **sole** `PASS_STATUS:` line in the output. Converged
+   `final-summary` → `PASS_STATUS: REVIEW_COMPLETE`; `final-summary-not-converged`
+   → `PASS_STATUS: ACTIONABLE_FEEDBACK`. This is exactly what
+   `parse-pass-status-routing` accepts (single occurrence, exact form), so the
+   gate resolves deterministically.
+2. **Retain an anti-echo instruction.** The template MUST explicitly forbid the
+   summary from reproducing or quoting the `PASS_STATUS:` lines carried in the
+   contributed review replies, so the single mandated final line is the only
+   `PASS_STATUS:` line present. Without this, the model may echo a contributed
+   status, producing >1 `PASS_STATUS:` line → `:ambiguous-pass-status` →
+   lifecycle hard-fail (the exact failure mode this task removes).
+3. **Reconcile the two existing anti-control-token sentences.** The current
+   converged templates carry *two* guards: (a) "Respond with a concise summary
+   for the user, not an internal control token." and (b) "Do not output REPEAT or
+   DONE unless quoting prior workflow behavior." Do **not** ambiguously "replace
+   the instruction". Instead: **keep** sentence (a) — it constrains the prose
+   body and is compatible with a mandated trailing status line. **Rewrite**
+   sentence (b) so it is no longer a blanket anti-`PASS_STATUS` guard but the
+   precise rule from (1)+(2), e.g. "Do not include REPEAT or DONE control tokens,
+   and do not reproduce the `PASS_STATUS:` lines from the review replies provided
+   as context; end your response with exactly one line
+   `PASS_STATUS: REVIEW_COMPLETE`." (the not-converged template uses
+   `PASS_STATUS: ACTIONABLE_FEEDBACK`).
+
+Test note: the Slice 2/3 converged-standalone result-text test (DI-2) already
+asserts the converged `final-summary` yields a single `PASS_STATUS: REVIEW_COMPLETE`
+line; that test is the runtime lock that the DI-4 template wording produces a
+parser-accepted status.
+
 ## Slice 1 — `:on-max-iterations` engine primitive (inert)
 
 Files:
@@ -143,17 +197,22 @@ Files:
     `:on-max-iterations "final-summary-not-converged"` alongside the existing
     `{:goto "design-review" :max-iterations 3}`.
   - Existing `final-summary` (converged): add the explicit-terminal judge + `:on`
-    (DI-1) and update its template to emit a required
-    `PASS_STATUS: REVIEW_COMPLETE` line (replacing the current "do not output
-    REPEAT/DONE/control tokens" instruction, D1/D5).
+    (DI-1) and update its template to emit the required
+    `PASS_STATUS: REVIEW_COMPLETE` line per the **DI-4** summary PASS_STATUS line
+    contract (single column-0 `PASS_STATUS: <TOKEN>` line, sole occurrence, last;
+    retain an anti-echo instruction; reconcile the two existing
+    anti-control-token sentences — keep the "concise summary … not an internal
+    control token" guard, rewrite the "do not output REPEAT/DONE" guard into the
+    precise anti-echo + single-required-line rule), D1/D5.
   - New `final-summary-not-converged` session step, placed **before** the
     converged `final-summary` so the converged summary stays last in `:steps`
     (DI-2): contributions sourced from `:workflow-original` + the three
     `design-review` per-prompt `:final-llm-reply` outputs; template produces a
     "design review did not converge within the configured follow-up iteration
-    limit" user summary (no literal iteration count, DI-3) and emits a required
-    `PASS_STATUS: ACTIONABLE_FEEDBACK` line; explicit-terminal judge + `:on`
-    (DI-1).
+    limit" user summary (no literal iteration count, DI-3) and emits the required
+    `PASS_STATUS: ACTIONABLE_FEEDBACK` line per the **DI-4** contract (same
+    single-line/anti-echo/reconciliation rules, ACTIONABLE_FEEDBACK token);
+    explicit-terminal judge + `:on` (DI-1).
 - `.psi/workflows/task-lifecycle.edn`:
   - New `check-design-review-status` invoke-step after `review-task-design`,
     mirroring `check-implementation-review-status`:
@@ -216,11 +275,15 @@ Exit: focused workflow-loader + affected runtime suites green; clj-kondo clean.
 Mirror Slice 2 for the plan review:
 - `.psi/workflows/review-task-plan.edn`: `plan-follow-up` `:on` gains
   `:on-max-iterations "final-summary-not-converged"`; converged `final-summary`
-  becomes explicit-terminal + `PASS_STATUS: REVIEW_COMPLETE`; new
-  `final-summary-not-converged` placed **before** the converged `final-summary`
-  so the converged summary stays last in `:steps` (DI-2), sourced from the two
-  `plan-review` per-prompt replies, wording with no literal iteration count
-  (DI-3) + `PASS_STATUS: ACTIONABLE_FEEDBACK` + explicit-terminal.
+  becomes explicit-terminal + `PASS_STATUS: REVIEW_COMPLETE` per the **DI-4**
+  summary PASS_STATUS line contract (single column-0 `PASS_STATUS: <TOKEN>` line,
+  sole occurrence, last; retain an anti-echo instruction; keep the "concise
+  summary … not an internal control token" guard and rewrite the
+  "do not output REPEAT/DONE" guard into the precise anti-echo + single-line
+  rule); new `final-summary-not-converged` placed **before** the converged
+  `final-summary` so the converged summary stays last in `:steps` (DI-2), sourced
+  from the two `plan-review` per-prompt replies, wording with no literal iteration
+  count (DI-3) + `PASS_STATUS: ACTIONABLE_FEEDBACK` per DI-4 + explicit-terminal.
 - `.psi/workflows/task-lifecycle.edn`: new `check-plan-review-status` gate after
   `review-task-plan` → `{"DONE" {:goto "implement-task"}
   "REPEAT" {:goto "final-summary-plan-not-converged"}}`; new
@@ -259,11 +322,16 @@ Exit: focused workflow-loader suites green; clj-kondo clean.
 
 - **R1 — terminal fall-through (DI-1).** Mitigated by making both summaries
   explicitly terminal; locked by definition tests asserting termination.
-- **R2 — PASS_STATUS reliability.** The gate parses an LLM-produced
+- **R2 — PASS_STATUS reliability / echo.** The gate parses an LLM-produced
   `PASS_STATUS:` line. Mitigated: each summary template hardcodes exactly one
   required status string (structurally determined by which step ran, D1), and
   `pass-status-routing` errors on missing/ambiguous status — failing loud, not
   silent. Same reliability profile as the existing implementation-review gate.
+  The summary steps also receive the review per-prompt replies (each ending in
+  its own `PASS_STATUS:` line) as contributions, so a naive template could echo
+  one and trip the strict >1-line `:ambiguous-pass-status` error; the DI-4
+  contract (mandatory single column-0 last line + explicit anti-echo
+  instruction) is the mitigation.
 - **R3 — definition-test drift.** Step-order assertions in
   `workflow_definitions_test.clj` are brittle to added steps; update them in the
   same slice that changes each `.edn`. Concretely: `task-lifecycle-test` is

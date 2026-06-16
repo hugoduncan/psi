@@ -5,7 +5,7 @@ plan.md / design.md (steps.md is read-only review context).
 
 ## Ambiguity review
 
-- [ ] **Summary-template PASS_STATUS emission is underspecified vs. the strict
+- [x] **Summary-template PASS_STATUS emission is underspecified vs. the strict
       parser and the PASS_STATUS-bearing contributions (Slice 2/3, D1/DI-1).**
       The lifecycle gates read each summary's `:yield :text` through
       `workflow/pass-status-routing`

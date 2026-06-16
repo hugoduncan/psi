@@ -78,3 +78,39 @@ alone would omit mandatory work. Verified D2 (judged-routing-transition keys
 dispatch off :failed only) and the model `:string` / ir `step-name-schema`
 mirror against code — both accurate, no inconsistency there. Loop-1 items
 (stale baseline, positional test) remain resolved in plan.md; not duplicated.
+
+## Plan-review loop-2 follow-up execution (2026-06-16)
+
+Batch baseline: `8a415a5ac` (parent of oldest loop-2 commit `0c3f5e343`; the
+previous plan-follow-up completion). HEAD `ff2653f72`. `git diff 8a415a5ac..HEAD`
+on design-steps.md added exactly two unchecked checklist items — the loop-2
+ambiguity item (summary PASS_STATUS emission) and the loop-2 inconsistency item
+(steps.md out of sync). Both were the candidate work set.
+
+- **Ambiguity-loop2 (summary PASS_STATUS emission) — RESOLVED in plan.md.**
+  Added DI-4 "summary PASS_STATUS line contract": exactly one column-0
+  `PASS_STATUS: <TOKEN>` line, sole occurrence, last line; retain an explicit
+  anti-echo instruction (summary must not reproduce the contributed review
+  replies' PASS_STATUS lines, else >1 line → `:ambiguous-pass-status` hard-fail);
+  reconcile the two existing anti-control-token sentences by keeping the "concise
+  summary … not an internal control token" guard and rewriting the
+  "do not output REPEAT/DONE" guard into the precise anti-echo + single-line rule.
+  Applies to converged `final-summary` + new `final-summary-not-converged` in both
+  `review-task-design.edn` and `review-task-plan.edn`. Updated Slice 2/3 D1
+  references to point at DI-4 and sharpened R2 with the echo-risk mitigation.
+  Verified the two anti-control-token sentences against the live converged
+  template in `review-task-design.edn` before specifying. Marked [x].
+
+- **Inconsistency-loop2 (steps.md out of sync) — BLOCKED, left unchecked.** The
+  item's prescribed resolution is "update steps.md Slice 2/3 to enumerate the four
+  mandated sub-tasks". That conflicts with two governing constraints: (1) the
+  design-steps.md header states "steps.md is read-only review context" (this
+  merged review-task-plan workflow routes follow-ups through design-steps.md and
+  treats steps.md as read-only), and (2) this follow-up run is explicitly
+  instructed not to touch steps.md beyond read-only context. The literal
+  resolution is therefore out of bounds; resolving it would require either
+  editing steps.md (forbidden) or unilaterally relocating the plan→steps sync
+  contract (a workflow-convention change, out of scope). Per the batch
+  evidence/disposition rule, left unchecked rather than guessing. Needs a human
+  decision: either authorize a steps.md edit for plan-review sync, or restate the
+  item to resolve the plan↔steps mandate sync within plan.md only.
