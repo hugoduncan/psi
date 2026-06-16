@@ -147,7 +147,7 @@ plan.md / design.md (steps.md is read-only review context).
       synthetic converged `final-summary` template must replicate the DI-4
       `PASS_STATUS: REVIEW_COMPLETE` wording for the assertion to be meaningful.
 
-- [ ] **Slice 1 engine change is incomplete: runtime exhaustion is decided
+- [x] **Slice 1 engine change is incomplete: runtime exhaustion is decided
       judge-side in `workflow-judge/evaluate-routing`, not in the statechart
       transition the plan modifies (Slice 1, D2).** The plan (design "Context",
       Slice 1, D2) treats exhaustion routing as governed solely by
@@ -197,7 +197,7 @@ plan.md / design.md (steps.md is read-only review context).
       integration-level exhaustion-routing assertion, since the existing
       `statechart_test` cannot detect this gap.
 
-- [ ] **DI-2 converged-standalone runtime test cannot lock the DI-4 template
+- [x] **DI-2 converged-standalone runtime test cannot lock the DI-4 template
       wording it claims to verify, because the model reply is stubbed (Slice
       2/3, DI-2/DI-4).** DI-2 (loop-4 resolution) states the converged-standalone
       result-text test "lock[s] that the **DI-4 template wording** in the real

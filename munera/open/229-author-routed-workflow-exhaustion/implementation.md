@@ -316,3 +316,107 @@ stubbed-LLM template-wording) not re-raised here — the engine-site item alread
 notes reconciling design "Context"/D2. Prior inconsistency items (stale baseline,
 positional task-lifecycle-test, (take 5 steps) restructuring resolved; steps.md
 sync + design.md item-6/7 open/BLOCKED) unchanged, not duplicated.
+
+## Plan-review loop-5 follow-up execution (2026-06-16)
+
+Batch baseline: `feaa179c7` (parent of the oldest loop-5 commit `276c1b0bc`; the
+previous plan-follow-up completion = loop-4 execution `feaa179c7`). HEAD
+`cb1775179`. `git diff feaa179c7..HEAD` on design-steps.md added exactly **three**
+unchecked checklist items — the two loop-5 ambiguity items (judge-side
+`evaluate-routing` exhaustion site; DI-2 stubbed-LLM template-wording) and the
+one loop-5 inconsistency item (design.md D5 vs plan.md R5/DI-2). Those three are
+the candidate work set. The earlier steps.md-sync (loop-2, `ff2653f72`) and
+design.md item-6/7 (loop-3, `bf8468207`) inconsistency items predate this batch
+and stay excluded/BLOCKED.
+
+- **Ambiguity-loop5-A (Slice 1 judge-side `evaluate-routing` gap) — RESOLVED in
+  plan.md.** Verified the review's claim against psi-main code before resolving:
+  `workflow_judge.clj` `evaluate-routing` (`:129`) returns
+  `{:action :fail :reason :iteration-exhausted}` via `check-iteration-limit`
+  (`:79`) when the target step's `:iteration-count` ≥ directive `:max-iterations`;
+  `statechart_runtime.clj` `:judge/enter` (`:383` `routing-table (or (:on
+  step-def) {})`; `:416` `:fail → :judge/failed`) → `:judge/record` else-branch
+  (`:status :failed`, `:reason :iteration-exhausted`). The statechart
+  `:iteration/exhausted` action (`:reason :iteration-limit-reached`, `:483`)
+  fires only on direct `:judge/signal`. Integration test
+  `review-pass-loop-iteration-limit-failure-test` (`:675`+) confirms real
+  exhausted review runs terminate `:reason :iteration-exhausted`,
+  `:step-id "design-follow-up"`/`"clarity-status"` — judge-side path, not the
+  statechart action. Critically, the judge's `routing-table` IS the full IR
+  directive (`(:on step-def)`), so `:on-max-iterations` (threaded by the Slice-1
+  `target_ir_compiler` change) is already available at `evaluate-routing`.
+  Chose option (a): added **DI-6** ("judge-side exhaustion is the runtime-governing
+  site") and extended Slice 1 to thread `:on-max-iterations` through
+  `evaluate-routing` — when `:exhausted` AND the directive carries
+  `:on-max-iterations`, resolve via existing `resolve-goto-target` and return
+  `{:action :goto :target …}`/`{:action :complete}` instead of `:fail`, so the
+  non-`:fail` action enqueues `:judge/signal` → `:judge/record` `:goto` branch →
+  author target, `:status :running` (run not failed). Kept the
+  `compile-routing-transitions` edit for two-site coherence/future direct-signal
+  path (now flagged dead-code-at-runtime for review workflows). Added Slice-1
+  files entry (`workflow_judge.clj`), a `workflow_judge_test` unit test, and a
+  **mandatory integration exhaustion-routing test** (drives a real exhausting
+  judged loop with `:on-max-iterations` through `execute-run!`/`execute-workflow-run`,
+  asserts author-target termination + run-not-failed); widened Slice-1 Exit to
+  require the integration assertion + workflow-judge suite; added a Slice-1
+  behaviour-inert note (no shipped `.edn` opts in until Slices 2/3). Updated the
+  Strategy "four routing layers" → "+ judge-side `evaluate-routing`". Marked [x].
+  **Residual (read-only-blocked):** the item also asks to "reconcile design
+  'Context'/D2 in design.md" — `design.md` Context frames exhaustion as
+  statechart-only and omits the `evaluate-routing` governing site, and D2 says
+  "the only statechart edit is …". D2's *decision* ("no change to
+  `judged-routing-transition`") remains valid; only the Context *description* and
+  the "only … edit" framing under-describe the change set. That `design.md`
+  clarification cannot be made under this plan-profile follow-up (design.md is
+  read-only). plan.md now authoritatively carries the two-site mechanism (DI-6),
+  and DI-6 records the design.md clarification as a deferred design-pass item, so
+  no implementer is misled. Item marked [x] on the strength of the complete
+  plan.md resolution (primary directive "Resolve in plan.md"); the design.md
+  clarification is folded into the recommended design pass below.
+
+- **Ambiguity-loop5-B (DI-2 runtime test cannot lock DI-4 wording) — RESOLVED in
+  plan.md.** The DI-2 converged-standalone runtime test stubs
+  `prompt-execution-result-in!` (the model *reply*), so the asserted
+  `PASS_STATUS: REVIEW_COMPLETE` is supplied by the stub, not the template (the
+  template is the *prompt*, never the *output*). Rewrote the DI-2 test note to
+  state explicitly that the runtime test locks the **ordering/plumbing** invariant
+  only (converged `final-summary`, ordered last per DI-2, is the step whose
+  yielded text surfaces via the standalone `(last :step-order)` path), and that
+  loading the real `.edn` is to exercise the real ordering — NOT to lock the
+  wording. Updated point (a) purpose + the Assertion paragraph accordingly. Added
+  **DI-4 point 4**: the **definition-level** `review-task-design-test` /
+  `review-task-plan-test` is the authority that locks the DI-4 template **text** —
+  assert the converged `final-summary` template body contains the sole, column-0,
+  single-space, last-line `PASS_STATUS: REVIEW_COMPLETE` (and not-converged
+  `PASS_STATUS: ACTIONABLE_FEEDBACK`) in the exact `parse-pass-status-routing`
+  form. Synced both Slice 2 and Slice 3 definition-test bullets to require this
+  DI-4 point-4 template-text assertion, and updated the DI-4 "Test note". Pure
+  plan.md edits; not blocked. Marked [x].
+
+- **Inconsistency-loop5 (design.md D5 vs plan.md R5/DI-2) — BLOCKED, left
+  unchecked.** The item's resolution is to reconcile `design.md` D5 (scope
+  "accepted as useful" to the converged standalone summary; record that the
+  not-converged standalone path surfaces empty/degraded result text per R5) — or
+  replace D5's standalone framing with a pointer to plan.md R5/DI-2. Both
+  alternatives edit `design.md`, which this `review-follow-up-plan` profile
+  explicitly treats as read-only ("read design.md as read-only context"; "Do not
+  touch … design.md beyond read-only context"). plan.md already carries the
+  authoritative standalone-output contract (R5 + DI-2): converged standalone
+  surfaces the converged summary's `PASS_STATUS: REVIEW_COMPLETE`; not-converged
+  standalone surfaces empty result text (degraded, accepted; the handback is a
+  lifecycle-only concern via the order-independent delegate-gate path). Resolving
+  in plan.md alone does not satisfy the item, which targets the design authority.
+  Per the batch evidence/disposition rule, left unchecked rather than editing an
+  out-of-bounds file.
+
+**Recommended design pass (consolidated, read-only-blocked here).** Three
+`design.md` reconciliations have now accumulated and should be handled together
+in a single design-review/design-follow-up pass (all out of bounds for this
+plan-profile follow-up):
+1. Items 6/7 (loop-3): drop "replaces the existing instruction"; align with
+   DI-4 keep-(a)/rewrite-(b).
+2. D5 (loop-5): scope "accepted as useful" to the converged standalone case;
+   record the not-converged standalone empty/degraded result text per R5.
+3. Context/D2 (loop-5 item-1 residual): note the judge-side `evaluate-routing`
+   governing site (DI-6) so the Context current-behaviour description and the
+   "only … edit" framing match the actual change set; D2's decision is unchanged.
