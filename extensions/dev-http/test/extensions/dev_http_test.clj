@@ -12,6 +12,7 @@
    [extensions.dev-http.routes :as routes]
    [extensions.dev-http.sse :as sse]
    [extensions.dev-http.tool :as tool]
+   [extensions.dev-http.util :as util]
    [org.httpkit.client :as http-client]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
@@ -213,48 +214,63 @@
 ;; dev-present tool (Slice 2)
 ;; ---------------------------------------------------------------------------
 
+(defn- registry-register-fn
+  "A real `register-content!` seam for the `dev-present` tool: registers the
+   normalized `content` map into `reg` under `route-id` (mirroring the
+   production `register-content-route!` seam) and returns a deterministic
+   session-route URL string. State-observable — assert on
+   `(registry/get-entry reg route-id)` rather than a recorded call."
+  [reg]
+  (fn [route-id content]
+    (registry/register-entry! reg route-id {:content content})
+    (str "http://127.0.0.1:9" (util/session-route-path route-id "t"))))
+
 (deftest dev-present-tool-test
   (testing "the tool registers a content route and returns its URL"
-    (let [captured (atom nil)
-          register! (fn [route-id content]
-                      (reset! captured {:route-id route-id :content content})
-                      (str "http://127.0.0.1:9/s/" route-id "?token=t"))
-          tool      (tool/dev-present-tool register!)
-          execute   (:execute tool)]
+    (let [reg     (registry/create-registry)
+          tool    (tool/dev-present-tool (registry-register-fn reg))
+          execute (:execute tool)]
       (testing "tool metadata"
         (is (= "dev-present" (:name tool)))
         (is (fn? (:format-request tool))))
       (testing "valid renderer → registers content + returns URL"
-        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "md"} {})]
+        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "md"} {})
+              entry  (registry/get-entry reg "md")]
           (is (false? (:is-error result)))
           (is (re-find #"Open: http://127\.0\.0\.1:9/s/md" (:content result)))
-          (is (= :markdown (get-in @captured [:content :renderer])))
-          (is (= "# Hi" (get-in @captured [:content :data])))
-          (is (= "md" (:route-id @captured)))))
+          (is (= :markdown (get-in entry [:content :renderer])))
+          (is (= "# Hi" (get-in entry [:content :data])))
+          (is (= "md" (:route-id entry)))))
       (testing "absent route-id is generated"
-        (let [result (execute {"renderer" "table" "data" {"rows" []}} {})]
+        (let [reg2   (registry/create-registry)
+              result ((:execute (tool/dev-present-tool (registry-register-fn reg2)))
+                      {"renderer" "table" "data" {"rows" []}} {})
+              entry  (val (first (registry/entries reg2)))]
           (is (false? (:is-error result)))
-          (is (string? (:route-id @captured)))
-          (is (re-find #"^r-" (:route-id @captured)))))
+          (is (string? (:route-id entry)))
+          (is (re-find #"^r-" (:route-id entry)))))
       (testing "opts :session-id threads into the registered content (invoking session only)"
         (let [result (execute {"renderer" "choices"
                                "data"     {"prompt" "Pick" "options" ["a" "b"]}
                                "route-id" "c"}
-                              {:session-id "sess-x"})]
+                              {:session-id "sess-x"})
+              entry  (registry/get-entry reg "c")]
           (is (false? (:is-error result)))
-          (is (= :choices (get-in @captured [:content :renderer])))
-          (is (= "sess-x" (get-in @captured [:content :session-id])))))
+          (is (= :choices (get-in entry [:content :renderer])))
+          (is (= "sess-x" (get-in entry [:content :session-id])))))
       (testing "absent opts :session-id threads nil (no fabricated session)"
-        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "n"} {})]
+        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "n"} {})
+              entry  (registry/get-entry reg "n")]
           (is (false? (:is-error result)))
-          (is (contains? (get-in @captured [:content]) :session-id))
-          (is (nil? (get-in @captured [:content :session-id])))))
+          (is (contains? (:content entry) :session-id))
+          (is (nil? (get-in entry [:content :session-id])))))
       (testing "unknown renderer → error, no registration"
-        (reset! captured :unchanged)
-        (let [result (execute {"renderer" "bogus" "data" "x"} {})]
+        (let [reg3   (registry/create-registry)
+              result ((:execute (tool/dev-present-tool (registry-register-fn reg3)))
+                      {"renderer" "bogus" "data" "x"} {})]
           (is (true? (:is-error result)))
           (is (re-find #"Unknown renderer" (:content result)))
-          (is (= :unchanged @captured))))))
+          (is (empty? (registry/entries reg3)))))))
   (testing "server not running (register! returns nil) → error"
     (let [tool    (tool/dev-present-tool (fn [_ _] nil))
           result  ((:execute tool) {"renderer" "markdown" "data" "hi"} {})]

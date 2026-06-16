@@ -614,7 +614,7 @@ the next begins.
 
 ## Test review follow-ups (round 6)
 
-- [ ] De-mock the unit `dev-present-tool-test`
+- [x] De-mock the unit `dev-present-tool-test`
       (`extensions/dev-http/test/extensions/dev_http_test.clj`) — it is built on
       a bespoke spy register seam and asserts *interactions*, the same mock/stub
       + interaction-assertion class round-1 removed from the choices handler
@@ -645,3 +645,20 @@ the next begins.
       already lives in the round-1 integration
       `dev-present-tool-renders-over-server-test`; the deeper injection proof in
       the core `submit-synthetic-prompt-injects-user-message-test`.)
+      Done: deleted the bespoke `register!`/`captured` spy. Added a
+      `registry-register-fn` helper that builds a real `register-content!` seam —
+      it registers the normalized content into a real
+      `registry/create-registry` as `{:content content}` (mirroring the
+      production `register-content-route!` seam) and returns a deterministic
+      `util/session-route-path`-built URL. The four positive `testing` blocks now
+      assert state via `(registry/get-entry reg route-id)` /
+      `(registry/entries reg)`: renderer/data/route-id for the explicit-id case,
+      a generated `^r-` route-id read off the sole registry entry, the threaded
+      `:session-id "sess-x"` (and `nil` for absent opts) on the entry's
+      `:content`. The unknown-renderer case now proves no registration via
+      `(empty? (registry/entries reg3))` (was the `(= :unchanged @captured)`
+      interaction assertion). The tool-result output assertions
+      (`:is-error`/`:content` regex, unknown-renderer + server-not-running error
+      paths) are unchanged. Focused Scry green (1 test / 21 assertions); full
+      dev-http unit ns green (17 / 118); `:extensions` suite green
+      (245 / 906); clj-kondo clean.

@@ -665,3 +665,18 @@ in-memory registry (logic, not infra), so it is fixable to a real,
 state-observable register fn — not an unavoidable boundary fake. Test-quality /
 methodology issue, not a behaviour defect; all other tests remain well-formed
 and use the sanctioned nullable api + ctx seams.
+
+## Test review (round 6) follow-up — 2026-06-15
+
+De-mocked `dev-present-tool-test` (the lone surviving spy/interaction unit
+test). Replaced the bespoke `register!`/`captured` spy with a real
+`registry-register-fn` seam registering normalized content into a real
+`registry/create-registry` (`{:content content}`, mirroring the production
+`register-content-route!` seam) and returning a deterministic
+`util/session-route-path` URL. Assertions now read registry state
+(`registry/get-entry` / `registry/entries`) for renderer/data/route-id,
+generated `^r-` id, threaded `:session-id` (and nil), and no-registration on
+unknown renderer (`empty? entries`, replacing `(= :unchanged @captured)`).
+Tool-result output assertions unchanged. No production change. Focused
+1/21, dev-http unit ns 17/118, `:extensions` suite 245/906 green; clj-kondo
+clean. Closes the round-6 finding; no remaining open follow-ups.
