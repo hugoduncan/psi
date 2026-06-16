@@ -101,3 +101,26 @@ plan.md / design.md (steps.md is read-only review context).
       be updated in Slices 2 and 3 (count, name vector, type vector, positional
       indices, yields-repeat); a separate 229 test is additive-only, not a
       substitute.
+
+- [ ] **`steps.md` execution checklist is out of sync with the hardened
+      `plan.md` mandates (Slice 2/3).** Prior plan-review passes hardened
+      `plan.md` with several MUST-do test items, but `steps.md` (the execution
+      surface) was never re-synced, so an implementer ticking `steps.md` alone
+      would omit mandatory work and produce an implementation that violates
+      `plan.md`. Concretely, `steps.md` Slice 2/3 is missing: (a) the
+      **pre-existing RED `review-task-design-test` `:max-iterations` 6→3 fix**
+      that `plan.md` Slice 2 requires in the same `review-task-design-test` edit
+      (`steps.md:40` only says "step-order + `:on-max-iterations` +
+      terminal/PASS_STATUS assertions"); (b) the **converged standalone
+      result-text runtime test** (DI-2) mandated by `plan.md` Slice 2 *and*
+      Slice 3 — absent from `steps.md` entirely; (c) the constraint that the
+      **existing `task-lifecycle-test` MUST be updated in place** (count 9→11→13,
+      name/type vectors, positional `nth`, `repeat` counts) with a separate `229`
+      test additive-only — `steps.md` only says the generic "task-lifecycle
+      definition coverage for the design/plan gate + handback routing", leaving
+      the positional-update mandate (R3) implicit; and (d) the **DI-3 "no literal
+      iteration count" wording constraint** on the not-converged summaries
+      (`steps.md:30`/Slice 3 just say "PASS_STATUS: ACTIONABLE_FEEDBACK,
+      explicit-terminal"). Resolve by updating `steps.md` Slice 2/3 to enumerate
+      these four mandated sub-tasks so the execution checklist matches `plan.md`.
+

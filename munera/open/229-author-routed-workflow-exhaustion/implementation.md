@@ -66,3 +66,15 @@ and the converged templates carry *two* anti-control-token sentences, so "replac
 the instruction" is ambiguous and risks echo → ambiguous-pass-status → lifecycle
 hard-fail. Prior batch items (DI-2 terminal-yield, DI-3 N-count, stale baseline,
 positional task-lifecycle-test) remain resolved; no duplication.
+
+## Plan-review inconsistency pass — loop 2 (2026-06-16)
+
+ACTIONABLE. 1 new inconsistency → design-steps.md. steps.md execution checklist
+is out of sync with the hardened plan.md: prior passes hardened plan.md (RED
+6→3 baseline fix, converged standalone result-text test (DI-2), in-place
+positional task-lifecycle-test update with additive-only 229 test, DI-3 no-N-
+count wording) but steps.md Slice 2/3 was never re-synced, so ticking steps.md
+alone would omit mandatory work. Verified D2 (judged-routing-transition keys
+dispatch off :failed only) and the model `:string` / ir `step-name-schema`
+mirror against code — both accurate, no inconsistency there. Loop-1 items
+(stale baseline, positional test) remain resolved in plan.md; not duplicated.
