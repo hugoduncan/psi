@@ -611,3 +611,37 @@ the next begins.
       full dev-http suite green (17 unit / 118 + 6 integration / 61); clj-kondo
       clean. (The unrelated `psi.rpc-smoke-test` handshake timeout reappears only
       when OR-focusing all `:integration` tests, per prior rounds.)
+
+## Test review follow-ups (round 6)
+
+- [ ] De-mock the unit `dev-present-tool-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`) — it is built on
+      a bespoke spy register seam and asserts *interactions*, the same mock/stub
+      + interaction-assertion class round-1 removed from the choices handler
+      tests but never applied here. The test injects a hand-rolled
+      `register!` `(fn [route-id content] (reset! captured {…}) "http://…/s/…")`
+      that records its args into a `captured` atom and returns a canned URL,
+      then asserts on `@captured`: `(get-in @captured [:content :renderer])`,
+      `[:content :data]`, `[:content :session-id]`, `(:route-id @captured)`,
+      and `(= :unchanged @captured)`. These are interaction assertions on what
+      was passed to the collaborator, contrary to the project guideline
+      `assert(state ∨ outputs) ∧ ¬assert(interactions)` and task-test-review's
+      `∀d ∈ infra_deps. ¬mock ∧ ¬stub`. (Round-5 then *added* the
+      `[:content :session-id]` interaction assertions onto the same spy.) The
+      `register-content!` seam (`register-content-route!`) registers into an
+      in-memory `registry/create-registry` (logic, not infrastructure → use the
+      real thing per testing-without-mocks), so the seam can be made real and
+      state-observable: pass a register fn that registers the normalized content
+      into a real registry (`registry/register-entry! reg route-id {:content …}`)
+      and returns a deterministic URL string, then assert on
+      `(:content (registry/get-entry reg route-id))` (the normalized
+      `{:renderer :data :session-id}` map) and the generated/explicit route-id
+      via the registry entry — observing state, not recorded calls. The tool
+      result map (`:is-error`/`:content` regex, including the unknown-renderer
+      and server-not-running error paths) is already an output assertion and
+      stays. This removes the spy and the interaction assertions while
+      preserving coverage of renderer validation, route-id generation,
+      session-id threading, and the error paths. (The end-to-end render proof
+      already lives in the round-1 integration
+      `dev-present-tool-renders-over-server-test`; the deeper injection proof in
+      the core `submit-synthetic-prompt-injects-user-message-test`.)

@@ -648,3 +648,20 @@ tests green (6 tests / 61 assertions); clj-kondo clean on the test file. The
 unrelated `psi.rpc-smoke-test/rpc-smoke-handshake-test` handshake timeout
 reappears only when OR-focusing all `:integration` tests (consistent with prior
 rounds), not related to this change.
+
+## Test review (round 6) — 2026-06-15
+
+One actionable finding filed (steps.md "Test review follow-ups (round 6)").
+Non-compliance worth flagging: the round-1 test-review's de-mock cleanup was
+incomplete — it converted the choices handler tests' bespoke spy maps to the
+nullable api and to state/output assertions, but left `dev-present-tool-test`
+built on a bespoke spy `register!` seam with interaction assertions on a
+`captured` atom (`[:content :renderer]`/`[:content :data]`/`:route-id`/
+`(= :unchanged @captured)`); round-5 then *added* the `[:content :session-id]`
+interaction assertions onto that same spy. So a unit test contradicting both
+task-test-review (`¬mock ∧ ¬stub`) and the project's `¬assert(interactions)`
+guideline survived all five prior test-review rounds. The seam registers into an
+in-memory registry (logic, not infra), so it is fixable to a real,
+state-observable register fn — not an unavoidable boundary fake. Test-quality /
+methodology issue, not a behaviour defect; all other tests remain well-formed
+and use the sanctioned nullable api + ctx seams.
