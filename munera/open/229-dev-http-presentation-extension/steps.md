@@ -260,7 +260,7 @@ the next begins.
 
 ## Implementation review follow-ups (round 4)
 
-- [ ] De-duplicate the HTTP response-map construction (same class as the
+- [x] De-duplicate the HTTP response-map construction (same class as the
       round-1 `kget`/urlencoded and round-2 path/format dedups, missed earlier).
       `choices/text-response`
       (`extensions/dev-http/src/extensions/dev_http/choices.clj`) is a verbatim
@@ -277,8 +277,17 @@ the next begins.
       by the plain-text 4xx/404 sites), and remove the misnamed
       `choices/text-response`. Keep it minimal — small builder fns, not a
       framework.
+      Done: extracted two small builders into `extensions.dev-http.util` —
+      `html-response` (200 `text/html`) and `text-response` (`status` + `body`,
+      `text/plain`). The misnamed private `choices/text-response` and the private
+      `renderers/html-response` are deleted; their HTML-page call sites use
+      `util/html-response`, and all the hand-built plain-text 4xx/404 maps in
+      `choices` (400), `router` (404), `middleware` (403), and `renderers`
+      (400 + two 404s) now call `util/text-response`. Each response shape now has
+      one source; the misname is gone. (`sse`'s event-stream response is a
+      distinct streaming-header shape, left as-is.)
 
-- [ ] Reconcile the demonstrated `/sse/registry` feed with the design's
+- [x] Reconcile the demonstrated `/sse/registry` feed with the design's
       platform-thin / content-churny split
       (`extensions/dev-http/src/extensions/dev_http/router.clj`,
       `build-handler`). The router builder is otherwise pure platform mechanism
@@ -293,3 +302,16 @@ the next begins.
       path (e.g. register `/sse/registry` as a session route at `start!` time
       like `register-sse-route!` does) so no specific content route is hardcoded
       into the generic router builder.
+      Done (option b): removed the hardcoded `/sse/registry` route (and the `sse`
+      require) from `router/build-handler`, which is now pure platform mechanism
+      (`/s/:route-id` dispatch subtree + ungated `/assets` subtree only). The
+      demonstrated feed is now registered as an ordinary session route at
+      `start!` time via a private `register-demo-feeds!` (`register-route!
+      "registry" (sse/registry-feed-handler reg)`), reachable at `/s/registry`
+      and token-gated by the `/s/` subtree like any session route. Updated the
+      unit token-gating test (register the feed as a session route, assert 403 at
+      `/s/registry`) and the integration feed test (`/s/registry?token=…`; the
+      snapshot now reports `routes 2` because the feed is itself a session route
+      and counts alongside the added `live-1`). Docs (`doc/dev-http.md`),
+      CHANGELOG, and `plan.md` Slice 4 updated to `/s/registry` and the
+      platform/content split note.

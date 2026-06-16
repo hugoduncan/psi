@@ -57,12 +57,6 @@
   [answer]
   (renderers/page "choices" [:p (str "Recorded your choice: " answer)]))
 
-(defn- text-response
-  [body]
-  {:status  200
-   :headers {"content-type" "text/html; charset=utf-8"}
-   :body    body})
-
 (defn- claim-answer!
   "Atomically mark `route-id` answered with `answer` if not already answered.
    Returns true iff this call won the claim. Single-developer/localhost — the
@@ -119,19 +113,18 @@
       (let [answer (form-choice request)]
         (cond
           (str/blank? answer)
-          {:status 400 :headers {"content-type" "text/plain; charset=utf-8"}
-           :body "400 missing choice"}
+          (util/text-response 400 "400 missing choice")
 
           (claim-answer! registry route-id answer)
           (if (inject-choice! api session-id answer)
-            (text-response (thanks-page answer))
+            (util/html-response (thanks-page answer))
             (do
               ;; Injection failed → the route injected zero user messages, so
               ;; do not consume the single-shot: release the claim so the choice
               ;; can be retried, and report failure rather than a false success.
               (release-claim! registry route-id)
-              (text-response (failed-page))))
+              (util/html-response (failed-page))))
 
           :else
-          (text-response (answered-page answer))))
-      (text-response (render-form route-id (mw/request-token request) content)))))
+          (util/html-response (answered-page answer))))
+      (util/html-response (render-form route-id (mw/request-token request) content)))))

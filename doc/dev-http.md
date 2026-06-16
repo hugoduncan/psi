@@ -111,16 +111,20 @@ fidelity.
 ## Live updates (SSE)
 
 A route may expose a `text/event-stream` feed; browser pages subscribe via
-`EventSource` to receive pushed updates without manual refresh. The built-in
-`/sse/registry` feed (token-gated) emits a snapshot of the current session-route
-count. Register custom feeds with `register-sse-route!`.
+`EventSource` to receive pushed updates without manual refresh. SSE feeds are
+ordinary session routes (registered under `/s/:route-id`), so they are
+token-gated like any other session route — no special subtree. The built-in
+`/s/registry` feed (registered as a session route at `start!`) emits a snapshot
+of the current session-route count. Register custom feeds with
+`register-sse-route!`.
 
 ## Security posture
 
 - Binds to `127.0.0.1` only; never remote/non-localhost.
-- Every **dynamic** subtree (persisted routes, `/s/` session routes, `/sse/`
-  feeds, choice submits) is gated by the per-launch token, supplied via the
-  `token` query parameter or the `x-dev-http-token` header. A mismatch is `403`.
+- Every **dynamic** subtree (persisted routes, `/s/` session routes — including
+  SSE feeds and choice submits) is gated by the per-launch token, supplied via
+  the `token` query parameter or the `x-dev-http-token` header. A mismatch is
+  `403`.
 - Vendored static client JS under `/assets/` is served ungated (it is public
   third-party library content with no session data, so token-less browser
   `<script>` requests resolve).

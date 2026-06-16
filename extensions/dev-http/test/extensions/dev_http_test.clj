@@ -340,11 +340,13 @@
     (is (= "data: hello\n\n" (sse/event "hello")))))
 
 (deftest sse-route-is-token-gated-test
-  (testing "the /sse/registry feed sits inside the token-gated subtree"
+  (testing "an SSE feed registered as a session route sits inside the token-gated subtree"
     (let [reg     (registry/create-registry)
           handler (router/build-handler {:registry reg :token "tok" :persisted-routes []})]
+      (registry/register-entry! reg "registry"
+                                {:handler (sse/registry-feed-handler reg)})
       (testing "no token → 403 (never reaches the event stream)"
-        (is (= 403 (:status (handler {:request-method :get :uri "/sse/registry"}))))))))
+        (is (= 403 (:status (handler {:request-method :get :uri "/s/registry"}))))))))
 
 ;; ---------------------------------------------------------------------------
 ;; lifecycle (integration — real ephemeral-port http-kit server)
@@ -463,16 +465,18 @@
           base   (str "http://" (:host server) ":" (:port server))
           token  (:token server)]
       (try
-        (testing "AC-8: the SSE feed requires the token"
-          (is (= 403 (get-status (str base "/sse/registry")))))
+        (testing "AC-8: the SSE feed (a session route registered at start!) requires the token"
+          (is (= 403 (get-status (str base "/s/registry")))))
         (testing "a connected client receives a pushed snapshot event"
+          ;; start! auto-registered the `registry` feed itself; add one more so
+          ;; the snapshot reflects both session routes (the feed counts itself).
           (sut/register-route! "live-1" (fn [_] {:status 200 :body "x"}))
-          (let [resp @(http-client/get (str base "/sse/registry?token=" token))]
+          (let [resp @(http-client/get (str base "/s/registry?token=" token))]
             (is (= 200 (:status resp)))
             (is (re-find #"text/event-stream"
                          (str (get-in resp [:headers :content-type]))))
             (let [body (body-str resp)]
               (is (re-find #"data: open" body))
-              (is (re-find #"data: routes 1" body)))))
+              (is (re-find #"data: routes 2" body)))))
         (finally
           (sut/stop!))))))

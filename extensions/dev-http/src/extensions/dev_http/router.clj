@@ -5,12 +5,16 @@
    1. Persisted routes loaded from the extension-local `dev/` source.
    2. A stable `/s/:route-id` dispatch subtree that resolves against the
       session-route registry atom at request time — so session-route churn never
-      rebuilds the router."
+      rebuilds the router.
+
+   The builder is pure platform mechanism: it bakes in no specific content
+   route. Demonstrated content (the persisted `/demo` page, the `/s/registry`
+   SSE feed) is registered as content — under `dev/` or as a session route at
+   `start!` time — never hardcoded here."
   (:require
    [extensions.dev-http.middleware :as mw]
    [extensions.dev-http.registry :as registry]
    [extensions.dev-http.renderers :as renderers]
-   [extensions.dev-http.sse :as sse]
    [extensions.dev-http.util :as util]
    [reitit.ring :as ring]))
 
@@ -20,9 +24,7 @@
     (let [route-id (get-in request [:path-params :route-id])]
       (if-let [handler (:handler (registry/get-entry reg route-id))]
         (handler request)
-        {:status  404
-         :headers {"content-type" "text/plain; charset=utf-8"}
-         :body    (str "404 no such session route: " route-id)}))))
+        (util/text-response 404 (str "404 no such session route: " route-id))))))
 
 (defn build-handler
   "Build a reitit-ring handler from a `:registry` atom, a per-launch `:token`,
@@ -30,9 +32,7 @@
   [{:keys [registry token persisted-routes]}]
   (let [gated-root (into ["" {:middleware [[mw/wrap-token token]]}
                           [(str util/session-route-prefix "/:route-id")
-                           {:handler (session-dispatch-handler registry)}]
-                          ;; Demonstrated SSE live feed (token-gated subtree).
-                          ["/sse/registry" {:get (sse/registry-feed-handler registry)}]]
+                           {:handler (session-dispatch-handler registry)}]]
                          (or persisted-routes []))
         ;; Vendored client JS is public third-party library content with no
         ;; session data; served ungated so token-less browser <script> requests

@@ -1,6 +1,26 @@
 (ns extensions.dev-http.util
   "Small shared helpers for the dev-http extension.")
 
+;; ---------------------------------------------------------------------------
+;; ring responses — single source of the two response shapes the extension
+;; builds (an HTML page and a plain-text status/error body).
+;; ---------------------------------------------------------------------------
+
+(defn html-response
+  "A 200 `text/html` ring response with `body` (an HTML string)."
+  [body]
+  {:status  200
+   :headers {"content-type" "text/html; charset=utf-8"}
+   :body    body})
+
+(defn text-response
+  "A plain-text ring response with HTTP `status` and `body` (used for the
+   4xx/404 status/error bodies)."
+  [status body]
+  {:status  status
+   :headers {"content-type" "text/plain; charset=utf-8"}
+   :body    body})
+
 (defn kget
   "Read a value from `m` under any of `ks`, returning the first present key's
    value. Lets a single accessor serve keyword-keyed (REPL) and string-keyed

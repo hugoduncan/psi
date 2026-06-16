@@ -12,7 +12,7 @@
    [cheshire.core :as json]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [extensions.dev-http.util :refer [kget]]
+   [extensions.dev-http.util :as util :refer [kget]]
    [hiccup2.core :as h])
   (:import
    (org.commonmark.parser Parser)
@@ -25,12 +25,6 @@
 (def vendor-resource-root
   "Classpath resource root holding the vendored client JS."
   "dev_http/vendor")
-
-(defn- html-response
-  [body]
-  {:status  200
-   :headers {"content-type" "text/html; charset=utf-8"}
-   :body    body})
 
 (defn page
   "Wrap `body` hiccup forms in a minimal HTML document string with `title`."
@@ -55,7 +49,7 @@
 
 (defn- render-markdown
   [{:keys [data]}]
-  (html-response (page "markdown" (h/raw (markdown->html data)))))
+  (util/html-response (page "markdown" (h/raw (markdown->html data)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; table
@@ -65,7 +59,7 @@
   [{:keys [data]}]
   (let [headers (kget data :headers "headers")
         rows    (kget data :rows "rows")]
-    (html-response
+    (util/html-response
      (page "table"
            [:table {:border "1" :cellpadding "4" :cellspacing "0"}
             (when (seq headers)
@@ -93,7 +87,7 @@
 
 (defn- render-hiccup
   [{:keys [data]}]
-  (html-response (str (h/html (coerce-hiccup data)))))
+  (util/html-response (str (h/html (coerce-hiccup data)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; file artifact
@@ -127,9 +121,7 @@
       {:status  200
        :headers {"content-type" (content-type-for path)}
        :body    f}
-      {:status  404
-       :headers {"content-type" "text/plain; charset=utf-8"}
-       :body    (str "404 file not found: " path)})))
+      (util/text-response 404 (str "404 file not found: " path)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; vega-lite (vendored client JS)
@@ -137,7 +129,7 @@
 
 (defn- render-vega
   [{:keys [data]}]
-  (html-response
+  (util/html-response
    (page "vega"
          [:div {:id "vega-view"}]
          [:script {:src (str asset-prefix "/vega.min.js")}]
@@ -153,7 +145,7 @@
 
 (defn- render-mermaid
   [{:keys [data]}]
-  (html-response
+  (util/html-response
    (page "mermaid"
          [:pre {:class "mermaid"} (str data)]
          [:script {:src (str asset-prefix "/mermaid.min.js")}]
@@ -181,9 +173,7 @@
   [{:keys [renderer] :as content}]
   (if-let [f (get renderers (keyword renderer))]
     (f content)
-    {:status  400
-     :headers {"content-type" "text/plain; charset=utf-8"}
-     :body    (str "400 unknown renderer: " renderer)}))
+    (util/text-response 400 (str "400 unknown renderer: " renderer))))
 
 (defn asset-handler
   "Serve a vendored client-JS asset by file name from the classpath resource
@@ -191,12 +181,9 @@
   [request]
   (let [file-name (get-in request [:path-params :asset])]
     (if (or (str/blank? file-name) (str/includes? file-name ".."))
-      {:status 404 :headers {"content-type" "text/plain; charset=utf-8"}
-       :body "404 asset not found"}
+      (util/text-response 404 "404 asset not found")
       (if-let [resource (io/resource (str vendor-resource-root "/" file-name))]
         {:status  200
          :headers {"content-type" (content-type-for file-name)}
          :body    (io/input-stream resource)}
-        {:status  404
-         :headers {"content-type" "text/plain; charset=utf-8"}
-         :body    (str "404 asset not found: " file-name)}))))
+        (util/text-response 404 (str "404 asset not found: " file-name))))))

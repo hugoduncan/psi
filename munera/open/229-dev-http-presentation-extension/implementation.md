@@ -319,3 +319,37 @@ hand-built ~6× with no shared builder; (2) low-severity — the demonstrated
 the otherwise platform-only `router/build-handler`, lightly contradicting the
 platform/content split (mechanism reason: persisted `dev/` routes can't reach
 the live registry atom). No correctness defect found.
+
+## Implementation review follow-ups (round 4) executed — 2026-06-15
+
+Resolved both round-4 dedup/consistency + platform/content follow-ups:
+
+- **HTTP response-map dedup.** Extracted two small builders into
+  `extensions.dev-http.util`: `html-response` (200 `text/html`) and
+  `text-response` (`status` + `body`, `text/plain`). Deleted the misnamed
+  private `choices/text-response` (it returned `text/html`) and the private
+  `renderers/html-response`; every HTML-page site now calls `util/html-response`,
+  and the ~6 hand-built plain-text 4xx/404 maps across `choices` (400), `router`
+  (404), `middleware` (403, now requires `util`), and `renderers` (400 + two
+  404s) call `util/text-response`. Each response shape has one source; the
+  misname is gone. `sse`'s event-stream response is a distinct streaming-header
+  shape and was left as-is.
+- **`/sse/registry` reconciled with the platform/content split (option b).**
+  Removed the hardcoded `/sse/registry` route + the `sse` require from
+  `router/build-handler`; the builder is now pure platform mechanism
+  (`/s/:route-id` dispatch + ungated `/assets` only — no specific content route).
+  The demonstrated feed is registered as an ordinary session route at `start!`
+  via private `register-demo-feeds!` → `register-route! "registry"
+  (sse/registry-feed-handler reg)`, reachable at `/s/registry`, token-gated by
+  the `/s/` subtree. Consequence: the feed is itself a session route, so its
+  `routes N` snapshot now counts itself (integration test updated `1 → 2`).
+  Added a forward `(declare register-route!)` since `register-demo-feeds!`
+  precedes it in the entry-point ns.
+- **Docs/changelog/plan.** `doc/dev-http.md` (SSE feeds are session routes under
+  `/s/`, built-in `/s/registry`; security posture no longer lists a `/sse/`
+  subtree), CHANGELOG (`/sse/registry` → `/s/registry`), and `plan.md` Slice 4
+  (platform/content split note) updated.
+- Verification: extensions suite green (15 tests / 88 assertions), integration
+  green (3 tests / 34 assertions); clj-kondo clean across extension src/test.
+  No behaviour change beyond the feed URL (`/sse/registry` → `/s/registry`) and
+  the self-counting snapshot.

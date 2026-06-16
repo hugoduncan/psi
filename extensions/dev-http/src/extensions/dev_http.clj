@@ -65,6 +65,16 @@
     (swap! state assoc :system nil))
   nil)
 
+(declare register-route!)
+
+(defn- register-demo-feeds!
+  "Register the demonstrated SSE live feed as a session route (content, not
+   platform) so the generic router builder bakes in no specific content route.
+   The `/s/registry` feed emits a snapshot of the current session-route count."
+  []
+  (when-let [reg (registry-component)]
+    (register-route! "registry" (sse/registry-feed-handler reg))))
+
 (defn start!
   "Start the dev-http server. Idempotent: halts any prior system first so no
    orphaned server survives a reload/restart. Returns server info."
@@ -73,6 +83,7 @@
   (let [api (:api @state)
         sys (ig/init (system/system-config api {:host "127.0.0.1" :port 0}))]
     (swap! state assoc :system sys)
+    (register-demo-feeds!)
     (server-component)))
 
 (defn- url-token-lines

@@ -2,7 +2,8 @@
   "Per-launch token gating. Every dynamic subtree is wrapped so that a request
    without the matching token is rejected with 403 before reaching a handler."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [extensions.dev-http.util :as util]))
 
 (defn- decode
   [s]
@@ -36,6 +37,5 @@
   (fn [request]
     (if (= token (request-token request))
       (handler request)
-      {:status  403
-       :headers {"content-type" "text/plain; charset=utf-8"}
-       :body    "403 forbidden: invalid or missing dev-http token"})))
+      (util/text-response
+       403 "403 forbidden: invalid or missing dev-http token"))))

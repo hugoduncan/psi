@@ -127,6 +127,13 @@ async channel. A route may expose an SSE feed; pages subscribe via `EventSource`
 to receive pushed updates without manual refresh. Kept minimal: one demonstrated
 feed (e.g. registry/route data evolving), no general pub/sub framework.
 
+The demonstrated feed is registered as an ordinary **session route**
+(`/s/registry`) at `start!` time — not hardcoded into the generic router
+builder — preserving the platform/content split: `router/build-handler` bakes in
+no specific content route (only the `/s/:route-id` dispatch subtree + the
+ungated `/assets` subtree). SSE feeds are therefore session routes and inherit
+the `/s/` subtree's token gating.
+
 ### Wiring / install
 
 - `extensions/dev-http/deps.edn`: extension-local deps
