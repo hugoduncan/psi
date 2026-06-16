@@ -140,6 +140,13 @@
         (is (re-find #"<td>1</td><td>2</td>" (:body kw)))
         (is (re-find #"<th>a</th>" (:body str)))
         (is (re-find #"<td>9</td>" (:body str)))))
+    (testing ":table with rows but no headers renders a tbody-only table"
+      ;; headers are optional; this is the `(seq headers)` false branch of
+      ;; render-table, which omits the <thead> entirely (no header row).
+      (let [resp (renderers/render {:renderer :table :data {:rows [[1 2]]}})]
+        (is (re-find #"<td>1</td><td>2</td>" (:body resp)))
+        (is (not (re-find #"<thead>" (:body resp))))
+        (is (not (re-find #"<th>" (:body resp))))))
     (testing ":hiccup renders a JSON-decoded (string-tag) tree as elements"
       (let [resp (renderers/render {:renderer :hiccup :data ["div" {} ["h1" "X"]]})]
         (is (= "<div><h1>X</h1></div>" (:body resp)))))

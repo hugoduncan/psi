@@ -731,3 +731,19 @@ left unexercised, the eighth such surface/branch gap the prior test-review
 rounds have each surfaced. Tests are otherwise well-formed and uniformly use the
 sanctioned nullable extension API + ctx seams (no infra-dep mocks/stubs; the
 round-6 de-mock closed the last spy/interaction test).
+
+## Test review (round 8) follow-up — 2026-06-15
+
+Executed the single round-8 actionable item: added a headerless `:table`
+regression guard. New `testing` block in `renderers-test`
+(`extensions/dev-http/test/extensions/dev_http_test.clj`) renders
+`{:renderer :table :data {:rows [[1 2]]}}` (rows-only, no `:headers`) and asserts
+the body carries the `<td>1</td><td>2</td>` cells but contains neither `<thead>`
+nor `<th>` — covering the `(seq headers)` false branch of `render-table` that
+both prior `:table` assertions (both supply `:headers`) left unguarded.
+
+Verification: full `extensions` suite green — 246 tests / 920 assertions,
+`:pass? true`. The non-zero scry exit is a pre-existing harness artifact (a
+single `nil`-var "unknown-result" classification, not a failure/error; all
+assertions pass). clj-kondo clean on the touched test file. No remaining
+unchecked round-8 follow-ups.

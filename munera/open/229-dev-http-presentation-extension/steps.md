@@ -722,7 +722,7 @@ the next begins.
 
 ## Test review follow-ups (round 8)
 
-- [ ] (Low) Cover the headerless `:table` branch of `renderers/render-table`
+- [x] (Low) Cover the headerless `:table` branch of `renderers/render-table`
       (`extensions/dev-http/src/extensions/dev_http/renderers.clj`). The renderer
       conditionally emits the `<thead>` only `(when (seq headers) …)`, so a
       `:table` content map with `:rows` but no `:headers` (or empty `:headers`)
@@ -736,3 +736,13 @@ the next begins.
       round-7 hiccup-passthrough / urlencoded-decode gaps. Add a `:table`
       assertion with rows-only data (e.g. `{:rows [[1 2]]}`, no `:headers`)
       asserting the body renders the `<td>` cells but no `<thead>`/`<th>`.
+      Done: added a `:table with rows but no headers renders a tbody-only table`
+      `testing` block to `renderers-test`
+      (`extensions/dev-http/test/extensions/dev_http_test.clj`) rendering
+      `{:renderer :table :data {:rows [[1 2]]}}` and asserting the body renders
+      the `<td>1</td><td>2</td>` cells but contains no `<thead>` and no `<th>` —
+      exercising the `(seq headers)` *false* branch of `render-table` distinct
+      from the two header-supplying assertions above. Full `extensions` suite
+      green (246 tests / 920 assertions, `:pass? true`; the lone scry
+      `unknown-result` is a pre-existing nil-var harness artifact); clj-kondo
+      clean.
