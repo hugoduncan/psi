@@ -487,3 +487,49 @@ author-target routing (`:step/handback.acting`, `:judge/record`, not `:failed`)
 
 Discovery: statechart acting-state ids are namespaced `:step/<name>.acting`
 (slash), not `:step.<name>.acting` — corrected the statechart test assertion.
+
+---
+
+## Slice 2 implementation (2026-06-16)
+
+review-task-design handback + lifecycle design gate.
+
+- **review-task-design.edn**: `design-follow-up` `:on` now
+  `{"DONE" {:goto "design-review" :max-iterations 3 :on-max-iterations
+  "final-summary-not-converged"}}`. New `final-summary-not-converged` session
+  step inserted BEFORE the converged `final-summary` (DI-2 ordering); both
+  summaries made explicit-terminal (constant-routing DONE judge + `:on {"DONE"
+  {:goto :done}}`). DI-4 template contract applied to both: kept guard (a),
+  rewrote guard (b) WITHOUT the literal `PASS_STATUS:` token (anti-echo phrased
+  as "do not reproduce the status lines from the review replies") so each
+  template body contains exactly ONE `PASS_STATUS:` occurrence, as the final
+  column-0 line — `REVIEW_COMPLETE` (converged) / `ACTIONABLE_FEEDBACK`
+  (not-converged, no iteration count per DI-3).
+- **task-lifecycle.edn**: `check-design-review-status` invoke-gate inserted
+  immediately after `review-task-design` (DONE→`create-task-plan`,
+  REPEAT→`final-summary-design-not-converged`);
+  `final-summary-design-not-converged` session handback appended last
+  (`:goto :done`, no extraction).
+- **workflow_definitions_test.clj**: `review-task-design-test` updated (4-step
+  order, `:on-max-iterations`, both-terminal, DI-4 template-text via new
+  `assert-sole-final-pass-status-line` helper). `task-lifecycle-test`
+  restructured (11 steps; the three `(take 5 steps)` positional assertions
+  replaced with name/type-filtered `delegate-steps` selection per DI-5; design
+  gate + handback assertions; `repeat 11`).
+- **workflow_delegate_review_step_live_test.clj**: DI-2 converged-standalone
+  runtime test — loads the real built-in `review-task-design`, stubs
+  `prompt-execution-result-in!` (review prompts + final-summary all REVIEW_COMPLETE),
+  drives the `execute-workflow-run` mutation, asserts `final-summary` is last in
+  step-order and `:psi.workflow/result` has exactly one `PASS_STATUS:
+  REVIEW_COMPLETE`.
+
+DEVIATION (out-of-scope pre-existing RED): `review-task-plan-test` and
+`review-task-prompt-artifact-targets-test` were already failing at the Slice-1
+baseline — they assert review-task-plan prompts contain "steps.md" and NOT
+"design-steps.md", but commit `9a0e4a01f` (#177 "route plan-review follow-ups
+through shared design-steps.md") intentionally changed the authored content to
+"design-steps.md" without updating these tests. This is #177 test-debt, not 229
+breakage, but it sits in the review-task-plan test surface Slice 3 rewrites, so
+it is reconciled there (update stale assertions to the authored #177 content; no
+workflow-content change). Recorded so the AC-7 green-suite gate is met by
+Slice 3, not silently.

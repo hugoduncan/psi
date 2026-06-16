@@ -32,7 +32,31 @@
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
-   :on {"DONE" {:goto "design-review" :max-iterations 3}}}
+   :on {"DONE" {:goto "design-review"
+                :max-iterations 3
+                :on-max-iterations "final-summary-not-converged"}}}
+  {:name "final-summary-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "design-review"
+                           :prompt "architecture"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "design-review"
+                           :prompt "ambiguity"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "design-review"
+                           :prompt "inconsistency"
+                           :output :final-llm-reply}}
+    {:type :template,
+     :text
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review that did not converge within the configured follow-up iteration limit. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Explain that the design review did not converge within the configured follow-up iteration limit, summarise the architectural-fit misfits, ambiguities, or inconsistencies that remain unresolved, list the task artifact files touched (design.md, design-steps.md, implementation.md), and state that the design needs further human attention before proceeding to plan creation.\n\nDo not include REPEAT or DONE control tokens, and do not reproduce the status lines from the review replies provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: ACTIONABLE_FEEDBACK",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
@@ -49,8 +73,12 @@
                            :output :final-llm-reply}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key architectural-fit misfits, ambiguities, or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step outputs\n- whether the design is now clear enough to proceed to plan creation\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
-     :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key architectural-fit misfits, ambiguities, or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step outputs\n- whether the design is now clear enough to proceed to plan creation\n\nDo not include REPEAT or DONE control tokens, and do not reproduce the status lines from the review replies provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: REVIEW_COMPLETE",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
  :name "review-task-design",
  :description
  "Repeatedly review a Munera task design for architectural fit, ambiguities, and inconsistencies in one shared multi-prompt review batch, record terse notes, execute batched follow-up steps, and loop until no actionable feedback remains"}

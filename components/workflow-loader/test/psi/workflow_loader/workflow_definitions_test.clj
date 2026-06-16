@@ -47,6 +47,24 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
+(defn- count-substring
+  [^String s ^String sub]
+  (loop [from 0 n 0]
+    (let [idx (.indexOf s sub from)]
+      (if (neg? idx)
+        n
+        (recur (+ idx (count sub)) (inc n))))))
+
+(defn- assert-sole-final-pass-status-line
+  "DI-4 point 4: the summary template body must end with the exact, column-0,
+   single-space `PASS_STATUS: <token>` line and contain exactly one
+   `PASS_STATUS:` occurrence (no echoed review-reply status lines)."
+  [text token]
+  (is (= 1 (count-substring text "PASS_STATUS:"))
+      (str "template should contain exactly one PASS_STATUS: occurrence for " token))
+  (is (.endsWith ^String text (str "\nPASS_STATUS: " token))
+      (str "template should end with the sole column-0 PASS_STATUS: " token " line")))
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -69,15 +87,17 @@
        (is (empty? errors))
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])]
-       (testing "has merged review topology with three steps"
-         (is (= 3 (count steps)))
-         (is (= ["design-review" "design-follow-up" "final-summary"]
+       (testing "has merged review topology with a not-converged handback before the converged summary (DI-2)"
+         (is (= 4 (count steps)))
+         (is (= ["design-review" "design-follow-up"
+                 "final-summary-not-converged" "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session]
+         (is (= [:session :session :session :session]
                 (mapv :type steps))))
        (let [step-by-name (into {} (map (juxt :name identity) steps))
              design-review (get step-by-name "design-review")
              design-follow-up (get step-by-name "design-follow-up")
+             not-converged-step (get step-by-name "final-summary-not-converged")
              final-step (get step-by-name "final-summary")]
          (testing "design-review carries shared step-level capabilities"
            (is (= ["read" "bash" "edit" "write"]
@@ -115,10 +135,12 @@
            (is (= {"REPEAT" {:goto "design-follow-up"}
                    "DONE" {:goto "final-summary"}}
                   (:on design-review))))
-         (testing "design-follow-up uses the shared design profile and loops to the review-pass target"
+         (testing "design-follow-up uses the shared design profile and loops to the review-pass target with author-routed exhaustion"
            (is (= (constant-routing-judge "DONE")
                   (:judge design-follow-up)))
-           (is (= {"DONE" {:goto "design-review" :max-iterations 6}}
+           (is (= {"DONE" {:goto "design-review"
+                           :max-iterations 3
+                           :on-max-iterations "final-summary-not-converged"}}
                   (:on design-follow-up)))
            (let [text (step-template-text design-follow-up)]
              (is (.contains text "design-steps.md"))
@@ -140,6 +162,24 @@
                                (contains? (:from %) :yield))
                          (filter #(= :source (:type %)) (:contributions final-step)))
                "final-summary must not use per-prompt :yield refs"))
+         (testing "both summaries are explicitly terminal (DI-1)"
+           (is (= (constant-routing-judge "DONE") (:judge final-step)))
+           (is (= {"DONE" {:goto :done}} (:on final-step)))
+           (is (= (constant-routing-judge "DONE") (:judge not-converged-step)))
+           (is (= {"DONE" {:goto :done}} (:on not-converged-step))))
+         (testing "summary templates carry the exact sole final PASS_STATUS line (DI-4 point 4)"
+           (assert-sole-final-pass-status-line
+            (step-template-text final-step) "REVIEW_COMPLETE")
+           (assert-sole-final-pass-status-line
+            (step-template-text not-converged-step) "ACTIONABLE_FEEDBACK"))
+         (testing "not-converged summary sources the same per-prompt review outputs"
+           (is (some? not-converged-step))
+           (doseq [source-ref [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
+                               {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
+                               {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]]
+             (is (some #(= {:type :source :from source-ref} %)
+                       (:contributions not-converged-step))
+                 (str "final-summary-not-converged should include " source-ref))))
          (testing "removed per-phase topology step names are absent"
            (doseq [removed ["architecture-review" "architecture-follow-up"
                             "ambiguity-review" "ambiguity-follow-up"
@@ -607,11 +647,11 @@
        (is (empty? errors))
        (is (contains? definitions "task-lifecycle")))
      (let [steps (get-in definitions ["task-lifecycle" :steps])
-           first-five-targets ["review-task-design"
-                               "create-task-plan"
-                               "review-task-plan"
-                               "implement-task"
-                               "review-task-implementation"]
+           step-by-name (into {} (map (juxt :name identity) steps))
+           ;; Select delegate steps by type, not position, so the inserted
+           ;; :invoke gates (which carry no :target/:prompt-string/:context)
+           ;; do not break these assertions (DI-5).
+           delegate-steps (filterv #(= :delegate (:type %)) steps)
            standard-prompt {:type :map
                             :fields {:input {:from :workflow-input
                                              :path [:input]}}}
@@ -621,14 +661,17 @@
                                        :implementation-review-yield
                                        {:from {:step "review-task-implementation"
                                                :yield :text}}}}
-           status-step (nth steps 5)
-           extraction-step (nth steps 6)
-           success-summary-step (nth steps 7)
-           skip-summary-step (nth steps 8)
+           design-gate-step (get step-by-name "check-design-review-status")
+           status-step (get step-by-name "check-implementation-review-status")
+           extraction-step (get step-by-name "extract-task-knowledge")
+           success-summary-step (get step-by-name "final-summary-after-extraction")
+           skip-summary-step (get step-by-name "final-summary-without-extraction")
+           design-not-converged-step (get step-by-name "final-summary-design-not-converged")
            skip-summary-text (step-template-text skip-summary-step)]
-       (testing "has 9 steps, with extraction guarded after implementation review"
-         (is (= 9 (count steps)))
+       (testing "has 11 steps, with design gate after design review and extraction guarded after implementation review"
+         (is (= 11 (count steps)))
          (is (= ["review-task-design"
+                 "check-design-review-status"
                  "create-task-plan"
                  "review-task-plan"
                  "implement-task"
@@ -636,15 +679,33 @@
                  "check-implementation-review-status"
                  "extract-task-knowledge"
                  "final-summary-after-extraction"
-                 "final-summary-without-extraction"]
+                 "final-summary-without-extraction"
+                 "final-summary-design-not-converged"]
                 (mapv :name steps)))
-         (is (= (concat (repeat 5 :delegate) [:invoke :delegate :session :session])
-                (mapv :type steps)))
-         (is (= first-five-targets (mapv :target (take 5 steps))))
-         (is (= "extract-task-knowledge" (:target extraction-step))))
-       (testing "the first five lifecycle delegate steps thread the same task input unchanged"
-         (is (= (repeat 5 standard-prompt)
-                (mapv :prompt-string (take 5 steps)))))
+         (is (= (concat [:delegate :invoke] (repeat 4 :delegate) [:invoke :delegate]
+                        (repeat 3 :session))
+                (mapv :type steps))))
+       (testing "the lifecycle delegate steps target their workflows in order"
+         (is (= ["review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "implement-task"
+                 "review-task-implementation"
+                 "extract-task-knowledge"]
+                (mapv :target delegate-steps))))
+       (testing "the delegate steps thread the same task input unchanged (extraction adds the review yield)"
+         (is (= (concat (repeat 5 standard-prompt) [extraction-prompt])
+                (mapv :prompt-string delegate-steps))))
+       (testing "the design gate routes converged design to plan and unconverged design to handback"
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "review-task-design"
+                                      :yield :text}}
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                (:judge design-gate-step)))
+         (is (= {"DONE" {:goto "create-task-plan"}
+                 "REPEAT" {:goto "final-summary-design-not-converged"}}
+                (:on design-gate-step))))
        (testing "the status step owns the extraction gate"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
@@ -666,7 +727,7 @@
                 (:on extraction-step))))
        (testing "delegate steps keep their original context only"
          (is (= (repeat 6 [{:type :source :from :workflow-original}])
-                (mapv :context (concat (take 5 steps) [extraction-step])))))
+                (mapv :context delegate-steps))))
        (testing "non-review-complete summary explains extraction was skipped"
          (is (= ["read" "bash"] (:tools skip-summary-step)))
          (is (.contains skip-summary-text "extract-task-knowledge was not invoked"))
@@ -683,6 +744,18 @@
                  :args {:route "DONE"}}
                 (:judge success-summary-step)))
          (is (= {"DONE" {:goto :done}} (:on success-summary-step))))
+       (testing "the design-not-converged handback terminates without extraction"
+         (is (= ["read" "bash"] (:tools design-not-converged-step)))
+         (is (some #(= {:type :source :from {:step "review-task-design" :yield :text}} %)
+                   (:contributions design-not-converged-step)))
+         (let [text (step-template-text design-not-converged-step)]
+           (is (.contains text "stopped at the design stage"))
+           (is (.contains text "Do not proceed to plan creation")))
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge design-not-converged-step)))
+         (is (= {"DONE" {:goto :done}} (:on design-not-converged-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 9 {})
+         (is (= (repeat 11 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))

@@ -6,6 +6,17 @@
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
    :context [{:type :source, :from :workflow-original}]}
+  {:name "check-design-review-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "review-task-design", :yield :text}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "create-task-plan"},
+        "REPEAT" {:goto "final-summary-design-not-converged"}}}
   {:name "create-task-plan",
    :type :delegate,
    :target "create-task-plan",
@@ -80,6 +91,19 @@
     {:type :source, :from {:step "review-task-implementation", :yield :text}}
     {:type :template,
      :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when implementation review did not complete cleanly. Summarize the design → plan → implement → review outcome, explain that extract-task-knowledge was not invoked because `review-task-implementation` did not yield `PASS_STATUS: REVIEW_COMPLETE`, and preserve the implementation-review outcome. Do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-design-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "review-task-design", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when the design review did not converge. Explain that the lifecycle stopped at the design stage because `review-task-design` did not reach a clean design (it yielded `PASS_STATUS: ACTIONABLE_FEEDBACK`), summarise the unresolved design feedback from the review yield, and hand control back to the human for further design work before plan creation. Do not proceed to plan creation and do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",

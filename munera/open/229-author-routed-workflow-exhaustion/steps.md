@@ -37,37 +37,43 @@ Slices are independently committable; keep each commit `small`.
 
 ## Slice 2 — review-task-design handback + lifecycle design gate
 
-- [ ] `review-task-design.edn`: `design-follow-up` `:on` +
-      `:on-max-iterations "final-summary-not-converged"`
-- [ ] `review-task-design.edn`: new `final-summary-not-converged` step placed
+- [x] `review-task-design.edn`: `design-follow-up` `:on` +
+      `:on-max-iterations "final-summary-not-converged"` (and 6→3 already in edn)
+- [x] `review-task-design.edn`: new `final-summary-not-converged` step placed
       **before** the converged `final-summary` (DI-2: keep converged last);
       design-review per-prompt sources; explicit-terminal
       judge+`:on {"DONE" {:goto :done}}`; DI-4 template contract
-      (`PASS_STATUS: ACTIONABLE_FEEDBACK`, keep prose guard (a) / rewrite anti-echo
-      guard (b), sole column-0 line); **DI-3: no literal iteration count** in the
-      wording
-- [ ] `review-task-design.edn`: converged `final-summary` → explicit-terminal
+      (`PASS_STATUS: ACTIONABLE_FEEDBACK`, kept prose guard (a) / rewrote anti-echo
+      guard (b) without literal `PASS_STATUS:` token, sole column-0 final line);
+      **DI-3: no literal iteration count** ("did not converge within the
+      configured follow-up iteration limit")
+- [x] `review-task-design.edn`: converged `final-summary` → explicit-terminal
       judge+`:on {"DONE" {:goto :done}}` + DI-4 contract
       (`PASS_STATUS: REVIEW_COMPLETE`, keep (a)/rewrite (b), sole line)
-- [ ] `task-lifecycle.edn`: `check-design-review-status` gate after
+- [x] `task-lifecycle.edn`: `check-design-review-status` gate after
       `review-task-design` (DONE→`create-task-plan`,
       REPEAT→`final-summary-design-not-converged`)
-- [ ] `task-lifecycle.edn`: `final-summary-design-not-converged` handback step
-      (`:goto :done`, no extraction)
-- [ ] `workflow_definitions_test.clj` `review-task-design-test`: (i) step-order
+- [x] `task-lifecycle.edn`: `final-summary-design-not-converged` handback step
+      appended last (`:goto :done`, no extraction)
+- [x] `workflow_definitions_test.clj` `review-task-design-test`: (i) step-order
       incl. `final-summary-not-converged` before converged `final-summary`;
-      (ii) `design-follow-up` `:on-max-iterations`; (iii) **fix the pre-existing
-      RED `:max-iterations` 6→3 assertion** in the same edit; (iv) DI-4
-      template-text authority — assert each summary body contains its sole,
-      exact-form `PASS_STATUS:` line
-- [ ] **converged standalone result-text runtime test (DI-2)**: converged
-      `final-summary` (ordered last) is the step whose yielded text surfaces via
-      the standalone `(last :step-order)` path (locks ordering/plumbing)
-- [ ] task-lifecycle coverage: **update existing `task-lifecycle-test` in place**
-      (count 9→11, name/type vectors, positional `nth`, `repeat` counts) for the
-      design gate + handback; any new `229` test additive-only (R3/DI-5)
-- [ ] focused workflow-loader + affected runtime Scry green; clj-kondo clean
-- [ ] commit `⚒ workflows: route unconverged design review to lifecycle handback`
+      (ii) `design-follow-up` `:on-max-iterations` + 6→3; (iii) both summaries
+      explicit-terminal; (iv) DI-4 template-text authority via
+      `assert-sole-final-pass-status-line` (sole, exact-form, final `PASS_STATUS:`)
+- [x] **converged standalone result-text runtime test (DI-2)**: real
+      `review-task-design.edn` driven through `execute-workflow-run` with stubbed
+      `prompt-execution-result-in!`; asserts converged `final-summary` is last in
+      step-order and `:psi.workflow/result` carries exactly one
+      `PASS_STATUS: REVIEW_COMPLETE` (locks ordering/plumbing)
+- [x] task-lifecycle coverage: **updated existing `task-lifecycle-test` in place**
+      (count 9→11, name/type vectors, restructured the three `(take 5 steps)`
+      assertions to name/type-filtered `delegate-steps` per DI-5, design gate +
+      handback assertions, `repeat 9→11`)
+- [x] focused workflow-loader (design+lifecycle vars) + DI-2 runtime Scry green;
+      clj-kondo clean
+- [ ] pre-existing RED `review-task-plan-test` / `review-task-prompt-artifact-targets-test`
+      (stale "steps.md" vs authored #177 "design-steps.md") → resolved in Slice 3
+- [x] commit `⚒ workflows: route unconverged design review to lifecycle handback`
 
 ## Slice 3 — review-task-plan handback + lifecycle plan gate (symmetric)
 
