@@ -299,3 +299,23 @@ Resolved the one round-3 robustness follow-up (choice-submit result/ordering gap
 - Verification: extensions suite green (15 tests / 88 assertions), integration
   green (3 tests / 34 assertions), nullable-api-test green (3/6); clj-kondo clean
   across `choices.clj`, the test ns, and the nullable api.
+
+## Implementation review (round 4) — 2026-06-15
+
+Re-verified green: extensions suite (15 tests / 88 assertions), integration
+(3/34); clj-kondo clean across extension src/dev/test. Code matches design and
+follows the architecture (reads via api, writes only via `:mutate-session`;
+live integrant system + registry in the extension's own atom; one sanctioned
+core touch = the thin `submit-synthetic-prompt` mutation; every dynamic subtree
+token-gated, assets ungated by documented decision). Docs/changelog/README/state
+present and accurate.
+
+Two new follow-ups filed in steps.md (round 4), both non-behavioural and in the
+same dedup/consistency class as the prior rounds: (1) `choices/text-response`
+verbatim-duplicates private `renderers/html-response` and is misnamed
+(`text-response` → `text/html`), and the plain-text error-response map shape is
+hand-built ~6× with no shared builder; (2) low-severity — the demonstrated
+`/sse/registry` content feed is the only specific content route hardcoded into
+the otherwise platform-only `router/build-handler`, lightly contradicting the
+platform/content split (mechanism reason: persisted `dev/` routes can't reach
+the live registry atom). No correctness defect found.

@@ -257,3 +257,39 @@ the next begins.
       exercised over the real server. New unit tests cover the falsey-result
       (claim released → retry succeeds) and throwing-mutation (claim released)
       paths.
+
+## Implementation review follow-ups (round 4)
+
+- [ ] De-duplicate the HTTP response-map construction (same class as the
+      round-1 `kget`/urlencoded and round-2 path/format dedups, missed earlier).
+      `choices/text-response`
+      (`extensions/dev-http/src/extensions/dev_http/choices.clj`) is a verbatim
+      duplicate of the private `renderers/html-response`
+      (`extensions/dev-http/src/extensions/dev_http/renderers.clj`) — identical
+      `{:status 200 :headers {"content-type" "text/html; charset=utf-8"} :body}`
+      shape — and is **misnamed** (`text-response` returns `text/html`, not
+      text). Separately, the plain-text error-response shape
+      `{:status N :headers {"content-type" "text/plain; charset=utf-8"} :body …}`
+      is hand-built ~6× across `choices` (400), `router` (404), `middleware`
+      (403), and `renderers` (400 + two 404s) with no shared builder. Extract a
+      single shared response location (e.g. public `renderers/html-response`
+      reused by `choices`, plus a `text-response`/`error-response` builder used
+      by the plain-text 4xx/404 sites), and remove the misnamed
+      `choices/text-response`. Keep it minimal — small builder fns, not a
+      framework.
+
+- [ ] Reconcile the demonstrated `/sse/registry` feed with the design's
+      platform-thin / content-churny split
+      (`extensions/dev-http/src/extensions/dev_http/router.clj`,
+      `build-handler`). The router builder is otherwise pure platform mechanism
+      (the `/s/:route-id` dispatch subtree + the `/assets` subtree); the
+      concrete `/sse/registry` *content* feed is the only specific route baked
+      into the generic builder — unlike the `/demo` content route, which lives
+      as persisted content under `dev/`. The mechanism reason is real (persisted
+      `dev/` routes are static route-data and cannot reach the live registry
+      atom the feed needs). Low-severity. Either (a) accept and document at the
+      design/plan level (not just implementation.md) that one demonstrated feed
+      is platform-wired by necessity, or (b) provide a content-side registration
+      path (e.g. register `/sse/registry` as a session route at `start!` time
+      like `register-sse-route!` does) so no specific content route is hardcoded
+      into the generic router builder.
