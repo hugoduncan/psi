@@ -225,3 +225,36 @@ plan.md / design.md (steps.md is read-only review context).
       design) to drop the "replaces the existing instruction" phrasing and align
       with DI-4 — or replace it with an explicit pointer to `plan.md` DI-4 as the
       authoritative template-contract.
+
+- [ ] **R3/DI-5's enumerated `task-lifecycle-test` update scope is incomplete —
+      it omits the `(take 5 steps)`-shaped assertions that also break (Slice
+      2/3).** The resolved positional-`task-lifecycle-test` item and DI-5
+      enumerate the assertions to update as "count, name vector, type vector,
+      positional `nth` indices, yields-`repeat`" (R3) / "count 9→11→13,
+      name/type vectors, index shifts and `repeat` count bumps" (DI-5). But the
+      live `task-lifecycle-test` (`workflow_definitions_test.clj`) contains
+      **three further assertions keyed off `(take 5 steps)`** that this
+      enumeration never names and that also break once an `:invoke` gate is
+      inserted at `:steps` index 1 (Slice 2) and index 4 (Slice 3):
+      (1) `(is (= first-five-targets (mapv :target (take 5 steps))))` (`:643`) —
+      `check-design-review-status`/`check-plan-review-status` have **no
+      `:target`**, so `take 5` no longer yields five delegate targets;
+      (2) `(is (= (repeat 5 standard-prompt) (mapv :prompt-string (take 5 steps))))`
+      (`:645-646`) — the gate steps have **no `:prompt-string`**;
+      (3) `(is (= (repeat 6 [{:type :source :from :workflow-original}])
+      (mapv :context (concat (take 5 steps) [extraction-step]))))` (`:667-668`) —
+      the gate steps have **no `:context`**, and `extraction-step`'s `nth` index
+      also shifts. These are not mechanical `nth`-index/`repeat`-count edits: the
+      whole `(take 5 steps)` "first five are delegates" assumption is invalidated
+      by the index-1/index-4 insertions, so the assertions must be **restructured**
+      (e.g. select the delegate steps by name/filter rather than positional
+      `take 5`). Because the plan presents R3/DI-5 as the exhaustive list of what
+      must change in `task-lifecycle-test`, an implementer following it literally
+      leaves these three assertions RED, contradicting the "focused
+      workflow-loader Scry green" exit criterion. Resolve in plan.md: extend the
+      R3/DI-5 task-lifecycle-test update scope to also cover the three
+      `(take 5 steps)`-based assertions (`first-five-targets` targets,
+      `(repeat 5 standard-prompt)` prompt-strings, `(repeat 6 …)` contexts),
+      noting they require restructuring away from the `take 5` positional
+      assumption — not just index/`repeat`-count bumps — for both Slice 2 (gate at
+      index 1) and Slice 3 (gate at index 4).

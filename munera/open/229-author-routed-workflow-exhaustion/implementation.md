@@ -202,3 +202,20 @@ proof defs at :393-447/:524+; `execute-workflow-run` at canonical_workflows.clj;
 pattern). Prior loop-1..3 items (DI-2 ordering, DI-3, DI-4, DI-5, stale baseline,
 positional task-lifecycle-test) remain resolved; steps.md-sync + design.md item
 6/7 inconsistencies still open/BLOCKED — not duplicated.
+
+## Plan-review inconsistency pass — loop 4 (2026-06-16)
+
+ACTIONABLE. 1 new inconsistency → design-steps.md. R3/DI-5's enumerated
+`task-lifecycle-test` update scope ("count, name/type vectors, positional nth,
+yields-repeat / repeat-count bumps") is incomplete: it omits three live
+assertions keyed off `(take 5 steps)` that also break when an :invoke gate is
+inserted at index 1 (Slice 2) and index 4 (Slice 3) — `first-five-targets`
+targets (:643), `(repeat 5 standard-prompt)` prompt-strings (:645-646), and
+`(repeat 6 [...])` contexts (:667-668). Gate steps have no :target/:prompt-string/
+:context, so these need restructuring away from the `take 5` "first-five-are-
+delegates" assumption, not mechanical nth/repeat bumps. Verified line refs and
+plan baselines still accurate (review-task-design-test:121 still 6 vs edn 3;
+task-lifecycle-test:602 still 9 steps). Distinct from the resolved positional-
+test item (which enumerated count/name/type/nth/yields only). Prior open items
+(steps.md sync, design.md 6/7) unchanged; loop-4 ambiguity (DI-2 test
+harness-vs-edn) not duplicated.
