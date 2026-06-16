@@ -121,3 +121,33 @@ Slices are independently committable; keep each commit `small`.
       are never tracked. (Scry writes failures under `.scry-results/` per
       `bb.edn`; the dir is currently un-ignored and one file leaked into the
       tree.)
+
+## Test-shaper review follow-ups (2026-06-16)
+
+- [ ] Deduplicate the two near-identical converged-standalone live tests in
+      `workflow_delegate_review_step_live_test.clj`
+      (`review-task-design-converged-standalone-surfaces-review-complete-result-test`
+      and `review-task-plan-converged-standalone-surfaces-review-complete-result-test`):
+      ~50 lines each that vary only by `:definition-id`, `:run-id`, and the
+      summary reply prefix ("Design"/"Plan review completed cleanly."). Extract a
+      parameterized helper carrying the shared models-path / context /
+      `with-redefs` / create+execute ceremony + assertions so each call site
+      expresses only the single varying axis (test-shaper: economical /
+      helpers_that_compress / minimal incidental variation).
+
+- [ ] Strengthen `review-pass-loop-on-max-iterations-routes-to-author-target-test`
+      (`workflow_review_step_routing_test.clj`): it asserts only negatives
+      (`not= :failed`, `not= :iteration-exhausted`) plus a `some?` existence
+      check, so a regression routing exhaustion to a non-failed-but-wrong
+      terminal state (e.g. `:blocked`, stuck `:running`) would still pass. Mirror
+      the positive shape of the sibling `review-pass-loop-iteration-limit-failure-test`
+      (which asserts `= :failed` / `= :iteration-exhausted`) by asserting the
+      positive terminal outcome — e.g. `(= :completed (:status run))` plus the
+      handback step's accepted-result — for meaningful failure signal
+      (test-shaper: meaningful_failures / behavior_focused).
+
+- [ ] (minor) `count-substring` is copy-pasted identically into
+      `workflow_definitions_test.clj` and `workflow_delegate_review_step_live_test.clj`
+      (different components). Consider hoisting to a shared test-support util, or
+      fold its single use into the live-test helper above, to remove the
+      cross-namespace duplicate.

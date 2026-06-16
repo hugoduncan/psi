@@ -677,3 +677,15 @@ live tests stub the turn boundary (`prompt-execution-result-in!`) via `with-rede
 follows the established convention of the same namespace's pre-existing
 `delegate-…-nullable-local-model-test` (no nullable turn seam exists). Systemic,
 not new debt this task should rewrite; left as-is for namespace consistency.
+
+## Test-shaper review pass (2026-06-16)
+
+ACTIONABLE (3 → steps.md). Engine-layer tests (ir/model/target-ir/statechart/
+workflow-judge) are narrow, positive, behavior-focused; the definition-level
+`assert-review-summary-handback` + `assert-sole-final-pass-status-line` helpers
+compress the summary assertions well. Non-compliance: (1) the two
+converged-standalone live tests duplicate ~50 lines of ceremony with only a
+three-field varying axis; (2) the DI-6 author-target routing integration test
+locks only negatives (no positive terminal-outcome assertion), weakening failure
+signal vs its `:failed`-asserting sibling; (3) `count-substring` duplicated
+across two component test namespaces. Details in steps.md.
