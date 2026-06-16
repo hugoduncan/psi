@@ -25,7 +25,7 @@ the next begins.
       (de-risk R1).
 - [x] Add a minimal `dev_http_test` asserting `init` captures the api map
       (nullable extension API). Focused Scry green; clj-kondo clean.
-- [ ] Commit: `⚒ 229: scaffold dev-http extension + wiring`.
+- [x] Commit: `⚒ 229: scaffold dev-http extension + wiring` (39086baec).
 
 ## Slice 1 — Platform end-to-end
 
