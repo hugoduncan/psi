@@ -747,3 +747,23 @@ Verification: full `extensions` suite green — 246 tests / 920 assertions,
 single `nil`-var "unknown-result" classification, not a failure/error; all
 assertions pass). clj-kondo clean on the touched test file. No remaining
 unchecked round-8 follow-ups.
+
+## Test review (round 9) — 2026-06-15
+
+One actionable coverage gap + one low sub-item filed (steps.md "Test review
+follow-ups (round 9)"), the same untested-behaviour regression-guard class as
+rounds 6-8. The `:mermaid` renderer test is named "…and the source" and feeds a
+diagram source, but asserts only the vendored JS + `class="mermaid"` shell,
+never that the diagram source itself is embedded — `render-mermaid`'s core job
+(`[:pre {:class "mermaid"} (str data)]`) has no regression guard, and a
+source-dropping regression would pass while the test name claims otherwise.
+(`:vega` already asserts its spec source, so this is `:mermaid`-only.) Low
+sub-item: `:vega` omits the base `vega.min.js` script + the `vegaEmbed(…)`
+invocation.
+
+Non-compliance worth flagging: the round-7 implementation review's "All
+AC-1..AC-10 covered" / "each renderer produces the expected response" framing
+overstates AC-5 for `:mermaid` — the renderer's source-embed (the expected
+response's substance) is unverified despite the test name asserting it. Tests
+are otherwise well-formed and uniformly use the sanctioned nullable extension
+API + ctx seams (no infra-dep mocks/stubs).

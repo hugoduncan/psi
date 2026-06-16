@@ -746,3 +746,39 @@ the next begins.
       green (246 tests / 920 assertions, `:pass? true`; the lone scry
       `unknown-result` is a pre-existing nil-var harness artifact); clj-kondo
       clean.
+
+## Test review follow-ups (round 9)
+
+- [ ] Assert the `:mermaid` renderer actually embeds the diagram **source**, not
+      just the vendored client JS + the `class="mermaid"` shell
+      (`renderers-test`, `extensions/dev-http/test/extensions/dev_http_test.clj`
+      lines ~164-167; `render-mermaid` in
+      `extensions/dev-http/src/extensions/dev_http/renderers.clj`). The test is
+      named ":mermaid embeds the vendored client JS **and the source**" and feeds
+      `:data "graph TD; A-->B"`, but it asserts only
+      `#"/assets/mermaid\.min\.js"` and `#"class=\"mermaid\""` — it never asserts
+      the diagram source (`graph TD; A-->B`) appears in the rendered body. The
+      renderer's whole job is to embed that source (`[:pre {:class "mermaid"}
+      (str data)]`); a regression dropping or garbling the `(str data)` body
+      would render an empty `<pre class="mermaid"></pre>` yet pass the suite, and
+      the test name would be a lie. This is the same untested-behaviour /
+      dead-assertion regression-guard class as the round-6 map-option, round-7
+      hiccup-passthrough, and round-8 headerless-table gaps, and it weakens AC-5
+      ("each renderer produces the expected response for representative input")
+      for `:mermaid` specifically. Add `(is (re-find #"graph TD; A--&gt;B"
+      (:body resp)))` (or the raw `graph TD; A-->B`, accounting for hiccup's
+      HTML-escaping of `>`) so the source-embed has a regression guard. By
+      contrast the sibling `:vega` assertion already covers its spec source
+      (`#"\{\"mark\":\"bar\"\}"`), so this gap is `:mermaid`-only.
+- [ ] (Low) Broaden the `:vega` renderer assertion to cover the missing third
+      vendored script and the embed invocation (`renderers-test`, lines ~157-161;
+      `render-vega`). The renderer embeds three script srcs —
+      `/assets/vega.min.js`, `/assets/vega-lite.min.js`,
+      `/assets/vega-embed.min.js` — plus a `vegaEmbed('#vega-view', <spec>);`
+      call, but the test asserts only the latter two scripts and the spec JSON;
+      `vega.min.js` (a required dependency of vega-embed) and the `vegaEmbed(…)`
+      invocation are unasserted, so a regression dropping the base `vega.min.js`
+      script (breaking the chart) or the `vegaEmbed` call would pass. Add
+      assertions for `#"/assets/vega\.min\.js"` and the `vegaEmbed('#vega-view'`
+      invocation. Same representative-input AC-5 completeness class as the
+      mermaid item above.
