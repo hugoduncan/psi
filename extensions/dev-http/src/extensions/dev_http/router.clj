@@ -9,6 +9,7 @@
   (:require
    [extensions.dev-http.middleware :as mw]
    [extensions.dev-http.registry :as registry]
+   [extensions.dev-http.renderers :as renderers]
    [reitit.ring :as ring]))
 
 (defn- session-dispatch-handler
@@ -27,7 +28,12 @@
   [{:keys [registry token persisted-routes]}]
   (let [gated-root (into ["" {:middleware [[mw/wrap-token token]]}
                           ["/s/:route-id" {:handler (session-dispatch-handler registry)}]]
-                         (or persisted-routes []))]
+                         (or persisted-routes []))
+        ;; Vendored client JS is public third-party library content with no
+        ;; session data; served ungated so token-less browser <script> requests
+        ;; resolve. Every *dynamic* subtree remains token-gated.
+        assets-root [(str renderers/asset-prefix "/:asset")
+                     {:get renderers/asset-handler}]]
     (ring/ring-handler
-     (ring/router [gated-root])
+     (ring/router [gated-root assets-root])
      (ring/create-default-handler))))

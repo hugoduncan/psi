@@ -97,7 +97,8 @@
                         "extensions/edit-clj/src"
                         "extensions/logprobs/src"
                         "extensions/metrics/src"
-                        "extensions/dev-http/src"]
+                        "extensions/dev-http/src"
+                        "extensions/dev-http/resources"]
           :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -159,7 +160,8 @@
                         "extensions/edit-clj/src"
                         "extensions/logprobs/src"
                         "extensions/metrics/src"
-                        "extensions/dev-http/src"]
+                        "extensions/dev-http/src"
+                        "extensions/dev-http/resources"]
           :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -201,7 +203,8 @@
                            "extensions/edit-clj/src"
                            "extensions/logprobs/src"
                            "extensions/metrics/src"
-                           "extensions/dev-http/src"]
+                           "extensions/dev-http/src"
+                           "extensions/dev-http/resources"]
              :extra-deps  {nrepl/nrepl             {:mvn/version "1.5.1"}
                            rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
              :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
@@ -394,6 +397,7 @@
                         "extensions/logprobs/src"
                         "extensions/metrics/src"
                         "extensions/dev-http/src"
+                        "extensions/dev-http/resources"
                         "extensions/dev-http/dev"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}

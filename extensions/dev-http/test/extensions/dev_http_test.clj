@@ -1,11 +1,14 @@
 (ns extensions.dev-http-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.dev-http :as sut]
    [extensions.dev-http.middleware :as mw]
    [extensions.dev-http.registry :as registry]
+   [extensions.dev-http.renderers :as renderers]
    [extensions.dev-http.router :as router]
    [extensions.dev-http.routes :as routes]
+   [extensions.dev-http.tool :as tool]
    [org.httpkit.client :as http-client]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
@@ -108,6 +111,121 @@
       (is (some #{"/demo"} paths)))))
 
 ;; ---------------------------------------------------------------------------
+;; renderers (Slice 2) — pure content-map → ring response
+;; ---------------------------------------------------------------------------
+
+(deftest renderers-test
+  (testing "each renderer produces the expected response for representative input"
+    (testing ":markdown renders commonmark to HTML"
+      (let [resp (renderers/render {:renderer :markdown :data "# Title\n\nhi *there*"})]
+        (is (= 200 (:status resp)))
+        (is (= "text/html; charset=utf-8" (get-in resp [:headers "content-type"])))
+        (is (re-find #"<h1>Title</h1>" (:body resp)))
+        (is (re-find #"<em>there</em>" (:body resp)))))
+    (testing ":table renders rows (keyword and string data keys)"
+      (let [kw  (renderers/render {:renderer :table :data {:headers ["a" "b"] :rows [[1 2]]}})
+            str (renderers/render {:renderer :table :data {"headers" ["a"] "rows" [[9]]}})]
+        (is (re-find #"<th>a</th><th>b</th>" (:body kw)))
+        (is (re-find #"<td>1</td><td>2</td>" (:body kw)))
+        (is (re-find #"<th>a</th>" (:body str)))
+        (is (re-find #"<td>9</td>" (:body str)))))
+    (testing ":hiccup renders a JSON-decoded (string-tag) tree as elements"
+      (let [resp (renderers/render {:renderer :hiccup :data ["div" {} ["h1" "X"]]})]
+        (is (= "<div><h1>X</h1></div>" (:body resp)))))
+    (testing ":vega embeds the vendored client JS and the spec as JSON"
+      (let [resp (renderers/render {:renderer :vega :data {"mark" "bar"}})]
+        (is (re-find #"/assets/vega-lite\.min\.js" (:body resp)))
+        (is (re-find #"/assets/vega-embed\.min\.js" (:body resp)))
+        (is (re-find #"\{\"mark\":\"bar\"\}" (:body resp)))))
+    (testing ":mermaid embeds the vendored client JS and the source"
+      (let [resp (renderers/render {:renderer :mermaid :data "graph TD; A-->B"})]
+        (is (re-find #"/assets/mermaid\.min\.js" (:body resp)))
+        (is (re-find #"class=\"mermaid\"" (:body resp)))))
+    (testing "an unknown renderer yields a 400"
+      (is (= 400 (:status (renderers/render {:renderer :nope :data 1})))))))
+
+(deftest file-renderer-test
+  (testing ":file serves a disk artifact with a content-type from its extension"
+    (let [f (java.io.File/createTempFile "dev-http" ".svg")]
+      (try
+        (spit f "<svg></svg>")
+        (let [resp (renderers/render {:renderer :file :data {:path (.getAbsolutePath f)}})]
+          (is (= 200 (:status resp)))
+          (is (= "image/svg+xml" (get-in resp [:headers "content-type"])))
+          (is (= f (:body resp))))
+        (finally (.delete f))))
+    (testing "a missing file yields a 404"
+      (let [resp (renderers/render {:renderer :file :data {:path "/no/such/artifact.png"}})]
+        (is (= 404 (:status resp)))))))
+
+(defn- resource-bytes
+  [path]
+  (with-open [in (io/input-stream (io/resource path))]
+    (.readAllBytes in)))
+
+(deftest asset-serving-test
+  (testing "vendored client JS is served locally from the classpath (no network)"
+    (let [resp (renderers/asset-handler {:path-params {:asset "vega-embed.min.js"}})]
+      (is (= 200 (:status resp)))
+      (is (= "application/javascript" (get-in resp [:headers "content-type"])))
+      (testing "served bytes equal the vendored resource bytes"
+        (let [served (with-open [in (:body resp)] (.readAllBytes in))]
+          (is (java.util.Arrays/equals served
+                                       (resource-bytes "dev_http/vendor/vega-embed.min.js"))))))
+    (testing "a path containing .. is rejected"
+      (is (= 404 (:status (renderers/asset-handler {:path-params {:asset "../secret"}})))))
+    (testing "a missing asset yields a 404"
+      (is (= 404 (:status (renderers/asset-handler {:path-params {:asset "nope.js"}})))))))
+
+(deftest asset-route-is-ungated-test
+  (testing "the /assets subtree is reachable without a token (public static JS)"
+    (let [reg     (registry/create-registry)
+          handler (router/build-handler {:registry reg :token "tok" :persisted-routes []})
+          resp    (handler {:request-method :get
+                            :uri            (str renderers/asset-prefix "/vega-embed.min.js")})]
+      (is (= 200 (:status resp)))
+      (is (= "application/javascript" (get-in resp [:headers "content-type"]))))))
+
+;; ---------------------------------------------------------------------------
+;; dev-present tool (Slice 2)
+;; ---------------------------------------------------------------------------
+
+(deftest dev-present-tool-test
+  (testing "the tool registers a content route and returns its URL"
+    (let [captured (atom nil)
+          register! (fn [route-id content]
+                      (reset! captured {:route-id route-id :content content})
+                      (str "http://127.0.0.1:9/s/" route-id "?token=t"))
+          tool      (tool/dev-present-tool register!)
+          execute   (:execute tool)]
+      (testing "tool metadata"
+        (is (= "dev-present" (:name tool)))
+        (is (fn? (:format-request tool))))
+      (testing "valid renderer → registers content + returns URL"
+        (let [result (execute {"renderer" "markdown" "data" "# Hi" "route-id" "md"} {})]
+          (is (false? (:is-error result)))
+          (is (re-find #"Open: http://127\.0\.0\.1:9/s/md" (:content result)))
+          (is (= :markdown (get-in @captured [:content :renderer])))
+          (is (= "# Hi" (get-in @captured [:content :data])))
+          (is (= "md" (:route-id @captured)))))
+      (testing "absent route-id is generated"
+        (let [result (execute {"renderer" "table" "data" {"rows" []}} {})]
+          (is (false? (:is-error result)))
+          (is (string? (:route-id @captured)))
+          (is (re-find #"^r-" (:route-id @captured)))))
+      (testing "unknown renderer → error, no registration"
+        (reset! captured :unchanged)
+        (let [result (execute {"renderer" "bogus" "data" "x"} {})]
+          (is (true? (:is-error result)))
+          (is (re-find #"Unknown renderer" (:content result)))
+          (is (= :unchanged @captured))))))
+  (testing "server not running (register! returns nil) → error"
+    (let [tool    (tool/dev-present-tool (fn [_ _] nil))
+          result  ((:execute tool) {"renderer" "markdown" "data" "hi"} {})]
+      (is (true? (:is-error result)))
+      (is (re-find #"not running" (:content result))))))
+
+;; ---------------------------------------------------------------------------
 ;; lifecycle (integration — real ephemeral-port http-kit server)
 ;; ---------------------------------------------------------------------------
 
@@ -146,6 +264,17 @@
             (is (= "first" (body-str @(http-client/get url1))))
             (sut/register-route! "rt" (fn [_] {:status 200 :body "second"}))
             (is (= "second" (body-str @(http-client/get (sut/route-url "rt")))))))
+        (testing "AC-3: register-content-route! renders a content route"
+          (let [url (sut/register-content-route! "md" {:renderer :markdown
+                                                       :data     "# Live"})]
+            (is (= 200 (get-status url)))
+            (is (re-find #"<h1>Live</h1>" (body-str @(http-client/get url))))))
+        (testing "AC-5: vendored asset served locally and ungated over the wire"
+          (let [resp @(http-client/get (str base renderers/asset-prefix
+                                            "/vega-embed.min.js"))]
+            (is (= 200 (:status resp)))
+            (is (re-find #"javascript"
+                         (str (get-in resp [:headers :content-type]))))))
         (testing "status reports running url + token"
           (is (re-find #"dev-http running" (sut/status-text))))
         (finally

@@ -11,7 +11,9 @@
   (:require
    [clojure.string :as str]
    [extensions.dev-http.registry :as registry]
+   [extensions.dev-http.renderers :as renderers]
    [extensions.dev-http.system :as system]
+   [extensions.dev-http.tool :as tool]
    [integrant.core :as ig]))
 
 (defonce ^:private state
@@ -94,6 +96,16 @@
       (route-url route-id))
     (throw (ex-info "dev-http server not running; call start! first" {}))))
 
+(defn register-content-route!
+  "Register a declarative `content` map (`{:renderer … :data …}`) as a session
+   route under `route-id` whose handler renders the content. Returns the route
+   URL, or nil when the server is not running (last-write-wins on collision)."
+  [route-id content]
+  (when-let [reg (registry-component)]
+    (registry/register-entry! reg route-id
+                              {:handler (fn [_request] (renderers/render content))})
+    (route-url route-id)))
+
 ;; ---------------------------------------------------------------------------
 ;; command surface
 ;; ---------------------------------------------------------------------------
@@ -123,6 +135,8 @@
    "dev-http"
    {:description "Start/stop the dev-time localhost HTTP side-channel server"
     :handler     handle-command})
+  ((:register-tool api)
+   (tool/dev-present-tool register-content-route!))
   ((:on api)
    "session_switch"
    (fn [_ev] nil))

@@ -64,26 +64,33 @@ the next begins.
 
 ## Slice 2 — `dev-present` tool + renderer set
 
-- [ ] `dev_http/renderers.clj`: dispatch on `:renderer` →
+- [x] `dev_http/renderers.clj`: dispatch on `:renderer` →
       `:markdown` (commonmark) · `:table` (hiccup) · `:hiccup` (raw) ·
       `:file` (serve disk artifact, content-type by extension) ·
       `:vega` (HTML embedding vendored Vega-Lite JS + spec) ·
       `:mermaid` (HTML embedding vendored Mermaid JS + source).
-- [ ] Vendor Vega-Lite + Mermaid client JS into
-      `resources/dev_http/vendor/`; add asset routes serving them locally; pin +
-      document versions.
-- [ ] `dev_http/tool.clj`: `dev-present` tool (`:register-tool`) — content map
-      `{:renderer … :data …}` → register session route → return URL.
-- [ ] Public `register-route!` REPL/dev fn registering an arbitrary ring handler
-      into the registry (in-process, throwaway).
-- [ ] Wire `dev-present` + `register-route!` to last-write-wins replace on
-      route-id collision.
-- [ ] Tests: each renderer produces expected response for representative input
-      (AC-5); Vega/Mermaid assets served locally with no network (AC-5);
-      `dev-present` returns a URL that renders the content (AC-3);
-      `register-route!` reachable + re-register replaces prior entry (AC-4).
-- [ ] Focused Scry green; clj-kondo clean.
-- [ ] Commit: `⚒ 229: dev-present tool + renderer set (vendored vega/mermaid)`.
+      Dispatch via a plain `:renderer → fn` map (no multimethod). `data`
+      accessors read keyword *or* string keys (REPL vs JSON-tool input).
+- [x] Vendor Vega-Lite + Mermaid client JS into
+      `resources/dev_http/vendor/`; add an **ungated** `/assets/:asset` route
+      serving them locally; pin + document versions (vega 5.30.0,
+      vega-lite 5.21.0, vega-embed 6.26.0, mermaid 10.9.1). Added
+      `extensions/dev-http/resources` to all classpath blocks.
+- [x] `dev_http/tool.clj`: `dev-present` tool (`:register-tool`) — content map
+      `{:renderer … :data …}` → register session route → return URL. Takes a
+      `register-content!` seam fn; nil return ⇒ "server not running" error.
+- [x] Public `register-route!` REPL/dev fn registering an arbitrary ring handler
+      into the registry (already present from Slice 1; added
+      `register-content-route!` for declarative content).
+- [x] Wire `dev-present` + `register-route!` to last-write-wins replace on
+      route-id collision (registry `register-entry!` semantics).
+- [x] Tests: each renderer produces expected response for representative input
+      (AC-5); Vega/Mermaid assets served locally with no network (AC-5,
+      byte-equality + over-the-wire ungated fetch); `dev-present` returns a URL
+      that renders the content (AC-3); `register-route!` reachable + re-register
+      replaces prior entry (AC-4).
+- [x] Focused Scry green; clj-kondo clean.
+- [x] Commit: `⚒ 229: dev-present tool + renderer set (vendored vega/mermaid)`.
 
 ## Slice 3 — Choice interaction loop
 

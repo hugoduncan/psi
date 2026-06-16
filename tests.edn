@@ -15,7 +15,8 @@
                    "extensions/edit-clj/src"
                    "extensions/logprobs/src"
                    "extensions/metrics/src"
-                   "extensions/dev-http/src"]
+                   "extensions/dev-http/src"
+                   "extensions/dev-http/resources"]
     :ns-patterns [".*-test$"]
     :skip-meta [:integration]}
 
@@ -46,6 +47,7 @@
                    "extensions/logprobs/src"
                    "extensions/metrics/src"
                    "extensions/dev-http/src"
+                   "extensions/dev-http/resources"
                    "extensions/dev-http/dev"]
     :ns-patterns [".*-test$"]
     :skip-meta [:integration]}
@@ -69,7 +71,7 @@
                    "extensions/auto-session-name/src" "extensions/commit-checks/src"
                    "extensions/hello-ext/src" "extensions/mcp-tasks-run/src" "extensions/mementum/src" "extensions/mementum/resources"
                    "extensions/munera/src" "extensions/munera/resources" "extensions/plan-state-learning/src" "extensions/work-on/src"
-                   "extensions/github/src" "extensions/edit-clj/src" "extensions/logprobs/src" "extensions/metrics/src" "extensions/dev-http/src" "extensions/dev-http/dev" "components/extension-test-helpers/src"]
+                   "extensions/github/src" "extensions/edit-clj/src" "extensions/logprobs/src" "extensions/metrics/src" "extensions/dev-http/src" "extensions/dev-http/resources" "extensions/dev-http/dev" "components/extension-test-helpers/src"]
     :ns-patterns [".*-test$"]
     :focus-meta [:integration]}]
 

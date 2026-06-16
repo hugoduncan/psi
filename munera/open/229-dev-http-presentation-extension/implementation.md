@@ -69,3 +69,42 @@ Append-only local memory of in-flight decisions and discoveries.
   `clojure -M:test integration --focus extensions.dev-http-test`
   (1 test / 16 assertions, real ephemeral-port boot) both green; clj-kondo clean
   across src/dev/test.
+
+## Slice 2 — dev-present tool + renderer set (2026-06-16)
+
+- Namespaces added: `renderers` (pure content-map → ring response) and `tool`
+  (`dev-present` factory). Entry-point gained `register-content-route!` and
+  registers the tool in `init` via `(:register-tool api)`.
+- **Renderer dispatch is a plain `:renderer → fn` map** (`renderers/render`),
+  not a multimethod (coding standard: avoid multimethods / global mutable
+  dispatch). `renderer-keys` is the supported set; unknown ⇒ 400.
+- **`data` accessors read keyword *or* string keys** via a small `kget`. The
+  same renderer serves idiomatic REPL data (keyword keys) and JSON-tool data
+  (string keys). `:hiccup` additionally coerces JSON string tags → keywords so
+  a decoded `["div" …]` renders as elements.
+- **Markdown via `org.commonmark.renderer.html.HtmlRenderer`** (already on the
+  classpath through the root `commonmark` dep) — distinct from the TUI's AST
+  walker; HTML output, not ANSI.
+- **Vega/Mermaid client JS vendored** under `resources/dev_http/vendor/`
+  (vega 5.30.0, vega-lite 5.21.0, vega-embed 6.26.0, mermaid 10.9.1; ~4 MB
+  total). Pages embed `<script src="/assets/…">` + the spec/source. JSON spec
+  serialized with cheshire (transitively present).
+- **Deviation (beyond plan): assets are served from an UNGATED `/assets/:asset`
+  subtree.** A browser `<script src>` request carries no token, so token-gating
+  the vendored public JS would break every Vega/Mermaid page. The assets are
+  third-party library bytes with no session data, so serving them ungated is
+  safe; **every *dynamic* subtree stays token-gated** (AC-8 unaffected). Path
+  traversal guarded (reject `..`). `asset-handler` lives in `renderers` and is
+  wired as a second top-level route alongside the gated root in `router`.
+- **Deviation (beyond plan): `extensions/dev-http/resources` added to the
+  classpath** in every block that already carried `…/src` (root `deps.edn`,
+  `tests.edn` `:unit`/`:extensions`/`:integration`, extension-local `deps.edn`
+  `:paths`) so `io/resource "dev_http/vendor/…"` resolves at runtime and in
+  tests.
+- **`:format-request`** is required by the tool registry; used
+  `call-summary/text-key-format-request "dev-present" "renderer"` (call-summary
+  is transitive via `psi/agent-session` → `psi/tool-runtime`).
+- Verification: `clojure -M:test extensions --focus extensions.dev-http-test`
+  (11 tests / 60 assertions) and `… integration …` (1 test / 20 assertions,
+  real boot incl. AC-3 content route + AC-5 ungated wire fetch) both green;
+  clj-kondo clean across src/test.
