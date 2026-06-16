@@ -24,6 +24,8 @@
 
 (use-fixtures :each reset-state-fixture)
 
+(def ^:private nullable-session "nullable-session")
+
 (deftest init-captures-api-test
   (testing "init captures the runtime ExtensionAPI map into the extension atom"
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
@@ -134,12 +136,12 @@
         (is (re-find #"<h1>Title</h1>" (:body resp)))
         (is (re-find #"<em>there</em>" (:body resp)))))
     (testing ":table renders rows (keyword and string data keys)"
-      (let [kw  (renderers/render {:renderer :table :data {:headers ["a" "b"] :rows [[1 2]]}})
-            str (renderers/render {:renderer :table :data {"headers" ["a"] "rows" [[9]]}})]
+      (let [kw       (renderers/render {:renderer :table :data {:headers ["a" "b"] :rows [[1 2]]}})
+            str-resp (renderers/render {:renderer :table :data {"headers" ["a"] "rows" [[9]]}})]
         (is (re-find #"<th>a</th><th>b</th>" (:body kw)))
         (is (re-find #"<td>1</td><td>2</td>" (:body kw)))
-        (is (re-find #"<th>a</th>" (:body str)))
-        (is (re-find #"<td>9</td>" (:body str)))))
+        (is (re-find #"<th>a</th>" (:body str-resp)))
+        (is (re-find #"<td>9</td>" (:body str-resp)))))
     (testing ":table with rows but no headers renders a tbody-only table"
       ;; headers are optional; this is the `(seq headers)` false branch of
       ;; render-table, which omits the <thead> entirely (no header row).
@@ -315,19 +317,34 @@
   [state]
   (filterv #(= 'psi.extension/submit-synthetic-prompt (:op %)) (:mutations @state)))
 
+(defn- make-choices-handler
+  "Compress the repeated `:choices` arrange ceremony. Builds a `:choices`
+   content map over `options`, makes its handler, registers the route entry,
+   and returns `{:handler :state :reg :api}`. Each test states only what
+   differs — the `:options` shape (and, for failure-seam tests, a pre-built
+   `:api` carrying a custom `:mutate-fn`). The GET/POST assertions stay inline."
+  [{:keys [options prompt api reg route-id session-id]
+    :or   {prompt     "Pick one"
+           route-id   "c1"
+           session-id nullable-session}}]
+  (let [created (when-not api
+                  (nullable/create-nullable-extension-api {:path "/test/dev_http.clj"}))
+        api     (or api (:api created))
+        state   (:state created)
+        reg     (or reg (registry/create-registry))
+        content {:renderer   :choices
+                 :data       {:prompt prompt :options options}
+                 :session-id session-id}
+        handler (choices/make-handler {:registry   reg
+                                       :route-id   route-id
+                                       :session-id session-id
+                                       :api        api
+                                       :content    content})]
+    (registry/register-entry! reg route-id {})
+    {:handler handler :state state :reg reg :api api}))
+
 (deftest choices-handler-test
-  (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                             {:path "/test/dev_http.clj"})
-        reg       (registry/create-registry)
-        content   {:renderer   :choices
-                   :data       {:prompt "Pick one" :options ["A" "B"]}
-                   :session-id "nullable-session"}
-        handler   (choices/make-handler {:registry   reg
-                                         :route-id   "c1"
-                                         :session-id "nullable-session"
-                                         :api        api
-                                         :content    content})]
-    (registry/register-entry! reg "c1" {})
+  (let [{:keys [handler state]} (make-choices-handler {:options ["A" "B"]})]
     (testing "GET renders a token-gated form posting back to the route"
       (let [resp (handler {:request-method :get :query-string "token=tok"})]
         (is (= 200 (:status resp)))
@@ -341,7 +358,7 @@
         (is (= 200 (:status resp)))
         (is (re-find #"Recorded" (:body resp)))
         (is (= 1 (count muts)))
-        (is (= "nullable-session" (:session-id (:params (first muts)))))
+        (is (= nullable-session (:session-id (:params (first muts)))))
         (is (= "A" (:user-msg (:params (first muts)))))))
     (testing "AC-7: single-shot — a second submission is rejected, no second injection"
       (let [resp (handler {:request-method :post :body "choice=B"})]
@@ -349,12 +366,8 @@
         (is (re-find #"Already answered" (:body resp)))
         (is (= 1 (count (submit-prompt-mutations state))))))
     (testing "a blank choice is a 400"
-      (let [reg2     (registry/create-registry)
-            handler2 (choices/make-handler {:registry   reg2
-                                            :route-id   "c2"
-                                            :session-id "nullable-session"
-                                            :api        api
-                                            :content    content})]
+      (let [{handler2 :handler} (make-choices-handler {:options  ["A" "B"]
+                                                       :route-id "c2"})]
         (is (= 400 (:status (handler2 {:request-method :post :body ""}))))))))
 
 (deftest choices-failed-injection-releases-claim-test
@@ -364,46 +377,33 @@
   ;; failing/throwing mutate seam is supplied through the sanctioned nullable
   ;; `:mutate-fn` override (not a bespoke spy map); the rendered page and the
   ;; registry claim state are the assertion signals.
-  (let [content {:renderer   :choices
-                 :data       {:prompt "Pick one" :options ["A" "B"]}
-                 :session-id "nullable-session"}]
-    (testing "a falsey prompt-submitted? renders a failure page and releases the claim"
-      (let [outcome       (atom {:psi.extension/prompt-submitted? false})
-            {:keys [api]} (nullable/create-nullable-extension-api
-                           {:path      "/test/dev_http.clj"
-                            :mutate-fn (fn [_op _params] @outcome)})
-            reg           (registry/create-registry)
-            handler       (choices/make-handler {:registry   reg
-                                                 :route-id   "c1"
-                                                 :session-id "nullable-session"
-                                                 :api        api
-                                                 :content    content})]
-        (registry/register-entry! reg "c1" {})
-        (let [resp (handler {:request-method :post :body "choice=A"})]
-          (is (= 200 (:status resp)))
-          (is (re-find #"try again" (:body resp)))
-          (is (not (re-find #"Recorded" (:body resp))))
-          (testing "claim released → not marked answered, retry can succeed"
-            (is (not (:answered? (registry/get-entry reg "c1"))))
-            (reset! outcome {:psi.extension/prompt-submitted? true})
-            (let [resp2 (handler {:request-method :post :body "choice=A"})]
-              (is (re-find #"Recorded" (:body resp2)))
-              (is (:answered? (registry/get-entry reg "c1"))))))))
-    (testing "a throwing mutation renders a failure page and releases the claim"
-      (let [{:keys [api]} (nullable/create-nullable-extension-api
-                           {:path      "/test/dev_http.clj"
-                            :mutate-fn (fn [_op _params] (throw (ex-info "boom" {})))})
-            reg           (registry/create-registry)
-            handler       (choices/make-handler {:registry   reg
-                                                 :route-id   "c1"
-                                                 :session-id "nullable-session"
-                                                 :api        api
-                                                 :content    content})]
-        (registry/register-entry! reg "c1" {})
-        (let [resp (handler {:request-method :post :body "choice=A"})]
-          (is (= 200 (:status resp)))
-          (is (re-find #"try again" (:body resp)))
-          (is (not (:answered? (registry/get-entry reg "c1")))))))))
+  (testing "a falsey prompt-submitted? renders a failure page and releases the claim"
+    (let [outcome       (atom {:psi.extension/prompt-submitted? false})
+          {:keys [api]} (nullable/create-nullable-extension-api
+                         {:path      "/test/dev_http.clj"
+                          :mutate-fn (fn [_op _params] @outcome)})
+          {:keys [handler reg]} (make-choices-handler {:options ["A" "B"]
+                                                       :api     api})
+          resp                  (handler {:request-method :post :body "choice=A"})]
+      (is (= 200 (:status resp)))
+      (is (re-find #"try again" (:body resp)))
+      (is (not (re-find #"Recorded" (:body resp))))
+      (testing "claim released → not marked answered, retry can succeed"
+        (is (not (:answered? (registry/get-entry reg "c1"))))
+        (reset! outcome {:psi.extension/prompt-submitted? true})
+        (let [resp2 (handler {:request-method :post :body "choice=A"})]
+          (is (re-find #"Recorded" (:body resp2)))
+          (is (:answered? (registry/get-entry reg "c1")))))))
+  (testing "a throwing mutation renders a failure page and releases the claim"
+    (let [{:keys [api]} (nullable/create-nullable-extension-api
+                         {:path      "/test/dev_http.clj"
+                          :mutate-fn (fn [_op _params] (throw (ex-info "boom" {})))})
+          {:keys [handler reg]} (make-choices-handler {:options ["A" "B"]
+                                                       :api     api})
+          resp                  (handler {:request-method :post :body "choice=A"})]
+      (is (= 200 (:status resp)))
+      (is (re-find #"try again" (:body resp)))
+      (is (not (:answered? (registry/get-entry reg "c1")))))))
 
 (deftest choices-map-option-test
   ;; A choice option given as a `{:label … :value …}` map renders the *label*
@@ -418,18 +418,7 @@
            ["string-keyed" [{"label" "Yes please" "value" "y"}
                             {"label" "No" "value" "n"}]]]]
     (testing variant
-      (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/dev_http.clj"})
-            reg       (registry/create-registry)
-            content   {:renderer   :choices
-                       :data       {:prompt "Pick one" :options options}
-                       :session-id "nullable-session"}
-            handler   (choices/make-handler {:registry   reg
-                                             :route-id   "c1"
-                                             :session-id "nullable-session"
-                                             :api        api
-                                             :content    content})]
-        (registry/register-entry! reg "c1" {})
+      (let [{:keys [handler state]} (make-choices-handler {:options options})]
         (testing "the button displays the label and posts the value"
           (let [resp (handler {:request-method :get :query-string "token=tok"})]
             (is (= 200 (:status resp)))
@@ -455,19 +444,8 @@
           [["plus-space"    "a b" "choice=a+b"]
            ["percent-slash" "a/b" "choice=a%2Fb"]]]
     (testing variant
-      (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/dev_http.clj"})
-            reg     (registry/create-registry)
-            content {:renderer   :choices
-                     :data       {:prompt  "Pick one"
-                                  :options [{:label "Opt" :value value}]}
-                     :session-id "nullable-session"}
-            handler (choices/make-handler {:registry   reg
-                                           :route-id   "c1"
-                                           :session-id "nullable-session"
-                                           :api        api
-                                           :content    content})]
-        (registry/register-entry! reg "c1" {})
+      (let [{:keys [handler state]} (make-choices-handler
+                                     {:options [{:label "Opt" :value value}]})]
         (testing "the GET form renders the raw (decoded) value attribute"
           (let [resp (handler {:request-method :get :query-string "token=tok"})]
             (is (re-find (re-pattern (str "value=\"" value "\"")) (:body resp)))))
@@ -500,6 +478,11 @@
 ;; lifecycle (integration — real ephemeral-port http-kit server)
 ;; ---------------------------------------------------------------------------
 
+(defn- server-base
+  "The `http://host:port` base URL of a running server map."
+  [server]
+  (str "http://" (:host server) ":" (:port server)))
+
 (defn- get-status
   [url]
   (:status @(http-client/get url)))
@@ -516,7 +499,7 @@
     (testing "not running before start"
       (is (= "dev-http not running" (sut/status-text))))
     (let [server (sut/start!)
-          base   (str "http://" (:host server) ":" (:port server))]
+          base   (server-base server)]
       (try
         (testing "AC-1: binds 127.0.0.1 on an ephemeral port"
           (is (= "127.0.0.1" (:host server)))
@@ -554,23 +537,23 @@
       (is (= "dev-http not running" (sut/status-text))))
     (testing "AC-1: restart leaves no orphaned server"
       (let [s1   (sut/start!)
-            url1 (str "http://" (:host s1) ":" (:port s1)
-                      "/demo?token=" (:token s1))]
+            url1 (str (server-base s1) "/demo?token=" (:token s1))]
         (try
           (is (= 200 (get-status url1)))
           (let [s2 (sut/start!)]
             (is (pos? (:port s2)))
-            (is (= 200 (get-status (str "http://" (:host s2) ":" (:port s2)
+            (is (= 200 (get-status (str (server-base s2)
                                         "/demo?token=" (:token s2)))))
             ;; The prior server must actually be gone — not merely supplanted.
-            ;; If the new launch re-bound the *same* ephemeral port, that itself
-            ;; proves the old server released it. Otherwise the old URL must no
-            ;; longer serve (its listening socket was closed by synchronous
-            ;; halt). Without one of these, a regression that stopped halting the
-            ;; prior `:system` would leave s1 still listening yet pass the suite.
-            (if (= (:port s1) (:port s2))
-              (is (= (:port s1) (:port s2))
-                  "old ephemeral port was freed and re-bound — prior server released it")
+            ;; Two cases carry the no-orphan evidence:
+            ;;  - same ephemeral port re-bound: s2 could not have bound s1's port
+            ;;    unless s1 released it; the s2 serve-200 assertion above is the
+            ;;    proof, so this case needs no extra check here.
+            ;;  - differing port: s1's old URL must no longer serve (its socket
+            ;;    was closed by synchronous halt). Without this guard a
+            ;;    regression that stopped halting the prior `:system` would leave
+            ;;    s1 still listening yet pass the suite.
+            (when (not= (:port s1) (:port s2))
               (is (not= 200 (get-status url1))
                   "prior server halted — its old URL no longer serves")))
           (finally
@@ -680,17 +663,15 @@
             (is (re-find #"Pick one" (body-str resp)))))
         (testing "AC-6: submitting injects one user message into the origin session"
           (let [resp (post-form url "choice=A")
-                muts (filter #(= 'psi.extension/submit-synthetic-prompt (:op %))
-                             (:mutations @state))]
+                muts (submit-prompt-mutations state)]
             (is (= 200 (:status resp)))
             (is (re-find #"Recorded" (body-str resp)))
             (is (= 1 (count muts)))
             (is (= "A" (:user-msg (:params (first muts)))))
-            (is (= "nullable-session" (:session-id (:params (first muts)))))))
+            (is (= nullable-session (:session-id (:params (first muts)))))))
         (testing "AC-7: a second submission is rejected with no further injection"
           (let [resp (post-form url "choice=B")
-                muts (filter #(= 'psi.extension/submit-synthetic-prompt (:op %))
-                             (:mutations @state))]
+                muts (submit-prompt-mutations state)]
             (is (re-find #"Already answered" (body-str resp)))
             (is (= 1 (count muts))))))
       (finally
@@ -703,7 +684,7 @@
                        {:path "/test/dev_http.clj"})]
     (sut/init api)
     (let [server (sut/start!)
-          base   (str "http://" (:host server) ":" (:port server))
+          base   (server-base server)
           token  (:token server)]
       (try
         (testing "AC-8: the SSE feed (a session route registered at start!) requires the token"
@@ -734,7 +715,7 @@
       (is (nil? (sut/register-sse-route!
                  "feed" (fn [send! _close!] (send! "tick"))))))
     (let [server (sut/start!)
-          base   (str "http://" (:host server) ":" (:port server))
+          base   (server-base server)
           token  (:token server)]
       (try
         (let [url (sut/register-sse-route!

@@ -897,3 +897,31 @@ Note (instruction non-compliance): the requested task slug
 `229-dev-http-lifecycle` does not exist; the only matching task is
 `229-dev-http-presentation-extension`, which was reviewed (its design §Lifecycle
 covers the dev-http lifecycle surface).
+
+## Round 12 follow-ups executed (test-shaper)
+
+All five round-12 test-shaping follow-ups in
+`extensions/dev-http/test/extensions/dev_http_test.clj` completed:
+
+- (1) `choices-interaction-loop-test` AC-6/AC-7 now reuse
+  `(submit-prompt-mutations state)` — one source for the recorded-mutation shape.
+- (2) Added a `make-choices-handler` helper (`{:options :prompt :api :reg
+  :route-id :session-id}` → `{:handler :state :reg :api}`) building the
+  `:choices` content, handler, and registered entry. Adopted by
+  `choices-handler-test`, both `choices-failed-injection-releases-claim-test`
+  branches, `choices-map-option-test`, `choices-urlencoded-decode-test`; added a
+  `nullable-session` const for the duplicated magic string. The helper exposed
+  two now-redundant nested `let`s in the failure-injection test (the helper does
+  the registration that previously separated them) — merged them to keep
+  clj-kondo clean.
+- (3 low) Renamed `renderers-test` `:table` block local `str` → `str-resp`
+  (drops the `clojure.core/str` shadow).
+- (4 low) `lifecycle-and-serving-test` restart: replaced the tautological
+  same-port `if` branch with a `when (not= (:port s1) (:port s2))` guard +
+  comment noting the same-port evidence is the earlier s2 serve-200 assertion.
+- (5 low) Added a `(server-base server)` helper used by the four integration
+  tests; skipped the optional `token-url` companion (low marginal value).
+
+Verification: focused extensions suite green (18 tests / 138 assertions),
+integration suite green (6 tests / 61 assertions) — both identical to the
+pre-refactor baseline (behaviour preserved); clj-kondo clean (0/0).

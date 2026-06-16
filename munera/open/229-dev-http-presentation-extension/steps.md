@@ -844,7 +844,7 @@ Distinct from the round 1–11 *coverage* gaps: these are test-*shaping* issues
 (consistent test abstractions, economical setup, meaningful failures, clarity)
 in `extensions/dev-http/test/extensions/dev_http_test.clj`.
 
-- [ ] Reuse the `submit-prompt-mutations` helper in the integration
+- [x] Reuse the `submit-prompt-mutations` helper in the integration
       `choices-interaction-loop-test` instead of re-inlining its predicate.
       The unit tests funnel the mutation lookup through the
       `submit-prompt-mutations` helper (line ~313), but
@@ -855,8 +855,13 @@ in `extensions/dev-http/test/extensions/dev_http_test.clj`.
       encodings, and a change to the recorded-mutation shape must be made in two
       places. Reuse `submit-prompt-mutations` in the integration test (it reads
       `(:mutations @state)` the same way) so the mutation-filter has one source.
+      Done: `choices-interaction-loop-test` AC-6/AC-7 now call
+      `(submit-prompt-mutations state)` (the same helper the unit tests use)
+      instead of the twice-inlined `(filter …)` predicate — single source for
+      the recorded-mutation shape; the `"nullable-session"` literal replaced
+      with the `nullable-session` const.
 
-- [ ] Extract a `make-choices-handler` test helper to compress the repeated
+- [x] Extract a `make-choices-handler` test helper to compress the repeated
       `:choices` setup ceremony. The five choices unit assertions
       (`choices-handler-test`, the two branches of
       `choices-failed-injection-releases-claim-test`, `choices-map-option-test`,
@@ -874,16 +879,28 @@ in `extensions/dev-http/test/extensions/dev_http_test.clj`.
       states only what differs (the option shape, the failing seam). Keep it a
       compressor of ceremony, not a hider of intent — the GET/POST assertions
       stay inline.
+      Done: added a `make-choices-handler` helper (`{:options :prompt :api :reg
+      :route-id :session-id}` → `{:handler :state :reg :api}`) that builds the
+      `:choices` content, makes the handler, and registers the route entry.
+      `choices-handler-test`, both branches of
+      `choices-failed-injection-releases-claim-test` (custom `:mutate-fn` api
+      passed in), `choices-map-option-test`, and `choices-urlencoded-decode-test`
+      now state only what differs (`:options`, the failing seam); defaults
+      centralize the `"c1"`/`nullable-session` magic strings. GET/POST
+      assertions stay inline. (Merged the now-redundant nested `let`s the helper
+      exposed in the failure-injection test to keep clj-kondo clean.)
 
-- [ ] (Low) Rename the `str`-shadowing local in `renderers-test`. The `:table`
+- [x] (Low) Rename the `str`-shadowing local in `renderers-test`. The `:table`
       block binds `str (renderers/render {…})` (line ~138), shadowing
       `clojure.core/str`. Harmless today only because `str` is never called as a
       fn inside that `let`, but it is a clarity hazard (a reader/maintainer
       adding a `(str …)` call there would silently invoke the ring-response map).
       Rename to a non-core name (e.g. `str-resp` / `string-keyed`) to match the
       sibling `kw` binding without shadowing a core fn.
+      Done: renamed the `:table` block's `str` binding to `str-resp` (sibling
+      `kw` kept), removing the `clojure.core/str` shadow.
 
-- [ ] (Low) Remove the tautological assertion in the AC-1 restart same-port
+- [x] (Low) Remove the tautological assertion in the AC-1 restart same-port
       branch (`lifecycle-and-serving-test`, lines ~572-575). The branch
       `(if (= (:port s1) (:port s2)) (is (= (:port s1) (:port s2)) …) (is (not= 200 …)))`
       asserts, in the equal branch, exactly the `if` condition that selected it —
@@ -895,8 +912,12 @@ in `extensions/dev-http/test/extensions/dev_http_test.clj`.
       guard and the prior serve-200 assertion carry the same-port evidence) or
       add an explicit comment that the assertion is a branch marker, not a check —
       so a maintainer doesn't read it as a real guard.
+      Done: replaced the same-port `if` branch (which asserted its own selecting
+      condition) with a `when (not= (:port s1) (:port s2))` guard carrying only
+      the differing-port no-orphan check; a comment records that the same-port
+      no-orphan evidence is the earlier s2 serve-200 assertion.
 
-- [ ] (Low) Extract a `server-base` helper for the integration tests. The
+- [x] (Low) Extract a `server-base` helper for the integration tests. The
       base-URL construction `(str "http://" (:host server) ":" (:port server))`
       is hand-built in four integration tests (lines ~519, ~557/563, ~706, ~737)
       with the host/port spelled out each time. test-shaper
@@ -905,3 +926,7 @@ in `extensions/dev-http/test/extensions/dev_http_test.clj`.
       `get-status`/`body-str`/`post-form` helper set) would remove the repeated
       URL assembly so a host/port-shape change has one source. Low — the
       duplication is mechanical and currently correct.
+      Done: added a `(server-base server)` helper; the four integration tests
+      (`lifecycle-and-serving-test` base + restart s1/s2 URLs, `sse-live-feed-test`,
+      `register-sse-route!-test`) build their base URL through it. Skipped the
+      optional `token-url` companion (out of scope, low marginal value).
