@@ -155,3 +155,29 @@ the next begins.
 - [x] Update `mementum/state.md` capabilities section to mention dev-http.
 - [x] Full Scry suite green; clj-kondo clean across extension + touched core.
 - [x] Commit: `⚒ 229: docs + changelog + coherence`.
+
+## Implementation review follow-ups (round 1)
+
+- [ ] Remove the dead no-op subscription in `init`:
+      `((:on api) "session_switch" (fn [_ev] nil))`
+      (`extensions/dev-http/src/extensions/dev_http.clj`). It was added in the
+      Slice 1 commit, is documented nowhere (design/plan/steps/implementation),
+      and registers a real session-event subscription that does nothing —
+      incidental complexity. Delete it, or, if a future hook is genuinely
+      intended, replace the no-op with the actual behaviour and document it.
+- [ ] Make the not-running precondition consistent across the sibling
+      registration fns in `dev_http.clj`. `register-route!` throws `ex-info`
+      while `register-content-route!` / `register-sse-route!` return `nil` for
+      the same "server not running" condition. Pick one idiom for the public
+      REPL/dev registration surface and apply it uniformly.
+- [ ] De-duplicate shared helpers:
+      `kget` is defined verbatim in both `renderers.clj` and `choices.clj`;
+      the urlencoded key/value regex parse `([^&=]+)=([^&]*)` is duplicated
+      between `middleware/query-token` and `choices/form-choice`. Extract each
+      into one shared location rather than copies.
+- [ ] Resolve the dead `source` param in the core `submit-synthetic-prompt`
+      mutation (`components/agent-session/.../mutations/prompts.clj`): `source`
+      is destructured and `(or source :extension)` is used, but `source` is not
+      in `::pco/params` and no caller supplies it, so the non-`:extension`
+      branch is unreachable. Either drop the param (always `:extension`) or
+      declare and wire it through a caller.

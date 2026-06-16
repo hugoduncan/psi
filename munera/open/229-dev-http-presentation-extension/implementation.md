@@ -178,3 +178,13 @@ Append-only local memory of in-flight decisions and discoveries.
 - Verification: extensions suite 14 tests / 77 assertions; integration suite
   3 tests / 34 assertions (incl. real SSE connect → snapshot read); clj-kondo
   clean.
+
+## Implementation review (round 1) — 2026-06-15
+
+Verified: extensions suite (14/77) + integration (3/34) +
+agent-session `submit-synthetic-prompt-mutation-test` (1/6) green; clj-kondo
+clean; all AC-1..AC-10 covered. Findings filed as follow-ups in steps.md
+(no-op `session_switch` subscription; throw-vs-nil inconsistency across
+registration fns; duplicated `kget`/urlencoded-parse helpers; dead `source`
+param on the core mutation). All are quality/consistency issues, not behaviour
+defects.
