@@ -265,3 +265,25 @@ reference both `steps.md` and `design-steps.md`. Left for the owning change/task
 fixing it here would mix concerns. All task-230 suites are green
 (routing 9/236, resolver 1/3, operation 7/17, task-lifecycle-test 48, plus
 agent-session resolvers/operation/graph-surface regression 72/2618).
+
+## Implementation review (task-implementation-review)
+
+No new actionable issues. Implementation matches design and follows architecture:
+pure scanner + IO-seam handler + generic resolver (reads-through-resolvers);
+workflow-specific marker/artifact/route labels stay in authored `task-lifecycle.edn`
+(workflow-runtime boundary respected); reuses the `constant-routing` gate idiom and
+the existing `munera-open-task-path-pattern` (no duplication / no unnecessary
+abstraction). Production-path verified against source: both invoke paths carry
+`:ctx`; `(or parent-session-id session-id)` resolves the owning session on the judge
+path (`:parent-session-id`, no `:session-id`) and the direct path (`:session-id`);
+`:task-path {:from :workflow-input :path [:input]}` resolves identically to the
+delegate steps' `:input`. Tests mock-free over real registry/resolver boundaries,
+all ACs covered incl. the DI-3 judge-path divergence guard; focused suites green
+(routing/resolver/operation 17/256, task-lifecycle definition 48) + clj-kondo clean.
+Docs + CHANGELOG consistent with the implemented "before check-design-review-status"
+placement.
+
+Only outstanding item is the pre-existing, already-tracked human-only design-steps
+residual: design.md's "after check-design-review-status" placement wording is stale
+vs the implemented "before" placement (code realizes D1's governing "scope handback
+wins" decision). No new follow-up filed (would duplicate the open design-steps item).
