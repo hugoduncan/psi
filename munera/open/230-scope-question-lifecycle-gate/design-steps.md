@@ -5,7 +5,7 @@ are scope decisions for the human only (do not execute; leave unchecked).
 
 ## Plan-review — ambiguity
 
-- [ ] DI-3 invocation-key mismatch on the gate's real (judge) path. DI-3 says the
+- [x] DI-3 invocation-key mismatch on the gate's real (judge) path. DI-3 says the
       handler receives `{:keys [args ctx session-id]}` and seeds `query-in` with
       `{:psi.agent-session/session-id session-id}`, citing both
       `workflow_judge.clj` and `deterministic-operation-action` as the source of
@@ -27,7 +27,7 @@ are scope decisions for the human only (do not execute; leave unchecked).
       provides `:session-id` and would pass while production fails (test/prod
       divergence masking the defect).
 
-- [ ] DI-1 `:open-questions` content underspecified / self-contradictory. The
+- [x] DI-1 `:open-questions` content underspecified / self-contradictory. The
       "Scanner semantics" bullet specifies `:details {:open-questions [<line…>]}`
       (full matched lines), while the same bullet's closing sentence and
       `steps.md` say the detail "captures the concern text (the substring after
@@ -38,7 +38,7 @@ are scope decisions for the human only (do not execute; leave unchecked).
 
 ## Plan-review — inconsistency
 
-- [ ] design.md D1 vs plan.md DI-5/R4 directly contradict on the
+- [x] design.md D1 vs plan.md DI-5/R4 directly contradict on the
       non-converged-AND-open-`SCOPE_QUESTION` precedence. design.md states as a
       **settled decision** (D1, line 124; restated line 111) that "the
       `SCOPE_QUESTION` handback **wins**" when a run is both non-converged (229)

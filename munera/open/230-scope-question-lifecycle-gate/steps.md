@@ -12,10 +12,11 @@ pass (AC-4).
       args `(content marker proceed-route open-route)`; returns the standard
       `{:status :ok :data <route> :summary <route> :details {…}}` shape (DI-1).
 - [ ] Scanner logic (D5): per line, `str/triml`, match unchecked checkbox
-      `- [ ]` followed by optional whitespace then `marker`; collect the concern
-      text after the marker for each open line. `nil`/empty/no-match →
-      `proceed-route`; ≥1 open → `open-route` with
-      `:details {:open-questions [...]}`. Ignore `- [x]`/`- [X]` items.
+      `- [ ]` followed by optional whitespace then `marker`; collect the
+      **trimmed concern substring** — the text after the `marker`, `str/trim`med
+      (DI-1 single defined shape; **not** the raw line) — for each open line.
+      `nil`/empty/no-match → `proceed-route`; ≥1 open → `open-route` with
+      `:details {:open-questions [<concern…>]}`. Ignore `- [x]`/`- [X]` items.
 - [ ] Unit tests in
       `components/agent-session/test/psi/agent_session/workflow/routing_test.clj`:
   - [ ] single unchecked `- [ ] SCOPE_QUESTION: …` → `open-route` + named question
@@ -51,8 +52,10 @@ pass (AC-4).
       `register-built-in-deterministic-operations!` with a `:description`.
 - [ ] Handler (DI-3): read `task-path`/`artifact`/`marker`/`proceed-route`/
       `open-route` from `args` (validate; `:status :error` on malformed args);
-      normalize `task-path` to a worktree-relative task dir (DI-4); run
-      `resolvers/query-in` seeded with session-id + `:psi.munera/task-path` +
+      resolve the owning session id as `(or parent-session-id session-id)`
+      (judge path supplies `:parent-session-id`, not `:session-id`); normalize
+      `task-path` to a worktree-relative task dir (DI-4); run `resolvers/query-in`
+      seeded with that session id + `:psi.munera/task-path` +
       `:psi.munera/artifact-name` for `[:psi.munera/task-artifact-content]`; call
       `routing/parse-scope-question-gate` and return its result.
 - [ ] Confirm the real `:workflow-input` shape against an actual `task-lifecycle`
@@ -65,23 +68,28 @@ pass (AC-4).
   - [ ] resume: same task after the item is checked → `DONE` (AC-3)
   - [ ] DI-4 input-shape normalization (bare `NNN-slug` and `munera/open/…` path)
   - [ ] malformed args → `:status :error`
+  - [ ] judge-path: drive the gate through the real `:invoke`-step judge
+        invocation (supplies `:parent-session-id`, no `:session-id`); assert it
+        resolves the worktree from `:parent-session-id` and fires
+        `SCOPE_QUESTION_OPEN` on an unchecked item (DI-3 test/prod divergence guard)
 - [ ] Run focused operation Scry suite green; clj-kondo clean.
 - [ ] Commit (230 Slice 3: scope-question-gate-routing operation).
 
 ## Slice 4 — wire task-lifecycle.edn + update task-lifecycle-test
 
 - [ ] Edit `.psi/workflows/task-lifecycle.edn` (DI-5):
-  - [ ] insert `check-scope-question-status` `:invoke` step at `:steps` index 2
-        (after `check-design-review-status`) with the gate idiom: step
-        `:operation constant-routing {:route "DONE"}`; `:judge`
+  - [ ] insert `check-scope-question-status` `:invoke` step at `:steps` index 1
+        (after `review-task-design`, before `check-design-review-status`) with the
+        gate idiom: step `:operation constant-routing {:route "DONE"}`; `:judge`
         `workflow/scope-question-gate-routing` with authored args
         (`:task-path {:from :workflow-input :path [:input]}`,
         `:artifact "design-steps.md"`, `:marker "SCOPE_QUESTION:"`,
         `:proceed-route "DONE"`, `:open-route "SCOPE_QUESTION_OPEN"`);
-        `:on {"DONE" {:goto "create-task-plan"}
+        `:on {"DONE" {:goto "check-design-review-status"}
         "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}`.
-  - [ ] repoint `check-design-review-status` `:on` `"DONE"` →
-        `{:goto "check-scope-question-status"}`.
+  - [ ] leave `check-design-review-status` `:on` unchanged
+        (`{"DONE" {:goto "create-task-plan"} "REPEAT" {:goto
+        "final-summary-design-not-converged"}}`).
   - [ ] append `final-summary-scope-question-open` `:session` step **last**:
         `:tools ["read" "bash"]`, contributions from `:workflow-original`;
         template names the open `SCOPE_QUESTION:` item(s) read from
@@ -95,16 +103,16 @@ pass (AC-4).
 - [ ] Update `task-lifecycle-test`
       (`components/workflow-loader/test/psi/workflow_loader/
       workflow_definitions_test.clj:655`):
-  - [ ] count `13 → 15`; insert `check-scope-question-status` (index 2) +
+  - [ ] count `13 → 15`; insert `check-scope-question-status` (index 1) +
         `final-summary-scope-question-open` (last) in the name vector; insert
-        `:invoke` (index 2) + `:session` (last) in the type vector.
+        `:invoke` (index 1) + `:session` (last) in the type vector.
   - [ ] `(repeat 13 {})` → `(repeat 15 {})` for the `:yields`/`:terminal-contract`
         assertion.
-  - [ ] change the design-gate `:on` `"DONE"` target assertion from
-        `"create-task-plan"` to `"check-scope-question-status"`.
+  - [ ] keep the design-gate `:on` `"DONE"` target assertion `"create-task-plan"`
+        (design gate is not repointed).
   - [ ] add scope-gate assertions: `:judge` =
         `workflow/scope-question-gate-routing` with authored args; `:on` =
-        `{"DONE" {:goto "create-task-plan"}
+        `{"DONE" {:goto "check-design-review-status"}
         "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}`.
   - [ ] add handback assertions: `:tools ["read" "bash"]`; template names the
         open `SCOPE_QUESTION` / stops before plan creation; terminates

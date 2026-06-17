@@ -64,9 +64,11 @@ The scanner, per authored `marker` (default authored value `"SCOPE_QUESTION:"`):
 - A **checked** item (`- [x]` / `- [X]`) with the same marker does **not** count
   (resolved — AC-2).
 - `nil`/absent content or zero matching lines → `proceed-route` (AC-2).
-- ≥1 open item → `open-route`, with `:details {:open-questions [<line…>]}` so the
-  handback can name the question(s) (AC-1). The detail captures the concern text
-  (the substring after the marker) for each open line.
+- ≥1 open item → `open-route`, with `:details {:open-questions [<concern…>]}` so
+  the handback can name the question(s) (AC-1). Each `:open-questions` entry is the
+  **trimmed concern substring** — the text after the `marker` on the open line,
+  `str/trim`med — **not** the raw matched line. This is the single defined shape;
+  the Slice-1 unit tests assert exactly it.
 
 The scanner is independent of any design-review convergence/`PASS_STATUS` signal
 (D2 — content-based detection).
@@ -99,8 +101,24 @@ inside a `defresolver`), feeding the pure scanner; the workflow-specific
 ## DI-3 — Operation wiring: ctx → resolver → scanner
 
 The deterministic operation `workflow/scope-question-gate-routing` handler
-receives `{:keys [args ctx session-id]}` (the invocation map; see
-`workflow_judge.clj`/`deterministic-operation-action`). It:
+receives the invocation map. **Critically, the gate runs as the `:judge` of the
+`check-scope-question-status` `:invoke` step**, and the judge and direct-invoke
+paths carry *different* session keys (verified in source):
+
+- judge path (`workflow_judge/execute-invoke-judge!`) supplies `:ctx` +
+  `:parent-session-id` and **no `:session-id`**;
+- direct `/operation invoke` path
+  (`deterministic_operation_action/build-invocation`) supplies `:session-id`
+  (+ a conditional `:parent-session-id`).
+
+The handler MUST therefore resolve the owning session id as
+`(or (:parent-session-id invocation) (:session-id invocation))`, **preferring
+`:parent-session-id`** — on the production judge path that is the parent
+agent-session whose `agent-session-cwd` resolves the task's `worktree-path`.
+Reading only `:session-id` would be nil on the judge path → nil session →
+`agent-session-cwd`/resolver returns nil → `parse-scope-question-gate` fails open
+to `proceed-route` → the gate silently never fires (the exact silent-default the
+task exists to prevent). It:
 
 1. Reads `task-path`, `artifact` (artifact filename), `marker`, `proceed-route`,
    `open-route` from `args` (all authored in EDN; `task-path` resolved from
@@ -109,13 +127,19 @@ receives `{:keys [args ctx session-id]}` (the invocation map; see
    shape).
 2. Normalizes `task-path` to a worktree-relative task directory (DI-4).
 3. Runs `resolvers/query-in` with the session entity
-   (`{:psi.agent-session/session-id session-id}`) plus extra-entity
-   `{:psi.munera/task-path <dir> :psi.munera/artifact-name <artifact>}`, querying
-   `[:psi.munera/task-artifact-content]`.
+   (`{:psi.agent-session/session-id (or parent-session-id session-id)}`) plus
+   extra-entity `{:psi.munera/task-path <dir> :psi.munera/artifact-name
+   <artifact>}`, querying `[:psi.munera/task-artifact-content]`.
 4. Calls `routing/parse-scope-question-gate` on the resolved content with the
    authored marker + route labels, and returns its result.
 
 The handler is the single IO seam (resolver read); the route decision is pure.
+**Test mandate (DI-3):** because the production path is the `:invoke`-step judge
+(which supplies `:parent-session-id`, not `:session-id`), the gate MUST be
+exercised by a test that drives it through the real `:invoke`-step judge
+invocation — not only the direct-invoke
+(`deterministic-operation-action`/registry) harness, which supplies `:session-id`
+and would pass while production fails (test/prod divergence). See Slice 3.
 
 ## DI-4 — Task-path normalization from workflow input (non-blocking residual)
 
@@ -141,11 +165,25 @@ normalization, and lock the chosen shape with an operation test.
 
 ## DI-5 — Gate placement and fall-through (D1)
 
-Per D1 the gate sits **after** 229's `check-design-review-status` and **before**
-`create-task-plan`. Concretely, in `.psi/workflows/task-lifecycle.edn`:
+Per D1 the scope gate sits in the design→plan boundary and, when a run is **both**
+non-converged (229) **and** has an open `SCOPE_QUESTION`, **the `SCOPE_QUESTION`
+handback wins** (D1, stated as a settled decision — it names the specific scope
+decision; 229's handback is generic). To make the scope handback *genuinely* win
+in the both-case, the scope gate is evaluated **before** the 229
+`check-design-review-status` convergence handback can terminate the run — i.e.
+immediately after `review-task-design` (which produces `design-steps.md`) and
+before `check-design-review-status`. This realizes D1's governing precedence
+decision. (Residual: design.md's D1 phrasing places the gate "after
+`check-design-review-status`", which is jointly unsatisfiable with its own
+governing "scope handback wins" under linear routing — see `implementation.md`;
+the follow-up may not edit design.md, so the plan implements the governing
+decision and flags the placement phrasing for human reconciliation.)
 
-- **Insert** `check-scope-question-status` (`:invoke`) at `:steps` index 2,
-  immediately after `check-design-review-status`. Mirror the gate idiom:
+Concretely, in `.psi/workflows/task-lifecycle.edn`:
+
+- **Insert** `check-scope-question-status` (`:invoke`) at `:steps` index 1,
+  immediately after `review-task-design` and before `check-design-review-status`.
+  Mirror the gate idiom:
   ```
   :operation "workflow/constant-routing" :args {:route "DONE"}
   :judge {:type :invoke
@@ -155,23 +193,20 @@ Per D1 the gate sits **after** 229's `check-design-review-status` and **before**
                  :marker "SCOPE_QUESTION:"
                  :proceed-route "DONE"
                  :open-route "SCOPE_QUESTION_OPEN"}}
-  :on {"DONE" {:goto "create-task-plan"}
+  :on {"DONE" {:goto "check-design-review-status"}
        "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}
   ```
-- **Repoint** `check-design-review-status` `:on` `"DONE"` from
-  `{:goto "create-task-plan"}` to `{:goto "check-scope-question-status"}` (its
-  `"REPEAT" → final-summary-design-not-converged` is unchanged). When a run is
-  both non-converged (229) and has an open `SCOPE_QUESTION`, the design gate's
-  `REPEAT` fires first and routes to the 229 handback — but D1 says the
-  `SCOPE_QUESTION` handback should win. **Resolution:** the design gate only
-  routes `REPEAT` when review yielded `ACTIONABLE_FEEDBACK`; a converged
-  (`REVIEW_COMPLETE`) run with an unchecked `SCOPE_QUESTION` is exactly the 022
-  gap and reaches the scope gate, where `SCOPE_QUESTION_OPEN` wins. A
-  *non-converged* run never reaches plan regardless, and its handback already
-  hands back to the human; the human resolving design will also surface the open
-  scope question on the next pass. This satisfies D1's intent (the scope decision
-  is never silently defaulted) without reordering the two gates. Recorded as a
-  decision; no extra machinery.
+- **Leave `check-design-review-status` unchanged** (its `:on` stays
+  `{"DONE" {:goto "create-task-plan"} "REPEAT" {:goto
+  "final-summary-design-not-converged"}}`). Routing outcomes:
+  - both non-converged **and** open `SCOPE_QUESTION` → the scope gate fires first
+    → `SCOPE_QUESTION_OPEN` → scope handback. **Scope wins** (D1). ✓
+  - converged but open `SCOPE_QUESTION` (the 022 gap) → scope gate
+    `SCOPE_QUESTION_OPEN` → scope handback. ✓
+  - non-converged, no open scope question → scope gate `DONE` →
+    `check-design-review-status` `REPEAT` → 229 handback. ✓
+  - converged, no open scope question → scope gate `DONE` →
+    `check-design-review-status` `DONE` → `create-task-plan`. ✓
 - **Append** `final-summary-scope-question-open` (`:session`) **last** in
   `:steps` (after `final-summary-plan-not-converged`), mirroring the existing
   not-converged handbacks: `:tools ["read" "bash"]`, contributions from
@@ -211,7 +246,8 @@ is last → also `:completed` by order and itself explicit-terminal.
 
 ### Slice 3 — deterministic gate operation + invocation test
 - Register `workflow/scope-question-gate-routing` in `workflow/core.clj`
-  (DI-3). Add a `:description`.
+  (DI-3). Add a `:description`. The handler resolves the owning session id as
+  `(or parent-session-id session-id)` (DI-3).
 - Operation invocation test (via `deterministic-operation-action`/registry, like
   `deterministic_operation_registry_test` / `operation_command_test`): seed a
   temp worktree with a task dir containing a `design-steps.md` fixture; invoke
@@ -220,21 +256,29 @@ is last → also `:completed` by order and itself explicit-terminal.
   AC-1 (halt route), AC-2 (no-op route incl. absent file), AC-3 (resume:
   re-invoking after the item is checked returns `DONE`). Also lock the DI-4
   input-shape normalization with one case.
+- **Judge-path test (DI-3, required):** add a test that drives the gate through
+  the real `:invoke`-step judge invocation (the production path), where the
+  invocation supplies `:parent-session-id` and **no `:session-id`**; assert the
+  gate resolves the worktree from `:parent-session-id` and still fires
+  `SCOPE_QUESTION_OPEN` on an unchecked item. Guards the test/prod divergence the
+  direct-invoke harness would otherwise mask.
 - Exit: focused operation Scry green; clj-kondo clean.
 
 ### Slice 4 — wire `task-lifecycle.edn` + update `task-lifecycle-test`
-- Edit `.psi/workflows/task-lifecycle.edn` per DI-5 (insert gate at index 2,
-  repoint design-gate DONE, append handback last).
+- Edit `.psi/workflows/task-lifecycle.edn` per DI-5 (insert gate at **index 1**,
+  immediately after `review-task-design` and before `check-design-review-status`;
+  leave `check-design-review-status` `:on` unchanged; append handback last).
 - Update `task-lifecycle-test` (`workflow_definitions_test.clj:655`) **in this
   slice** (the test is positionally hard-coded): count `13→15`; add
-  `check-scope-question-status` (index 2) and `final-summary-scope-question-open`
-  (last) to the name vector and `:invoke`/`:session` to the type vector; bump
-  `(repeat 13 {})`→`(repeat 15 {})`. The delegate-step assertions select by
-  `:type` (already DI-5-restructured from 229) and stay 6 delegates — unchanged.
-  Change the design-gate `:on` assertion `"DONE"` target from `"create-task-plan"`
-  to `"check-scope-question-status"`. Add assertions: the scope gate's `:judge`
-  is `workflow/scope-question-gate-routing` with the authored args, and its `:on`
-  routes `"DONE" → create-task-plan` and
+  `check-scope-question-status` (**index 1**) and `final-summary-scope-question-open`
+  (last) to the name vector and `:invoke` (index 1) / `:session` (last) to the
+  type vector; bump `(repeat 13 {})`→`(repeat 15 {})`. The delegate-step
+  assertions select by `:type` (already DI-5-restructured from 229) and stay 6
+  delegates — unchanged. The design-gate `:on` `"DONE"` target assertion stays
+  `"create-task-plan"` (unchanged — the design gate is no longer repointed). Add
+  assertions: the scope gate's `:judge` is `workflow/scope-question-gate-routing`
+  with the authored args, and its `:on` routes
+  `"DONE" → check-design-review-status` and
   `"SCOPE_QUESTION_OPEN" → final-summary-scope-question-open`; the handback step
   has `:tools ["read" "bash"]`, a template that names the open `SCOPE_QUESTION`
   and stops before plan creation, and terminates `:goto :done` (AC-4 definition
@@ -269,11 +313,14 @@ is last → also `:completed` by order and itself explicit-terminal.
   slice that edits the `.edn` (the delegate-by-type selection from 229 already
   absorbs the index shift for the delegate assertions).
 - **R4 — design-gate vs scope-gate precedence (DI-5).** A run that is both
-  non-converged and has an open `SCOPE_QUESTION` routes via the 229 design
-  handback, not the scope handback. Accepted per DI-5 reasoning: the scope
-  decision is still never silently defaulted (the run halts and hands back), and
-  the converged-with-open-`SCOPE_QUESTION` case — the actual 022 gap — reaches
-  the scope gate where `SCOPE_QUESTION_OPEN` wins.
+  non-converged and has an open `SCOPE_QUESTION` routes via the **scope**
+  handback: the scope gate is evaluated before the 229 convergence handback, so
+  the `SCOPE_QUESTION` handback wins exactly as D1 mandates. Residual: design.md's
+  D1 phrasing places the gate "after `check-design-review-status`", in tension with
+  its own governing "scope handback wins" decision (jointly unsatisfiable under
+  linear routing). The plan implements the governing decision; design.md's
+  placement phrasing should be reconciled by the human (the follow-up may not edit
+  design.md). Recorded in `implementation.md`.
 
 ## Open questions (non-blocking)
 
