@@ -193,3 +193,34 @@ pass (AC-4).
       and the real `:routing-result` `{:action :goto :target
       "final-summary-scope-question-open"}`. If the production invocation key set
       drifts the test moves with it (no silent mirror).
+
+## Test shaping (test-shaper) — follow-ups
+
+- [ ] **Pure `normalize-open-task-path` lacks direct narrow unit tests.**
+      `routing/normalize-open-task-path` is a pure `string → string/nil`
+      function, but `routing_test.clj` has no direct coverage — its grammar is
+      exercised only through the heavyweight `gate-task-path-normalization-test`
+      (temp dir + session + registry boundary) in
+      `scope_question_gate_operation_test.clj`. The nil-input guard
+      (`(when (string? task-path) …)`) and the `str/trim` whitespace handling are
+      not covered anywhere. Add direct unit tests for `normalize-open-task-path`
+      in `routing_test.clj` (full `munera/open/NNN-slug` verbatim, bare
+      `NNN-slug` → `munera/open/<token>`, `munera/closed/…`/free-text/partial →
+      nil, plus nil input and leading/trailing whitespace), and reduce the
+      operation-level normalization test to one representative case
+      (narrow_tests ∧ fast_feedback ∧ economical — test pure string logic at the
+      pure layer, not through the resolver/session/registry stack).
+- [ ] **Duplicated/inconsistent test fixtures across the two agent-session
+      test files.** `temp-dir!` is defined identically in
+      `scope_question_gate_operation_test.clj` and
+      `task_artifact_content_resolver_test.clj`; `write-design-steps!`
+      (operation) and `write-artifact!` (resolver) are near-duplicate
+      spit-to-task-dir helpers; the operation test has a `session-with-worktree!`
+      helper while the resolver test inlines the same
+      `create-test-session {:persist? false :session-defaults {:worktree-path …}}`
+      map 4×. Consolidate the shared ceremony (a `session-with-worktree!` /
+      temp-worktree helper, in shared test-support or per-file) so the two
+      closely-related files use consistent fixtures and the resolver test's
+      repeated session-creation ceremony is compressed
+      (consistent(fixtures) ∧ minimal_incidental_setup ∧
+      helpers_that_compress(ceremony)).

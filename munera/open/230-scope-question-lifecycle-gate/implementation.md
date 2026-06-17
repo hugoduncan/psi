@@ -356,3 +356,14 @@ before `check-design-review-status`, plus the asserted `:on` targets), matching
 the 229 definition-level gate convention — adequate, no runtime both-gate test
 filed. The only open item is the pre-existing human-only design.md placement-wording
 residual (already tracked in `design-steps.md`).
+
+## Test review (test-shaper)
+
+Tests are clear, layered (pure scanner / resolver / operation / definition),
+behaviour-focused, deterministic, and mock-free over real boundaries; failures
+carry `pr-str` context. Two shaping follow-ups filed to steps.md: pure
+`normalize-open-task-path` is only exercised through the heavyweight operation
+path (no narrow unit tests, nil/whitespace cases uncovered); and fixture
+ceremony is duplicated/inconsistent across the two agent-session test files.
+Both are economy/consistency improvements, not correctness or coverage gaps —
+all four ACs remain covered.
