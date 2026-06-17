@@ -301,3 +301,44 @@ Only outstanding item is the pre-existing, already-tracked human-only design-ste
 residual: design.md's "after check-design-review-status" placement wording is stale
 vs the implemented "before" placement (code realizes D1's governing "scope handback
 wins" decision). No new follow-up filed (would duplicate the open design-steps item).
+
+## Test-review follow-ups (executed)
+
+Executed the three test-review coverage residuals filed to steps.md. Test-only
+changes (no production code, no docs, no `task-lifecycle.edn`):
+
+1. **Resolver fail-open guard (covered).** Added
+   `task-artifact-content-resolver-fail-open-guard-test` calling
+   `session-resolvers/agent-session-task-artifact-content` directly (Pathom 3
+   Resolver is IFn) with nil worktree-path / task-path / artifact-name → nil
+   content, exercising the `(and (string? …) …)` safety hinge with no NPE. A
+   first attempt also added a query-in missing-input case asserting nil; dropped
+   it — `query-in` does **not** silently skip a missing *required* input (it
+   errors, and the resulting structure stack-overflows on print), so that case
+   made a false Pathom-semantics claim. The branch is documented as unreachable
+   through query-in (worktree-path either resolves to a string or
+   `agent-session-cwd` throws; the handler supplies task-path/artifact literally),
+   making the guard defensive and only reachable by a direct call.
+
+2. **Scanner false-halt protection (covered).** Added a `testing` block to
+   `scope-question-gate-parser-test` locking marker prefix-anchoring: a line that
+   merely mentions `SCOPE_QUESTION:` later in the prose (`- [ ] note:
+   SCOPE_QUESTION: …`, `- [ ] resolved the SCOPE_QUESTION: …`) routes to
+   `proceed-route` — guarding the inverse false-halt failure mode.
+
+3. **Judge-path mirror replaced with the real judge path.** Rewrote
+   `gate-judge-path-resolves-parent-session-test` to drive the gate through the
+   public `workflow-judge/execute-judge!` with an `:invoke` judge-spec, which
+   dispatches to `execute-invoke-judge!` — the production code that builds the
+   `:parent-session-id`/no-`:session-id` invocation map inline. Deleted the
+   hand-rolled `judge-invocation` helper (the silent-drift risk). The test
+   registers the real gate handler in the ctx registry and asserts
+   `:judge-event "SCOPE_QUESTION_OPEN"`, the named open question, and the real
+   `:routing-result {:action :goto :target "final-summary-scope-question-open"}`.
+   `resolve-invoke-args` passes literal `:args` through (workflow-run nil), so no
+   workflow-run scaffolding is needed.
+
+Verification: focused suites green —
+`routing-test` + `task-artifact-content-resolver-test` +
+`scope-question-gate-operation-test` = 18 tests / 265 assertions, 0 fail /
+0 error; clj-kondo + cljfmt clean on all three files.

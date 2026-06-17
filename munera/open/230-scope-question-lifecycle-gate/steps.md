@@ -147,7 +147,7 @@ pass (AC-4).
 
 ## Test review (task-test-review) — follow-ups
 
-- [ ] **Resolver fail-open guard untested.** `agent-session-task-artifact-content`
+- [x] **Resolver fail-open guard untested.** `agent-session-task-artifact-content`
       returns nil when `worktree-path`/`task-path`/`artifact-name` is not a string
       (the `(and (string? …) …)` guard) — the safety hinge DI-3 relies on (nil
       session → nil worktree-path → resolver nil → gate fails open / never halts,
@@ -156,14 +156,27 @@ pass (AC-4).
       Add a case exercising the missing/nil-input guard branch (e.g. unresolvable
       worktree-path → nil content), or document why it is unreachable through
       `query-in` (Pathom required-input semantics) so the branch isn't dead/untested.
-- [ ] **Scanner false-halt protection untested.** No test asserts the inverse
+      Added `task-artifact-content-resolver-fail-open-guard-test`: invokes the
+      resolver directly (Pathom 3 Resolver is IFn) with nil worktree-path /
+      task-path / artifact-name → nil content (no NPE). Comment documents the
+      query-in branch is unreachable as a present-but-non-string input (worktree
+      either a valid string or `agent-session-cwd` throws; handler supplies
+      task-path/artifact literally). Dropped a first attempt at a query-in
+      missing-input case — query-in does **not** silently skip on a missing
+      required input (it errors / overflows when printed), so it would have made a
+      false Pathom-semantics claim.
+- [x] **Scanner false-halt protection untested.** No test asserts the inverse
       failure mode: a checklist line that contains `SCOPE_QUESTION:` but **not** as
       the item prefix (marker after other prose, e.g.
       `- [ ] note: SCOPE_QUESTION: is discussed elsewhere`) must route to
       `proceed-route` (a false halt wrongly blocks the lifecycle). The only ignore
       case in `routing_test` uses a no-marker line. Add a case locking the
       prefix-anchoring of `open-scope-question-concern`.
-- [ ] **Judge-path divergence guard is a hand-rolled mirror (lower priority,
+      Added a `testing` block to `scope-question-gate-parser-test`: both
+      `- [ ] note: SCOPE_QUESTION: is discussed elsewhere` and
+      `- [ ] resolved the SCOPE_QUESTION: about bucket-size` → `proceed-route`,
+      locking marker prefix-anchoring.
+- [x] **Judge-path divergence guard is a hand-rolled mirror (lower priority,
       documented trade-off).** `gate-judge-path-resolves-parent-session-test`
       constructs the `:ctx`+`:parent-session-id` (no `:session-id`) invocation map
       manually via `judge-invocation`; it never drives the real
@@ -172,3 +185,11 @@ pass (AC-4).
       divergence DI-3 set out to prevent. Consider driving the test through the
       real judge invocation construction (or anchoring the key set to a shared
       source) so the mirror cannot silently drift.
+      Rewrote the test to drive the gate through the real public
+      `workflow-judge/execute-judge!` (`:invoke` judge-spec → `execute-invoke-judge!`),
+      which builds the `:parent-session-id`/no-`:session-id` invocation map inline
+      in production; deleted the hand-rolled `judge-invocation` helper. The test
+      now asserts `:judge-event "SCOPE_QUESTION_OPEN"`, the named open question,
+      and the real `:routing-result` `{:action :goto :target
+      "final-summary-scope-question-open"}`. If the production invocation key set
+      drifts the test moves with it (no silent mirror).

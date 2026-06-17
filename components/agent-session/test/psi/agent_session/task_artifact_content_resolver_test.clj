@@ -9,6 +9,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.resolvers :as resolvers]
+   [psi.agent-session.resolvers.session :as session-resolvers]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- temp-dir!
@@ -68,3 +69,33 @@
         (is (= "design body"
                (:psi.munera/task-artifact-content result))
             (pr-str result))))))
+
+(deftest task-artifact-content-resolver-fail-open-guard-test
+  ;; The resolver's (and (string? worktree-path) (string? task-path)
+  ;; (string? artifact-name)) guard is the safety hinge the gate relies on
+  ;; (DI-3): a nil/unresolvable input must yield nil content, not an NPE on
+  ;; io/file, so the gate fails *open* (proceed) rather than crashing. Invoke
+  ;; the resolver directly so the guard branch itself is exercised. Through
+  ;; query-in this branch is unreachable as a present-but-non-string input:
+  ;; worktree-path is either resolved to a valid string by agent-session-cwd or
+  ;; that resolver throws (session missing :worktree-path), and the operation
+  ;; handler supplies task-path/artifact-name as literal strings — so the guard
+  ;; is defensive (belt-and-suspenders) and only reachable by a direct call.
+  (testing "nil worktree-path → nil content (no NPE)"
+    (is (nil? (:psi.munera/task-artifact-content
+               (session-resolvers/agent-session-task-artifact-content
+                {:psi.agent-session/worktree-path nil
+                 :psi.munera/task-path "munera/open/230-x"
+                 :psi.munera/artifact-name "design-steps.md"})))))
+  (testing "nil task-path → nil content (no NPE)"
+    (is (nil? (:psi.munera/task-artifact-content
+               (session-resolvers/agent-session-task-artifact-content
+                {:psi.agent-session/worktree-path (System/getProperty "java.io.tmpdir")
+                 :psi.munera/task-path nil
+                 :psi.munera/artifact-name "design-steps.md"})))))
+  (testing "nil artifact-name → nil content (no NPE)"
+    (is (nil? (:psi.munera/task-artifact-content
+               (session-resolvers/agent-session-task-artifact-content
+                {:psi.agent-session/worktree-path (System/getProperty "java.io.tmpdir")
+                 :psi.munera/task-path "munera/open/230-x"
+                 :psi.munera/artifact-name nil}))))))

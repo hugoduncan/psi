@@ -373,6 +373,16 @@
     (assert-route scope-proceed
                   (parse-scope-gate "- [ ] ordinary follow-up item")))
 
+  (testing "marker present but not as the item prefix routes to proceed (no false halt)"
+    ;; The marker must be the item prose prefix (immediately after the
+    ;; checkbox). A line that merely *mentions* SCOPE_QUESTION: later in the
+    ;; prose is not an open item — wrongly halting on it would block the
+    ;; lifecycle (the inverse failure mode to a missed halt).
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] note: SCOPE_QUESTION: is discussed elsewhere"))
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] resolved the SCOPE_QUESTION: about bucket-size")))
+
   (testing "route labels are honoured from args, not hardcoded"
     (let [result (routing/parse-scope-question-gate
                   "- [ ] SCOPE_QUESTION: pick" scope-marker "GO" "STOP")]

@@ -7,6 +7,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow-judge :as workflow-judge]
    [psi.agent-session.workflow.core :as workflow-core]
    [psi.deterministic-operation-registry.registry :as registry]
    [psi.deterministic-operation-runtime.core :as runtime]))
@@ -51,18 +52,19 @@
     (registry/invoke-operation-in reg gate-operation-id invocation
                                   runtime/invoke-operation)))
 
+(defn- register-gate!
+  "Register the real gate handler under its production id in the ctx registry."
+  [ctx]
+  (registry/register-operation-in!
+   (:deterministic-operation-registry ctx)
+   {:id gate-operation-id
+    :description "scope gate (test registration)"
+    :handler workflow-core/scope-question-gate-routing}))
+
 (defn- direct-invocation
   [ctx session-id task-path]
   {:ctx ctx
    :session-id session-id
-   :args (assoc default-args :task-path task-path)})
-
-(defn- judge-invocation
-  "Mirror the workflow `:invoke`-step judge invocation key set: `:ctx` +
-   `:parent-session-id`, and no `:session-id` (workflow_judge/execute-invoke-judge!)."
-  [ctx parent-session-id task-path]
-  {:ctx ctx
-   :parent-session-id parent-session-id
    :args (assoc default-args :task-path task-path)})
 
 (deftest gate-open-on-unchecked-scope-question-test
@@ -138,19 +140,37 @@
     (is (= :invalid-scope-question-gate-args (:reason result)) (pr-str result))))
 
 (deftest gate-judge-path-resolves-parent-session-test
-  ;; DI-3 test/prod divergence guard: the production judge invocation supplies
-  ;; :parent-session-id and NO :session-id. The gate must resolve the worktree
-  ;; from :parent-session-id and still fire on an unchecked item.
+  ;; DI-3 test/prod divergence guard. Rather than hand-rolling the judge
+  ;; invocation key set (which could silently drift from production), drive the
+  ;; gate through the REAL `:invoke`-step judge entry point
+  ;; (workflow-judge/execute-judge! → execute-invoke-judge!). That production
+  ;; code builds the invocation map inline with :parent-session-id and NO
+  ;; :session-id; if that key set changes, this test moves with it. The gate
+  ;; must resolve the worktree from :parent-session-id and still fire.
   (let [worktree (temp-dir!)
         [ctx parent-sid] (session-with-worktree! worktree)]
+    (register-gate! ctx)
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: judge-path concern\n")
-    (let [invocation (judge-invocation ctx parent-sid "munera/open/230-x")]
-      (is (not (contains? invocation :session-id))
-          "judge invocation carries no :session-id")
-      (let [result (invoke-gate ctx invocation)]
-        (is (= :ok (:status result)) (pr-str result))
-        (is (= "SCOPE_QUESTION_OPEN" (:data result)) (pr-str result))
-        (is (= ["judge-path concern"]
-               (get-in result [:details :open-questions]))
-            (pr-str result))))))
+    (let [judge-spec {:type :invoke
+                      :operation gate-operation-id
+                      :args (assoc default-args :task-path "munera/open/230-x")}
+          routing-table {"DONE" {:goto "check-design-review-status"}
+                         "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}
+          routing-context {:current-step-id "check-scope-question-status"
+                           :step-order ["check-scope-question-status"
+                                        "final-summary-scope-question-open"]
+                           :step-runs {}}
+          result (workflow-judge/execute-judge!
+                  ctx parent-sid nil judge-spec routing-table routing-context)
+          op-result (get-in result [:judge-output :routing-result])]
+      ;; The gate fired through the real judge path (worktree resolved from
+      ;; :parent-session-id), naming the open question and routing to handback.
+      (is (= "SCOPE_QUESTION_OPEN" (:judge-event result)) (pr-str result))
+      (is (= :ok (:status op-result)) (pr-str result))
+      (is (= ["judge-path concern"]
+             (get-in op-result [:details :open-questions]))
+          (pr-str result))
+      (is (= {:action :goto :target "final-summary-scope-question-open"}
+             (:routing-result result))
+          (pr-str result)))))
