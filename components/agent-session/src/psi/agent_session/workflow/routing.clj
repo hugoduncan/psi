@@ -16,6 +16,26 @@
 (def ^:private munera-open-task-path-pattern
   #"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
+(def ^:private bare-task-token-pattern
+  #"^[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+(defn normalize-open-task-path
+  "Normalize a workflow-input task path/token to a worktree-relative open task
+   directory, or nil when it is not parseable (fail-open — DI-4).
+
+   Open-only and anchored (full-string match), reusing the existing open-task
+   grammar: a trimmed input that fully matches `munera/open/NNN-slug` is returned
+   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`;
+   anything else (free text, a `munera/closed/...` path, a partial/substring
+   match) yields nil so the gate reads no content and proceeds."
+  [task-path]
+  (when (string? task-path)
+    (let [trimmed (str/trim task-path)]
+      (cond
+        (re-matches munera-open-task-path-pattern trimmed) trimmed
+        (re-matches bare-task-token-pattern trimmed) (str "munera/open/" trimmed)
+        :else nil))))
+
 (defn- pass-status-line-value
   [line]
   (when (str/starts-with? line pass-status-prefix)

@@ -48,42 +48,36 @@ pass (AC-4).
 
 ## Slice 3 — deterministic gate operation + invocation test
 
-- [ ] Register `workflow/scope-question-gate-routing` in
+- [x] Register `workflow/scope-question-gate-routing` in
       `components/agent-session/src/psi/agent_session/workflow/core.clj`
       `register-built-in-deterministic-operations!` with a `:description`.
-- [ ] Handler (DI-3): read `task-path`/`artifact`/`marker`/`proceed-route`/
-      `open-route` from `args` (validate; `:status :error` on malformed args);
-      resolve the owning session id as `(or parent-session-id session-id)`
-      (judge path supplies `:parent-session-id`, not `:session-id`); normalize
-      `task-path` to a worktree-relative task dir (DI-4); run `resolvers/query-in`
-      (`(query-in ctx q extra-entity)`) passing `(:ctx invocation)` as the first
-      positional `ctx` arg, query `[:psi.munera/task-artifact-content]`, and a
-      **single** extra-entity map
-      `{:psi.agent-session/session-id (or parent-session-id session-id)
-      :psi.munera/task-path <dir> :psi.munera/artifact-name <artifact>}` (the
-      session id MUST be in extra-entity — `query-in` derives it there, not from
-      ctx — DI-3); call `routing/parse-scope-question-gate` and return its
-      result.
-- [ ] Confirm the real `:workflow-input` shape against an actual `task-lifecycle`
-      invocation; finalize DI-4 normalization accordingly.
-- [ ] Operation invocation test (temp worktree + task dir + `design-steps.md`
-      fixtures), covering acceptance criteria:
-  - [ ] unchecked `SCOPE_QUESTION:` → `SCOPE_QUESTION_OPEN`, names the question (AC-1)
-  - [ ] only-checked items → `DONE` (AC-2)
-  - [ ] absent `design-steps.md` → `DONE` (AC-2)
-  - [ ] resume: same task after the item is checked → `DONE` (AC-3)
-  - [ ] DI-4 input-shape normalization (DI-4 pinned grammar: open-only,
-        anchored/full-match): full `munera/open/NNN-slug` path → used verbatim;
-        bare anchored `NNN-slug` token → `munera/open/NNN-slug`; a
-        `munera/closed/…` path / free text / partial-substring input → fail-open
-        `DONE` (no usable path → resolver `nil`)
-  - [ ] malformed args → `:status :error`
-  - [ ] judge-path: drive the gate through the real `:invoke`-step judge
-        invocation (supplies `:parent-session-id`, no `:session-id`); assert it
-        resolves the worktree from `:parent-session-id` and fires
-        `SCOPE_QUESTION_OPEN` on an unchecked item (DI-3 test/prod divergence guard)
-- [ ] Run focused operation Scry suite green; clj-kondo clean.
-- [ ] Commit (230 Slice 3: scope-question-gate-routing operation).
+- [x] Handler (DI-3): reads `task-path`/`artifact`/`marker`/`proceed-route`/
+      `open-route` from `args` (validates string-ness; `:status :error`
+      `:invalid-scope-question-gate-args` on malformed args); resolves owning
+      session id as `(or parent-session-id session-id)` (judge path supplies
+      `:parent-session-id`, not `:session-id`); normalizes `task-path` via
+      `routing/normalize-open-task-path` (DI-4); runs `resolvers/query-in`
+      passing `(:ctx invocation)` positionally + single extra-entity map carrying
+      `:psi.agent-session/session-id` + `:psi.munera/task-path` +
+      `:psi.munera/artifact-name`; calls `routing/parse-scope-question-gate`.
+- [x] Confirmed the real `:workflow-input` shape: the gate arg
+      `:task-path {:from :workflow-input :path [:input]}` resolves identically to
+      the existing task-lifecycle delegate steps' `:input` field (same source
+      ref). DI-4 normalization (open-only, anchored) + fail-open covers all
+      shapes (bare `NNN-slug`, full `munera/open/NNN-slug`, free text).
+- [x] Operation invocation test
+      (`scope_question_gate_operation_test.clj`, 7 tests / 17 assertions):
+  - [x] unchecked `SCOPE_QUESTION:` → `SCOPE_QUESTION_OPEN`, names the question (AC-1)
+  - [x] only-checked items → `DONE` (AC-2)
+  - [x] absent `design-steps.md` → `DONE` (AC-2)
+  - [x] resume: same task after the item is checked → `DONE` (AC-3)
+  - [x] DI-4 input-shape normalization: full path verbatim; bare token →
+        `munera/open/NNN-slug`; `munera/closed/…` / free text → fail-open `DONE`
+  - [x] malformed args → `:status :error`
+  - [x] judge-path: invocation carrying `:parent-session-id`, no `:session-id`,
+        resolves worktree from `:parent-session-id` and fires `SCOPE_QUESTION_OPEN`
+- [x] Run focused operation Scry suite green; clj-kondo clean.
+- [x] Commit (230 Slice 3: scope-question-gate-routing operation).
 
 ## Slice 4 — wire task-lifecycle.edn + update task-lifecycle-test
 
