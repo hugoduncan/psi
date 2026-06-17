@@ -137,6 +137,10 @@ pass (AC-4).
       of silently defaulting the scope decision.
 - [x] Coherence: re-read edited files (`sync`); update `mementum/state.md`
       workflow-gate bullet if warranted.
-- [x] Final verify: AC-1..AC-4 each covered by a test; full focused suites green;
-      clj-kondo clean.
+- [x] Final verify: AC-1 (gate-open + handback wiring), AC-2 (only-checked /
+      absent proceed), AC-3 (resume re-scan), AC-4 (routing/resolver/operation +
+      task-lifecycle definition tests, cljfmt + clj-kondo pre-commit) each
+      covered. Task-230 suites green; one pre-existing unrelated
+      `review-follow-up-plan-prompt-contract-test` failure (commit `2b7b0face`,
+      out of scope) noted in implementation.md.
 - [x] Commit (230 Slice 5: docs + changelog + coherence).

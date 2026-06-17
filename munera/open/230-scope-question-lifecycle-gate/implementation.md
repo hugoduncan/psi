@@ -248,3 +248,20 @@ workflow.core).
 ("after `check-design-review-status`") is still stale vs the implemented "before"
 placement — tracked as the unchecked human-only item in `design-steps.md`. The
 implementation realizes design.md D1's governing "scope handback wins" decision.
+
+## Out-of-scope pre-existing failure (noted, not fixed)
+
+The full `components/workflow-loader/test` suite has **one** pre-existing failure
+unrelated to task 230: `workflow-review-prompt-contract-test/
+review-follow-up-plan-prompt-contract-test` (4 assertions). It checks the content
+of `.psi/workflows/review-follow-up-plan.md`, last modified by commit `2b7b0face`
+("⊘ workflow: review-follow-up-plan may edit steps.md…") — which predates all
+task-230 slice commits. None of the 230 commits touch that prompt or its contract
+test (`git log 8d7a36b3f..HEAD -- review-follow-up-plan.md
+workflow_review_prompt_contract_test.clj` shows only `2b7b0face`). The contract
+test still asserts the prompt must say `git diff … steps.md` / "match unchecked
+step items" and must NOT contain `design-steps.md`, but the prompt was edited to
+reference both `steps.md` and `design-steps.md`. Left for the owning change/task;
+fixing it here would mix concerns. All task-230 suites are green
+(routing 9/236, resolver 1/3, operation 7/17, task-lifecycle-test 48, plus
+agent-session resolvers/operation/graph-surface regression 72/2618).
