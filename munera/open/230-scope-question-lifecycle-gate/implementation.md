@@ -69,3 +69,24 @@ steps.md only (no code yet).
    the placement phrasing for human reconciliation in design.md (subordinate
    wording vs governing decision). This is a design-authority wording fix, not a
    plan defect.
+
+### plan-review / ambiguity (fresh batch, turn 1)
+
+Two new actionable ambiguities filed to `design-steps.md`:
+
+1. DI-3 step 3 pins the session-*id* key but not the `ctx` arg of
+   `resolvers/query-in` (`(query-in ctx q extra-entity)`); a missing/wrong ctx →
+   nil worktree-path → resolver nil → fails open → gate silently never fires
+   (same silent-default class as the resolved session-id item).
+2. DI-4 normalization regex is internally inconsistent: substring +
+   `(open|closed)` vs the "mirror existing grammar" reference, whose pattern is
+   open-only + anchored/full-match.
+
+Source verification this turn: `query-in` (`resolvers.clj`) is
+`(query-in ctx q extra-entity)` seeding `:psi/agent-session-ctx`←ctx and
+`:psi.agent-session/session-id`←`(:psi.agent-session/session-id extra-entity)`;
+judge-path invocation (`execute-invoke-judge!`) supplies `:ctx` +
+`:parent-session-id`, no `:session-id`; `:from :workflow-input :path [:input]`
+is a supported invoke-arg source (`apply-source-spec`), so that authored arg is
+sound (not flagged); existing `munera-open-task-path-pattern` is open-only and
+anchored.

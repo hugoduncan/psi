@@ -36,6 +36,42 @@ are scope decisions for the human only (do not execute; leave unchecked).
       concern substring) so the scanner unit tests (Slice 1) assert a single
       defined shape.
 
+- [ ] DI-3 step 3 omits the agent-session-ctx that the handler must pass as
+      `resolvers/query-in`'s first positional arg. `query-in`'s signature is
+      `(query-in ctx q extra-entity)`: the first `ctx` is seeded as
+      `:psi/agent-session-ctx`, which `agent-session-cwd` requires (input
+      `[:psi/agent-session-ctx :psi.agent-session/session-id]`; body
+      `(support/session-worktree-path agent-session-ctx session-id)`) to resolve
+      `:psi.agent-session/worktree-path` for the new
+      `agent-session-task-artifact-content` resolver. DI-3 precisely pins the
+      session-*id* key (`:parent-session-id`) but never says where the `ctx` arg
+      comes from. An implementer who passes `nil`, reconstructs a ctx, or relies
+      only on the entity map gets a nil worktree-path → resolver returns `nil` →
+      `parse-scope-question-gate` fails open to `proceed-route` → the gate
+      silently never fires (the *same* silent-default failure class as the
+      already-resolved session-id item). Pin that the handler passes
+      `(:ctx invocation)` (the judge-path agent-session-ctx) as `query-in`'s
+      first positional arg, alongside the `(or parent-session-id session-id)`
+      entity. (Note: `query-in` derives `session-id` from `extra-entity`, so the
+      session id must be in `extra-entity`, not only in `ctx`.)
+
+- [ ] DI-4 normalization grammar is internally inconsistent, leaving the exact
+      regex underspecified. The first bullet matches a
+      `munera/(open|closed)/NNN-slug` **substring**, but its own parenthetical
+      and the Open-questions note say the task is always `open` during a pre-plan
+      gate run, and DI-4 also says to mirror
+      `parse-munera-open-task-path-routing`'s grammar — whose pattern
+      `#"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"` is **open-only**,
+      **anchored (full-string)**, and therefore cannot substring-match. An
+      implementer cannot tell whether to (a) accept `closed` as well as `open`,
+      (b) substring-match vs full-match, or (c) reuse vs replace the existing
+      anchored pattern. These choices change which inputs the gate accepts
+      (observable for `munera/closed/…` or otherwise-prefixed inputs, despite the
+      fail-open default). Pin the exact normalization grammar — directory set
+      (open-only vs `open|closed`), anchored vs substring, and the slug char
+      class — and reconcile the "mirror existing grammar" reference with the
+      substring/`closed` intent.
+
 ## Plan-review — inconsistency
 
 - [x] design.md D1 vs plan.md DI-5/R4 directly contradict on the
