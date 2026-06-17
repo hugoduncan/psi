@@ -36,7 +36,7 @@ are scope decisions for the human only (do not execute; leave unchecked).
       concern substring) so the scanner unit tests (Slice 1) assert a single
       defined shape.
 
-- [ ] DI-3 step 3 omits the agent-session-ctx that the handler must pass as
+- [x] DI-3 step 3 omits the agent-session-ctx that the handler must pass as
       `resolvers/query-in`'s first positional arg. `query-in`'s signature is
       `(query-in ctx q extra-entity)`: the first `ctx` is seeded as
       `:psi/agent-session-ctx`, which `agent-session-cwd` requires (input
@@ -55,7 +55,7 @@ are scope decisions for the human only (do not execute; leave unchecked).
       entity. (Note: `query-in` derives `session-id` from `extra-entity`, so the
       session id must be in `extra-entity`, not only in `ctx`.)
 
-- [ ] DI-4 normalization grammar is internally inconsistent, leaving the exact
+- [x] DI-4 normalization grammar is internally inconsistent, leaving the exact
       regex underspecified. The first bullet matches a
       `munera/(open|closed)/NNN-slug` **substring**, but its own parenthetical
       and the Open-questions note say the task is always `open` during a pre-plan

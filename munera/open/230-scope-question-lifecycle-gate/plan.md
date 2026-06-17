@@ -126,10 +126,24 @@ task exists to prevent). It:
    :error` result on malformed args (mirroring the other operations' error
    shape).
 2. Normalizes `task-path` to a worktree-relative task directory (DI-4).
-3. Runs `resolvers/query-in` with the session entity
-   (`{:psi.agent-session/session-id (or parent-session-id session-id)}`) plus
-   extra-entity `{:psi.munera/task-path <dir> :psi.munera/artifact-name
-   <artifact>}`, querying `[:psi.munera/task-artifact-content]`.
+3. Runs `resolvers/query-in` — whose signature is `(query-in ctx q
+   extra-entity)`. The handler passes **`(:ctx invocation)`** (the judge-path
+   agent-session-ctx) as the first positional `ctx` arg: `query-in` seeds it as
+   `:psi/agent-session-ctx`, which `agent-session-cwd` requires
+   (input `[:psi/agent-session-ctx :psi.agent-session/session-id]`; body
+   `(support/session-worktree-path agent-session-ctx session-id)`) to resolve
+   `:psi.agent-session/worktree-path`. The query `q` is
+   `[:psi.munera/task-artifact-content]`. The `extra-entity` is a **single map**
+   carrying both the session id and the task params:
+   `{:psi.agent-session/session-id (or parent-session-id session-id)
+     :psi.munera/task-path <dir> :psi.munera/artifact-name <artifact>}`.
+   `query-in` derives the session id from `extra-entity`
+   (`(:psi.agent-session/session-id extra-entity)`), so the session id MUST live
+   in `extra-entity` — **not** only in `ctx`. Passing `nil` (or a reconstructed)
+   ctx, or putting the session id only in `ctx`, yields a nil `worktree-path` →
+   resolver `nil` → `parse-scope-question-gate` fails open to `proceed-route` →
+   the gate silently never fires (the same silent-default failure class as the
+   session-id item).
 4. Calls `routing/parse-scope-question-gate` on the resolved content with the
    authored marker + route labels, and returns its result.
 
@@ -147,15 +161,29 @@ The gate needs a concrete worktree-relative task directory. The authored arg
 `:task-path {:from :workflow-input :path [:input]}` yields whatever string
 `task-lifecycle` was invoked with. The exact input shape is not pinned by
 `design.md` (the only residual ambiguity — see "Open questions"); the operation
-**normalizes defensively**, mirroring `parse-munera-open-task-path-routing`'s
-existing path grammar:
+**normalizes defensively**.
 
-- If the input contains a `munera/(open|closed)/NNN-slug` substring, use that
-  path (the task is **open** during a pre-plan gate run, so this will be
-  `munera/open/NNN-slug`).
-- Else, if the input is a bare `NNN-slug` token, construct
-  `munera/open/NNN-slug`.
-- Else, the resolver read yields `nil` → `proceed-route` (fail-open to no-op,
+**Pinned normalization grammar (resolving the substring-vs-anchored /
+open-vs-`closed` ambiguity).** The gate is a **pre-plan** gate, so the task is
+**always `open`** when it runs (it halts *before* `create-task-plan`, long before
+any `closed/` transition). Therefore the normalization is **open-only** and
+**anchored (full-string match)** — it does **not** accept `closed`, and it does
+**not** substring-match. This genuinely reuses the existing anchored open-only
+grammar rather than diverging from it; the earlier "substring / `(open|closed)`"
+phrasing is superseded. Concretely, mirror `routing.clj`'s existing
+`munera-open-task-path-pattern`
+(`#"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"`, full-match via
+`re-matches`) — same directory (`open` only), same anchoring, same slug char
+class (`[0-9]{3,}` task number, then `-` separated `[a-z0-9]+` kebab segments):
+
+- If the trimmed input **fully matches** `munera-open-task-path-pattern`
+  (i.e. `munera/open/NNN-slug`), use it verbatim.
+- Else, if the trimmed input **fully matches** the bare-token slug grammar
+  `#"^[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"` (same number + slug char class,
+  anchored), construct `munera/open/<token>`.
+- Else (anything else — free text, a `munera/closed/…` path, a partial/substring
+  match, or an otherwise-malformed token), the normalization yields no usable
+  path → the resolver read yields `nil` → `proceed-route` (fail-open to no-op,
   AC-2 — never a false halt from an unparseable input).
 
 The implementer MUST confirm the real `:workflow-input` shape against an actual

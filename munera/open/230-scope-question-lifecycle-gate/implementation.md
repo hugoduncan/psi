@@ -104,3 +104,46 @@ turn: `task-lifecycle-test` (`workflow_definitions_test.clj:655`) asserts 13 ste
 / `(repeat 13 {})` / delegate-by-`:type` / `(repeat 6 …)` / design-gate `:on
 "DONE" → create-task-plan`; all match the plan's Slice-4 `13→15` update claims
 (plan↔steps↔test consistent there — not flagged).
+
+### plan-review / follow-up (batch: fresh ambiguity + inconsistency turns)
+
+Batch baseline `dc2b30c41` (prev follow-up completion); preceding plan-review
+batch = `f73347905` (ambiguity) + `18c2aba48` (inconsistency). `git diff
+dc2b30c41..HEAD -- design-steps.md` added three unchecked items. Two are
+plan-stage executor work (plan.md + steps.md only — Slices 1–5 still
+unimplemented, no code yet); one is human-only.
+
+1. **DI-3 ctx arg (resolved).** Verified `resolvers/query-in` signature
+   (`resolvers.clj:161`): `(query-in ctx q extra-entity)` — seeds `ctx` as
+   `:psi/agent-session-ctx`, and derives the session id from `extra-entity`
+   (`(:psi.agent-session/session-id extra-entity)`), **not** from `ctx`. Pinned
+   DI-3 step 3 (plan.md) + steps.md Slice-3 handler: the handler passes
+   `(:ctx invocation)` (the judge-path agent-session-ctx) as the first positional
+   `ctx`, query `[:psi.munera/task-artifact-content]`, and a **single**
+   extra-entity map carrying `:psi.agent-session/session-id (or parent-session-id
+   session-id)` + `:psi.munera/task-path` + `:psi.munera/artifact-name`. Session
+   id must live in extra-entity, else nil worktree-path → resolver nil → fail-open
+   → silent no-fire (same class as the session-id item).
+
+2. **DI-4 normalization grammar (resolved).** Verified existing
+   `munera-open-task-path-pattern` (`routing.clj:16-17`):
+   `#"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"` — open-only, anchored
+   (full-match via `re-matches`), slug class `[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*`.
+   Pinned DI-4 (plan.md) to **open-only + anchored/full-match**, reusing that
+   exact grammar (the pre-plan gate always runs on an `open` task, so `closed`
+   and substring-matching are dropped — superseding the earlier
+   "substring/`(open|closed)`" phrasing). Bare `NNN-slug` token → anchored
+   `#"^[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$"` → `munera/open/<token>`; everything
+   else (free text, `munera/closed/…`, partial substring) → no usable path →
+   resolver nil → fail-open `proceed-route`. Locked with a steps.md Slice-3 test
+   bullet (full path verbatim / bare token / fail-open cases).
+
+3. **design.md gate-placement wording (NOT executed — human-only, left
+   unchecked).** This item explicitly states the follow-up executor may not edit
+   design.md and the **human** must update design.md (Composition para + D1 +
+   "Relationship to task 229") to read "before `check-design-review-status`". The
+   change it requires lies solely in design.md, which the follow-up is forbidden
+   to touch (and `SCOPE_QUESTION`-class human-decision items are out of executor
+   scope). No plan/steps/code edit can satisfy it (plan.md + steps.md already
+   implement the "before" placement; the residual is design.md authority wording
+   only). Left unchecked per the evidence rule; not a plan defect.

@@ -55,9 +55,14 @@ pass (AC-4).
       resolve the owning session id as `(or parent-session-id session-id)`
       (judge path supplies `:parent-session-id`, not `:session-id`); normalize
       `task-path` to a worktree-relative task dir (DI-4); run `resolvers/query-in`
-      seeded with that session id + `:psi.munera/task-path` +
-      `:psi.munera/artifact-name` for `[:psi.munera/task-artifact-content]`; call
-      `routing/parse-scope-question-gate` and return its result.
+      (`(query-in ctx q extra-entity)`) passing `(:ctx invocation)` as the first
+      positional `ctx` arg, query `[:psi.munera/task-artifact-content]`, and a
+      **single** extra-entity map
+      `{:psi.agent-session/session-id (or parent-session-id session-id)
+      :psi.munera/task-path <dir> :psi.munera/artifact-name <artifact>}` (the
+      session id MUST be in extra-entity — `query-in` derives it there, not from
+      ctx — DI-3); call `routing/parse-scope-question-gate` and return its
+      result.
 - [ ] Confirm the real `:workflow-input` shape against an actual `task-lifecycle`
       invocation; finalize DI-4 normalization accordingly.
 - [ ] Operation invocation test (temp worktree + task dir + `design-steps.md`
@@ -66,7 +71,11 @@ pass (AC-4).
   - [ ] only-checked items → `DONE` (AC-2)
   - [ ] absent `design-steps.md` → `DONE` (AC-2)
   - [ ] resume: same task after the item is checked → `DONE` (AC-3)
-  - [ ] DI-4 input-shape normalization (bare `NNN-slug` and `munera/open/…` path)
+  - [ ] DI-4 input-shape normalization (DI-4 pinned grammar: open-only,
+        anchored/full-match): full `munera/open/NNN-slug` path → used verbatim;
+        bare anchored `NNN-slug` token → `munera/open/NNN-slug`; a
+        `munera/closed/…` path / free text / partial-substring input → fail-open
+        `DONE` (no usable path → resolver `nil`)
   - [ ] malformed args → `:status :error`
   - [ ] judge-path: drive the gate through the real `:invoke`-step judge
         invocation (supplies `:parent-session-id`, no `:session-id`); assert it
