@@ -31,19 +31,20 @@ pass (AC-4).
 
 ## Slice 2 — task-artifact-content resolver + test
 
-- [ ] Add `agent-session-task-artifact-content` resolver to
+- [x] Add `agent-session-task-artifact-content` resolver to
       `components/agent-session/src/psi/agent_session/resolvers/session.clj`
       (next to `agent-session-cwd`): input
       `[:psi.agent-session/worktree-path :psi.munera/task-path
       :psi.munera/artifact-name]`, output `[:psi.munera/task-artifact-content]`;
       slurp `(io/file worktree-path task-path artifact-name)` from the
       working tree if it exists, else `nil` (DI-2).
-- [ ] Register the resolver in `session-resolvers/resolvers` so it reaches
+- [x] Register the resolver in `session-resolvers/resolvers` so it reaches
       `all-resolvers` / `resolvers/query-in`.
-- [ ] Resolver test (temp worktree dir fixture): present `design-steps.md` →
-      slurped content; absent file → `nil`.
-- [ ] Run focused agent-session resolver Scry suite green; clj-kondo clean.
-- [ ] Commit (230 Slice 2: task-artifact-content resolver).
+- [x] Resolver test (temp worktree dir fixture): present `design-steps.md` →
+      slurped content; absent file → `nil`; path composed from worktree+task+artifact.
+      (`task_artifact_content_resolver_test.clj`, 1 test / 3 assertions)
+- [x] Run focused agent-session resolver Scry suite green; clj-kondo clean.
+- [x] Commit (230 Slice 2: task-artifact-content resolver).
 
 ## Slice 3 — deterministic gate operation + invocation test
 

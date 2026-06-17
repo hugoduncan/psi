@@ -1,6 +1,7 @@
 (ns psi.agent-session.resolvers.session
   "Session-focused Pathom3 resolvers extracted from the main agent-session resolver namespace."
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extensions :as ext]
@@ -365,6 +366,30 @@
    ::pco/output [:psi.agent-session/worktree-path]}
   {:psi.agent-session/worktree-path (support/session-worktree-path agent-session-ctx session-id)})
 
+(pco/defresolver agent-session-task-artifact-content
+  "Resolve the working-tree content of a task artifact file under a worktree.
+
+   Generic, workflow-agnostic: the task directory (`:psi.munera/task-path`,
+   worktree-relative) and artifact filename (`:psi.munera/artifact-name`) are
+   inputs, so this resolver knows nothing about `design-steps.md` or any marker.
+   Reads the current working-tree file (not git HEAD) so a freshly-edited file is
+   honoured on a stateless re-scan. Returns nil content when any input is missing
+   or the file does not exist."
+  [{:keys [psi.agent-session/worktree-path
+           psi.munera/task-path
+           psi.munera/artifact-name]}]
+  {::pco/input  [:psi.agent-session/worktree-path
+                 :psi.munera/task-path
+                 :psi.munera/artifact-name]
+   ::pco/output [:psi.munera/task-artifact-content]}
+  {:psi.munera/task-artifact-content
+   (when (and (string? worktree-path)
+              (string? task-path)
+              (string? artifact-name))
+     (let [file (io/file worktree-path task-path artifact-name)]
+       (when (.exists file)
+         (slurp file))))})
+
 (defn- workflow-session-link-attrs
   [sd]
   {:psi.agent-session/workflow-run-id     (:workflow-run-id sd)
@@ -631,6 +656,7 @@
    agent-session-extensions
    agent-session-context-usage
    agent-session-cwd
+   agent-session-task-artifact-content
    agent-session-workflow-linkage
    ;; agent-session-workflow-run-ref is intentionally excluded from the root
    ;; resolver list. It produces :psi.workflow.run/id from a session, which
