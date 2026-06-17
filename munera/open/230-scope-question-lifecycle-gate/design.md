@@ -60,32 +60,37 @@ recorded in the task artifacts; only then does the lifecycle continue.
 
 In scope:
 
-1. **Detect** open (unchecked) `SCOPE_QUESTION:` items in a task's
+1. **Detect** open (unchecked) `- [ ] SCOPE_QUESTION: …` items in a task's
    `design-steps.md` (content-based; independent of the design-review convergence
-   signal). Likely a deterministic operation (`:invoke`) that scans for
-   `- [ ] … SCOPE_QUESTION:` lines and yields a routing status + the list of open
-   questions, mirroring `check-implementation-review-status`.
-2. **Gate** the lifecycle: when ≥1 open `SCOPE_QUESTION` exists, halt **before
-   plan creation** and produce a clear, human-facing "scope decision needed"
-   hand-back that names the open question(s). (Backstop before close to be
-   decided — see open questions.)
-3. **Resume**: define and test how a human records a resolution (decision +
-   rationale in the task artifacts; check the `SCOPE_QUESTION` item) and re-enters
-   the lifecycle so it continues from the gate.
+   signal). A dedicated deterministic operation (D4) consumes resolver-read
+   content (D2) and yields a routing status + the list of open questions.
+2. **Gate** the lifecycle: a single pre-plan gate (D1) — when ≥1 open
+   `SCOPE_QUESTION` exists, halt **before `create-task-plan`** and produce a
+   clear, human-facing "scope decision needed" hand-back that names the open
+   question(s).
+3. **Resume**: stateless re-scan (D3) — the human checks the item and records the
+   decision/rationale in `design.md` (D5), then re-invokes `task-lifecycle`; the
+   idempotent gate re-scans and proceeds. This path is tested (AC-3).
 4. **Tests**: workflow grammar/runtime coverage of the gate (open → halt; none →
    no regression; resume path), under the existing `workflow_*_test` suites
    (`components/agent-session/test`, `components/workflow-runtime/test`,
    workflow-loader definition tests). cljfmt + clj-kondo pre-commit pass.
 
-Out of scope (separate task, cross-referenced):
+Out of scope (separate tasks, cross-referenced):
 
 - The **engine** change making `:max-iterations` exhaustion route
-  author-controllable instead of hardcoded `:target :failed`
-  (`components/workflow-runtime/.../statechart.clj` `compile-routing-transitions`,
-  schema in `ir.clj`) — graceful non-convergence. This is task
-  **229-author-routed-workflow-exhaustion** (`:on-max-iterations`). The
-  `SCOPE_QUESTION` gate is detectable purely from `design-steps.md` content and
-  does **not** require the engine change.
+  author-controllable instead of hardcoded `:target :failed` — graceful
+  non-convergence. This is task **229-author-routed-workflow-exhaustion**
+  (`:on-max-iterations`), now **implemented and closed** (landed in
+  `task-lifecycle.edn` as `check-design-review-status`/`check-plan-review-status`
+  + `final-summary-not-converged`). The `SCOPE_QUESTION` gate is detectable purely
+  from `design-steps.md` content and does **not** require it.
+- A **design-review guardrail** that treats *"the design defers a decision to the
+  human"* as a halt/`SCOPE_QUESTION` condition, stopping the review loop from
+  thrashing on under-decided designs at the source. Distinct from 230 (which gates
+  on an *already-filed* `SCOPE_QUESTION`). Separate task; cross-reference only.
+  (Motivated directly by 230's own runaway design review — see git tag
+  `230-design-review-churn`.)
 
 ## Relationship to task 229 (must coordinate, do not bundle)
 
@@ -101,32 +106,52 @@ to the human, but they answer different questions and compose:
   unchecked `SCOPE_QUESTION` (the precise gap that let 022 slip through). It names
   the scope question(s) explicitly rather than a generic "did not converge".
 
-The design must specify how the 230 gate orders/composes with 229's
-`check-design-review-status` gate (both sit between `review-task-design` and
-`create-task-plan`). 229 is being implemented concurrently on branch
-`exhaustion-routing`; 230 should assume the post-229 `task-lifecycle.edn` shape
-and reuse the gate idiom rather than duplicating handback machinery.
+Composition is settled in D1: the 230 gate sits **after** 229's
+`check-design-review-status` and **before** `create-task-plan`; when a run is both
+non-converged and has an open `SCOPE_QUESTION`, the `SCOPE_QUESTION` handback wins.
+229 is **implemented and closed** on `exhaustion-routing`, so 230 builds on the
+post-229 `task-lifecycle.edn` shape and reuses the gate idiom rather than
+duplicating handback machinery.
 
-## Open design questions (to settle collaboratively)
+## Settled design decisions
 
-1. **Gate placement.** Before plan creation only (primary), or also a backstop
-   before close? Recommend primary gate pre-plan; evaluate whether a pre-close
-   backstop adds value or is redundant once the pre-plan gate exists.
-2. **Detection source of truth.** Is `design-steps.md` the sole canonical
-   location for `SCOPE_QUESTION:` items, or can they also appear elsewhere (e.g.
-   `implementation.md` deferral notes)? Confirm the single authoritative source
-   the scanner reads. Define behaviour when `design-steps.md` is absent (treat as
-   no open questions → proceed).
-3. **Resume mechanism.** How the human's resolution re-enters the lifecycle:
-   check the `SCOPE_QUESTION` item + record decision/rationale (where —
-   `design.md`? `implementation.md`?), then resume via re-run / workflow
-   `resume-run`. The gate re-scans and proceeds when no unchecked `SCOPE_QUESTION`
-   remains. Must be a *defined, tested* path (AC-3).
-4. **Status vocabulary.** A dedicated deterministic operation yielding a
-   DONE/handback route, vs reusing `pass-status-routing` with a new status. Keep
-   workflow-specific labels in authored EDN/operations, not generic runtime code.
-5. **What counts as "resolved".** Checked checkbox alone, or checkbox + a recorded
-   decision marker? Define the minimal, machine-checkable resolution signal.
+- **D1 — Gate placement: one gate, pre-plan.** A single gate sits between
+  `review-task-design` (after 229's `check-design-review-status`) and
+  `create-task-plan`. No separate pre-close backstop: `SCOPE_QUESTION`s are only
+  *produced* by design review (plan/implement do not file them), so the pre-plan
+  gate covers the lifecycle (`λone_way`, minimal surface). When a run is both
+  non-converged (229) **and** has an open `SCOPE_QUESTION`, the `SCOPE_QUESTION`
+  handback wins (it names the decision; 229's is generic).
+- **D2 — Detection source + mechanism.** `design-steps.md` is the **sole**
+  canonical location for `SCOPE_QUESTION:` items (it is where design-review
+  follow-ups live). Absent `design-steps.md` → no open questions → proceed (AC-2).
+  *Mechanism principle:* the file read goes through a **generic task-artifact read
+  resolver** (reads-through-resolvers, mirroring
+  `agent_session/resolvers/session.clj`, which already `slurp`s git files inside a
+  `defresolver`), feeding a **pure parser**. The workflow-specific
+  `design-steps.md` path and `SCOPE_QUESTION:` marker live in **authored EDN**,
+  not runtime code. design.md records only this principle; the resolver-vs-step
+  wiring is deferred to plan.md (over-specifying it here is what triggered the
+  earlier review thrash).
+- **D3 — Resume: stateless re-scan.** The gate reads current `design-steps.md`
+  content on each run. The human resolves by checking the item and recording the
+  decision (D5), then **re-invokes `task-lifecycle`**; the gate re-scans, finds no
+  unchecked `SCOPE_QUESTION`, and proceeds. The gate is idempotent so re-invoke is
+  safe; no special resume plumbing required (this is the defined, tested path for
+  AC-3).
+- **D4 — Status vocabulary: dedicated deterministic operation.** The gate is a
+  **deterministic content scan with no LLM**, unlike `pass-status-routing` (which
+  parses an LLM `PASS_STATUS` line). A dedicated pure operation yields the
+  DONE/handback route, keeping the gate deterministic and avoiding op-output/naming
+  collisions. Route labels, marker, and artifact path stay authored-EDN (generic
+  primitive).
+- **D5 — Resolved signal: the checkbox.** The machine-checkable signal is the
+  checkbox state: the gate passes iff no unchecked `- [ ] SCOPE_QUESTION: …`
+  lines remain. The human additionally records the decision + rationale in
+  `design.md` (per `change_chain`, scope decisions are *intent* → live in design);
+  that is a human obligation/AC, not machine-enforced. **Canonical marker form:**
+  `- [ ] SCOPE_QUESTION: <concern>` — the marker is the item prefix immediately
+  after the checkbox, matching the review prompts' "item prefixed `SCOPE_QUESTION:`".
 
 ## Acceptance criteria
 
