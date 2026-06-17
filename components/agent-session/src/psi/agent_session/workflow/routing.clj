@@ -151,6 +151,45 @@
        :details {:reason :invalid-munera-open-task-path
                  :text text}})))
 
+(def ^:private unchecked-checkbox-prefix "- [ ]")
+
+(defn- open-scope-question-concern
+  "Return the trimmed concern substring of an open (unchecked) scope-question
+   line, or nil when the line is not an open item for `marker`.
+
+   An open item is a markdown checklist line whose left-trimmed form starts with
+   the unchecked checkbox `- [ ]`, then (after optional whitespace) the authored
+   `marker`. Checked items (`- [x]`/`- [X]`) do not start with `- [ ]`, so they
+   never match. The returned concern is the text after the marker, trimmed."
+  [marker line]
+  (let [trimmed (str/triml line)]
+    (when (str/starts-with? trimmed unchecked-checkbox-prefix)
+      (let [after-box (str/triml (subs trimmed (count unchecked-checkbox-prefix)))]
+        (when (str/starts-with? after-box marker)
+          (str/trim (subs after-box (count marker))))))))
+
+(defn parse-scope-question-gate
+  "Deterministically route on unchecked scope-question items in artifact content.
+
+   Scans `content` (a string or nil) for open (unchecked) checklist items whose
+   prose begins with `marker` (e.g. \"SCOPE_QUESTION:\"). When one or more open
+   items remain, routes to `open-route` and returns the trimmed concern of each
+   open item under `:details {:open-questions [...]}`. When `content` is nil,
+   empty, or has no open items (including only-checked items), routes to
+   `proceed-route`. No IO and independent of any review-convergence signal."
+  [content marker proceed-route open-route]
+  (let [open-questions (->> (str/split-lines (or content ""))
+                            (keep #(open-scope-question-concern marker %))
+                            vec)]
+    (if (seq open-questions)
+      {:status :ok
+       :data open-route
+       :summary open-route
+       :details {:open-questions open-questions}}
+      {:status :ok
+       :data proceed-route
+       :summary proceed-route})))
+
 (defn- route-token? [value]
   (and (string? value)
        (boolean (re-matches route-token-pattern value))))

@@ -7,27 +7,27 @@ pass (AC-4).
 
 ## Slice 1 — pure scanner + unit tests
 
-- [ ] Add `parse-scope-question-gate` to
+- [x] Add `parse-scope-question-gate` to
       `components/agent-session/src/psi/agent_session/workflow/routing.clj`:
       args `(content marker proceed-route open-route)`; returns the standard
       `{:status :ok :data <route> :summary <route> :details {…}}` shape (DI-1).
-- [ ] Scanner logic (D5): per line, `str/triml`, match unchecked checkbox
+- [x] Scanner logic (D5): per line, `str/triml`, match unchecked checkbox
       `- [ ]` followed by optional whitespace then `marker`; collect the
       **trimmed concern substring** — the text after the `marker`, `str/trim`med
       (DI-1 single defined shape; **not** the raw line) — for each open line.
       `nil`/empty/no-match → `proceed-route`; ≥1 open → `open-route` with
       `:details {:open-questions [<concern…>]}`. Ignore `- [x]`/`- [X]` items.
-- [ ] Unit tests in
+- [x] Unit tests in
       `components/agent-session/test/psi/agent_session/workflow/routing_test.clj`:
-  - [ ] single unchecked `- [ ] SCOPE_QUESTION: …` → `open-route` + named question
-  - [ ] only checked `- [x] SCOPE_QUESTION: …` → `proceed-route` (AC-2)
-  - [ ] `nil` content and empty string → `proceed-route` (AC-2 absent file)
-  - [ ] mixed checked + unchecked → `open-route`
-  - [ ] indented unchecked item (leading whitespace) → `open-route` (`triml`)
-  - [ ] unchecked non-marker checklist item → `proceed-route` (ignored)
-  - [ ] route labels honoured from args (not hardcoded)
-- [ ] Run focused routing Scry suite green; clj-kondo clean.
-- [ ] Commit (`⊨` / `⚒` 230 Slice 1: scope-question scanner).
+  - [x] single unchecked `- [ ] SCOPE_QUESTION: …` → `open-route` + named question
+  - [x] only checked `- [x] SCOPE_QUESTION: …` → `proceed-route` (AC-2)
+  - [x] `nil` content and empty string → `proceed-route` (AC-2 absent file)
+  - [x] mixed checked + unchecked → `open-route`
+  - [x] indented unchecked item (leading whitespace) → `open-route` (`triml`)
+  - [x] unchecked non-marker checklist item → `proceed-route` (ignored)
+  - [x] route labels honoured from args (not hardcoded)
+- [x] Run focused routing Scry suite green; clj-kondo clean. (9 tests / 236 assertions)
+- [x] Commit (`⊨` / `⚒` 230 Slice 1: scope-question scanner).
 
 ## Slice 2 — task-artifact-content resolver + test
 

@@ -327,3 +327,64 @@
                                  (routing/parse-exact-marker-routing args))]
         (is (= expected-errors (get-in result [:details :errors]))
             (pr-str result))))))
+
+(def ^:private scope-marker "SCOPE_QUESTION:")
+(def ^:private scope-proceed "DONE")
+(def ^:private scope-open "SCOPE_QUESTION_OPEN")
+
+(defn- parse-scope-gate
+  [content]
+  (routing/parse-scope-question-gate content scope-marker scope-proceed scope-open))
+
+(deftest scope-question-gate-parser-test
+  ;; Tests the pure content scanner that gates the task lifecycle on unchecked
+  ;; SCOPE_QUESTION items in design-steps.md content. No IO; route labels and the
+  ;; marker are supplied as args (not hardcoded).
+  (testing "single unchecked SCOPE_QUESTION item routes to the open route with named concern"
+    (let [result (parse-scope-gate "- [ ] SCOPE_QUESTION: bucket-size in reopen identity?")]
+      (assert-route scope-open result)
+      (is (= ["bucket-size in reopen identity?"]
+             (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "only-checked SCOPE_QUESTION items route to proceed (AC-2)"
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [x] SCOPE_QUESTION: resolved one\n- [X] SCOPE_QUESTION: resolved two")))
+
+  (testing "nil and empty content route to proceed (AC-2 absent file)"
+    (assert-route scope-proceed (parse-scope-gate nil))
+    (assert-route scope-proceed (parse-scope-gate "")))
+
+  (testing "mixed checked and unchecked items route to open, naming only open concerns"
+    (let [result (parse-scope-gate
+                  (str "- [x] SCOPE_QUESTION: resolved\n"
+                       "- [ ] SCOPE_QUESTION: still open"))]
+      (assert-route scope-open result)
+      (is (= ["still open"] (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "indented unchecked item routes to open (leading whitespace tolerated)"
+    (let [result (parse-scope-gate "    - [ ] SCOPE_QUESTION: indented concern")]
+      (assert-route scope-open result)
+      (is (= ["indented concern"] (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "unchecked non-marker checklist item is ignored (proceed)"
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] ordinary follow-up item")))
+
+  (testing "route labels are honoured from args, not hardcoded"
+    (let [result (routing/parse-scope-question-gate
+                  "- [ ] SCOPE_QUESTION: pick" scope-marker "GO" "STOP")]
+      (assert-route "STOP" result))
+    (assert-route "GO"
+                  (routing/parse-scope-question-gate
+                   "- [x] SCOPE_QUESTION: done" scope-marker "GO" "STOP")))
+
+  (testing "multiple open items are all named in order"
+    (let [result (parse-scope-gate
+                  (str "- [ ] SCOPE_QUESTION: first\n"
+                       "- [ ] SCOPE_QUESTION: second"))]
+      (assert-route scope-open result)
+      (is (= ["first" "second"] (get-in result [:details :open-questions]))
+          (pr-str result)))))
