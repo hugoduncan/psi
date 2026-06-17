@@ -81,8 +81,8 @@ pass (AC-4).
 
 ## Slice 4 — wire task-lifecycle.edn + update task-lifecycle-test
 
-- [ ] Edit `.psi/workflows/task-lifecycle.edn` (DI-5):
-  - [ ] insert `check-scope-question-status` `:invoke` step at `:steps` index 1
+- [x] Edit `.psi/workflows/task-lifecycle.edn` (DI-5):
+  - [x] insert `check-scope-question-status` `:invoke` step at `:steps` index 1
         (after `review-task-design`, before `check-design-review-status`) with the
         gate idiom: step `:operation constant-routing {:route "DONE"}`; `:judge`
         `workflow/scope-question-gate-routing` with authored args
@@ -91,10 +91,10 @@ pass (AC-4).
         `:proceed-route "DONE"`, `:open-route "SCOPE_QUESTION_OPEN"`);
         `:on {"DONE" {:goto "check-design-review-status"}
         "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}`.
-  - [ ] leave `check-design-review-status` `:on` unchanged
+  - [x] leave `check-design-review-status` `:on` unchanged
         (`{"DONE" {:goto "create-task-plan"} "REPEAT" {:goto
         "final-summary-design-not-converged"}}`).
-  - [ ] append `final-summary-scope-question-open` `:session` step **last**:
+  - [x] append `final-summary-scope-question-open` `:session` step **last**:
         `:tools ["read" "bash"]`, contributions from `:workflow-original`;
         template names the open `SCOPE_QUESTION:` item(s) read from
         `design-steps.md`, states the lifecycle stopped before plan creation,
@@ -102,29 +102,29 @@ pass (AC-4).
         the item, and re-invoke `task-lifecycle` to resume; does not proceed to
         plan or extract knowledge; explicit-terminal
         `:judge constant-routing {:route "DONE"}` + `:on {"DONE" {:goto :done}}`.
-- [ ] `clj-paren-repair .psi/workflows/task-lifecycle.edn`; confirm it loads
+- [x] `clj-paren-repair .psi/workflows/task-lifecycle.edn`; confirm it loads
       (workflow-loader) without errors.
-- [ ] Update `task-lifecycle-test`
+- [x] Update `task-lifecycle-test`
       (`components/workflow-loader/test/psi/workflow_loader/
       workflow_definitions_test.clj:655`):
-  - [ ] count `13 → 15`; insert `check-scope-question-status` (index 1) +
+  - [x] count `13 → 15`; insert `check-scope-question-status` (index 1) +
         `final-summary-scope-question-open` (last) in the name vector; insert
         `:invoke` (index 1) + `:session` (last) in the type vector.
-  - [ ] `(repeat 13 {})` → `(repeat 15 {})` for the `:yields`/`:terminal-contract`
+  - [x] `(repeat 13 {})` → `(repeat 15 {})` for the `:yields`/`:terminal-contract`
         assertion.
-  - [ ] keep the design-gate `:on` `"DONE"` target assertion `"create-task-plan"`
+  - [x] keep the design-gate `:on` `"DONE"` target assertion `"create-task-plan"`
         (design gate is not repointed).
-  - [ ] add scope-gate assertions: `:judge` =
+  - [x] add scope-gate assertions: `:judge` =
         `workflow/scope-question-gate-routing` with authored args; `:on` =
         `{"DONE" {:goto "check-design-review-status"}
         "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}`.
-  - [ ] add handback assertions: `:tools ["read" "bash"]`; template names the
+  - [x] add handback assertions: `:tools ["read" "bash"]`; template names the
         open `SCOPE_QUESTION` / stops before plan creation; terminates
         `:goto :done` (AC-4 definition coverage).
-  - [ ] confirm the `delegate-steps` (by-`:type`) assertions still hold
+  - [x] confirm the `delegate-steps` (by-`:type`) assertions still hold
         unchanged (6 delegates).
-- [ ] Run focused workflow-loader Scry suite green; clj-kondo clean.
-- [ ] Commit (230 Slice 4: wire pre-plan scope-question gate into task-lifecycle).
+- [x] Run focused workflow-loader Scry suite green; clj-kondo clean.
+- [x] Commit (230 Slice 4: wire pre-plan scope-question gate into task-lifecycle).
 
 ## Slice 5 — docs + coherence
 

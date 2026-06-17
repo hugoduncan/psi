@@ -674,6 +674,8 @@
                                        :implementation-review-yield
                                        {:from {:step "review-task-implementation"
                                                :yield :text}}}}
+           scope-gate-step (get step-by-name "check-scope-question-status")
+           scope-question-open-step (get step-by-name "final-summary-scope-question-open")
            design-gate-step (get step-by-name "check-design-review-status")
            plan-gate-step (get step-by-name "check-plan-review-status")
            status-step (get step-by-name "check-implementation-review-status")
@@ -683,9 +685,10 @@
            design-not-converged-step (get step-by-name "final-summary-design-not-converged")
            plan-not-converged-step (get step-by-name "final-summary-plan-not-converged")
            skip-summary-text (step-template-text skip-summary-step)]
-       (testing "has 13 steps, with design/plan review gates and extraction guarded after implementation review"
-         (is (= 13 (count steps)))
+       (testing "has 15 steps, with the pre-plan scope-question gate, design/plan review gates, and extraction guarded after implementation review"
+         (is (= 15 (count steps)))
          (is (= ["review-task-design"
+                 "check-scope-question-status"
                  "check-design-review-status"
                  "create-task-plan"
                  "review-task-plan"
@@ -697,10 +700,11 @@
                  "final-summary-after-extraction"
                  "final-summary-without-extraction"
                  "final-summary-design-not-converged"
-                 "final-summary-plan-not-converged"]
+                 "final-summary-plan-not-converged"
+                 "final-summary-scope-question-open"]
                 (mapv :name steps)))
-         (is (= [:delegate :invoke :delegate :delegate :invoke :delegate :delegate
-                 :invoke :delegate :session :session :session :session]
+         (is (= [:delegate :invoke :invoke :delegate :delegate :invoke :delegate :delegate
+                 :invoke :delegate :session :session :session :session :session]
                 (mapv :type steps))))
        (testing "the lifecycle delegate steps target their workflows in order"
          (is (= ["review-task-design"
@@ -713,6 +717,19 @@
        (testing "the delegate steps thread the same task input unchanged (extraction adds the review yield)"
          (is (= (concat (repeat 5 standard-prompt) [extraction-prompt])
                 (mapv :prompt-string delegate-steps))))
+       (testing "the pre-plan scope-question gate scans design-steps.md and routes open questions to handback"
+         (is (= {:type :invoke
+                 :operation "workflow/scope-question-gate-routing"
+                 :args {:task-path {:from :workflow-input
+                                    :path [:input]}
+                        :artifact "design-steps.md"
+                        :marker "SCOPE_QUESTION:"
+                        :proceed-route "DONE"
+                        :open-route "SCOPE_QUESTION_OPEN"}}
+                (:judge scope-gate-step)))
+         (is (= {"DONE" {:goto "check-design-review-status"}
+                 "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}
+                (:on scope-gate-step))))
        (testing "the design gate routes converged design to plan and unconverged design to handback"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
@@ -795,6 +812,19 @@
                  :args {:route "DONE"}}
                 (:judge plan-not-converged-step)))
          (is (= {"DONE" {:goto :done}} (:on plan-not-converged-step))))
+       (testing "the scope-question-open handback names the open question and stops before plan creation"
+         (is (= ["read" "bash"] (:tools scope-question-open-step)))
+         (let [text (step-template-text scope-question-open-step)]
+           (is (.contains text "SCOPE_QUESTION:"))
+           (is (.contains text "before plan creation"))
+           (is (.contains text "design-steps.md"))
+           (is (.contains text "re-invoke `task-lifecycle`"))
+           (is (.contains text "Do not proceed to plan creation")))
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge scope-question-open-step)))
+         (is (= {"DONE" {:goto :done}} (:on scope-question-open-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 13 {})
+         (is (= (repeat 15 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
