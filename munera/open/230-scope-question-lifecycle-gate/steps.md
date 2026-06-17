@@ -144,3 +144,31 @@ pass (AC-4).
       `review-follow-up-plan-prompt-contract-test` failure (commit `2b7b0face`,
       out of scope) noted in implementation.md.
 - [x] Commit (230 Slice 5: docs + changelog + coherence).
+
+## Test review (task-test-review) — follow-ups
+
+- [ ] **Resolver fail-open guard untested.** `agent-session-task-artifact-content`
+      returns nil when `worktree-path`/`task-path`/`artifact-name` is not a string
+      (the `(and (string? …) …)` guard) — the safety hinge DI-3 relies on (nil
+      session → nil worktree-path → resolver nil → gate fails open / never halts,
+      the silent-default the task exists to prevent). `task_artifact_content_resolver_test`
+      only covers all-inputs-present present-file → content and absent-file → nil.
+      Add a case exercising the missing/nil-input guard branch (e.g. unresolvable
+      worktree-path → nil content), or document why it is unreachable through
+      `query-in` (Pathom required-input semantics) so the branch isn't dead/untested.
+- [ ] **Scanner false-halt protection untested.** No test asserts the inverse
+      failure mode: a checklist line that contains `SCOPE_QUESTION:` but **not** as
+      the item prefix (marker after other prose, e.g.
+      `- [ ] note: SCOPE_QUESTION: is discussed elsewhere`) must route to
+      `proceed-route` (a false halt wrongly blocks the lifecycle). The only ignore
+      case in `routing_test` uses a no-marker line. Add a case locking the
+      prefix-anchoring of `open-scope-question-concern`.
+- [ ] **Judge-path divergence guard is a hand-rolled mirror (lower priority,
+      documented trade-off).** `gate-judge-path-resolves-parent-session-test`
+      constructs the `:ctx`+`:parent-session-id` (no `:session-id`) invocation map
+      manually via `judge-invocation`; it never drives the real
+      `workflow_judge/execute-invoke-judge!`. If the judge's invocation key set
+      drifts, production breaks while this test stays green — the exact test/prod
+      divergence DI-3 set out to prevent. Consider driving the test through the
+      real judge invocation construction (or anchoring the key set to a shared
+      source) so the mirror cannot silently drift.

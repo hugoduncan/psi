@@ -249,6 +249,20 @@ workflow.core).
 placement — tracked as the unchecked human-only item in `design-steps.md`. The
 implementation realizes design.md D1's governing "scope handback wins" decision.
 
+## Test review (task-test-review)
+
+Tests are mock-free over real boundaries (temp dirs, real registry/runtime, real
+`query-in` resolver, real session via `test-support/create-test-session`) — the
+`¬mock ∧ ¬stub` criterion holds. AC-1/2/3/4 each have at least one covering test;
+definition-level (not runtime) gate-routing coverage matches the established
+229 task-lifecycle-gate convention (no divergence). Three coverage residuals filed
+to steps.md: (1) the resolver's nil/missing-input fail-open guard branch — the
+DI-3 silent-default safety hinge — is untested; (2) no test locks the inverse
+false-halt failure mode (marker present but not as item prefix → proceed); (3) the
+judge-path divergence guard hand-rolls the invocation map rather than driving the
+real `execute-invoke-judge!`, so it can drift silently (this last is a deliberate,
+already-documented trade-off — lower priority).
+
 ## Out-of-scope pre-existing failure (noted, not fixed)
 
 The full `components/workflow-loader/test` suite has **one** pre-existing failure
