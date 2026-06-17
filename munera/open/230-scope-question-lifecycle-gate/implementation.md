@@ -147,3 +147,29 @@ unimplemented, no code yet); one is human-only.
    scope). No plan/steps/code edit can satisfy it (plan.md + steps.md already
    implement the "before" placement; the residual is design.md authority wording
    only). Left unchecked per the evidence rule; not a plan defect.
+
+### plan-review / ambiguity (fresh batch, turn 1) — no new actionable ambiguity
+
+Reviewed plan.md + steps.md for ambiguities, verifying the pinned mechanics
+against runtime source. No new actionable ambiguity found; nothing filed to
+design-steps.md.
+
+Verified sound (no gap):
+- Operation `:description` is a supported optional field
+  (`deterministic_operation_registry/defs.clj` `operation-definition-schema`),
+  so Slice-3's "register with a `:description`" is valid despite existing
+  built-ins omitting it.
+- Gate result `{:status :ok :data <route> :summary <route> :details {…}}` is
+  valid against `operation-success-result-schema` (`:summary` string,
+  `:details` map both optional).
+- Malformed-args `:status :error` routes via the runtime's
+  `invoke-judge-error-result` → `:action :fail` (hard fail), consistent with all
+  deterministic operations; authored EDN args make this a non-production path.
+- Handler receives the full invocation map
+  (`deterministic_operation_runtime/core.clj:174`
+  `((:handler operation) (assoc invocation :operation-id …))`), so DI-3's read of
+  `:ctx` / `:parent-session-id` (judge path) / `:session-id` (direct path) is
+  satisfiable as pinned.
+- Index-1 insertion wiring is sound against the live `task-lifecycle.edn`:
+  `review-task-design` has no `:on` (positional fall-through), so the new gate at
+  index 1 receives the fall-through and routes `DONE → check-design-review-status`.
