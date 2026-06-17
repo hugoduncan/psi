@@ -342,3 +342,17 @@ Verification: focused suites green —
 `routing-test` + `task-artifact-content-resolver-test` +
 `scope-question-gate-operation-test` = 18 tests / 265 assertions, 0 fail /
 0 error; clj-kondo + cljfmt clean on all three files.
+
+## Test review (task-test-review) — re-review pass
+
+Re-reviewed after the three residuals above were executed. No new actionable
+issues. Re-ran focused suites this pass: scanner+resolver 3 tests/46 assertions,
+operation 7/17, task-lifecycle definition 1/48 — all green; clj-kondo clean on
+the four test files. Tests remain well-formed and mock-free over real boundaries
+(temp dirs, real registry/runtime, real `query-in`, real session); all four ACs
+covered. The D1 both-non-converged-and-open "scope handback wins" precedence is
+locked structurally by the definition test (step order: `check-scope-question-status`
+before `check-design-review-status`, plus the asserted `:on` targets), matching
+the 229 definition-level gate convention — adequate, no runtime both-gate test
+filed. The only open item is the pre-existing human-only design.md placement-wording
+residual (already tracked in `design-steps.md`).
