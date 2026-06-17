@@ -92,3 +92,28 @@ are scope decisions for the human only (do not execute; leave unchecked).
       scope handback win when both conditions hold. Do not leave the literal
       "`SCOPE_QUESTION` handback wins" in design.md contradicting the plan's
       "not the scope handback".
+
+- [ ] design.md gate-placement wording now contradicts the implemented plan
+      (live, untracked-as-open). design.md states the gate sits **after**
+      `check-design-review-status` — Composition para (lines 109-110: "the 230
+      gate sits **after** 229's `check-design-review-status` and **before**
+      `create-task-plan`") and D1 (lines 118-119: "A single gate sits between
+      `review-task-design` (after 229's `check-design-review-status`) and
+      `create-task-plan`"). The prior inconsistency turn resolved the
+      precedence/"scope handback wins" contradiction on the **plan side only**:
+      plan.md DI-5/Slice 4 and steps.md now insert `check-scope-question-status`
+      at `:steps` **index 1, before `check-design-review-status`**, routing
+      `DONE → check-design-review-status`. So design.md's "after
+      `check-design-review-status`" placement is stale and directly contradicts
+      plan.md/steps.md's "before" placement (and is jointly unsatisfiable with
+      design.md's own governing "the `SCOPE_QUESTION` handback wins": under linear
+      routing a non-converged run terminates at `check-design-review-status`'s
+      REPEAT handback before reaching any gate placed after it). This residual is
+      currently recorded only in implementation.md prose, not as a trackable
+      design-steps item, and is distinct from the checked precedence item above
+      (that item targeted the literal "handback wins" text, now satisfied; this is
+      the step-ordering placement wording). The follow-up executor may not edit
+      design.md; the **human** must update design.md (Composition para + D1 + any
+      "Relationship to task 229" restatement) so the placement wording reads
+      "before `check-design-review-status`" to match the governing "scope handback
+      wins" decision and the plan/steps.

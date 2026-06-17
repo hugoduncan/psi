@@ -90,3 +90,17 @@ judge-path invocation (`execute-invoke-judge!`) supplies `:ctx` +
 is a supported invoke-arg source (`apply-source-spec`), so that authored arg is
 sound (not flagged); existing `munera-open-task-path-pattern` is open-only and
 anchored.
+
+### plan-review / inconsistency (turn 2)
+
+One new actionable inconsistency filed to `design-steps.md`: design.md's
+gate-placement wording (Composition para lines 109-110 + D1 lines 118-119, "after
+`check-design-review-status`") now contradicts the implemented plan.md DI-5/Slice
+4 + steps.md, which place the gate at `:steps` index 1 **before**
+`check-design-review-status`. Prior turn fixed the plan side; design.md wording is
+the stale residual, tracked only in implementation.md until now → surfaced as an
+open human-reconciliation item (follow-up may not edit design.md). Verified this
+turn: `task-lifecycle-test` (`workflow_definitions_test.clj:655`) asserts 13 steps
+/ `(repeat 13 {})` / delegate-by-`:type` / `(repeat 6 …)` / design-gate `:on
+"DONE" → create-task-plan`; all match the plan's Slice-4 `13→15` update claims
+(plan↔steps↔test consistent there — not flagged).
