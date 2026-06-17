@@ -19,3 +19,11 @@ Verified against runtime: `known-pass-status->route` (REVIEW_COMPLETE→DONE,
 ACTIONABLE_FEEDBACK→REPEAT) confirms the DI-5 design-gate-vs-scope-gate
 precedence reasoning is sound; `execute-invoke-judge!` and `build-invocation`
 confirm the two distinct invocation-map key sets.
+
+### plan-review / inconsistency (turn 2)
+
+One actionable inconsistency filed to `design-steps.md`: design.md D1 (lines
+111/124) states the `SCOPE_QUESTION` handback **wins** on a both-non-converged-
+and-open run, while plan.md DI-5/R4 (line 273) decides the 229 design handback
+wins (scope handback does not fire) and re-interprets D1 as intent-only —
+authority (design) vs plan disagree on observable routing.
