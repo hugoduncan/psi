@@ -128,15 +128,15 @@ pass (AC-4).
 
 ## Slice 5 — docs + coherence
 
-- [ ] `doc/workflows.md`: document the pre-plan `SCOPE_QUESTION` gate in
+- [x] `doc/workflows.md`: document the pre-plan `SCOPE_QUESTION` gate in
       `task-lifecycle` (content-based detection in `design-steps.md`; halts +
       hands back; resume by checking the item, recording the decision in
       `design.md`, and re-invoking).
-- [ ] `CHANGELOG.md` `[Unreleased] Changed`: `task-lifecycle` halts before plan
+- [x] `CHANGELOG.md` `[Unreleased] Changed`: `task-lifecycle` halts before plan
       creation and hands back, naming the open `SCOPE_QUESTION:` item(s), instead
       of silently defaulting the scope decision.
-- [ ] Coherence: re-read edited files (`sync`); update `mementum/state.md`
+- [x] Coherence: re-read edited files (`sync`); update `mementum/state.md`
       workflow-gate bullet if warranted.
-- [ ] Final verify: AC-1..AC-4 each covered by a test; full focused suites green;
+- [x] Final verify: AC-1..AC-4 each covered by a test; full focused suites green;
       clj-kondo clean.
-- [ ] Commit (230 Slice 5: docs + changelog + coherence).
+- [x] Commit (230 Slice 5: docs + changelog + coherence).

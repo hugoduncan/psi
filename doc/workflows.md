@@ -900,6 +900,35 @@ gate proceeds to `implement-task` on `REVIEW_COMPLETE` or routes to
 `final-summary-plan-not-converged` on `ACTIONABLE_FEEDBACK`. Neither handback
 extracts knowledge.
 
+`task-lifecycle` additionally gates the design→plan boundary on **unresolved
+scope questions**. The design-review guardrail records a reviewer's scope-boundary
+concern as an unchecked `- [ ] SCOPE_QUESTION:` item in the task's
+`design-steps.md` for the human to decide (the follow-up executor must never act
+on it). A `check-scope-question-status` invoke gate runs immediately after
+`review-task-design` (before `check-design-review-status`) and scans the task's
+`design-steps.md` **by content** — independent of any review-convergence signal,
+because a later review pass can report converged while a `SCOPE_QUESTION` line
+remains unchecked. When one or more unchecked `SCOPE_QUESTION:` items remain, the
+gate routes to a `final-summary-scope-question-open` handback that names each open
+question and stops the lifecycle **before plan creation**, instead of silently
+defaulting the scope decision. With no unchecked `SCOPE_QUESTION:` items
+(including a `design-steps.md` with only checked items, or no `design-steps.md` at
+all) the gate proceeds to `check-design-review-status` and the lifecycle behaves
+exactly as before.
+
+Because the scope gate is evaluated *before* the design-convergence gate, when a
+run is both non-converged and has an open `SCOPE_QUESTION` the scope handback wins
+(it names the specific decision; the convergence handback is generic). To resume,
+the human decides the scope question, records the decision and rationale in
+`design.md` (scope decisions are intent and live in the design), checks the
+corresponding `- [x] SCOPE_QUESTION:` item in `design-steps.md`, then re-invokes
+`task-lifecycle`; the gate is a stateless re-scan, so it finds no unchecked items
+and proceeds. Detection is a deterministic content scan (no LLM): the workflow
+`.edn` authors the artifact filename (`design-steps.md`), the marker
+(`SCOPE_QUESTION:`), and the route labels, while the generic
+`workflow/scope-question-gate-routing` operation reads the artifact through a
+resolver and routes on the checkbox state.
+
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the
 immediately preceding implementation-review yielded text contains

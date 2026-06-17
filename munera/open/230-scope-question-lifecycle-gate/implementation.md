@@ -197,3 +197,54 @@ Verified consistent (no new gap):
   placement-wording item stays open (human-only) and already covers every stale
   design.md placement passage (Composition lines 109-110, D1 lines 119-120;
   line 97 "after `review-task-design`" is correct, not stale).
+
+## Implementation (Slices 1–5)
+
+Implemented all five slices in one pass on `exhaustion-routing`.
+
+- **Slice 1** — `routing/parse-scope-question-gate` (pure, IO-free) + 9 unit
+  tests / 236 assertions. Open item = left-trimmed line starting `- [ ]` then
+  (after optional ws) the marker; concern = trimmed text after the marker.
+  Checked `- [x]`/`- [X]` never match the `- [ ]` prefix.
+- **Slice 2** — `resolvers/session/agent-session-task-artifact-content`
+  (working-tree read; nil-safe on missing inputs/file) registered in
+  `session-resolvers/resolvers`. New `task_artifact_content_resolver_test`.
+- **Slice 3** — `workflow/core/scope-question-gate-routing` operation +
+  `routing/normalize-open-task-path` (open-only, anchored; bare token →
+  `munera/open/<token>`; else nil fail-open). Handler resolves owning session as
+  `(or parent-session-id session-id)`, passes `(:ctx invocation)` positionally
+  to `resolvers/query-in` with session-id in extra-entity. 7 tests / 17
+  assertions incl. the required judge-path divergence guard.
+  - **Deviation (minor):** made the operation handler `scope-question-gate-routing`
+    a **public** `defn` (not `defn-`) so the operation test can register the real
+    handler into a fresh registry and exercise the actual code (rather than a
+    duplicated copy). The plan did not pin visibility; public is consistent with
+    the pure `routing/*` parsers being public.
+  - **Test faithfulness note:** the judge-path test invokes the registered
+    operation through `registry/invoke-operation-in` + `runtime/invoke-operation`
+    with an invocation map shaped exactly like
+    `workflow_judge/execute-invoke-judge!` produces (`:ctx` + `:parent-session-id`,
+    no `:session-id`), asserting the worktree resolves from `:parent-session-id`.
+    This exercises the production key-resolution divergence without standing up a
+    full workflow run.
+  - **Input shape (DI-4 / R1 resolved):** the authored gate arg
+    `:task-path {:from :workflow-input :path [:input]}` resolves identically to
+    the existing `task-lifecycle` delegate steps' `:input` field (same source
+    ref), so no new input-shape assumption; fail-open normalization covers all
+    forms.
+- **Slice 4** — inserted `check-scope-question-status` at `:steps` index 1 and
+  appended `final-summary-scope-question-open` last in `task-lifecycle.edn`;
+  `check-design-review-status` `:on` unchanged. `task-lifecycle-test` updated
+  (13→15, gate + handback assertions; `repeat 13`→`repeat 15`). 48 assertions.
+- **Slice 5** — `doc/workflows.md` (pre-plan scope gate section), CHANGELOG
+  `[Unreleased] Changed`, `mementum/state.md` gate bullet.
+
+Regression: agent-session resolvers/operation/graph-surface suites green
+(72 tests / 2618 assertions) after adding the resolver + the
+`workflow.core → resolvers` require (no load cycle: resolvers does not require
+workflow.core).
+
+**Open human-only residual (unchanged):** design.md's gate-placement wording
+("after `check-design-review-status`") is still stale vs the implemented "before"
+placement — tracked as the unchecked human-only item in `design-steps.md`. The
+implementation realizes design.md D1's governing "scope handback wins" decision.
