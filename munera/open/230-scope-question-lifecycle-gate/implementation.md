@@ -173,3 +173,27 @@ Verified sound (no gap):
 - Index-1 insertion wiring is sound against the live `task-lifecycle.edn`:
   `review-task-design` has no `:on` (positional fall-through), so the new gate at
   index 1 receives the fall-through and routes `DONE → check-design-review-status`.
+
+### plan-review / inconsistency (fresh batch, turn 2) — no new actionable inconsistency
+
+Cross-file review (design.md ↔ plan.md ↔ steps.md, against live
+`task-lifecycle.edn`). No new actionable inconsistency; nothing filed to
+design-steps.md.
+
+Verified consistent (no new gap):
+- Step/type/count claims agree end-to-end: live edn has 13 steps / 6 delegates;
+  plan + steps assert `13→15`, `(repeat 13 {})→(repeat 15 {})`, gate `:invoke`
+  at index 1 + handback `:session` last, "stay 6 delegates".
+- Gate `:on` (`DONE → check-design-review-status`,
+  `SCOPE_QUESTION_OPEN → final-summary-scope-question-open`) and the unchanged
+  `check-design-review-status` `:on "DONE" → create-task-plan` agree across
+  DI-5, Slice 4, steps.md, and the live edn.
+- Route labels, authored arg keys (`:task-path`/`:artifact`/`:marker`/
+  `:proceed-route`/`:open-route`), handback name, resolver registration target,
+  and scanner semantics are consistent plan ↔ steps.
+- The two pre-existing cross-file inconsistencies remain correctly tracked: the
+  D1 "scope handback wins" precedence item is resolved (plan genuinely makes
+  scope fire first); the design.md "after `check-design-review-status`"
+  placement-wording item stays open (human-only) and already covers every stale
+  design.md placement passage (Composition lines 109-110, D1 lines 119-120;
+  line 97 "after `review-task-design`" is correct, not stale).
