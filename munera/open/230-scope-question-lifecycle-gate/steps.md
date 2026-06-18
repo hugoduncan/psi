@@ -279,3 +279,31 @@ pass (AC-4).
       `munera/open/999-bootstrap-smoke-absent/design-steps.md` and asserts
       fail-open `DONE`. The other routing-operation smoke cases continue to use
       the live-repo context because they do not read task artifacts.
+
+## Test review (task-test-review) — post-bootstrap final pass follow-ups
+
+- [ ] **Built-in scope-gate bootstrap smoke does not exercise the halt route.**
+      `workflow_delegate_review_step_live_test.clj` now proves the production
+      `init-built-in-workflow!` registry path registers and invokes
+      `workflow/scope-question-gate-routing`, but the scope-gate case uses a
+      guaranteed-absent artifact and only asserts fail-open `DONE`. A regression
+      that accidentally registered a constant/proceed-only handler under the
+      production operation id would still pass while `task-lifecycle` silently
+      failed AC-1 in production. Extend the self-contained temp-worktree bootstrap
+      smoke with an unchecked `design-steps.md` fixture and assert the bootstrapped
+      registry invocation returns `SCOPE_QUESTION_OPEN` and names the open
+      question, so the production registration path covers the halt behaviour, not
+      only operation existence / absent-artifact proceed.
+
+- [ ] **Operation boundary no longer locks invalid task-path fail-open behaviour.**
+      After the test-shaper reduction, `gate-task-path-normalization-boundary-test`
+      keeps only the positive bare-token integration case; invalid inputs
+      (`munera/closed/...`, free text, partial paths) are covered only by the pure
+      `normalize-open-task-path` unit test. That does not prove the operation
+      handler actually treats a nil normalized path as no content / `DONE`, nor
+      would it catch a regression that read the raw disallowed path. Add one
+      operation-level negative boundary case with a real disallowed artifact (for
+      example `munera/closed/NNN-slug/design-steps.md` containing an unchecked
+      `SCOPE_QUESTION:`) and invoke with that closed path, asserting fail-open
+      `DONE`; this locks DI-4 at the external operation boundary without
+      re-expanding the full grammar matrix.

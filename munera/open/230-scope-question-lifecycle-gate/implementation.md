@@ -451,3 +451,8 @@ clean; focused Scry vars green:
 `built-in-routing-operations-invoke-through-registry-test` → 2 tests / 13
 assertions. A first Scry invocation used unqualified `--var` names and failed at
 CLI argument parsing only; rerun with fully qualified vars succeeded.
+
+## Test review (task-test-review) — post-bootstrap final pass
+
+Filed 2 new actionable test coverage follow-ups in `steps.md`. Focused review
+suite remained green before filing (20 tests / 321 assertions).
