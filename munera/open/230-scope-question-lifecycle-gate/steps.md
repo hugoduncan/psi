@@ -318,3 +318,17 @@ pass (AC-4).
       operation with `munera/closed/230-x`, and asserts fail-open `DONE`, proving
       the handler does not read the raw disallowed path when normalization returns
       nil.
+
+## Test shaping (test-shaper) — final pass follow-up
+
+- [ ] **Scope-gate temp worktree/session fixtures leak resources across tests.**
+      The shared `test-support/temp-worktree-dir!` creates a directory under
+      `java.io.tmpdir` with `System/nanoTime`, and the resolver/operation/bootstrap
+      smoke tests create worktree-backed sessions without a scoped fixture that
+      consistently deletes the temp worktree and shuts down the context. This
+      leaves test IO/resources behind and makes repeated/full-suite runs less
+      robust. Add a scoped helper (for example `with-temp-worktree-session` using
+      `Files/createTempDirectory`, `try`/`finally`, `context/shutdown-context!`,
+      and `test-support/delete-recursively!`) and update the scope-gate resolver,
+      operation, and bootstrap smoke tests to use it so temp dirs and contexts are
+      cleaned deterministically.

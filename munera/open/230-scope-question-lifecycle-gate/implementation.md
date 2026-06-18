@@ -475,3 +475,7 @@ failure (3 assertions; same `missing-pass-status`/stubbed "ok" issue noted earli
 ## Test review (task-test-review) — post-follow-up re-review
 
 No new actionable test issues found after the post-bootstrap follow-ups. Re-checked scanner/resolver/operation/task-lifecycle definition coverage plus the built-in bootstrap smoke: focused Scry suites green (20 tests / 322 assertions; bootstrap vars 2 tests / 14 assertions) and focused clj-kondo clean. Existing unrelated live workflow-delegate test failure remains out of scope as previously noted.
+
+## Test review (test-shaper) — final pass
+
+Filed one new actionable fixture-robustness issue in `steps.md`: scope-gate temp worktree/session fixtures leave temp dirs and some contexts unscoped across tests. Focused review suites remained green (parser/resolver/operation/task-lifecycle 20 tests / 322 assertions; bootstrap vars 2 tests / 14 assertions). Existing unrelated live workflow-delegate failure remains out of scope.
