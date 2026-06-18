@@ -16,6 +16,8 @@ and steps.md. Work independently.
 
 Read the task's design.md as needed.
 
+Be careful not to introduce new ambiguity or inconsistencies.
+
 If a design-step is completed, mark it done in design-steps.md.
 
 When finished, add a minimalist note to implementation.md stating that

@@ -646,10 +646,13 @@
                       "review-task-implementation"]
         workflow-filenames ["reduce-incidental-complexity.edn"
                             "review-task-design.edn"
+                            "review-task-design-core.edn"
                             "create-task-plan.edn"
                             "review-task-plan.edn"
+                            "review-task-plan-core.edn"
                             "implement-task.edn"
                             "review-task-implementation.edn"
+                            "review-task-implementation-core.edn"
                             "review-step.edn"]
         prompt-filenames ["review-task-design-architecture-review.md"
                           "review-task-design-ambiguity-review.md"
@@ -684,7 +687,7 @@
                   (str "delegate target resolves: " target)))))
         (testing "implementation review workflow preserves the transitive task-test-review gate (TT2)"
           (let [implementation-review-steps (get-in definitions
-                                                    ["review-task-implementation" :steps])
+                                                    ["review-task-implementation-core" :steps])
                 implementation-review-step-by-name (into {}
                                                          (map (juxt :name identity)
                                                               implementation-review-steps))
@@ -705,7 +708,7 @@
                 "review-task-tests delegate target resolves to the real review-step workflow")))
         (testing "implementation review workflow preserves the transitive test-shaper gate (TT6)"
           (let [implementation-review-steps (get-in definitions
-                                                    ["review-task-implementation" :steps])
+                                                    ["review-task-implementation-core" :steps])
                 implementation-review-step-by-name (into {}
                                                          (map (juxt :name identity)
                                                               implementation-review-steps))

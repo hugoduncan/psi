@@ -85,206 +85,167 @@
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
-(defn- prompt-group-template-text
-  [prompt-group]
-  (->> (:contributions prompt-group)
-       (filter #(= :template (:type %)))
-       (map :text)
-       (apply str)))
+(defn- assert-design-core-shape
+  [definitions workflow-name]
+  (let [steps (get-in definitions [workflow-name :steps])]
+    (is (= 3 (count steps)))
+    (is (= ["design-review" "design-follow-up" "status-not-converged"]
+           (mapv :name steps)))
+    (is (= [:session :session :session]
+           (mapv :type steps)))
+    (let [step-by-name (into {} (map (juxt :name identity) steps))
+          design-review (get step-by-name "design-review")
+          design-follow-up (get step-by-name "design-follow-up")]
+      (is (= ["read" "bash" "edit" "write"] (:tools design-review)))
+      (is (= ["work-independently" "review-task-architecture" "task-design"]
+             (:skills design-review)))
+      (is (= ["architecture" "ambiguity" "inconsistency"]
+             (mapv :name (:prompts design-review))))
+      (is (= {:type :invoke
+              :operation "workflow/pass-feedback-routing"
+              :args {:architecture-text {:from {:step "design-review"
+                                                :prompt "architecture"
+                                                :output :final-llm-reply}}
+                     :ambiguity-text {:from {:step "design-review"
+                                             :prompt "ambiguity"
+                                             :output :final-llm-reply}}
+                     :inconsistency-text {:from {:step "design-review"
+                                                 :prompt "inconsistency"
+                                                 :output :final-llm-reply}}}}
+             (:judge design-review)))
+      (is (= {"REPEAT" {:goto "design-follow-up"}
+              "DONE" {:goto :done}}
+             (:on design-review)))
+      (is (= (constant-routing-judge "DONE") (:judge design-follow-up)))
+      (is (= {"DONE" {:goto "design-review"
+                      :max-iterations 6
+                      :on-max-iterations "status-not-converged"}}
+             (:on design-follow-up)))
+      (let [text (step-template-text design-follow-up)]
+        (is (.contains text "design-steps.md"))
+        (is (.contains text "design.md"))
+        (is (.contains text "SCOPE_QUESTION:"))))))
 
-(deftest review-task-design-test
+(deftest review-task-design-core-test
   (load-edn-with-md-refs
-   "review-task-design.edn"
+   "review-task-design-core.edn"
    ["review-task-design-architecture-review.md"
     "review-task-design-ambiguity-review.md"
     "review-task-design-inconsistency-review.md"
     "review-follow-up-design.md"]
    (fn [{:keys [definitions errors]}]
-     (testing "loads without error"
+     (is (empty? errors))
+     (is (contains? definitions "review-task-design-core"))
+     (assert-design-core-shape definitions "review-task-design-core"))))
+
+(deftest review-task-design-test
+  (load-edn-only
+   "review-task-design.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone wrapper without error"
        (is (empty? errors))
        (is (contains? definitions "review-task-design")))
-     (let [steps (get-in definitions ["review-task-design" :steps])]
-       (testing "has merged review topology with a not-converged handback before the converged summary (DI-2)"
-         (is (= 4 (count steps)))
-         (is (= ["design-review" "design-follow-up"
-                 "final-summary-not-converged" "final-summary"]
-                (mapv :name steps)))
-         (is (= [:session :session :session :session]
-                (mapv :type steps))))
-       (let [step-by-name (into {} (map (juxt :name identity) steps))
-             design-review (get step-by-name "design-review")
-             design-follow-up (get step-by-name "design-follow-up")
-             not-converged-step (get step-by-name "final-summary-not-converged")
-             final-step (get step-by-name "final-summary")]
-         (testing "design-review carries shared step-level capabilities"
-           (is (= ["read" "bash" "edit" "write"]
-                  (:tools design-review)))
-           (is (= ["work-independently" "review-task-architecture" "task-design"]
-                  (:skills design-review))))
-         (testing "design-review contains ordered prompt groups imported from the review prompt workflows"
-           (is (= ["architecture" "ambiguity" "inconsistency"]
-                  (mapv :name (:prompts design-review))))
-           (is (.contains (slurp-workflow-file "review-task-design.edn")
-                          ":prompt-workflow \"review-task-design-architecture-review.md\""))
-           (is (.contains (slurp-workflow-file "review-task-design.edn")
-                          ":prompt-workflow \"review-task-design-ambiguity-review.md\""))
-           (is (.contains (slurp-workflow-file "review-task-design.edn")
-                          ":prompt-workflow \"review-task-design-inconsistency-review.md\""))
-           (is (.contains (prompt-group-template-text (first (:prompts design-review)))
-                          "first turn of the shared `design-review` multi-prompt session"))
-           (is (.contains (prompt-group-template-text (second (:prompts design-review)))
-                          "Use the already-loaded task design.md"))
-           (is (.contains (prompt-group-template-text (nth (:prompts design-review) 2))
-                          "Use the already-loaded task design.md")))
-         (testing "design-review routes directly from validated per-prompt output refs"
-           (is (= {:type :invoke
-                   :operation "workflow/pass-feedback-routing"
-                   :args {:architecture-text {:from {:step "design-review"
-                                                     :prompt "architecture"
-                                                     :output :final-llm-reply}}
-                          :ambiguity-text {:from {:step "design-review"
-                                                  :prompt "ambiguity"
-                                                  :output :final-llm-reply}}
-                          :inconsistency-text {:from {:step "design-review"
-                                                      :prompt "inconsistency"
-                                                      :output :final-llm-reply}}}}
-                  (:judge design-review)))
-           (is (= {"REPEAT" {:goto "design-follow-up"}
-                   "DONE" {:goto "final-summary"}}
-                  (:on design-review))))
-         (testing "design-follow-up uses the shared design profile and loops to the review-pass target with author-routed exhaustion"
-           (is (= (constant-routing-judge "DONE")
-                  (:judge design-follow-up)))
-           (is (= {"DONE" {:goto "design-review"
-                           :max-iterations 3
-                           :on-max-iterations "final-summary-not-converged"}}
-                  (:on design-follow-up)))
-           (let [text (step-template-text design-follow-up)]
-             (is (.contains text "design-steps.md"))
-             (is (.contains text "immediately preceding whole `design-review` batch"))
-             (is (.contains text "git diff <baseline>..HEAD -- <task>/design-steps.md"))
-             (is (.contains text "Do not touch plan.md or steps.md"))
-             (is (not (.contains text "code, tests, and docs")))
-             (is (not (.contains text "design.md as read-only context")))))
-         (testing "final-summary sources each review text through per-prompt outputs"
-           (is (some? final-step) "final-summary step should exist")
-           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")
-           (doseq [source-ref [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
-                               {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
-                               {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]]
-             (is (some #(= {:type :source :from source-ref} %)
-                       (:contributions final-step))
-                 (str "final-summary should include " source-ref)))
-           (is (not-any? #(and (map? (:from %))
-                               (contains? (:from %) :yield))
-                         (filter #(= :source (:type %)) (:contributions final-step)))
-               "final-summary must not use per-prompt :yield refs"))
-         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
-           (assert-review-summary-handback
-            final-step not-converged-step
-            [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
-             {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
-             {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]))
-         (testing "removed per-phase topology step names are absent"
-           (doseq [removed ["architecture-review" "architecture-follow-up"
-                            "ambiguity-review" "ambiguity-follow-up"
-                            "inconsistency-review" "inconsistency-follow-up"
-                            "clarity-status"]]
-             (is (not (contains? step-by-name removed))
-                 (str removed " should not remain as a step")))))))))
+     (let [steps (get-in definitions ["review-task-design" :steps])
+           step-by-name (into {} (map (juxt :name identity) steps))
+           core-step (get step-by-name "review-task-design-core")
+           final-step (get step-by-name "final-summary")
+           not-converged-step (get step-by-name "final-summary-not-converged")]
+       (is (= ["review-task-design-core" "final-summary-not-converged" "final-summary"]
+              (mapv :name steps)))
+       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= "review-task-design-core" (:target core-step)))
+       (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
+              (:prompt-string core-step)))
+       (is (= {:type :invoke
+               :operation "workflow/pass-status-routing"
+               :args {:text {:from {:step "review-task-design-core" :yield :text}}
+                      :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+              (:judge core-step)))
+       (is (= {"DONE" {:goto "final-summary"}
+               "REPEAT" {:goto "final-summary-not-converged"}}
+              (:on core-step)))
+       (assert-review-summary-handback
+        final-step not-converged-step
+        [{:step "review-task-design-core" :yield :text}])))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
 
-(deftest review-task-plan-test
+(defn- assert-plan-core-shape
+  [definitions workflow-name]
+  (let [steps (get-in definitions [workflow-name :steps])
+        step-by-name (into {} (map (juxt :name identity) steps))
+        plan-review (get step-by-name "plan-review")
+        plan-follow-up (get step-by-name "plan-follow-up")]
+    (is (= ["plan-review" "plan-follow-up" "status-not-converged"]
+           (mapv :name steps)))
+    (is (= [:session :session :session]
+           (mapv :type steps)))
+    (is (= ["read" "bash" "edit" "write"] (:tools plan-review)))
+    (is (= ["work-independently" "task-design"] (:skills plan-review)))
+    (is (= ["ambiguity" "inconsistency"] (mapv :name (:prompts plan-review))))
+    (is (= {:type :invoke
+            :operation "workflow/pass-feedback-routing"
+            :args {:ambiguity-text {:from {:step "plan-review"
+                                           :prompt "ambiguity"
+                                           :output :final-llm-reply}}
+                   :inconsistency-text {:from {:step "plan-review"
+                                               :prompt "inconsistency"
+                                               :output :final-llm-reply}}}}
+           (:judge plan-review)))
+    (is (= {"REPEAT" {:goto "plan-follow-up"}
+            "DONE" {:goto :done}}
+           (:on plan-review)))
+    (is (= (constant-routing-judge "DONE") (:judge plan-follow-up)))
+    (is (= {"DONE" {:goto "plan-review"
+                    :max-iterations 5
+                    :on-max-iterations "status-not-converged"}}
+           (:on plan-follow-up)))
+    (let [text (step-template-text plan-follow-up)]
+      (is (.contains text "design-steps.md"))
+      (is (.contains text "plan.md"))
+      (is (.contains text "steps.md")))))
+
+(deftest review-task-plan-core-test
   (load-edn-with-md-refs
-   "review-task-plan.edn"
+   "review-task-plan-core.edn"
    ["review-task-plan-ambiguity-review.md"
     "review-task-plan-inconsistency-review.md"
     "review-follow-up-plan.md"]
    (fn [{:keys [definitions errors]}]
-     (testing "loads without error"
+     (is (empty? errors))
+     (is (contains? definitions "review-task-plan-core"))
+     (assert-plan-core-shape definitions "review-task-plan-core"))))
+
+(deftest review-task-plan-test
+  (load-edn-only
+   "review-task-plan.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone wrapper without error"
        (is (empty? errors))
        (is (contains? definitions "review-task-plan")))
-     (let [steps (get-in definitions ["review-task-plan" :steps])]
-       (testing "has merged review topology with a not-converged handback before the converged summary (DI-2)"
-         (is (= 4 (count steps)))
-         (is (= ["plan-review" "plan-follow-up"
-                 "final-summary-not-converged" "final-summary"]
-                (mapv :name steps)))
-         (is (= [:session :session :session :session]
-                (mapv :type steps))))
-       (let [step-by-name (into {} (map (juxt :name identity) steps))
-             plan-review (get step-by-name "plan-review")
-             plan-follow-up (get step-by-name "plan-follow-up")
-             not-converged-step (get step-by-name "final-summary-not-converged")
-             final-step (get step-by-name "final-summary")]
-         (testing "plan-review carries shared step-level capabilities"
-           (is (= ["read" "bash" "edit" "write"]
-                  (:tools plan-review)))
-           (is (= ["work-independently" "task-design"]
-                  (:skills plan-review))))
-         (testing "plan-review contains ordered prompt groups imported from the review prompt workflows"
-           (is (= ["ambiguity" "inconsistency"]
-                  (mapv :name (:prompts plan-review))))
-           (is (.contains (slurp-workflow-file "review-task-plan.edn")
-                          ":prompt-workflow \"review-task-plan-ambiguity-review.md\""))
-           (is (.contains (slurp-workflow-file "review-task-plan.edn")
-                          ":prompt-workflow \"review-task-plan-inconsistency-review.md\""))
-           (is (.contains (prompt-group-template-text (first (:prompts plan-review)))
-                          "first turn of the shared `plan-review` multi-prompt session"))
-           (is (.contains (prompt-group-template-text (second (:prompts plan-review)))
-                          "Use the already-loaded task plan.md")))
-         (testing "plan-review routes directly from validated per-prompt output refs"
-           (is (= {:type :invoke
-                   :operation "workflow/pass-feedback-routing"
-                   :args {:ambiguity-text {:from {:step "plan-review"
-                                                  :prompt "ambiguity"
-                                                  :output :final-llm-reply}}
-                          :inconsistency-text {:from {:step "plan-review"
-                                                      :prompt "inconsistency"
-                                                      :output :final-llm-reply}}}}
-                  (:judge plan-review)))
-           (is (= {"REPEAT" {:goto "plan-follow-up"}
-                   "DONE" {:goto "final-summary"}}
-                  (:on plan-review))))
-         (testing "plan-follow-up uses the batch plan profile and loops to the review-pass target with author-routed exhaustion"
-           (is (= (constant-routing-judge "DONE")
-                  (:judge plan-follow-up)))
-           (is (= {"DONE" {:goto "plan-review"
-                           :max-iterations 5
-                           :on-max-iterations "final-summary-not-converged"}}
-                  (:on plan-follow-up)))
-           (let [text (step-template-text plan-follow-up)]
-             ;; #177 routes plan-review follow-ups through shared design-steps.md.
-             (is (.contains text "design-steps.md"))
-             (is (.contains text "immediately preceding whole `plan-review` batch"))
-             (is (.contains text "git diff <baseline>..HEAD -- <task>/design-steps.md"))
-             (is (.contains text "predate the preceding review pass"))
-             (is (.contains text "code, tests, and docs"))
-             (is (.contains text "design.md as read-only context"))))
-         (testing "final-summary sources each review text through per-prompt outputs"
-           (is (some? final-step) "final-summary step should exist")
-           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")
-           (doseq [source-ref [{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}
-                               {:step "plan-review" :prompt "inconsistency" :output :final-llm-reply}]]
-             (is (some #(= {:type :source :from source-ref} %)
-                       (:contributions final-step))
-                 (str "final-summary should include " source-ref)))
-           (is (not-any? #(and (map? (:from %))
-                               (contains? (:from %) :yield))
-                         (filter #(= :source (:type %)) (:contributions final-step)))
-               "final-summary must not use per-prompt :yield refs"))
-         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
-           (assert-review-summary-handback
-            final-step not-converged-step
-            [{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}
-             {:step "plan-review" :prompt "inconsistency" :output :final-llm-reply}]))
-         (testing "removed per-phase topology step names are absent"
-           (doseq [removed ["ambiguity-review" "ambiguity-follow-up"
-                            "inconsistency-review" "inconsistency-follow-up"
-                            "clarity-status"]]
-             (is (not (contains? step-by-name removed))
-                 (str removed " should not remain as a step")))))))))
+     (let [steps (get-in definitions ["review-task-plan" :steps])
+           step-by-name (into {} (map (juxt :name identity) steps))
+           core-step (get step-by-name "review-task-plan-core")
+           final-step (get step-by-name "final-summary")
+           not-converged-step (get step-by-name "final-summary-not-converged")]
+       (is (= ["review-task-plan-core" "final-summary-not-converged" "final-summary"]
+              (mapv :name steps)))
+       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= "review-task-plan-core" (:target core-step)))
+       (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
+              (:prompt-string core-step)))
+       (is (= {:type :invoke
+               :operation "workflow/pass-status-routing"
+               :args {:text {:from {:step "review-task-plan-core" :yield :text}}
+                      :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+              (:judge core-step)))
+       (is (= {"DONE" {:goto "final-summary"}
+               "REPEAT" {:goto "final-summary-not-converged"}}
+              (:on core-step)))
+       (assert-review-summary-handback
+        final-step not-converged-step
+        [{:step "review-task-plan-core" :yield :text}])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets
@@ -340,24 +301,51 @@
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
 
+(defn- assert-implementation-core-shape
+  [definitions workflow-name]
+  (let [steps (get-in definitions [workflow-name :steps])]
+    (is (= 5 (count steps)))
+    (is (= ["review-task-implementation"
+            "review-task-tests"
+            "review-test-shape"
+            "review-task-docs"
+            "review-code-shape"]
+           (mapv :name steps)))
+    (is (= [:delegate :delegate :delegate :delegate :delegate]
+           (mapv :type steps)))))
+
+(deftest review-task-implementation-core-test
+  (load-edn-only
+   "review-task-implementation-core.edn"
+   (fn [{:keys [definitions errors]}]
+     (is (empty? errors))
+     (is (contains? definitions "review-task-implementation-core"))
+     (assert-implementation-core-shape definitions "review-task-implementation-core"))))
+
 (deftest review-task-implementation-test
   (load-edn-only
    "review-task-implementation.edn"
    (fn [{:keys [definitions errors]}]
-     (testing "loads without error"
+     (testing "loads standalone wrapper without error"
        (is (empty? errors))
        (is (contains? definitions "review-task-implementation")))
-     (let [steps (get-in definitions ["review-task-implementation" :steps])]
-       (testing "has 5 steps with correct names and types"
-         (is (= 5 (count steps)))
-         (is (= ["review-task-implementation"
-                 "review-task-tests"
-                 "review-test-shape"
-                 "review-task-docs"
-                 "review-code-shape"]
-                (mapv :name steps)))
-         (is (= [:delegate :delegate :delegate :delegate :delegate]
-                (mapv :type steps))))))))
+     (let [steps (get-in definitions ["review-task-implementation" :steps])
+           core-step (first steps)
+           final-step (second steps)]
+       (is (= ["review-task-implementation-core" "final-summary"]
+              (mapv :name steps)))
+       (is (= [:delegate :session] (mapv :type steps)))
+       (is (= "review-task-implementation-core" (:target core-step)))
+       (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
+              (:prompt-string core-step)))
+       (is (some #(= {:type :source
+                      :from {:step "review-task-implementation-core" :yield :text}} %)
+                 (:contributions final-step)))
+       (is (= (constant-routing-judge "DONE") (:judge final-step)))
+       (is (= {"DONE" {:goto :done}} (:on final-step)))
+       (assert-sole-final-pass-status-line
+        (step-template-text final-step)
+        "REVIEW_COMPLETE")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; create-task-plan

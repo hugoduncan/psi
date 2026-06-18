@@ -1,7 +1,7 @@
 {:steps
  [{:name "review-task-design",
    :type :delegate,
-   :target "review-task-design",
+   :target "review-task-design-core",
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
@@ -40,7 +40,7 @@
    :context [{:type :source, :from :workflow-original}]}
   {:name "review-task-plan",
    :type :delegate,
-   :target "review-task-plan",
+   :target "review-task-plan-core",
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
@@ -65,7 +65,7 @@
    :context [{:type :source, :from :workflow-original}]}
   {:name "review-task-implementation",
    :type :delegate,
-   :target "review-task-implementation",
+   :target "review-task-implementation-core",
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},

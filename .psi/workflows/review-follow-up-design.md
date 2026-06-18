@@ -14,6 +14,8 @@ For the Munera task identified by {{input}}, execute the unchecked,
 actionable, follow-up items in design-steps.md with updates to
 design.md. Work independently.
 
+Be careful not to introduce new ambiguity or inconsistencies.
+
 If a design-step is completed, mark it done in design-steps.md.
 
 When finished, add a minimalist note to implementation.md stating that
