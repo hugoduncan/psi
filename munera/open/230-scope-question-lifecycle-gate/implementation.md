@@ -456,3 +456,18 @@ CLI argument parsing only; rerun with fully qualified vars succeeded.
 
 Filed 2 new actionable test coverage follow-ups in `steps.md`. Focused review
 suite remained green before filing (20 tests / 321 assertions).
+
+## Test-review post-bootstrap final follow-ups
+
+Executed the two newly added post-bootstrap test-review follow-ups. Test-only changes plus task artifact updates:
+
+1. **Built-in bootstrap smoke halt route covered.** Extended `workflow_delegate_review_step_live_test.clj`'s self-contained scope-gate smoke. It still invokes the production `init-built-in-workflow!` registry path on a temp-worktree session and asserts absent-artifact fail-open `DONE`; it now also writes `munera/open/999-bootstrap-smoke-open/design-steps.md` with an unchecked `SCOPE_QUESTION:` and asserts the bootstrapped `workflow/scope-question-gate-routing` returns `SCOPE_QUESTION_OPEN` with `:open-questions ["bootstrap halt route?"]`. This locks halt behaviour through production bootstrap, not only operation existence.
+
+2. **Operation negative normalization boundary covered.** Extended `gate-task-path-normalization-boundary-test` with a real disallowed artifact at `munera/closed/230-x/design-steps.md` containing an unchecked `SCOPE_QUESTION:`. Invoking the real operation with `task-path "munera/closed/230-x"` returns `DONE`, proving the operation uses `normalize-open-task-path`'s nil result as no-content/fail-open and does not read the raw disallowed path.
+
+Verification: `clj-paren-repair` no-op; `clj-kondo --lint` clean on the two touched test files. Focused Scry vars green:
+`init-built-in-workflow-registers-review-step-routing-operations-test` +
+`built-in-routing-operations-invoke-through-registry-test` +
+`gate-task-path-normalization-boundary-test` → 3 tests / 16 assertions. A full two-namespace Scry run still hits the pre-existing unrelated
+`delegate-review-task-implementation-completes-with-nullable-local-model-test`
+failure (3 assertions; same `missing-pass-status`/stubbed "ok" issue noted earlier), not caused by these follow-ups.

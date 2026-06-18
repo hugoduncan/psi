@@ -282,7 +282,7 @@ pass (AC-4).
 
 ## Test review (task-test-review) — post-bootstrap final pass follow-ups
 
-- [ ] **Built-in scope-gate bootstrap smoke does not exercise the halt route.**
+- [x] **Built-in scope-gate bootstrap smoke does not exercise the halt route.**
       `workflow_delegate_review_step_live_test.clj` now proves the production
       `init-built-in-workflow!` registry path registers and invokes
       `workflow/scope-question-gate-routing`, but the scope-gate case uses a
@@ -294,8 +294,13 @@ pass (AC-4).
       registry invocation returns `SCOPE_QUESTION_OPEN` and names the open
       question, so the production registration path covers the halt behaviour, not
       only operation existence / absent-artifact proceed.
+      Added a self-contained open-artifact case to the bootstrapped registry smoke:
+      it writes unchecked `munera/open/999-bootstrap-smoke-open/design-steps.md`
+      into the temp worktree, invokes the production-bootstrapped operation id,
+      and asserts `SCOPE_QUESTION_OPEN` plus the named `bootstrap halt route?`
+      concern.
 
-- [ ] **Operation boundary no longer locks invalid task-path fail-open behaviour.**
+- [x] **Operation boundary no longer locks invalid task-path fail-open behaviour.**
       After the test-shaper reduction, `gate-task-path-normalization-boundary-test`
       keeps only the positive bare-token integration case; invalid inputs
       (`munera/closed/...`, free text, partial paths) are covered only by the pure
@@ -307,3 +312,9 @@ pass (AC-4).
       `SCOPE_QUESTION:`) and invoke with that closed path, asserting fail-open
       `DONE`; this locks DI-4 at the external operation boundary without
       re-expanding the full grammar matrix.
+      Added a closed-path negative boundary case to
+      `gate-task-path-normalization-boundary-test`: it writes an unchecked
+      `SCOPE_QUESTION:` artifact under `munera/closed/230-x`, invokes the real
+      operation with `munera/closed/230-x`, and asserts fail-open `DONE`, proving
+      the handler does not read the raw disallowed path when normalization returns
+      nil.
