@@ -255,3 +255,19 @@ pass (AC-4).
       `init-built-in-workflow!` registry path with the session ctx/id and an
       absent task artifact, asserting fail-open `DONE`. Focused vars: 2 tests /
       13 assertions green; clj-kondo clean on the touched file.
+
+## Test review (task-test-review) — bootstrap smoke re-review follow-up
+
+- [ ] **Built-in scope-gate invocation smoke is fixture-sensitive to the live repo task artifact.**
+      `workflow_delegate_review_step_live_test.clj`'s
+      `built-in-routing-operations-invoke-through-registry-test` claims the
+      `workflow/scope-question-gate-routing` smoke uses an absent task artifact,
+      but `create-tui-context+session` points the session worktree at the live
+      repository and the test invokes the operation on
+      `munera/open/230-scope-question-lifecycle-gate` / `design-steps.md`, which
+      exists. The test passes only because the current file has no unchecked
+      `SCOPE_QUESTION:` item; a future legitimate task-artifact edit could make
+      this unrelated bootstrap-registration smoke fail. Make the smoke fixture
+      self-contained (e.g. use a guaranteed-absent task path or a temp worktree
+      session) while still invoking the production `init-built-in-workflow!`
+      registry path and asserting fail-open `DONE`.

@@ -421,3 +421,8 @@ assertions. A full namespace run still hits the pre-existing unrelated
 `delegate-review-task-implementation-completes-with-nullable-local-model-test`
 failure (`missing-pass-status` from the stubbed "ok" reply), not caused by this
 follow-up.
+
+## Test review (task-test-review) — bootstrap smoke re-review
+
+Filed one new test fixture-isolation issue in `steps.md`: the built-in scope-gate
+registry invocation smoke is coupled to the live task artifact it claims is absent.
