@@ -493,3 +493,7 @@ Verification: `clj-paren-repair` clean/no-op after edits; `clj-kondo --lint` cle
 ## Test shaping (test-shaper) — post-fixture-cleanup review
 
 No new actionable test-shaping issues found. Focused parser/resolver/operation/task-lifecycle definition suites and bootstrapped registry smoke remain green; focused clj-kondo clean on reviewed test files.
+
+## Docs review (review-task-docs)
+
+User-facing docs non-compliance found: one README overview gap filed in `steps.md`. `doc/workflows.md` and `CHANGELOG.md` are otherwise consistent with the implemented scope-question lifecycle gate.

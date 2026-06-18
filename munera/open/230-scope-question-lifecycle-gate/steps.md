@@ -339,3 +339,14 @@ pass (AC-4).
       temp worktree in `finally`. Verification: resolver + operation Scry suites
       green (9 tests / 21 assertions), bootstrap smoke vars green (2 tests / 14
       assertions), and focused clj-kondo clean.
+
+## Docs review (review-task-docs) — follow-up
+
+- [ ] **README workflow overview omits the user-facing lifecycle gate.**
+      `doc/workflows.md` and `CHANGELOG.md` document the pre-plan
+      `SCOPE_QUESTION:` handback, but `README.md`'s Workflows section only points
+      generally to `doc/workflows.md` and lists the autonomous simplification
+      workflows. Add a concise `README.md` Workflows bullet for
+      `/delegate task-lifecycle` that mentions unresolved `SCOPE_QUESTION:` items
+      halt before plan creation and links to `doc/workflows.md`, so the primary
+      user documentation reflects the changed user-visible workflow behaviour.
