@@ -160,6 +160,34 @@
                (:details result))
             (pr-str result))))))
 
+(deftest normalize-open-task-path-test
+  ;; Tests the pure workflow-input normalizer directly. Operation-level tests keep
+  ;; only a representative boundary case; this pure unit owns the grammar.
+  (testing "full munera/open paths are returned after trimming surrounding whitespace"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "munera/open/230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "  munera/open/230-scope-question-lifecycle-gate\n"))))
+  (testing "bare task tokens become munera/open paths after trimming whitespace"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "\t230-scope-question-lifecycle-gate "))))
+  (testing "non-open, free-text, partial, malformed, and nil inputs yield nil"
+    (doseq [invalid ["munera/closed/230-scope-question-lifecycle-gate"
+                     "please run 230-scope-question-lifecycle-gate"
+                     "prefix munera/open/230-scope-question-lifecycle-gate"
+                     "munera/open/230-scope-question-lifecycle-gate/extra"
+                     "munera/open/not-a-number"
+                     "230-Scope-Question-Lifecycle-Gate"
+                     nil]]
+      (is (nil? (routing/normalize-open-task-path invalid))
+          (pr-str invalid)))))
+
 (deftest exact-marker-routing-valid-and-missing-test
   ;; Tests generic exact-marker routing accepts arbitrary workflow-owned marker
   ;; labels/routes and ignores surrounding non-candidate lines.

@@ -371,3 +371,24 @@ all four ACs remain covered.
 ## Implementation review (task-implementation-review) — fixture follow-up pass
 
 No new implementation/architecture issues found in the fixture consolidation. Existing actionable work remains: the unchecked `normalize-open-task-path` narrow unit-test follow-up in `steps.md`; no duplicate item filed.
+
+
+## Test-shaper follow-up — normalize-open-task-path tests
+
+Executed the remaining test-shaper follow-up in `steps.md`. Test-only changes:
+
+- Added direct pure coverage in `routing_test.clj` for
+  `routing/normalize-open-task-path`: full `munera/open/NNN-slug` paths, bare
+  `NNN-slug` tokens, leading/trailing whitespace trimming, and nil/non-open/
+  free-text/partial/malformed inputs returning nil. This moves the grammar
+  contract to the pure layer.
+- Reduced `scope_question_gate_operation_test.clj`'s normalization coverage to
+  one representative integration boundary case: a bare token reaches the
+  normalized `munera/open/...` task through the real operation/resolver/session
+  path.
+
+Verification: `bb clojure:test:scry --namespace
+psi.agent-session.workflow.routing-test --namespace
+psi.agent-session.scope-question-gate-operation-test` → 17 tests / 267
+assertions green. `clj-kondo --lint` on the two touched test files → clean. No
+production code, docs, or plan changes needed.

@@ -196,7 +196,7 @@ pass (AC-4).
 
 ## Test shaping (test-shaper) — follow-ups
 
-- [ ] **Pure `normalize-open-task-path` lacks direct narrow unit tests.**
+- [x] **Pure `normalize-open-task-path` lacks direct narrow unit tests.**
       `routing/normalize-open-task-path` is a pure `string → string/nil`
       function, but `routing_test.clj` has no direct coverage — its grammar is
       exercised only through the heavyweight `gate-task-path-normalization-test`
@@ -210,6 +210,11 @@ pass (AC-4).
       operation-level normalization test to one representative case
       (narrow_tests ∧ fast_feedback ∧ economical — test pure string logic at the
       pure layer, not through the resolver/session/registry stack).
+      Added `normalize-open-task-path-test` to `routing_test.clj` covering full
+      open paths, bare tokens, trimming, nil, closed/free-text/partial/malformed
+      inputs; reduced the operation-level normalization test to one
+      representative bare-token integration boundary case. Focused Scry suites:
+      17 tests / 267 assertions green; clj-kondo clean on both touched tests.
 - [x] **Duplicated/inconsistent test fixtures across the two agent-session
       test files.** `temp-dir!` is defined identically in
       `scope_question_gate_operation_test.clj` and

@@ -100,24 +100,17 @@
     (is (= "DONE"
            (:data (invoke-gate ctx (direct-invocation ctx sid "munera/open/230-x")))))))
 
-(deftest gate-task-path-normalization-test
-  ;; DI-4: open-only, anchored full-match normalization.
+(deftest gate-task-path-normalization-boundary-test
+  ;; Representative integration case: the operation uses the pure normalizer to
+  ;; resolve workflow input before reading the task artifact. The full grammar is
+  ;; locked by `normalize-open-task-path-test` in routing_test.clj.
   (let [worktree (test-support/temp-worktree-dir!)
         [ctx sid] (test-support/session-with-worktree! worktree)]
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: open one\n")
-    (testing "full munera/open/NNN-slug path is used verbatim"
+    (testing "bare anchored NNN-slug token reaches the normalized munera/open task"
       (is (= "SCOPE_QUESTION_OPEN"
-             (:data (invoke-gate ctx (direct-invocation ctx sid "munera/open/230-x"))))))
-    (testing "bare anchored NNN-slug token becomes munera/open/<token>"
-      (is (= "SCOPE_QUESTION_OPEN"
-             (:data (invoke-gate ctx (direct-invocation ctx sid "230-x"))))))
-    (testing "a munera/closed/... path fails open (no usable path → proceed)"
-      (is (= "DONE"
-             (:data (invoke-gate ctx (direct-invocation ctx sid "munera/closed/230-x"))))))
-    (testing "free text fails open to proceed"
-      (is (= "DONE"
-             (:data (invoke-gate ctx (direct-invocation ctx sid "please decide scope"))))))))
+             (:data (invoke-gate ctx (direct-invocation ctx sid "230-x"))))))))
 
 (deftest gate-malformed-args-error-test
   ;; Malformed args (missing/non-string) hard-fail with :status :error.
