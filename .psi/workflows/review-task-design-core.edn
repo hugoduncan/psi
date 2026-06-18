@@ -1,0 +1,62 @@
+{:steps
+ [{:name "design-review",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently"
+            "review-task-architecture"
+            "task-design"],
+   :prompts
+   [{:name "architecture",
+     :prompt-workflow "review-task-design-architecture-review.md"}
+    {:name "ambiguity",
+     :prompt-workflow "review-task-design-ambiguity-review.md"}
+    {:name "inconsistency",
+     :prompt-workflow "review-task-design-inconsistency-review.md"}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-feedback-routing",
+    :args {:architecture-text {:from {:step "design-review",
+                                      :prompt "architecture",
+                                      :output :final-llm-reply}},
+           :ambiguity-text {:from {:step "design-review",
+                                   :prompt "ambiguity",
+                                   :output :final-llm-reply}},
+           :inconsistency-text {:from {:step "design-review",
+                                       :prompt "inconsistency",
+                                       :output :final-llm-reply}}}},
+   :on {"REPEAT" {:goto "design-follow-up"},
+        "DONE" {:goto :done}}}
+  {:name "design-follow-up",
+   :type :session,
+   :prompt-workflow "review-follow-up-design.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "design-review"
+                :max-iterations 6
+                :on-max-iterations "status-not-converged"}}}
+  {:name "status-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "design-review"
+                           :prompt "architecture"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "design-review"
+                           :prompt "ambiguity"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "design-review"
+                           :prompt "inconsistency"
+                           :output :final-llm-reply}}
+    {:type :template,
+     :text
+     "Report the machine-readable outcome for the Munera task design review identified by {{input}} after the review loop did not converge within the configured follow-up iteration limit. This is a lower-level workflow result consumed by wrapper workflows; do not write a user-facing final summary. Briefly list the unresolved design-review categories, if evident from the prior review outputs. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: ACTIONABLE_FEEDBACK",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
+ :name "review-task-design-core",
+ :description
+ "Run the reusable Munera task design review loop without a standalone final summary."}

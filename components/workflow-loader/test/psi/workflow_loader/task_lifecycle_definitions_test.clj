@@ -66,11 +66,11 @@
                  :invoke :delegate :session :session :session :session :session]
                 (mapv :type steps))))
        (testing "the lifecycle delegate steps target their workflows in order"
-         (is (= ["review-task-design"
+         (is (= ["review-task-design-core"
                  "create-task-plan"
-                 "review-task-plan"
+                 "review-task-plan-core"
                  "implement-task"
-                 "review-task-implementation"
+                 "review-task-implementation-core"
                  "extract-task-knowledge"]
                 (mapv :target delegate-steps))))
        (testing "the delegate steps thread the same task input unchanged (extraction adds the review yield)"

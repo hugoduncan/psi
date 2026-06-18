@@ -1,0 +1,52 @@
+{:steps
+ [{:name "plan-review",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently" "task-design"],
+   :prompts
+   [{:name "ambiguity",
+     :prompt-workflow "review-task-plan-ambiguity-review.md"}
+    {:name "inconsistency",
+     :prompt-workflow "review-task-plan-inconsistency-review.md"}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-feedback-routing",
+    :args {:ambiguity-text {:from {:step "plan-review",
+                                   :prompt "ambiguity",
+                                   :output :final-llm-reply}},
+           :inconsistency-text {:from {:step "plan-review",
+                                       :prompt "inconsistency",
+                                       :output :final-llm-reply}}}},
+   :on {"REPEAT" {:goto "plan-follow-up"},
+        "DONE" {:goto :done}}}
+  {:name "plan-follow-up",
+   :type :session,
+   :prompt-workflow "review-follow-up-plan.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "plan-review"
+                :max-iterations 5
+                :on-max-iterations "status-not-converged"}}}
+  {:name "status-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "plan-review"
+                           :prompt "ambiguity"
+                           :output :final-llm-reply}}
+    {:type :source, :from {:step "plan-review"
+                           :prompt "inconsistency"
+                           :output :final-llm-reply}}
+    {:type :template,
+     :text
+     "Report the machine-readable outcome for the Munera task plan review identified by {{input}} after the review loop did not converge within the configured follow-up iteration limit. This is a lower-level workflow result consumed by wrapper workflows; do not write a user-facing final summary. Briefly list the unresolved plan-review categories, if evident from the prior review outputs. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: ACTIONABLE_FEEDBACK",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
+ :name "review-task-plan-core",
+ :description
+ "Run the reusable Munera task plan review loop without a standalone final summary."}
