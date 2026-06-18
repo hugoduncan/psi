@@ -96,6 +96,8 @@
                                             "workflow/munera-open-task-path-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/exact-marker-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/scope-question-gate-routing")))
         (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                            "workflow/proof-sync-disposition-routing")))
         (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
@@ -127,14 +129,23 @@
                   {:text "QUALITY_GATE: APPROVE"
                    :marker-label "QUALITY_GATE"
                    :allowed-routes ["APPROVE" "REPAIR"]}
-                  "APPROVE"]]]
+                  "APPROVE"]
+                 ["workflow/scope-question-gate-routing"
+                  {:task-path "munera/open/230-scope-question-lifecycle-gate"
+                   :artifact "design-steps.md"
+                   :marker "SCOPE_QUESTION:"
+                   :proceed-route "DONE"
+                   :open-route "SCOPE_QUESTION_OPEN"}
+                  "DONE"]]]
           (is (= {:status :ok
                   :data expected-route
                   :summary expected-route}
                  (op-reg/invoke-operation-in
                   (:deterministic-operation-registry ctx)
                   operation-id
-                  {:args args}
+                  {:ctx ctx
+                   :session-id session-id
+                   :args args}
                   deterministic-op-runtime/invoke-operation))))
         (is (= :invalid-route-marker-args
                (:reason

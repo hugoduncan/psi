@@ -400,3 +400,24 @@ No new actionable implementation issues found. Re-reviewed the post-test-shaper 
 ## Test review (task-test-review) — final pass
 
 Production bootstrap registration coverage for `workflow/scope-question-gate-routing` is missing; follow-up filed in steps.md.
+
+## Test-review final follow-up — built-in operation bootstrap coverage
+
+Executed the final unchecked test-review follow-up. Test-only change:
+
+- Extended `workflow_delegate_review_step_live_test.clj`'s existing built-in
+  workflow bootstrap smoke tests so the production `init-built-in-workflow!`
+  registry path must register `workflow/scope-question-gate-routing`.
+- Added `workflow/scope-question-gate-routing` to the live built-in routing
+  operation registry invocation smoke cases. The invocation uses the
+  bootstrapped registry with the real session ctx/id and an absent task artifact,
+  asserting the safe fail-open `DONE` route.
+
+Verification: `clj-paren-repair` no-op, `clj-kondo --lint` on the touched test
+file clean, and focused Scry vars green:
+`init-built-in-workflow-registers-review-step-routing-operations-test` +
+`built-in-routing-operations-invoke-through-registry-test` → 2 tests / 13
+assertions. A full namespace run still hits the pre-existing unrelated
+`delegate-review-task-implementation-completes-with-nullable-local-model-test`
+failure (`missing-pass-status` from the stubbed "ok" reply), not caused by this
+follow-up.

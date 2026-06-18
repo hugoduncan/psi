@@ -235,7 +235,7 @@ pass (AC-4).
 
 ## Test review (task-test-review) — final pass follow-ups
 
-- [ ] **Built-in operation registration untested.**
+- [x] **Built-in operation registration untested.**
       `scope_question_gate_operation_test.clj` manually registers
       `workflow-core/scope-question-gate-routing` into a fresh registry, and
       `task_lifecycle_definitions_test.clj` only proves the authored workflow
@@ -249,3 +249,9 @@ pass (AC-4).
       equivalent) to assert `op-reg/get-operation-in` returns the scope-question
       operation, and preferably invoke it once through the bootstrapped registry
       on an absent/checked artifact so the built-in registry path is covered.
+      Added `workflow/scope-question-gate-routing` to the existing built-in
+      bootstrap registration smoke test and the live built-in routing-operation
+      registry invocation smoke test. The invocation uses the production
+      `init-built-in-workflow!` registry path with the session ctx/id and an
+      absent task artifact, asserting fail-open `DONE`. Focused vars: 2 tests /
+      13 assertions green; clj-kondo clean on the touched file.
