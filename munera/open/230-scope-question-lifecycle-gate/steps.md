@@ -386,3 +386,17 @@ pass (AC-4).
       after the scope-question gate proceeds, `check-design-review-status`
       routes complete design reviews to `create-task-plan` or unconverged
       reviews to `final-summary-design-not-converged`.
+
+## Code shaping (code-shaper) — follow-up
+
+- [ ] **Generic task-artifact resolver lacks path containment / regular-file guards.**
+      `agent-session-task-artifact-content` composes `(io/file worktree-path task-path artifact-name)`
+      and `slurp`s it whenever `.exists`, but the resolver is generic and registered in
+      the agent-session resolver graph. A caller that seeds `:psi.munera/artifact-name`
+      or `:psi.munera/task-path` with `..` segments or an absolute path can escape the
+      intended worktree/task-artifact boundary; a directory path can also reach `slurp`
+      and fail at runtime. Keep the workflow-specific marker/path policy out of runtime
+      code, but make the generic file-read primitive robust: require task/artifact inputs
+      to resolve under the session worktree (canonical/normalized containment check),
+      require the target to be a regular file, return nil for rejected/missing paths, and
+      add resolver tests for absolute-path, `..` escape, and directory inputs.

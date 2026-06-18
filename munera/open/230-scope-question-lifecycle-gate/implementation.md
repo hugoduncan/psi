@@ -551,3 +551,7 @@ No code/test changes were required; this was documentation-only.
 ## Docs review (review-task-docs) — final pass
 
 No new user-facing docs non-compliance found.
+
+## Code-shaper review
+
+Filed one robustness follow-up in `steps.md`: the generic task-artifact resolver needs path-containment and regular-file guards.
