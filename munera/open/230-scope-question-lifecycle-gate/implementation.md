@@ -581,3 +581,26 @@ Verification:
 ## Code-shaper review — final pass
 
 Found one remaining robustness issue: the task-artifact resolver's containment check is worktree-wide rather than task-directory-scoped, so artifact-name `..` segments can read other in-worktree files. Filed a non-duplicative follow-up in `steps.md`.
+
+## Code-shaper final follow-up: task-artifact resolver task-directory containment
+
+Executed the final code-shaper follow-up from `steps.md`.
+
+- Tightened `contained-regular-file` in `resolvers/session.clj`: it now resolves
+  the session worktree, the task directory, and the target artifact via real paths,
+  requires the task directory to remain under the worktree, and requires the
+  target artifact to remain under the resolved task directory before slurping a
+  regular file.
+- This preserves the existing absolute-path / `..` / symlink escape rejection and
+  narrows the generic task-artifact reader from worktree-wide containment to the
+  task-artifact boundary.
+- Added resolver tests proving `artifact-name` escapes to worktree-root
+  `README.md` and to a sibling task's `design.md` both return nil.
+- Marked the follow-up complete in `steps.md`.
+
+Verification:
+
+- `clj-paren-repair components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj` → no changes needed.
+- `bb clojure:test:scry --namespace psi.agent-session.task-artifact-content-resolver-test` → 3 tests / 12 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.scope-question-gate-operation-test` → 7 tests / 15 assertions green.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` → clean.

@@ -369,7 +369,7 @@
   {:psi.agent-session/worktree-path (support/session-worktree-path agent-session-ctx session-id)})
 
 (defn- contained-regular-file
-  "Return the artifact file when the task/artifact path stays under worktree.
+  "Return the artifact file when the target stays under the task directory.
    Reject absolute/escaping inputs, missing paths, and directories."
   [worktree-path task-path artifact-name]
   (when (and (string? worktree-path)
@@ -382,9 +382,12 @@
         (when-not (or (.isAbsolute task-path*)
                       (.isAbsolute artifact-path*))
           (let [worktree (.toRealPath worktree-path* (make-array LinkOption 0))
-                target   (.toRealPath (.resolve (.resolve worktree task-path*) artifact-path*)
+                task-dir (.toRealPath (.resolve worktree task-path*)
+                                      (make-array LinkOption 0))
+                target   (.toRealPath (.resolve task-dir artifact-path*)
                                       (make-array LinkOption 0))]
-            (when (and (.startsWith target worktree)
+            (when (and (.startsWith task-dir worktree)
+                       (.startsWith target task-dir)
                        (Files/isRegularFile target (make-array LinkOption 0)))
               (.toFile target)))))
       (catch InvalidPathException _ nil)
@@ -398,7 +401,7 @@
    inputs, so this resolver knows nothing about `design-steps.md` or any marker.
    Reads the current working-tree file (not git HEAD) so a freshly-edited file is
    honoured on a stateless re-scan. Returns nil content when any input is missing,
-   escapes the worktree, or does not name a regular file."
+   escapes the task directory/worktree, or does not name a regular file."
   [{:keys [psi.agent-session/worktree-path
            psi.munera/task-path
            psi.munera/artifact-name]}]

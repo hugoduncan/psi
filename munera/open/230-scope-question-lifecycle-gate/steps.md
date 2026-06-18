@@ -409,7 +409,7 @@ pass (AC-4).
 
 ## Code shaping (code-shaper) — final pass follow-up
 
-- [ ] **Task-artifact resolver still allows artifact-name escapes within the worktree.**
+- [x] **Task-artifact resolver still allows artifact-name escapes within the worktree.**
       `contained-regular-file` rejects absolute paths and paths whose canonical target
       leaves the session worktree, but it only checks `target.startsWith(worktree)`.
       Because the resolver is named/used as a task-artifact reader, a caller can pass
@@ -419,3 +419,8 @@ pass (AC-4).
       resolved task directory (not merely under the worktree), keep absolute-path and
       symlink/`..` escape rejection, and add resolver tests proving an artifact-name
       `..` escape to a repo-root file and to a sibling task returns nil.
+      Tightened `contained-regular-file` so it canonicalizes the worktree, resolved
+      task directory, and target, then requires both task-dir-under-worktree and
+      target-under-task-dir before slurping a regular file. Added resolver tests for
+      artifact-name `..` escape to worktree-root `README.md` and sibling task
+      `design.md`; focused resolver + operation suites and clj-kondo are green.

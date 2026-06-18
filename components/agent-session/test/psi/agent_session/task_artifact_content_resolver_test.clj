@@ -101,6 +101,35 @@
             (finally
               (test-support/delete-recursively! sibling-dir)))))))
 
+  (testing "artifact-name .. escape to a worktree-root file is rejected"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (spit (io/file worktree "README.md") "root readme")
+        (test-support/write-task-artifact! worktree "munera/open/230-x" "design.md"
+                                           "task design")
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-x"
+                       :psi.munera/artifact-name "../../../README.md"})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
+
+  (testing "artifact-name .. escape to a sibling task artifact is rejected"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (test-support/write-task-artifact! worktree "munera/open/230-x" "design.md"
+                                           "task design")
+        (test-support/write-task-artifact! worktree "munera/open/231-y" "design.md"
+                                           "sibling design")
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-x"
+                       :psi.munera/artifact-name "../231-y/design.md"})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
+
   (testing "directory artifact is rejected instead of slurped"
     (test-support/with-temp-worktree-session
       (fn [worktree ctx sid]
