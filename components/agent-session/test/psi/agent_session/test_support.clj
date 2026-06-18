@@ -1,6 +1,7 @@
 (ns psi.agent-session.test-support
   "Helpers for canonical-root-backed agent-session test contexts."
   (:require
+   [clojure.java.io :as io]
    [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
@@ -362,6 +363,38 @@
    (let [ctx (session-core/create-context (safe-context-opts opts))
          sd  (session-core/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
+
+;; --- Worktree task-artifact fixtures (task 230) ---
+;; Shared ceremony for the closely-related scope-question-gate operation and
+;; task-artifact-content resolver suites: one temp-worktree helper, one
+;; worktree-backed session helper, one task-artifact writer. Keeps the two
+;; files consistent and free of duplicated fixture variation.
+
+(defn temp-worktree-dir!
+  "Create a fresh test-owned temp worktree directory and return it as a File."
+  []
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "psi-worktree-" (System/nanoTime)))]
+    (.mkdirs dir)
+    dir))
+
+(defn session-with-worktree!
+  "Create a non-persisted test session whose worktree-path is `worktree`.
+   Returns [ctx session-id]. `worktree` may be a File or a path string."
+  [worktree]
+  (create-test-session
+   {:persist? false
+    :session-defaults {:worktree-path (str worktree)}}))
+
+(defn write-task-artifact!
+  "Write `content` to `<worktree>/<task-path>/<artifact-name>`, creating the
+   task directory. Returns the written File."
+  [worktree task-path artifact-name content]
+  (let [dir (io/file worktree task-path)]
+    (.mkdirs dir)
+    (let [f (io/file dir artifact-name)]
+      (spit f content)
+      f)))
 
 ;; --- Deterministic-operation surface fixtures (task 205) ---
 ;; Shared canonical fixtures for the four deterministic-operation test suites

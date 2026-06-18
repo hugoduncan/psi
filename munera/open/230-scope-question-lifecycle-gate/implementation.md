@@ -367,3 +367,7 @@ path (no narrow unit tests, nil/whitespace cases uncovered); and fixture
 ceremony is duplicated/inconsistent across the two agent-session test files.
 Both are economy/consistency improvements, not correctness or coverage gaps —
 all four ACs remain covered.
+
+## Implementation review (task-implementation-review) — fixture follow-up pass
+
+No new implementation/architecture issues found in the fixture consolidation. Existing actionable work remains: the unchecked `normalize-open-task-path` narrow unit-test follow-up in `steps.md`; no duplicate item filed.

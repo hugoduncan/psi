@@ -210,7 +210,7 @@ pass (AC-4).
       operation-level normalization test to one representative case
       (narrow_tests ∧ fast_feedback ∧ economical — test pure string logic at the
       pure layer, not through the resolver/session/registry stack).
-- [ ] **Duplicated/inconsistent test fixtures across the two agent-session
+- [x] **Duplicated/inconsistent test fixtures across the two agent-session
       test files.** `temp-dir!` is defined identically in
       `scope_question_gate_operation_test.clj` and
       `task_artifact_content_resolver_test.clj`; `write-design-steps!`
@@ -223,4 +223,7 @@ pass (AC-4).
       closely-related files use consistent fixtures and the resolver test's
       repeated session-creation ceremony is compressed
       (consistent(fixtures) ∧ minimal_incidental_setup ∧
-      helpers_that_compress(ceremony)).
+      helpers_that_compress(ceremony)). Added shared `temp-worktree-dir!`,
+      `session-with-worktree!`, and `write-task-artifact!` helpers to
+      `test_support.clj`; both scope-gate operation and task-artifact resolver
+      tests now use them.

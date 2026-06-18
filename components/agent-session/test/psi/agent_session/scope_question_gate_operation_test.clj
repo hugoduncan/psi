@@ -12,6 +12,10 @@
    [psi.deterministic-operation-registry.registry :as registry]
    [psi.deterministic-operation-runtime.core :as runtime]))
 
+;; Worktree/session/artifact ceremony is shared via test-support
+;; (`temp-worktree-dir!`, `session-with-worktree!`, `write-task-artifact!`),
+;; keeping this file consistent with the task-artifact-content resolver suite.
+
 (def ^:private gate-operation-id "workflow/scope-question-gate-routing")
 
 (def ^:private default-args
@@ -20,24 +24,10 @@
    :proceed-route "DONE"
    :open-route "SCOPE_QUESTION_OPEN"})
 
-(defn- temp-dir!
-  []
-  (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "psi-scope-gate-" (System/nanoTime)))]
-    (.mkdirs dir)
-    dir))
-
 (defn- write-design-steps!
+  "Write `content` as the task's design-steps.md (the artifact this gate reads)."
   [worktree task-dir content]
-  (let [dir (io/file worktree task-dir)]
-    (.mkdirs dir)
-    (spit (io/file dir "design-steps.md") content)))
-
-(defn- session-with-worktree!
-  [worktree]
-  (test-support/create-test-session
-   {:persist? false
-    :session-defaults {:worktree-path (str worktree)}}))
+  (test-support/write-task-artifact! worktree task-dir "design-steps.md" content))
 
 (defn- invoke-gate
   "Invoke the registered gate operation with a caller-supplied invocation map.
@@ -69,8 +59,8 @@
 
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)]
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: bucket-size in reopen identity?\n")
     (let [result (invoke-gate ctx (direct-invocation ctx sid "munera/open/230-x"))]
@@ -82,8 +72,8 @@
 
 (deftest gate-proceeds-on-only-checked-items-test
   ;; AC-2: only-checked items route to proceed.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)]
     (write-design-steps! worktree "munera/open/230-x"
                          "- [x] SCOPE_QUESTION: resolved here\n")
     (let [result (invoke-gate ctx (direct-invocation ctx sid "munera/open/230-x"))]
@@ -91,16 +81,16 @@
 
 (deftest gate-proceeds-on-absent-artifact-test
   ;; AC-2: a task with no design-steps.md proceeds.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)]
     (.mkdirs (io/file worktree "munera/open/230-x"))
     (let [result (invoke-gate ctx (direct-invocation ctx sid "munera/open/230-x"))]
       (is (= "DONE" (:data result)) (pr-str result)))))
 
 (deftest gate-resume-after-item-checked-test
   ;; AC-3: re-invoking after the human checks the item returns DONE.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)]
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: open one\n")
     (is (= "SCOPE_QUESTION_OPEN"
@@ -112,8 +102,8 @@
 
 (deftest gate-task-path-normalization-test
   ;; DI-4: open-only, anchored full-match normalization.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)]
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: open one\n")
     (testing "full munera/open/NNN-slug path is used verbatim"
@@ -131,8 +121,8 @@
 
 (deftest gate-malformed-args-error-test
   ;; Malformed args (missing/non-string) hard-fail with :status :error.
-  (let [worktree (temp-dir!)
-        [ctx sid] (session-with-worktree! worktree)
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx sid] (test-support/session-with-worktree! worktree)
         result (invoke-gate ctx {:ctx ctx
                                  :session-id sid
                                  :args (dissoc default-args :marker)})]
@@ -147,8 +137,8 @@
   ;; code builds the invocation map inline with :parent-session-id and NO
   ;; :session-id; if that key set changes, this test moves with it. The gate
   ;; must resolve the worktree from :parent-session-id and still fire.
-  (let [worktree (temp-dir!)
-        [ctx parent-sid] (session-with-worktree! worktree)]
+  (let [worktree (test-support/temp-worktree-dir!)
+        [ctx parent-sid] (test-support/session-with-worktree! worktree)]
     (register-gate! ctx)
     (write-design-steps! worktree "munera/open/230-x"
                          "- [ ] SCOPE_QUESTION: judge-path concern\n")
