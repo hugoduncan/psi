@@ -604,3 +604,7 @@ Verification:
 - `bb clojure:test:scry --namespace psi.agent-session.task-artifact-content-resolver-test` → 3 tests / 12 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.scope-question-gate-operation-test` → 7 tests / 15 assertions green.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` → clean.
+
+## Code-shaper review — post-containment re-review
+
+No new actionable code-shaper issues found. Re-reviewed the final task-artifact resolver containment, scope-gate operation boundary, pure scanner, workflow wiring, and focused tests; the mechanism remains simple, workflow-agnostic at the resolver/runtime boundary, and robust against the previously filed path-escape issues.
