@@ -497,3 +497,17 @@ No new actionable test-shaping issues found. Focused parser/resolver/operation/t
 ## Docs review (review-task-docs)
 
 User-facing docs non-compliance found: one README overview gap filed in `steps.md`. `doc/workflows.md` and `CHANGELOG.md` are otherwise consistent with the implemented scope-question lifecycle gate.
+
+## Docs follow-up: README lifecycle gate bullet
+
+Executed the docs-review follow-up from `steps.md`.
+
+- Updated `README.md`'s Workflows overview from a simplification-only paragraph
+  to a short project-workflows list.
+- Added a `/delegate task-lifecycle <task>` bullet that states the lifecycle runs
+  design → plan → implement → review → extract knowledge, and that unresolved
+  `SCOPE_QUESTION:` items halt before plan creation and hand back to the human,
+  linking to `doc/workflows.md` for details.
+- Marked the follow-up item complete in `steps.md`.
+
+No code/test changes were required; this was documentation-only.

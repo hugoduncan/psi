@@ -342,7 +342,7 @@ pass (AC-4).
 
 ## Docs review (review-task-docs) — follow-up
 
-- [ ] **README workflow overview omits the user-facing lifecycle gate.**
+- [x] **README workflow overview omits the user-facing lifecycle gate.**
       `doc/workflows.md` and `CHANGELOG.md` document the pre-plan
       `SCOPE_QUESTION:` handback, but `README.md`'s Workflows section only points
       generally to `doc/workflows.md` and lists the autonomous simplification
@@ -350,3 +350,7 @@ pass (AC-4).
       `/delegate task-lifecycle` that mentions unresolved `SCOPE_QUESTION:` items
       halt before plan creation and links to `doc/workflows.md`, so the primary
       user documentation reflects the changed user-visible workflow behaviour.
+      Added a concise README Workflows bullet for `/delegate task-lifecycle <task>`
+      describing the design→plan→implement→review→extract-knowledge lifecycle and
+      the unresolved `SCOPE_QUESTION:` pre-plan human handback, linking to
+      `doc/workflows.md`.
