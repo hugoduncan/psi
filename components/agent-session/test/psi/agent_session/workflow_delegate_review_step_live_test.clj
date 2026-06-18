@@ -142,38 +142,35 @@
                    :args args}
                   deterministic-op-runtime/invoke-operation))))
         (testing "scope-question gate smoke uses self-contained task artifacts"
-          (let [worktree (test-support/temp-worktree-dir!)
-                [scope-ctx scope-session-id] (test-support/session-with-worktree! worktree)
-                scope-gate-args {:artifact "design-steps.md"
-                                 :marker "SCOPE_QUESTION:"
-                                 :proceed-route "DONE"
-                                 :open-route "SCOPE_QUESTION_OPEN"}
-                invoke-scope-gate (fn [task-path]
-                                    (op-reg/invoke-operation-in
-                                     (:deterministic-operation-registry scope-ctx)
-                                     "workflow/scope-question-gate-routing"
-                                     {:ctx scope-ctx
-                                      :session-id scope-session-id
-                                      :args (assoc scope-gate-args :task-path task-path)}
-                                     deterministic-op-runtime/invoke-operation))]
-            (try
-              (workflow-test-support/init-built-in-workflow! scope-ctx scope-session-id)
-              (is (= {:status :ok
-                      :data "DONE"
-                      :summary "DONE"}
-                     (invoke-scope-gate "munera/open/999-bootstrap-smoke-absent")))
-              (test-support/write-task-artifact!
-               worktree
-               "munera/open/999-bootstrap-smoke-open"
-               "design-steps.md"
-               "- [ ] SCOPE_QUESTION: bootstrap halt route?\n")
-              (is (= {:status :ok
-                      :data "SCOPE_QUESTION_OPEN"
-                      :summary "SCOPE_QUESTION_OPEN"
-                      :details {:open-questions ["bootstrap halt route?"]}}
-                     (invoke-scope-gate "munera/open/999-bootstrap-smoke-open")))
-              (finally
-                (context/shutdown-context! scope-ctx)))))
+          (test-support/with-temp-worktree-session
+            (fn [worktree scope-ctx scope-session-id]
+              (let [scope-gate-args {:artifact "design-steps.md"
+                                     :marker "SCOPE_QUESTION:"
+                                     :proceed-route "DONE"
+                                     :open-route "SCOPE_QUESTION_OPEN"}
+                    invoke-scope-gate (fn [task-path]
+                                        (op-reg/invoke-operation-in
+                                         (:deterministic-operation-registry scope-ctx)
+                                         "workflow/scope-question-gate-routing"
+                                         {:ctx scope-ctx
+                                          :session-id scope-session-id
+                                          :args (assoc scope-gate-args :task-path task-path)}
+                                         deterministic-op-runtime/invoke-operation))]
+                (workflow-test-support/init-built-in-workflow! scope-ctx scope-session-id)
+                (is (= {:status :ok
+                        :data "DONE"
+                        :summary "DONE"}
+                       (invoke-scope-gate "munera/open/999-bootstrap-smoke-absent")))
+                (test-support/write-task-artifact!
+                 worktree
+                 "munera/open/999-bootstrap-smoke-open"
+                 "design-steps.md"
+                 "- [ ] SCOPE_QUESTION: bootstrap halt route?\n")
+                (is (= {:status :ok
+                        :data "SCOPE_QUESTION_OPEN"
+                        :summary "SCOPE_QUESTION_OPEN"
+                        :details {:open-questions ["bootstrap halt route?"]}}
+                       (invoke-scope-gate "munera/open/999-bootstrap-smoke-open")))))))
         (is (= :invalid-route-marker-args
                (:reason
                 (op-reg/invoke-operation-in

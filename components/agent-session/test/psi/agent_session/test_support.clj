@@ -373,10 +373,10 @@
 (defn temp-worktree-dir!
   "Create a fresh test-owned temp worktree directory and return it as a File."
   []
-  (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "psi-worktree-" (System/nanoTime)))]
-    (.mkdirs dir)
-    dir))
+  (.toFile
+   (java.nio.file.Files/createTempDirectory
+    "psi-worktree-"
+    (make-array java.nio.file.attribute.FileAttribute 0))))
 
 (defn session-with-worktree!
   "Create a non-persisted test session whose worktree-path is `worktree`.
@@ -385,6 +385,23 @@
   (create-test-session
    {:persist? false
     :session-defaults {:worktree-path (str worktree)}}))
+
+(defn with-temp-worktree-session
+  "Call f with [worktree ctx session-id] for a fresh temp worktree-backed session.
+   Always shuts down the context and deletes the temp worktree in finally."
+  [f]
+  (let [worktree (temp-worktree-dir!)
+        ctx-holder (atom nil)]
+    (try
+      (let [[ctx session-id] (session-with-worktree! worktree)]
+        (reset! ctx-holder ctx)
+        (f worktree ctx session-id))
+      (finally
+        (try
+          (when-let [ctx @ctx-holder]
+            (session-context/shutdown-context! ctx))
+          (finally
+            (delete-recursively! worktree)))))))
 
 (defn write-task-artifact!
   "Write `content` to `<worktree>/<task-path>/<artifact-name>`, creating the

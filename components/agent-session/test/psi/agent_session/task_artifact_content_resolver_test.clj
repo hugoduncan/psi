@@ -13,42 +13,42 @@
 
 (deftest task-artifact-content-resolver-test
   (testing "present file resolves to its working-tree content"
-    (let [worktree (test-support/temp-worktree-dir!)
-          [ctx sid] (test-support/session-with-worktree! worktree)]
-      (test-support/write-task-artifact! worktree "munera/open/230-x" "design-steps.md"
-                                         "- [ ] SCOPE_QUESTION: open one\n")
-      (let [result (resolvers/query-in
-                    ctx [:psi.munera/task-artifact-content]
-                    {:psi.agent-session/session-id sid
-                     :psi.munera/task-path "munera/open/230-x"
-                     :psi.munera/artifact-name "design-steps.md"})]
-        (is (= "- [ ] SCOPE_QUESTION: open one\n"
-               (:psi.munera/task-artifact-content result))
-            (pr-str result)))))
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (test-support/write-task-artifact! worktree "munera/open/230-x" "design-steps.md"
+                                           "- [ ] SCOPE_QUESTION: open one\n")
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-x"
+                       :psi.munera/artifact-name "design-steps.md"})]
+          (is (= "- [ ] SCOPE_QUESTION: open one\n"
+                 (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
 
   (testing "absent file resolves to nil content"
-    (let [worktree (test-support/temp-worktree-dir!)
-          [ctx sid] (test-support/session-with-worktree! worktree)
-          result (resolvers/query-in
-                  ctx [:psi.munera/task-artifact-content]
-                  {:psi.agent-session/session-id sid
-                   :psi.munera/task-path "munera/open/230-missing"
-                   :psi.munera/artifact-name "design-steps.md"})]
-      (is (nil? (:psi.munera/task-artifact-content result))
-          (pr-str result))))
+    (test-support/with-temp-worktree-session
+      (fn [_worktree ctx sid]
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-missing"
+                       :psi.munera/artifact-name "design-steps.md"})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
 
   (testing "path is composed from worktree-path + task-path + artifact-name"
-    (let [worktree (test-support/temp-worktree-dir!)
-          [ctx sid] (test-support/session-with-worktree! worktree)]
-      (test-support/write-task-artifact! worktree "munera/open/230-y" "design.md" "design body")
-      (let [result (resolvers/query-in
-                    ctx [:psi.munera/task-artifact-content]
-                    {:psi.agent-session/session-id sid
-                     :psi.munera/task-path "munera/open/230-y"
-                     :psi.munera/artifact-name "design.md"})]
-        (is (= "design body"
-               (:psi.munera/task-artifact-content result))
-            (pr-str result))))))
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (test-support/write-task-artifact! worktree "munera/open/230-y" "design.md" "design body")
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-y"
+                       :psi.munera/artifact-name "design.md"})]
+          (is (= "design body"
+                 (:psi.munera/task-artifact-content result))
+              (pr-str result)))))))
 
 (deftest task-artifact-content-resolver-fail-open-guard-test
   ;; The resolver's (and (string? worktree-path) (string? task-path)

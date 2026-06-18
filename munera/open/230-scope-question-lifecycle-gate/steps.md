@@ -321,7 +321,7 @@ pass (AC-4).
 
 ## Test shaping (test-shaper) — final pass follow-up
 
-- [ ] **Scope-gate temp worktree/session fixtures leak resources across tests.**
+- [x] **Scope-gate temp worktree/session fixtures leak resources across tests.**
       The shared `test-support/temp-worktree-dir!` creates a directory under
       `java.io.tmpdir` with `System/nanoTime`, and the resolver/operation/bootstrap
       smoke tests create worktree-backed sessions without a scoped fixture that
@@ -332,3 +332,10 @@ pass (AC-4).
       and `test-support/delete-recursively!`) and update the scope-gate resolver,
       operation, and bootstrap smoke tests to use it so temp dirs and contexts are
       cleaned deterministically.
+      Added `test-support/with-temp-worktree-session`, changed
+      `temp-worktree-dir!` to use `Files/createTempDirectory`, and migrated the
+      resolver, operation, and built-in bootstrap scope-gate smoke tests to the
+      scoped helper. The helper shuts down the created context and deletes the
+      temp worktree in `finally`. Verification: resolver + operation Scry suites
+      green (9 tests / 21 assertions), bootstrap smoke vars green (2 tests / 14
+      assertions), and focused clj-kondo clean.

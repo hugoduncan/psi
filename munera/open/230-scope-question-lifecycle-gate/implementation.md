@@ -479,3 +479,13 @@ No new actionable test issues found after the post-bootstrap follow-ups. Re-chec
 ## Test review (test-shaper) — final pass
 
 Filed one new actionable fixture-robustness issue in `steps.md`: scope-gate temp worktree/session fixtures leave temp dirs and some contexts unscoped across tests. Focused review suites remained green (parser/resolver/operation/task-lifecycle 20 tests / 322 assertions; bootstrap vars 2 tests / 14 assertions). Existing unrelated live workflow-delegate failure remains out of scope.
+
+## Test-shaper final fixture follow-up
+
+Executed the final unchecked test-shaper follow-up in `steps.md`. Test-only change:
+
+- Added `test-support/with-temp-worktree-session`, a scoped fixture helper that creates a fresh temp worktree-backed session, always calls `context/shutdown-context!`, and deletes the temp worktree in `finally`.
+- Changed `temp-worktree-dir!` to use `Files/createTempDirectory` instead of a `System/nanoTime` path under `java.io.tmpdir`.
+- Migrated the scope-gate resolver tests, operation tests, and built-in bootstrap smoke to the scoped helper so temp dirs and worktree-backed contexts are cleaned deterministically.
+
+Verification: `clj-paren-repair` clean/no-op after edits; `clj-kondo --lint` clean on the touched files. Focused Scry green: resolver + operation suites = 9 tests / 21 assertions; bootstrap smoke vars = 2 tests / 14 assertions.
