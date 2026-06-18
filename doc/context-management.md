@@ -5,7 +5,7 @@
 Replace the current monolithic journal-as-context model with an extension-owned
 IR pipeline. The core session stores structured IR representations of each turn
 and of session/project state. An extension (the *context manager*) projects
-those IRs into the provider-facing conversation, controls what is retained, and
+those IRs into the provider-neutral conversation, controls what is retained, and
 processes replies out-of-band to maintain derived state.
 
 This gives the extension full authority over context shape, compaction strategy,
@@ -37,8 +37,9 @@ IR-based context management solves these by:
    and summarise at will.
 2. Giving the session and project **state IRs** that the extension can
    materialise into the conversation at the right time.
-3. Making the **projection** (what the LLM sees) an extension concern, not a
-  core concern.
+3. Making the **context projection** (which provider-neutral conversation
+   entries are retained, summarised, or added before provider adaptation) an
+   extension concern, not a provider-specific concern.
 4. Providing **out-of-band reply processing** so memory extraction and state
    updates don't block the user.
 
@@ -468,14 +469,15 @@ user text
     → calls :build-prepared-request-fn (ctx fn, not dispatch)
       → inside build-prepared-request, core calls
         :ir-project-conversion-fn (NEW ctx fn, extension-owned)
-        → extension projects IRs into provider messages:
+        → extension projects IRs into provider-neutral conversation entries:
           - queries :extension-ir-data for turn IRs and state IRs
           - selects which turns to include
           - projects Session State IR and Project State IR as system messages
           - removes older turns (replacing with summary or dropping)
-          - returns projected message list
-        → core uses projected messages for the provider request
-    → returns prepared-request with projected messages
+          - returns projected provider-neutral conversation
+        → core passes the projected provider-neutral conversation into the
+          existing provider-specific projection/adaptation step
+    → returns prepared-request after existing provider-specific projection
   → :session/prompt-execute handler
     → starts agent loop with prepared messages
 ```
@@ -572,8 +574,8 @@ only rebuilding IRs since the last compaction boundary.
 
 When the context manager extension is not installed, or when projection fails,
 the ctx fn `:ir-project-conversion-fn` returns `nil` to signal core to use the
-default journal-to-messages projection (`journal->provider-messages` in
-`psi.agent-session.prompt-request`). When only some Turn IRs are absent (e.g.,
+default journal-to-neutral-conversation projection, followed by the existing
+provider-specific projection/adaptation step. When only some Turn IRs are absent (e.g.,
 the next turn starts before out-of-band processing finishes), the projector may
 mix IR-projected turns with raw journal fallback for the missing turns.
 
@@ -585,7 +587,7 @@ requirement.
 ### Journal Metadata Contract
 
 Core adds enough metadata to journal entries for deterministic IR rebuild and
-provider-valid projection:
+neutral-conversation projection:
 
 ```clojure
 {:journal/entry-id "stable-entry-id"
@@ -601,8 +603,8 @@ provider-valid projection:
 Required fields are `:journal/entry-id`, `:journal/turn-id`,
 `:journal/turn-seq`, `:journal/timestamp`, and `:journal/kind`. Tool linkage
 fields are required when the entry represents a tool call or tool result. The
-projector uses this metadata to either preserve a raw provider-valid segment or
-replace the whole segment with summary/context.
+projector uses this metadata to either preserve a raw neutral-conversation
+segment or replace the whole segment with summary/context.
 
 Legacy journal entries without this metadata are supported by best-effort rebuild
 only. They may be projected as raw journal history or summarised conservatively;
@@ -629,9 +631,9 @@ Add one context-manager projection function to the ctx map (built in
 `context.clj`):
 
 ```clojure
-:ir-project-conversion-fn  (fn [ctx session-id turn-id user-msg base-messages]
-                             ;; returns {:messages [...] :metadata {...}}
-                             ;; or nil to use base-messages unchanged)
+:ir-project-conversion-fn  (fn [ctx session-id turn-id user-msg base-conversation]
+                             ;; returns {:conversation [...] :metadata {...}}
+                             ;; or nil to use base conversation unchanged)
 ```
 
 Projection is synchronous and happens inside request preparation. All IR state
@@ -729,7 +731,7 @@ New extension dispatch events for extensions that want to observe IR lifecycle:
 The context manager extension owns:
 
 1. **IR builders** — functions that construct each IR type from raw data
-2. **IR projector** — function that projects IRs into provider messages
+2. **IR projector** — function that projects IRs into provider-neutral conversation entries
 3. **IR processor** — function that processes replies out-of-band
 4. **IR compactor** — function that compacts IRs when context is full
 5. **State IR materialisers** — functions that build Session State IR and
@@ -752,7 +754,8 @@ The context manager extension owns:
 
 ### Projection Strategy
 
-The projector decides what the LLM sees. A typical strategy:
+The projector decides the provider-neutral conversation that will later be
+adapted for the selected provider. A typical strategy:
 
 1. **System layer**: Session State IR + Project State IR as system messages
 2. **Recent turns**: Last N turns projected from their semantic IRs — entities,
@@ -769,11 +772,11 @@ The projector can use different strategies based on context pressure:
 
 ### Projection Contract
 
-The projector receives base provider messages produced from the journal and
-returns either `nil` (use base messages unchanged) or:
+The projector receives the base provider-neutral conversation produced from the
+journal and returns either `nil` (use the base conversation unchanged) or:
 
 ```clojure
-{:messages provider-valid-messages
+{:conversation provider-neutral-conversation
  :metadata {:strategy :low-pressure|:high-pressure|:critical
             :raw-turns [turn-id ...]
             :ir-turns [turn-id ...]
@@ -784,20 +787,41 @@ returns either `nil` (use base messages unchanged) or:
 Projection must obey these rules:
 
 1. Preserve the current user message for the in-flight turn.
-2. Emit provider-valid messages for the selected provider.
+2. Emit a valid provider-neutral conversation according to psi's internal
+   conversation schema.
 3. Preserve tool-call/tool-result adjacency when including raw tool segments.
 4. Never include only one side of a tool-call/tool-result pair. If a raw segment
-   cannot be included validly, replace the whole segment with a summary or
-   structured context message.
+   cannot be included validly in the neutral conversation, replace the whole
+   segment with a summary or structured context entry.
 5. Preserve active system/developer steering messages unless they are explicitly
    superseded by a newer message according to existing session rules.
-6. Keep provider-specific constraints at the projection boundary; IR schemas
-   stay provider-agnostic.
+6. Stay provider-neutral: do not encode provider-specific roles, message quirks,
+   token-accounting rules, or request shapes in the context-manager projection.
+   Existing provider-specific projection/adaptation runs after this step.
 7. Return `nil` on timeout, invalid projection, unavailable context manager, or
-   any uncertainty about provider-message validity.
+   any uncertainty about neutral-conversation validity.
 
 The projection metadata is for introspection and debugging only; core must not
 depend on it for semantic decisions.
+
+
+### Provider-Specific Adaptation Boundary
+
+Context-manager projection runs **before** provider-specific request projection.
+The order is:
+
+```
+journal
+  → provider-neutral base conversation
+  → context-manager projection (provider-neutral)
+  → existing provider-specific projection/adaptation
+  → provider request
+```
+
+The context manager must not know whether the final request is for OpenAI,
+Anthropic, a local model, or another provider. It may shape semantic context,
+retention, summaries, and neutral conversation entries; it must not emit
+provider-specific message maps or compensate for provider-specific quirks.
 
 ### Reply Processing
 
@@ -854,8 +878,8 @@ IR-based compaction controls future provider projection only. It does not rewrit
 the persisted journal. The journal remains the authoritative raw history from
 which IRs are rebuilt. Compaction stores extension-owned summary metadata and
 projection policy in `:extension-ir-data`; the projector uses that metadata to
-replace older raw/semantic turns with compact summaries when building provider
-messages.
+replace older raw/semantic turns with compact summaries when building the
+provider-neutral conversation.
 
 Because compaction does not mutate journal history, pruning old in-memory IRs is
 safe: removed IRs can be rebuilt from the journal if needed. Overflow cache files
@@ -871,9 +895,10 @@ The context-management design depends on these invariants:
    indexes/projections over the journal, not independent sources of truth.
 3. **Core does not interpret IR.** Core may store opaque extension IR maps and
    route lifecycle events, but it must not depend on IR schema semantics.
-4. **Projection is the IR-to-provider boundary.** Provider-facing messages are
-   produced only by the active context manager's projector or by legacy journal
-   projection fallback.
+4. **Projection is the IR-to-neutral-conversation boundary.** The active context
+   manager shapes psi's provider-neutral conversation before existing
+   provider-specific projection/adaptation runs. Legacy journal projection
+   remains the fallback.
 5. **Compaction changes projection policy, not journal history.** IR compaction
    stores summaries and retention choices for future projections; it does not
    rewrite persisted journal entries.
@@ -888,11 +913,13 @@ The context-management design depends on these invariants:
    The only ctx hook is synchronous projection during request preparation.
 9. **Reply processing is ordered per session.** Completed turns are processed in
    increasing turn-id order for each `session-id`.
-10. **Projected messages must be provider-valid.** Projection must preserve
-    provider protocol constraints, especially role ordering and tool-call/tool-
-    result adjacency. If a raw segment cannot be included validly, the projector
-    must replace the whole segment with a summary/context representation rather
-    than emit an invalid partial message sequence.
+10. **Projected conversations must be neutral-schema-valid.** Projection must
+    preserve psi conversation constraints, especially role ordering and tool-call/
+    tool-result adjacency. Provider-specific protocol constraints are handled by
+    the existing provider adapter after context projection. If a raw segment
+    cannot be included validly in the neutral conversation, the projector must
+    replace the whole segment with a summary/context representation rather than
+    emit an invalid partial sequence.
 
 ## Architecture Fit
 
@@ -915,7 +942,9 @@ The context-management design depends on these invariants:
 IR data flows one way:
 - Core → Extension: raw data via dispatch event input or ctx fn call
 - Extension → Core: structured IR via handler return or ctx fn return
-- Extension → Provider: projected messages via projector return
+- Extension → Core: projected provider-neutral conversation via projector return
+- Core → Provider adapter: provider-neutral conversation converted by existing
+  provider-specific projection
 
 Core never reads IR data for its own purposes. The extension is the sole
 consumer and producer of IR semantics.
