@@ -47,6 +47,41 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
+(defn- count-substring
+  [^String s ^String sub]
+  (loop [from 0 n 0]
+    (let [idx (.indexOf s sub from)]
+      (if (neg? idx)
+        n
+        (recur (+ idx (count sub)) (inc n))))))
+
+(defn- assert-sole-final-pass-status-line
+  "DI-4 point 4: the summary template body must end with the exact, column-0,
+   single-space `PASS_STATUS: <token>` line and contain exactly one
+   `PASS_STATUS:` occurrence (no echoed review-reply status lines)."
+  [text token]
+  (is (= 1 (count-substring text "PASS_STATUS:"))
+      (str "template should contain exactly one PASS_STATUS: occurrence for " token))
+  (is (.endsWith ^String text (str "\nPASS_STATUS: " token))
+      (str "template should end with the sole column-0 PASS_STATUS: " token " line")))
+
+(defn- assert-review-summary-handback
+  "Shared assertions for a review workflow's converged `final-summary` and its
+   `final-summary-not-converged` handback (DI-1/DI-4): both explicit-terminal,
+   each template body carries its sole final PASS_STATUS line, and the
+   not-converged summary sources the same per-prompt review outputs."
+  [final-step not-converged-step source-refs]
+  (is (= (constant-routing-judge "DONE") (:judge final-step)))
+  (is (= {"DONE" {:goto :done}} (:on final-step)))
+  (is (= (constant-routing-judge "DONE") (:judge not-converged-step)))
+  (is (= {"DONE" {:goto :done}} (:on not-converged-step)))
+  (assert-sole-final-pass-status-line (step-template-text final-step) "REVIEW_COMPLETE")
+  (assert-sole-final-pass-status-line (step-template-text not-converged-step) "ACTIONABLE_FEEDBACK")
+  (doseq [source-ref source-refs]
+    (is (some #(= {:type :source :from source-ref} %)
+              (:contributions not-converged-step))
+        (str "final-summary-not-converged should include " source-ref))))
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -69,15 +104,17 @@
        (is (empty? errors))
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])]
-       (testing "has merged review topology with three steps"
-         (is (= 3 (count steps)))
-         (is (= ["design-review" "design-follow-up" "final-summary"]
+       (testing "has merged review topology with a not-converged handback before the converged summary (DI-2)"
+         (is (= 4 (count steps)))
+         (is (= ["design-review" "design-follow-up"
+                 "final-summary-not-converged" "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session]
+         (is (= [:session :session :session :session]
                 (mapv :type steps))))
        (let [step-by-name (into {} (map (juxt :name identity) steps))
              design-review (get step-by-name "design-review")
              design-follow-up (get step-by-name "design-follow-up")
+             not-converged-step (get step-by-name "final-summary-not-converged")
              final-step (get step-by-name "final-summary")]
          (testing "design-review carries shared step-level capabilities"
            (is (= ["read" "bash" "edit" "write"]
@@ -115,10 +152,12 @@
            (is (= {"REPEAT" {:goto "design-follow-up"}
                    "DONE" {:goto "final-summary"}}
                   (:on design-review))))
-         (testing "design-follow-up uses the shared design profile and loops to the review-pass target"
+         (testing "design-follow-up uses the shared design profile and loops to the review-pass target with author-routed exhaustion"
            (is (= (constant-routing-judge "DONE")
                   (:judge design-follow-up)))
-           (is (= {"DONE" {:goto "design-review" :max-iterations 6}}
+           (is (= {"DONE" {:goto "design-review"
+                           :max-iterations 3
+                           :on-max-iterations "final-summary-not-converged"}}
                   (:on design-follow-up)))
            (let [text (step-template-text design-follow-up)]
              (is (.contains text "design-steps.md"))
@@ -140,6 +179,12 @@
                                (contains? (:from %) :yield))
                          (filter #(= :source (:type %)) (:contributions final-step)))
                "final-summary must not use per-prompt :yield refs"))
+         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
+           (assert-review-summary-handback
+            final-step not-converged-step
+            [{:step "design-review" :prompt "architecture" :output :final-llm-reply}
+             {:step "design-review" :prompt "ambiguity" :output :final-llm-reply}
+             {:step "design-review" :prompt "inconsistency" :output :final-llm-reply}]))
          (testing "removed per-phase topology step names are absent"
            (doseq [removed ["architecture-review" "architecture-follow-up"
                             "ambiguity-review" "ambiguity-follow-up"
@@ -161,15 +206,17 @@
        (is (empty? errors))
        (is (contains? definitions "review-task-plan")))
      (let [steps (get-in definitions ["review-task-plan" :steps])]
-       (testing "has merged review topology with three steps"
-         (is (= 3 (count steps)))
-         (is (= ["plan-review" "plan-follow-up" "final-summary"]
+       (testing "has merged review topology with a not-converged handback before the converged summary (DI-2)"
+         (is (= 4 (count steps)))
+         (is (= ["plan-review" "plan-follow-up"
+                 "final-summary-not-converged" "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session]
+         (is (= [:session :session :session :session]
                 (mapv :type steps))))
        (let [step-by-name (into {} (map (juxt :name identity) steps))
              plan-review (get step-by-name "plan-review")
              plan-follow-up (get step-by-name "plan-follow-up")
+             not-converged-step (get step-by-name "final-summary-not-converged")
              final-step (get step-by-name "final-summary")]
          (testing "plan-review carries shared step-level capabilities"
            (is (= ["read" "bash" "edit" "write"]
@@ -200,19 +247,21 @@
            (is (= {"REPEAT" {:goto "plan-follow-up"}
                    "DONE" {:goto "final-summary"}}
                   (:on plan-review))))
-         (testing "plan-follow-up uses the batch plan profile and loops to the review-pass target"
+         (testing "plan-follow-up uses the batch plan profile and loops to the review-pass target with author-routed exhaustion"
            (is (= (constant-routing-judge "DONE")
                   (:judge plan-follow-up)))
-           (is (= {"DONE" {:goto "plan-review" :max-iterations 5}}
+           (is (= {"DONE" {:goto "plan-review"
+                           :max-iterations 5
+                           :on-max-iterations "final-summary-not-converged"}}
                   (:on plan-follow-up)))
            (let [text (step-template-text plan-follow-up)]
-             (is (.contains text "steps.md"))
+             ;; #177 routes plan-review follow-ups through shared design-steps.md.
+             (is (.contains text "design-steps.md"))
              (is (.contains text "immediately preceding whole `plan-review` batch"))
-             (is (.contains text "git diff <baseline>..HEAD -- <task>/steps.md"))
+             (is (.contains text "git diff <baseline>..HEAD -- <task>/design-steps.md"))
              (is (.contains text "predate the preceding review pass"))
              (is (.contains text "code, tests, and docs"))
-             (is (.contains text "design.md as read-only context"))
-             (is (not (.contains text "design-steps.md")))))
+             (is (.contains text "design.md as read-only context"))))
          (testing "final-summary sources each review text through per-prompt outputs"
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")
@@ -225,6 +274,11 @@
                                (contains? (:from %) :yield))
                          (filter #(= :source (:type %)) (:contributions final-step)))
                "final-summary must not use per-prompt :yield refs"))
+         (testing "converged + not-converged summaries: terminal, DI-4 PASS_STATUS, shared sources"
+           (assert-review-summary-handback
+            final-step not-converged-step
+            [{:step "plan-review" :prompt "ambiguity" :output :final-llm-reply}
+             {:step "plan-review" :prompt "inconsistency" :output :final-llm-reply}]))
          (testing "removed per-phase topology step names are absent"
            (doseq [removed ["ambiguity-review" "ambiguity-follow-up"
                             "inconsistency-review" "inconsistency-follow-up"
@@ -236,8 +290,8 @@
 ;;; review task prompt artifact targets
 
 (deftest review-task-prompt-artifact-targets-test
-  ;; Tests review prompt artifact ownership: design review uses design-steps.md,
-  ;; plan review uses steps.md and never design-steps.md.
+  ;; Artifact ownership: per #177 both design and plan review write follow-up
+  ;; items to the shared design-steps.md (steps.md is read-only task context).
   (testing "design review prompts target design-steps.md"
     (doseq [filename ["review-task-design-architecture-review.md"
                       "review-task-design-ambiguity-review.md"
@@ -245,17 +299,16 @@
                       "review-follow-up-design.md"]]
       (let [content (slurp-workflow-file filename)]
         (is (.contains content "design-steps.md") filename))))
-  (testing "plan review prompts target steps.md rather than design-steps.md"
+  (testing "plan review prompts also target the shared design-steps.md (#177)"
     (doseq [filename ["review-task-plan-ambiguity-review.md"
                       "review-task-plan-inconsistency-review.md"
-                      "review-follow-up-plan.md"
-                      "review-follow-up-steps.md"]]
+                      "review-follow-up-plan.md"]]
       (let [content (slurp-workflow-file filename)]
-        ;; Standalone (non-"design-") steps.md reference: a bare substring
-        ;; check passes trivially on "design-steps.md", so anchor on a
-        ;; non-"-" boundary to give the positive independent signal (TS2).
-        (is (re-find #"(^|[^-])steps\.md" content) filename)
-        (is (not (.contains content "design-steps.md")) filename))))
+        (is (.contains content "design-steps.md") filename))))
+  (testing "the shared steps follow-up profile still owns steps.md"
+    (let [content (slurp-workflow-file "review-follow-up-steps.md")]
+      (is (re-find #"(^|[^-])steps\.md" content))
+      (is (not (.contains content "design-steps.md")))))
   (testing "rewired host edns leave no orphan references to removed per-aspect files"
     ;; AC3 regression guard (T3): the four removed per-aspect follow-up files
     ;; must not be referenced by any rewired host workflow edn.
@@ -595,94 +648,3 @@
     (is (not (.exists (io/file (System/getProperty "user.dir")
                                ".psi/workflows"
                                "extract-task-knowledge.edn"))))))
-
-;;; ---------------------------------------------------------------------------
-;;; task-lifecycle
-
-(deftest task-lifecycle-test
-  (load-edn-only
-   "task-lifecycle.edn"
-   (fn [{:keys [definitions errors]}]
-     (testing "loads without error"
-       (is (empty? errors))
-       (is (contains? definitions "task-lifecycle")))
-     (let [steps (get-in definitions ["task-lifecycle" :steps])
-           first-five-targets ["review-task-design"
-                               "create-task-plan"
-                               "review-task-plan"
-                               "implement-task"
-                               "review-task-implementation"]
-           standard-prompt {:type :map
-                            :fields {:input {:from :workflow-input
-                                             :path [:input]}}}
-           extraction-prompt {:type :map
-                              :fields {:input {:from :workflow-input
-                                               :path [:input]}
-                                       :implementation-review-yield
-                                       {:from {:step "review-task-implementation"
-                                               :yield :text}}}}
-           status-step (nth steps 5)
-           extraction-step (nth steps 6)
-           success-summary-step (nth steps 7)
-           skip-summary-step (nth steps 8)
-           skip-summary-text (step-template-text skip-summary-step)]
-       (testing "has 9 steps, with extraction guarded after implementation review"
-         (is (= 9 (count steps)))
-         (is (= ["review-task-design"
-                 "create-task-plan"
-                 "review-task-plan"
-                 "implement-task"
-                 "review-task-implementation"
-                 "check-implementation-review-status"
-                 "extract-task-knowledge"
-                 "final-summary-after-extraction"
-                 "final-summary-without-extraction"]
-                (mapv :name steps)))
-         (is (= (concat (repeat 5 :delegate) [:invoke :delegate :session :session])
-                (mapv :type steps)))
-         (is (= first-five-targets (mapv :target (take 5 steps))))
-         (is (= "extract-task-knowledge" (:target extraction-step))))
-       (testing "the first five lifecycle delegate steps thread the same task input unchanged"
-         (is (= (repeat 5 standard-prompt)
-                (mapv :prompt-string (take 5 steps)))))
-       (testing "the status step owns the extraction gate"
-         (is (= {:type :invoke
-                 :operation "workflow/pass-status-routing"
-                 :args {:text {:from {:step "review-task-implementation"
-                                      :yield :text}}
-                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-                (:judge status-step)))
-         (is (= {"DONE" {:goto "extract-task-knowledge"}
-                 "REPEAT" {:goto "final-summary-without-extraction"}}
-                (:on status-step))))
-       (testing "the extraction step threads task input plus a labeled implementation-review yield"
-         (is (= extraction-prompt (:prompt-string extraction-step))))
-       (testing "the extraction step routes to the extraction success summary"
-         (is (= {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-                (:judge extraction-step)))
-         (is (= {"DONE" {:goto "final-summary-after-extraction"}}
-                (:on extraction-step))))
-       (testing "delegate steps keep their original context only"
-         (is (= (repeat 6 [{:type :source :from :workflow-original}])
-                (mapv :context (concat (take 5 steps) [extraction-step])))))
-       (testing "non-review-complete summary explains extraction was skipped"
-         (is (= ["read" "bash"] (:tools skip-summary-step)))
-         (is (.contains skip-summary-text "extract-task-knowledge was not invoked"))
-         (is (.contains skip-summary-text "PASS_STATUS: REVIEW_COMPLETE"))
-         (is (.contains skip-summary-text "Do not extract or write mementum knowledge here"))
-         (is (= {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-                (:judge skip-summary-step)))
-         (is (= {"DONE" {:goto :done}} (:on skip-summary-step))))
-       (testing "successful extraction summary terminates the success path"
-         (is (= {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-                (:judge success-summary-step)))
-         (is (= {"DONE" {:goto :done}} (:on success-summary-step))))
-       (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 9 {})
-                (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))

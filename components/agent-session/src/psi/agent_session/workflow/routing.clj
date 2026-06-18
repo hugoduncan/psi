@@ -16,6 +16,26 @@
 (def ^:private munera-open-task-path-pattern
   #"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
+(def ^:private bare-task-token-pattern
+  #"^[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+(defn normalize-open-task-path
+  "Normalize a workflow-input task path/token to a worktree-relative open task
+   directory, or nil when it is not parseable (fail-open — DI-4).
+
+   Open-only and anchored (full-string match), reusing the existing open-task
+   grammar: a trimmed input that fully matches `munera/open/NNN-slug` is returned
+   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`;
+   anything else (free text, a `munera/closed/...` path, a partial/substring
+   match) yields nil so the gate reads no content and proceeds."
+  [task-path]
+  (when (string? task-path)
+    (let [trimmed (str/trim task-path)]
+      (cond
+        (re-matches munera-open-task-path-pattern trimmed) trimmed
+        (re-matches bare-task-token-pattern trimmed) (str "munera/open/" trimmed)
+        :else nil))))
+
 (defn- pass-status-line-value
   [line]
   (when (str/starts-with? line pass-status-prefix)
@@ -150,6 +170,45 @@
        :summary "REPEAT"
        :details {:reason :invalid-munera-open-task-path
                  :text text}})))
+
+(def ^:private unchecked-checkbox-prefix "- [ ]")
+
+(defn- open-scope-question-concern
+  "Return the trimmed concern substring of an open (unchecked) scope-question
+   line, or nil when the line is not an open item for `marker`.
+
+   An open item is a markdown checklist line whose left-trimmed form starts with
+   the unchecked checkbox `- [ ]`, then (after optional whitespace) the authored
+   `marker`. Checked items (`- [x]`/`- [X]`) do not start with `- [ ]`, so they
+   never match. The returned concern is the text after the marker, trimmed."
+  [marker line]
+  (let [trimmed (str/triml line)]
+    (when (str/starts-with? trimmed unchecked-checkbox-prefix)
+      (let [after-box (str/triml (subs trimmed (count unchecked-checkbox-prefix)))]
+        (when (str/starts-with? after-box marker)
+          (str/trim (subs after-box (count marker))))))))
+
+(defn parse-scope-question-gate
+  "Deterministically route on unchecked scope-question items in artifact content.
+
+   Scans `content` (a string or nil) for open (unchecked) checklist items whose
+   prose begins with `marker` (e.g. \"SCOPE_QUESTION:\"). When one or more open
+   items remain, routes to `open-route` and returns the trimmed concern of each
+   open item under `:details {:open-questions [...]}`. When `content` is nil,
+   empty, or has no open items (including only-checked items), routes to
+   `proceed-route`. No IO and independent of any review-convergence signal."
+  [content marker proceed-route open-route]
+  (let [open-questions (->> (str/split-lines (or content ""))
+                            (keep #(open-scope-question-concern marker %))
+                            vec)]
+    (if (seq open-questions)
+      {:status :ok
+       :data open-route
+       :summary open-route
+       :details {:open-questions open-questions}}
+      {:status :ok
+       :data proceed-route
+       :summary proceed-route})))
 
 (defn- route-token? [value]
   (and (string? value)

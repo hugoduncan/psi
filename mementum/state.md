@@ -34,7 +34,16 @@ Architecture follows a Viable System Model (see `AGENTS.md` → Architecture):
 - Workflow routing uses generic deterministic operations (`workflow/pass-status-routing`,
   `workflow/constant-routing`, `workflow/exact-marker-routing`,
   `workflow/munera-open-task-path-routing`); workflow-specific labels/topology
-  live in the authored workflow definitions, not in runtime code.
+  live in the authored workflow definitions, not in runtime code. Judged routing
+  directives may declare `:on-max-iterations` (alongside `:max-iterations`) to
+  route loop exhaustion to an author target instead of hard-failing; the
+  runtime-governing site is `workflow-judge/evaluate-routing`. `review-task-design`/
+  `-plan` use it to hand non-converging reviews to a not-converged summary, and
+  `task-lifecycle` gates design/plan stages on the review `PASS_STATUS`, and a
+  pre-plan `check-scope-question-status` gate (`workflow/scope-question-gate-routing`)
+  halts the lifecycle when `design-steps.md` has unchecked `SCOPE_QUESTION:` items
+  (content scan, independent of convergence; scope handback wins over the
+  non-converged handback).
 - Workflow cancellation/removal stop signals and ordinary-work entry locks are
   shared in `components/workflow-coordination`; workflow-runtime,
   agent-session, and deterministic-operation-runtime reuse those primitives.

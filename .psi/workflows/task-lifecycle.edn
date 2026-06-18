@@ -6,6 +6,31 @@
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
    :context [{:type :source, :from :workflow-original}]}
+  {:name "check-scope-question-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/scope-question-gate-routing",
+    :args {:task-path {:from :workflow-input, :path [:input]},
+           :artifact "design-steps.md",
+           :marker "SCOPE_QUESTION:",
+           :proceed-route "DONE",
+           :open-route "SCOPE_QUESTION_OPEN"}},
+   :on {"DONE" {:goto "check-design-review-status"},
+        "SCOPE_QUESTION_OPEN" {:goto "final-summary-scope-question-open"}}}
+  {:name "check-design-review-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "review-task-design", :yield :text}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "create-task-plan"},
+        "REPEAT" {:goto "final-summary-design-not-converged"}}}
   {:name "create-task-plan",
    :type :delegate,
    :target "create-task-plan",
@@ -20,6 +45,17 @@
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
    :context [{:type :source, :from :workflow-original}]}
+  {:name "check-plan-review-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "review-task-plan", :yield :text}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "implement-task"},
+        "REPEAT" {:goto "final-summary-plan-not-converged"}}}
   {:name "implement-task",
    :type :delegate,
    :target "implement-task",
@@ -80,6 +116,44 @@
     {:type :source, :from {:step "review-task-implementation", :yield :text}}
     {:type :template,
      :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when implementation review did not complete cleanly. Summarize the design → plan → implement → review outcome, explain that extract-task-knowledge was not invoked because `review-task-implementation` did not yield `PASS_STATUS: REVIEW_COMPLETE`, and preserve the implementation-review outcome. Do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-design-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "review-task-design", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when the design review did not converge. Explain that the lifecycle stopped at the design stage because `review-task-design` did not reach a clean design (it yielded `PASS_STATUS: ACTIONABLE_FEEDBACK`), summarise the unresolved design feedback from the review yield, and hand control back to the human for further design work before plan creation. Do not proceed to plan creation and do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-plan-not-converged",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "review-task-plan", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when the plan review did not converge. Explain that the lifecycle stopped at the plan stage because `review-task-plan` did not reach a clean plan (it yielded `PASS_STATUS: ACTIONABLE_FEEDBACK`), summarise the unresolved plan feedback from the review yield, and hand control back to the human for further plan work before implementation. Do not proceed to implementation and do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-scope-question-open",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when the lifecycle is halted before plan creation by an unresolved scope question. The lifecycle stopped because one or more open (unchecked) `SCOPE_QUESTION:` items remain in the task's `design-steps.md`. Independently read the task's `design-steps.md` and quote each open `- [ ] SCOPE_QUESTION:` item verbatim so the human knows exactly which scope decision is required.\n\nExplain to the human that scope decisions must not be made implicitly by the autonomous lifecycle. To resume: decide each open scope question, record the decision and rationale in `design.md` (scope decisions are intent and belong in the design), check the corresponding `- [x] SCOPE_QUESTION:` item in `design-steps.md`, then re-invoke `task-lifecycle` for this task — the gate re-scans and proceeds once no unchecked `SCOPE_QUESTION:` items remain. Do not proceed to plan creation and do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",

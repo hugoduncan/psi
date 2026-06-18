@@ -139,6 +139,11 @@
   (testing "routing and compat schemas accept canonical forms"
     (is (m/validate workflow-ir/routing-directive-schema {:goto :done}))
     (is (m/validate workflow-ir/routing-directive-schema {:goto "build" :max-iterations 2}))
+    (is (m/validate workflow-ir/routing-directive-schema
+                    {:goto "design-review" :max-iterations 3
+                     :on-max-iterations "final-summary-not-converged"}))
+    (is (m/validate workflow-ir/routing-directive-schema
+                    {:goto "design-review" :max-iterations 3 :on-max-iterations :done}))
     (is (m/validate workflow-ir/routing-table-schema {"APPROVED" {:goto :done}}))
     (is (m/validate workflow-ir/compat-schema {:legacy-source :session-preload}))))
 
@@ -166,6 +171,11 @@
 
   (testing "routing directive rejects missing goto"
     (is (not (m/validate workflow-ir/routing-directive-schema {:max-iterations 3}))))
+
+  (testing "routing directive rejects on-max-iterations without max-iterations (D3)"
+    (is (not (m/validate workflow-ir/routing-directive-schema
+                         {:goto "design-review"
+                          :on-max-iterations "final-summary-not-converged"}))))
 
   (testing "yield rejects malformed shape"
     (is (not (m/validate workflow-ir/yields-schema {:type :text :data :data}))))

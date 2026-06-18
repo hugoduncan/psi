@@ -442,12 +442,44 @@
                 :type :session
                 :contributions [{:type :template :text "final-summary"}]}]))}))
 
+(defn- conditional-review-design-on-max-iterations-definition
+  "A design-review loop whose `design-follow-up` route names an
+   `:on-max-iterations` author target (`final-summary-not-converged`) with a
+   small `:max-iterations` so exhaustion routes to the handback instead of
+   hard-failing (DI-6 integration coverage). `final-summary-not-converged` is
+   inserted before the converged `final-summary` (DI-2 ordering) and is
+   explicitly terminal."
+  [definition-name]
+  (let [base (conditional-review-design-definition definition-name)
+        steps (mapv (fn [step]
+                      (if (= "design-follow-up" (:name step))
+                        (assoc step :on {"DONE" {:goto "design-review"
+                                                 :max-iterations 2
+                                                 :on-max-iterations "final-summary-not-converged"}})
+                        step))
+                    (:steps base))
+        handback {:name "final-summary-not-converged"
+                  :type :session
+                  :contributions [{:type :template :text "final-summary-not-converged"}]
+                  :judge {:type :invoke
+                          :operation "workflow/constant-routing"
+                          :args {:route "DONE"}}
+                  :on {"DONE" {:goto :done}}}
+        steps (conj (vec (butlast steps)) handback (last steps))]
+    (assoc base :steps steps)))
+
 (defn- conditional-review-definition
   ([definition-name]
    (conditional-review-definition definition-name {}))
   ([definition-name opts]
-   (if (= :design (:kind opts))
+   (cond
+     (= :design-on-max-iterations (:kind opts))
+     (conditional-review-design-on-max-iterations-definition definition-name)
+
+     (= :design (:kind opts))
      (conditional-review-design-definition definition-name)
+
+     :else
      (conditional-review-plan-definition definition-name opts))))
 
 (defn- create-conditional-review-run!
@@ -703,3 +735,27 @@
       (is (= :iteration-exhausted (:reason (:terminal-outcome run))))
       (is (= "clarity-status" (:step-id (:terminal-outcome run))))
       (is (= 15 (count prompts))))))
+
+(deftest review-pass-loop-on-max-iterations-routes-to-author-target-test
+  ;; DI-6: a real exhausting judged review loop carrying :on-max-iterations
+  ;; routes to the author target (the not-converged handback) with the run NOT
+  ;; marked :failed — the judge-side evaluate-routing governing path. The
+  ;; pure-statechart test cannot exercise this; the existing
+  ;; review-pass-loop-iteration-limit-failure-test (no :on-max-iterations) is the
+  ;; regression-lock that exhaustion without the key still hard-fails.
+  (testing "design loop exhaustion with :on-max-iterations routes to handback, run not failed"
+    (let [{:keys [result run]} (execute-conditional-review-proof!
+                                "review-task-design-on-max-proof" "design-on-max-iterations"
+                                {"architecture-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                                 "ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                 "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"}
+                                {:kind :design-on-max-iterations})]
+      (is (= :completed (:status result))
+          "author-routed exhaustion completes at the handback, not failed/blocked/stuck")
+      (is (= :completed (:status run)))
+      (is (not= :iteration-exhausted (:reason (:terminal-outcome run)))
+          "author-routed exhaustion must not terminate with :iteration-exhausted")
+      (is (= 2 (count (get-in run [:step-runs "design-follow-up" :attempts])))
+          "the judged loop must iterate to its configured :max-iterations cap (2) before routing to the handback — proves exhaustion-at-cap, not a premature :on-max-iterations route")
+      (is (some? (get-in run [:step-runs "final-summary-not-converged" :accepted-result]))
+          "the :on-max-iterations author target (handback) must have run to an accepted result"))))

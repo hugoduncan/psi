@@ -12,7 +12,11 @@ skills:
 ---
 For the Munera task identified by {{input}}, run the architecture review as the first turn of the shared `design-review` multi-prompt session. Work independently. Read the task's design.md and consult the project's architecture sources (AGENTS.md, META.md, and doc/architecture.md) as needed before producing architectural-fit feedback. This first turn loads the task design and architecture context for the later ambiguity and inconsistency turns in the same child session.
 
-Review the task design for architectural fit with the project's architecture and principles (not for ambiguity or inconsistency). Do not review plan.md or steps.md. Then:
+Review the task design for architectural fit with the project's architecture and principles (not for ambiguity or inconsistency). Do not review plan.md or steps.md.
+
+**Scope is frozen.** Treat the design's stated scope boundary (its scope sections — e.g. "What this slice does", "Scope (in)"/"Scope (out)", or any explicit frozen-boundary statement) as fixed for this review. Do not file follow-ups that widen, narrow, or re-draw that boundary, and never resolve a finding by changing scope. If you conclude the scope boundary itself is wrong, do not edit it: add exactly one follow-up item prefixed `SCOPE_QUESTION:` stating the concern for a human to decide, and do not raise further variants of that same boundary concern in this or any later pass. A `SCOPE_QUESTION:` item counts as actionable feedback.
+
+Then:
 
 1. append a terse review note to the task's implementation.md
 2. add unchecked follow-up items to design-steps.md for every new actionable architectural misfit you found (create design-steps.md if it does not exist)

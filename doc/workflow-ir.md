@@ -461,12 +461,18 @@ The IR uses:
 - `:on`
 - `:max-iterations`
 
+Transition directives inside `:on` additionally use:
+
+- `:max-iterations` (transition-local loop bound)
+- `:on-max-iterations` (optional exhaustion target; only valid alongside
+  transition-local `:max-iterations`)
+
 Illustrative shape:
 
 ```clojure
 {:judge {...}
  :on {"APPROVED" {:goto :done}
-      "REVISE" {:goto "build" :max-iterations 3}}
+      "REVISE" {:goto "build" :max-iterations 3 :on-max-iterations "summary"}}
  :max-iterations 5}
 ```
 
@@ -477,6 +483,13 @@ Illustrative shape:
 - normalized IR requires `:on` when `:judge` is present, and requires `:judge` when `:on` is present
 - if a selected transition goes to `:done`, the parent step's yielded value becomes the workflow result
 - a judge routes; it does not replace the parent step's yielded value
+- a transition directive may carry `:on-max-iterations` (a goto-target) only
+  when it also carries transition-local `:max-iterations`; a directive with
+  `:on-max-iterations` and no `:max-iterations` is rejected
+- when a judged loop exhausts its transition-local `:max-iterations`: if the
+  directive carries `:on-max-iterations`, the run routes to that target and
+  continues (`:status :running`); if absent, the run hard-fails with
+  `:reason :iteration-exhausted`
 
 ## Judge forms
 
@@ -787,7 +800,10 @@ invoke-judge ::= {:type :invoke
 outcome-map ::= {outcome transition-map}+
 
 transition-map ::= {:goto goto-target
-                    :max-iterations? pos-int}
+                    :max-iterations? pos-int
+                    :on-max-iterations? goto-target}
+;; :on-max-iterations is only valid alongside :max-iterations; it names the
+;; exhaustion target instead of the default :reason :iteration-exhausted fail.
 
 goto-target ::= :next | :previous | :done | step-name
 

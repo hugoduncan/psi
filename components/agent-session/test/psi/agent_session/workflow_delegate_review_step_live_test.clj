@@ -5,6 +5,8 @@
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.context :as context]
    [psi.agent-session.mutations :as mutations]
+   [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
+   [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-test-support :as workflow-test-support]
    [psi.command-registry.registry :as command-registry]
@@ -24,6 +26,64 @@
     (spit tmp (pr-str config))
     (.getAbsolutePath tmp)))
 
+(defn- assert-converged-standalone-surfaces-review-complete
+  "DI-2: drive a converged standalone review run for `definition-id` through the
+   `execute-workflow-run` mutation (stubbing the model reply at
+   `prompt-execution-result-in!`) and assert the converged `final-summary` —
+   ordered last per DI-2 — is the step whose yielded text surfaces as
+   `:psi.workflow/result` via the standalone `(last :step-order)` path. The reply
+   is stubbed, so this locks the ordering/plumbing invariant only, NOT the DI-4
+   template wording (that is locked by the definition-level review-task-*-test).
+   The single varying axis is `definition-id` / `run-id` / converged summary
+   `reply-prefix`."
+  [definition-id run-id reply-prefix]
+  (let [models-path (write-temp-models!
+                     {:version 1
+                      :providers {"local"
+                                  {:base-url "http://localhost:8080/v1"
+                                   :api :openai-completions
+                                   :models [{:id "test-model"}]}}})]
+    (try
+      (model-registry/init! {:user-models-path models-path})
+      (let [[ctx session-id]
+            (workflow-test-support/create-tui-context+session
+             mutations/all-mutations
+             {:session-defaults {:model {:provider "local" :id "test-model" :reasoning false}}})]
+        (workflow-test-support/init-built-in-workflow! ctx session-id)
+        (try
+          (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                        (fn [_ctx _child-session-id prompt]
+                          (let [reply (if (str/includes? prompt "Produce the user-facing final result")
+                                        (str reply-prefix "\n\nPASS_STATUS: REVIEW_COMPLETE")
+                                        "PASS_STATUS: REVIEW_COMPLETE")]
+                            {:execution-result/assistant-message
+                             {:role "assistant"
+                              :content [{:type :text :text reply}]
+                              :stop-reason :stop}}))]
+            (cwf-mutations/create-workflow-run
+             {} {:psi/agent-session-ctx ctx
+                 :definition-id definition-id
+                 :workflow-input {:input "munera/open/229-author-routed-workflow-exhaustion"}
+                 :run-id run-id})
+            (let [result (cwf-mutations/execute-workflow-run
+                          {} {:psi/agent-session-ctx ctx
+                              :session-id session-id
+                              :run-id run-id})
+                  run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+                  result-text (:psi.workflow/result result)]
+              (is (= :completed (:psi.workflow/status result)) (pr-str run))
+              (is (= "final-summary" (last (:step-order (:effective-definition run))))
+                  "converged final-summary must be ordered last (DI-2)")
+              (is (string? result-text))
+              (is (= 1 (count (re-seq #"PASS_STATUS: REVIEW_COMPLETE" result-text)))
+                  "standalone result text is the converged final-summary's single REVIEW_COMPLETE line")
+              (is (str/includes? result-text reply-prefix)
+                  "standalone result text is the converged final-summary's reply (prefix unique to that step), not some other step's bare REVIEW_COMPLETE")))
+          (finally
+            (context/shutdown-context! ctx))))
+      (finally
+        (.delete (java.io.File. models-path))))))
+
 (deftest init-built-in-workflow-registers-review-step-routing-operations-test
   (testing "built-in workflow bootstrap registers deterministic review-step routing operations"
     (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
@@ -37,6 +97,8 @@
                                             "workflow/munera-open-task-path-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/exact-marker-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/scope-question-gate-routing")))
         (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                            "workflow/proof-sync-disposition-routing")))
         (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
@@ -75,8 +137,40 @@
                  (op-reg/invoke-operation-in
                   (:deterministic-operation-registry ctx)
                   operation-id
-                  {:args args}
+                  {:ctx ctx
+                   :session-id session-id
+                   :args args}
                   deterministic-op-runtime/invoke-operation))))
+        (testing "scope-question gate smoke uses self-contained task artifacts"
+          (test-support/with-temp-worktree-session
+            (fn [worktree scope-ctx scope-session-id]
+              (let [scope-gate-args {:artifact "design-steps.md"
+                                     :marker "SCOPE_QUESTION:"
+                                     :proceed-route "DONE"
+                                     :open-route "SCOPE_QUESTION_OPEN"}
+                    invoke-scope-gate (fn [task-path]
+                                        (op-reg/invoke-operation-in
+                                         (:deterministic-operation-registry scope-ctx)
+                                         "workflow/scope-question-gate-routing"
+                                         {:ctx scope-ctx
+                                          :session-id scope-session-id
+                                          :args (assoc scope-gate-args :task-path task-path)}
+                                         deterministic-op-runtime/invoke-operation))]
+                (workflow-test-support/init-built-in-workflow! scope-ctx scope-session-id)
+                (is (= {:status :ok
+                        :data "DONE"
+                        :summary "DONE"}
+                       (invoke-scope-gate "munera/open/999-bootstrap-smoke-absent")))
+                (test-support/write-task-artifact!
+                 worktree
+                 "munera/open/999-bootstrap-smoke-open"
+                 "design-steps.md"
+                 "- [ ] SCOPE_QUESTION: bootstrap halt route?\n")
+                (is (= {:status :ok
+                        :data "SCOPE_QUESTION_OPEN"
+                        :summary "SCOPE_QUESTION_OPEN"
+                        :details {:open-questions ["bootstrap halt route?"]}}
+                       (invoke-scope-gate "munera/open/999-bootstrap-smoke-open")))))))
         (is (= :invalid-route-marker-args
                (:reason
                 (op-reg/invoke-operation-in
@@ -156,3 +250,13 @@
               (context/shutdown-context! ctx))))
         (finally
           (.delete (java.io.File. models-path)))))))
+
+(deftest review-task-design-converged-standalone-surfaces-review-complete-result-test
+  (testing "converged review-task-design surfaces the converged final-summary text as standalone result"
+    (assert-converged-standalone-surfaces-review-complete
+     "review-task-design" "run-design-converged" "Design review completed cleanly.")))
+
+(deftest review-task-plan-converged-standalone-surfaces-review-complete-result-test
+  (testing "converged review-task-plan surfaces the converged final-summary text as standalone result"
+    (assert-converged-standalone-surfaces-review-complete
+     "review-task-plan" "run-plan-converged" "Plan review completed cleanly.")))

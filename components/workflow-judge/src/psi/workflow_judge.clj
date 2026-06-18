@@ -129,6 +129,12 @@
 (defn evaluate-routing
   "Evaluate a judge signal against a routing table with iteration checks.
 
+   This is the runtime-governing exhaustion site for judged loops (DI-6): on
+   exhaustion it either hard-fails (`:iteration-exhausted`) or, when the directive
+   carries `:on-max-iterations`, routes to that author-chosen target via the same
+   `resolve-goto-target` resolution used for `:goto` — so the run is never marked
+   failed and continues to the author's handback step.
+
    Returns one of:
    - {:action :goto :target step-id}
    - {:action :complete}
@@ -144,7 +150,9 @@
               iter-count (get target-run :iteration-count 0)
               limit-check (check-iteration-limit iter-count (:max-iterations directive))]
           (if (= :exhausted limit-check)
-            {:action :fail :reason :iteration-exhausted :step-id target :iteration-count iter-count}
+            (if (contains? directive :on-max-iterations)
+              (resolve-goto-target (:on-max-iterations directive) current-step-id step-order)
+              {:action :fail :reason :iteration-exhausted :step-id target :iteration-count iter-count})
             resolved))
 
         ;; :complete or :fail — pass through

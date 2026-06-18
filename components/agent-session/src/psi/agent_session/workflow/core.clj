@@ -16,6 +16,7 @@
    [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
+   [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
    [psi.agent-session.workflow.routing :as routing]
@@ -107,6 +108,45 @@
     (register-prompt-contribution!)
     result))
 
+(defn- scope-question-gate-arg-errors
+  [{:keys [task-path artifact marker proceed-route open-route]}]
+  (cond-> []
+    (not (string? task-path))     (conj {:field :task-path :reason :non-string})
+    (not (string? artifact))      (conj {:field :artifact :reason :non-string})
+    (not (string? marker))        (conj {:field :marker :reason :non-string})
+    (not (string? proceed-route)) (conj {:field :proceed-route :reason :non-string})
+    (not (string? open-route))    (conj {:field :open-route :reason :non-string})))
+
+(defn scope-question-gate-routing
+  "Deterministic gate handler: scan a task artifact for unchecked SCOPE_QUESTION
+   items and route to proceed/open accordingly (DI-3).
+
+   IO is the single resolver read; the routing decision is the pure scanner.
+   The owning session id is `(or parent-session-id session-id)`: the production
+   `:invoke`-step judge path supplies `:parent-session-id` and no `:session-id`,
+   so reading only `:session-id` would resolve a nil worktree and fail the gate
+   open. The session id is seeded into `extra-entity` (where `query-in` reads it)
+   and `(:ctx invocation)` is passed as the agent-session-ctx."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [errors (scope-question-gate-arg-errors args)]
+    (if (seq errors)
+      {:status :error
+       :reason :invalid-scope-question-gate-args
+       :message "workflow/scope-question-gate-routing args are invalid"
+       :details {:errors errors}}
+      (let [{:keys [task-path artifact marker proceed-route open-route]} args
+            owning-session-id (or parent-session-id session-id)
+            task-dir (routing/normalize-open-task-path task-path)
+            content (when task-dir
+                      (:psi.munera/task-artifact-content
+                       (resolvers/query-in
+                        ctx
+                        [:psi.munera/task-artifact-content]
+                        {:psi.agent-session/session-id owning-session-id
+                         :psi.munera/task-path task-dir
+                         :psi.munera/artifact-name artifact})))]
+        (routing/parse-scope-question-gate content marker proceed-route open-route)))))
+
 (defn- register-built-in-deterministic-operations!
   [api]
   (when-let [register-operation (:register-operation api)]
@@ -136,7 +176,12 @@
     (register-operation
      {:id "workflow/exact-marker-routing"
       :handler (fn [{:keys [args]}]
-                 (routing/parse-exact-marker-routing args))})))
+                 (routing/parse-exact-marker-routing args))})
+    (register-operation
+     {:id "workflow/scope-question-gate-routing"
+      :description (str "Deterministically gate the task lifecycle on unchecked "
+                        "SCOPE_QUESTION items in a task artifact (content scan, no LLM).")
+      :handler scope-question-gate-routing})))
 
 (declare refresh-widgets!)
 

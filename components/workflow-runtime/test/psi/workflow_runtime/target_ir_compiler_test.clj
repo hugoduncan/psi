@@ -267,6 +267,27 @@
              (select-keys (workflow-ir/validate-workflow-ir bad-ir)
                           [:valid? :structural-errors :semantic-errors])))))
 
+  (testing ":on-max-iterations is threaded from authored model into IR (AC-2)"
+    (let [ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "build"
+                        :type :session
+                        :model "gpt-5.4"
+                        :contributions [{:type :template
+                                         :text "Build it: {{input}}"
+                                         :vars {"input" {:from :workflow-input :path [:input]}}}]
+                        :judge {:type :llm
+                                :model "gpt-5.4"
+                                :contributions [{:type :template
+                                                 :text "APPROVED or REVISE?"
+                                                 :vars {}}]
+                                :projection {:type :tail :turns 1}}
+                        :on {"APPROVED" {:goto :done}
+                             "REVISE" {:goto "build" :max-iterations 3
+                                       :on-max-iterations "handback"}}}]})]
+      (is (= {:goto "build" :max-iterations 3 :on-max-iterations "handback"}
+             (get-in ir [:steps 0 :on "REVISE"])))
+      (is (not (contains? (get-in ir [:steps 0 :on "APPROVED"]) :on-max-iterations)))))
+
   (testing "target-authored source specs reject non-canonical workflow-runtime refs at validation time"
     (let [{:keys [valid? structural-errors semantic-errors compile-error]}
           (target-compiler/compile-and-validate-workflow-definition

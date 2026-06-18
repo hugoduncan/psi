@@ -191,6 +191,29 @@
         (is (= {:action :fail :reason :iteration-exhausted :step-id "step-2-build" :iteration-count 3}
                (workflow-judge/evaluate-routing "REVISE" table "step-3-review" step-order exhausted-runs)))))
 
+    (testing "exhausted with :on-max-iterations → route to author target, not fail (DI-6)"
+      (let [on-max-table {"REVISE" {:goto "step-2-build" :max-iterations 3
+                                    :on-max-iterations "step-1-plan"}}
+            exhausted-runs (assoc-in step-runs ["step-2-build" :iteration-count] 3)]
+        (is (= {:action :goto :target "step-1-plan"}
+               (workflow-judge/evaluate-routing
+                "REVISE" on-max-table "step-3-review" step-order exhausted-runs)))))
+
+    (testing "exhausted with :on-max-iterations :done → complete (DI-6)"
+      (let [on-max-done-table {"REVISE" {:goto "step-2-build" :max-iterations 3
+                                         :on-max-iterations :done}}
+            exhausted-runs (assoc-in step-runs ["step-2-build" :iteration-count] 3)]
+        (is (= {:action :complete}
+               (workflow-judge/evaluate-routing
+                "REVISE" on-max-done-table "step-3-review" step-order exhausted-runs)))))
+
+    (testing "within-limit with :on-max-iterations still routes the success goto (DI-6)"
+      (let [on-max-table {"REVISE" {:goto "step-2-build" :max-iterations 3
+                                    :on-max-iterations "step-1-plan"}}]
+        (is (= {:action :goto :target "step-2-build"}
+               (workflow-judge/evaluate-routing
+                "REVISE" on-max-table "step-3-review" step-order step-runs)))))
+
     (testing "no match"
       (is (= {:action :no-match}
              (workflow-judge/evaluate-routing "REJECT" table "step-3-review" step-order step-runs))))

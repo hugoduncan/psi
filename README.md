@@ -154,10 +154,15 @@ For user-facing workflow usage, workflow file location, `/delegate`, reload
 behavior, and workflow-run retention/cleanup behavior, see:
 - [`doc/workflows.md`](doc/workflows.md)
 
-Project workflows include autonomous simplification helpers: `/delegate
-reduce-incidental-complexity` for function/executable-unit incidental complexity
-and `/delegate reduce-architectural-complexity` for namespace/family/pair/community
-architecture targets selected by Gordian.
+Project workflows include:
+
+- `/delegate task-lifecycle <task>` runs a Munera task through design → plan →
+  implement → review → extract knowledge. Unresolved `SCOPE_QUESTION:` items halt
+  the lifecycle before plan creation and hand back to the human; see
+  [`doc/workflows.md`](doc/workflows.md).
+- `/delegate reduce-incidental-complexity` for function/executable-unit
+  incidental complexity and `/delegate reduce-architectural-complexity` for
+  namespace/family/pair/community architecture targets selected by Gordian.
 
 Completed workflow runs are retained per originating session and older runs are
 cleaned up automatically; retention is configurable. See

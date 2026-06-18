@@ -160,6 +160,34 @@
                (:details result))
             (pr-str result))))))
 
+(deftest normalize-open-task-path-test
+  ;; Tests the pure workflow-input normalizer directly. Operation-level tests keep
+  ;; only a representative boundary case; this pure unit owns the grammar.
+  (testing "full munera/open paths are returned after trimming surrounding whitespace"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "munera/open/230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "  munera/open/230-scope-question-lifecycle-gate\n"))))
+  (testing "bare task tokens become munera/open paths after trimming whitespace"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "\t230-scope-question-lifecycle-gate "))))
+  (testing "non-open, free-text, partial, malformed, and nil inputs yield nil"
+    (doseq [invalid ["munera/closed/230-scope-question-lifecycle-gate"
+                     "please run 230-scope-question-lifecycle-gate"
+                     "prefix munera/open/230-scope-question-lifecycle-gate"
+                     "munera/open/230-scope-question-lifecycle-gate/extra"
+                     "munera/open/not-a-number"
+                     "230-Scope-Question-Lifecycle-Gate"
+                     nil]]
+      (is (nil? (routing/normalize-open-task-path invalid))
+          (pr-str invalid)))))
+
 (deftest exact-marker-routing-valid-and-missing-test
   ;; Tests generic exact-marker routing accepts arbitrary workflow-owned marker
   ;; labels/routes and ignores surrounding non-candidate lines.
@@ -327,3 +355,74 @@
                                  (routing/parse-exact-marker-routing args))]
         (is (= expected-errors (get-in result [:details :errors]))
             (pr-str result))))))
+
+(def ^:private scope-marker "SCOPE_QUESTION:")
+(def ^:private scope-proceed "DONE")
+(def ^:private scope-open "SCOPE_QUESTION_OPEN")
+
+(defn- parse-scope-gate
+  [content]
+  (routing/parse-scope-question-gate content scope-marker scope-proceed scope-open))
+
+(deftest scope-question-gate-parser-test
+  ;; Tests the pure content scanner that gates the task lifecycle on unchecked
+  ;; SCOPE_QUESTION items in design-steps.md content. No IO; route labels and the
+  ;; marker are supplied as args (not hardcoded).
+  (testing "single unchecked SCOPE_QUESTION item routes to the open route with named concern"
+    (let [result (parse-scope-gate "- [ ] SCOPE_QUESTION: bucket-size in reopen identity?")]
+      (assert-route scope-open result)
+      (is (= ["bucket-size in reopen identity?"]
+             (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "only-checked SCOPE_QUESTION items route to proceed (AC-2)"
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [x] SCOPE_QUESTION: resolved one\n- [X] SCOPE_QUESTION: resolved two")))
+
+  (testing "nil and empty content route to proceed (AC-2 absent file)"
+    (assert-route scope-proceed (parse-scope-gate nil))
+    (assert-route scope-proceed (parse-scope-gate "")))
+
+  (testing "mixed checked and unchecked items route to open, naming only open concerns"
+    (let [result (parse-scope-gate
+                  (str "- [x] SCOPE_QUESTION: resolved\n"
+                       "- [ ] SCOPE_QUESTION: still open"))]
+      (assert-route scope-open result)
+      (is (= ["still open"] (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "indented unchecked item routes to open (leading whitespace tolerated)"
+    (let [result (parse-scope-gate "    - [ ] SCOPE_QUESTION: indented concern")]
+      (assert-route scope-open result)
+      (is (= ["indented concern"] (get-in result [:details :open-questions]))
+          (pr-str result))))
+
+  (testing "unchecked non-marker checklist item is ignored (proceed)"
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] ordinary follow-up item")))
+
+  (testing "marker present but not as the item prefix routes to proceed (no false halt)"
+    ;; The marker must be the item prose prefix (immediately after the
+    ;; checkbox). A line that merely *mentions* SCOPE_QUESTION: later in the
+    ;; prose is not an open item — wrongly halting on it would block the
+    ;; lifecycle (the inverse failure mode to a missed halt).
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] note: SCOPE_QUESTION: is discussed elsewhere"))
+    (assert-route scope-proceed
+                  (parse-scope-gate "- [ ] resolved the SCOPE_QUESTION: about bucket-size")))
+
+  (testing "route labels are honoured from args, not hardcoded"
+    (let [result (routing/parse-scope-question-gate
+                  "- [ ] SCOPE_QUESTION: pick" scope-marker "GO" "STOP")]
+      (assert-route "STOP" result))
+    (assert-route "GO"
+                  (routing/parse-scope-question-gate
+                   "- [x] SCOPE_QUESTION: done" scope-marker "GO" "STOP")))
+
+  (testing "multiple open items are all named in order"
+    (let [result (parse-scope-gate
+                  (str "- [ ] SCOPE_QUESTION: first\n"
+                       "- [ ] SCOPE_QUESTION: second"))]
+      (assert-route scope-open result)
+      (is (= ["first" "second"] (get-in result [:details :open-questions]))
+          (pr-str result)))))

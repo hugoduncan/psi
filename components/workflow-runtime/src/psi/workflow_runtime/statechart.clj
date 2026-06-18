@@ -201,28 +201,44 @@
                   (nth step-order (dec idx))))
     goto))
 
+(defn- resolve-goto-acting-target
+  "Resolve a goto target (`:next`/`:done`/`:previous`/step-name) to its
+   statechart acting-state id, relative to `current-step-id`. Shared by the
+   `:goto` success target and the `:on-max-iterations` exhaustion target so the
+   two cannot diverge."
+  [step-order current-step-id goto]
+  (case goto
+    :next (next-step-target step-order current-step-id)
+    :done :completed
+    :previous (let [idx (.indexOf ^java.util.List step-order current-step-id)]
+                (if (<= idx 0)
+                  :failed
+                  (step-acting-state-id (nth step-order (dec idx)))))
+    ;; string step-id
+    (step-acting-state-id goto)))
+
 (defn- compile-routing-transitions
   "Compile judge routing table `:on` into statechart transitions with guards.
 
    Each signal in the routing table becomes one or more guarded transitions on
    `:judge/signal`. Iteration-limited routes compile both the success path and the
-   exhaustion-to-failed path so the chart remains quiescent only for truly unmatched
-   signals."
+   exhaustion path. The exhaustion target is the author's `:on-max-iterations`
+   target when present (resolved via the same goto resolution as `:goto`),
+   otherwise `:failed` (the hard-fail default). Note (DI-6): the judge-side
+   `evaluate-routing` is the runtime-governing exhaustion site for judged loops;
+   this statechart exhaustion guard is dead code for those workflows and is kept
+   coherent for any future direct-`:judge/signal` path."
   [routing-table step-order current-step-id]
   (vec
    (mapcat
     (fn [[signal directive]]
-      (let [{:keys [goto max-iterations]} directive
+      (let [{:keys [goto max-iterations on-max-iterations]} directive
             target-step (routing-target-step-id step-order current-step-id goto)
-            target (case goto
-                     :next (next-step-target step-order current-step-id)
-                     :done :completed
-                     :previous (let [idx (.indexOf ^java.util.List step-order current-step-id)]
-                                 (if (<= idx 0)
-                                   :failed
-                                   (step-acting-state-id (nth step-order (dec idx)))))
-                     ;; string step-id
-                     (step-acting-state-id goto))]
+            target (resolve-goto-acting-target step-order current-step-id goto)
+            exhaustion-target (if (contains? directive :on-max-iterations)
+                                (resolve-goto-acting-target
+                                 step-order current-step-id on-max-iterations)
+                                :failed)]
         (if max-iterations
           [(ele/transition {:event :judge/signal
                             :target target
@@ -233,7 +249,7 @@
                                       (and (= signal-str signal)
                                            (< iter-count max-iterations))))})
            (ele/transition {:event :judge/signal
-                            :target :failed
+                            :target exhaustion-target
                             :cond (fn [_env data]
                                     (let [signal-str (:signal data)
                                           iter-counts (:iteration-counts data)

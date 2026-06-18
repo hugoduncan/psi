@@ -91,6 +91,31 @@
                       :result-schema [:map]
                       :retry-policy {:max-attempts 1 :retry-on #{}}}}})
 
+(def judged-looping-on-max-iterations-definition
+  "A judged loop whose CHANGED route names an `:on-max-iterations` author target
+   (the `handback` step) instead of hard-failing on exhaustion."
+  {:definition-id "loop-test-on-max"
+   :step-order ["produce" "check" "handback"]
+   :steps {"produce"  {:name "produce"
+                       :type :session
+                       :executor {:type :agent}
+                       :result-schema [:map]
+                       :retry-policy {:max-attempts 1 :retry-on #{}}}
+           "check"    {:name "check"
+                       :type :session
+                       :judge {:type :llm}
+                       :on {"DONE"    {:goto :done}
+                            "CHANGED" {:goto "produce" :max-iterations 2
+                                       :on-max-iterations "handback"}}
+                       :executor {:type :agent}
+                       :result-schema [:map]
+                       :retry-policy {:max-attempts 1 :retry-on #{}}}
+           "handback" {:name "handback"
+                       :type :session
+                       :executor {:type :agent}
+                       :result-schema [:map]
+                       :retry-policy {:max-attempts 1 :retry-on #{}}}}})
+
 (defn- hierarchical-chart-run
   "Run a compiled hierarchical chart through a sequence of events, collecting
    action dispatches. Returns {:configuration ... :actions [...]}."
@@ -170,6 +195,27 @@
           "DONE signal should reach :completed")
       (is (not (some #(= :iteration/exhausted (:action %)) actions))
           ":iteration/exhausted should not fire for DONE signal"))))
+
+(deftest iteration-exhaustion-routes-to-on-max-iterations-target-test
+  (testing "exhausted CHANGED with :on-max-iterations routes to the author target, not :failed"
+    (let [{:keys [configuration actions]}
+          (hierarchical-chart-run
+           judged-looping-on-max-iterations-definition
+           [{:event :workflow/start :data {}}
+            {:event :actor/done :data {:iteration-counts {"produce" 1} :attempt-counts {"produce" 1}}}
+            {:event :actor/done :data {:iteration-counts {"check" 1} :attempt-counts {"check" 1}}}
+            ;; judge says CHANGED, iteration count for "produce" is already at max
+            {:event :judge/signal :data {:signal "CHANGED"
+                                         :iteration-counts {"produce" 2 "check" 1}
+                                         :attempt-counts {"produce" 2 "check" 1}}}])]
+      (is (contains? configuration :step/handback.acting)
+          "Exhaustion should route to the :on-max-iterations author target's acting state")
+      (is (not (contains? configuration :failed))
+          "Author-routed exhaustion should NOT mark the run :failed")
+      (is (some #(= {:action :judge/record :step-id "check"} %) actions)
+          "Author-routed exhaustion should dispatch :judge/record, not :iteration/exhausted")
+      (is (not (some #(= :iteration/exhausted (:action %)) actions))
+          ":iteration/exhausted should not fire when an author target is routed"))))
 
 (deftest judged-routing-transition-vector-failed-target-test
   (testing "both :failed and [:failed] are normalized onto the failed transition path"

@@ -90,11 +90,25 @@
    [:system-prompt {:optional true} [:maybe :string]]
    [:projection {:optional true} [:maybe projection-schema]]])
 
+(defn- on-max-iterations-requires-max-iterations?
+  "Cross-field constraint: `:on-max-iterations` is only meaningful with
+  `:max-iterations` (D3). Reject `:on-max-iterations` without `:max-iterations`."
+  [directive]
+  (or (not (contains? directive :on-max-iterations))
+      (some? (:max-iterations directive))))
+
 (def routing-directive-schema
-  "A single routing directive mapping a judge signal to a target."
-  [:map
-   [:goto [:or [:enum :next :previous :done] :string]]
-   [:max-iterations {:optional true} [:maybe pos-int?]]])
+  "A single routing directive mapping a judge signal to a target.
+  Optional `:on-max-iterations` names an author-chosen exhaustion target so a
+  judged loop that exhausts `:max-iterations` routes there instead of hard
+  failing; it is only valid alongside `:max-iterations` (D3)."
+  [:and
+   [:map
+    [:goto [:or [:enum :next :previous :done] :string]]
+    [:max-iterations {:optional true} [:maybe pos-int?]]
+    [:on-max-iterations {:optional true} [:or [:enum :next :previous :done] :string]]]
+   [:fn {:error/message ":on-max-iterations requires :max-iterations"}
+    on-max-iterations-requires-max-iterations?]])
 
 (def routing-table-schema
   "Maps judge signal strings to routing directives."
