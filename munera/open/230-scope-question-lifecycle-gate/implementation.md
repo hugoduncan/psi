@@ -577,3 +577,7 @@ Verification:
 - `bb clojure:test:scry --namespace psi.agent-session.task-artifact-content-resolver-test` → 3 tests / 10 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.scope-question-gate-operation-test` → 7 tests / 15 assertions green.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` → clean.
+
+## Code-shaper review — final pass
+
+Found one remaining robustness issue: the task-artifact resolver's containment check is worktree-wide rather than task-directory-scoped, so artifact-name `..` segments can read other in-worktree files. Filed a non-duplicative follow-up in `steps.md`.

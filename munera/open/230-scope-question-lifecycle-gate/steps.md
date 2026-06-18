@@ -406,3 +406,16 @@ pass (AC-4).
       and returns nil for rejected paths. Added resolver tests for absolute task
       path, absolute artifact path, relative `..` escape, and directory artifact
       inputs.
+
+## Code shaping (code-shaper) — final pass follow-up
+
+- [ ] **Task-artifact resolver still allows artifact-name escapes within the worktree.**
+      `contained-regular-file` rejects absolute paths and paths whose canonical target
+      leaves the session worktree, but it only checks `target.startsWith(worktree)`.
+      Because the resolver is named/used as a task-artifact reader, a caller can pass
+      a valid task path plus an artifact name such as `../../../../README.md` (or
+      `../other-task/design.md`) and read an arbitrary regular file elsewhere inside
+      the worktree. Tighten the boundary so the resolved target must stay under the
+      resolved task directory (not merely under the worktree), keep absolute-path and
+      symlink/`..` escape rejection, and add resolver tests proving an artifact-name
+      `..` escape to a repo-root file and to a sibling task returns nil.
