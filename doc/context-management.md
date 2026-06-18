@@ -102,7 +102,7 @@ form.
 ```clojure
 {:ir/type :user-input
  :ir/version 1
- :ir/turn-id "uuid"
+ :ir/turn-id 0
  :ir/timestamp (Instant)
  :ir/raw-text "original user text"
  :ir/commands ["command" ...]          ;; extracted /model, /remember, etc.
@@ -123,7 +123,7 @@ mechanics of how it was produced.
 ```clojure
 {:ir/type :turn
  :ir/version 1
- :ir/turn-id "uuid"
+ :ir/turn-id 0
  :ir/timestamp (Instant)
  :ir/user-input user-input-ir          ;; reference to the User Input IR
  :ir/entities [{:name "..." :type :file|:task|:concept|:person|:custom
@@ -195,7 +195,7 @@ recording that something noteworthy happened.
  :ir/event-id "uuid"
  :ir/timestamp (Instant)
  :ir/event-type :file-changed|:task-advanced|:decision-made|:error-encountered|:custom
- :ir/source-turn-id "uuid"
+ :ir/source-turn-id 0
  :ir/summary "concise description"
  :ir/details {}
  :ir/metadata {}}
@@ -235,6 +235,14 @@ because it is expensive to materialise and may be shared by sessions in the same
 worktree. The extension may choose other backends (database, remote storage) as
 needed. Core never reads or interprets project state storage.
 
+**Cache policy**: Project State IR cache is safe to delete. It may contain
+conversation-derived summaries, local git state, and task/memory summaries, so it
+must be treated as local/private runtime data. The context-manager extension must
+ensure its cache directory is ignored by git (for example via `.git/info/exclude`
+or a project `.gitignore` entry) before writing cache files. Durable project
+knowledge should be written to mementum, munera, docs, or source artifacts, not
+kept only in `.psi/context/`.
+
 ## IR Storage Model
 
 IRs are stored on the session under `:extension-ir-data` as a map:
@@ -242,17 +250,25 @@ IRs are stored on the session under `:extension-ir-data` as a map:
 ```clojure
 {:extension-ir-data
  {:context-manager
-  {:turn-irs        {turn-id-1 turn-ir-1
-                     turn-id-2 turn-ir-2
-                     ...}
-   :project-events  [project-event-1 project-event-2 ...]
-   :session-state   session-state-ir
-   :project-state   project-state-ir
-   :compaction-summary "..."}}}}
+  {:user-input-irs {0 user-input-ir-0
+                    1 user-input-ir-1
+                    ...}
+   :turn-irs       {0 turn-ir-0
+                    1 turn-ir-1
+                    ...}
+   :project-events {event-id-1 project-event-1
+                    event-id-2 project-event-2
+                    ...}
+   :session-state  session-state-ir
+   :project-state  project-state-ir
+   :projection     {:compaction-summary "..."
+                    :compacted-turn-ids #{0 1 2}}}}}
 ```
 
-The outer key (`:context-manager`) is the extension path, allowing multiple
-extensions to store IR data without collision. The inner keys are extension-defined.
+The outer key (`:context-manager`) is the active context-manager extension key.
+The key is a keyword selected at extension activation time; for a manifest-backed
+extension it should be derived from the manifest id. The inner keys are
+extension-defined.
 
 Core never reads or interprets these values. The extension queries them via EQL.
 
@@ -445,7 +461,7 @@ user text
       → handler returns {:root-state-update f :return ir-map}
       → core stores IR in :extension-ir-data
     → core appends journal entry (as before)
-    → returns {:turn-id uuid :user-msg msg}
+    → returns {:turn-id 0 :user-msg msg}
   → :session/prompt handler
     → starts agent loop with user message
   → :session/prompt-prepare-request handler
@@ -566,6 +582,32 @@ requirement.
 
 ## Core Model Changes
 
+### Journal Metadata Contract
+
+Core adds enough metadata to journal entries for deterministic IR rebuild and
+provider-valid projection:
+
+```clojure
+{:journal/entry-id "stable-entry-id"
+ :journal/turn-id 0
+ :journal/turn-seq 0
+ :journal/timestamp instant
+ :journal/kind :user|:assistant|:tool-call|:tool-result|:system|:summary
+ :journal/provider {:id "openai" :model "..."}
+ :journal/tool-call-id "provider-tool-call-id"
+ :journal/tool-result-for "provider-tool-call-id"}
+```
+
+Required fields are `:journal/entry-id`, `:journal/turn-id`,
+`:journal/turn-seq`, `:journal/timestamp`, and `:journal/kind`. Tool linkage
+fields are required when the entry represents a tool call or tool result. The
+projector uses this metadata to either preserve a raw provider-valid segment or
+replace the whole segment with summary/context.
+
+Legacy journal entries without this metadata are supported by best-effort rebuild
+only. They may be projected as raw journal history or summarised conservatively;
+they are not expected to produce high-fidelity Turn IRs.
+
 ### Session Data
 
 Add to `agent-session-schema` in `psi.session-state.model`:
@@ -614,7 +656,7 @@ but before journaling.
 ```
 
 **Handler:** stores the User Input IR on the session under
-`:extension-ir-data :context-manager :turn-irs :user-input turn-id`.
+`:extension-ir-data :context-manager :user-input-irs turn-id`.
 
 **Return:** `{:root-state-update f :return ir-map}`
 
@@ -627,7 +669,7 @@ Dispatched as an effect during `:session/prompt-finish` (async, non-blocking).
 **Input:**
 ```clojure
 {:session-id sid
- :turn-id "uuid"
+ :turn-id 0
  :journal-entries [journal-entry ...]}
 ```
 
@@ -724,20 +766,58 @@ The projector can use different strategies based on context pressure:
 - **High pressure**: aggressive summarisation, keep only decisions and key entities
 - **Critical**: keep only the last turn + essential state + active decisions
 
+
+### Projection Contract
+
+The projector receives base provider messages produced from the journal and
+returns either `nil` (use base messages unchanged) or:
+
+```clojure
+{:messages provider-valid-messages
+ :metadata {:strategy :low-pressure|:high-pressure|:critical
+            :raw-turns [turn-id ...]
+            :ir-turns [turn-id ...]
+            :summarised-turns [turn-id ...]
+            :dropped-turns [turn-id ...]}}
+```
+
+Projection must obey these rules:
+
+1. Preserve the current user message for the in-flight turn.
+2. Emit provider-valid messages for the selected provider.
+3. Preserve tool-call/tool-result adjacency when including raw tool segments.
+4. Never include only one side of a tool-call/tool-result pair. If a raw segment
+   cannot be included validly, replace the whole segment with a summary or
+   structured context message.
+5. Preserve active system/developer steering messages unless they are explicitly
+   superseded by a newer message according to existing session rules.
+6. Keep provider-specific constraints at the projection boundary; IR schemas
+   stay provider-agnostic.
+7. Return `nil` on timeout, invalid projection, unavailable context manager, or
+   any uncertainty about provider-message validity.
+
+The projection metadata is for introspection and debugging only; core must not
+depend on it for semantic decisions.
+
 ### Reply Processing
 
 Out-of-band processing after each reply:
 
 1. **Read journal entries** for the completed turn
-2. **Extract Turn IR**: parse entities, relationships, claims, questions,
-   decisions, and actions from the raw conversation content
+2. **Extract Turn IR conservatively**: parse entities, relationships, claims,
+   questions, decisions, and actions from the raw conversation content; when in
+   doubt, preserve a raw summary/reference rather than inventing structure
 3. **Extract project events**: file changes, task progress, decisions made
 4. **Update session state IR**: turn count, context usage, phase
-5. **Check for memory extraction**: does the turn contain insights worth
-   storing? (integrates with mementum)
+5. **Identify memory candidates**: detect possible mementum memories/knowledge,
+   but only propose or stage them unless the run is operating under an explicitly
+   approved autonomous extraction protocol
 6. **Re-materialise project state IR** if events warrant
 
-This runs in a background thread and does not block the user.
+This runs in a background thread and does not block the user. Initial
+implementations should prefer context preservation over aggressive reduction:
+keep recent raw turns, summarise older turns, and expose projection metadata so
+bad extraction can be inspected and corrected.
 
 ### Compaction Strategy
 
@@ -820,11 +900,13 @@ The context-management design depends on these invariants:
 
 - **S1 (Operations)**: IR storage is session state; IR builders/projectors are
   extension handlers. Core dispatches events; extension handles them.
-- **S2 (Regulation)**: IR schemas are extension-defined; core validates that
-  IR data is stored but never interprets it. Extension permissions control
-  what state the extension can read.
+- **S2 (Regulation)**: IR schemas are extension-defined; core validates only
+  the opaque storage envelope (map shape / extension key), not IR semantics.
+  Extension permissions control what state the extension can read.
 - **S3 (Coordination)**: Dispatch pipeline feeds IR lifecycle events in the
-  right order. Extension handlers are pure functions that return IR data.
+  right order. Extension handlers should keep state transitions pure and return
+  effects-as-data for cache/file/model work; impure work runs at the runtime
+  boundary.
 - **S4 (Adaptation)**: Extension can evolve IR schemas and projection
   strategies without core changes. EQL introspection exposes IR data.
 
