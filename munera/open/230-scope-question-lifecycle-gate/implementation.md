@@ -471,3 +471,7 @@ Verification: `clj-paren-repair` no-op; `clj-kondo --lint` clean on the two touc
 `gate-task-path-normalization-boundary-test` → 3 tests / 16 assertions. A full two-namespace Scry run still hits the pre-existing unrelated
 `delegate-review-task-implementation-completes-with-nullable-local-model-test`
 failure (3 assertions; same `missing-pass-status`/stubbed "ok" issue noted earlier), not caused by these follow-ups.
+
+## Test review (task-test-review) — post-follow-up re-review
+
+No new actionable test issues found after the post-bootstrap follow-ups. Re-checked scanner/resolver/operation/task-lifecycle definition coverage plus the built-in bootstrap smoke: focused Scry suites green (20 tests / 322 assertions; bootstrap vars 2 tests / 14 assertions) and focused clj-kondo clean. Existing unrelated live workflow-delegate test failure remains out of scope as previously noted.
