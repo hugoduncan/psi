@@ -7,9 +7,10 @@ tools:
   - edit
   - write
 skills:
+  - task-design
   - work-independently
 ---
-For the Munera task identified by {{input}}, execute newly added actionable follow-up items in design-steps.md. Work independently. Read the task's design-steps.md, plan.md, steps.md, and implementation.md, and read the task's design.md as read-only context as needed. Then inspect task-scoped git history to identify unchecked items added by the preceding review pass.
+For the Munera task identified by {{input}}, execute newly added actionable follow-up items in design-steps.md with updates to plan.md and steps.md. Work independently. Read the task's design-steps.md, plan.md, steps.md, and implementation.md, and read the task's design.md as read-only context as needed. Then inspect task-scoped git history to identify unchecked items added by the preceding review pass.
 
 In the merged `review-task-plan` workflow, the preceding review pass is the immediately preceding whole `plan-review` batch: the ambiguity and inconsistency review prompts run back-to-back in one shared child session before this follow-up. Treat "newly added" as spanning both review prompts in that immediately preceding batch.
 
@@ -21,4 +22,8 @@ Use this evidence rule for batch review workflows:
 4. Execute only those candidate items. Do not execute unchecked items that predate the preceding review pass, edited stale items whose addition cannot be attributed to the just-finished batch, checked items, or items from steps.md.
 5. If the review-batch segment or baseline cannot be identified confidently, or if a diff-added checklist item cannot be matched unambiguously to a current unchecked item, leave the item unchecked and record the blocking reason tersely in implementation.md rather than guessing.
 
-Read and update the task's plan.md, steps.md, design-steps.md, and implementation.md as needed. The plan review reviews both plan.md and steps.md, so a follow-up item that reports plan.md↔steps.md drift (for example steps.md not re-synced after a plan.md change) MUST be resolved by editing steps.md to match the authoritative plan.md — do not merely defer or block such items, or the review loop cannot converge. When a follow-up item requires it, also update the code, tests, and docs the item references. Complete any newly added unchecked design-steps when possible, updating the task's code, tests, docs, and task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. Do not touch design.md beyond read-only context. Commit when done.
+Read and update the task's plan.md, steps.md, design-steps.md, and implementation.md as needed. The plan review reviews both plan.md and steps.md, so a follow-up item that reports plan.md↔steps.md drift (for example steps.md not re-synced after a plan.md change) MUST be resolved by editing steps.md to match the authoritative plan.md — do not merely defer or block such items, or the review loop cannot converge. When a follow-up item requires it, also update the code, tests, and docs the item references. Complete any newly added unchecked design-steps when possible, updating the task's code, tests, docs, and task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. Do not touch design.md beyond read-only context.
+
+When finished, add a minimalist note to implementation.md stating that you have addressed the design-steps, and noting anything you were not able to do. e.g. "- design-steps completed"
+
+Commit when done.
