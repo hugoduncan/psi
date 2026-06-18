@@ -1,7 +1,6 @@
 (ns psi.agent-session.resolvers.session
   "Session-focused Pathom3 resolvers extracted from the main agent-session resolver namespace."
   (:require
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extensions :as ext]
@@ -15,7 +14,10 @@
    [psi.ai.model-registry :as model-registry]
    [psi.shared-config.session-profiles :as session-profiles]
    [psi.history.git :as git]
-   [psi.skill-registry.root-storage :as skill-storage]))
+   [psi.skill-registry.root-storage :as skill-storage])
+  (:import
+   [java.io IOException]
+   [java.nio.file Files InvalidPathException LinkOption Paths]))
 
 ;; ── Core session fields ─────────────────────────────────
 
@@ -366,6 +368,28 @@
    ::pco/output [:psi.agent-session/worktree-path]}
   {:psi.agent-session/worktree-path (support/session-worktree-path agent-session-ctx session-id)})
 
+(defn- contained-regular-file
+  "Return the artifact file when the task/artifact path stays under worktree.
+   Reject absolute/escaping inputs, missing paths, and directories."
+  [worktree-path task-path artifact-name]
+  (when (and (string? worktree-path)
+             (string? task-path)
+             (string? artifact-name))
+    (try
+      (let [worktree-path* (.normalize (Paths/get worktree-path (make-array String 0)))
+            task-path*     (Paths/get task-path (make-array String 0))
+            artifact-path* (Paths/get artifact-name (make-array String 0))]
+        (when-not (or (.isAbsolute task-path*)
+                      (.isAbsolute artifact-path*))
+          (let [worktree (.toRealPath worktree-path* (make-array LinkOption 0))
+                target   (.toRealPath (.resolve (.resolve worktree task-path*) artifact-path*)
+                                      (make-array LinkOption 0))]
+            (when (and (.startsWith target worktree)
+                       (Files/isRegularFile target (make-array LinkOption 0)))
+              (.toFile target)))))
+      (catch InvalidPathException _ nil)
+      (catch IOException _ nil))))
+
 (pco/defresolver agent-session-task-artifact-content
   "Resolve the working-tree content of a task artifact file under a worktree.
 
@@ -373,8 +397,8 @@
    worktree-relative) and artifact filename (`:psi.munera/artifact-name`) are
    inputs, so this resolver knows nothing about `design-steps.md` or any marker.
    Reads the current working-tree file (not git HEAD) so a freshly-edited file is
-   honoured on a stateless re-scan. Returns nil content when any input is missing
-   or the file does not exist."
+   honoured on a stateless re-scan. Returns nil content when any input is missing,
+   escapes the worktree, or does not name a regular file."
   [{:keys [psi.agent-session/worktree-path
            psi.munera/task-path
            psi.munera/artifact-name]}]
@@ -383,12 +407,8 @@
                  :psi.munera/artifact-name]
    ::pco/output [:psi.munera/task-artifact-content]}
   {:psi.munera/task-artifact-content
-   (when (and (string? worktree-path)
-              (string? task-path)
-              (string? artifact-name))
-     (let [file (io/file worktree-path task-path artifact-name)]
-       (when (.exists file)
-         (slurp file))))})
+   (some-> (contained-regular-file worktree-path task-path artifact-name)
+           slurp)})
 
 (defn- workflow-session-link-attrs
   [sd]

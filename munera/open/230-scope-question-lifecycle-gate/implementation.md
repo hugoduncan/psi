@@ -555,3 +555,25 @@ No new user-facing docs non-compliance found.
 ## Code-shaper review
 
 Filed one robustness follow-up in `steps.md`: the generic task-artifact resolver needs path-containment and regular-file guards.
+
+## Code-shaper follow-up: task-artifact resolver containment
+
+Executed the code-shaper follow-up from `steps.md` (baseline `2afc9e6b5`).
+
+- Replaced the resolver's raw `(io/file worktree-path task-path artifact-name)` +
+  `.exists` + `slurp` path with `contained-regular-file`.
+- The helper now rejects non-string inputs, absolute task/artifact paths,
+  canonical/real `..` escapes outside the session worktree, missing paths, and
+  non-regular-file artifacts before `slurp`.
+- Kept the resolver workflow-agnostic: no `design-steps.md`, marker, or
+  scope-question policy moved into runtime code.
+- Added resolver tests for absolute task-path rejection, absolute artifact-path
+  rejection, relative `..` escape rejection, and directory artifact rejection.
+- Marked the follow-up item complete in `steps.md`.
+
+Verification:
+
+- `clj-paren-repair components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj`
+- `bb clojure:test:scry --namespace psi.agent-session.task-artifact-content-resolver-test` → 3 tests / 10 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.scope-question-gate-operation-test` → 7 tests / 15 assertions green.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/resolvers/session.clj components/agent-session/test/psi/agent_session/task_artifact_content_resolver_test.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` → clean.

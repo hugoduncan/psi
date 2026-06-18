@@ -6,6 +6,7 @@
    :psi.munera/task-path and :psi.munera/artifact-name inputs. It knows nothing
    about design-steps.md or any marker (DI-2)."
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.resolvers.session :as session-resolvers]
@@ -50,17 +51,79 @@
                  (:psi.munera/task-artifact-content result))
               (pr-str result)))))))
 
+(deftest task-artifact-content-resolver-rejects-unsafe-paths-test
+  ;; The generic file-read resolver is registered in the agent-session resolver
+  ;; graph, so it must be robust independent of the scope-gate operation's
+  ;; workflow-specific task-path normalization. Unsafe or non-file inputs return
+  ;; nil content: the lifecycle gate fails open instead of escaping the worktree
+  ;; or throwing from slurp.
+  (testing "absolute task path is rejected"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (let [outside (test-support/write-task-artifact! worktree "outside" "design-steps.md"
+                                                         "escaped content")
+              result  (resolvers/query-in
+                       ctx [:psi.munera/task-artifact-content]
+                       {:psi.agent-session/session-id sid
+                        :psi.munera/task-path (.getParent outside)
+                        :psi.munera/artifact-name (.getName outside)})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
+
+  (testing "absolute artifact path is rejected"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (let [outside (test-support/write-task-artifact! worktree "outside" "design-steps.md"
+                                                         "escaped content")
+              result  (resolvers/query-in
+                       ctx [:psi.munera/task-artifact-content]
+                       {:psi.agent-session/session-id sid
+                        :psi.munera/task-path "munera/open/230-x"
+                        :psi.munera/artifact-name (.getAbsolutePath outside)})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result))))))
+
+  (testing "relative .. escape is rejected"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (let [sibling-dir (io/file (.getParentFile worktree)
+                                   (str (.getName worktree) "-outside"))]
+          (try
+            (.mkdirs sibling-dir)
+            (spit (io/file sibling-dir "design-steps.md") "escaped content")
+            (let [result (resolvers/query-in
+                          ctx [:psi.munera/task-artifact-content]
+                          {:psi.agent-session/session-id sid
+                           :psi.munera/task-path (str "../" (.getName sibling-dir))
+                           :psi.munera/artifact-name "design-steps.md"})]
+              (is (nil? (:psi.munera/task-artifact-content result))
+                  (pr-str result)))
+            (finally
+              (test-support/delete-recursively! sibling-dir)))))))
+
+  (testing "directory artifact is rejected instead of slurped"
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx sid]
+        (.mkdirs (io/file worktree "munera/open/230-x/design-steps.md"))
+        (let [result (resolvers/query-in
+                      ctx [:psi.munera/task-artifact-content]
+                      {:psi.agent-session/session-id sid
+                       :psi.munera/task-path "munera/open/230-x"
+                       :psi.munera/artifact-name "design-steps.md"})]
+          (is (nil? (:psi.munera/task-artifact-content result))
+              (pr-str result)))))))
+
 (deftest task-artifact-content-resolver-fail-open-guard-test
-  ;; The resolver's (and (string? worktree-path) (string? task-path)
-  ;; (string? artifact-name)) guard is the safety hinge the gate relies on
+  ;; The resolver's input/type guard is the safety hinge the gate relies on
   ;; (DI-3): a nil/unresolvable input must yield nil content, not an NPE on
-  ;; io/file, so the gate fails *open* (proceed) rather than crashing. Invoke
-  ;; the resolver directly so the guard branch itself is exercised. Through
-  ;; query-in this branch is unreachable as a present-but-non-string input:
-  ;; worktree-path is either resolved to a valid string by agent-session-cwd or
-  ;; that resolver throws (session missing :worktree-path), and the operation
-  ;; handler supplies task-path/artifact-name as literal strings — so the guard
-  ;; is defensive (belt-and-suspenders) and only reachable by a direct call.
+  ;; path composition, so the gate fails *open* (proceed) rather than crashing.
+  ;; Invoke the resolver directly so the guard branch itself is exercised.
+  ;; Through query-in this branch is unreachable as a present-but-non-string
+  ;; input: worktree-path is either resolved to a valid string by
+  ;; agent-session-cwd or that resolver throws (session missing :worktree-path),
+  ;; and the operation handler supplies task-path/artifact-name as literal
+  ;; strings — so the guard is defensive (belt-and-suspenders) and only
+  ;; reachable by a direct call.
   (testing "nil worktree-path → nil content (no NPE)"
     (is (nil? (:psi.munera/task-artifact-content
                (session-resolvers/agent-session-task-artifact-content

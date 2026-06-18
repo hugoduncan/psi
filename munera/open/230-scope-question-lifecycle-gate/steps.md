@@ -389,7 +389,7 @@ pass (AC-4).
 
 ## Code shaping (code-shaper) — follow-up
 
-- [ ] **Generic task-artifact resolver lacks path containment / regular-file guards.**
+- [x] **Generic task-artifact resolver lacks path containment / regular-file guards.**
       `agent-session-task-artifact-content` composes `(io/file worktree-path task-path artifact-name)`
       and `slurp`s it whenever `.exists`, but the resolver is generic and registered in
       the agent-session resolver graph. A caller that seeds `:psi.munera/artifact-name`
@@ -400,3 +400,9 @@ pass (AC-4).
       to resolve under the session worktree (canonical/normalized containment check),
       require the target to be a regular file, return nil for rejected/missing paths, and
       add resolver tests for absolute-path, `..` escape, and directory inputs.
+      Added `contained-regular-file` to reject absolute task/artifact paths,
+      escaping `..` paths, missing paths, and non-regular-file artifacts before
+      slurp. The resolver remains generic (no `design-steps.md` / marker policy)
+      and returns nil for rejected paths. Added resolver tests for absolute task
+      path, absolute artifact path, relative `..` escape, and directory artifact
+      inputs.
