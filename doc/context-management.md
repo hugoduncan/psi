@@ -9,8 +9,8 @@ those IRs into the provider-facing conversation, controls what is retained, and
 processes replies out-of-band to maintain derived state.
 
 This gives the extension full authority over context shape, compaction strategy,
-and memory extraction — while the core only owns the IR storage and the
-lifecycle hooks that feed it.
+and memory extraction — while the core owns only lifecycle hooks, opaque
+extension IR storage, and the journal as the rebuildable source of truth.
 
 ## Why
 
@@ -73,10 +73,26 @@ Turn IR:
 This is different from the journal model where each message is a separate entry
 with no semantic structure. The IR groups by turn boundary and extracts meaning.
 
+
+### Turn IDs
+
+Core creates turn ids per session at prompt submission time. Turn ids are
+sequential from zero within each `session-id` (for example, turn `0`, `1`, `2`,
+...). Every journal entry produced by the prompt/continue/finish lifecycle is
+stamped with the current turn id. This makes tool-call continuations and final
+assistant messages recoverable as one semantic turn.
+
+On resume, the extension rebuilds Turn IRs by grouping journal entries by the
+persisted turn id. For legacy journal entries without turn ids, rebuild uses a
+best-effort boundary scan (`user` entry followed by assistant/tool/result entries
+until the next user entry) and may assign synthetic sequential ids for rebuilt
+IRs.
+
 ## IR Types
 
-Five IR types, each with a fixed schema. The schemas are defined by the
-extension, not by core. Core only stores them as opaque maps under known keys.
+Core knows only opaque extension IR storage. The first-party context-manager
+extension defines five IR types with fixed extension-owned schemas. Core does
+not interpret these schemas.
 
 ### 1. User Input IR
 
@@ -212,10 +228,12 @@ The extension decides the refresh cadence and content. Typically refreshed at
 projection time.
 
 **Storage**: The extension decides where and how project state is persisted.
-The default approach is file-based storage in the worktree (e.g.,
-`.psi/context/project-state.edn`), keeping it alongside the project and
-version-controlled. The extension may choose other backends (database, remote
-storage) as needed. Core never reads or interprets project state storage.
+The default approach is file-based storage in a local cache under the worktree
+(e.g., `.psi/context/project-state.edn`). This cache is **not
+version-controlled**. Project State IR is persisted as a rebuildable cache
+because it is expensive to materialise and may be shared by sessions in the same
+worktree. The extension may choose other backends (database, remote storage) as
+needed. Core never reads or interprets project state storage.
 
 ## IR Storage Model
 
@@ -238,16 +256,19 @@ extensions to store IR data without collision. The inner keys are extension-defi
 
 Core never reads or interprets these values. The extension queries them via EQL.
 
-**Session IRs are not persisted.** They are in-memory only. On session resume,
-the extension rebuilds IRs from the journal entries. The journal is the single
-source of truth for persisted state. This avoids persistence format coupling and
-keeps the session file clean.
+**Session IRs are not authoritative persisted state.** They are kept in memory
+on the session and are excluded from session-file persistence. On session
+resume, the extension rebuilds IRs from the journal entries. The journal is the
+single source of truth for persisted session history. This avoids persistence
+format coupling and keeps the session file clean.
 
-**Project State IR is cached** (file-based by default) because it is expensive
-to materialise and is shared across sessions in the same worktree. The cache is
-invalidated on project events or at projection time if stale.
+**Project State IR is persisted as a local cache** (file-based by default)
+because it is expensive to materialise and is shared across sessions in the same
+worktree. The cache is invalidated on project events or at projection time if
+stale. The cache is not version-controlled and is not authoritative; durable
+project knowledge belongs in mementum, munera, docs, or source artifacts.
 
-IR instances may contain `:ir/overflow-ref` fields pointing to external files when the IR exceeds its configured size budget. The extension tracks budget metadata and enforces budgets at creation and projection time. See **Size Budgets and Overflow** for details.
+IR instances may contain `:ir/overflow-ref` fields pointing to local cache files when the IR exceeds its configured size budget. These overflow files are rebuildable, non-authoritative cache entries, not version-controlled artifacts. The extension tracks budget metadata and enforces budgets at creation and projection time. See **Size Budgets and Overflow** for details.
 
 The extension also manages a pruning budget for the total IR store, controlling how many IRs are retained and when old ones are removed. See **IR Pruning** for details.
 
@@ -325,8 +346,9 @@ Overflow files are stored in the worktree under `.psi/context/irs/`:
   project-state.edn
 ```
 
-Files are plain EDN. The extension is responsible for creating, updating, and
-cleaning up these files.
+Files are plain EDN. They are local, rebuildable cache files and are not
+version-controlled. The extension is responsible for creating, updating, and
+cleaning them up.
 
 ### Budget Enforcement
 
@@ -460,9 +482,10 @@ assistant message with tool calls
   → loops back to :session/prompt-prepare-request
 ```
 
-No IR building during the continue loop. The raw journal entries accumulate;
-the extension will extract semantic content from the complete turn after it
-finishes.
+No Turn IR extraction during the continue loop. The raw journal entries
+accumulate; the extension extracts semantic content from the complete turn after
+it finishes. Core still stamps each journal entry in the loop with the current
+turn id so the extension can recover the turn boundary.
 
 ### On Reply Completion (Turn Finish)
 
@@ -485,6 +508,13 @@ final assistant message (no tool calls)
       → user sees reply immediately; processing happens in background
 ```
 
+
+Reply processing is ordered per session. The context manager processes completed
+turns sequentially by turn id for a given session-id; it does not process turn
+`N+1` before turn `N`. If the user submits the next prompt before processing has
+finished, projection uses the latest completed IRs and raw journal fallback for
+any still-unprocessed turns.
+
 ### On Auto-Compaction
 
 ```
@@ -498,7 +528,8 @@ context threshold exceeded
         - returns {:root-state-update f :return {:summary "..." :turns-to-remove [...]}}
         → f updates :extension-ir-data with compaction summary
           and removes old turn IRs
-      → core rebuilds journal from compacted IRs (using core-owned journal utilities)
+      → core records the compaction metadata for future projection; the journal
+        remains the source of truth and is not rebuilt from IRs
     → extension dispatches ir_compacted event
 ```
 
@@ -523,12 +554,12 @@ only rebuilding IRs since the last compaction boundary.
 
 ### Projection Fallback
 
-When the context manager extension is not installed, or when a Turn IR is
-absent (e.g., the next turn starts before out-of-band processing finishes),
-the projector falls back to raw journal entries. The ctx fn
-`:ir-project-conversion-fn` returns `nil` to signal core to use the default
-journal-to-messages projection (`journal->provider-messages` in
-`psi.agent-session.prompt-request`).
+When the context manager extension is not installed, or when projection fails,
+the ctx fn `:ir-project-conversion-fn` returns `nil` to signal core to use the
+default journal-to-messages projection (`journal->provider-messages` in
+`psi.agent-session.prompt-request`). When only some Turn IRs are absent (e.g.,
+the next turn starts before out-of-band processing finishes), the projector may
+mix IR-projected turns with raw journal fallback for the missing turns.
 
 This means the system always works — the IR pipeline is an enhancement, not a
 requirement.
@@ -552,24 +583,20 @@ extension does via EQL query.
 
 ### Context Function Additions
 
-Add to the ctx map (built in `context.clj`):
+Add one context-manager projection function to the ctx map (built in
+`context.clj`):
 
 ```clojure
 :ir-project-conversion-fn  (fn [ctx session-id turn-id user-msg base-messages]
                              ;; returns {:messages [...] :metadata {...}}
                              ;; or nil to use base-messages unchanged)
-:ir-build-user-input-fn    (fn [ctx session-id user-msg expansion commands]
-                             ;; returns {:ir ir-map :store? true})
-:ir-process-reply-fn       (fn [ctx session-id turn-id journal-entries]
-                             ;; void, runs async — extracts Turn IR from journal entries)
-:ir-compact-fn             (fn [ctx session-id ir-data context-tokens context-window]
-                             ;; returns {:summary "..." :turns-to-remove [...]})
-:ir-rebuild-fn             (fn [ctx session-id journal-entries]
-                             ;; void, runs sync — rebuilds all IRs from journal)
 ```
 
-These are set during extension activation. When no context manager extension is
-installed, they are nil and core uses legacy behaviour.
+Projection is synchronous and happens inside request preparation. All IR state
+creation and mutation (`build-user-input`, reply processing, compaction metadata,
+and rebuild) goes through dispatch events/mutations, not ctx functions. When no
+context manager extension is installed, the projector is nil and core uses
+legacy behaviour.
 
 ### New Dispatch Events
 
@@ -677,10 +704,8 @@ The context manager extension owns:
   (api/on "session/ir-compact" compact-handler)
   (api/on "session/ir-rebuild" rebuild-handler)
 
-  ;; Register ctx fns via new API methods
-  (api/register-ir-projector! project-conversation)
-  (api/register-ir-processor! process-reply)
-  (api/register-ir-compiler! compact-irs))
+  ;; Register the one synchronous projection hook
+  (api/register-ir-projector! project-conversation))
 ```
 
 ### Projection Strategy
@@ -742,6 +767,19 @@ When a session is resumed, the extension rebuilds all IRs from journal entries:
 
 This is a one-time synchronous cost at session start. The extension can
 optimise by only rebuilding IRs since the last compaction entry in the journal.
+
+## Compaction Semantics
+
+IR-based compaction controls future provider projection only. It does not rewrite
+the persisted journal. The journal remains the authoritative raw history from
+which IRs are rebuilt. Compaction stores extension-owned summary metadata and
+projection policy in `:extension-ir-data`; the projector uses that metadata to
+replace older raw/semantic turns with compact summaries when building provider
+messages.
+
+Because compaction does not mutate journal history, pruning old in-memory IRs is
+safe: removed IRs can be rebuilt from the journal if needed. Overflow cache files
+may be deleted and recreated.
 
 ## Architecture Fit
 
@@ -822,7 +860,7 @@ extension is installed.
 
 Session IRs (turn IRs, user input IRs, session state IR, project events) are
 in-memory only. They are stored on the session atom under `:extension-ir-data`
-but are not written to the session file. On resume, the extension rebuilds them
+but are excluded from the session file. On resume, the extension rebuilds them
 from the journal.
 
 **Rationale**: The journal is the single source of truth. Persisting IRs would
@@ -852,8 +890,8 @@ can react to IR lifecycle events without competing for projection control.
 ### 4. Session state is in the session; project IR is cached
 
 Session State IR lives on the session atom (in-memory, session-scoped).
-Project State IR is cached by the extension (file-based by default, shared
-across sessions in the same worktree).
+Project State IR is persisted by the extension as a local, non-version-controlled
+cache (file-based by default, shared across sessions in the same worktree).
 
 **Rationale**: Session state is cheap to materialise and is session-specific.
 Project state is expensive to materialise (git status, munera state, mementum
@@ -861,9 +899,10 @@ state) and is shared across sessions. Caching avoids redundant work.
 
 ### 5. Fallback to raw journal entries
 
-When the context manager extension is not installed, or when a Turn IR is
-absent (e.g., the next turn starts before out-of-band processing finishes),
+When the context manager extension is not installed, or when projection fails,
 the projector returns `nil` and core uses the default journal-to-messages
+projection. When individual Turn IRs are absent, the projector may fall back to
+raw journal entries for those turns while still using IRs for the rest of the
 projection.
 
 **Rationale**: The IR pipeline is an enhancement, not a requirement. The
