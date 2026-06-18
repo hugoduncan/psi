@@ -373,7 +373,7 @@ pass (AC-4).
 
 ## Docs review (review-task-docs) — final re-review follow-up
 
-- [ ] **`CHANGELOG.md` design-gate wording conflicts with the scope gate ordering.**
+- [x] **`CHANGELOG.md` design-gate wording conflicts with the scope gate ordering.**
       The new `SCOPE_QUESTION:` changelog entry correctly says
       `check-scope-question-status` runs immediately after `review-task-design`,
       but the adjacent design/plan non-convergence entry still says "After
@@ -382,3 +382,7 @@ pass (AC-4).
       convergence gate is described as running after the scope-question gate
       proceeds / at the design boundary, avoiding the same stale implied ordering
       that was fixed in `doc/workflows.md`.
+      Updated the adjacent changelog entry to say that at the design boundary,
+      after the scope-question gate proceeds, `check-design-review-status`
+      routes complete design reviews to `create-task-plan` or unconverged
+      reviews to `final-summary-design-not-converged`.

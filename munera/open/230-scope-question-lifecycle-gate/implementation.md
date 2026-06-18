@@ -533,3 +533,17 @@ No code/test changes were required; this was documentation-only.
 ## Docs review (review-task-docs) — final re-review
 
 User-facing docs non-compliance found: `CHANGELOG.md` still has stale design-gate ordering wording relative to the new scope-question gate. Filed one follow-up in `steps.md`.
+
+## Docs final re-review follow-up: changelog ordering wording
+
+Executed the final docs-review follow-up from `steps.md`.
+
+- Updated `CHANGELOG.md`'s design/plan non-convergence entry so it no longer
+  implies `check-design-review-status` runs immediately after
+  `review-task-design`.
+- The entry now describes the design convergence gate as running at the design
+  boundary after the scope-question gate proceeds, matching the implemented
+  `task-lifecycle` ordering and the previously fixed `doc/workflows.md` wording.
+- Marked the follow-up item complete in `steps.md`.
+
+No code/test changes were required; this was documentation-only.
