@@ -18,9 +18,8 @@ Review the task design for inconsistencies, focusing on internal inconsistency w
 
 Then:
 
-1. append a terse review note on the outcome of the review to the task's implementation.md
-1a. Do not note compliance with these instructions; only note any non-compliance
-2. add unchecked follow-up items to design-steps.md for every new actionable inconsistency you found (create design-steps.md if it does not exist)
+1. add unchecked follow-up items to design-steps.md for every new actionable inconsistency you found (create design-steps.md if it does not exist)
+2. append a minimalist review note on the outcome of the review to the task's implementation.md, e.g. "- no inconsistency review feedback" or "- inconsistency review added 2 new design steps"
 3. avoid duplicating review notes or steps that already exist
 4. commit
 5. if there is no new actionable inconsistency feedback, say so explicitly
