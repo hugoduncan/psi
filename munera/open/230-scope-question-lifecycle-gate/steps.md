@@ -370,3 +370,15 @@ pass (AC-4).
       after `review-task-design`, `task-lifecycle` first evaluates the unresolved
       scope-question gate; when that proceeds, it then runs
       `check-design-review-status` over the review `PASS_STATUS`.
+
+## Docs review (review-task-docs) — final re-review follow-up
+
+- [ ] **`CHANGELOG.md` design-gate wording conflicts with the scope gate ordering.**
+      The new `SCOPE_QUESTION:` changelog entry correctly says
+      `check-scope-question-status` runs immediately after `review-task-design`,
+      but the adjacent design/plan non-convergence entry still says "After
+      `review-task-design` a `check-design-review-status` gate proceeds to
+      `create-task-plan`...". Update that changelog wording so the design
+      convergence gate is described as running after the scope-question gate
+      proceeds / at the design boundary, avoiding the same stale implied ordering
+      that was fixed in `doc/workflows.md`.

@@ -529,3 +529,7 @@ Executed the docs-review re-review follow-up from `steps.md`.
 - Marked the follow-up item complete in `steps.md`.
 
 No code/test changes were required; this was documentation-only.
+
+## Docs review (review-task-docs) — final re-review
+
+User-facing docs non-compliance found: `CHANGELOG.md` still has stale design-gate ordering wording relative to the new scope-question gate. Filed one follow-up in `steps.md`.
