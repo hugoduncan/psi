@@ -357,7 +357,7 @@ pass (AC-4).
 
 ## Docs review (review-task-docs) — re-review follow-up
 
-- [ ] **`doc/workflows.md` design-gate ordering wording conflicts with the scope gate.**
+- [x] **`doc/workflows.md` design-gate ordering wording conflicts with the scope gate.**
       The task-lifecycle docs now correctly state that `check-scope-question-status`
       runs immediately after `review-task-design` and before
       `check-design-review-status`, but the preceding design/plan gate paragraph
@@ -366,3 +366,7 @@ pass (AC-4).
       design-convergence gate is described as running after the scope-question
       gate / at the design boundary, avoiding a stale implied step order that
       contradicts the implemented workflow and the later scope-question section.
+      Updated the paragraph to describe the design boundary ordering explicitly:
+      after `review-task-design`, `task-lifecycle` first evaluates the unresolved
+      scope-question gate; when that proceeds, it then runs
+      `check-design-review-status` over the review `PASS_STATUS`.

@@ -887,18 +887,19 @@ When entries pass those filters, the workflow writes mementum memories or
 knowledge pages and commits them autonomously using the mementum commit
 conventions; it does not request human approval.
 
-`task-lifecycle` also gates its design and plan stages. After
-`review-task-design` it runs a `check-design-review-status` invoke gate
-(mirroring the implementation-review gate) over the review's yielded
-`PASS_STATUS` line: `REVIEW_COMPLETE` (converged) proceeds to
-`create-task-plan`, while `ACTIONABLE_FEEDBACK` (the non-convergence handback
-from the review's `:on-max-iterations` summary) routes to a
-`final-summary-design-not-converged` step that stops the lifecycle at the design
-stage and hands back to the human — without proceeding to plan and without
-hard-failing. After `review-task-plan` an analogous `check-plan-review-status`
-gate proceeds to `implement-task` on `REVIEW_COMPLETE` or routes to
-`final-summary-plan-not-converged` on `ACTIONABLE_FEEDBACK`. Neither handback
-extracts knowledge.
+`task-lifecycle` also gates its design and plan stages. At the design boundary,
+after `review-task-design`, it first evaluates the unresolved-scope-question
+gate described below. When that gate proceeds, `task-lifecycle` then runs a
+`check-design-review-status` invoke gate (mirroring the implementation-review
+gate) over the review's yielded `PASS_STATUS` line: `REVIEW_COMPLETE`
+(converged) proceeds to `create-task-plan`, while `ACTIONABLE_FEEDBACK` (the
+non-convergence handback from the review's `:on-max-iterations` summary) routes
+to a `final-summary-design-not-converged` step that stops the lifecycle at the
+design stage and hands back to the human — without proceeding to plan and
+without hard-failing. After `review-task-plan` an analogous
+`check-plan-review-status` gate proceeds to `implement-task` on
+`REVIEW_COMPLETE` or routes to `final-summary-plan-not-converged` on
+`ACTIONABLE_FEEDBACK`. Neither handback extracts knowledge.
 
 `task-lifecycle` additionally gates the design→plan boundary on **unresolved
 scope questions**. The design-review guardrail records a reviewer's scope-boundary

@@ -515,3 +515,17 @@ No code/test changes were required; this was documentation-only.
 ## Docs review (review-task-docs) — re-review
 
 User-facing docs non-compliance found: `doc/workflows.md` still implies `check-design-review-status` runs immediately after `review-task-design`, contradicting the documented/implemented pre-design-gate `check-scope-question-status` ordering. Filed one follow-up in `steps.md`.
+
+## Docs re-review follow-up: workflow ordering wording
+
+Executed the docs-review re-review follow-up from `steps.md`.
+
+- Updated `doc/workflows.md`'s design/plan gate paragraph so it no longer implies
+  `check-design-review-status` runs immediately after `review-task-design`.
+- The paragraph now states the design boundary ordering explicitly: after
+  `review-task-design`, `task-lifecycle` first evaluates the unresolved
+  scope-question gate; when that gate proceeds, it then runs
+  `check-design-review-status` over the design-review `PASS_STATUS`.
+- Marked the follow-up item complete in `steps.md`.
+
+No code/test changes were required; this was documentation-only.
