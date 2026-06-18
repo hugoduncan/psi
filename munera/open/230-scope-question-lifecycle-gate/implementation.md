@@ -489,3 +489,7 @@ Executed the final unchecked test-shaper follow-up in `steps.md`. Test-only chan
 - Migrated the scope-gate resolver tests, operation tests, and built-in bootstrap smoke to the scoped helper so temp dirs and worktree-backed contexts are cleaned deterministically.
 
 Verification: `clj-paren-repair` clean/no-op after edits; `clj-kondo --lint` clean on the touched files. Focused Scry green: resolver + operation suites = 9 tests / 21 assertions; bootstrap smoke vars = 2 tests / 14 assertions.
+
+## Test shaping (test-shaper) — post-fixture-cleanup review
+
+No new actionable test-shaping issues found. Focused parser/resolver/operation/task-lifecycle definition suites and bootstrapped registry smoke remain green; focused clj-kondo clean on reviewed test files.
