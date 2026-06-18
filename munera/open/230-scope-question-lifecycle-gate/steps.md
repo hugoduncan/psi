@@ -354,3 +354,15 @@ pass (AC-4).
       describing the design→plan→implement→review→extract-knowledge lifecycle and
       the unresolved `SCOPE_QUESTION:` pre-plan human handback, linking to
       `doc/workflows.md`.
+
+## Docs review (review-task-docs) — re-review follow-up
+
+- [ ] **`doc/workflows.md` design-gate ordering wording conflicts with the scope gate.**
+      The task-lifecycle docs now correctly state that `check-scope-question-status`
+      runs immediately after `review-task-design` and before
+      `check-design-review-status`, but the preceding design/plan gate paragraph
+      still says "After `review-task-design` it runs a
+      `check-design-review-status` invoke gate". Update that paragraph so the
+      design-convergence gate is described as running after the scope-question
+      gate / at the design boundary, avoiding a stale implied step order that
+      contradicts the implemented workflow and the later scope-question section.

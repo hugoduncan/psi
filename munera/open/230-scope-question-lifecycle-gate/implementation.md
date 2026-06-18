@@ -511,3 +511,7 @@ Executed the docs-review follow-up from `steps.md`.
 - Marked the follow-up item complete in `steps.md`.
 
 No code/test changes were required; this was documentation-only.
+
+## Docs review (review-task-docs) — re-review
+
+User-facing docs non-compliance found: `doc/workflows.md` still implies `check-design-review-status` runs immediately after `review-task-design`, contradicting the documented/implemented pre-design-gate `check-scope-question-status` ordering. Filed one follow-up in `steps.md`.
