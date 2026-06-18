@@ -6,6 +6,7 @@
    [psi.agent-session.context :as context]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
+   [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-test-support :as workflow-test-support]
    [psi.command-registry.registry :as command-registry]
@@ -129,14 +130,7 @@
                   {:text "QUALITY_GATE: APPROVE"
                    :marker-label "QUALITY_GATE"
                    :allowed-routes ["APPROVE" "REPAIR"]}
-                  "APPROVE"]
-                 ["workflow/scope-question-gate-routing"
-                  {:task-path "munera/open/230-scope-question-lifecycle-gate"
-                   :artifact "design-steps.md"
-                   :marker "SCOPE_QUESTION:"
-                   :proceed-route "DONE"
-                   :open-route "SCOPE_QUESTION_OPEN"}
-                  "DONE"]]]
+                  "APPROVE"]]]
           (is (= {:status :ok
                   :data expected-route
                   :summary expected-route}
@@ -147,6 +141,27 @@
                    :session-id session-id
                    :args args}
                   deterministic-op-runtime/invoke-operation))))
+        (testing "scope-question gate smoke uses a self-contained absent task artifact"
+          (let [worktree (test-support/temp-worktree-dir!)
+                [scope-ctx scope-session-id] (test-support/session-with-worktree! worktree)]
+            (try
+              (workflow-test-support/init-built-in-workflow! scope-ctx scope-session-id)
+              (is (= {:status :ok
+                      :data "DONE"
+                      :summary "DONE"}
+                     (op-reg/invoke-operation-in
+                      (:deterministic-operation-registry scope-ctx)
+                      "workflow/scope-question-gate-routing"
+                      {:ctx scope-ctx
+                       :session-id scope-session-id
+                       :args {:task-path "munera/open/999-bootstrap-smoke-absent"
+                              :artifact "design-steps.md"
+                              :marker "SCOPE_QUESTION:"
+                              :proceed-route "DONE"
+                              :open-route "SCOPE_QUESTION_OPEN"}}
+                      deterministic-op-runtime/invoke-operation)))
+              (finally
+                (context/shutdown-context! scope-ctx)))))
         (is (= :invalid-route-marker-args
                (:reason
                 (op-reg/invoke-operation-in

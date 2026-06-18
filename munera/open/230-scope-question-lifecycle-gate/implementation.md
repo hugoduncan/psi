@@ -426,3 +426,28 @@ follow-up.
 
 Filed one new test fixture-isolation issue in `steps.md`: the built-in scope-gate
 registry invocation smoke is coupled to the live task artifact it claims is absent.
+
+## Test-review bootstrap smoke fixture follow-up
+
+Executed the newly added bootstrap smoke re-review follow-up. Test-only change:
+
+- `workflow_delegate_review_step_live_test.clj` no longer invokes
+  `workflow/scope-question-gate-routing` against the live repository task
+  `munera/open/230-scope-question-lifecycle-gate/design-steps.md`.
+- The scope-gate smoke now creates a temp worktree session via the shared
+  `test-support/temp-worktree-dir!` / `session-with-worktree!` helpers, runs the
+  production `init-built-in-workflow!` bootstrap for that context, invokes the
+  bootstrapped `workflow/scope-question-gate-routing` operation on guaranteed
+  absent `munera/open/999-bootstrap-smoke-absent/design-steps.md`, and asserts the
+  fail-open `DONE` result.
+- The non-file-reading routing-operation smoke cases remain on the existing live
+  repo context; only the task-artifact-reading operation needed fixture
+  isolation.
+
+Verification: `clj-paren-repair` no-op after edit; `clj-kondo --lint
+components/agent-session/test/psi/agent_session/workflow_delegate_review_step_live_test.clj`
+clean; focused Scry vars green:
+`init-built-in-workflow-registers-review-step-routing-operations-test` +
+`built-in-routing-operations-invoke-through-registry-test` → 2 tests / 13
+assertions. A first Scry invocation used unqualified `--var` names and failed at
+CLI argument parsing only; rerun with fully qualified vars succeeded.

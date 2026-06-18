@@ -258,7 +258,7 @@ pass (AC-4).
 
 ## Test review (task-test-review) — bootstrap smoke re-review follow-up
 
-- [ ] **Built-in scope-gate invocation smoke is fixture-sensitive to the live repo task artifact.**
+- [x] **Built-in scope-gate invocation smoke is fixture-sensitive to the live repo task artifact.**
       `workflow_delegate_review_step_live_test.clj`'s
       `built-in-routing-operations-invoke-through-registry-test` claims the
       `workflow/scope-question-gate-routing` smoke uses an absent task artifact,
@@ -271,3 +271,11 @@ pass (AC-4).
       self-contained (e.g. use a guaranteed-absent task path or a temp worktree
       session) while still invoking the production `init-built-in-workflow!`
       registry path and asserting fail-open `DONE`.
+      Moved the scope-gate bootstrap invocation smoke into its own temp-worktree
+      session using `test-support/temp-worktree-dir!` and
+      `test-support/session-with-worktree!`; it still calls the production
+      `init-built-in-workflow!` registry bootstrap, then invokes
+      `workflow/scope-question-gate-routing` on guaranteed-absent
+      `munera/open/999-bootstrap-smoke-absent/design-steps.md` and asserts
+      fail-open `DONE`. The other routing-operation smoke cases continue to use
+      the live-repo context because they do not read task artifacts.
