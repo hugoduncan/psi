@@ -547,3 +547,7 @@ Executed the final docs-review follow-up from `steps.md`.
 - Marked the follow-up item complete in `steps.md`.
 
 No code/test changes were required; this was documentation-only.
+
+## Docs review (review-task-docs) — final pass
+
+No new user-facing docs non-compliance found.
