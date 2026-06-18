@@ -396,3 +396,7 @@ production code, docs, or plan changes needed.
 ## Implementation review (task-implementation-review) — final pass
 
 No new actionable implementation issues found. Re-reviewed the post-test-shaper state against design/plan/architecture: production mechanism still matches the intended pure scanner + resolver-read IO seam + authored workflow gate; the final test-only changes did not alter behaviour. Focused suites green (20 tests / 321 assertions) and focused clj-kondo clean. Existing open residual remains the human-only design.md placement wording item already tracked in `design-steps.md`; no duplicate follow-up filed.
+
+## Test review (task-test-review) — final pass
+
+Production bootstrap registration coverage for `workflow/scope-question-gate-routing` is missing; follow-up filed in steps.md.

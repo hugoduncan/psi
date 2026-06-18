@@ -232,3 +232,20 @@ pass (AC-4).
       `session-with-worktree!`, and `write-task-artifact!` helpers to
       `test_support.clj`; both scope-gate operation and task-artifact resolver
       tests now use them.
+
+## Test review (task-test-review) — final pass follow-ups
+
+- [ ] **Built-in operation registration untested.**
+      `scope_question_gate_operation_test.clj` manually registers
+      `workflow-core/scope-question-gate-routing` into a fresh registry, and
+      `task_lifecycle_definitions_test.clj` only proves the authored workflow
+      references the operation id. No test proves the production workflow-loader
+      bootstrap (`workflow/core` `register-built-in-deterministic-operations!`,
+      exercised via `init-built-in-workflow!`) actually registers
+      `workflow/scope-question-gate-routing`. A regression deleting that
+      registration would leave the production `task-lifecycle` judge failing with
+      an unknown deterministic operation while the focused gate tests stay green.
+      Extend the existing built-in routing-operation registration smoke test (or
+      equivalent) to assert `op-reg/get-operation-in` returns the scope-question
+      operation, and preferably invoke it once through the bootstrapped registry
+      on an absent/checked artifact so the built-in registry path is covered.
