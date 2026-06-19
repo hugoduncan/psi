@@ -1,0 +1,6 @@
+{:steps
+ [{:name "resolve-design-entities"
+   :type :session
+   :prompt-workflow "resolve-task-design-entities-resolve.md"}]
+ :name "resolve-task-design-entities"
+ :description "Resolve ambiguous references in a Munera task design and update design.md with canonical values"}

@@ -12,6 +12,10 @@ skills:
 For the Munera task identified by {{input}}, execute any unchecked,
 actionable, follow-up items in steps.md. Work independently.
 
+Only execute follow-up items that were added by the immediately preceding
+review pass. Do not execute older unchecked items that predate the preceding review pass;
+leave them for their owning workflow or human decision.
+
 Read the task's design.md as read-only context as needed. Read and
 update the task's plan.md, steps.md as needed. When a follow-up item
 requires it, also update the code, tests, and docs the item references.

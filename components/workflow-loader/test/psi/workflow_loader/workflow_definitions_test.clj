@@ -535,6 +535,82 @@
               (is (contains? definitions "review-implementation-in-worktree"))))))))))
 
 ;;; ---------------------------------------------------------------------------
+;;; entity-resolution
+
+(deftest entity-resolution-test
+  (load-edn-only
+   "entity-resolution.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone resolver workflow without error"
+       (is (empty? errors))
+       (is (contains? definitions "entity-resolution")))
+     (let [steps (get-in definitions ["entity-resolution" :steps])
+           step (first steps)
+           text (step-template-text step)]
+       (testing "is one session step using the entity-resolution skill"
+         (is (= 1 (count steps)))
+         (is (= [:session] (mapv :type steps)))
+         (is (= "resolve-entities" (:name step)))
+         (is (= ["read" "bash"] (:tools step)))
+         (is (= ["entity-resolution"] (:skills step))))
+       (testing "wires the caller input into the prompt"
+         (is (some (fn [contribution]
+                     (and (= :template (:type contribution))
+                          (= {:from :workflow-input}
+                             (get-in contribution [:vars "input"]))))
+                   (:contributions step))))
+       (testing "locks the evidence-backed resolution contract"
+         (doseq [needle ["Use the entity-resolution skill"
+                         "do not silently guess paths or entities"
+                         "Surface, Canonical, Type, Evidence, Confidence"
+                         "ask the smallest focused clarification question"]]
+           (is (.contains text needle) needle)))))))
+
+;;; ---------------------------------------------------------------------------
+;;; resolve-task-design-entities
+
+(deftest resolve-task-design-entities-test
+  (load-edn-with-md-refs
+   "resolve-task-design-entities.edn"
+   ["resolve-task-design-entities-resolve.md"]
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone task-design entity resolver workflow without error"
+       (is (empty? errors))
+       (is (contains? definitions "resolve-task-design-entities")))
+     (let [steps (get-in definitions ["resolve-task-design-entities" :steps])
+           step (first steps)
+           text (step-template-text step)]
+       (testing "is one lifecycle-ready session step using entity-resolution"
+         (is (= 1 (count steps)))
+         (is (= [:session] (mapv :type steps)))
+         (is (= "resolve-design-entities" (:name step)))
+         (is (= ["read" "bash" "edit" "write"] (:tools step)))
+         (is (= ["entity-resolution"] (:skills step))))
+       (testing "wires task input from the extracted prompt workflow"
+         (is (step-has-input-var-wired? step)))
+       (testing "locks task-reference normalization and design-only update boundary"
+         (doseq [needle ["Accept exactly one of: `NNN-slug`, `munera/open/NNN-slug`, or `munera/closed/NNN-slug`"
+                         "Read task artifacts"
+                         "Always read the resolved task's `design.md`"
+                         "Update `design.md` only when the mapping is unambiguous"
+                         "do not redesign the task"
+                         "Do not silently guess project paths or entities"]]
+           (is (.contains text needle) needle)))
+       (testing "locks future-step implementation notes and lifecycle-compatible outcomes"
+         (doseq [needle ["Update `implementation.md` with useful discoveries for future task steps"
+                         "What would the next task-lifecycle step, implementation slice, or review need to know"
+                         "Append a minimalist entry to `implementation.md`"
+                         "Avoid duplicating information already obvious"]]
+           (is (.contains text needle) needle)))
+       (testing "locks isolated commit behavior"
+         (doseq [needle ["PASS_STATUS: REVIEW_COMPLETE"
+                         "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                         "Stage only the resolved task's `design.md`, `implementation.md`"
+                         "Never use `git add .` or `git add -A`"
+                         "future task-lifecycle step"]]
+           (is (.contains text needle) needle)))))))
+
+;;; ---------------------------------------------------------------------------
 ;;; extract-task-knowledge
 
 (deftest extract-task-knowledge-test

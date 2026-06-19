@@ -1,0 +1,11 @@
+{:steps
+ [{:name "resolve-entities"
+   :type :session
+   :tools ["read" "bash"]
+   :skills ["entity-resolution"]
+   :contributions
+   [{:type :template
+     :text "Use the entity-resolution skill.\nResolve ambiguous references in the input into concrete project entities, paths, terms, or tasks before any follow-on action.\n\nRequirements:\n- Identify referring expressions, aliases, shorthand, project terms, and path-like references.\n- Use available project context and evidence; do not silently guess paths or entities.\n- Return a concise mapping table with columns: Surface, Canonical, Type, Evidence, Confidence.\n- If the input is ambiguous, ask the smallest focused clarification question and list the likely options.\n- If no ambiguity is present, state that no entity-resolution action is needed and preserve the original input.\n\nInput:\n{{input}}"
+     :vars {"input" {:from :workflow-input}}}]}]
+ :name "entity-resolution"
+ :description "Resolves ambiguous input references into concrete project entities before acting"}
