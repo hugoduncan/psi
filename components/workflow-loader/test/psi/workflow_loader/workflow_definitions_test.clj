@@ -230,26 +230,30 @@
        (is (contains? definitions "review-task-plan")))
      (let [steps (get-in definitions ["review-task-plan" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
-           core-step (get step-by-name "review-task-plan-core")
+           core-step (get step-by-name "run-review-task-plan-core")
+           status-step (get step-by-name "check-review-task-plan-core-status")
            final-step (get step-by-name "final-summary")
            not-converged-step (get step-by-name "final-summary-not-converged")]
-       (is (= ["review-task-plan-core" "final-summary-not-converged" "final-summary"]
+       (is (= ["run-review-task-plan-core"
+               "check-review-task-plan-core-status"
+               "final-summary-not-converged"
+               "final-summary"]
               (mapv :name steps)))
-       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= [:delegate :invoke :session :session] (mapv :type steps)))
        (is (= "review-task-plan-core" (:target core-step)))
        (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
               (:prompt-string core-step)))
        (is (= {:type :invoke
                :operation "workflow/pass-status-routing"
-               :args {:text {:from {:step "review-task-plan-core" :yield :text}}
+               :args {:text {:from {:step "run-review-task-plan-core" :yield :text}}
                       :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-              (:judge core-step)))
+              (:judge status-step)))
        (is (= {"DONE" {:goto "final-summary"}
                "REPEAT" {:goto "final-summary-not-converged"}}
-              (:on core-step)))
+              (:on status-step)))
        (assert-review-summary-handback
         final-step not-converged-step
-        [{:step "review-task-plan-core" :yield :text}])))))
+        [{:step "run-review-task-plan-core" :yield :text}])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets
