@@ -270,6 +270,17 @@
                       "review-follow-up-plan.md"]]
       (let [content (slurp-workflow-file filename)]
         (is (.contains content "design-steps.md") filename))))
+  (testing "design and plan review prompts capture useful future-step implementation notes"
+    (doseq [filename ["review-task-design-architecture-review.md"
+                      "review-task-design-ambiguity-review.md"
+                      "review-task-design-inconsistency-review.md"
+                      "review-task-plan-ambiguity-review.md"
+                      "review-task-plan-inconsistency-review.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "Implementation notes for future task steps") filename)
+        (is (.contains content "What would the next task-lifecycle step, implementation slice, or review need to know") filename)
+        (is (.contains content "Append useful discoveries to `implementation.md`") filename)
+        (is (.contains content "avoid duplicating information already obvious") filename))))
   (testing "the shared steps follow-up profile still owns steps.md"
     (let [content (slurp-workflow-file "review-follow-up-steps.md")]
       (is (re-find #"(^|[^-])steps\.md" content))
@@ -593,12 +604,12 @@
                          "Read task artifacts"
                          "Always read the resolved task's `design.md`"
                          "Update `design.md` only when the mapping is unambiguous"
-                         "do not redesign the task"
+                         "redesign the task"
                          "Do not silently guess project paths or entities"]]
            (is (.contains text needle) needle)))
        (testing "locks future-step implementation notes and lifecycle-compatible outcomes"
          (doseq [needle ["Update `implementation.md` with useful discoveries for future task steps"
-                         "What would the next task-lifecycle step, implementation slice, or review need to know"
+                         "What would the next task-lifecycle step"
                          "Append a minimalist entry to `implementation.md`"
                          "Avoid duplicating information already obvious"]]
            (is (.contains text needle) needle)))
@@ -607,7 +618,7 @@
                          "PASS_STATUS: ACTIONABLE_FEEDBACK"
                          "Stage only the resolved task's `design.md`, `implementation.md`"
                          "Never use `git add .` or `git add -A`"
-                         "future task-lifecycle step"]]
+                         "task-lifecycle step"]]
            (is (.contains text needle) needle)))))))
 
 ;;; ---------------------------------------------------------------------------
