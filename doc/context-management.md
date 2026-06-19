@@ -107,8 +107,13 @@ form.
  :ir/timestamp (Instant)
  :ir/raw-text "original user text"
  :ir/commands ["command" ...]          ;; extracted /model, /remember, etc.
- :ir/images [{:type :image :url "..."} ...]
- :ir/expansion {:kind :skill|:template :name "..." :expanded-text "..."}
+ :ir/attachments [{:type :image :url "..."} ...]
+ :ir/intent :design-question
+ :ir/topics #{:session-memory :ir-design}
+ :ir/claims []
+ :ir/questions []
+ :ir/candidate-decisions []
+ :ir/tasks []
  :ir/metadata {}}                      ;; extension-owned, e.g. intent classification
 ```
 
@@ -161,43 +166,51 @@ Stored on the session as extension-specific data, keyed by turn-id.
 ### 3. Session State IR
 
 A snapshot of session-relevant state that the extension wants projected into
-context. Re-materialised on demand by the extension at projection time.
+context. Stored on the core session object.
 
 ```clojure
 {:ir/type :session-state
  :ir/version 1
  :ir/timestamp (Instant)
  :ir/session-id "uuid"
- :ir/model {:provider "..." :id "..."}
- :ir/thinking-level :off|:low|:medium|:high
- :ir/context-tokens N
- :ir/context-window N
- :ir/phase :idle|:streaming|:compacting
- :ir/turn-count N
- :ir/tool-ids ["read" "bash" ...]
- :ir/worktree-path "..."
- :ir/git-branch "..."
- :ir/git-dirty? true
+ :ir/current
+   {:ir/topic :llm-session-compaction
+    :ir/goal "Design a model-agnostic memory system for a local agent"
+    :ir/phase :architecture}
+
+ :ir/working-set
+  {:ir/topics #{:turn-ir :session-ir :event-ir :project-ir}
+   :ir/entities {}
+   :ir/claims {}
+   :ir/assumptions {}
+   :ir/open-questions {}
+   :ir/tentative-decisions {}
+   :ir/tasks {}}
+
  :ir/metadata {}}
 ```
 
-Built by the extension from EQL queries against session state. The extension
-decides when to refresh and what to include. Typically refreshed at projection
-time.
+The session-ir is a materialised view over the turn-ir.  Logically it is
+something like:
+
+``` clojure
+session-ir = reduce(apply-turn-ir initial-session turn-irs)
+```
 
 ### 4. Project Event IR
 
-Discrete events derived from reply processing. These are the extension's way of
-recording that something noteworthy happened.
+Discrete events derived from reply processing. These are the extension's
+way of recording that something noteworthy happened at the project level.
 
 ```clojure
 {:ir/type :project-event
  :ir/version 1
  :ir/event-id "uuid"
  :ir/timestamp (Instant)
- :ir/event-type :file-changed|:task-advanced|:decision-made|:error-encountered|:custom
+ :ir/event-type :decision-made|:preference-stated|:scope-changed
  :ir/source-turn-id 0
  :ir/summary "concise description"
+ :ir/probability 0.9
  :ir/details {}
  :ir/metadata {}}
 ```
