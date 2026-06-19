@@ -5,6 +5,7 @@
 # Design Review — Ambiguity
 
 - [x] Launcher catalog entry shape: resolved in wiring details — design now shows the full 3-policy launcher entry shape (`:development`, `:installed`, `:jar`) matching `psi/auto-session-name`.
+- [x] Ambiguity review (2026-06-19, re-review): no new ambiguities found. Design is well-specified with explicit wiring details, namespace names, event payload keys, and test approach following auto-session-name pattern.
 
 # Design Review — Inconsistency
 
