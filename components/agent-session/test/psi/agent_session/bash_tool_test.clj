@@ -31,11 +31,17 @@
       (is (false? (:is-error result)))
       (is (= "(no output)" (:content result)))))
 
-  (testing "stderr is merged into output"
+  (testing "stderr is merged into output with [stderr] separator"
     (let [result (tools/execute-bash {"command" "echo out; echo err >&2"})]
       (is (false? (:is-error result)))
       (is (str/includes? (:content result) "out"))
-      (is (str/includes? (:content result) "err")))))
+      (is (str/includes? (:content result) "[stderr]"))
+      (is (str/includes? (:content result) "err"))))
+
+  (testing "stderr separator is not appended when stderr is empty"
+    (let [result (tools/execute-bash {"command" "echo stdout-only"})]
+      (is (false? (:is-error result)))
+      (is (not (str/includes? (:content result) "[stderr]"))))))
 
 ;;; Non-zero exit
 

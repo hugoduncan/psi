@@ -387,7 +387,9 @@
             :is-error true
             :details  nil}
            ;; Normal completion
-           (let [merged    (str (:out result) (:err result))
+           (let [merged    (str (:out result)
+                                (when (seq (:err result))
+                                  (str "\n[stderr]\n" (:err result))))
                  exit-code (:exit result)
                  non-zero? (not= 0 exit-code)
                  trunc     (tool-output/tail-truncate merged policy)
