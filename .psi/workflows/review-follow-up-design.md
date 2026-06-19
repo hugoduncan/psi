@@ -18,9 +18,16 @@ Be careful not to introduce new ambiguity or inconsistencies.
 
 If a design-step is completed, mark it done in design-steps.md.
 
-When finished, add a minimalist note to implementation.md stating that
-you have addressed the design-steps, and noting anything you were not
-able to do. e.g. "- design-steps completed"
+When finished, ask yourself: "What would the next review or
+   implementation step need to know that you had to discover?". Append a
+   minimalist entry to implementation.md to record important information
+   for subsequent reviews or implementation.
+   **What to add:**
+  - task information that deosn't belong in design.md, but helps with
+    carrying out the task
+  - paths to important files
+  - existing behaviour relevant to implementing the current task
+  Avoid adding duplicate information already in the task files.
 
 Commit when done.
 

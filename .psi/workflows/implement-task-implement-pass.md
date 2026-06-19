@@ -23,9 +23,17 @@ Required procedure:
 5. Add or refine tests as required by the task design.
 6. Run relevant verification for the affected area.
 7. Mark completed checklist items done in `steps.md`; add new implementation follow-up items when discovered.
-8. Append a minimalist entry to implementation.md :
-     - record, tersely concisely and accurately, any important deviations from the initial design
-	 - record a minimal statement, e.g. "- Slice 3 implemented. No follow up steps added."
+8. Ask yourself: "What would the next slice need to know about the work
+   done in this slice?". Append a minimalist entry to implementation.md
+   to record important information for subsequent slices or reviews.
+   **What to add:**
+    - Key decisions made and their rationale
+    - Implementation discoveries (e.g., "function X now returns Y format")
+    - API or schema changes
+    - Dependencies added or modified
+    - Edge cases handled
+    - Deviations from original design
+   Avoid adding duplicate information already in the task files.
 9. Commit any changes made during this pass with an appropriate commit message.
 
 End your final response with exactly one of:
