@@ -14,7 +14,7 @@ For the implemented Munera task, review all user-facing documentation:
 
 1. **New/changed behaviours**: Are all new or changed behaviours reflected in `README.md` and `doc/`?
 2. **Removed behaviours**: Are removed behaviours cleaned up from docs (no stale references)?
-3. **Changelog**: Is `CHANGELOG.md` updated if the change is user-visible (commands, flags, behaviours, breaking changes, bug fixes, extension capabilities)?
+3. **Changelog**: When `CHANGELOG.md` exists, is `CHANGELOG.md` updated if the change is user-visible (commands, flags, behaviours, breaking changes, bug fixes, extension capabilities)?
 4. **Examples**: Are any examples in docs accurate and consistent with the implementation?
 5. **Consistency**: Does the documentation language match the implementation (correct names, correct flags, correct file paths)?
 
