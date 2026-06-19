@@ -42,24 +42,35 @@ extension, a dedicated extension provides:
 
 ## Wiring Details
 
-- **Catalog**: Add `psi/context-manager` to `psi-owned-extension-catalog` in
+- **Runtime catalog**: Add `psi/context-manager` to `psi-owned-extension-catalog` in
   `components/agent-session/src/psi/agent_session/extension_installs.clj` with
   `:psi/init 'extensions.context-manager/init` and
   `:source-policies {:installed {:local/root "extensions/context-manager"}}`.
-  Also add the matching entry to the launcher catalog
-  `psi.launcher.extensions/psi-owned-extension-catalog` — parity is asserted by
-  the `psi-owned-extension-catalog-parity-with-launcher` test.
+
+- **Launcher catalog**: Add the matching entry to
+  `psi.launcher.extensions/psi-owned-extension-catalog` in
+  `bases/main/src/psi/launcher/extensions.clj` with all three policies:
+  ```clojure
+  'psi/context-manager
+  {:psi/init 'extensions.context-manager/init
+   :source-policies
+   {:development {:local/root "extensions/context-manager"}
+    :installed   {:local/root "extensions/context-manager"}
+    :jar         {:mvn/version :psi/release-version}}}
+  ```
+  Parity is asserted by the `psi-owned-extension-catalog-parity-with-launcher` test.
 
 - **Top-level deps**: Add `psi/context-manager {:local/root "context-manager"}`
   to `:deps` in `extensions/deps.edn` and add `"context-manager/test"` to the
   `:test` alias `:extra-paths`.
 
-- **Extension deps.edn**: Mirror `auto-session-name/deps.edn` — `:paths ["src"]`,
-  `:deps` includes `org.clojure/clojure` and `psi/ai`; `:aliases/test` includes
+- **Extension deps.edn**: `:paths ["src"]`, `:deps` includes only
+  `org.clojure/clojure` (no `psi/ai` — the scaffold performs no action beyond
+  logging and does not need the AI component). `:aliases/test` includes
   `kaocha`, `psi/extension-test-helpers`, and `psi/agent-session`.
 
 - **Event payload**: The `session_turn_finished` event carries `:session-id`
-  (string) and `:psi.agent-session/turn-id` (string). Log both.
+  (string) and `:turn-id` (string). Log both.
 
 - **Manifest**: No `:allowed-events` or capability declarations needed — same as
   `auto-session-name`. The extension only subscribes via `(:on api)`.
