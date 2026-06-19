@@ -34,11 +34,39 @@ extension, a dedicated extension provides:
 
 ## Constraints
 
-- Follow the same patterns as `auto-session-name` and `metrics` extensions
+- Follow the same patterns as the `auto-session-name` extension
 - Use `(:on api)` for event subscription (not `psi.extension/register-handler`)
 - Extension must load cleanly on reload without state corruption
 - No dependencies on other extensions or external libraries beyond Clojure core
   and timbre
+
+## Wiring Details
+
+- **Catalog**: Add `psi/context-manager` to `psi-owned-extension-catalog` in
+  `components/agent-session/src/psi/agent_session/extension_installs.clj` with
+  `:psi/init 'extensions.context-manager/init` and
+  `:source-policies {:installed {:local/root "extensions/context-manager"}}`.
+  Also add the matching entry to the launcher catalog
+  `psi.launcher.extensions/psi-owned-extension-catalog` — parity is asserted by
+  the `psi-owned-extension-catalog-parity-with-launcher` test.
+
+- **Top-level deps**: Add `psi/context-manager {:local/root "context-manager"}`
+  to `:deps` in `extensions/deps.edn` and add `"context-manager/test"` to the
+  `:test` alias `:extra-paths`.
+
+- **Extension deps.edn**: Mirror `auto-session-name/deps.edn` — `:paths ["src"]`,
+  `:deps` includes `org.clojure/clojure` and `psi/ai`; `:aliases/test` includes
+  `kaocha`, `psi/extension-test-helpers`, and `psi/agent-session`.
+
+- **Event payload**: The `session_turn_finished` event carries `:session-id`
+  (string) and `:psi.agent-session/turn-id` (string). Log both.
+
+- **Manifest**: No `:allowed-events` or capability declarations needed — same as
+  `auto-session-name`. The extension only subscribes via `(:on api)`.
+
+- **Test**: One test namespace `extensions.context_manager_test` using the
+  nullable API pattern from `auto-session-name` — verify the handler is
+  registered and fires on a synthetic `session_turn_finished` event.
 
 ## Acceptance
 
