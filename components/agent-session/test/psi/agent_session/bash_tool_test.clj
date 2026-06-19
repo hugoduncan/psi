@@ -31,11 +31,24 @@
       (is (false? (:is-error result)))
       (is (= "(no output)" (:content result)))))
 
-  (testing "stderr is merged into output"
-    (let [result (tools/execute-bash {"command" "echo out; echo err >&2"})]
+  (testing "stderr appears before stdout, both labelled"
+    (let [result  (tools/execute-bash {"command" "echo out; echo err >&2"})
+          content (:content result)]
       (is (false? (:is-error result)))
-      (is (str/includes? (:content result) "out"))
-      (is (str/includes? (:content result) "err")))))
+      (is (str/includes? content "[stderr]"))
+      (is (str/includes? content "err"))
+      (is (str/includes? content "[stdout]"))
+      (is (str/includes? content "out"))
+      ;; stderr section comes before stdout section
+      (is (< (.indexOf content "[stderr]")
+             (.indexOf content "[stdout]")))))
+
+  (testing "stdout is not labelled when stderr is empty"
+    (let [result (tools/execute-bash {"command" "echo stdout-only"})]
+      (is (false? (:is-error result)))
+      (is (not (str/includes? (:content result) "[stderr]")))
+      (is (not (str/includes? (:content result) "[stdout]")))
+      (is (str/includes? (:content result) "out")))))
 
 ;;; Non-zero exit
 
@@ -178,6 +191,32 @@
           (is (contains? trunc :max-lines))
           (is (contains? trunc :max-bytes))
           (is (contains? trunc :last-line-partial)))))))
+
+;;; POSIX error string
+
+(deftest execute-bash-posix-error-string-test
+  (testing "non-zero exit includes POSIX error string for known codes"
+    (let [result (tools/execute-bash {"command" "exit 2"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 2"))
+      (is (str/includes? (:content result) "No such file or directory"))))
+
+  (testing "exit code 13 includes Permission denied"
+    (let [result (tools/execute-bash {"command" "exit 13"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 13"))
+      (is (str/includes? (:content result) "Permission denied"))))
+
+  (testing "exit code 127 includes Command not found"
+    (let [result (tools/execute-bash {"command" "nonexistent-command-xyz"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 127"))
+      (is (str/includes? (:content result) "Unknown error: 127"))))
+
+  (testing "exit code 0 does not include error string"
+    (let [result (tools/execute-bash {"command" "exit 0"})]
+      (is (false? (:is-error result)))
+      (is (not (str/includes? (:content result) "Command exited with code"))))))
 
 ;;; Abort mechanism
 

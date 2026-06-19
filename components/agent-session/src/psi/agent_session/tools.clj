@@ -10,6 +10,7 @@
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tool-output :as tool-output]
    [psi.agent-session.tool-path :as tool-path]
+   [psi.posix-errors :as posix-errors]
    [psi.tool-runtime.call-summary :as call-summary])
   (:import
    [java.awt.geom AffineTransform]
@@ -387,7 +388,9 @@
             :is-error true
             :details  nil}
            ;; Normal completion
-           (let [merged    (str (:out result) (:err result))
+           (let [merged    (if (seq (:err result))
+                             (str "[stderr]\n" (:err result) "\n[stdout]\n" (:out result))
+                             (:out result))
                  exit-code (:exit result)
                  non-zero? (not= 0 exit-code)
                  trunc     (tool-output/tail-truncate merged policy)
@@ -404,7 +407,10 @@
                  ;; Build content
                  content   (cond-> ""
                              non-zero?
-                             (str "Command exited with code " exit-code "\n")
+                             (str "Command exited with code " exit-code
+                                  (when-let [err-str (posix-errors/error-string exit-code)]
+                                    (str " (" err-str ")"))
+                                  "\n")
 
                              true
                              (str base-text)
