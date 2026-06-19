@@ -31,17 +31,24 @@
       (is (false? (:is-error result)))
       (is (= "(no output)" (:content result)))))
 
-  (testing "stderr is merged into output with [stderr] separator"
-    (let [result (tools/execute-bash {"command" "echo out; echo err >&2"})]
+  (testing "stderr appears before stdout, both labelled"
+    (let [result  (tools/execute-bash {"command" "echo out; echo err >&2"})
+          content (:content result)]
       (is (false? (:is-error result)))
-      (is (str/includes? (:content result) "out"))
-      (is (str/includes? (:content result) "[stderr]"))
-      (is (str/includes? (:content result) "err"))))
+      (is (str/includes? content "[stderr]"))
+      (is (str/includes? content "err"))
+      (is (str/includes? content "[stdout]"))
+      (is (str/includes? content "out"))
+      ;; stderr section comes before stdout section
+      (is (< (.indexOf content "[stderr]")
+             (.indexOf content "[stdout]")))))
 
-  (testing "stderr separator is not appended when stderr is empty"
+  (testing "stdout is not labelled when stderr is empty"
     (let [result (tools/execute-bash {"command" "echo stdout-only"})]
       (is (false? (:is-error result)))
-      (is (not (str/includes? (:content result) "[stderr]"))))))
+      (is (not (str/includes? (:content result) "[stderr]")))
+      (is (not (str/includes? (:content result) "[stdout]")))
+      (is (str/includes? (:content result) "out")))))
 
 ;;; Non-zero exit
 
