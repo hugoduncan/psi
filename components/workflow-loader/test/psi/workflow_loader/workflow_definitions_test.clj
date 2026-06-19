@@ -147,26 +147,30 @@
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
-           core-step (get step-by-name "review-task-design-core")
+           core-step (get step-by-name "run-review-task-design-core")
+           status-step (get step-by-name "check-review-task-design-core-status")
            final-step (get step-by-name "final-summary")
            not-converged-step (get step-by-name "final-summary-not-converged")]
-       (is (= ["review-task-design-core" "final-summary-not-converged" "final-summary"]
+       (is (= ["run-review-task-design-core"
+               "check-review-task-design-core-status"
+               "final-summary-not-converged"
+               "final-summary"]
               (mapv :name steps)))
-       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= [:delegate :invoke :session :session] (mapv :type steps)))
        (is (= "review-task-design-core" (:target core-step)))
        (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
               (:prompt-string core-step)))
        (is (= {:type :invoke
                :operation "workflow/pass-status-routing"
-               :args {:text {:from {:step "review-task-design-core" :yield :text}}
+               :args {:text {:from {:step "run-review-task-design-core" :yield :text}}
                       :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-              (:judge core-step)))
+              (:judge status-step)))
        (is (= {"DONE" {:goto "final-summary"}
                "REPEAT" {:goto "final-summary-not-converged"}}
-              (:on core-step)))
+              (:on status-step)))
        (assert-review-summary-handback
         final-step not-converged-step
-        [{:step "review-task-design-core" :yield :text}])))))
+        [{:step "run-review-task-design-core" :yield :text}])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan

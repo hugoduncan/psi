@@ -1,15 +1,19 @@
 {:steps
- [{:name "review-task-design-core",
+ [{:name "run-review-task-design-core",
    :type :delegate,
    :target "review-task-design-core",
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
-   :context [{:type :source, :from :workflow-original}],
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "check-review-task-design-core-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
    :judge
    {:type :invoke,
     :operation "workflow/pass-status-routing",
-    :args {:text {:from {:step "review-task-design-core", :yield :text}},
+    :args {:text {:from {:step "run-review-task-design-core", :yield :text}},
            :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
    :on {"DONE" {:goto "final-summary"},
         "REPEAT" {:goto "final-summary-not-converged"}}}
@@ -18,7 +22,7 @@
    :tools ["read" "bash"],
    :contributions
    [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "review-task-design-core" :yield :text}}
+    {:type :source, :from {:step "run-review-task-design-core" :yield :text}}
     {:type :template,
      :text
      "Produce the user-facing final result for the Munera task identified by {{input}} after a design review that did not converge within the configured follow-up iteration limit. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior core review output as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Explain that the design review did not converge within the configured follow-up iteration limit, summarise the architectural-fit misfits, ambiguities, or inconsistencies that remain unresolved, list the task artifact files touched (design.md, design-steps.md, implementation.md), and state that the design needs further human attention before proceeding to plan creation.\n\nDo not reproduce the status lines from the review output provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: ACTIONABLE_FEEDBACK",
@@ -32,7 +36,7 @@
    :tools ["read" "bash"],
    :contributions
    [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "review-task-design-core" :yield :text}}
+    {:type :source, :from {:step "run-review-task-design-core" :yield :text}}
     {:type :template,
      :text
      "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior core review output as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key architectural-fit misfits, ambiguities, or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step output\n- whether the design is now clear enough to proceed to plan creation\n\nDo not reproduce the status lines from the review output provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: REVIEW_COMPLETE",
