@@ -192,6 +192,32 @@
           (is (contains? trunc :max-bytes))
           (is (contains? trunc :last-line-partial)))))))
 
+;;; POSIX error string
+
+(deftest execute-bash-posix-error-string-test
+  (testing "non-zero exit includes POSIX error string for known codes"
+    (let [result (tools/execute-bash {"command" "exit 2"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 2"))
+      (is (str/includes? (:content result) "No such file or directory"))))
+
+  (testing "exit code 13 includes Permission denied"
+    (let [result (tools/execute-bash {"command" "exit 13"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 13"))
+      (is (str/includes? (:content result) "Permission denied"))))
+
+  (testing "exit code 127 includes Command not found"
+    (let [result (tools/execute-bash {"command" "nonexistent-command-xyz"})]
+      (is (true? (:is-error result)))
+      (is (str/includes? (:content result) "Command exited with code 127"))
+      (is (str/includes? (:content result) "Unknown error: 127"))))
+
+  (testing "exit code 0 does not include error string"
+    (let [result (tools/execute-bash {"command" "exit 0"})]
+      (is (false? (:is-error result)))
+      (is (not (str/includes? (:content result) "Command exited with code"))))))
+
 ;;; Abort mechanism
 
 (deftest abort-bash-test
