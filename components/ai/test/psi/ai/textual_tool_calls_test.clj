@@ -348,4 +348,16 @@
             assistant {:role "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
+
+    (testing "quotes adjacent to a well-formed block are preserved as surrounding text"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text
+                                  :text "before '<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>' after"}]}]
+        (is (= [{:type :text :text "before '"}
+                {:type :tool-call
+                 :id "turn-4/toolcall/1"
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd\"}"}
+                {:type :text :text "' after"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))))

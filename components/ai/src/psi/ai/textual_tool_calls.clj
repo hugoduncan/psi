@@ -243,8 +243,6 @@
       (let [[_ tool-name function-body] function-match]
         (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
                       (non-parameter-remainder-contains-tag? function-body "<tool_call>")
-                      (and (pos? start)
-                           (contains? #{\' \"} (.charAt full-text (dec start))))
                       (and (< end (count full-text))
                            (contains? #{\' \"} (.charAt full-text end))
                            (re-find #"['\"]<tool_call>" function-body))
