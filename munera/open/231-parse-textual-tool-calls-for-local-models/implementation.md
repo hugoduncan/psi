@@ -141,3 +141,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 2 review steps: literal `<parameter=...>` / `</parameter>` text inside parameter values is preserved, and fully replaced text blocks containing multiple adjacent recovered calls can reuse the source index for the first recovered id.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 1 new step to be addressed.
