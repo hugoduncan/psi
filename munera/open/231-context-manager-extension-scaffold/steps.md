@@ -1,0 +1,21 @@
+## Slice 1: Extension Scaffold
+
+- [ ] Create `extensions/context-manager/deps.edn` with `:paths ["src"]`, `:deps` including only `org.clojure/clojure`, and `:aliases/test` with kaocha, `psi/extension-test-helpers`, and `psi/agent-session`
+- [ ] Create `extensions/context-manager/src/extensions/context_manager.clj` with namespace docstring, `init` function that subscribes to `session_turn_finished` via `(:on api)`, handler that logs `:session-id` and `:turn-id` then returns nil
+
+## Slice 2: Wiring
+
+- [ ] Add `'psi/context-manager` entry to `psi-owned-extension-catalog` in `components/agent-session/src/psi/agent_session/extension_installs.clj` with `:psi/init 'extensions.context-manager/init` and `:source-policies {:installed {:local/root "extensions/context-manager"}}`
+- [ ] Add `'psi/context-manager` entry to `psi-owned-extension-catalog` in `bases/main/src/psi/launcher/extensions.clj` with all three source policies (development, installed, jar)
+- [ ] Add `psi/context-manager {:local/root "context-manager"}` to `:deps` in `extensions/deps.edn`
+- [ ] Add `"context-manager/test"` to `:extra-paths` in the `:test` alias of `extensions/deps.edn`
+
+## Slice 3: Test
+
+- [ ] Create `extensions/context-manager/test/extensions/context_manager_test.clj` with one test using nullable API pattern: verify `init` registers a `session_turn_finished` handler and that the handler fires on a synthetic event
+
+## Slice 4: Verify
+
+- [ ] Run `clj-kondo --lint extensions/context-manager/src` — must be clean
+- [ ] Run `bb test` focused on `extensions.context-manager-test` — must pass
+- [ ] Run the catalog parity test to confirm both catalogs are in sync
