@@ -185,6 +185,38 @@
               (recur (inc idx) (conj starts idx))
               starts)))))
 
+(defn- span-starts-in-later-function-parameter?
+  [body body-start start]
+  (let [relative-start (- start body-start)
+        function-starts (loop [search-from 0
+                               starts []]
+                          (if-let [idx (str/index-of body "<function=" search-from)]
+                            (recur (inc idx) (conj starts idx))
+                            starts))]
+    (when (> (count function-starts) 1)
+      (some (fn [function-open]
+              (let [function-open-end (str/index-of body ">" function-open)
+                    function-close    (when function-open-end
+                                        (str/index-of body "</function>" function-open-end))
+                    valid-function-open? (when function-open-end
+                                           (re-matches
+                                            (re-pattern (str "<function=" identifier-pattern ">"))
+                                            (subs body function-open (inc function-open-end))))]
+                (and function-open-end
+                     function-close
+                     valid-function-open?
+                     (< function-open relative-start)
+                     (< relative-start function-close)
+                     (some (fn [{relative-value-start :end}]
+                             (let [value-start (+ function-open relative-value-start)]
+                               (when-let [parameter-close (str/index-of body "</parameter>" value-start)]
+                                 (and (<= value-start relative-start)
+                                      (< relative-start parameter-close)
+                                      (< parameter-close function-close)))))
+                           (parameter-open-matches
+                            (subs body function-open (inc function-close)))))))
+            (rest function-starts)))))
+
 (defn- span-starts-in-invalid-parameter-value?
   [body body-start start]
   (let [relative-start (- start body-start)]
@@ -225,6 +257,10 @@
                        function-body
                        function-body-start
                        start)
+                      (span-starts-in-later-function-parameter?
+                       body
+                       body-start
+                       start)
                       (and nested-in-parameter?
                            (duplicate-parameter-name? function-body))
                       (and nested-in-parameter?
@@ -235,6 +271,7 @@
                            (str/starts-with? (str/trim function-body) "<tool_call>"))))
                 (or (span-starts-in-body-parameter-before-function? body body-start start)
                     (span-starts-in-invalid-function-parameter? body body-start start)
+                    (span-starts-in-later-function-parameter? body body-start start)
                     (span-starts-in-invalid-parameter-value? body body-start start))))))
         (candidate-tool-call-spans text)))
 

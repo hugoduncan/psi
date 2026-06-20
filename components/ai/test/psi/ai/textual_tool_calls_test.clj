@@ -190,6 +190,15 @@
                     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                     "</parameter></function>"
                     "</tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested valid tool calls inside later function blocks of multi-function outers are not recovered"
+    (let [text (str "<tool_call>"
+                    "<function=a><parameter=x>one</parameter></function>"
+                    "<function=b><parameter=y>before "
+                    "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+                    "</parameter></function>"
+                    "</tool_call>")]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
@@ -350,6 +359,18 @@
     (testing "nested valid calls inside invalid-parameter-grammar outer blocks remain text"
       (let [text      (str "<tool_call>"
                            "<function=outer><parameter=x.y>before "
+                           "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+                           "</parameter></function>"
+                           "</tool_call>")
+            assistant {:role "assistant"
+                       :content [{:type :text :text text}]}]
+        (is (= [{:type :text :text text}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
+
+    (testing "nested valid calls inside later function blocks of multi-function outers remain text"
+      (let [text      (str "<tool_call>"
+                           "<function=a><parameter=x>one</parameter></function>"
+                           "<function=b><parameter=y>before "
                            "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</parameter></function>"
                            "</tool_call>")
