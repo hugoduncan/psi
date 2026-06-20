@@ -155,3 +155,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 1 review step: literal adjacent `<tool_call><function=...>` text inside parameter values is preserved while nested valid tool-call markup inside a malformed prefix remains recoverable.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 1 step to be addressed.
