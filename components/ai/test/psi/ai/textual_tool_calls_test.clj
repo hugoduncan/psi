@@ -159,13 +159,13 @@
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                        [:content 1 :id])))))
 
-    (testing "generated ids skip later provider indexes and existing per-turn canonical ids"
+    (testing "generated ids skip later provider indexes and count unindexed provider blocks"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :content-index 7 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :tool-call :id "turn-3/toolcall/0" :name "generated-provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
-        (is (= "turn-3/toolcall/8"
+        (is (= "turn-3/toolcall/9"
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                        [:content 2 :id])))))
 
@@ -178,6 +178,15 @@
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :text :text "before "}
                 {:type :tool-call :id "turn-3/toolcall/3" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
+    (testing "generated ids count preceding unindexed provider blocks"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "overlapping malformed prefix does not block later valid normalization"

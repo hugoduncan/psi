@@ -226,7 +226,6 @@
                                   set)
         used-indexes   (set (concat (remove shadowed-source-indexes source-indexes)
                                     generated-id-indexes))
-        max-index      (apply max -1 used-indexes)
         state          (atom {:used used-indexes :position -1 :source-text-reserved #{}})]
     (fn
       ([]
@@ -243,17 +242,29 @@
                               (fully-replaced-text-block? source-block))
                          (long source-index)
 
+                         (and (= :existing-content kind) source-index)
+                         (long source-index)
+
+                         (= :existing-content kind)
+                         (inc (long position))
+
                          source-index
                          (max (inc (long source-index)) (inc (long position)))
 
                          :else
-                         (inc (max (long position) (long max-index))))]
-         (if (and (= :source-text kind) source-index)
+                         (inc (long position)))]
+         (cond
+           (and (= :existing-content kind) source-index)
+           (reserve-content-index state preferred)
+
+           (and (= :source-text kind) source-index)
            (if (contains? (:source-text-reserved @state) source-index)
              (allocate-content-index state (max (inc (long source-index)) (inc (long position))))
              (do
                (swap! state update :source-text-reserved conj source-index)
                (reserve-content-index state source-index)))
+
+           :else
            (let [preferred* (if (contains? (:source-text-reserved @state) source-index)
                               (max (inc (long source-index)) preferred)
                               preferred)]
@@ -263,7 +274,9 @@
   [turn-id next-content-index block]
   (if (and (= :text (:type block)) (string? (:text block)))
     (textual-tool-call-content turn-id next-content-index block)
-    [block]))
+    (do
+      (next-content-index block :existing-content)
+      [block])))
 
 (defn- strip-content-index
   [block]
