@@ -132,15 +132,48 @@
                  provider  (assoc :provider provider)
                  signature (assoc :signature signature))))))
 
-(defn build-final-content [thinking-blocks text-buffer tool-calls]
-  (let [invalids       (keep invalid-tool-call tool-calls)
-        valid-calls    (remove invalid-tool-call tool-calls)
-        thinking-parts (thinking-blocks-in-order thinking-blocks)
-        text-blocks    (cond-> [] (seq text-buffer) (conj {:type :text :text text-buffer}))
-        error-blocks   (mapv (fn [inv] {:type :error :text (:message inv)}) invalids)
-        tool-blocks    (mapv (fn [tc] {:type :tool-call :id (:id tc) :name (:name tc) :arguments (:arguments tc) :call-summary (:call-summary tc)})
-                             valid-calls)]
-    (-> thinking-parts (into text-blocks) (into error-blocks) (into tool-blocks))))
+(defn- text-content-blocks
+  [text-buffer text-content-index]
+  (cond-> []
+    (seq text-buffer)
+    (conj {:type :text :content-index (or text-content-index 0) :text text-buffer})))
+
+(defn- error-content-blocks
+  [invalids]
+  (mapv (fn [inv]
+          {:type :error
+           :content-index (get-in inv [:tool-call :content-index])
+           :text (:message inv)})
+        invalids))
+
+(defn- tool-content-blocks
+  [tool-calls]
+  (mapv (fn [tc]
+          {:type :tool-call
+           :content-index (:content-index tc)
+           :id (:id tc)
+           :name (:name tc)
+           :arguments (:arguments tc)
+           :call-summary (:call-summary tc)})
+        tool-calls))
+
+(defn- strip-content-index
+  [block]
+  (dissoc block :content-index))
+
+(defn build-final-content
+  ([thinking-blocks text-buffer tool-calls]
+   (build-final-content thinking-blocks text-buffer nil tool-calls))
+  ([thinking-blocks text-buffer text-content-index tool-calls]
+   (let [invalids       (keep invalid-tool-call tool-calls)
+         valid-calls    (remove invalid-tool-call tool-calls)
+         thinking-parts (thinking-blocks-in-order thinking-blocks)
+         content-parts  (->> (concat (text-content-blocks text-buffer text-content-index)
+                                     (error-content-blocks invalids)
+                                     (tool-content-blocks valid-calls))
+                             (sort-by #(or (:content-index %) 0))
+                             (map strip-content-index))]
+     (into thinking-parts content-parts))))
 
 (defn- emit-tool-assembly-errors! [progress-queue tool-calls]
   (doseq [invalid (keep invalid-tool-call tool-calls)]
@@ -232,7 +265,10 @@
 
 (defn- handle-text-delta! [td progress-queue data]
   (let [idx    (content-index data)
-        merged (:text-buffer (swap! td update :text-buffer merge-stream-text (:delta data)))]
+        merged (:text-buffer (swap! td (fn [td*]
+                                         (-> td*
+                                             (update :text-buffer merge-stream-text (:delta data))
+                                             (update :text-content-index #(or % idx))))))]
     (note-last-provider-event! td :text-delta data)
     (note-content-delta! td idx :text)
     (emit-progress! progress-queue {:event-kind :text-delta :content-index idx :text merged})))
@@ -316,9 +352,9 @@
   (swap! td assoc :structured-output-result (:structured-output data)))
 
 (defn- handle-done! [td done-p progress-queue data]
-  (let [{:keys [thinking-blocks text-buffer tool-calls logprob-buffer]} @td
+  (let [{:keys [thinking-blocks text-buffer text-content-index tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
-        content   (build-final-content thinking-blocks text-buffer completed)
+        content   (build-final-content thinking-blocks text-buffer text-content-index completed)
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
         logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))

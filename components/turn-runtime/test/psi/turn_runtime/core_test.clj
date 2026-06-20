@@ -26,6 +26,12 @@
     (consume-fn {:type :text-delta :delta text})
     (consume-fn {:type :done :reason :stop})))
 
+(defn- stub-event-stream
+  [events]
+  (fn [_ai-ctx _conv _model _opts consume-fn]
+    (doseq [event events]
+      (consume-fn event))))
+
 (defn- setup-agent-ctx!
   []
   (let [ctx (agent/create-context)]
@@ -204,6 +210,34 @@
             turn-id       (:turn-id (turn-sc/get-turn-data
                                      (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
         (is (= [{:type :text :text "prefix "}
+                {:type :tool-call
+                 :id (str turn-id "/toolcall/0")
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd\"}"}
+                {:type :text :text " suffix"}]
+               (:content assistant-msg)))))))
+
+(deftest streaming-final-content-preserves-provider-index-order-test
+  ;; Tests mixed streaming provider tool calls keep content-index order before textual recovery.
+  (let [agent-ctx   (setup-agent-ctx!)
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
+        model       (assoc stub-model :capabilities {:textual-tool-calls #{:xml}})]
+    (agent/start-loop-in! agent-ctx [user-msg])
+    (with-redefs [turn-runtime/do-stream!
+                  (stub-event-stream [{:type :start}
+                                      {:type :toolcall-start :content-index 1 :id "provider-call" :name "read"}
+                                      {:type :toolcall-delta :content-index 1 :delta "{}"}
+                                      {:type :toolcall-end :content-index 1}
+                                      {:type :text-delta
+                                       :content-index 2
+                                       :delta "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix"}
+                                      {:type :done :reason :stop}])]
+      (let [assistant-msg (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id model nil nil)
+            turn-id       (:turn-id (turn-sc/get-turn-data
+                                     (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
+        (is (= [{:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
+                {:type :text :text "prefix "}
                 {:type :tool-call
                  :id (str turn-id "/toolcall/0")
                  :name "bash"

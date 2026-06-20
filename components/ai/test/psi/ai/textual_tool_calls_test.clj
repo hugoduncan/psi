@@ -66,7 +66,15 @@
       "<TOOL_CALL><function=bash><parameter=command>x</parameter></function></TOOL_CALL>"
       "<tool_call><function=bash.shell><parameter=command>x</parameter></function></tool_call>"
       "<tool_call><function= bash><parameter=command>x</parameter></function></tool_call>"
-      "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>")))
+      "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>"))
+
+  (testing "literal function tags inside parameter values remain parameter text"
+    (is (= [{:span [0 129]
+             :source "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"
+             :name "bash"
+             :arguments {"command" "printf '<function=literal>' && echo '</function>'"}}]
+           (textual-tool-calls/parse-xml-tool-calls
+            "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>")))))
 
 (deftest normalize-assistant-message-test
   ;; Tests canonical recovery without invoking the tool execution machinery.
@@ -96,27 +104,30 @@
 
     (testing "multiple calls and mixed malformed markup preserve response order"
       (let [assistant {:role "assistant"
-                       :content [{:type :text :text "A "}
-                                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
+                       :content [{:type :text :content-index 0 :text "A "}
+                                 {:type :tool-call :content-index 1 :id "provider-call" :name "read" :arguments "{}"}
                                  {:type :text
+                                  :content-index 2
                                   :text (str " B <tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
                                              " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call>"
                                              " D <tool_call><function=second><parameter=y>2</parameter></function></tool_call> E")}]}]
         (is (= [{:type :text :text "A "}
                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
                 {:type :text :text " B "}
-                {:type :tool-call :id "turn-2/toolcall/0" :name "first" :arguments "{\"x\":\"1\"}"}
+                {:type :tool-call :id "turn-2/toolcall/3" :name "first" :arguments "{\"x\":\"1\"}"}
                 {:type :text
-                 :text " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call> D "}
-                {:type :tool-call :id "turn-2/toolcall/1" :name "second" :arguments "{\"y\":\"2\"}"}
+                 :text (str " C <tool_call><function=bad><parameter=x>1</parameter>"
+                            "<parameter=x>2</parameter></function></tool_call> D ")}
+                {:type :tool-call :id "turn-2/toolcall/4" :name "second" :arguments "{\"y\":\"2\"}"}
                 {:type :text :text " E"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
 
-    (testing "generated ids skip existing per-turn canonical ids"
+    (testing "generated ids skip provider content indexes and existing per-turn canonical ids"
       (let [assistant {:role "assistant"
-                       :content [{:type :tool-call :id "turn-3/toolcall/0" :name "provider" :arguments "{}"}
+                       :content [{:type :tool-call :content-index 7 :id "provider-call" :name "provider" :arguments "{}"}
+                                 {:type :tool-call :id "turn-3/toolcall/0" :name "generated-provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= "turn-3/toolcall/1"
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
-                       [:content 1 :id])))))))
+                       [:content 2 :id])))))))

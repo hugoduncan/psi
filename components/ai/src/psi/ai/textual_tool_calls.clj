@@ -16,7 +16,7 @@
 (def ^:private identifier-pattern "[A-Za-z0-9_-]+")
 (def ^:private tool-call-pattern #"(?s)<tool_call>(.*?)</tool_call>")
 (def ^:private function-pattern
-  (re-pattern (str "(?s)<function=(" identifier-pattern ")>(.*?)</function>")))
+  (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
 (def ^:private parameter-pattern
   (re-pattern (str "(?s)<parameter=(" identifier-pattern ")>(.*?)</parameter>")))
 
@@ -57,20 +57,15 @@
 
 (defn- parsed-tool-call
   [{:keys [start end match groups]}]
-  (let [[body]           groups
-        function-matches (matcher-results function-pattern body)]
-    (when (= 1 (count function-matches))
-      (let [{function-start :start function-end :end function-groups :groups} (first function-matches)
-            outside-function (str (subs body 0 function-start)
-                                  (subs body function-end))
-            [tool-name function-body] function-groups]
-        (when (and (str/blank? outside-function)
-                   (not (str/includes? function-body "<function=")))
-          (when-let [arguments (parsed-parameters function-body)]
-            {:span      [start end]
-             :source    match
-             :name      tool-name
-             :arguments arguments}))))))
+  (let [[body]          groups
+        function-match  (re-matches function-pattern body)]
+    (when function-match
+      (let [[_ tool-name function-body] function-match]
+        (when-let [arguments (parsed-parameters function-body)]
+          {:span      [start end]
+           :source    match
+           :name      tool-name
+           :arguments arguments})))))
 
 (defn parse-xml-tool-calls
   "Parse well-formed XML-like textual tool calls from text.
@@ -83,22 +78,26 @@
        vec))
 
 (defn- text-block
-  [text]
+  [source-block text]
   (when (seq text)
-    {:type :text :text text}))
+    (cond-> {:type :text :text text}
+      (contains? source-block :content-index) (assoc :content-index (:content-index source-block)))))
 
 (defn- recovered-tool-call-block
   [turn-id next-content-index parsed-call]
-  {:type :tool-call
-   :id (str turn-id "/toolcall/" (next-content-index))
-   :name (:name parsed-call)
-   :arguments (json/generate-string (:arguments parsed-call))})
+  (let [content-index (next-content-index)]
+    {:type :tool-call
+     :content-index content-index
+     :id (str turn-id "/toolcall/" content-index)
+     :name (:name parsed-call)
+     :arguments (json/generate-string (:arguments parsed-call))}))
 
 (defn- textual-tool-call-content
-  [turn-id next-content-index text]
-  (let [parsed-calls (parse-xml-tool-calls text)]
+  [turn-id next-content-index source-block]
+  (let [text         (:text source-block)
+        parsed-calls (parse-xml-tool-calls text)]
     (if (empty? parsed-calls)
-      [(text-block text)]
+      [(text-block source-block text)]
       (loop [cursor 0
              calls  parsed-calls
              blocks []]
@@ -107,10 +106,10 @@
             (recur end
                    (rest calls)
                    (cond-> blocks
-                     (seq before) (conj (text-block before))
+                     (seq before) (conj (text-block source-block before))
                      :always      (conj (recovered-tool-call-block turn-id next-content-index parsed-call)))))
           (cond-> blocks
-            (seq (subs text cursor)) (conj (text-block (subs text cursor)))))))))
+            (seq (subs text cursor)) (conj (text-block source-block (subs text cursor)))))))))
 
 (defn- generated-tool-call-index
   [turn-id tool-call-id]
@@ -118,11 +117,16 @@
     (when (str/starts-with? (str tool-call-id) prefix)
       (parse-long (subs (str tool-call-id) (count prefix))))))
 
+(defn- content-index
+  [turn-id block]
+  (or (:content-index block)
+      (when (= :tool-call (:type block))
+        (generated-tool-call-index turn-id (:id block)))))
+
 (defn- next-content-index-fn
   [turn-id content]
   (let [used-indexes (->> content
-                          (keep #(when (= :tool-call (:type %))
-                                   (generated-tool-call-index turn-id (:id %))))
+                          (keep #(content-index turn-id %))
                           set)
         state        (atom {:candidate 0 :used used-indexes})]
     (fn []
@@ -135,6 +139,16 @@
                                {:candidate (inc candidate)
                                 :used      (conj used candidate)}))
                 candidate)))))))
+
+(defn- normalize-block
+  [turn-id next-content-index block]
+  (if (and (= :text (:type block)) (string? (:text block)))
+    (textual-tool-call-content turn-id next-content-index block)
+    [block]))
+
+(defn- strip-content-index
+  [block]
+  (dissoc block :content-index))
 
 (defn normalize-assistant-message
   "Recover textual tool calls in an assistant message when the resolved model opts in.
@@ -149,10 +163,8 @@
     assistant-message
     (let [content            (:content assistant-message)
           next-content-index (next-content-index-fn turn-id content)
-          normalized         (mapcat (fn [block]
-                                       (if (and (= :text (:type block)) (string? (:text block)))
-                                         (textual-tool-call-content turn-id next-content-index (:text block))
-                                         [block]))
-                                     content)
-          content*           (vec (keep identity normalized))]
-      (assoc assistant-message :content content*))))
+          normalized         (->> content
+                                  (mapcat #(normalize-block turn-id next-content-index %))
+                                  (keep identity)
+                                  (mapv strip-content-index))]
+      (assoc assistant-message :content normalized))))
