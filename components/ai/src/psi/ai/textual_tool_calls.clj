@@ -72,10 +72,15 @@
                         (parameter-candidates function-body open-match next-open))))))]
     (step 0 0)))
 
-(defn- nested-tool-call-start?
+(defn- incomplete-nested-tool-call-start?
   [value]
-  (boolean (re-find (re-pattern (str "<tool_call><function=" identifier-pattern "><parameter=" identifier-pattern ">"))
-                    value)))
+  (let [start-pattern (re-pattern (str "<tool_call><function=" identifier-pattern "><parameter=" identifier-pattern ">"))
+        matcher       (re-matcher start-pattern value)]
+    (loop []
+      (if (.find matcher)
+        (or (not (str/index-of value tool-call-close (.start matcher)))
+            (recur))
+        false))))
 
 (defn- parsed-parameters
   [function-body]
@@ -86,7 +91,7 @@
         param-names (map first params)]
     (when (and (seq params)
                (= (count param-names) (count (distinct param-names)))
-               (every? (complement nested-tool-call-start?) (map second params)))
+               (every? (complement incomplete-nested-tool-call-start?) (map second params)))
       (into {} params))))
 
 (defn- non-parameter-remainder-contains-tag?

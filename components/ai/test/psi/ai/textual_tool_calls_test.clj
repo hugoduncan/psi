@@ -94,6 +94,22 @@
                :arguments {"command" "printf '<tool_call><function=literal>'"}}]
              (textual-tool-calls/parse-xml-tool-calls text)))))
 
+  (testing "complete nested well-formed tool-call text inside parameter values remains parameter text"
+    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call><function=x><parameter=y>z</parameter></function></tool_call>'</parameter></function></tool_call>"]
+      (is (= [{:span [0 161]
+               :source text
+               :name "bash"
+               :arguments {"command" "printf '<tool_call><function=x><parameter=y>z</parameter></function></tool_call>'"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "incomplete nested tool-call start inside parameter values remains malformed and later valid blocks recover"
+    (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
+      (is (= [{:span [47 130]
+               :source "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+               :name "bash"
+               :arguments {"command" "pwd"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
   (testing "literal parameter tags inside parameter values remain parameter text"
     (let [text "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"]
       (is (= [{:span [0 131]
