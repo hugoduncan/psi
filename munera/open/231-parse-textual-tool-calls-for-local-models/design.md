@@ -41,11 +41,15 @@ In scope:
   - `<tool_call> ... </tool_call>` encloses one call.
   - `<function=TOOL_NAME> ... </function>` declares the tool name.
   - One or more `<parameter=PARAM_NAME> ... </parameter>` blocks declare string parameters.
+  - Tag names and tool/parameter names are case-sensitive. Only lowercase `tool_call`, `function`, and `parameter` tags are recognized; variants such as `<TOOL_CALL>`, `<function=TOOL_NAME>` with a different tool-name case, or `<parameter=PARAM_NAME>` with a different parameter-name case are distinct text and are not normalized.
+  - `TOOL_NAME` and `PARAM_NAME` must match the narrow identifier grammar `[A-Za-z0-9_-]+`. No whitespace, quotes, namespaces, attributes, dots, slashes, or entity decoding are accepted inside tag names.
   - Parameter text is trimmed at tag boundaries but otherwise preserved, including internal newlines and shell metacharacters.
+  - Parsed arguments are represented as the existing canonical tool-call `:arguments` JSON object string before they reach tool execution. Parameter names become JSON object keys and parameter values remain strings.
 - Convert a parsed textual tool call into the same canonical assistant tool-call content shape and downstream execution path used by provider-emitted tool calls.
 - Remove the exact parsed `<tool_call>...</tool_call>` blocks from assistant text for the turn that generated them, so the transcript does not contain both prose markup and executable tool calls. Any non-tool prose before/after parsed blocks remains as assistant text.
 - Support multiple textual tool calls in one assistant response. Every well-formed `<tool_call>` block is converted into a canonical tool call in response order.
-- Reject malformed, partial, unknown-format, or unsupported textual tool-call markup safely: leave text unchanged and do not execute a tool unless the parser can produce an unambiguous canonical call. Malformed markup is a no-op, not an error surface.
+- Mixed responses are handled block-by-block: well-formed `<tool_call>...</tool_call>` blocks are converted and removed, while malformed or partial markup outside those exact parsed blocks remains ordinary assistant text and does not prevent conversion of other well-formed blocks.
+- Reject malformed, partial, unknown-format, or unsupported textual tool-call markup safely: leave malformed text unchanged and do not execute a tool for that malformed text unless the parser can produce an unambiguous canonical call. Malformed markup is a no-op, not an error surface.
 - Add focused tests for capability gating, parser behavior, turn accumulation/conversion, and no-op behavior for frontier/default models.
 - Document the model capability in user-facing custom-provider/model documentation and add a changelog entry if the capability is user-visible.
 
@@ -61,11 +65,11 @@ Out of scope:
 
 1. A model definition can opt in to textual tool-call recovery with `{:capabilities {:textual-tool-calls #{:xml}}}`.
 2. Models without the capability — including default/frontier models — pay no parsing/execution behavior cost and preserve textual `<tool_call>` content as ordinary assistant text.
-3. With the capability enabled, the example `bash` block above produces one canonical tool call named `bash` with arguments `{:command "cd /Users/duncan/projects/hugoduncan/psi/compaction && git diff --stat"}` (or the existing canonical string-key equivalent used by the tool executor).
+3. With the capability enabled, the example `bash` block above produces one canonical tool call named `bash` with canonical `:arguments` JSON equivalent to `{"command":"cd /Users/duncan/projects/hugoduncan/psi/compaction && git diff --stat"}` before existing tool execution parses it.
 4. Multiple well-formed textual tool-call blocks in a single assistant response produce multiple canonical tool calls in response order.
 5. Parsed calls are executed by the existing tool execution machinery and produce ordinary tool-result journal entries; no separate compatibility execution path is introduced.
 6. The exact parsed `<tool_call>...</tool_call>` blocks are not retained as assistant prose in the conversation for the same turn. Surrounding non-tool text, if any, is preserved.
-7. Malformed examples are no-ops: they do not execute any tool, do not corrupt the turn, and remain visible as ordinary assistant text.
+7. Malformed examples are no-ops for the malformed text: they do not execute any tool, do not corrupt the turn, and remain visible as ordinary assistant text; other well-formed blocks in the same response are still converted.
 8. Unknown tool names or unavailable tools follow the same errors/policy as canonical provider-emitted tool calls.
 9. Tests cover enabled vs disabled capability, nominal `bash` parsing, multiple calls, multi-parameter parsing, malformed markup no-op, and preservation of surrounding text while removing only exact parsed blocks.
 10. User docs explain how a local/custom model opts into the compatibility parser and warn that frontier models should not enable it.
@@ -74,6 +78,8 @@ Out of scope:
 
 - Prefer model-map capability data over provider/model heuristics. `runtime-active-model` or the turn's already-resolved model is the authority.
 - Keep parsing local to the turn/provider-boundary normalization layer: after assistant text is known, before the runtime decides whether tool calls are pending/executable.
+- The normalization should be a single pure boundary used by both streaming final assembly and non-streaming assistant responses. Do not implement separate streaming-only and non-streaming parsers, and do not duplicate conversion logic across execution paths.
+- Resolve textual tool-call capability from the turn's already-resolved runtime model/prepared-request model. Do not make `turn-runtime` depend on the `agent-session` component to call session capability helpers; if shared helpers are needed, place pure model-capability/parser helpers in a lower-level component already allowed by the dependency graph.
 - Reuse existing canonical tool-call ids and content block semantics. If the parsed markup has no id, generate one with the same per-turn/canonical id approach used for provider tool calls.
 - Do not bypass security: parsed textual calls must be indistinguishable from provider calls by the time authorization/tool availability checks run.
 - Make invalid states unreachable where practical: either the assistant message has text or canonical tool-call blocks, not an unexecuted textual tool-call block that also triggers execution.
