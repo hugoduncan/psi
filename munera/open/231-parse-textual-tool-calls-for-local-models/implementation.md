@@ -200,3 +200,7 @@ No implementation work has been done yet.
 
 2026-06-20 implementation review:
 - added 1 invalid-parameter-name follow-up step.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: nested well-formed textual tool calls inside malformed outer blocks with invalid parameter-name grammar remain ordinary text and are not recovered/executed.
+- verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.

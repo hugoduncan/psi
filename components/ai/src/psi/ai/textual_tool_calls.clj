@@ -178,6 +178,28 @@
               (recur (inc idx) (conj starts idx))
               starts)))))
 
+(defn- span-starts-in-invalid-parameter-value?
+  [body body-start start]
+  (let [relative-start (- start body-start)]
+    (some (fn [parameter-open]
+            (let [parameter-open-end (str/index-of body ">" parameter-open)
+                  parameter-close    (when parameter-open-end
+                                       (str/index-of body "</parameter>" parameter-open-end))
+                  valid-parameter-open? (when parameter-open-end
+                                          (re-matches
+                                           (re-pattern (str "<parameter=" identifier-pattern ">"))
+                                           (subs body parameter-open (inc parameter-open-end))))]
+              (and parameter-open-end
+                   parameter-close
+                   (not valid-parameter-open?)
+                   (<= (inc parameter-open-end) relative-start)
+                   (< relative-start parameter-close))))
+          (loop [search-from 0
+                 starts []]
+            (if-let [idx (str/index-of body "<parameter=" search-from)]
+              (recur (inc idx) (conj starts idx))
+              starts)))))
+
 (defn- enclosing-malformed-tool-call?
   [text start end]
   (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
@@ -192,7 +214,11 @@
                                             function-body
                                             function-body-start
                                             start)]
-                  (or (and nested-in-parameter?
+                  (or (span-starts-in-invalid-parameter-value?
+                       function-body
+                       function-body-start
+                       start)
+                      (and nested-in-parameter?
                            (duplicate-parameter-name? function-body))
                       (and nested-in-parameter?
                            (some swallowed-following-function-block?
@@ -201,7 +227,8 @@
                            (nil? (parsed-parameters function-body))
                            (str/starts-with? (str/trim function-body) "<tool_call>"))))
                 (or (span-starts-in-body-parameter-before-function? body body-start start)
-                    (span-starts-in-invalid-function-parameter? body body-start start))))))
+                    (span-starts-in-invalid-function-parameter? body body-start start)
+                    (span-starts-in-invalid-parameter-value? body body-start start))))))
         (candidate-tool-call-spans text)))
 
 (defn- parsed-tool-call
