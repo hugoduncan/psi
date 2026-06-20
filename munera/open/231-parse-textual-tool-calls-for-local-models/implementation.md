@@ -36,3 +36,7 @@ No implementation work has been done yet.
 
 2026-06-20 inconsistency review (shared design-review third turn):
 - no inconsistency review feedback.
+
+2026-06-20 design follow-up execution:
+- Completed the two unchecked non-scope ambiguity follow-ups in `design-steps.md`; no `SCOPE_QUESTION:` items were present.
+- Implementation should treat duplicate parameter names, multiple/missing function blocks, parameter blocks outside the function, and function blocks with zero parameters as malformed block-level no-ops.
