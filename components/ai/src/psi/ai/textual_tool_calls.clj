@@ -134,17 +134,29 @@
         (choose-parameter-candidates function-body
                                      (parameter-open-matches function-body))))
 
+(defn- span-starts-in-body-parameter-before-function?
+  [body body-start start]
+  (let [first-function-start (str/index-of body "<function=")]
+    (and first-function-start
+         (some (fn [{param-start :start value-start :end}]
+                 (when-let [close-start (str/index-of body "</parameter>" value-start)]
+                   (let [absolute-value-start (+ body-start value-start)
+                         absolute-value-end   (+ body-start close-start)]
+                     (and (< param-start first-function-start)
+                          (<= absolute-value-start start)
+                          (< start absolute-value-end)))))
+               (parameter-open-matches body)))))
+
 (defn- enclosing-malformed-tool-call?
   [text start end]
   (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
           (when (and (< candidate-start start) (>= candidate-end end))
-            (let [[body]  groups
-                  matcher (re-matcher function-pattern body)]
-              (when (.matches matcher)
+            (let [[body]     groups
+                  body-start (+ candidate-start (count tool-call-open))
+                  matcher    (re-matcher function-pattern body)]
+              (if (.matches matcher)
                 (let [function-body       (.group matcher 2)
-                      function-body-start (+ candidate-start
-                                             (count tool-call-open)
-                                             (.start matcher 2))
+                      function-body-start (+ body-start (.start matcher 2))
                       nested-in-parameter? (span-starts-in-parameter-value?
                                             function-body
                                             function-body-start
@@ -156,7 +168,8 @@
                                  (map second (parsed-parameter-pairs function-body))))
                       (and (nil? (parsed-parameter-pairs function-body))
                            (nil? (parsed-parameters function-body))
-                           (str/starts-with? (str/trim function-body) "<tool_call>"))))))))
+                           (str/starts-with? (str/trim function-body) "<tool_call>"))))
+                (span-starts-in-body-parameter-before-function? body body-start start)))))
         (candidate-tool-call-spans text)))
 
 (defn- parsed-tool-call
