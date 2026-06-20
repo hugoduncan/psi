@@ -57,3 +57,10 @@ No implementation work has been done yet.
 
 2026-06-20 plan inconsistency review (shared plan-review second turn rerun):
 - no new inconsistency review feedback.
+
+2026-06-20 implementation slice 1/2:
+- Added lower-level `psi.ai.textual-tool-calls` so `turn-runtime` can later require capability/parser helpers without depending on `agent-session`.
+- `schemas/ModelCapabilities` now accepts optional `:textual-tool-calls #{:xml}`; omitted/empty capability remains disabled via `supports-format?`.
+- Parser currently returns only successfully parsed calls with exact source spans/source text/name/string arguments; malformed blocks are omitted so the next normalizer slice can remove only successful spans and leave malformed markup as text.
+- Parser is intentionally regex/narrow, not XML: lowercase tags only, `[A-Za-z0-9_-]+` identifiers, duplicate params/cardinality/nesting failures are block-level no-ops.
+- Verified `bb clojure:test:scry --ns psi.ai.textual-tool-calls-test` and focused `clj-kondo` on changed Clojure files.

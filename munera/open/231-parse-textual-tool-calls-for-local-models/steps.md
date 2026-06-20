@@ -2,19 +2,19 @@
 
 ## Slice 1 — Capability model surface
 
-- [ ] Inspect existing model capability schemas/loading paths in `components/ai` and identify the lowest-level namespace for textual-tool-call capability helpers.
-- [ ] Extend model capability schema/validation to accept `{:textual-tool-calls #{:xml}}` without requiring the key on existing/default models.
-- [ ] Add a pure predicate such as `supports-textual-tool-calls-format?` that checks the resolved model map for a requested format.
-- [ ] Add focused tests that custom/user model maps can declare `#{:xml}` and that omitted/empty capabilities return disabled.
+- [x] Inspect existing model capability schemas/loading paths in `components/ai` and identify the lowest-level namespace for textual-tool-call capability helpers.
+- [x] Extend model capability schema/validation to accept `{:textual-tool-calls #{:xml}}` without requiring the key on existing/default models.
+- [x] Add a pure predicate such as `supports-textual-tool-calls-format?` that checks the resolved model map for a requested format.
+- [x] Add focused tests that custom/user model maps can declare `#{:xml}` and that omitted/empty capabilities return disabled.
 
 ## Slice 2 — Pure XML-like parser
 
-- [ ] Implement a pure parser for exact lowercase `<tool_call>...</tool_call>` blocks containing exactly one `<function=TOOL_NAME>...</function>` block.
-- [ ] Enforce `[A-Za-z0-9_-]+` for tool and parameter names and reject whitespace, attributes, namespaces, dots, slashes, quotes, and entity decoding.
-- [ ] Parse one or more nested `<parameter=PARAM_NAME>...</parameter>` blocks, trimming only at tag boundaries and preserving internal text/newlines/metacharacters.
-- [ ] Treat duplicate parameter names, missing/multiple function blocks, zero parameters, or parameter blocks outside the function as malformed block-level no-ops.
-- [ ] Return enough information to remove only successfully parsed exact block spans while leaving malformed/partial markup unchanged.
-- [ ] Add parser tests for nominal `bash`, multiple calls, multi-parameter calls, duplicate parameters, malformed cardinality/nesting, unsupported case/grammar variants, and surrounding-text preservation.
+- [x] Implement a pure parser for exact lowercase `<tool_call>...</tool_call>` blocks containing exactly one `<function=TOOL_NAME>...</function>` block.
+- [x] Enforce `[A-Za-z0-9_-]+` for tool and parameter names and reject whitespace, attributes, namespaces, dots, slashes, quotes, and entity decoding.
+- [x] Parse one or more nested `<parameter=PARAM_NAME>...</parameter>` blocks, trimming only at tag boundaries and preserving internal text/newlines/metacharacters.
+- [x] Treat duplicate parameter names, missing/multiple function blocks, zero parameters, or parameter blocks outside the function as malformed block-level no-ops.
+- [x] Return enough information to remove only successfully parsed exact block spans while leaving malformed/partial markup unchanged.
+- [x] Add parser tests for nominal `bash`, multiple calls, multi-parameter calls, duplicate parameters, malformed cardinality/nesting, unsupported case/grammar variants, and surrounding-text preservation.
 
 ## Slice 3 — Canonical normalization
 

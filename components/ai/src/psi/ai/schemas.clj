@@ -151,9 +151,13 @@
    [:defaulted? {:optional true} boolean?]
    [:notes {:optional true} string?]])
 
+(def TextualToolCallFormat
+  [:enum :xml])
+
 (def ModelCapabilities
   [:map {:closed true}
-   [:structured-output {:optional true} StructuredOutputCapability]])
+   [:structured-output {:optional true} StructuredOutputCapability]
+   [:textual-tool-calls {:optional true} [:set TextualToolCallFormat]]])
 
 (def Model
   [:map {:closed true}
