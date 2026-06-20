@@ -134,3 +134,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 2 review steps: canonical unindexed provider ids now occupy their parsed generated index without adding a hidden position; unrelated diff areas were confirmed as pre-existing commits before task 231 implementation rather than new task-scope changes.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 2 steps to be addressed.
