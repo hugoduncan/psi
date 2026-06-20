@@ -42,6 +42,7 @@
                  (conj candidates {:start (:start open-match)
                                    :end end
                                    :name (:name open-match)
+                                   :value-start (:end open-match)
                                    :value (subs function-body (:end open-match) close-start)
                                    :crosses-next-open? (boolean (and next-open (< (:start next-open) close-start)))
                                    :crosses-nonnested-next-open? (boolean
@@ -124,17 +125,38 @@
          (not= (count (map first params))
                (count (distinct (map first params)))))))
 
+(defn- span-starts-in-parameter-value?
+  [function-body body-start start]
+  (some (fn [{value-start :value-start candidate-end :end}]
+          (let [absolute-value-start (+ body-start value-start)
+                absolute-value-end   (- (+ body-start candidate-end) (count "</parameter>"))]
+            (and (<= absolute-value-start start) (< start absolute-value-end))))
+        (choose-parameter-candidates function-body
+                                     (parameter-open-matches function-body))))
+
 (defn- enclosing-malformed-tool-call?
   [text start end]
   (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
           (when (and (< candidate-start start) (>= candidate-end end))
-            (let [[body]         groups
-                  function-match (re-matches function-pattern body)]
-              (when function-match
-                (let [[_ _tool-name function-body] function-match]
-                  (or (duplicate-parameter-name? function-body)
-                      (some swallowed-following-function-block?
-                            (map second (parsed-parameter-pairs function-body)))))))))
+            (let [[body]  groups
+                  matcher (re-matcher function-pattern body)]
+              (when (.matches matcher)
+                (let [function-body       (.group matcher 2)
+                      function-body-start (+ candidate-start
+                                             (count tool-call-open)
+                                             (.start matcher 2))
+                      nested-in-parameter? (span-starts-in-parameter-value?
+                                            function-body
+                                            function-body-start
+                                            start)]
+                  (or (and nested-in-parameter?
+                           (duplicate-parameter-name? function-body))
+                      (and nested-in-parameter?
+                           (some swallowed-following-function-block?
+                                 (map second (parsed-parameter-pairs function-body))))
+                      (and (nil? (parsed-parameter-pairs function-body))
+                           (nil? (parsed-parameters function-body))
+                           (str/starts-with? (str/trim function-body) "<tool_call>"))))))))
         (candidate-tool-call-spans text)))
 
 (defn- parsed-tool-call

@@ -145,6 +145,12 @@
     (let [text (str "<tool_call><function=outer>"
                     "<parameter=x>one <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                     "</function><function=second><parameter=y>2</parameter></function></tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested valid tool calls inside malformed no-parameter outer blocks are not recovered"
+    (let [text (str "<tool_call><function=outer>"
+                    "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+                    "</function></tool_call>")]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
@@ -277,6 +283,15 @@
       (let [text      (str "<tool_call><function=outer>"
                            "<parameter=x>one <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                            "<parameter=x>two</parameter>"
+                           "</function></tool_call>")
+            assistant {:role "assistant"
+                       :content [{:type :text :text text}]}]
+        (is (= [{:type :text :text text}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
+
+    (testing "nested valid calls inside malformed no-parameter outer blocks remain text"
+      (let [text      (str "<tool_call><function=outer>"
+                           "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</function></tool_call>")
             assistant {:role "assistant"
                        :content [{:type :text :text text}]}]
