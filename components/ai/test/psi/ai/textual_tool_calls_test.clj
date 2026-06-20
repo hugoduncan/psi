@@ -1,5 +1,6 @@
 (ns psi.ai.textual-tool-calls-test
   (:require
+   [cheshire.core :as json]
    [clojure.test :refer [are deftest is testing]]
    [psi.ai.schemas :as schemas]
    [psi.ai.textual-tool-calls :as textual-tool-calls]
@@ -66,3 +67,56 @@
       "<tool_call><function=bash.shell><parameter=command>x</parameter></function></tool_call>"
       "<tool_call><function= bash><parameter=command>x</parameter></function></tool_call>"
       "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>")))
+
+(deftest normalize-assistant-message-test
+  ;; Tests canonical recovery without invoking the tool execution machinery.
+  (let [enabled-model  {:capabilities {:textual-tool-calls #{:xml}}}
+        disabled-model {:capabilities {}}]
+    (testing "disabled models preserve textual markup unchanged"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= assistant
+               (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant)))))
+
+    (testing "enabled models convert parsed calls to canonical tool-call blocks with JSON arguments"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text
+                                  :text "Before <tool_call><function=bash><parameter=command>pwd && echo hi</parameter></function></tool_call> after"}]}
+            content   (:content (textual-tool-calls/normalize-assistant-message "turn-1" enabled-model assistant))]
+        (is (= [{:type :text :text "Before "}
+                {:type :tool-call
+                 :id "turn-1/toolcall/0"
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd && echo hi\"}"}
+                {:type :text :text " after"}]
+               content))
+        (is (= {"command" "pwd && echo hi"}
+               (json/parse-string (:arguments (second content)))))))
+
+    (testing "multiple calls and mixed malformed markup preserve response order"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text :text "A "}
+                                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
+                                 {:type :text
+                                  :text (str " B <tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                             " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call>"
+                                             " D <tool_call><function=second><parameter=y>2</parameter></function></tool_call> E")}]}]
+        (is (= [{:type :text :text "A "}
+                {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
+                {:type :text :text " B "}
+                {:type :tool-call :id "turn-2/toolcall/0" :name "first" :arguments "{\"x\":\"1\"}"}
+                {:type :text
+                 :text " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call> D "}
+                {:type :tool-call :id "turn-2/toolcall/1" :name "second" :arguments "{\"y\":\"2\"}"}
+                {:type :text :text " E"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
+
+    (testing "generated ids skip existing per-turn canonical ids"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "turn-3/toolcall/0" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= "turn-3/toolcall/1"
+               (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
+                       [:content 1 :id])))))))

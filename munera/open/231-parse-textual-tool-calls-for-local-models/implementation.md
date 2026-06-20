@@ -64,3 +64,8 @@ No implementation work has been done yet.
 - Parser currently returns only successfully parsed calls with exact source spans/source text/name/string arguments; malformed blocks are omitted so the next normalizer slice can remove only successful spans and leave malformed markup as text.
 - Parser is intentionally regex/narrow, not XML: lowercase tags only, `[A-Za-z0-9_-]+` identifiers, duplicate params/cardinality/nesting failures are block-level no-ops.
 - Verified `bb clojure:test:scry --ns psi.ai.textual-tool-calls-test` and focused `clj-kondo` on changed Clojure files.
+
+2026-06-20 implementation slice 3/4:
+- Added `psi.ai.textual-tool-calls/normalize-assistant-message` as the shared pure boundary for canonical recovery. It is model-capability gated, converts parsed calls to canonical `:tool-call` blocks with JSON object string arguments, removes only exact parsed spans, preserves malformed markup, and skips existing `turn-id/toolcall/N` ids when generating recovered ids.
+- Wired streaming final assembly and non-streaming responses through the same normalizer using the already-resolved `ai-model`; `turn-runtime` now stores `:ai-model` in turn data for accumulator finalization and still avoids any `agent-session` dependency.
+- Focused normalizer tests cover disabled models, JSON args, multiple calls, malformed interleaving, provider/recovered/text ordering, and id non-collision. Existing accumulator tests remain green; focused clj-kondo reports only pre-existing unresolved `ai/execute-response[-in]` warnings in `turn-runtime/core.clj`.

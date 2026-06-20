@@ -5,6 +5,7 @@
    Owns all mutable state updates to the turn-data atom during a streaming turn."
   (:require
    [clojure.string :as str]
+   [psi.ai.textual-tool-calls :as textual-tool-calls]
    [psi.turn-runtime.state :as trs]
    [psi.tool-runtime.args :as tool-args]
    [psi.turn-statechart.core :as turn-sc]))
@@ -321,10 +322,13 @@
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
         logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))
-        final     (cond-> {:role        "assistant"
-                           :content     content
-                           :stop-reason stop-reason
-                           :timestamp   (java.time.Instant/now)}
+        final     (cond-> (textual-tool-calls/normalize-assistant-message
+                           (:turn-id @td)
+                           (:ai-model @td)
+                           {:role        "assistant"
+                            :content     content
+                            :stop-reason stop-reason
+                            :timestamp   (java.time.Instant/now)})
                     (map? usage) (assoc :usage usage))]
     (note-last-provider-event! td :done data)
     (emit-tool-assembly-errors! progress-queue completed)

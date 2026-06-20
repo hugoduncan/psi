@@ -8,6 +8,7 @@
    [psi.ai.core :as ai]
    [psi.ai.models :as models]
    [psi.ai.structured-output :as structured-output]
+   [psi.ai.textual-tool-calls :as textual-tool-calls]
    [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
    [psi.session-state.state :as ss]
@@ -83,7 +84,7 @@
         actions-fn       (accum/make-turn-actions ctx session-id done-p progress-queue
                                                   ai-model thinking-buffers)
         turn-ctx         (turn-sc/create-turn-context actions-fn)
-        _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id)
+        _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id :ai-model ai-model)
         last-progress-ms (atom (stream/now-ms))
         timed-out?       (atom false)]
     (trs/set-turn-context-in! ctx session-id turn-ctx)
@@ -256,7 +257,8 @@
       {:turn-id turn-id
        :model ai-model
        :ai-options ai-options
-       :assistant-message (:assistant-message result)
+       :assistant-message (textual-tool-calls/normalize-assistant-message
+                           turn-id ai-model (:assistant-message result))
        :logprobs (:logprobs result)
        :structured-output (:structured-output result)})))
 

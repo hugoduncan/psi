@@ -18,21 +18,21 @@
 
 ## Slice 3 — Canonical normalization
 
-- [ ] Implement one pure normalizer that takes `turn-id`, resolved `ai-model`, assistant text/content, and existing provider tool calls and returns canonical assistant content.
-- [ ] Gate parsing entirely on the resolved model capability containing `:xml`; when disabled, return text/content unchanged.
-- [ ] Convert each parsed call to canonical `{:type :tool-call :id ... :name ... :arguments ...}` content using JSON object string arguments.
-- [ ] Preserve provider-emitted tool-call ids and indexes when present, and generate recovered-call ids with the same per-turn canonical id convention using final-order, non-colliding content indexes.
-- [ ] Preserve response order for residual text, provider-emitted tool calls, and recovered textual tool calls while removing exact parsed blocks from assistant prose.
-- [ ] Keep malformed or partial markup as ordinary text and continue converting other well-formed blocks in the same response.
-- [ ] Add normalizer tests for enabled/disabled capability, canonical JSON arguments, multiple calls order, mixed valid/malformed markup, provider/recovered/text interleaving, id/index non-collision, and text removal/preservation.
+- [x] Implement one pure normalizer that takes `turn-id`, resolved `ai-model`, assistant text/content, and existing provider tool calls and returns canonical assistant content.
+- [x] Gate parsing entirely on the resolved model capability containing `:xml`; when disabled, return text/content unchanged.
+- [x] Convert each parsed call to canonical `{:type :tool-call :id ... :name ... :arguments ...}` content using JSON object string arguments.
+- [x] Preserve provider-emitted tool-call ids and indexes when present, and generate recovered-call ids with the same per-turn canonical id convention using final-order, non-colliding content indexes.
+- [x] Preserve response order for residual text, provider-emitted tool calls, and recovered textual tool calls while removing exact parsed blocks from assistant prose.
+- [x] Keep malformed or partial markup as ordinary text and continue converting other well-formed blocks in the same response.
+- [x] Add normalizer tests for enabled/disabled capability, canonical JSON arguments, multiple calls order, mixed valid/malformed markup, provider/recovered/text interleaving, id/index non-collision, and text removal/preservation.
 
 ## Slice 4 — Turn-runtime integration
 
-- [ ] Wire streaming final assembly to call the shared normalizer after text accumulation and provider tool-call completion but before delivering the final assistant message.
-- [ ] Wire non-streaming assistant responses to call the same shared normalizer before returning the turn result.
-- [ ] Ensure the integration uses the already-resolved runtime `ai-model` passed through the turn attempt and does not require `agent-session` from `turn-runtime`.
-- [ ] Preserve existing thinking, error, logprob, usage, and structured-output behavior when no textual tool-call parsing occurs.
-- [ ] Add/adjust turn-runtime tests for streaming and non-streaming normalization paths where practical.
+- [x] Wire streaming final assembly to call the shared normalizer after text accumulation and provider tool-call completion but before delivering the final assistant message.
+- [x] Wire non-streaming assistant responses to call the same shared normalizer before returning the turn result.
+- [x] Ensure the integration uses the already-resolved runtime `ai-model` passed through the turn attempt and does not require `agent-session` from `turn-runtime`.
+- [x] Preserve existing thinking, error, logprob, usage, and structured-output behavior when no textual tool-call parsing occurs.
+- [x] Add/adjust turn-runtime tests for streaming and non-streaming normalization paths where practical.
 
 ## Slice 5 — Existing execution-path coverage
 

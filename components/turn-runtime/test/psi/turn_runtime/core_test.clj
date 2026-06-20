@@ -191,6 +191,26 @@
                  (some #(when (= :text (:type %)) (:text %))
                        (:content assistant-msg)))))))))
 
+(deftest stream-turn-recovers-textual-tool-call-test
+  ;; Tests streaming final assembly uses the textual tool-call normalizer when opted in.
+  (let [agent-ctx   (setup-agent-ctx!)
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+        user-msg    {:role "user" :content [{:type :text :text "hi"}]}
+        model       (assoc stub-model :capabilities {:textual-tool-calls #{:xml}})]
+    (agent/start-loop-in! agent-ctx [user-msg])
+    (with-redefs [turn-runtime/do-stream!
+                  (stub-text-stream "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix")]
+      (let [assistant-msg (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id model nil nil)
+            turn-id       (:turn-id (turn-sc/get-turn-data
+                                     (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
+        (is (= [{:type :text :text "prefix "}
+                {:type :tool-call
+                 :id (str turn-id "/toolcall/0")
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd\"}"}
+                {:type :text :text " suffix"}]
+               (:content assistant-msg)))))))
+
 (deftest run-turn-loop-test
   (testing "multi-turn loop separates one-turn execution from recursive control"
     (let [agent-ctx   (setup-agent-ctx!)
