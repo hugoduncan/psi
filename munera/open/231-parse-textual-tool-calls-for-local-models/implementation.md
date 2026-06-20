@@ -30,3 +30,6 @@ No implementation work has been done yet.
 
 2026-06-20 architecture review (shared design-review first turn):
 - no architectural review feedback.
+
+2026-06-20 ambiguity review (shared design-review second turn):
+- ambiguity review added 2 new design steps: duplicate parameter-name semantics, and exact per-call function/parameter cardinality/nesting.
