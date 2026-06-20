@@ -16,3 +16,7 @@
 # Design Review — Ambiguity (re-review)
 
 - [ ] Test namespace naming convention: design specifies `extensions.context_manager_test` (underscores in ns name) but codebase convention (e.g. `extensions.auto-session-name-test`) uses hyphens in namespace names. Clarify that the ns form should be `extensions.context-manager-test` to match convention.
+
+# Design Review — Inconsistency (re-review)
+
+- [x] Inconsistency review (2026-06-20): no new inconsistencies found. Design, plan, and steps are consistent with each other and with the auto-session-name reference pattern. Both catalogs, extensions/deps.edn wiring, and test approach are correctly specified.
