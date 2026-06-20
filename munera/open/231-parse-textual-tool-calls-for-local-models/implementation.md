@@ -27,3 +27,6 @@ No implementation work has been done yet.
 - Completed all unchecked non-scope design follow-ups in `design-steps.md`; no `SCOPE_QUESTION:` items were present.
 - Useful implementation orientation: `turn-runtime` already receives the resolved `ai-model` in `components/turn-runtime/src/psi/turn_runtime/core.clj` and `accumulator.clj`, while `runtime-active-model` currently lives in `components/agent-session/src/psi/agent_session/model_capabilities.clj`; avoid adding a `turn-runtime` dependency on `agent-session`.
 - Existing canonical tool-call validation expects `:arguments` to be a JSON object string (`psi.tool-runtime.args/parse-args-strict`, used by `psi.turn-runtime.accumulator/invalid-tool-call`).
+
+2026-06-20 architecture review (shared design-review first turn):
+- no architectural review feedback.
