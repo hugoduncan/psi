@@ -7,6 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
+- Custom/local model definitions can opt into textual tool-call recovery with `{:capabilities {:textual-tool-calls #{:xml}}}`. This compatibility path converts strict `<tool_call><function=...><parameter=...>` assistant-text blocks from local runners into ordinary canonical tool calls while leaving malformed markup or opt-out/frontier models unchanged.
 - New `sub-agent` workflow: uses the `/delegate sub-agent ...` input directly as the delegated prompt, without adding workflow-specific instructions.
 - New `resolve-task-design-entities` workflow: takes a Munera task reference, runs the entity-resolution skill over the task's `design.md`, updates unambiguous ambiguous references to canonical project entities/paths/terms, appends useful future-step discoveries to `implementation.md`, records unresolved blocking ambiguity as feedback, and emits `PASS_STATUS: REVIEW_COMPLETE|ACTIONABLE_FEEDBACK` so it can be inserted into `task-lifecycle` later. Invokable via `/delegate resolve-task-design-entities`.
 - New `entity-resolution` workflow: runs the entity-resolution skill over arbitrary input, resolves ambiguous references into concrete project entities/paths/terms with evidence and confidence, and asks a focused clarification question when the mapping is not unique. Invokable via `/delegate entity-resolution`.

@@ -36,15 +36,15 @@
 
 ## Slice 5 — Existing execution-path coverage
 
-- [ ] Add an end-to-end or focused turn/session test proving a capability-enabled textual `bash` block reaches the existing tool execution path and records an ordinary tool result.
-- [ ] Add coverage that unknown or unavailable parsed tool names follow the same failure/policy behavior as canonical provider-emitted tool calls.
-- [ ] Add coverage that frontier/default models preserve textual `<tool_call>` content as assistant text and execute no tool.
-- [ ] Run focused Scry suites for parser/model/turn-runtime/session tool-call behavior and fix regressions.
-- [ ] Run `clj-kondo` on changed Clojure files and fix warnings rather than suppressing globally.
+- [x] Add an end-to-end or focused turn/session test proving a capability-enabled textual `bash` block reaches the existing tool execution path and records an ordinary tool result.
+- [x] Add coverage that unknown or unavailable parsed tool names follow the same failure/policy behavior as canonical provider-emitted tool calls.
+- [x] Add coverage that frontier/default models preserve textual `<tool_call>` content as assistant text and execute no tool.
+- [x] Run focused Scry suites for parser/model/turn-runtime/session tool-call behavior and fix regressions.
+- [x] Run `clj-kondo` on changed Clojure files and fix warnings rather than suppressing globally.
 
 ## Slice 6 — Docs and changelog
 
-- [ ] Update custom/local model documentation to show `{:capabilities {:textual-tool-calls #{:xml}}}` opt-in.
-- [ ] Document that frontier/provider-native models should not enable textual tool-call recovery and that malformed markup is left as text.
-- [ ] Add a user-visible `CHANGELOG.md` entry under `[Unreleased]` for the new local-model compatibility capability.
-- [ ] Re-run relevant docs/tests checks if available.
+- [x] Update custom/local model documentation to show `{:capabilities {:textual-tool-calls #{:xml}}}` opt-in.
+- [x] Document that frontier/provider-native models should not enable textual tool-call recovery and that malformed markup is left as text.
+- [x] Add a user-visible `CHANGELOG.md` entry under `[Unreleased]` for the new local-model compatibility capability.
+- [x] Re-run relevant docs/tests checks if available.

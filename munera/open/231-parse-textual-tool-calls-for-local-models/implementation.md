@@ -69,3 +69,8 @@ No implementation work has been done yet.
 - Added `psi.ai.textual-tool-calls/normalize-assistant-message` as the shared pure boundary for canonical recovery. It is model-capability gated, converts parsed calls to canonical `:tool-call` blocks with JSON object string arguments, removes only exact parsed spans, preserves malformed markup, and skips existing `turn-id/toolcall/N` ids when generating recovered ids.
 - Wired streaming final assembly and non-streaming responses through the same normalizer using the already-resolved `ai-model`; `turn-runtime` now stores `:ai-model` in turn data for accumulator finalization and still avoids any `agent-session` dependency.
 - Focused normalizer tests cover disabled models, JSON args, multiple calls, malformed interleaving, provider/recovered/text ordering, and id non-collision. Existing accumulator tests remain green; focused clj-kondo reports only pre-existing unresolved `ai/execute-response[-in]` warnings in `turn-runtime/core.clj`.
+
+2026-06-20 implementation slice 5/6:
+- Added focused mock-free session coverage in `psi.agent-session.textual-tool-call-execution-test` using a nullable stub AI provider and real prompt-chain/tool dispatch: capability-enabled textual `bash` executes through the existing tool path and records an ordinary `toolResult`; recovered unknown tools surface the same error-shaped `toolResult`; default/frontier opt-out preserves markup as text and dispatches no tools.
+- Documented `{:capabilities {:textual-tool-calls #{:xml}}}` in `doc/custom-providers.md`, including the strict XML-like shape, malformed-markup no-op behavior, and warning not to enable it for provider-native/frontier models.
+- Added the user-visible changelog entry under `[Unreleased]`.

@@ -50,6 +50,29 @@ Custom model definitions may opt into structured-output requests with a model-le
 
 Omitting `:capabilities :structured-output` is valid and normalizes to unsupported. Psi will not inject prompted-JSON fallback instructions for omitted legacy/custom models; add `:strategies [:prompted-json]` when that behavior is wanted.
 
+## Textual tool-call compatibility
+
+Some local model runners emit tool-call markup as assistant text instead of returning provider-native tool-call events. A custom/local model can opt into Psi's narrow recovery parser with:
+
+```clojure
+{:capabilities
+ {:textual-tool-calls #{:xml}}}
+```
+
+The `:xml` format recognizes only the strict compatibility form:
+
+```xml
+<tool_call>
+<function=bash>
+<parameter=command>
+pwd
+</parameter>
+</function>
+</tool_call>
+```
+
+When enabled on the active runtime model, well-formed blocks are removed from assistant prose, converted into ordinary canonical tool calls, and then pass through the existing tool availability, authorization, execution, journaling, and result-recording path. Malformed, partial, or unsupported markup remains ordinary assistant text and does not execute a tool. Frontier/provider-native models should not enable this compatibility flag; leave the capability omitted unless the configured local runner is known to leak this textual markup.
+
 Native capability declarations should only be used when the configured transport is known to support the provider mechanism:
 
 - `:openai-completions` may use `:native-mechanism :openai/chat-completions-json-schema-response-format` when the compatible API supports Chat Completions `response_format` JSON Schema.
