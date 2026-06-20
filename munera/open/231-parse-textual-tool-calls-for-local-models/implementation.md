@@ -100,3 +100,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 1 review step: streaming final assembly now preserves content-index metadata through textual-tool-call normalization, then strips it only from the final assistant content; regressions now expect recovered ids after provider/text positions.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 1 step to be addressed.
