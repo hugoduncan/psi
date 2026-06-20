@@ -172,3 +172,7 @@ No implementation work has been done yet.
 
 2026-06-20 implementation review:
 - added 1 step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: outer textual tool calls with multiple function blocks are rejected even when the first parameter contains literal nested well-formed tool-call text.
+- verified focused textual-tool-call/turn-runtime/session Scry suites; focused clj-kondo reports only the pre-existing `psi.ai.core/execute-response-in` unresolved-var warning in `response_mode_test.clj`.

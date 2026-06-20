@@ -139,6 +139,12 @@
                     "<parameter=x>one <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                     "<parameter=x>two</parameter>"
                     "</function></tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "outer multiple-function blocks are malformed when first parameter contains nested tool-call text"
+    (let [text (str "<tool_call><function=outer>"
+                    "<parameter=x>one <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
+                    "</function><function=second><parameter=y>2</parameter></function></tool_call>")]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test

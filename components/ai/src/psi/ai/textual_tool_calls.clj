@@ -84,6 +84,12 @@
             (recur))
         false))))
 
+(defn- swallowed-following-function-block?
+  [value]
+  (boolean
+   (re-find (re-pattern (str "(?s)</parameter>\\s*</function>\\s*<function=" identifier-pattern ">"))
+            value)))
+
 (defn- parsed-parameter-pairs
   [function-body]
   (some->> (choose-parameter-candidates function-body
@@ -97,7 +103,8 @@
         param-names (map first params)]
     (when (and (seq params)
                (= (count param-names) (count (distinct param-names)))
-               (every? (complement incomplete-nested-tool-call-start?) (map second params)))
+               (every? (complement incomplete-nested-tool-call-start?) (map second params))
+               (every? (complement swallowed-following-function-block?) (map second params)))
       (into {} params))))
 
 (defn- non-parameter-remainder-contains-tag?
@@ -117,7 +124,7 @@
          (not= (count (map first params))
                (count (distinct (map first params)))))))
 
-(defn- enclosing-malformed-tool-call-with-duplicate-parameters?
+(defn- enclosing-malformed-tool-call?
   [text start end]
   (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
           (when (and (< candidate-start start) (>= candidate-end end))
@@ -125,7 +132,9 @@
                   function-match (re-matches function-pattern body)]
               (when function-match
                 (let [[_ _tool-name function-body] function-match]
-                  (duplicate-parameter-name? function-body))))))
+                  (or (duplicate-parameter-name? function-body)
+                      (some swallowed-following-function-block?
+                            (map second (parsed-parameter-pairs function-body)))))))))
         (candidate-tool-call-spans text)))
 
 (defn- parsed-tool-call
@@ -136,7 +145,7 @@
       (let [[_ tool-name function-body] function-match]
         (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
                       (non-parameter-remainder-contains-tag? function-body "<tool_call>")
-                      (enclosing-malformed-tool-call-with-duplicate-parameters? full-text start end))
+                      (enclosing-malformed-tool-call? full-text start end))
           (when-let [arguments (parsed-parameters function-body)]
             {:span      [start end]
              :source    match
