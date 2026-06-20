@@ -18,6 +18,8 @@
 (def ^:private tool-call-close "</tool_call>")
 (def ^:private function-pattern
   (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
+(declare candidate-tool-call-spans)
+
 (defn- parameter-open-matches
   [function-body]
   (let [matcher (re-matcher (re-pattern (str "<parameter=(" identifier-pattern ")>"))
@@ -82,12 +84,16 @@
             (recur))
         false))))
 
+(defn- parsed-parameter-pairs
+  [function-body]
+  (some->> (choose-parameter-candidates function-body
+                                        (parameter-open-matches function-body))
+           (mapv (fn [{:keys [name value]}]
+                   [name (str/trim value)]))))
+
 (defn- parsed-parameters
   [function-body]
-  (let [params      (some->> (choose-parameter-candidates function-body
-                                                          (parameter-open-matches function-body))
-                             (mapv (fn [{:keys [name value]}]
-                                     [name (str/trim value)])))
+  (let [params      (parsed-parameter-pairs function-body)
         param-names (map first params)]
     (when (and (seq params)
                (= (count param-names) (count (distinct param-names)))
@@ -104,14 +110,33 @@
           (recur end (rest params)))
       (str/includes? (subs function-body cursor) tag))))
 
+(defn- duplicate-parameter-name?
+  [function-body]
+  (let [params (parsed-parameter-pairs function-body)]
+    (and (seq params)
+         (not= (count (map first params))
+               (count (distinct (map first params)))))))
+
+(defn- enclosing-malformed-tool-call-with-duplicate-parameters?
+  [text start end]
+  (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
+          (when (and (< candidate-start start) (>= candidate-end end))
+            (let [[body]         groups
+                  function-match (re-matches function-pattern body)]
+              (when function-match
+                (let [[_ _tool-name function-body] function-match]
+                  (duplicate-parameter-name? function-body))))))
+        (candidate-tool-call-spans text)))
+
 (defn- parsed-tool-call
-  [{:keys [start end match groups]}]
+  [{:keys [start end match groups full-text]}]
   (let [[body]         groups
         function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
         (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
-                      (non-parameter-remainder-contains-tag? function-body "<tool_call>"))
+                      (non-parameter-remainder-contains-tag? function-body "<tool_call>")
+                      (enclosing-malformed-tool-call-with-duplicate-parameters? full-text start end))
           (when-let [arguments (parsed-parameters function-body)]
             {:span      [start end]
              :source    match
@@ -124,10 +149,11 @@
          candidates        []]
     (if-let [close-start (str/index-of s tool-call-close close-search-from)]
       (let [end       (+ close-start (count tool-call-close))
-            candidate {:start  open
-                       :end    end
-                       :match  (subs s open end)
-                       :groups [(subs s (+ open (count tool-call-open)) close-start)]}]
+            candidate {:start     open
+                       :end       end
+                       :match     (subs s open end)
+                       :groups    [(subs s (+ open (count tool-call-open)) close-start)]
+                       :full-text s}]
         (recur end (conj candidates candidate)))
       candidates)))
 
