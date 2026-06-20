@@ -173,12 +173,6 @@
     (when (str/starts-with? (str tool-call-id) prefix)
       (parse-long (subs (str tool-call-id) (count prefix))))))
 
-(defn- content-index
-  [turn-id block]
-  (or (:content-index block)
-      (when (= :tool-call (:type block))
-        (generated-tool-call-index turn-id (:id block)))))
-
 (defn- reserve-content-index
   [state content-index]
   (swap! state (fn [state*]
@@ -211,19 +205,29 @@
                              vec)
         shadowed-source-indexes (->> indexed-content
                                      (filter (fn [[idx block]]
-                                               (and (fully-replaced-text-block? block)
-                                                    (:content-index block)
-                                                    (not-any? #(and (not= idx (first %))
-                                                                    (= (:content-index block) (:content-index (second %))))
-                                                              indexed-content))))
+                                               (let [source-index (:content-index block)]
+                                                 (and (fully-replaced-text-block? block)
+                                                      source-index
+                                                      (not-any? (fn [[other-idx other-block]]
+                                                                  (and (not= idx other-idx)
+                                                                       (or (= source-index (:content-index other-block))
+                                                                           (= source-index
+                                                                              (generated-tool-call-index
+                                                                               turn-id
+                                                                               (:id other-block))))))
+                                                                indexed-content)))))
                                      (keep (comp :content-index second))
                                      set)
-        used-indexes   (->> content
-                            (keep #(content-index turn-id %))
-                            (remove shadowed-source-indexes)
+        source-indexes (->> content
+                            (keep :content-index)
                             set)
+        generated-id-indexes (->> content
+                                  (keep #(generated-tool-call-index turn-id (:id %)))
+                                  set)
+        used-indexes   (set (concat (remove shadowed-source-indexes source-indexes)
+                                    generated-id-indexes))
         max-index      (apply max -1 used-indexes)
-        state          (atom {:used used-indexes :position -1})]
+        state          (atom {:used used-indexes :position -1 :source-text-reserved #{}})]
     (fn
       ([]
        (advance-position! state))
@@ -244,12 +248,16 @@
 
                          :else
                          (inc (max (long position) (long max-index))))]
-         (if (and (= :recovered-tool-call kind)
-                  source-index
-                  (= preferred source-index)
-                  (contains? (:used @state) source-index))
-           (reserve-content-index state source-index)
-           (allocate-content-index state preferred)))))))
+         (if (and (= :source-text kind) source-index)
+           (if (contains? (:source-text-reserved @state) source-index)
+             (allocate-content-index state (max (inc (long source-index)) (inc (long position))))
+             (do
+               (swap! state update :source-text-reserved conj source-index)
+               (reserve-content-index state source-index)))
+           (let [preferred* (if (contains? (:source-text-reserved @state) source-index)
+                              (max (inc (long source-index)) preferred)
+                              preferred)]
+             (allocate-content-index state preferred*))))))))
 
 (defn- normalize-block
   [turn-id next-content-index block]

@@ -130,11 +130,11 @@
         (is (= [{:type :text :text "A "}
                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
                 {:type :text :text " B "}
-                {:type :tool-call :id "turn-2/toolcall/5" :name "first" :arguments "{\"x\":\"1\"}"}
+                {:type :tool-call :id "turn-2/toolcall/3" :name "first" :arguments "{\"x\":\"1\"}"}
                 {:type :text
                  :text (str " C <tool_call><function=bad><parameter=x>1</parameter>"
                             "<parameter=x>2</parameter></function></tool_call> D ")}
-                {:type :tool-call :id "turn-2/toolcall/7" :name "second" :arguments "{\"y\":\"2\"}"}
+                {:type :tool-call :id "turn-2/toolcall/5" :name "second" :arguments "{\"y\":\"2\"}"}
                 {:type :text :text " E"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
 
@@ -148,6 +148,16 @@
         (is (= "turn-3/toolcall/3"
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                        [:content 2 :id])))))
+
+    (testing "generated ids do not collide with existing canonical ids when reusing replaced source index"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "turn-3/toolcall/3" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :content-index 3
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= "turn-3/toolcall/4"
+               (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
+                       [:content 1 :id])))))
 
     (testing "generated ids skip later provider indexes and existing per-turn canonical ids"
       (let [assistant {:role "assistant"
@@ -167,7 +177,7 @@
                                   :text "before <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :text :text "before "}
-                {:type :tool-call :id "turn-3/toolcall/4" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+                {:type :tool-call :id "turn-3/toolcall/3" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "overlapping malformed prefix does not block later valid normalization"
