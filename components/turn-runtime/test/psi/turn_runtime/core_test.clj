@@ -211,7 +211,7 @@
                                      (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
         (is (= [{:type :text :text "prefix "}
                 {:type :tool-call
-                 :id (str turn-id "/toolcall/1")
+                 :id (str turn-id "/toolcall/2")
                  :name "bash"
                  :arguments "{\"command\":\"pwd\"}"}
                 {:type :text :text " suffix"}]
@@ -239,7 +239,7 @@
         (is (= [{:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
                 {:type :text :text "prefix "}
                 {:type :tool-call
-                 :id (str turn-id "/toolcall/3")
+                 :id (str turn-id "/toolcall/4")
                  :name "bash"
                  :arguments "{\"command\":\"pwd\"}"}
                 {:type :text :text " suffix"}]
@@ -271,7 +271,7 @@
                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
                 {:type :text :text "after "}
                 {:type :tool-call
-                 :id (str turn-id "/toolcall/3")
+                 :id (str turn-id "/toolcall/5")
                  :name "bash"
                  :arguments "{\"command\":\"pwd\"}"}
                 {:type :text :text " done"}]

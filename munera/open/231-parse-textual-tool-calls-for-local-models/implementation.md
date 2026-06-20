@@ -109,3 +109,7 @@ No implementation work has been done yet.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
 2026-06-20 implementation review:
 - added 1 step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: fully replaced textual-tool-call source text blocks no longer reserve their removed source index, so recovered ids can reuse that source content index while residual-text cases still allocate after the retained text block.
+- verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.

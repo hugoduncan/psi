@@ -139,7 +139,7 @@
 (defn- append-text-block
   [next-content-index source-block text]
   (when (seq text)
-    (next-content-index)
+    (next-content-index source-block :source-text)
     (text-block source-block text)))
 
 (defn- textual-tool-call-content
@@ -147,7 +147,9 @@
   (let [text         (:text source-block)
         parsed-calls (parse-xml-tool-calls text)]
     (if (empty? parsed-calls)
-      [(text-block source-block text)]
+      (do
+        (next-content-index source-block :source-text)
+        [(text-block source-block text)])
       (loop [cursor 0
              calls  parsed-calls
              blocks []]
@@ -157,7 +159,11 @@
                    (rest calls)
                    (cond-> blocks
                      (seq before) (conj (append-text-block next-content-index source-block before))
-                     :always      (conj (recovered-tool-call-block turn-id next-content-index parsed-call)))))
+                     :always      (conj (recovered-tool-call-block
+                                         turn-id
+                                         (fn [_]
+                                           (next-content-index source-block :recovered-tool-call))
+                                         parsed-call)))))
           (cond-> blocks
             (seq (subs text cursor)) (conj (append-text-block next-content-index source-block (subs text cursor)))))))))
 
@@ -173,32 +179,77 @@
       (when (= :tool-call (:type block))
         (generated-tool-call-index turn-id (:id block)))))
 
+(defn- reserve-content-index
+  [state content-index]
+  (swap! state (fn [state*]
+                 (-> state*
+                     (update :used conj content-index)
+                     (assoc :position content-index))))
+  content-index)
+
 (defn- allocate-content-index
   [state preferred]
-  (advance-position! state)
   (loop [candidate preferred]
     (let [{:keys [used]} @state]
       (if (contains? used candidate)
         (recur (inc candidate))
-        (do (swap! state update :used conj candidate)
-            candidate)))))
+        (reserve-content-index state candidate)))))
+
+(defn- fully-replaced-text-block?
+  [block]
+  (and (= :text (:type block))
+       (string? (:text block))
+       (let [parsed-calls (parse-xml-tool-calls (:text block))]
+         (and (= 1 (count parsed-calls))
+              (let [{[start end] :span} (first parsed-calls)]
+                (and (zero? start) (= end (count (:text block)))))))))
 
 (defn- next-content-index-fn
   [turn-id content]
-  (let [used-indexes (->> content
-                          (keep #(content-index turn-id %))
-                          set)
-        max-index    (apply max -1 used-indexes)
-        state        (atom {:used used-indexes :position -1})]
+  (let [indexed-content (->> content
+                             (map-indexed vector)
+                             vec)
+        shadowed-source-indexes (->> indexed-content
+                                     (filter (fn [[idx block]]
+                                               (and (fully-replaced-text-block? block)
+                                                    (:content-index block)
+                                                    (not-any? #(and (not= idx (first %))
+                                                                    (= (:content-index block) (:content-index (second %))))
+                                                              indexed-content))))
+                                     (keep (comp :content-index second))
+                                     set)
+        used-indexes   (->> content
+                            (keep #(content-index turn-id %))
+                            (remove shadowed-source-indexes)
+                            set)
+        max-index      (apply max -1 used-indexes)
+        state          (atom {:used used-indexes :position -1})]
     (fn
       ([]
        (advance-position! state))
-      ([source-block]
+      ([source-block kind]
        (let [{:keys [position]} @state
-             preferred (if (:content-index source-block)
-                         (max (long (:content-index source-block)) (inc (long position)))
+             source-index (:content-index source-block)
+             preferred (cond
+                         (and (= :source-text kind) source-index)
+                         (max (long source-index) (inc (long position)))
+
+                         (and (= :recovered-tool-call kind)
+                              source-index
+                              (fully-replaced-text-block? source-block))
+                         (long source-index)
+
+                         source-index
+                         (max (inc (long source-index)) (inc (long position)))
+
+                         :else
                          (inc (max (long position) (long max-index))))]
-         (allocate-content-index state preferred))))))
+         (if (and (= :recovered-tool-call kind)
+                  source-index
+                  (= preferred source-index)
+                  (contains? (:used @state) source-index))
+           (reserve-content-index state source-index)
+           (allocate-content-index state preferred)))))))
 
 (defn- normalize-block
   [turn-id next-content-index block]
