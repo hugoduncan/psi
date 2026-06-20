@@ -219,3 +219,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 1 review step: adjacent quote characters outside an exact well-formed textual tool-call span are now preserved as surrounding text instead of suppressing recovery.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 1 step to be addressed.
