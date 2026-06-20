@@ -115,7 +115,9 @@
    'psi/metrics {:psi/init 'psi.metrics.extension/init
                  :source-policies {:installed {:local/root "extensions/metrics"}}}
    'psi/dev-http {:psi/init 'extensions.dev-http/init
-                  :source-policies {:installed {:local/root "extensions/dev-http"}}}})
+                  :source-policies {:installed {:local/root "extensions/dev-http"}}}
+   'psi/context-manager {:psi/init 'extensions.context-manager/init
+                         :source-policies {:installed {:local/root "extensions/context-manager"}}}})
 
 (defn- catalog-entry
   [lib]
