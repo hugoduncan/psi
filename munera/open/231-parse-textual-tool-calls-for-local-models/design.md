@@ -83,6 +83,11 @@ Out of scope:
 - The normalization should be a single pure boundary used by both streaming final assembly and non-streaming assistant responses. Do not implement separate streaming-only and non-streaming parsers, and do not duplicate conversion logic across execution paths.
 - Resolve textual tool-call capability from the turn's already-resolved runtime model/prepared-request model. Do not make `turn-runtime` depend on the `agent-session` component to call session capability helpers; if shared helpers are needed, place pure model-capability/parser helpers in a lower-level component already allowed by the dependency graph.
 - Reuse existing canonical tool-call ids and content block semantics. If the parsed markup has no id, generate one with the same per-turn/canonical id approach used for provider tool calls.
+- When residual assistant text, provider-emitted tool calls, and recovered textual tool calls coexist, preserve canonical response order by content position:
+  - provider-emitted tool calls keep their existing content indexes and ids;
+  - recovered textual tool calls are inserted at the position of their parsed `<tool_call>...</tool_call>` block relative to residual text;
+  - generated ids for recovered calls use the existing `turn-id/toolcall/content-index` convention with non-colliding content indexes assigned in final-content order after considering provider indexes;
+  - final assistant content blocks should not expose implementation-only content-index metadata unless that is already part of the existing canonical content shape.
 - Do not bypass security: parsed textual calls must be indistinguishable from provider calls by the time authorization/tool availability checks run.
 - Make invalid states unreachable where practical: either the assistant message has text or canonical tool-call blocks, not an unexecuted textual tool-call block that also triggers execution.
 - Keep the parser intentionally narrow. It should handle the known runner output reliably, not become a general XML parser.

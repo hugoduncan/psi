@@ -46,3 +46,8 @@ No implementation work has been done yet.
 
 2026-06-20 plan inconsistency review (shared plan-review second turn):
 - no inconsistency review feedback.
+
+2026-06-20 design follow-up execution:
+- Completed the remaining ordering/id ambiguity follow-up in `design-steps.md`; no `SCOPE_QUESTION:` items were present.
+- Existing streaming assembly currently creates canonical ids in `components/turn-runtime/src/psi/turn_runtime/accumulator.clj` via `canonical-tool-call-id` / `complete-tool-calls`, then drops content-index metadata in `build-final-content`.
+- Existing `build-final-content` orders blocks as thinking, one text block, errors, then tool calls; implementing provider/recovered/text interleaving may require changing that final assembly shape, with tests guarding provider id/index preservation and recovered id non-collision.

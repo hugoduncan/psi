@@ -21,10 +21,10 @@
 - [ ] Implement one pure normalizer that takes `turn-id`, resolved `ai-model`, assistant text/content, and existing provider tool calls and returns canonical assistant content.
 - [ ] Gate parsing entirely on the resolved model capability containing `:xml`; when disabled, return text/content unchanged.
 - [ ] Convert each parsed call to canonical `{:type :tool-call :id ... :name ... :arguments ...}` content using JSON object string arguments.
-- [ ] Generate ids with the same per-turn canonical id convention used for provider tool calls when parsed markup has no id.
-- [ ] Preserve response order for multiple parsed blocks and surrounding text while removing exact parsed blocks from assistant prose.
+- [ ] Preserve provider-emitted tool-call ids and indexes when present, and generate recovered-call ids with the same per-turn canonical id convention using final-order, non-colliding content indexes.
+- [ ] Preserve response order for residual text, provider-emitted tool calls, and recovered textual tool calls while removing exact parsed blocks from assistant prose.
 - [ ] Keep malformed or partial markup as ordinary text and continue converting other well-formed blocks in the same response.
-- [ ] Add normalizer tests for enabled/disabled capability, canonical JSON arguments, multiple calls order, mixed valid/malformed markup, and text removal/preservation.
+- [ ] Add normalizer tests for enabled/disabled capability, canonical JSON arguments, multiple calls order, mixed valid/malformed markup, provider/recovered/text interleaving, id/index non-collision, and text removal/preservation.
 
 ## Slice 4 — Turn-runtime integration
 

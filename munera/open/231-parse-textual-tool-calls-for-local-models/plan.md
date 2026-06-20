@@ -23,7 +23,7 @@ Key decisions:
 - Parser looseness could create false-positive tool execution from prose; mitigate with explicit capability gating and a strict tag/name grammar.
 - Parser strictness may reject near-miss runner output; this is acceptable for the first slice because the design intentionally targets one known XML-like format.
 - Streaming and non-streaming paths may drift if normalization is wired twice; mitigate by introducing one pure normalization function and testing both paths where practical.
-- Content ordering/id generation can regress if parsed calls are appended without respecting original block order; tests must cover surrounding text and multiple calls in response order.
+- Content ordering/id generation can regress if parsed calls are appended without respecting original block order; tests must cover surrounding text, provider/recovered mixed content, multiple calls in response order, and generated id/index non-collision.
 - Capability placement can accidentally introduce a component cycle; keep helpers in `components/ai` or another lower-level namespace already available to `turn-runtime`.
 
 ## Slice order
