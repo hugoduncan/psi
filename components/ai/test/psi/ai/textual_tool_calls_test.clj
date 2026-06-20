@@ -158,6 +158,14 @@
                     "<parameter=x>before <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                     "<function=outer><parameter=y>after</parameter></function>"
                     "</tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested valid tool calls inside invalid-function-grammar outer blocks are not recovered"
+    (let [text (str "<tool_call>"
+                    "<function=outer.bad><parameter=x>before "
+                    "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+                    "</parameter></function>"
+                    "</tool_call>")]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
