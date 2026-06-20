@@ -86,6 +86,14 @@
                :arguments {"command" "printf '<tool_call>' && echo '</tool_call>'"}}]
              (textual-tool-calls/parse-xml-tool-calls text)))))
 
+  (testing "literal adjacent tool-call/function text inside parameter values remains parameter text"
+    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call><function=literal>'</parameter></function></tool_call>"]
+      (is (= [{:span [0 118]
+               :source text
+               :name "bash"
+               :arguments {"command" "printf '<tool_call><function=literal>'"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
   (testing "literal parameter tags inside parameter values remain parameter text"
     (let [text "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"]
       (is (= [{:span [0 131]

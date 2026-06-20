@@ -72,6 +72,11 @@
                         (parameter-candidates function-body open-match next-open))))))]
     (step 0 0)))
 
+(defn- nested-tool-call-start?
+  [value]
+  (boolean (re-find (re-pattern (str "<tool_call><function=" identifier-pattern "><parameter=" identifier-pattern ">"))
+                    value)))
+
 (defn- parsed-parameters
   [function-body]
   (let [params      (some->> (choose-parameter-candidates function-body
@@ -80,7 +85,8 @@
                                      [name (str/trim value)])))
         param-names (map first params)]
     (when (and (seq params)
-               (= (count param-names) (count (distinct param-names))))
+               (= (count param-names) (count (distinct param-names)))
+               (every? (complement nested-tool-call-start?) (map second params)))
       (into {} params))))
 
 (defn- non-parameter-remainder-contains-tag?
@@ -99,8 +105,7 @@
         function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
-        (when-not (or (str/includes? function-body "<tool_call><function=")
-                      (non-parameter-remainder-contains-tag? function-body "<function=")
+        (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
                       (non-parameter-remainder-contains-tag? function-body "<tool_call>"))
           (when-let [arguments (parsed-parameters function-body)]
             {:span      [start end]
