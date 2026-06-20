@@ -12,3 +12,7 @@
 - [x] Event payload key: resolved — design now correctly specifies unqualified `:turn-id` matching the actual event payload in `turn/handlers.clj`.
 - [x] `psi/ai` dependency: resolved — design now explicitly excludes `psi/ai` from deps.edn, noting the scaffold only needs Clojure core.
 - [x] Inconsistency review (2026-06-19, re-review): no new inconsistencies found. Design is internally consistent and consistent with auto-session-name reference, both catalogs, and extensions/deps.edn.
+
+# Design Review — Ambiguity (re-review)
+
+- [ ] Test namespace naming convention: design specifies `extensions.context_manager_test` (underscores in ns name) but codebase convention (e.g. `extensions.auto-session-name-test`) uses hyphens in namespace names. Clarify that the ns form should be `extensions.context-manager-test` to match convention.
