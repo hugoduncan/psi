@@ -147,6 +147,11 @@ set to `off`: the request body includes
 OpenAI-compatible servers that expose hidden reasoning via a nonstandard
 `chat_template_kwargs.enable_thinking` flag.
 
+Models may also declare `:parallel-tool-calls false`. When tools are available,
+psi sends this as OpenAI-compatible `parallel_tool_calls: false` for that model.
+This is useful for local OpenAI-compatible servers whose streaming tool-call
+support is more reliable when the model emits at most one tool call per turn.
+
 ## Reload after editing
 
 If psi is already running, reload the definitions after editing either models

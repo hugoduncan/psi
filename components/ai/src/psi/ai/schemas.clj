@@ -169,6 +169,7 @@
    [:supports-text boolean?]
    [:context-window pos-int?]
    [:max-tokens pos-int?]
+   [:parallel-tool-calls {:optional true} boolean?]
    [:input-cost number?]
    [:output-cost number?]
    [:cache-read-cost number?]

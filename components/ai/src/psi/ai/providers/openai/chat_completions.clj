@@ -162,6 +162,9 @@
                                :temperature    temperature}
                         (:max-tokens options)       (assoc :max_tokens  (:max-tokens options))
                         (seq tool-defs)             (assoc :tools tool-defs)
+                        (and (seq tool-defs)
+                             (contains? model :parallel-tool-calls))
+                        (assoc :parallel_tool_calls (:parallel-tool-calls model))
                         effort                      (assoc :reasoning_effort effort)
                         (= :fast (:speed-mode options)) (assoc :service_tier "flex")
                         template-kw                 (assoc :chat_template_kwargs template-kw)

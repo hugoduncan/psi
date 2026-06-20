@@ -50,6 +50,7 @@
                             :supports-images  false
                             :context-window   65536
                             :max-tokens       8192
+                            :parallel-tool-calls false
                             :input-cost       1.0
                             :output-cost      2.0
                             :cache-read-cost  0.5
@@ -112,6 +113,7 @@
         (is (false? (:supports-images model)))
         (is (= 65536 (:context-window model)))
         (is (= 8192 (:max-tokens model)))
+        (is (false? (:parallel-tool-calls model)))
         (is (= 1.0 (:input-cost model)))
         (is (= 2.0 (:output-cost model)))))
 

@@ -581,6 +581,32 @@
         (is (nil? (:reasoning_effort body)))
         (is (nil? (:chat_template_kwargs body)))))))
 
+(deftest openai-completions-parallel-tool-calls-uses-model-setting-test
+  (let [convo (-> (conv/create "sys")
+                  (conv/add-user-message "hi")
+                  (conv/add-tool {:name "read"
+                                  :description "Read"
+                                  :parameters {:type "object"
+                                               :properties {:path {:type "string"}}
+                                               :required ["path"]}}))
+        model (assoc (models/get-model :gpt-5)
+                     :parallel-tool-calls false)
+        req   (#'openai/build-request convo model {:api-key "sk-test"})
+        body  (json/parse-string (:body req) true)]
+    (is (= false (:parallel_tool_calls body))))
+
+  (testing "omits provider option when model does not declare it"
+    (let [convo (-> (conv/create "sys")
+                    (conv/add-user-message "hi")
+                    (conv/add-tool {:name "read"
+                                    :description "Read"
+                                    :parameters {:type "object"
+                                                 :properties {:path {:type "string"}}
+                                                 :required ["path"]}}))
+          req   (#'openai/build-request convo (models/get-model :gpt-5) {:api-key "sk-test"})
+          body  (json/parse-string (:body req) true)]
+      (is (not (contains? body :parallel_tool_calls))))))
+
 (deftest local-openai-completions-thinking-off-disables-chat-template-thinking-test
   (let [model {:id                 "local-completions"
                :name               "Local Completions"
