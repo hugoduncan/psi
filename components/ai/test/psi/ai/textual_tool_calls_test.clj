@@ -162,7 +162,7 @@
     (testing "generated ids skip later provider indexes and count unindexed provider blocks"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :content-index 7 :id "provider-call" :name "provider" :arguments "{}"}
-                                 {:type :tool-call :id "turn-3/toolcall/0" :name "generated-provider" :arguments "{}"}
+                                 {:type :tool-call :id "unindexed-provider" :name "generated-provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= "turn-3/toolcall/9"
@@ -186,6 +186,15 @@
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
+    (testing "unindexed canonical provider ids occupy their generated index without an extra hidden position"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "turn-3/toolcall/0" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= [{:type :tool-call :id "turn-3/toolcall/0" :name "provider" :arguments "{}"}
                 {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 

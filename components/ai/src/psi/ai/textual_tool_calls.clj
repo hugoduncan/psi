@@ -178,7 +178,7 @@
   (swap! state (fn [state*]
                  (-> state*
                      (update :used conj content-index)
-                     (assoc :position content-index))))
+                     (update :position max content-index))))
   content-index)
 
 (defn- allocate-content-index
@@ -245,6 +245,10 @@
                          (and (= :existing-content kind) source-index)
                          (long source-index)
 
+                         (and (= :existing-content kind)
+                              (generated-tool-call-index turn-id (:id source-block)))
+                         (generated-tool-call-index turn-id (:id source-block))
+
                          (= :existing-content kind)
                          (inc (long position))
 
@@ -255,6 +259,10 @@
                          (inc (long position)))]
          (cond
            (and (= :existing-content kind) source-index)
+           (reserve-content-index state preferred)
+
+           (and (= :existing-content kind)
+                (generated-tool-call-index turn-id (:id source-block)))
            (reserve-content-index state preferred)
 
            (and (= :source-text kind) source-index)
