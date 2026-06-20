@@ -82,9 +82,12 @@
     (loop []
       (if (.find matcher)
         (let [start (.start matcher)
+              end   (.end matcher)
               quoted-literal? (and (pos? start)
-                                   (contains? #{\' \"} (.charAt value (dec start))))]
+                                   (contains? #{\' \"} (.charAt value (dec start))))
+              parameter-open-at-boundary? (str/blank? (subs value end))]
           (or (and (not quoted-literal?)
+                   (not parameter-open-at-boundary?)
                    (not (str/index-of value tool-call-close start)))
               (recur)))
         false))))

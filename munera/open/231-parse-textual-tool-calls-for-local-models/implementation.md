@@ -222,3 +222,7 @@ No implementation work has been done yet.
 
 2026-06-20 implementation review:
 - added 1 step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: unquoted incomplete nested textual tool-call starts inside parameter values now remain literal parameter text instead of being recovered as inner calls.
+- verified focused textual-tool-call/turn-runtime/session Scry suites; focused clj-kondo reports only the pre-existing `psi.ai.core/execute-response-in` unresolved-var warning in `response_mode_test.clj`.
