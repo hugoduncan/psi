@@ -83,3 +83,7 @@ No implementation work has been done yet.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure files.
 2026-06-20 implementation review:
 - added 1 step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: streaming text now accumulates per provider content index, preserving `text(0) → provider tool(1) → text/recovered call(2)` order while retaining the legacy aggregate `:text-buffer` for compatibility.
+- verified focused turn-runtime/textual-tool-call Scry suites and focused clj-kondo on changed Clojure files.

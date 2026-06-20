@@ -133,10 +133,20 @@
                  signature (assoc :signature signature))))))
 
 (defn- text-content-blocks
-  [text-buffer text-content-index]
-  (cond-> []
-    (seq text-buffer)
-    (conj {:type :text :content-index (or text-content-index 0) :text text-buffer})))
+  ([text-buffer text-content-index]
+   (cond-> []
+     (seq text-buffer)
+     (conj {:type :text :content-index (or text-content-index 0) :text text-buffer})))
+  ([text-buffer text-content-index text-blocks]
+   (let [blocks (->> (or text-blocks {})
+                     (sort-by key)
+                     (keep (fn [[idx {:keys [text]}]]
+                             (when (seq text)
+                               {:type :text :content-index idx :text text})))
+                     vec)]
+     (if (seq blocks)
+       blocks
+       (text-content-blocks text-buffer text-content-index)))))
 
 (defn- error-content-blocks
   [invalids]
@@ -163,12 +173,14 @@
 
 (defn build-final-content
   ([thinking-blocks text-buffer tool-calls]
-   (build-final-content thinking-blocks text-buffer nil tool-calls))
+   (build-final-content thinking-blocks text-buffer nil nil tool-calls))
   ([thinking-blocks text-buffer text-content-index tool-calls]
+   (build-final-content thinking-blocks text-buffer text-content-index nil tool-calls))
+  ([thinking-blocks text-buffer text-content-index text-blocks tool-calls]
    (let [invalids       (keep invalid-tool-call tool-calls)
          valid-calls    (remove invalid-tool-call tool-calls)
          thinking-parts (thinking-blocks-in-order thinking-blocks)
-         content-parts  (->> (concat (text-content-blocks text-buffer text-content-index)
+         content-parts  (->> (concat (text-content-blocks text-buffer text-content-index text-blocks)
                                      (error-content-blocks invalids)
                                      (tool-content-blocks valid-calls))
                              (sort-by #(or (:content-index %) 0))
@@ -265,10 +277,14 @@
 
 (defn- handle-text-delta! [td progress-queue data]
   (let [idx    (content-index data)
-        merged (:text-buffer (swap! td (fn [td*]
-                                         (-> td*
-                                             (update :text-buffer merge-stream-text (:delta data))
-                                             (update :text-content-index #(or % idx))))))]
+        merged (get-in (swap! td (fn [td*]
+                                   (-> td*
+                                       (update-in [:text-blocks idx :text]
+                                                  merge-stream-text (:delta data))
+                                       (assoc-in [:text-blocks idx :content-index] idx)
+                                       (update :text-buffer merge-stream-text (:delta data))
+                                       (update :text-content-index #(or % idx)))))
+                       [:text-blocks idx :text])]
     (note-last-provider-event! td :text-delta data)
     (note-content-delta! td idx :text)
     (emit-progress! progress-queue {:event-kind :text-delta :content-index idx :text merged})))
@@ -352,9 +368,9 @@
   (swap! td assoc :structured-output-result (:structured-output data)))
 
 (defn- handle-done! [td done-p progress-queue data]
-  (let [{:keys [thinking-blocks text-buffer text-content-index tool-calls logprob-buffer]} @td
+  (let [{:keys [thinking-blocks text-buffer text-content-index text-blocks tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
-        content   (build-final-content thinking-blocks text-buffer text-content-index completed)
+        content   (build-final-content thinking-blocks text-buffer text-content-index text-blocks completed)
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
         logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))
