@@ -40,3 +40,6 @@ No implementation work has been done yet.
 2026-06-20 design follow-up execution:
 - Completed the two unchecked non-scope ambiguity follow-ups in `design-steps.md`; no `SCOPE_QUESTION:` items were present.
 - Implementation should treat duplicate parameter names, multiple/missing function blocks, parameter blocks outside the function, and function blocks with zero parameters as malformed block-level no-ops.
+
+2026-06-20 plan ambiguity review (shared plan-review first turn):
+- ambiguity review added 1 new design step: canonical ordering/content-index/id allocation when residual text, provider tool calls, and recovered textual calls coexist.
