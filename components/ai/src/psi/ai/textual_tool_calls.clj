@@ -81,8 +81,12 @@
         matcher       (re-matcher start-pattern value)]
     (loop []
       (if (.find matcher)
-        (or (not (str/index-of value tool-call-close (.start matcher)))
-            (recur))
+        (let [start (.start matcher)
+              quoted-literal? (and (pos? start)
+                                   (contains? #{\' \"} (.charAt value (dec start))))]
+          (or (and (not quoted-literal?)
+                   (not (str/index-of value tool-call-close start)))
+              (recur)))
         false))))
 
 (defn- swallowed-following-function-block?
@@ -239,6 +243,11 @@
       (let [[_ tool-name function-body] function-match]
         (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
                       (non-parameter-remainder-contains-tag? function-body "<tool_call>")
+                      (and (pos? start)
+                           (contains? #{\' \"} (.charAt full-text (dec start))))
+                      (and (< end (count full-text))
+                           (contains? #{\' \"} (.charAt full-text end))
+                           (re-find #"['\"]<tool_call>" function-body))
                       (enclosing-malformed-tool-call? full-text start end))
           (when-let [arguments (parsed-parameters function-body)]
             {:span      [start end]
