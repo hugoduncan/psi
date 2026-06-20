@@ -18,45 +18,62 @@
 (def ^:private tool-call-close "</tool_call>")
 (def ^:private function-pattern
   (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
-(def ^:private parameter-pattern
-  (re-pattern (str "(?s)<parameter=(" identifier-pattern ")>(.*?)</parameter>")))
-
-(defn- matcher-results
-  [pattern s]
-  (let [matcher (re-matcher pattern (or s ""))]
+(defn- parameter-open-matches
+  [function-body]
+  (let [matcher (re-matcher (re-pattern (str "<parameter=(" identifier-pattern ")>"))
+                            (or function-body ""))]
     (loop [matches []]
       (if (.find matcher)
-        (recur (conj matches {:start  (.start matcher)
-                              :end    (.end matcher)
-                              :match  (.group matcher 0)
-                              :groups (mapv #(.group matcher %) (range 1 (inc (.groupCount matcher))))}))
+        (recur (conj matches {:start (.start matcher)
+                              :end   (.end matcher)
+                              :name  (.group matcher 1)}))
         matches))))
 
-(defn- remove-spans
-  [s spans]
-  (let [ordered (sort-by :start spans)]
-    (loop [cursor 0
-           spans*  ordered
-           parts   []]
-      (if-let [{:keys [start end]} (first spans*)]
-        (recur end (rest spans*) (conj parts (subs s cursor start)))
-        (apply str (conj parts (subs s cursor)))))))
+(defn- parameter-candidates
+  [function-body open-match next-open]
+  (loop [search-from (:end open-match)
+         candidates  []]
+    (if-let [close-start (str/index-of function-body "</parameter>" search-from)]
+      (let [end (+ close-start (count "</parameter>"))]
+        (recur end
+               (conj candidates {:start (:start open-match)
+                                 :end end
+                                 :name (:name open-match)
+                                 :value (subs function-body (:end open-match) close-start)
+                                 :crosses-next-open? (boolean (and next-open (< (:start next-open) close-start)))})))
+      candidates)))
+
+(defn- choose-parameter-candidates
+  [function-body open-matches]
+  (letfn [(next-open-index [end]
+            (or (first (keep-indexed (fn [idx open-match]
+                                       (when (>= (:start open-match) end)
+                                         idx))
+                                     open-matches))
+                (count open-matches)))
+          (step [idx cursor]
+            (if (= idx (count open-matches))
+              (when (str/blank? (subs function-body cursor))
+                [])
+              (let [open-match (nth open-matches idx)
+                    next-open  (get open-matches (inc idx))]
+                (when (str/blank? (subs function-body cursor (:start open-match)))
+                  (some (fn [{:keys [end crosses-next-open?] :as candidate}]
+                          (let [next-idx (next-open-index end)]
+                            (when (or (not crosses-next-open?) (> next-idx (inc idx)))
+                              (when-let [rest-candidates (step next-idx end)]
+                                (cons candidate rest-candidates)))))
+                        (parameter-candidates function-body open-match next-open))))))]
+    (step 0 0)))
 
 (defn- parsed-parameters
   [function-body]
-  (let [parameter-matches (matcher-results parameter-pattern function-body)
-        remainder         (remove-spans function-body parameter-matches)
-        params            (mapv (fn [{:keys [groups]}]
-                                  (let [[param-name param-value] groups]
-                                    [param-name (str/trim param-value)]))
-                                parameter-matches)
-        param-names       (map first params)]
+  (let [params      (some->> (choose-parameter-candidates function-body
+                                                          (parameter-open-matches function-body))
+                             (mapv (fn [{:keys [name value]}]
+                                     [name (str/trim value)])))
+        param-names (map first params)]
     (when (and (seq params)
-               (str/blank? remainder)
-               (not-any? (fn [[_ param-value]]
-                           (or (str/includes? param-value "<parameter=")
-                               (str/includes? param-value "</parameter>")))
-                         params)
                (= (count param-names) (count (distinct param-names))))
       (into {} params))))
 
@@ -66,11 +83,13 @@
         function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
-        (when-let [arguments (parsed-parameters function-body)]
-          {:span      [start end]
-           :source    match
-           :name      tool-name
-           :arguments arguments})))))
+        (when-not (or (str/includes? function-body "</function><function=")
+                      (str/includes? function-body "<tool_call><function="))
+          (when-let [arguments (parsed-parameters function-body)]
+            {:span      [start end]
+             :source    match
+             :name      tool-name
+             :arguments arguments}))))))
 
 (defn- candidates-for-open
   [s open]
@@ -194,9 +213,12 @@
   (and (= :text (:type block))
        (string? (:text block))
        (let [parsed-calls (parse-xml-tool-calls (:text block))]
-         (and (= 1 (count parsed-calls))
-              (let [{[start end] :span} (first parsed-calls)]
-                (and (zero? start) (= end (count (:text block)))))))))
+         (and (seq parsed-calls)
+              (zero? (-> parsed-calls first :span first))
+              (= (count (:text block)) (-> parsed-calls last :span second))
+              (every? (fn [[left right]]
+                        (= (-> left :span second) (-> right :span first)))
+                      (partition 2 1 parsed-calls))))))
 
 (defn- next-content-index-fn
   [turn-id content]

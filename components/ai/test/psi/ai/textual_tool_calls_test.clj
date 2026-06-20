@@ -84,6 +84,22 @@
                :arguments {"command" "printf '<tool_call>' && echo '</tool_call>'"}}]
              (textual-tool-calls/parse-xml-tool-calls text)))))
 
+  (testing "literal parameter tags inside parameter values remain parameter text"
+    (let [text "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"]
+      (is (= [{:span [0 131]
+               :source text
+               :name "bash"
+               :arguments {"command" "printf '<parameter=literal>' && echo '</parameter>'"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested parameter starts remain parameter text when closed inside the outer parameter"
+    (let [text "<tool_call><function=bash><parameter=command>outer <parameter=other>inner</parameter></parameter></function></tool_call>"]
+      (is (= [{:span [0 120]
+               :source text
+               :name "bash"
+               :arguments {"command" "outer <parameter=other>inner</parameter>"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
   (testing "later valid blocks recover after an earlier malformed overlapping prefix"
     (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
       (is (= [{:span [47 130]
@@ -138,16 +154,23 @@
                 {:type :text :text " E"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
 
-    (testing "generated ids use source index when a text block is fully replaced by one recovered call"
+    (testing "generated ids use source index when a text block is fully replaced by recovered calls"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :text :content-index 2 :text "between"}
                                  {:type :text
                                   :content-index 3
-                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
-        (is (= "turn-3/toolcall/3"
-               (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
-                       [:content 2 :id])))))
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}
+                                 {:type :text
+                                  :content-index 5
+                                  :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                             "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
+        (is (= ["turn-3/toolcall/3" "turn-3/toolcall/5" "turn-3/toolcall/6"]
+               (->> (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
+                    :content
+                    (filter #(= :tool-call (:type %)))
+                    (remove #(= "provider-call" (:id %)))
+                    (mapv :id))))))
 
     (testing "generated ids do not collide with existing canonical ids when reusing replaced source index"
       (let [assistant {:role "assistant"
