@@ -264,6 +264,10 @@
                       (and nested-in-parameter?
                            (duplicate-parameter-name? function-body))
                       (and nested-in-parameter?
+                           (zero? candidate-start)
+                           (seq (parsed-parameter-pairs function-body))
+                           (nil? (parsed-parameters function-body)))
+                      (and nested-in-parameter?
                            (some swallowed-following-function-block?
                                  (map second (parsed-parameter-pairs function-body))))
                       (and (nil? (parsed-parameter-pairs function-body))

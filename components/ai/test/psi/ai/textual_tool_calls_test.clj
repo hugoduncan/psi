@@ -199,6 +199,10 @@
                     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                     "</parameter></function>"
                     "</tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested valid tool calls inside unterminated outer parameters are not recovered"
+    (let [text "<tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
@@ -374,6 +378,13 @@
                            "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</parameter></function>"
                            "</tool_call>")
+            assistant {:role "assistant"
+                       :content [{:type :text :text text}]}]
+        (is (= [{:type :text :text text}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
+
+    (testing "nested valid calls inside unterminated outer parameters remain text"
+      (let [text      "<tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"
             assistant {:role "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
