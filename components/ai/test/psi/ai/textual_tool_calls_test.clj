@@ -76,6 +76,14 @@
            (textual-tool-calls/parse-xml-tool-calls
             "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"))))
 
+  (testing "literal tool-call tags inside parameter values remain parameter text"
+    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call>' && echo '</tool_call>'</parameter></function></tool_call>"]
+      (is (= [{:span [0 123]
+               :source text
+               :name "bash"
+               :arguments {"command" "printf '<tool_call>' && echo '</tool_call>'"}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
   (testing "later valid blocks recover after an earlier malformed overlapping prefix"
     (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
       (is (= [{:span [47 130]

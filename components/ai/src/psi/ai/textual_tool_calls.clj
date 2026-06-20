@@ -53,6 +53,10 @@
         param-names       (map first params)]
     (when (and (seq params)
                (str/blank? remainder)
+               (not-any? (fn [[_ param-value]]
+                           (or (str/includes? param-value "<parameter=")
+                               (str/includes? param-value "</parameter>")))
+                         params)
                (= (count param-names) (count (distinct param-names))))
       (into {} params))))
 
@@ -62,13 +66,24 @@
         function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
-        (when (and (not (str/includes? function-body tool-call-open))
-                   (not (str/includes? function-body tool-call-close)))
-          (when-let [arguments (parsed-parameters function-body)]
-            {:span      [start end]
-             :source    match
-             :name      tool-name
-             :arguments arguments}))))))
+        (when-let [arguments (parsed-parameters function-body)]
+          {:span      [start end]
+           :source    match
+           :name      tool-name
+           :arguments arguments})))))
+
+(defn- candidates-for-open
+  [s open]
+  (loop [close-search-from (+ open (count tool-call-open))
+         candidates        []]
+    (if-let [close-start (str/index-of s tool-call-close close-search-from)]
+      (let [end       (+ close-start (count tool-call-close))
+            candidate {:start  open
+                       :end    end
+                       :match  (subs s open end)
+                       :groups [(subs s (+ open (count tool-call-open)) close-start)]}]
+        (recur end (conj candidates candidate)))
+      candidates)))
 
 (defn- candidate-tool-call-spans
   [text]
@@ -76,14 +91,7 @@
     (loop [search-from 0
            spans       []]
       (if-let [open (str/index-of s tool-call-open search-from)]
-        (if-let [close-start (str/index-of s tool-call-close (+ open (count tool-call-open)))]
-          (let [end       (+ close-start (count tool-call-close))
-                candidate {:start  open
-                           :end    end
-                           :match  (subs s open end)
-                           :groups [(subs s (+ open (count tool-call-open)) close-start)]}]
-            (recur (inc open) (conj spans candidate)))
-          spans)
+        (recur (inc open) (into spans (candidates-for-open s open)))
         spans))))
 
 (defn- non-overlapping-successes
