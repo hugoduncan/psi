@@ -74,3 +74,6 @@ No implementation work has been done yet.
 - Added focused mock-free session coverage in `psi.agent-session.textual-tool-call-execution-test` using a nullable stub AI provider and real prompt-chain/tool dispatch: capability-enabled textual `bash` executes through the existing tool path and records an ordinary `toolResult`; recovered unknown tools surface the same error-shaped `toolResult`; default/frontier opt-out preserves markup as text and dispatches no tools.
 - Documented `{:capabilities {:textual-tool-calls #{:xml}}}` in `doc/custom-providers.md`, including the strict XML-like shape, malformed-markup no-op behavior, and warning not to enable it for provider-native/frontier models.
 - Added the user-visible changelog entry under `[Unreleased]`.
+
+2026-06-20 implementation review:
+- added 3 steps to be addressed.

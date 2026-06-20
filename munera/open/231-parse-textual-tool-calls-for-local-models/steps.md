@@ -48,3 +48,9 @@
 - [x] Document that frontier/provider-native models should not enable textual tool-call recovery and that malformed markup is left as text.
 - [x] Add a user-visible `CHANGELOG.md` entry under `[Unreleased]` for the new local-model compatibility capability.
 - [x] Re-run relevant docs/tests checks if available.
+
+## Implementation review follow-ups
+
+- [ ] Preserve original streaming content-index order when provider-emitted tool calls, recovered textual tool calls, and residual text coexist; the current streaming assembly still builds one text block before all provider tool calls, so the normalizer cannot satisfy the design requirement for content-position ordering in mixed responses.
+- [ ] Preserve provider-surface content-index information through normalization/id allocation so recovered textual tool-call ids are generated after considering provider tool-call content indexes even when provider calls have non-canonical provider ids.
+- [ ] Allow literal `<function=...>` text inside parameter values; the parser currently rejects any function body containing that substring, which can incorrectly make otherwise valid command text malformed instead of preserving parameter text.
