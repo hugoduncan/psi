@@ -171,21 +171,29 @@
   [block]
   (dissoc block :content-index))
 
+(defn- build-final-content-indexed
+  [thinking-blocks text-buffer text-content-index text-blocks tool-calls]
+  (let [invalids       (keep invalid-tool-call tool-calls)
+        valid-calls    (remove invalid-tool-call tool-calls)
+        thinking-parts (thinking-blocks-in-order thinking-blocks)
+        content-parts  (->> (concat (text-content-blocks text-buffer text-content-index text-blocks)
+                                    (error-content-blocks invalids)
+                                    (tool-content-blocks valid-calls))
+                            (sort-by #(or (:content-index %) 0)))]
+    (into thinking-parts content-parts)))
+
 (defn build-final-content
   ([thinking-blocks text-buffer tool-calls]
    (build-final-content thinking-blocks text-buffer nil nil tool-calls))
   ([thinking-blocks text-buffer text-content-index tool-calls]
    (build-final-content thinking-blocks text-buffer text-content-index nil tool-calls))
   ([thinking-blocks text-buffer text-content-index text-blocks tool-calls]
-   (let [invalids       (keep invalid-tool-call tool-calls)
-         valid-calls    (remove invalid-tool-call tool-calls)
-         thinking-parts (thinking-blocks-in-order thinking-blocks)
-         content-parts  (->> (concat (text-content-blocks text-buffer text-content-index text-blocks)
-                                     (error-content-blocks invalids)
-                                     (tool-content-blocks valid-calls))
-                             (sort-by #(or (:content-index %) 0))
-                             (map strip-content-index))]
-     (into thinking-parts content-parts))))
+   (mapv strip-content-index
+         (build-final-content-indexed thinking-blocks
+                                      text-buffer
+                                      text-content-index
+                                      text-blocks
+                                      tool-calls))))
 
 (defn- emit-tool-assembly-errors! [progress-queue tool-calls]
   (doseq [invalid (keep invalid-tool-call tool-calls)]
@@ -370,7 +378,7 @@
 (defn- handle-done! [td done-p progress-queue data]
   (let [{:keys [thinking-blocks text-buffer text-content-index text-blocks tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
-        content   (build-final-content thinking-blocks text-buffer text-content-index text-blocks completed)
+        content   (build-final-content-indexed thinking-blocks text-buffer text-content-index text-blocks completed)
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
         logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))
@@ -381,6 +389,7 @@
                             :content     content
                             :stop-reason stop-reason
                             :timestamp   (java.time.Instant/now)})
+                    true (update :content #(mapv strip-content-index %))
                     (map? usage) (assoc :usage usage))]
     (note-last-provider-event! td :done data)
     (emit-tool-assembly-errors! progress-queue completed)
