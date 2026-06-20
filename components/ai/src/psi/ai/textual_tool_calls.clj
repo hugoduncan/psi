@@ -31,17 +31,22 @@
 
 (defn- parameter-candidates
   [function-body open-match next-open]
-  (loop [search-from (:end open-match)
-         candidates  []]
-    (if-let [close-start (str/index-of function-body "</parameter>" search-from)]
-      (let [end (+ close-start (count "</parameter>"))]
-        (recur end
-               (conj candidates {:start (:start open-match)
-                                 :end end
-                                 :name (:name open-match)
-                                 :value (subs function-body (:end open-match) close-start)
-                                 :crosses-next-open? (boolean (and next-open (< (:start next-open) close-start)))})))
-      candidates)))
+  (let [first-close-start (str/index-of function-body "</parameter>" (:end open-match))]
+    (loop [search-from (:end open-match)
+           candidates  []]
+      (if-let [close-start (str/index-of function-body "</parameter>" search-from)]
+        (let [end (+ close-start (count "</parameter>"))]
+          (recur end
+                 (conj candidates {:start (:start open-match)
+                                   :end end
+                                   :name (:name open-match)
+                                   :value (subs function-body (:end open-match) close-start)
+                                   :crosses-next-open? (boolean (and next-open (< (:start next-open) close-start)))
+                                   :crosses-nonnested-next-open? (boolean
+                                                                  (and next-open
+                                                                       first-close-start
+                                                                       (< first-close-start (:start next-open) close-start)))})))
+        candidates))))
 
 (defn- choose-parameter-candidates
   [function-body open-matches]
@@ -58,9 +63,10 @@
               (let [open-match (nth open-matches idx)
                     next-open  (get open-matches (inc idx))]
                 (when (str/blank? (subs function-body cursor (:start open-match)))
-                  (some (fn [{:keys [end crosses-next-open?] :as candidate}]
+                  (some (fn [{:keys [end crosses-next-open? crosses-nonnested-next-open?] :as candidate}]
                           (let [next-idx (next-open-index end)]
-                            (when (or (not crosses-next-open?) (> next-idx (inc idx)))
+                            (when (and (or (not crosses-next-open?) (> next-idx (inc idx)))
+                                       (not crosses-nonnested-next-open?))
                               (when-let [rest-candidates (step next-idx end)]
                                 (cons candidate rest-candidates)))))
                         (parameter-candidates function-body open-match next-open))))))]
@@ -77,14 +83,25 @@
                (= (count param-names) (count (distinct param-names))))
       (into {} params))))
 
+(defn- non-parameter-remainder-contains-tag?
+  [function-body tag]
+  (loop [cursor 0
+         params (choose-parameter-candidates function-body
+                                             (parameter-open-matches function-body))]
+    (if-let [{:keys [start end]} (first params)]
+      (or (str/includes? (subs function-body cursor start) tag)
+          (recur end (rest params)))
+      (str/includes? (subs function-body cursor) tag))))
+
 (defn- parsed-tool-call
   [{:keys [start end match groups]}]
   (let [[body]         groups
         function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
-        (when-not (or (str/includes? function-body "</function><function=")
-                      (str/includes? function-body "<tool_call><function="))
+        (when-not (or (str/includes? function-body "<tool_call><function=")
+                      (non-parameter-remainder-contains-tag? function-body "<function=")
+                      (non-parameter-remainder-contains-tag? function-body "<tool_call>"))
           (when-let [arguments (parsed-parameters function-body)]
             {:span      [start end]
              :source    match

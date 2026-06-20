@@ -58,6 +58,8 @@
       "<tool_call><function=bash><parameter=command>one</parameter><parameter=command>two</parameter></function></tool_call>"
       "<tool_call></tool_call>"
       "<tool_call><function=a><parameter=x>1</parameter></function><function=b><parameter=y>2</parameter></function></tool_call>"
+      "<tool_call><function=a><parameter=x>1</parameter></function> <function=b><parameter=y>2</parameter></function></tool_call>"
+      "<tool_call><function=a><parameter=x>1</parameter></function> <parameter=z>text</parameter> <function=b><parameter=y>2</parameter></function></tool_call>"
       "<tool_call><function=bash></function></tool_call>"
       "<tool_call><parameter=x>1</parameter><function=bash><parameter=y>2</parameter></function></tool_call>"))
 

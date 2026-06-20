@@ -144,3 +144,7 @@ No implementation work has been done yet.
 
 2026-06-20 implementation review:
 - added 1 new step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: multiple `<function=...>` blocks in one textual `<tool_call>` are rejected even when separated by whitespace or parameter-looking text, while literal function tags inside parameter values remain preserved.
+- verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
