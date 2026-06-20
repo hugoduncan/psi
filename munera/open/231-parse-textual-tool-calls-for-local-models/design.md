@@ -1,0 +1,89 @@
+# 231 — Parse textual tool calls for local models
+
+## Intent
+
+Make Psi optionally recover tool calls that a local model runner emits as plain assistant text, so local models can still use tools when their runner fails to convert a tool-call markup block into provider tool-call events.
+
+The motivating observed shape is:
+
+```xml
+<tool_call>
+<function=bash>
+<parameter=command>
+cd /Users/duncan/projects/hugoduncan/psi/compaction && git diff --stat
+</parameter>
+</function>
+</tool_call>
+```
+
+When the active model explicitly declares this compatibility capability, Psi should interpret that assistant text as a normal tool call instead of leaving it in the conversation transcript as user-visible prose.
+
+## Problem
+
+Some local model runners, e.g. llama.cpp-compatible paths, may output tool-call markup in the assistant text stream rather than emitting Psi's canonical provider tool-call events. Today the turn runtime only executes tools when provider adapters produce canonical tool-call content. A malformed/local runner response therefore strands an otherwise valid tool request as text, and the session does not execute the tool.
+
+Frontier/provider-native models already emit structured tool events correctly. Running a text parser on every model turn would add unnecessary cost and risk false positives on models that do not need this compatibility path. The behavior needs to be gated by explicit model capability metadata, not inferred from provider names or ad hoc text heuristics.
+
+## Scope
+
+In scope:
+
+- Add an explicit model capability flag for textual tool-call recovery using this capability shape:
+
+  ```edn
+  {:capabilities
+   {:textual-tool-calls #{:xml}}}
+  ```
+
+  `:xml` means the observed XML-like `<tool_call>` / `<function=...>` / `<parameter=...>` tag format. Frontier/default models omit the capability or provide an empty set.
+- Resolve the capability from the **runtime active model** used for the turn, after any model-registry/provider-auth runtime resolution, so custom local model definitions can opt in and frontier models remain opt out.
+- Add a parser for the XML-like textual tool-call format:
+  - `<tool_call> ... </tool_call>` encloses one call.
+  - `<function=TOOL_NAME> ... </function>` declares the tool name.
+  - One or more `<parameter=PARAM_NAME> ... </parameter>` blocks declare string parameters.
+  - Parameter text is trimmed at tag boundaries but otherwise preserved, including internal newlines and shell metacharacters.
+- Convert a parsed textual tool call into the same canonical assistant tool-call content shape and downstream execution path used by provider-emitted tool calls.
+- Remove the exact parsed `<tool_call>...</tool_call>` blocks from assistant text for the turn that generated them, so the transcript does not contain both prose markup and executable tool calls. Any non-tool prose before/after parsed blocks remains as assistant text.
+- Support multiple textual tool calls in one assistant response. Every well-formed `<tool_call>` block is converted into a canonical tool call in response order.
+- Reject malformed, partial, unknown-format, or unsupported textual tool-call markup safely: leave text unchanged and do not execute a tool unless the parser can produce an unambiguous canonical call. Malformed markup is a no-op, not an error surface.
+- Add focused tests for capability gating, parser behavior, turn accumulation/conversion, and no-op behavior for frontier/default models.
+- Document the model capability in user-facing custom-provider/model documentation and add a changelog entry if the capability is user-visible.
+
+Out of scope:
+
+- Teaching every local runner to emit canonical tool events at the adapter level.
+- Inferring this behavior from provider ids, model ids, runner names, or endpoints.
+- Parsing arbitrary JSON/function-call syntaxes beyond the observed XML-like tags.
+- Executing text that merely resembles XML unless it is inside a well-formed `<tool_call>` block and the active model has opted in.
+- Changing tool permission/capability policy. Parsed textual tool calls must pass through the same existing tool availability, authorization, execution, journaling, and result-recording paths as normal tool calls.
+
+## Acceptance criteria
+
+1. A model definition can opt in to textual tool-call recovery with `{:capabilities {:textual-tool-calls #{:xml}}}`.
+2. Models without the capability — including default/frontier models — pay no parsing/execution behavior cost and preserve textual `<tool_call>` content as ordinary assistant text.
+3. With the capability enabled, the example `bash` block above produces one canonical tool call named `bash` with arguments `{:command "cd /Users/duncan/projects/hugoduncan/psi/compaction && git diff --stat"}` (or the existing canonical string-key equivalent used by the tool executor).
+4. Multiple well-formed textual tool-call blocks in a single assistant response produce multiple canonical tool calls in response order.
+5. Parsed calls are executed by the existing tool execution machinery and produce ordinary tool-result journal entries; no separate compatibility execution path is introduced.
+6. The exact parsed `<tool_call>...</tool_call>` blocks are not retained as assistant prose in the conversation for the same turn. Surrounding non-tool text, if any, is preserved.
+7. Malformed examples are no-ops: they do not execute any tool, do not corrupt the turn, and remain visible as ordinary assistant text.
+8. Unknown tool names or unavailable tools follow the same errors/policy as canonical provider-emitted tool calls.
+9. Tests cover enabled vs disabled capability, nominal `bash` parsing, multiple calls, multi-parameter parsing, malformed markup no-op, and preservation of surrounding text while removing only exact parsed blocks.
+10. User docs explain how a local/custom model opts into the compatibility parser and warn that frontier models should not enable it.
+
+## Design constraints
+
+- Prefer model-map capability data over provider/model heuristics. `runtime-active-model` or the turn's already-resolved model is the authority.
+- Keep parsing local to the turn/provider-boundary normalization layer: after assistant text is known, before the runtime decides whether tool calls are pending/executable.
+- Reuse existing canonical tool-call ids and content block semantics. If the parsed markup has no id, generate one with the same per-turn/canonical id approach used for provider tool calls.
+- Do not bypass security: parsed textual calls must be indistinguishable from provider calls by the time authorization/tool availability checks run.
+- Make invalid states unreachable where practical: either the assistant message has text or canonical tool-call blocks, not an unexecuted textual tool-call block that also triggers execution.
+- Keep the parser intentionally narrow. It should handle the known runner output reliably, not become a general XML parser.
+
+## Implementation notes / likely touch points
+
+These are orientation hints, not binding implementation instructions:
+
+- Capability helpers likely belong near `psi.agent-session.model-capabilities`, which already resolves session runtime model capabilities.
+- Turn accumulation and final assistant content assembly live in `components/turn-runtime/src/psi/turn_runtime/accumulator.clj`; this is a likely normalization point for converting final text into canonical tool-call content before `:on-done` delivers the assistant message.
+- Model definitions live under `components/ai/src/psi/ai/models.clj`; custom/user model loading may need schema/doc updates so the new capability can be declared by local model definitions.
+- Existing tool-call assembly helpers in the turn runtime should be reused rather than introducing a second execution path.
