@@ -12,7 +12,7 @@
 
 ## Slice 3: Test
 
-- [ ] Create `extensions/context-manager/test/extensions/context_manager_test.clj` with one test using nullable API pattern: verify `init` registers a `session_turn_finished` handler and that the handler fires on a synthetic event
+- [ ] Create `extensions/context-manager/test/extensions/context_manager_test.clj` (ns `extensions.context-manager-test`) with one test using nullable API pattern: verify `init` registers a `session_turn_finished` handler and that the handler fires on a synthetic event
 
 ## Slice 4: Verify
 

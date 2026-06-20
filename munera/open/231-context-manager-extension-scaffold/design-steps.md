@@ -15,7 +15,7 @@
 
 # Design Review — Ambiguity (re-review)
 
-- [ ] Test namespace naming convention: design specifies `extensions.context_manager_test` (underscores in ns name) but codebase convention (e.g. `extensions.auto-session-name-test`) uses hyphens in namespace names. Clarify that the ns form should be `extensions.context-manager-test` to match convention.
+- [x] Test namespace naming convention: resolved — design now specifies `extensions.context-manager-test` (hyphens in ns form) matching codebase convention (`extensions.auto-session-name-test`, `extensions.logprobs-test`). File name uses underscores (`context_manager_test.clj`) per Clojure convention, consistent with `auto_session_name_test.clj`.
 
 # Design Review — Inconsistency (re-review)
 

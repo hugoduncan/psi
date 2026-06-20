@@ -75,7 +75,7 @@ extension, a dedicated extension provides:
 - **Manifest**: No `:allowed-events` or capability declarations needed — same as
   `auto-session-name`. The extension only subscribes via `(:on api)`.
 
-- **Test**: One test namespace `extensions.context_manager_test` using the
+- **Test**: One test namespace `extensions.context-manager-test` using the
   nullable API pattern from `auto-session-name` — verify the handler is
   registered and fires on a synthetic `session_turn_finished` event.
 
