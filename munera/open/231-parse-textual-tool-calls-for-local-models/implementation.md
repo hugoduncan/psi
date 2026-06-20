@@ -127,3 +127,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 1 review step: recovered textual tool-call id allocation now advances across preceding unindexed provider/content blocks in final content order.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
+
+2026-06-20 implementation review:
+- added 2 unaddressed follow-up steps.
