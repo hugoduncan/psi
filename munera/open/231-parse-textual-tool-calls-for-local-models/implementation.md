@@ -16,3 +16,6 @@ No implementation work has been done yet.
 
 2026-06-19 architecture review:
 - architectural review added 2 new design steps: keep capability/parser placement acyclic (`turn-runtime` must not depend on `agent-session`), and apply normalization once across both streaming and non-streaming turn paths.
+
+2026-06-19 ambiguity review:
+- ambiguity review added 3 new design steps: mixed valid/malformed response semantics, exact tag grammar/name rules, and canonical argument representation.
