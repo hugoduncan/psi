@@ -80,14 +80,14 @@
           result-message (first tool-results)]
       (is (= :turn.outcome/tool-use (:execution-result/turn-outcome execution-result)))
       (is (= [{:type :tool-call
-               :id "turn-textual-bash/toolcall/0"
+               :id "turn-textual-bash/toolcall/1"
                :name "bash"
                :arguments "{\"command\":\"printf textual-tool-ok\"}"}]
              (:execution-result/tool-calls execution-result)))
       (is (= {:continued? true :tool-call-count 1}
              continuation))
       (is (= 1 (count tool-results)))
-      (is (= "turn-textual-bash/toolcall/0"
+      (is (= "turn-textual-bash/toolcall/1"
              (:tool-call-id result-message)))
       (is (= "bash" (:tool-name result-message)))
       (is (false? (:is-error result-message)))

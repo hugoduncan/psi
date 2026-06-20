@@ -74,7 +74,15 @@
              :name "bash"
              :arguments {"command" "printf '<function=literal>' && echo '</function>'"}}]
            (textual-tool-calls/parse-xml-tool-calls
-            "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>")))))
+            "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"))))
+
+  (testing "later valid blocks recover after an earlier malformed overlapping prefix"
+    (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
+      (is (= [{:span [47 130]
+               :source "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+               :name "bash"
+               :arguments {"command" "pwd"}}]
+             (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
   ;; Tests canonical recovery without invoking the tool execution machinery.
@@ -94,7 +102,7 @@
             content   (:content (textual-tool-calls/normalize-assistant-message "turn-1" enabled-model assistant))]
         (is (= [{:type :text :text "Before "}
                 {:type :tool-call
-                 :id "turn-1/toolcall/0"
+                 :id "turn-1/toolcall/1"
                  :name "bash"
                  :arguments "{\"command\":\"pwd && echo hi\"}"}
                 {:type :text :text " after"}]
@@ -122,12 +130,36 @@
                 {:type :text :text " E"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
 
-    (testing "generated ids skip provider content indexes and existing per-turn canonical ids"
+    (testing "generated ids use final content order after preceding provider indexes"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
+                                 {:type :text :content-index 2 :text "between"}
+                                 {:type :text
+                                  :content-index 3
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= "turn-3/toolcall/4"
+               (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
+                       [:content 2 :id])))))
+
+    (testing "generated ids skip later provider indexes and existing per-turn canonical ids"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :content-index 7 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :tool-call :id "turn-3/toolcall/0" :name "generated-provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
-        (is (= "turn-3/toolcall/1"
+        (is (= "turn-3/toolcall/8"
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
-                       [:content 2 :id])))))))
+                       [:content 2 :id])))))
+
+    (testing "overlapping malformed prefix does not block later valid normalization"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text
+                                  :text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"}]}]
+        (is (= [{:type :text
+                 :text "broken <tool_call><function=bad><parameter=x>1 "}
+                {:type :tool-call
+                 :id "turn-4/toolcall/1"
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd\"}"}
+                {:type :text :text " tail"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))))

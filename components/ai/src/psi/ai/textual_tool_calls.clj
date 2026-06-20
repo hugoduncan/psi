@@ -14,7 +14,8 @@
   (contains? (set (get-in model [:capabilities :textual-tool-calls])) format))
 
 (def ^:private identifier-pattern "[A-Za-z0-9_-]+")
-(def ^:private tool-call-pattern #"(?s)<tool_call>(.*?)</tool_call>")
+(def ^:private tool-call-open "<tool_call>")
+(def ^:private tool-call-close "</tool_call>")
 (def ^:private function-pattern
   (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
 (def ^:private parameter-pattern
@@ -57,24 +58,55 @@
 
 (defn- parsed-tool-call
   [{:keys [start end match groups]}]
-  (let [[body]          groups
-        function-match  (re-matches function-pattern body)]
+  (let [[body]         groups
+        function-match (re-matches function-pattern body)]
     (when function-match
       (let [[_ tool-name function-body] function-match]
-        (when-let [arguments (parsed-parameters function-body)]
-          {:span      [start end]
-           :source    match
-           :name      tool-name
-           :arguments arguments})))))
+        (when (and (not (str/includes? function-body tool-call-open))
+                   (not (str/includes? function-body tool-call-close)))
+          (when-let [arguments (parsed-parameters function-body)]
+            {:span      [start end]
+             :source    match
+             :name      tool-name
+             :arguments arguments}))))))
+
+(defn- candidate-tool-call-spans
+  [text]
+  (let [s (or text "")]
+    (loop [search-from 0
+           spans       []]
+      (if-let [open (str/index-of s tool-call-open search-from)]
+        (if-let [close-start (str/index-of s tool-call-close (+ open (count tool-call-open)))]
+          (let [end       (+ close-start (count tool-call-close))
+                candidate {:start  open
+                           :end    end
+                           :match  (subs s open end)
+                           :groups [(subs s (+ open (count tool-call-open)) close-start)]}]
+            (recur (inc open) (conj spans candidate)))
+          spans)
+        spans))))
+
+(defn- non-overlapping-successes
+  [parsed-calls]
+  (loop [cursor 0
+         calls  parsed-calls
+         kept   []]
+    (if-let [{[start end] :span :as call} (first calls)]
+      (if (< start cursor)
+        (recur cursor (rest calls) kept)
+        (recur end (rest calls) (conj kept call)))
+      kept)))
 
 (defn parse-xml-tool-calls
   "Parse well-formed XML-like textual tool calls from text.
 
    Returns successful calls in response order. Malformed blocks are omitted from
-   the result so callers can leave their source text unchanged."
+   the result so callers can leave their source text unchanged. Later valid
+   blocks are still recoverable when an earlier malformed prefix overlaps them."
   [text]
-  (->> (matcher-results tool-call-pattern text)
+  (->> (candidate-tool-call-spans text)
        (keep parsed-tool-call)
+       non-overlapping-successes
        vec))
 
 (defn- text-block
@@ -83,14 +115,24 @@
     (cond-> {:type :text :text text}
       (contains? source-block :content-index) (assoc :content-index (:content-index source-block)))))
 
+(defn- advance-position!
+  [state]
+  (swap! state update :position (fnil inc 0)))
+
 (defn- recovered-tool-call-block
   [turn-id next-content-index parsed-call]
-  (let [content-index (next-content-index)]
+  (let [content-index (next-content-index parsed-call)]
     {:type :tool-call
      :content-index content-index
      :id (str turn-id "/toolcall/" content-index)
      :name (:name parsed-call)
      :arguments (json/generate-string (:arguments parsed-call))}))
+
+(defn- append-text-block
+  [next-content-index source-block text]
+  (when (seq text)
+    (next-content-index)
+    (text-block source-block text)))
 
 (defn- textual-tool-call-content
   [turn-id next-content-index source-block]
@@ -106,10 +148,10 @@
             (recur end
                    (rest calls)
                    (cond-> blocks
-                     (seq before) (conj (text-block source-block before))
+                     (seq before) (conj (append-text-block next-content-index source-block before))
                      :always      (conj (recovered-tool-call-block turn-id next-content-index parsed-call)))))
           (cond-> blocks
-            (seq (subs text cursor)) (conj (text-block source-block (subs text cursor)))))))))
+            (seq (subs text cursor)) (conj (append-text-block next-content-index source-block (subs text cursor)))))))))
 
 (defn- generated-tool-call-index
   [turn-id tool-call-id]
@@ -123,22 +165,32 @@
       (when (= :tool-call (:type block))
         (generated-tool-call-index turn-id (:id block)))))
 
+(defn- allocate-content-index
+  [state preferred]
+  (advance-position! state)
+  (loop [candidate preferred]
+    (let [{:keys [used]} @state]
+      (if (contains? used candidate)
+        (recur (inc candidate))
+        (do (swap! state update :used conj candidate)
+            candidate)))))
+
 (defn- next-content-index-fn
   [turn-id content]
   (let [used-indexes (->> content
                           (keep #(content-index turn-id %))
                           set)
-        state        (atom {:candidate 0 :used used-indexes})]
-    (fn []
-      (loop []
-        (let [{:keys [candidate used]} @state]
-          (if (contains? used candidate)
-            (do (swap! state update :candidate inc)
-                (recur))
-            (do (swap! state (fn [{:keys [used]}]
-                               {:candidate (inc candidate)
-                                :used      (conj used candidate)}))
-                candidate)))))))
+        max-index    (apply max -1 used-indexes)
+        state        (atom {:used used-indexes :position -1})]
+    (fn
+      ([]
+       (advance-position! state))
+      ([source-block]
+       (let [{:keys [position]} @state
+             preferred (if (:content-index source-block)
+                         (max (long (:content-index source-block)) (inc (long position)))
+                         (inc (max (long position) (long max-index))))]
+         (allocate-content-index state preferred))))))
 
 (defn- normalize-block
   [turn-id next-content-index block]
