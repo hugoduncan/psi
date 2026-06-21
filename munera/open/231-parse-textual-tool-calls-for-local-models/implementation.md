@@ -367,3 +367,5 @@ No implementation work has been done yet.
 
 2026-06-21 test review:
 - no new actionable issues.
+2026-06-21 test-shaper review:
+- added 2 test-review steps to be addressed.
