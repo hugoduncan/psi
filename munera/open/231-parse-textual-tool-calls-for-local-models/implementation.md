@@ -391,3 +391,6 @@ No implementation work has been done yet.
 2026-06-21 code-shaper follow-up execution:
 - addressed 2 review steps: split textual tool-call capability/parsing/normalization/index allocation into focused namespaces and replaced mutable closure allocation with explicit pure state transitions.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed files.
+
+2026-06-21 code-shaper review:
+- added 1 step to be addressed.
