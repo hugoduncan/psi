@@ -346,3 +346,7 @@ No implementation work has been done yet.
 
 2026-06-21 test review:
 - added 3 test-review steps to be addressed.
+
+2026-06-21 test review follow-up execution:
+- addressed 3 review steps: disabled-capability normalization now proves the XML parser is not invoked; recovered known-tool unavailable execution is covered through the ordinary tool-result error path; non-streaming turn-runtime recovery now uses an injected provider seam instead of redefining AI execution.
+- verified focused textual-tool-call/turn-runtime/session Scry suites; focused clj-kondo reports only the pre-existing `psi.ai.core/execute-response-in` unresolved-var warning in `response_mode_test.clj`.

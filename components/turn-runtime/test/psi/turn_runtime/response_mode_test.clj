@@ -44,7 +44,7 @@
                        :timestamp (java.time.Instant/now)}})
 
 (deftest execute-prepared-request-non-streaming-uses-execute-path-test
-  (testing "workflow-owned child session with :response-mode :non-streaming uses ai/execute-response-in"
+  (testing "workflow-owned child session with :response-mode :non-streaming uses psi.ai.core/execute-response-in"
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                    (merge (ss/get-session-data-in ctx session-id)
@@ -107,29 +107,33 @@
                          (-> result :execution-result/provider-captures :response-captures first :timestamp))))))))
 
 (deftest execute-prepared-request-non-streaming-recovers-textual-tool-call-test
-  ;; Tests non-streaming responses use the same textual tool-call normalizer.
+  ;; Tests non-streaming responses use the same textual tool-call normalizer via
+  ;; a nullable provider seam rather than redefining the AI execution function.
   (let [[ctx session-id] (create-session-context {:persist? false})
-        model (assoc {:provider "local" :id "local-tool-model"}
+        model (assoc (models/get-model :claude-3-5-sonnet)
+                     :provider :local
+                     :id "local-tool-model"
                      :capabilities {:textual-tool-calls #{:xml}})
+        provider {:execute (fn [_conversation _model _options]
+                             {:assistant-message {:role "assistant"
+                                                  :content [{:type :text
+                                                             :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]
+                                                  :stop-reason :stop
+                                                  :timestamp (java.time.Instant/now)}})}
         _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                  (merge (ss/get-session-data-in ctx session-id)
                         {:model model
                          :response-mode :non-streaming}))
-        prepared (prepared-request ctx session-id)]
-    (with-redefs [psi.ai.core/execute-response-in
-                  (fn [_ai-ctx _conv _model _opts]
-                    {:assistant-message {:role "assistant"
-                                         :content [{:type :text
-                                                    :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]
-                                         :stop-reason :stop
-                                         :timestamp (java.time.Instant/now)}})]
-      (let [result (turn-runtime/execute-prepared-request! {:provider-registry (atom {})} ctx session-id prepared nil)]
-        (is (= [{:type :tool-call
-                 :id "turn-1/toolcall/0"
-                 :name "bash"
-                 :arguments "{\"command\":\"pwd\"}"}]
-               (get-in result [:execution-result/assistant-message :content])))
-        (is (= :turn.outcome/tool-use (:execution-result/turn-outcome result)))))))
+        prepared (prepared-request ctx session-id)
+        result (turn-runtime/execute-prepared-request!
+                {:provider-registry (atom {:local provider})}
+                ctx session-id prepared nil)]
+    (is (= [{:type :tool-call
+             :id "turn-1/toolcall/0"
+             :name "bash"
+             :arguments "{\"command\":\"pwd\"}"}]
+           (get-in result [:execution-result/assistant-message :content])))
+    (is (= :turn.outcome/tool-use (:execution-result/turn-outcome result)))))
 
 (deftest execute-prepared-request-defaults-to-streaming-test
   (testing "absent :response-mode preserves streaming execution path"

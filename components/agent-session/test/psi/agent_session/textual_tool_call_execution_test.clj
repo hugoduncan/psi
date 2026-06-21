@@ -119,6 +119,40 @@
     (is (str/includes? (:result-text result-message)
                        "Unknown tool: missing_tool"))))
 
+(deftest parsed-unavailable-tool-follows-existing-tool-error-policy-test
+  ;; Tests recovered calls to known-but-unavailable tools follow the same
+  ;; runtime policy as canonical provider-emitted calls: execution is attempted
+  ;; through the ordinary tool path and records an error-shaped toolResult.
+  (let [executed-tools (atom [])
+        [ctx* session-id] (test-support/create-test-session {:persist? false})
+        ctx (assoc ctx* :runtime-tool-executor-fn
+                   (fn [_ctx _session-id tool-name _args _opts]
+                     (swap! executed-tools conj tool-name)
+                     (throw (ex-info (str "Unknown tool: " tool-name)
+                                     {:tool tool-name}))))
+        execution-result (execute-text-response!
+                          ctx
+                          session-id
+                          (textual-tool-model)
+                          "turn-textual-unavailable"
+                          (str "<tool_call><function=bash>"
+                               "<parameter=command>printf should-not-run</parameter>"
+                               "</function></tool_call>"))
+        continuation (prompt-chain/run-prompt-tools! ctx session-id execution-result nil)
+        [result-message] (tool-result-messages ctx session-id)]
+    (is (= [{:type :tool-call
+             :id "turn-textual-unavailable/toolcall/0"
+             :name "bash"
+             :arguments "{\"command\":\"printf should-not-run\"}"}]
+           (:execution-result/tool-calls execution-result)))
+    (is (= {:continued? true :tool-call-count 1}
+           continuation))
+    (is (= ["bash"] @executed-tools))
+    (is (= "bash" (:tool-name result-message)))
+    (is (true? (:is-error result-message)))
+    (is (str/includes? (:result-text result-message)
+                       "Unknown tool: bash"))))
+
 (deftest default-model-preserves-textual-tool-markup-and-runs-no-tools-test
   ;; Tests frontier/default opt-out keeps textual markup as assistant text and
   ;; produces no session tool execution.

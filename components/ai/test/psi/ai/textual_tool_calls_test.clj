@@ -232,6 +232,16 @@
         (is (= assistant
                (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant)))))
 
+    (testing "disabled models do not invoke the XML parser"
+      (let [assistant {:role "assistant"
+                       :content [{:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (with-redefs [textual-tool-calls/parse-xml-tool-calls
+                      (fn [_]
+                        (throw (ex-info "parser should not run for disabled textual-tool-call capability" {})))]
+          (is (= assistant
+                 (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant))))))
+
     (testing "enabled models convert parsed calls to canonical tool-call blocks with JSON arguments"
       (let [assistant {:role "assistant"
                        :content [{:type :text
