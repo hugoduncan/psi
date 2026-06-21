@@ -4,6 +4,8 @@
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
+   [psi.ai.core :as ai]
+   [psi.ai.models :as models]
    [psi.session-persistence.core :as persist]
    [psi.agent-session.prompt-loop :as prompt-loop]
    [psi.turn-runtime.recording :as prompt-recording]
@@ -26,11 +28,16 @@
     (consume-fn {:type :text-delta :delta text})
     (consume-fn {:type :done :reason :stop})))
 
-(defn- stub-event-stream
+(defn- stub-stream-provider
   [events]
-  (fn [_ai-ctx _conv _model _opts consume-fn]
-    (doseq [event events]
-      (consume-fn event))))
+  {:name :stub-stream
+   :stream (fn [_conversation _model _options consume-fn]
+             (doseq [event events]
+               (consume-fn event)))})
+
+(defn- stream-ai-ctx
+  [events]
+  (ai/create-context {:providers {:stub (stub-stream-provider events)}}))
 
 (defn- setup-agent-ctx!
   []
@@ -202,48 +209,53 @@
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
         user-msg    {:role "user" :content [{:type :text :text "hi"}]}
-        model       (assoc stub-model :capabilities {:textual-tool-calls #{:xml}})]
+        model       (assoc (models/get-model :claude-3-5-sonnet)
+                           :provider :stub
+                           :capabilities {:textual-tool-calls #{:xml}})]
     (agent/start-loop-in! agent-ctx [user-msg])
-    (with-redefs [turn-runtime/do-stream!
-                  (stub-text-stream "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix")]
-      (let [assistant-msg (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id model nil nil)
-            turn-id       (:turn-id (turn-sc/get-turn-data
-                                     (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
-        (is (= [{:type :text :text "prefix "}
-                {:type :tool-call
-                 :id (str turn-id "/toolcall/1")
-                 :name "bash"
-                 :arguments "{\"command\":\"pwd\"}"}
-                {:type :text :text " suffix"}]
-               (:content assistant-msg)))))))
+    (let [ai-ctx        (stream-ai-ctx [{:type :start}
+                                        {:type :text-delta
+                                         :delta "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix"}
+                                        {:type :done :reason :stop}])
+          assistant-msg (#'prompt-turn/stream-turn! ai-ctx session-ctx session-ctx-id model nil nil)
+          turn-id       (:turn-id (turn-sc/get-turn-data
+                                   (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
+      (is (= [{:type :text :text "prefix "}
+              {:type :tool-call
+               :id (str turn-id "/toolcall/1")
+               :name "bash"
+               :arguments "{\"command\":\"pwd\"}"}
+              {:type :text :text " suffix"}]
+             (:content assistant-msg))))))
 
 (deftest streaming-final-content-preserves-provider-index-order-test
   ;; Tests mixed streaming provider tool calls keep content-index order before textual recovery.
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
         user-msg    {:role "user" :content [{:type :text :text "hi"}]}
-        model       (assoc stub-model :capabilities {:textual-tool-calls #{:xml}})]
+        model       (assoc (models/get-model :claude-3-5-sonnet)
+                           :provider :stub
+                           :capabilities {:textual-tool-calls #{:xml}})]
     (agent/start-loop-in! agent-ctx [user-msg])
-    (with-redefs [turn-runtime/do-stream!
-                  (stub-event-stream [{:type :start}
-                                      {:type :toolcall-start :content-index 1 :id "provider-call" :name "read"}
-                                      {:type :toolcall-delta :content-index 1 :delta "{}"}
-                                      {:type :toolcall-end :content-index 1}
-                                      {:type :text-delta
-                                       :content-index 2
-                                       :delta "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix"}
-                                      {:type :done :reason :stop}])]
-      (let [assistant-msg (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id model nil nil)
-            turn-id       (:turn-id (turn-sc/get-turn-data
-                                     (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
-        (is (= [{:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
-                {:type :text :text "prefix "}
-                {:type :tool-call
-                 :id (str turn-id "/toolcall/3")
-                 :name "bash"
-                 :arguments "{\"command\":\"pwd\"}"}
-                {:type :text :text " suffix"}]
-               (:content assistant-msg)))))))
+    (let [ai-ctx        (stream-ai-ctx [{:type :start}
+                                        {:type :toolcall-start :content-index 1 :id "provider-call" :name "read"}
+                                        {:type :toolcall-delta :content-index 1 :delta "{}"}
+                                        {:type :toolcall-end :content-index 1}
+                                        {:type :text-delta
+                                         :content-index 2
+                                         :delta "prefix <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> suffix"}
+                                        {:type :done :reason :stop}])
+          assistant-msg (#'prompt-turn/stream-turn! ai-ctx session-ctx session-ctx-id model nil nil)
+          turn-id       (:turn-id (turn-sc/get-turn-data
+                                   (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
+      (is (= [{:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
+              {:type :text :text "prefix "}
+              {:type :tool-call
+               :id (str turn-id "/toolcall/3")
+               :name "bash"
+               :arguments "{\"command\":\"pwd\"}"}
+              {:type :text :text " suffix"}]
+             (:content assistant-msg))))))
 
 (deftest streaming-final-content-preserves-multiple-text-index-interleaving-test
   ;; Tests streaming text is accumulated per provider content-index so text after
@@ -252,30 +264,31 @@
   (let [agent-ctx   (setup-agent-ctx!)
         [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
         user-msg    {:role "user" :content [{:type :text :text "hi"}]}
-        model       (assoc stub-model :capabilities {:textual-tool-calls #{:xml}})]
+        model       (assoc (models/get-model :claude-3-5-sonnet)
+                           :provider :stub
+                           :capabilities {:textual-tool-calls #{:xml}})]
     (agent/start-loop-in! agent-ctx [user-msg])
-    (with-redefs [turn-runtime/do-stream!
-                  (stub-event-stream [{:type :start}
-                                      {:type :text-delta :content-index 0 :delta "before "}
-                                      {:type :toolcall-start :content-index 1 :id "provider-call" :name "read"}
-                                      {:type :toolcall-delta :content-index 1 :delta "{}"}
-                                      {:type :toolcall-end :content-index 1}
-                                      {:type :text-delta
-                                       :content-index 2
-                                       :delta "after <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> done"}
-                                      {:type :done :reason :stop}])]
-      (let [assistant-msg (#'prompt-turn/stream-turn! nil session-ctx session-ctx-id model nil nil)
-            turn-id       (:turn-id (turn-sc/get-turn-data
-                                     (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
-        (is (= [{:type :text :text "before "}
-                {:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
-                {:type :text :text "after "}
-                {:type :tool-call
-                 :id (str turn-id "/toolcall/3")
-                 :name "bash"
-                 :arguments "{\"command\":\"pwd\"}"}
-                {:type :text :text " done"}]
-               (:content assistant-msg)))))))
+    (let [ai-ctx        (stream-ai-ctx [{:type :start}
+                                        {:type :text-delta :content-index 0 :delta "before "}
+                                        {:type :toolcall-start :content-index 1 :id "provider-call" :name "read"}
+                                        {:type :toolcall-delta :content-index 1 :delta "{}"}
+                                        {:type :toolcall-end :content-index 1}
+                                        {:type :text-delta
+                                         :content-index 2
+                                         :delta "after <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> done"}
+                                        {:type :done :reason :stop}])
+          assistant-msg (#'prompt-turn/stream-turn! ai-ctx session-ctx session-ctx-id model nil nil)
+          turn-id       (:turn-id (turn-sc/get-turn-data
+                                   (ss/get-state-value-in session-ctx (ss/state-path :turn-ctx session-ctx-id))))]
+      (is (= [{:type :text :text "before "}
+              {:type :tool-call :id "provider-call" :name "read" :arguments "{}" :call-summary nil}
+              {:type :text :text "after "}
+              {:type :tool-call
+               :id (str turn-id "/toolcall/3")
+               :name "bash"
+               :arguments "{\"command\":\"pwd\"}"}
+              {:type :text :text " done"}]
+             (:content assistant-msg))))))
 
 (deftest run-turn-loop-test
   (testing "multi-turn loop separates one-turn execution from recursive control"

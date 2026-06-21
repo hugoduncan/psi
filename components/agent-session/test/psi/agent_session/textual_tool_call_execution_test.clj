@@ -12,14 +12,18 @@
 (defn- now []
   (java.time.Instant/now))
 
-(defn- stub-provider
-  [assistant-text]
+(defn- stub-message-provider
+  [assistant-message]
   {:name :stub
    :execute (fn [_conversation _model _options]
-              {:assistant-message {:role "assistant"
-                                   :content [{:type :text :text assistant-text}]
-                                   :stop-reason :stop
-                                   :timestamp (now)}})})
+              {:assistant-message assistant-message})})
+
+(defn- stub-provider
+  [assistant-text]
+  (stub-message-provider {:role "assistant"
+                          :content [{:type :text :text assistant-text}]
+                          :stop-reason :stop
+                          :timestamp (now)}))
 
 (defn- prepared-request
   [session-id turn-id model]
@@ -40,14 +44,19 @@
   (assoc (models/get-model :claude-3-5-sonnet)
          :capabilities {:textual-tool-calls #{:xml}}))
 
-(defn- execute-text-response!
-  [ctx session-id model turn-id text]
+(defn- execute-provider-response!
+  [ctx session-id model turn-id provider]
   (turn-runtime/execute-prepared-request!
-   {:provider-registry (atom {:anthropic (stub-provider text)})}
+   {:provider-registry (atom {:anthropic provider})}
    ctx
    session-id
    (prepared-request session-id turn-id model)
    nil))
+
+(defn- execute-text-response!
+  [ctx session-id model turn-id text]
+  (execute-provider-response!
+   ctx session-id model turn-id (stub-provider text)))
 
 (defn- journal-messages
   [ctx session-id]
@@ -179,3 +188,103 @@
     (is (= {:continued? false :tool-call-count 0}
            continuation))
     (is (empty? (tool-result-messages ctx session-id)))))
+
+(deftest canonical-and-recovered-tool-errors-have-same-policy-shape-test
+  ;; Tests textual recovery does not introduce a separate unavailable/unknown
+  ;; tool policy surface: recovered calls and provider-emitted canonical calls
+  ;; both reach the same ordinary tool-result error machinery.
+  (letfn [(run-case [turn-id assistant-message]
+            (let [[ctx session-id] (test-support/create-test-session {:persist? false})
+                  execution-result (execute-provider-response!
+                                    ctx
+                                    session-id
+                                    (textual-tool-model)
+                                    turn-id
+                                    (stub-message-provider assistant-message))
+                  continuation (prompt-chain/run-prompt-tools! ctx session-id execution-result nil)
+                  [result-message] (tool-result-messages ctx session-id)]
+              {:tool-call (first (:execution-result/tool-calls execution-result))
+               :continuation continuation
+               :result result-message}))]
+    (testing "unknown tool policy shape matches canonical provider calls"
+      (let [canonical (run-case "turn-canonical-unknown"
+                                {:role "assistant"
+                                 :content [{:type :tool-call
+                                            :id "canonical-unknown"
+                                            :name "missing_tool"
+                                            :arguments "{\"arg\":\"value\"}"}]
+                                 :stop-reason :tool_use
+                                 :timestamp (now)})
+            recovered (run-case "turn-recovered-unknown"
+                                {:role "assistant"
+                                 :content [{:type :text
+                                            :text (str "<tool_call><function=missing_tool>"
+                                                       "<parameter=arg>value</parameter>"
+                                                       "</function></tool_call>")}]
+                                 :stop-reason :stop
+                                 :timestamp (now)})]
+        (is (= {:continued? true :tool-call-count 1} (:continuation canonical) (:continuation recovered)))
+        (is (= [{:name "missing_tool" :arguments "{\"arg\":\"value\"}"}
+                {:name "missing_tool" :arguments "{\"arg\":\"value\"}"}]
+               (mapv #(select-keys (:tool-call %) [:name :arguments]) [canonical recovered])))
+        (is (= ["missing_tool" "missing_tool"]
+               (mapv #(get-in % [:result :tool-name]) [canonical recovered])))
+        (is (= [true true]
+               (mapv #(get-in % [:result :is-error]) [canonical recovered])))
+        (is (every? #(str/includes? (get-in % [:result :result-text])
+                                    "Unknown tool: missing_tool")
+                    [canonical recovered]))))
+    (testing "known unavailable tool policy shape matches canonical provider calls"
+      (letfn [(run-unavailable-case [turn-id assistant-message]
+                (let [[ctx session-id] (test-support/create-test-session {:persist? false})
+                      _ (ext/register-extension-in! (:extension-registry ctx) "unavailable-baseline-test")
+                      _ (ext/register-tool-in! (:extension-registry ctx)
+                                               "unavailable-baseline-test"
+                                               {:name "known-unavailable"
+                                                :description "Known test tool that is blocked by policy."
+                                                :parameters {:type "object"
+                                                             :properties {"value" {:type "string"}}}
+                                                :format-request (fn [_args] "known-unavailable …")
+                                                :execute (fn [_args _opts]
+                                                           (throw (ex-info "Tool is unavailable in this session"
+                                                                           {:tool "known-unavailable"})))})
+                      execution-result (execute-provider-response!
+                                        ctx
+                                        session-id
+                                        (textual-tool-model)
+                                        turn-id
+                                        (stub-message-provider assistant-message))
+                      continuation (prompt-chain/run-prompt-tools! ctx session-id execution-result nil)
+                      [result-message] (tool-result-messages ctx session-id)]
+                  {:tool-call (first (:execution-result/tool-calls execution-result))
+                   :continuation continuation
+                   :result result-message}))]
+        (let [canonical (run-unavailable-case
+                         "turn-canonical-unavailable"
+                         {:role "assistant"
+                          :content [{:type :tool-call
+                                     :id "canonical-unavailable"
+                                     :name "known-unavailable"
+                                     :arguments "{\"value\":\"abc\"}"}]
+                          :stop-reason :tool_use
+                          :timestamp (now)})
+              recovered (run-unavailable-case
+                         "turn-recovered-unavailable"
+                         {:role "assistant"
+                          :content [{:type :text
+                                     :text (str "<tool_call><function=known-unavailable>"
+                                                "<parameter=value>abc</parameter>"
+                                                "</function></tool_call>")}]
+                          :stop-reason :stop
+                          :timestamp (now)})]
+          (is (= {:continued? true :tool-call-count 1} (:continuation canonical) (:continuation recovered)))
+          (is (= [{:name "known-unavailable" :arguments "{\"value\":\"abc\"}"}
+                  {:name "known-unavailable" :arguments "{\"value\":\"abc\"}"}]
+                 (mapv #(select-keys (:tool-call %) [:name :arguments]) [canonical recovered])))
+          (is (= ["known-unavailable" "known-unavailable"]
+                 (mapv #(get-in % [:result :tool-name]) [canonical recovered])))
+          (is (= [true true]
+                 (mapv #(get-in % [:result :is-error]) [canonical recovered])))
+          (is (every? #(str/includes? (get-in % [:result :result-text])
+                                      "Tool is unavailable in this session")
+                      [canonical recovered])))))))
