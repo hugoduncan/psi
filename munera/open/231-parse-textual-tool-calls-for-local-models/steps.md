@@ -112,3 +112,8 @@
 
 - [x] Clarify `doc/custom-providers.md` so the textual-tool-call section documents the full strict parser contract users need when configuring local runners: exact lowercase tag names, `[A-Za-z0-9_-]+` tool/parameter identifiers, exactly one function block, one or more parameters, duplicate/misnested parameters as malformed/no-op, tag-looking parameter text including closing tags as unsupported, no nested recovery, and the existing 65,536-character block limit.
 - [x] Reorganize or clarify `doc/custom-providers.md` so the structured-output native-capability guidance remains visibly part of the structured-output section rather than reading as if it also applies to textual tool-call recovery.
+
+## Code-shaper review follow-ups
+
+- [ ] Split `psi.ai.textual-tool-calls` so model capability lookup, XML-like parsing, assistant-content normalization, and content-index allocation are locally comprehensible units instead of one namespace carrying multiple responsibilities.
+- [ ] Replace `next-content-index-fn`'s mutable closure/kind-dispatch allocation with an explicit pure allocation state transition (state in → `[state index]` out) with named cases for existing content, retained source text, and recovered textual tool calls.
