@@ -18,6 +18,12 @@
 (def ^:private tool-call-close "</tool_call>")
 (def ^:private function-pattern
   (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
+(def ^:private parameter-open-pattern
+  (re-pattern (str "<parameter=(" identifier-pattern ")>")))
+(def ^:private textual-tool-call-tag-pattern
+  (re-pattern
+   (str "<tool_call>|</tool_call>|<function=" identifier-pattern ">|</function>|"
+        "<parameter=" identifier-pattern ">|</parameter>")))
 
 (def ^:private max-candidate-span-chars
   "Hard bound on one textual tool-call candidate block.
@@ -26,305 +32,17 @@
   scans linear in the response size with a fixed per-open work cap."
   65536)
 
-(declare candidate-tool-call-spans)
-
-(defn- parameter-open-matches
-  [function-body]
-  (let [matcher (re-matcher (re-pattern (str "<parameter=(" identifier-pattern ")>"))
-                            (or function-body ""))]
-    (loop [matches []]
-      (if (.find matcher)
-        (recur (conj matches {:start (.start matcher)
-                              :end   (.end matcher)
-                              :name  (.group matcher 1)}))
-        matches))))
-
-(defn- parameter-candidates
-  [function-body open-match next-open]
-  (let [first-close-start (str/index-of function-body "</parameter>" (:end open-match))]
-    (loop [search-from (:end open-match)
-           candidates  []]
-      (if-let [close-start (str/index-of function-body "</parameter>" search-from)]
-        (let [end (+ close-start (count "</parameter>"))]
-          (recur end
-                 (conj candidates {:start (:start open-match)
-                                   :end end
-                                   :name (:name open-match)
-                                   :value-start (:end open-match)
-                                   :value (subs function-body (:end open-match) close-start)
-                                   :crosses-next-open? (boolean (and next-open (< (:start next-open) close-start)))
-                                   :crosses-nonnested-next-open? (boolean
-                                                                  (and next-open
-                                                                       first-close-start
-                                                                       (< first-close-start (:start next-open) close-start)))})))
-        candidates))))
-
-(defn- choose-parameter-candidates
-  [function-body open-matches]
-  (letfn [(next-open-index [end]
-            (or (first (keep-indexed (fn [idx open-match]
-                                       (when (>= (:start open-match) end)
-                                         idx))
-                                     open-matches))
-                (count open-matches)))
-          (step [idx cursor]
-            (if (= idx (count open-matches))
-              (when (str/blank? (subs function-body cursor))
-                [])
-              (let [open-match (nth open-matches idx)
-                    next-open  (get open-matches (inc idx))]
-                (when (str/blank? (subs function-body cursor (:start open-match)))
-                  (some (fn [{:keys [end crosses-next-open? crosses-nonnested-next-open?] :as candidate}]
-                          (let [next-idx (next-open-index end)]
-                            (when (and (or (not crosses-next-open?) (> next-idx (inc idx)))
-                                       (not crosses-nonnested-next-open?))
-                              (when-let [rest-candidates (step next-idx end)]
-                                (cons candidate rest-candidates)))))
-                        (parameter-candidates function-body open-match next-open))))))]
-    (step 0 0)))
-
-(defn- incomplete-nested-tool-call-start?
-  [value]
-  (let [start-pattern (re-pattern (str "<tool_call><function=" identifier-pattern "><parameter=" identifier-pattern ">"))
-        matcher       (re-matcher start-pattern value)]
-    (loop []
-      (if (.find matcher)
-        (let [start (.start matcher)
-              end   (.end matcher)
-              quoted-literal? (and (pos? start)
-                                   (contains? #{\' \"} (.charAt value (dec start))))
-              parameter-open-at-boundary? (str/blank? (subs value end))]
-          (or (and (not quoted-literal?)
-                   (not parameter-open-at-boundary?)
-                   (not (str/index-of value tool-call-close start)))
-              (recur)))
-        false))))
-
-(defn- swallowed-following-function-block?
-  [value]
-  (boolean
-   (re-find (re-pattern (str "(?s)</parameter>\\s*</function>\\s*<function=" identifier-pattern ">"))
-            value)))
-
-(defn- parsed-parameter-pairs
-  [function-body]
-  (some->> (choose-parameter-candidates function-body
-                                        (parameter-open-matches function-body))
-           (mapv (fn [{:keys [name value]}]
-                   [name (str/trim value)]))))
-
-(defn- parsed-parameters
-  [function-body]
-  (let [params      (parsed-parameter-pairs function-body)
-        param-names (map first params)]
-    (when (and (seq params)
-               (= (count param-names) (count (distinct param-names)))
-               (every? (complement incomplete-nested-tool-call-start?) (map second params))
-               (every? (complement swallowed-following-function-block?) (map second params)))
-      (into {} params))))
-
-(defn- non-parameter-remainder-contains-tag?
-  [function-body tag]
-  (loop [cursor 0
-         params (choose-parameter-candidates function-body
-                                             (parameter-open-matches function-body))]
-    (if-let [{:keys [start end]} (first params)]
-      (or (str/includes? (subs function-body cursor start) tag)
-          (recur end (rest params)))
-      (str/includes? (subs function-body cursor) tag))))
-
-(defn- duplicate-parameter-name?
-  [function-body]
-  (let [params (parsed-parameter-pairs function-body)]
-    (and (seq params)
-         (not= (count (map first params))
-               (count (distinct (map first params)))))))
-
-(defn- span-starts-in-parameter-value?
-  [function-body body-start start]
-  (some (fn [{value-start :value-start candidate-end :end}]
-          (let [absolute-value-start (+ body-start value-start)
-                absolute-value-end   (- (+ body-start candidate-end) (count "</parameter>"))]
-            (and (<= absolute-value-start start) (< start absolute-value-end))))
-        (choose-parameter-candidates function-body
-                                     (parameter-open-matches function-body))))
-
-(defn- span-starts-in-body-parameter-before-function?
-  [body body-start start]
-  (let [first-function-start (str/index-of body "<function=")]
-    (and first-function-start
-         (some (fn [{param-start :start value-start :end}]
-                 (when-let [close-start (str/index-of body "</parameter>" value-start)]
-                   (let [absolute-value-start (+ body-start value-start)
-                         absolute-value-end   (+ body-start close-start)]
-                     (and (< param-start first-function-start)
-                          (<= absolute-value-start start)
-                          (< start absolute-value-end)))))
-               (parameter-open-matches body)))))
-
-(defn- span-starts-in-invalid-function-parameter?
-  [body body-start start]
-  (let [relative-start (- start body-start)]
-    (some (fn [function-open]
-            (let [function-open-end (str/index-of body ">" function-open)
-                  function-close (when function-open-end
-                                   (str/index-of body "</function>" function-open-end))
-                  valid-function-open? (when function-open-end
-                                         (re-matches
-                                          (re-pattern (str "<function=" identifier-pattern ">"))
-                                          (subs body function-open (inc function-open-end))))]
-              (and function-open-end
-                   function-close
-                   (not valid-function-open?)
-                   (< function-open relative-start)
-                   (> function-close relative-start)
-                   (some (fn [{relative-value-start :end}]
-                           (let [value-start (+ function-open relative-value-start)]
-                             (when-let [parameter-close (str/index-of body "</parameter>" value-start)]
-                               (and (<= value-start relative-start)
-                                    (< relative-start parameter-close)
-                                    (< function-open value-start)
-                                    (< parameter-close function-close)))))
-                         (parameter-open-matches
-                          (subs body function-open (inc function-close)))))))
-          (loop [search-from 0
-                 starts []]
-            (if-let [idx (str/index-of body "<function=" search-from)]
-              (recur (inc idx) (conj starts idx))
-              starts)))))
-
-(defn- span-starts-in-later-function-parameter?
-  [body body-start start]
-  (let [relative-start (- start body-start)
-        function-starts (loop [search-from 0
-                               starts []]
-                          (if-let [idx (str/index-of body "<function=" search-from)]
-                            (recur (inc idx) (conj starts idx))
-                            starts))]
-    (when (> (count function-starts) 1)
-      (some (fn [function-open]
-              (let [function-open-end (str/index-of body ">" function-open)
-                    function-close    (when function-open-end
-                                        (str/index-of body "</function>" function-open-end))
-                    valid-function-open? (when function-open-end
-                                           (re-matches
-                                            (re-pattern (str "<function=" identifier-pattern ">"))
-                                            (subs body function-open (inc function-open-end))))]
-                (and function-open-end
-                     function-close
-                     valid-function-open?
-                     (< function-open relative-start)
-                     (< relative-start function-close)
-                     (some (fn [{relative-value-start :end}]
-                             (let [value-start (+ function-open relative-value-start)]
-                               (when-let [parameter-close (str/index-of body "</parameter>" value-start)]
-                                 (and (<= value-start relative-start)
-                                      (< relative-start parameter-close)
-                                      (< parameter-close function-close)))))
-                           (parameter-open-matches
-                            (subs body function-open (inc function-close)))))))
-            (rest function-starts)))))
-
-(defn- span-starts-in-invalid-parameter-value?
-  [body body-start start]
-  (let [relative-start (- start body-start)]
-    (some (fn [parameter-open]
-            (let [parameter-open-end (str/index-of body ">" parameter-open)
-                  parameter-close    (when parameter-open-end
-                                       (str/index-of body "</parameter>" parameter-open-end))
-                  valid-parameter-open? (when parameter-open-end
-                                          (re-matches
-                                           (re-pattern (str "<parameter=" identifier-pattern ">"))
-                                           (subs body parameter-open (inc parameter-open-end))))]
-              (and parameter-open-end
-                   parameter-close
-                   (not valid-parameter-open?)
-                   (<= (inc parameter-open-end) relative-start)
-                   (< relative-start parameter-close))))
-          (loop [search-from 0
-                 starts []]
-            (if-let [idx (str/index-of body "<parameter=" search-from)]
-              (recur (inc idx) (conj starts idx))
-              starts)))))
-
-(defn- enclosing-malformed-tool-call?
-  [text start end]
-  (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
-          (when (and (< candidate-start start) (>= candidate-end end))
-            (let [[body]       groups
-                  body-start   (+ candidate-start (count tool-call-open))
-                  start-in-body (- start body-start)
-                  earlier-close (str/index-of body tool-call-close)
-                  matcher      (re-matcher function-pattern body)]
-              (when-not (and earlier-close (< earlier-close start-in-body))
-                (if (.matches matcher)
-                  (let [function-body       (.group matcher 2)
-                        function-body-start (+ body-start (.start matcher 2))
-                        nested-in-parameter? (span-starts-in-parameter-value?
-                                              function-body
-                                              function-body-start
-                                              start)]
-                    (or (span-starts-in-invalid-parameter-value?
-                         function-body
-                         function-body-start
-                         start)
-                        (span-starts-in-later-function-parameter?
-                         body
-                         body-start
-                         start)
-                        (and nested-in-parameter?
-                             (duplicate-parameter-name? function-body))
-                        (and nested-in-parameter?
-                             (or (zero? candidate-start)
-                                 (= candidate-end (count text)))
-                             (seq (parsed-parameter-pairs function-body))
-                             (nil? (parsed-parameters function-body)))
-                        (and nested-in-parameter?
-                             (some swallowed-following-function-block?
-                                   (map second (parsed-parameter-pairs function-body))))
-                        (and (nil? (parsed-parameter-pairs function-body))
-                             (nil? (parsed-parameters function-body))
-                             (str/starts-with? (str/trim function-body) "<tool_call>"))))
-                  (or (span-starts-in-body-parameter-before-function? body body-start start)
-                      (span-starts-in-invalid-function-parameter? body body-start start)
-                      (span-starts-in-later-function-parameter? body body-start start)
-                      (span-starts-in-invalid-parameter-value? body body-start start)))))))
-        (candidate-tool-call-spans text)))
-
-(defn- parsed-tool-call
-  [{:keys [start end match groups full-text]}]
-  (let [[body]         groups
-        function-match (re-matches function-pattern body)]
-    (when function-match
-      (let [[_ tool-name function-body] function-match]
-        (when-not (or (non-parameter-remainder-contains-tag? function-body "<function=")
-                      (non-parameter-remainder-contains-tag? function-body "<tool_call>")
-                      (and (< end (count full-text))
-                           (contains? #{\' \"} (.charAt full-text end))
-                           (re-find #"['\"]<tool_call>" function-body))
-                      (enclosing-malformed-tool-call? full-text start end))
-          (when-let [arguments (parsed-parameters function-body)]
-            {:span      [start end]
-             :source    match
-             :name      tool-name
-             :arguments arguments}))))))
-
-(defn- candidates-for-open
+(defn- candidate-for-open
   [s open]
   (let [max-end (+ open max-candidate-span-chars)]
-    (loop [close-search-from (+ open (count tool-call-open))
-           candidates        []]
-      (if-let [close-start (str/index-of s tool-call-close close-search-from)]
-        (let [end (+ close-start (count tool-call-close))]
-          (if (> end max-end)
-            candidates
-            (let [candidate {:start     open
-                             :end       end
-                             :match     (subs s open end)
-                             :groups    [(subs s (+ open (count tool-call-open)) close-start)]
-                             :full-text s}]
-              (recur end (conj candidates candidate)))))
-        candidates))))
+    (when-let [close-start (str/index-of s tool-call-close (+ open (count tool-call-open)))]
+      (let [end (+ close-start (count tool-call-close))]
+        (when (<= end max-end)
+          {:start     open
+           :end       end
+           :match     (subs s open end)
+           :groups    [(subs s (+ open (count tool-call-open)) close-start)]
+           :full-text s})))))
 
 (defn- candidate-tool-call-spans
   [text]
@@ -332,8 +50,66 @@
     (loop [search-from 0
            spans       []]
       (if-let [open (str/index-of s tool-call-open search-from)]
-        (recur (inc open) (into spans (candidates-for-open s open)))
+        (recur (inc open)
+               (cond-> spans
+                 (candidate-for-open s open) (conj (candidate-for-open s open))))
         spans))))
+
+(defn- inside-earlier-candidate?
+  [all-spans start end]
+  (boolean
+   (some (fn [{candidate-start :start candidate-end :end}]
+           (and (< candidate-start start) (>= candidate-end end)))
+         all-spans)))
+
+(defn- tag-looking-parameter-text?
+  [value]
+  (boolean (re-find textual-tool-call-tag-pattern value)))
+
+(defn- parse-parameter-at
+  [function-body cursor]
+  (let [matcher (re-matcher parameter-open-pattern function-body)]
+    (.region matcher cursor (count function-body))
+    (when (.lookingAt matcher)
+      (let [name        (.group matcher 1)
+            value-start (.end matcher)]
+        (when-let [close-start (str/index-of function-body "</parameter>" value-start)]
+          {:name  name
+           :value (subs function-body value-start close-start)
+           :end   (+ close-start (count "</parameter>"))})))))
+
+(defn- parsed-parameters
+  [function-body]
+  (loop [cursor 0
+         params []]
+    (cond
+      (str/blank? (subs function-body cursor))
+      (let [param-names (map first params)]
+        (when (and (seq params)
+                   (= (count param-names) (count (distinct param-names))))
+          (into {} params)))
+
+      :else
+      (when (str/blank? (subs function-body cursor
+                              (or (str/index-of function-body "<parameter=" cursor)
+                                  (count function-body))))
+        (when-let [open-start (str/index-of function-body "<parameter=" cursor)]
+          (when-let [{:keys [name value end]} (parse-parameter-at function-body open-start)]
+            (when-not (tag-looking-parameter-text? value)
+              (recur end (conj params [name (str/trim value)])))))))))
+
+(defn- parsed-tool-call
+  [all-spans {:keys [start end match groups]}]
+  (let [[body]         groups
+        function-match (re-matches function-pattern body)]
+    (when (and function-match
+               (not (inside-earlier-candidate? all-spans start end)))
+      (let [[_ tool-name function-body] function-match]
+        (when-let [arguments (parsed-parameters function-body)]
+          {:span      [start end]
+           :source    match
+           :name      tool-name
+           :arguments arguments})))))
 
 (defn- non-overlapping-successes
   [parsed-calls]
@@ -351,13 +127,14 @@
 
    Returns successful calls in response order. Malformed blocks are omitted from
    the result so callers can leave their source text unchanged. Later valid
-   blocks are still recoverable when an earlier malformed prefix overlaps them."
+   blocks are still recoverable when they are outside earlier candidate spans."
   [text]
-  (->> (candidate-tool-call-spans text)
-       (keep parsed-tool-call)
-       non-overlapping-successes
-       vec))
-
+  (let [spans (candidate-tool-call-spans text)]
+    (->> spans
+         (remove :unterminated?)
+         (keep #(parsed-tool-call spans %))
+         non-overlapping-successes
+         vec)))
 (defn- text-block
   [source-block text]
   (when (seq text)

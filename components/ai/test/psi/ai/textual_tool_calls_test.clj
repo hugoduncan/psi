@@ -71,85 +71,16 @@
       "<tool_call><function= bash><parameter=command>x</parameter></function></tool_call>"
       "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>"))
 
-  (testing "literal function tags inside parameter values remain parameter text"
-    (is (= [{:span [0 129]
-             :source "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"
-             :name "bash"
-             :arguments {"command" "printf '<function=literal>' && echo '</function>'"}}]
-           (textual-tool-calls/parse-xml-tool-calls
-            "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"))))
+  (testing "tag-looking markup inside parameter values makes the enclosing call malformed"
+    (are [text] (empty? (textual-tool-calls/parse-xml-tool-calls text))
+      "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<tool_call>' && echo '</tool_call>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>outer <parameter=other>inner</parameter></parameter></function></tool_call>"))
 
-  (testing "literal tool-call tags inside parameter values remain parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call>' && echo '</tool_call>'</parameter></function></tool_call>"]
-      (is (= [{:span [0 123]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf '<tool_call>' && echo '</tool_call>'"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "literal adjacent tool-call/function text inside parameter values remains parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call><function=literal>'</parameter></function></tool_call>"]
-      (is (= [{:span [0 118]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf '<tool_call><function=literal>'"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "complete nested well-formed tool-call text inside parameter values remains parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call><function=x><parameter=y>z</parameter></function></tool_call>'</parameter></function></tool_call>"]
-      (is (= [{:span [0 161]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf '<tool_call><function=x><parameter=y>z</parameter></function></tool_call>'"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "quoted incomplete nested tool-call starts inside parameter values remain parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf '<tool_call><function=literal><parameter=x>'</parameter></function></tool_call>"]
-      (is (= [{:span [0 131]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf '<tool_call><function=literal><parameter=x>'"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "unquoted incomplete nested tool-call starts inside parameter values remain parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x></parameter></function></tool_call>"]
-      (is (= [{:span [0 129]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf <tool_call><function=literal><parameter=x>"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "incomplete nested tool-call start inside parameter values remains malformed and later valid blocks recover"
+  (testing "nested textual tool calls inside malformed outer candidates are not recovered"
     (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
-      (is (= [{:span [47 130]
-               :source "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
-               :name "bash"
-               :arguments {"command" "pwd"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "literal parameter tags inside parameter values remain parameter text"
-    (let [text "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"]
-      (is (= [{:span [0 131]
-               :source text
-               :name "bash"
-               :arguments {"command" "printf '<parameter=literal>' && echo '</parameter>'"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "nested parameter starts remain parameter text when closed inside the outer parameter"
-    (let [text "<tool_call><function=bash><parameter=command>outer <parameter=other>inner</parameter></parameter></function></tool_call>"]
-      (is (= [{:span [0 120]
-               :source text
-               :name "bash"
-               :arguments {"command" "outer <parameter=other>inner</parameter>"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "later valid blocks recover after an earlier malformed overlapping prefix"
-    (let [text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"]
-      (is (= [{:span [47 130]
-               :source "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
-               :name "bash"
-               :arguments {"command" "pwd"}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
 
   (testing "nested valid tool calls inside malformed duplicate-parameter blocks are not recovered"
     (let [text (str "<tool_call><function=outer>"
@@ -218,19 +149,7 @@
           result (future (textual-tool-calls/parse-xml-tool-calls nested))]
       (is (= [] (deref result 1000 ::timeout)))))
 
-  (testing "literal close tags beyond the removed per-open cap remain parameter text"
-    (let [literal-closes (str/join (repeat 80 "</tool_call>"))
-          command        (str "printf '" literal-closes "done'")
-          text           (str "<tool_call><function=bash><parameter=command>"
-                              command
-                              "</parameter></function></tool_call>")]
-      (is (= [{:span [0 (count text)]
-               :source text
-               :name "bash"
-               :arguments {"command" command}}]
-             (textual-tool-calls/parse-xml-tool-calls text)))))
-
-  (testing "later valid blocks recover after malformed outer blocks with nested tool-like text"
+  (testing "later independent valid blocks recover after malformed outer blocks with nested tool-like text"
     (let [malformed-outer (str "<tool_call><function=outer>"
                                "<parameter=x>one <tool_call><function=inner><parameter=y>z</parameter></function></tool_call></parameter>"
                                "<parameter=x>two</parameter>"
@@ -356,17 +275,11 @@
                 {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
-    (testing "overlapping malformed prefix does not block later valid normalization"
-      (let [assistant {:role "assistant"
-                       :content [{:type :text
-                                  :text "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"}]}]
-        (is (= [{:type :text
-                 :text "broken <tool_call><function=bad><parameter=x>1 "}
-                {:type :tool-call
-                 :id "turn-4/toolcall/1"
-                 :name "bash"
-                 :arguments "{\"command\":\"pwd\"}"}
-                {:type :text :text " tail"}]
+    (testing "nested calls inside malformed prefixes remain text"
+      (let [text      "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"
+            assistant {:role "assistant"
+                       :content [{:type :text :text text}]}]
+        (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
 
     (testing "nested valid calls inside malformed duplicate-parameter blocks remain text"

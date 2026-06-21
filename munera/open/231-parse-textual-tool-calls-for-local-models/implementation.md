@@ -281,3 +281,15 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review follow-up execution:
 - addressed 1 review step: documented the 65,536-character maximum supported textual tool-call candidate block length in custom/local model docs; oversized blocks remain ordinary assistant text to preserve bounded malformed-input behavior.
+
+2026-06-21 design simplification decision:
+- User chose the strict/simple parser contract to stop review non-convergence around ambiguous nested/literal tag markup.
+- Updated `design.md`: parameter text must not contain tag-looking textual-tool-call markup (`<tool_call>`, `</tool_call>`, `<function=...>`, `</function>`, `<parameter=...>`, `</parameter>`). Such text makes the enclosing candidate malformed/no-op.
+- Nested recovery is now explicitly unsupported: a well-formed-looking call inside another candidate span remains ordinary text and must not execute, even if the outer candidate is malformed. Later independent valid blocks remain recoverable.
+- Next implementation pass should simplify/reconcile parser/tests/docs to this stricter contract, deleting permissive literal-tag preservation behavior where necessary.
+
+2026-06-21 strict parser simplification implementation:
+- Reconciled `psi.ai.textual-tool-calls` with the strict/simple `:xml` contract: parameter values containing textual-tool-call tag-looking markup are now malformed/no-op instead of preserved as literal arguments.
+- Simplified the parser substantially by removing permissive nested/literal-tag recovery heuristics; candidates now use the first bounded `</tool_call>` close and nested well-formed-looking calls inside earlier candidate spans are not recovered independently.
+- Updated parser/normalizer tests and custom-provider docs to match the unsupported literal-tag/nested-recovery contract.
+- Verified focused textual-tool-call, turn-runtime streaming/non-streaming, and agent-session execution Scry suites. Focused clj-kondo has only pre-existing unresolved `ai/execute-response[-in]` warnings outside this slice.
