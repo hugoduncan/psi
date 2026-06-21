@@ -184,6 +184,31 @@
   ;; Tests canonical recovery without invoking the tool execution machinery.
   (let [enabled-model  {:capabilities {:textual-tool-calls #{:xml}}}
         disabled-model {:capabilities {}}]
+    (testing "normalization parses each source text block once"
+      (let [parse-count (atom 0)
+            assistant   {:role "assistant"
+                         :content [{:type :text
+                                    :content-index 2
+                                    :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                               " middle "
+                                               "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}
+            normalized  (with-redefs [textual-tool-calls/parse-xml-tool-calls
+                                      (fn [text]
+                                        (swap! parse-count inc)
+                                        [{:span [0 76]
+                                          :source (subs text 0 76)
+                                          :name "first"
+                                          :arguments {"x" "1"}}
+                                         {:span [84 161]
+                                          :source (subs text 84 161)
+                                          :name "second"
+                                          :arguments {"y" "2"}}])]
+                          (textual-tool-calls/normalize-assistant-message "turn-parse" enabled-model assistant))]
+        (is (= 1 @parse-count))
+        (is (= ["turn-parse/toolcall/2" "turn-parse/toolcall/4"]
+               (->> (:content normalized)
+                    (filter #(= :tool-call (:type %)))
+                    (mapv :id))))))
     (testing "disabled models preserve textual markup unchanged"
       (let [assistant {:role "assistant"
                        :content [{:type :text

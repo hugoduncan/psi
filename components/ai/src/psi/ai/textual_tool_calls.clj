@@ -181,10 +181,13 @@
     (next-content-index source-block :source-text)
     (text-block source-block text)))
 
+(def ^:private parsed-calls-key
+  ::parsed-calls)
+
 (defn- textual-tool-call-content
   [turn-id next-content-index source-block]
   (let [text         (:text source-block)
-        parsed-calls (parse-xml-tool-calls text)]
+        parsed-calls (get source-block parsed-calls-key)]
     (if (empty? parsed-calls)
       (do
         (next-content-index source-block :source-text)
@@ -228,15 +231,16 @@
         (recur (inc candidate))
         (reserve-content-index state candidate)))))
 
-(defn- parsed-text-calls
+(defn- with-parsed-calls
   [block]
-  (when (and (= :text (:type block))
-             (string? (:text block)))
-    (parse-xml-tool-calls (:text block))))
+  (if (and (= :text (:type block))
+           (string? (:text block)))
+    (assoc block parsed-calls-key (parse-xml-tool-calls (:text block)))
+    block))
 
 (defn- leading-recovered-text-block?
   [block]
-  (when-let [parsed-calls (seq (parsed-text-calls block))]
+  (when-let [parsed-calls (seq (get block parsed-calls-key))]
     (zero? (-> parsed-calls first :span first))))
 
 (defn- next-content-index-fn
@@ -351,7 +355,7 @@
   [turn-id model assistant-message]
   (if-not (supports-format? model :xml)
     assistant-message
-    (let [content            (:content assistant-message)
+    (let [content            (mapv with-parsed-calls (:content assistant-message))
           next-content-index (next-content-index-fn turn-id content)
           normalized         (->> content
                                   (mapcat #(normalize-block turn-id next-content-index %))

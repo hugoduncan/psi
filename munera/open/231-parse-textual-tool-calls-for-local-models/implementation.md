@@ -329,3 +329,7 @@ No implementation work has been done yet.
 - verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.
 2026-06-21 implementation review:
 - added 1 normalizer performance step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: normalization now parses each source text block once and threads cached parsed-call metadata through id allocation/content rewriting.
+- verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
