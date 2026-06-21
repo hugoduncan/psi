@@ -398,3 +398,6 @@ No implementation work has been done yet.
 2026-06-21 code-shaper follow-up execution:
 - addressed 1 review step: generated tool-call index parsing now treats generated-prefix ids with non-numeric or overflowing suffixes as ordinary provider ids instead of throwing during normalization/id allocation.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed files.
+
+2026-06-21 code-shaper review (post-id-parsing follow-up):
+- no new actionable issues.
