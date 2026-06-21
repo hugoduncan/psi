@@ -278,3 +278,6 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review:
 - added 1 step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: documented the 65,536-character maximum supported textual tool-call candidate block length in custom/local model docs; oversized blocks remain ordinary assistant text to preserve bounded malformed-input behavior.

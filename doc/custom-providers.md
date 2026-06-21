@@ -71,7 +71,7 @@ pwd
 </tool_call>
 ```
 
-When enabled on the active runtime model, well-formed blocks are removed from assistant prose, converted into ordinary canonical tool calls, and then pass through the existing tool availability, authorization, execution, journaling, and result-recording path. Malformed, partial, or unsupported markup remains ordinary assistant text and does not execute a tool. Frontier/provider-native models should not enable this compatibility flag; leave the capability omitted unless the configured local runner is known to leak this textual markup.
+When enabled on the active runtime model, well-formed blocks are removed from assistant prose, converted into ordinary canonical tool calls, and then pass through the existing tool availability, authorization, execution, journaling, and result-recording path. Malformed, partial, unsupported, or oversized markup remains ordinary assistant text and does not execute a tool. A single textual tool-call candidate block is supported up to 65,536 characters; longer blocks are intentionally left as text to keep malformed many-marker output bounded. Frontier/provider-native models should not enable this compatibility flag; leave the capability omitted unless the configured local runner is known to leak this textual markup.
 
 Native capability declarations should only be used when the configured transport is known to support the provider mechanism:
 
