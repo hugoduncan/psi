@@ -160,6 +160,13 @@
           result (future (textual-tool-calls/parse-xml-tool-calls text))]
       (is (= [] (deref result 1000 ::timeout)))))
 
+  (testing "nested tool calls inside oversized candidates are not recovered"
+    (let [oversized-prefix (str "<tool_call><function=outer><parameter=x>"
+                                (apply str (repeat 66000 "x")))
+          nested-valid     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+          text             (str oversized-prefix nested-valid "</parameter></function></tool_call>")]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
   (testing "later independent valid blocks recover after malformed outer blocks with nested tool-like text"
     (let [malformed-outer (str "<tool_call><function=outer>"
                                "<parameter=x>one <tool_call><function=inner><parameter=y>z</parameter></function></tool_call></parameter>"

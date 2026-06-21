@@ -310,3 +310,7 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review:
 - added 1 oversized-nesting step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: oversized textual tool-call candidates now suppress nested recovery within their skipped span, so inner well-formed-looking calls remain ordinary text when enclosed by oversized markup.
+- verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.

@@ -53,14 +53,16 @@
           (recur (rest opens)
                  closes*
                  (if-let [close-start (first closes*)]
-                   (let [end (+ close-start (count tool-call-close))]
-                     (cond-> spans
-                       (<= end (+ open max-candidate-span-chars))
-                       (conj {:start     open
-                              :end       end
-                              :match     (subs s open end)
-                              :groups    [(subs s min-close-start close-start)]
-                              :full-text s})))
+                   (let [end       (+ close-start (count tool-call-close))
+                         oversized? (> end (+ open max-candidate-span-chars))]
+                     (conj spans
+                           (cond-> {:start     open
+                                    :end       end
+                                    :oversized? oversized?}
+                             (not oversized?)
+                             (assoc :match (subs s open end)
+                                    :groups [(subs s min-close-start close-start)]
+                                    :full-text s))))
                    spans)))
         spans))))
 
@@ -69,6 +71,15 @@
   (boolean
    (some (fn [{candidate-start :start candidate-end :end}]
            (and (< candidate-start start) (>= candidate-end end)))
+         all-spans)))
+
+(defn- in-oversized-candidate?
+  [all-spans start end]
+  (boolean
+   (some (fn [{candidate-start :start candidate-end :end oversized? :oversized?}]
+           (and oversized?
+                (< candidate-start start)
+                (> candidate-end end)))
          all-spans)))
 
 (defn- tag-looking-parameter-text?
@@ -112,7 +123,8 @@
   (let [[body]         groups
         function-match (re-matches function-pattern body)]
     (when (and function-match
-               (not (inside-earlier-candidate? all-spans start end)))
+               (not (inside-earlier-candidate? all-spans start end))
+               (not (in-oversized-candidate? all-spans start end)))
       (let [[_ tool-name function-body] function-match]
         (when-let [arguments (parsed-parameters function-body)]
           {:span      [start end]
@@ -140,7 +152,7 @@
   [text]
   (let [spans (candidate-tool-call-spans text)]
     (->> spans
-         (remove :unterminated?)
+         (remove :oversized?)
          (keep #(parsed-tool-call spans %))
          non-overlapping-successes
          vec)))
