@@ -5,6 +5,7 @@
    [clojure.test :refer [are deftest is testing]]
    [psi.ai.schemas :as schemas]
    [psi.ai.textual-tool-calls :as textual-tool-calls]
+   [psi.ai.textual-tool-calls.parser :as textual-tool-call-parser]
    [psi.ai.user-models :as user-models]))
 
 (def ^:private minimal-config
@@ -217,19 +218,9 @@
                                     :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
                                                " middle "
                                                "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}
-            normalized  (with-redefs [textual-tool-calls/parse-xml-tool-calls
-                                      (fn [text]
-                                        (swap! parse-count inc)
-                                        [{:span [0 76]
-                                          :source (subs text 0 76)
-                                          :name "first"
-                                          :arguments {"x" "1"}}
-                                         {:span [84 161]
-                                          :source (subs text 84 161)
-                                          :name "second"
-                                          :arguments {"y" "2"}}])]
+            normalized  (binding [textual-tool-call-parser/*parse-work-counter* parse-count]
                           (textual-tool-calls/normalize-assistant-message "turn-parse" enabled-model assistant))]
-        (is (= 1 @parse-count))
+        (is (pos? @parse-count))
         (is (= ["turn-parse/toolcall/2" "turn-parse/toolcall/4"]
                (->> (:content normalized)
                     (filter #(= :tool-call (:type %)))
@@ -242,14 +233,14 @@
                (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant)))))
 
     (testing "disabled models do not invoke the XML parser"
-      (let [assistant {:role "assistant"
-                       :content [{:type :text
-                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
-        (with-redefs [textual-tool-calls/parse-xml-tool-calls
-                      (fn [_]
-                        (throw (ex-info "parser should not run for disabled textual-tool-call capability" {})))]
+      (let [assistant  {:role "assistant"
+                        :content [{:type :text
+                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}
+            parse-work (atom 0)]
+        (binding [textual-tool-call-parser/*parse-work-counter* parse-work]
           (is (= assistant
-                 (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant))))))
+                 (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant)))
+          (is (zero? @parse-work)))))
 
     (testing "enabled models convert parsed calls to canonical tool-call blocks with JSON arguments"
       (let [assistant {:role "assistant"

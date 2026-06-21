@@ -115,5 +115,5 @@
 
 ## Code-shaper review follow-ups
 
-- [ ] Split `psi.ai.textual-tool-calls` so model capability lookup, XML-like parsing, assistant-content normalization, and content-index allocation are locally comprehensible units instead of one namespace carrying multiple responsibilities.
-- [ ] Replace `next-content-index-fn`'s mutable closure/kind-dispatch allocation with an explicit pure allocation state transition (state in → `[state index]` out) with named cases for existing content, retained source text, and recovered textual tool calls.
+- [x] Split `psi.ai.textual-tool-calls` so model capability lookup, XML-like parsing, assistant-content normalization, and content-index allocation are locally comprehensible units instead of one namespace carrying multiple responsibilities.
+- [x] Replace `next-content-index-fn`'s mutable closure/kind-dispatch allocation with an explicit pure allocation state transition (state in → `[state index]` out) with named cases for existing content, retained source text, and recovered textual tool calls.
