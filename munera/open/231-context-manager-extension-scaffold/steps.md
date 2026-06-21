@@ -19,3 +19,8 @@
 - [x] Run `clj-kondo --lint extensions/context-manager/src` — must be clean
 - [x] Run `bb test` focused on `extensions.context-manager-test` — must pass
 - [x] Run the catalog parity test to confirm both catalogs are in sync
+
+## Review Follow-ups
+
+- [ ] Remove unnecessary `com.taoensso/timbre` dep from `extensions/context-manager/deps.edn` — code uses `(:log api)` exclusively, never requires timbre
+- [ ] Tighten test regex assertions in `context_manager_test.clj` — remove `(?i)` flag; log output is deterministic and case-sensitive
