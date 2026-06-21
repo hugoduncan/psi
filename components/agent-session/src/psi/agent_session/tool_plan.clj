@@ -93,6 +93,10 @@
   (let [tool-def   (find-tool-def ctx session-id tool-name)
         execute-fn (:execute tool-def)]
     (cond
+      (false? (:enabled? tool-def))
+      (throw (ex-info (str "Tool is unavailable in this session: " tool-name)
+                      {:tool tool-name :reason :tool-unavailable}))
+
       (= tool-name "psi-tool")
       (execute-psi-tool-in! ctx session-id args opts)
 

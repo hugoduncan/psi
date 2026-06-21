@@ -24,6 +24,16 @@
   (re-pattern
    "<tool_call>|</tool_call>|<function=[^>]*>|</function>|<parameter=[^>]*>|</parameter>"))
 
+(def ^:dynamic *parse-work-counter*
+  "Optional instrumentation hook for parser tests. When bound to an atom,
+  parser scan work increments the atom without affecting parse semantics."
+  nil)
+
+(defn- count-work!
+  []
+  (when *parse-work-counter*
+    (swap! *parse-work-counter* inc)))
+
 (def ^:private max-candidate-span-chars
   "Hard bound on one textual tool-call candidate block.
 
@@ -35,6 +45,7 @@
   [s marker]
   (loop [search-from 0
          positions   []]
+    (count-work!)
     (if-let [position (str/index-of s marker search-from)]
       (recur (+ position (count marker)) (conj positions position))
       positions)))
@@ -48,22 +59,24 @@
            closes closes
            spans  []]
       (if-let [open (first opens)]
-        (let [min-close-start (+ open (count tool-call-open))
-              closes*         (drop-while #(< % min-close-start) closes)]
-          (recur (rest opens)
-                 closes*
-                 (if-let [close-start (first closes*)]
-                   (let [end       (+ close-start (count tool-call-close))
-                         oversized? (> end (+ open max-candidate-span-chars))]
-                     (conj spans
-                           (cond-> {:start     open
-                                    :end       end
-                                    :oversized? oversized?}
-                             (not oversized?)
-                             (assoc :match (subs s open end)
-                                    :groups [(subs s min-close-start close-start)]
-                                    :full-text s))))
-                   spans)))
+        (do
+          (count-work!)
+          (let [min-close-start (+ open (count tool-call-open))
+                closes*         (drop-while #(< % min-close-start) closes)]
+            (recur (rest opens)
+                   closes*
+                   (if-let [close-start (first closes*)]
+                     (let [end       (+ close-start (count tool-call-close))
+                           oversized? (> end (+ open max-candidate-span-chars))]
+                       (conj spans
+                             (cond-> {:start     open
+                                      :end       end
+                                      :oversized? oversized?}
+                               (not oversized?)
+                               (assoc :match (subs s open end)
+                                      :groups [(subs s min-close-start close-start)]
+                                      :full-text s))))
+                     spans))))
         spans))))
 
 (defn- inside-earlier-candidate?

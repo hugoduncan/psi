@@ -369,3 +369,7 @@ No implementation work has been done yet.
 - no new actionable issues.
 2026-06-21 test-shaper review:
 - added 2 test-review steps to be addressed.
+
+2026-06-21 test-shaper follow-up execution:
+- addressed 2 review steps: parser stress regressions now use deterministic parser-work instrumentation instead of future/deref wall-clock timeouts; known-unavailable textual/canonical tool coverage now uses disabled tool definitions to prove availability-policy parity rather than execution-failure parity.
+- verified focused textual-tool-call parser/session Scry suites; focused clj-kondo on changed files reports only pre-existing `ext/merge-tool-result-override` warning in `tool_plan.clj`.

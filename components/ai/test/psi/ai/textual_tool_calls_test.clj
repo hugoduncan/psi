@@ -161,20 +161,29 @@
     (let [text "prefix <tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
 
-  (testing "malformed many-marker output is bounded"
-    (let [nested (str "prefix "
-                      (str/join (repeat 300 "<tool_call>"))
-                      "literal"
-                      (str/join (repeat 300 "</tool_call>")))
-          result (future (textual-tool-calls/parse-xml-tool-calls nested))]
-      (is (= [] (deref result 1000 ::timeout)))))
+  (testing "malformed many-marker output uses bounded linear parser work"
+    (let [nested      (str "prefix "
+                           (str/join (repeat 300 "<tool_call>"))
+                           "literal"
+                           (str/join (repeat 300 "</tool_call>")))
+          work-count  (atom 0)
+          parse-result (binding [textual-tool-calls/*parse-work-counter* work-count]
+                         (textual-tool-calls/parse-xml-tool-calls nested))]
+      (is (= [] parse-result))
+      (is (<= @work-count 1000)
+          (str "expected bounded scan work, got " @work-count))))
 
-  (testing "many unclosed open markers before a far lone close are bounded"
-    (let [text   (str (str/join (repeat 3000 "<tool_call>"))
-                      (apply str (repeat 70000 "x"))
-                      "</tool_call>")
-          result (future (textual-tool-calls/parse-xml-tool-calls text))]
-      (is (= [] (deref result 1000 ::timeout)))))
+  (testing "many unclosed open markers before a far lone close use bounded linear parser work"
+    (let [open-count  3000
+          text        (str (str/join (repeat open-count "<tool_call>"))
+                           (apply str (repeat 70000 "x"))
+                           "</tool_call>")
+          work-count  (atom 0)
+          parse-result (binding [textual-tool-calls/*parse-work-counter* work-count]
+                         (textual-tool-calls/parse-xml-tool-calls text))]
+      (is (= [] parse-result))
+      (is (<= @work-count (+ (* 2 open-count) 10))
+          (str "expected bounded scan work, got " @work-count))))
 
   (testing "nested tool calls inside oversized candidates are not recovered"
     (let [oversized-prefix (str "<tool_call><function=outer><parameter=x>"

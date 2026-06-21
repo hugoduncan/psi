@@ -132,21 +132,18 @@
 (deftest parsed-unavailable-tool-follows-existing-tool-error-policy-test
   ;; Tests recovered calls to known-but-unavailable tools follow the same
   ;; runtime policy as canonical provider-emitted calls: the ordinary tool path
-  ;; resolves the known extension tool, executes it through the real runtime,
-  ;; and records the standard error-shaped toolResult when that tool is
-  ;; unavailable at execution time.
+  ;; resolves a known extension tool whose definition is disabled/unavailable,
+  ;; does not execute it, and records the standard error-shaped toolResult.
   (let [[ctx session-id] (test-support/create-test-session {:persist? false})
         _ (ext/register-extension-in! (:extension-registry ctx) "unavailable-tool-test")
         _ (ext/register-tool-in! (:extension-registry ctx)
                                  "unavailable-tool-test"
                                  {:name "known-unavailable"
-                                  :description "Known test tool that is blocked by policy."
+                                  :description "Known test tool disabled for this session."
+                                  :enabled? false
                                   :parameters {:type "object"
                                                :properties {"value" {:type "string"}}}
-                                  :format-request (fn [_args] "known-unavailable …")
-                                  :execute (fn [_args _opts]
-                                             (throw (ex-info "Tool is unavailable in this session"
-                                                             {:tool "known-unavailable"})))})
+                                  :format-request (fn [_args] "known-unavailable …")})
         execution-result (execute-text-response!
                           ctx
                           session-id
@@ -241,13 +238,11 @@
                       _ (ext/register-tool-in! (:extension-registry ctx)
                                                "unavailable-baseline-test"
                                                {:name "known-unavailable"
-                                                :description "Known test tool that is blocked by policy."
+                                                :description "Known test tool disabled for this session."
+                                                :enabled? false
                                                 :parameters {:type "object"
                                                              :properties {"value" {:type "string"}}}
-                                                :format-request (fn [_args] "known-unavailable …")
-                                                :execute (fn [_args _opts]
-                                                           (throw (ex-info "Tool is unavailable in this session"
-                                                                           {:tool "known-unavailable"})))})
+                                                :format-request (fn [_args] "known-unavailable …")})
                       execution-result (execute-provider-response!
                                         ctx
                                         session-id
