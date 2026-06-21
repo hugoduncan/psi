@@ -264,7 +264,7 @@
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                        [:content 2 :id])))))
 
-    (testing "generated ids skip a source text index when residual text keeps that index"
+    (testing "generated ids skip a source text index when preceding residual text keeps that index"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :text
@@ -273,6 +273,17 @@
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :text :text "before "}
                 {:type :tool-call :id "turn-3/toolcall/3" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
+    (testing "generated ids use source index when recovered call precedes residual text"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :content-index 2
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> after"}]}]
+        (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/2" :name "bash" :arguments "{\"command\":\"pwd\"}"}
+                {:type :text :text " after"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "generated ids count preceding unindexed provider blocks"

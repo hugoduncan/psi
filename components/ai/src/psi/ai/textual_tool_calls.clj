@@ -228,17 +228,16 @@
         (recur (inc candidate))
         (reserve-content-index state candidate)))))
 
-(defn- fully-replaced-text-block?
+(defn- parsed-text-calls
   [block]
-  (and (= :text (:type block))
-       (string? (:text block))
-       (let [parsed-calls (parse-xml-tool-calls (:text block))]
-         (and (seq parsed-calls)
-              (zero? (-> parsed-calls first :span first))
-              (= (count (:text block)) (-> parsed-calls last :span second))
-              (every? (fn [[left right]]
-                        (= (-> left :span second) (-> right :span first)))
-                      (partition 2 1 parsed-calls))))))
+  (when (and (= :text (:type block))
+             (string? (:text block)))
+    (parse-xml-tool-calls (:text block))))
+
+(defn- leading-recovered-text-block?
+  [block]
+  (when-let [parsed-calls (seq (parsed-text-calls block))]
+    (zero? (-> parsed-calls first :span first))))
 
 (defn- next-content-index-fn
   [turn-id content]
@@ -248,7 +247,7 @@
         shadowed-source-indexes (->> indexed-content
                                      (filter (fn [[idx block]]
                                                (let [source-index (:content-index block)]
-                                                 (and (fully-replaced-text-block? block)
+                                                 (and (leading-recovered-text-block? block)
                                                       source-index
                                                       (not-any? (fn [[other-idx other-block]]
                                                                   (and (not= idx other-idx)
@@ -281,7 +280,8 @@
 
                          (and (= :recovered-tool-call kind)
                               source-index
-                              (fully-replaced-text-block? source-block))
+                              (leading-recovered-text-block? source-block)
+                              (not (contains? (:source-text-reserved @state) source-index)))
                          (long source-index)
 
                          (and (= :existing-content kind) source-index)
