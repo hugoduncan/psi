@@ -207,7 +207,7 @@
                     :on-max-iterations "status-not-converged"}}
            (:on plan-follow-up)))
     (let [text (step-template-text plan-follow-up)]
-      (is (.contains text "design-steps.md"))
+      (is (not (.contains text "design-steps.md")))
       (is (.contains text "plan.md"))
       (is (.contains text "steps.md")))))
 
@@ -270,12 +270,15 @@
                       "review-follow-up-design.md"]]
       (let [content (slurp-workflow-file filename)]
         (is (.contains content "design-steps.md") filename))))
-  (testing "plan review prompts also target the shared design-steps.md (#177)"
+  (testing "plan review prompts target design-steps.md while plan follow-up owns steps.md"
     (doseq [filename ["review-task-plan-ambiguity-review.md"
-                      "review-task-plan-inconsistency-review.md"
-                      "review-follow-up-plan.md"]]
+                      "review-task-plan-inconsistency-review.md"]]
       (let [content (slurp-workflow-file filename)]
-        (is (.contains content "design-steps.md") filename))))
+        (is (.contains content "design-steps.md") filename)))
+    (let [content (slurp-workflow-file "review-follow-up-plan.md")]
+      (is (.contains content "steps.md") "review-follow-up-plan.md")
+      (is (not (.contains content "design-steps.md"))
+          "review-follow-up-plan.md must not target design-steps.md")))
   (testing "design and plan review prompts capture useful future-step implementation notes"
     (doseq [filename ["review-task-design-architecture-review.md"
                       "review-task-design-ambiguity-review.md"
