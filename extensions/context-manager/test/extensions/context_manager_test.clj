@@ -18,9 +18,9 @@
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"})))
-        (is (some #(re-find #"(?i)session_turn_finished" %)
+        (is (some #(re-find #"session_turn_finished" %)
                   (:log-lines @state)))
-        (is (some #(re-find #"(?i)s1" %)
+        (is (some #(re-find #"session-id=s1" %)
                   (:log-lines @state)))
-        (is (some #(re-find #"(?i)t1" %)
+        (is (some #(re-find #"turn-id=t1" %)
                   (:log-lines @state)))))))
