@@ -149,6 +149,13 @@
           result (future (textual-tool-calls/parse-xml-tool-calls nested))]
       (is (= [] (deref result 1000 ::timeout)))))
 
+  (testing "many unclosed open markers before a far lone close are bounded"
+    (let [text   (str (str/join (repeat 3000 "<tool_call>"))
+                      (apply str (repeat 70000 "x"))
+                      "</tool_call>")
+          result (future (textual-tool-calls/parse-xml-tool-calls text))]
+      (is (= [] (deref result 1000 ::timeout)))))
+
   (testing "later independent valid blocks recover after malformed outer blocks with nested tool-like text"
     (let [malformed-outer (str "<tool_call><function=outer>"
                                "<parameter=x>one <tool_call><function=inner><parameter=y>z</parameter></function></tool_call></parameter>"

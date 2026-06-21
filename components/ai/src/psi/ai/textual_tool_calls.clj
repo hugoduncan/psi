@@ -32,27 +32,37 @@
   scans linear in the response size with a fixed per-open work cap."
   65536)
 
-(defn- candidate-for-open
-  [s open]
-  (let [max-end (+ open max-candidate-span-chars)]
-    (when-let [close-start (str/index-of s tool-call-close (+ open (count tool-call-open)))]
-      (let [end (+ close-start (count tool-call-close))]
-        (when (<= end max-end)
-          {:start     open
-           :end       end
-           :match     (subs s open end)
-           :groups    [(subs s (+ open (count tool-call-open)) close-start)]
-           :full-text s})))))
+(defn- marker-positions
+  [s marker]
+  (loop [search-from 0
+         positions   []]
+    (if-let [position (str/index-of s marker search-from)]
+      (recur (+ position (count marker)) (conj positions position))
+      positions)))
 
 (defn- candidate-tool-call-spans
   [text]
-  (let [s (or text "")]
-    (loop [search-from 0
-           spans       []]
-      (if-let [open (str/index-of s tool-call-open search-from)]
-        (recur (inc open)
-               (cond-> spans
-                 (candidate-for-open s open) (conj (candidate-for-open s open))))
+  (let [s      (or text "")
+        opens  (marker-positions s tool-call-open)
+        closes (marker-positions s tool-call-close)]
+    (loop [opens  opens
+           closes closes
+           spans  []]
+      (if-let [open (first opens)]
+        (let [min-close-start (+ open (count tool-call-open))
+              closes*         (drop-while #(< % min-close-start) closes)]
+          (recur (rest opens)
+                 closes*
+                 (if-let [close-start (first closes*)]
+                   (let [end (+ close-start (count tool-call-close))]
+                     (cond-> spans
+                       (<= end (+ open max-candidate-span-chars))
+                       (conj {:start     open
+                              :end       end
+                              :match     (subs s open end)
+                              :groups    [(subs s min-close-start close-start)]
+                              :full-text s})))
+                   spans)))
         spans))))
 
 (defn- inside-earlier-candidate?
