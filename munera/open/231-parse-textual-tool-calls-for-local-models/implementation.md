@@ -307,3 +307,6 @@ No implementation work has been done yet.
 2026-06-21 implementation review follow-up execution:
 - addressed 1 review step: strict parameter text rejection now treats any `<function=...>` / `<parameter=...>` tag-looking substring ending at `>` as malformed, including invalid embedded names such as `x.y` or whitespace variants.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 implementation review:
+- added 1 oversized-nesting step to be addressed.
