@@ -343,3 +343,6 @@ No implementation work has been done yet.
 2026-06-21 test review follow-up execution:
 - addressed 2 review steps: added parser coverage for uppercase identifier preservation and disallowed quote/namespace/slash/entity-encoded identifier forms.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 test review:
+- added 3 test-review steps to be addressed.
