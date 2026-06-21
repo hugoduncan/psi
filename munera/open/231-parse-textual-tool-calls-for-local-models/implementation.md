@@ -275,3 +275,6 @@ No implementation work has been done yet.
 2026-06-21 implementation review follow-up execution:
 - addressed 1 review step: removed the fixed per-open textual-tool-call close-candidate cap so valid parameter text with more than 64 literal `</tool_call>` substrings is preserved; span-length bounding still limits malformed-input work.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 implementation review:
+- added 1 step to be addressed.
