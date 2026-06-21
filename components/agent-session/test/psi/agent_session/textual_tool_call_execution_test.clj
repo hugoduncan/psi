@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.ai.models :as models]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.prompt-chain :as prompt-chain]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
@@ -121,37 +122,43 @@
 
 (deftest parsed-unavailable-tool-follows-existing-tool-error-policy-test
   ;; Tests recovered calls to known-but-unavailable tools follow the same
-  ;; runtime policy as canonical provider-emitted calls: execution is attempted
-  ;; through the ordinary tool path and records an error-shaped toolResult.
-  (let [executed-tools (atom [])
-        [ctx* session-id] (test-support/create-test-session {:persist? false})
-        ctx (assoc ctx* :runtime-tool-executor-fn
-                   (fn [_ctx _session-id tool-name _args _opts]
-                     (swap! executed-tools conj tool-name)
-                     (throw (ex-info (str "Unknown tool: " tool-name)
-                                     {:tool tool-name}))))
+  ;; runtime policy as canonical provider-emitted calls: the ordinary tool path
+  ;; resolves the known extension tool, executes it through the real runtime,
+  ;; and records the standard error-shaped toolResult when that tool is
+  ;; unavailable at execution time.
+  (let [[ctx session-id] (test-support/create-test-session {:persist? false})
+        _ (ext/register-extension-in! (:extension-registry ctx) "unavailable-tool-test")
+        _ (ext/register-tool-in! (:extension-registry ctx)
+                                 "unavailable-tool-test"
+                                 {:name "known-unavailable"
+                                  :description "Known test tool that is blocked by policy."
+                                  :parameters {:type "object"
+                                               :properties {"value" {:type "string"}}}
+                                  :format-request (fn [_args] "known-unavailable …")
+                                  :execute (fn [_args _opts]
+                                             (throw (ex-info "Tool is unavailable in this session"
+                                                             {:tool "known-unavailable"})))})
         execution-result (execute-text-response!
                           ctx
                           session-id
                           (textual-tool-model)
                           "turn-textual-unavailable"
-                          (str "<tool_call><function=bash>"
-                               "<parameter=command>printf should-not-run</parameter>"
+                          (str "<tool_call><function=known-unavailable>"
+                               "<parameter=value>abc</parameter>"
                                "</function></tool_call>"))
         continuation (prompt-chain/run-prompt-tools! ctx session-id execution-result nil)
         [result-message] (tool-result-messages ctx session-id)]
     (is (= [{:type :tool-call
              :id "turn-textual-unavailable/toolcall/0"
-             :name "bash"
-             :arguments "{\"command\":\"printf should-not-run\"}"}]
+             :name "known-unavailable"
+             :arguments "{\"value\":\"abc\"}"}]
            (:execution-result/tool-calls execution-result)))
     (is (= {:continued? true :tool-call-count 1}
            continuation))
-    (is (= ["bash"] @executed-tools))
-    (is (= "bash" (:tool-name result-message)))
+    (is (= "known-unavailable" (:tool-name result-message)))
     (is (true? (:is-error result-message)))
     (is (str/includes? (:result-text result-message)
-                       "Unknown tool: bash"))))
+                       "Tool is unavailable in this session"))))
 
 (deftest default-model-preserves-textual-tool-markup-and-runs-no-tools-test
   ;; Tests frontier/default opt-out keeps textual markup as assistant text and

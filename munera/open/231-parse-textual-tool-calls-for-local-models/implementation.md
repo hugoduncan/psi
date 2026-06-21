@@ -353,3 +353,7 @@ No implementation work has been done yet.
 
 2026-06-21 test review:
 - added 1 test-review step to be addressed.
+
+2026-06-21 test review follow-up execution:
+- addressed 1 review step: replaced the unavailable-tool executor stub with a registered extension tool whose real execute path returns the standard error-shaped toolResult.
+- verified focused session textual-tool-call Scry suite and focused clj-kondo on the changed test file.
