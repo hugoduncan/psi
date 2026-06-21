@@ -286,6 +286,20 @@
                 {:type :text :text " after"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
+    (testing "generated ids allocate later recovered calls after intervening residual text"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :content-index 2
+                                  :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                             " mid "
+                                             "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
+        (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/2" :name "first" :arguments "{\"x\":\"1\"}"}
+                {:type :text :text " mid "}
+                {:type :tool-call :id "turn-3/toolcall/4" :name "second" :arguments "{\"y\":\"2\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
     (testing "generated ids count preceding unindexed provider blocks"
       (let [assistant {:role "assistant"
                        :content [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}

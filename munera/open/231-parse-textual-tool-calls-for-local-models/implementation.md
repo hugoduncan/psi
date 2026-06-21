@@ -323,3 +323,7 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review:
 - added 1 content-order step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: later recovered textual tool-call ids now allocate after intervening residual text when a provider-indexed text block begins with a recovered call.
+- verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.

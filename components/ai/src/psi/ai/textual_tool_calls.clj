@@ -314,6 +314,14 @@
                (swap! state update :source-text-reserved conj source-index)
                (reserve-content-index state source-index)))
 
+           (and (= :recovered-tool-call kind)
+                source-index
+                (leading-recovered-text-block? source-block)
+                (not (contains? (:source-text-reserved @state) source-index)))
+           (do
+             (swap! state update :source-text-reserved conj source-index)
+             (allocate-content-index state preferred))
+
            :else
            (let [preferred* (if (contains? (:source-text-reserved @state) source-index)
                               (max (inc (long source-index)) preferred)
