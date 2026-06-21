@@ -378,3 +378,6 @@ No implementation work has been done yet.
 - no new actionable issues.
 2026-06-21 docs review:
 - added 2 docs-review steps to be addressed.
+
+2026-06-21 docs review follow-up execution:
+- addressed 2 review steps.

@@ -110,5 +110,5 @@
 
 ## Docs review follow-ups
 
-- [ ] Clarify `doc/custom-providers.md` so the textual-tool-call section documents the full strict parser contract users need when configuring local runners: exact lowercase tag names, `[A-Za-z0-9_-]+` tool/parameter identifiers, exactly one function block, one or more parameters, duplicate/misnested parameters as malformed/no-op, tag-looking parameter text including closing tags as unsupported, no nested recovery, and the existing 65,536-character block limit.
-- [ ] Reorganize or clarify `doc/custom-providers.md` so the structured-output native-capability guidance remains visibly part of the structured-output section rather than reading as if it also applies to textual tool-call recovery.
+- [x] Clarify `doc/custom-providers.md` so the textual-tool-call section documents the full strict parser contract users need when configuring local runners: exact lowercase tag names, `[A-Za-z0-9_-]+` tool/parameter identifiers, exactly one function block, one or more parameters, duplicate/misnested parameters as malformed/no-op, tag-looking parameter text including closing tags as unsupported, no nested recovery, and the existing 65,536-character block limit.
+- [x] Reorganize or clarify `doc/custom-providers.md` so the structured-output native-capability guidance remains visibly part of the structured-output section rather than reading as if it also applies to textual tool-call recovery.
