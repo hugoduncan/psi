@@ -23,9 +23,11 @@
   "Hard bound on ambiguous close tags considered for one textual tool-call open.
 
   The parser intentionally supports a narrow compatibility format, not arbitrary
-  XML. A constant candidate bound prevents capability-enabled malformed output
-  with many open/close markers from forcing quadratic-plus candidate expansion."
-  8)
+  XML. This bound is high enough to preserve ordinary literal </tool_call>
+  strings inside parameter text while still preventing capability-enabled
+  malformed output with many open/close markers from forcing unbounded candidate
+  expansion."
+  64)
 
 (def ^:private max-candidate-span-chars
   "Hard bound on one textual tool-call candidate block.

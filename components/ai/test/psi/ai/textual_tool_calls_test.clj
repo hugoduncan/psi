@@ -216,7 +216,19 @@
                       "literal"
                       (str/join (repeat 300 "</tool_call>")))
           result (future (textual-tool-calls/parse-xml-tool-calls nested))]
-      (is (= [] (deref result 1000 ::timeout))))))
+      (is (= [] (deref result 1000 ::timeout)))))
+
+  (testing "literal close tags beyond the old per-open cap remain parameter text"
+    (let [literal-closes (str/join (repeat 12 "</tool_call>"))
+          command        (str "printf '" literal-closes "done'")
+          text           (str "<tool_call><function=bash><parameter=command>"
+                              command
+                              "</parameter></function></tool_call>")]
+      (is (= [{:span [0 (count text)]
+               :source text
+               :name "bash"
+               :arguments {"command" command}}]
+             (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
   ;; Tests canonical recovery without invoking the tool execution machinery.

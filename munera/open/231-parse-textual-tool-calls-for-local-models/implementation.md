@@ -257,3 +257,7 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review:
 - added 1 step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: valid textual tool-call blocks now tolerate more than eight literal `</tool_call>` substrings inside parameter values before the real outer close while retaining a bounded per-open candidate cap.
+- verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
