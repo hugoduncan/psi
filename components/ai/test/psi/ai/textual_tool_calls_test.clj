@@ -74,8 +74,12 @@
   (testing "tag-looking markup inside parameter values makes the enclosing call malformed"
     (are [text] (empty? (textual-tool-calls/parse-xml-tool-calls text))
       "<tool_call><function=bash><parameter=command>printf '<function=literal>' && echo '</function>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<function=x.y>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<function= bad>'</parameter></function></tool_call>"
       "<tool_call><function=bash><parameter=command>printf '<tool_call>' && echo '</tool_call>'</parameter></function></tool_call>"
       "<tool_call><function=bash><parameter=command>printf '<parameter=literal>' && echo '</parameter>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<parameter=x.y>'</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command>printf '<parameter= bad>'</parameter></function></tool_call>"
       "<tool_call><function=bash><parameter=command>outer <parameter=other>inner</parameter></parameter></function></tool_call>"))
 
   (testing "nested textual tool calls inside malformed outer candidates are not recovered"

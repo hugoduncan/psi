@@ -22,8 +22,7 @@
   (re-pattern (str "<parameter=(" identifier-pattern ")>")))
 (def ^:private textual-tool-call-tag-pattern
   (re-pattern
-   (str "<tool_call>|</tool_call>|<function=" identifier-pattern ">|</function>|"
-        "<parameter=" identifier-pattern ">|</parameter>")))
+   "<tool_call>|</tool_call>|<function=[^>]*>|</function>|<parameter=[^>]*>|</parameter>"))
 
 (def ^:private max-candidate-span-chars
   "Hard bound on one textual tool-call candidate block.
