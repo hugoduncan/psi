@@ -261,41 +261,44 @@
   [text start end]
   (some (fn [{candidate-start :start candidate-end :end :keys [groups]}]
           (when (and (< candidate-start start) (>= candidate-end end))
-            (let [[body]     groups
-                  body-start (+ candidate-start (count tool-call-open))
-                  matcher    (re-matcher function-pattern body)]
-              (if (.matches matcher)
-                (let [function-body       (.group matcher 2)
-                      function-body-start (+ body-start (.start matcher 2))
-                      nested-in-parameter? (span-starts-in-parameter-value?
-                                            function-body
-                                            function-body-start
-                                            start)]
-                  (or (span-starts-in-invalid-parameter-value?
-                       function-body
-                       function-body-start
-                       start)
-                      (span-starts-in-later-function-parameter?
-                       body
-                       body-start
-                       start)
-                      (and nested-in-parameter?
-                           (duplicate-parameter-name? function-body))
-                      (and nested-in-parameter?
-                           (or (zero? candidate-start)
-                               (= candidate-end (count text)))
-                           (seq (parsed-parameter-pairs function-body))
-                           (nil? (parsed-parameters function-body)))
-                      (and nested-in-parameter?
-                           (some swallowed-following-function-block?
-                                 (map second (parsed-parameter-pairs function-body))))
-                      (and (nil? (parsed-parameter-pairs function-body))
-                           (nil? (parsed-parameters function-body))
-                           (str/starts-with? (str/trim function-body) "<tool_call>"))))
-                (or (span-starts-in-body-parameter-before-function? body body-start start)
-                    (span-starts-in-invalid-function-parameter? body body-start start)
-                    (span-starts-in-later-function-parameter? body body-start start)
-                    (span-starts-in-invalid-parameter-value? body body-start start))))))
+            (let [[body]       groups
+                  body-start   (+ candidate-start (count tool-call-open))
+                  start-in-body (- start body-start)
+                  earlier-close (str/index-of body tool-call-close)
+                  matcher      (re-matcher function-pattern body)]
+              (when-not (and earlier-close (< earlier-close start-in-body))
+                (if (.matches matcher)
+                  (let [function-body       (.group matcher 2)
+                        function-body-start (+ body-start (.start matcher 2))
+                        nested-in-parameter? (span-starts-in-parameter-value?
+                                              function-body
+                                              function-body-start
+                                              start)]
+                    (or (span-starts-in-invalid-parameter-value?
+                         function-body
+                         function-body-start
+                         start)
+                        (span-starts-in-later-function-parameter?
+                         body
+                         body-start
+                         start)
+                        (and nested-in-parameter?
+                             (duplicate-parameter-name? function-body))
+                        (and nested-in-parameter?
+                             (or (zero? candidate-start)
+                                 (= candidate-end (count text)))
+                             (seq (parsed-parameter-pairs function-body))
+                             (nil? (parsed-parameters function-body)))
+                        (and nested-in-parameter?
+                             (some swallowed-following-function-block?
+                                   (map second (parsed-parameter-pairs function-body))))
+                        (and (nil? (parsed-parameter-pairs function-body))
+                             (nil? (parsed-parameters function-body))
+                             (str/starts-with? (str/trim function-body) "<tool_call>"))))
+                  (or (span-starts-in-body-parameter-before-function? body body-start start)
+                      (span-starts-in-invalid-function-parameter? body body-start start)
+                      (span-starts-in-later-function-parameter? body body-start start)
+                      (span-starts-in-invalid-parameter-value? body body-start start)))))))
         (candidate-tool-call-spans text)))
 
 (defn- parsed-tool-call

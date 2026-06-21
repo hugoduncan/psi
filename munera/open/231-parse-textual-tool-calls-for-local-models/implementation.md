@@ -264,3 +264,7 @@ No implementation work has been done yet.
 
 2026-06-21 implementation review:
 - added 1 step to be addressed.
+
+2026-06-21 implementation review follow-up execution:
+- addressed 1 review step: later well-formed textual tool-call blocks after malformed outer blocks with nested tool-call-like text now recover instead of being suppressed by the malformed-enclosure guard.
+- verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.

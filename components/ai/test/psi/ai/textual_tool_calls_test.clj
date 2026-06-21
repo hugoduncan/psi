@@ -228,6 +228,19 @@
                :source text
                :name "bash"
                :arguments {"command" command}}]
+             (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "later valid blocks recover after malformed outer blocks with nested tool-like text"
+    (let [malformed-outer (str "<tool_call><function=outer>"
+                               "<parameter=x>one <tool_call><function=inner><parameter=y>z</parameter></function></tool_call></parameter>"
+                               "<parameter=x>two</parameter>"
+                               "</function></tool_call>")
+          later-valid     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+          text            (str malformed-outer " after " later-valid)]
+      (is (= [{:span [(+ (count malformed-outer) 7) (count text)]
+               :source later-valid
+               :name "bash"
+               :arguments {"command" "pwd"}}]
              (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test
@@ -413,6 +426,21 @@
             assistant {:role "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
+
+    (testing "later valid blocks after malformed outer blocks with nested tool-like text are recovered"
+      (let [malformed-outer (str "<tool_call><function=outer>"
+                                 "<parameter=x>one <tool_call><function=inner><parameter=y>z</parameter></function></tool_call></parameter>"
+                                 "<parameter=x>two</parameter>"
+                                 "</function></tool_call>")
+            later-valid     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
+            assistant       {:role "assistant"
+                             :content [{:type :text :text (str malformed-outer " after " later-valid)}]}]
+        (is (= [{:type :text :text (str malformed-outer " after ")}
+                {:type :tool-call
+                 :id "turn-4/toolcall/1"
+                 :name "bash"
+                 :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
 
     (testing "quotes adjacent to a well-formed block are preserved as surrounding text"
