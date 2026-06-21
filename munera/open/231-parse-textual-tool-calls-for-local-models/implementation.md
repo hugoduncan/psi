@@ -300,3 +300,6 @@ No implementation work has been done yet.
 2026-06-21 implementation review follow-up execution:
 - addressed 1 review step: textual tool-call candidate scanning now precomputes open/close marker positions and advances through closes monotonically, with a many-unclosed-open-marker stress regression for far lone closes.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 implementation review:
+- added 1 tag-grammar step to be addressed.
