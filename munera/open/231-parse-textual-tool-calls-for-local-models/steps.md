@@ -96,5 +96,5 @@
 
 ## Test review follow-ups
 
-- [ ] Add parser/normalizer tests proving uppercase letters in valid tool and parameter identifiers are accepted and preserved exactly (case-sensitive, not normalized).
-- [ ] Add parser rejection tests for the remaining disallowed identifier/tag-name forms from the design—quotes, namespace/colon, slash, and entity-encoded names—so the narrow grammar is executable rather than implied by regex implementation.
+- [x] Add parser/normalizer tests proving uppercase letters in valid tool and parameter identifiers are accepted and preserved exactly (case-sensitive, not normalized).
+- [x] Add parser rejection tests for the remaining disallowed identifier/tag-name forms from the design—quotes, namespace/colon, slash, and entity-encoded names—so the narrow grammar is executable rather than implied by regex implementation.

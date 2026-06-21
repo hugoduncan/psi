@@ -54,6 +54,14 @@
                :arguments {"x" "z"}}]
              (textual-tool-calls/parse-xml-tool-calls text)))))
 
+  (testing "accepts uppercase letters in identifiers and preserves case"
+    (is (= [{:span [0 93]
+             :source "<tool_call><function=Bash_Tool-1><parameter=CommandArg>pwd</parameter></function></tool_call>"
+             :name "Bash_Tool-1"
+             :arguments {"CommandArg" "pwd"}}]
+           (textual-tool-calls/parse-xml-tool-calls
+            "<tool_call><function=Bash_Tool-1><parameter=CommandArg>pwd</parameter></function></tool_call>"))))
+
   (testing "duplicate parameters and malformed cardinality are block-level no-ops"
     (are [text] (empty? (textual-tool-calls/parse-xml-tool-calls text))
       "<tool_call><function=bash><parameter=command>one</parameter><parameter=command>two</parameter></function></tool_call>"
@@ -69,7 +77,15 @@
       "<TOOL_CALL><function=bash><parameter=command>x</parameter></function></TOOL_CALL>"
       "<tool_call><function=bash.shell><parameter=command>x</parameter></function></tool_call>"
       "<tool_call><function= bash><parameter=command>x</parameter></function></tool_call>"
-      "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>"))
+      "<tool_call><function=\"bash\"><parameter=command>x</parameter></function></tool_call>"
+      "<tool_call><function=ns:bash><parameter=command>x</parameter></function></tool_call>"
+      "<tool_call><function=ns/bash><parameter=command>x</parameter></function></tool_call>"
+      "<tool_call><function=bash&amp;sh><parameter=command>x</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command value>x</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=\"command\">x</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=ns:command>x</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=ns/command>x</parameter></function></tool_call>"
+      "<tool_call><function=bash><parameter=command&amp;arg>x</parameter></function></tool_call>"))
 
   (testing "tag-looking markup inside parameter values makes the enclosing call malformed"
     (are [text] (empty? (textual-tool-calls/parse-xml-tool-calls text))
