@@ -293,3 +293,6 @@ No implementation work has been done yet.
 - Simplified the parser substantially by removing permissive nested/literal-tag recovery heuristics; candidates now use the first bounded `</tool_call>` close and nested well-formed-looking calls inside earlier candidate spans are not recovered independently.
 - Updated parser/normalizer tests and custom-provider docs to match the unsupported literal-tag/nested-recovery contract.
 - Verified focused textual-tool-call, turn-runtime streaming/non-streaming, and agent-session execution Scry suites. Focused clj-kondo has only pre-existing unresolved `ai/execute-response[-in]` warnings outside this slice.
+
+2026-06-21 implementation review:
+- added 1 parser-bound step to be addressed.
