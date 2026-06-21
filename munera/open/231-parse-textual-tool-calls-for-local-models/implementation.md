@@ -254,3 +254,6 @@ No implementation work has been done yet.
 2026-06-20 implementation review follow-up execution:
 - addressed 1 review step: textual tool-call candidate expansion is now bounded per open marker and per candidate span, with a malformed many-marker stress regression to prevent quadratic-plus normalization cost.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 implementation review:
+- added 1 step to be addressed.
