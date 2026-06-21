@@ -369,6 +369,24 @@
                 {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
+    (testing "provider ids with generated prefix and non-numeric suffix are ordinary provider ids"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "turn-3/toolcall/provider" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= [{:type :tool-call :id "turn-3/toolcall/provider" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
+    (testing "provider ids with generated prefix and overflowing numeric suffix are ordinary provider ids"
+      (let [assistant {:role "assistant"
+                       :content [{:type :tool-call :id "turn-3/toolcall/9223372036854775808" :name "provider" :arguments "{}"}
+                                 {:type :text
+                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+        (is (= [{:type :tool-call :id "turn-3/toolcall/9223372036854775808" :name "provider" :arguments "{}"}
+                {:type :tool-call :id "turn-3/toolcall/1" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
+               (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
+
     (testing "nested calls inside malformed prefixes remain text"
       (let [text      "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"
             assistant {:role "assistant"

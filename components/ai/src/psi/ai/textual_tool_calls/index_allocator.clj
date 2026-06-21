@@ -2,11 +2,30 @@
   (:require
    [clojure.string :as str]))
 
+(defn- digit?
+  [ch]
+  (<= (int \0) (int ch) (int \9)))
+
+(defn- decimal-string->long
+  [s]
+  (when (and (seq s) (every? digit? s))
+    (let [limit (quot Long/MAX_VALUE 10)
+          final-limit (mod Long/MAX_VALUE 10)]
+      (loop [digits (seq s)
+             value  0]
+        (if-let [digit (first digits)]
+          (let [n (- (int digit) (int \0))]
+            (when (or (< value limit)
+                      (and (= value limit) (<= n final-limit)))
+              (recur (next digits) (+ (* value 10) n))))
+          value)))))
+
 (defn generated-tool-call-index
   [turn-id tool-call-id]
-  (let [prefix (str turn-id "/toolcall/")]
-    (when (str/starts-with? (str tool-call-id) prefix)
-      (parse-long (subs (str tool-call-id) (count prefix))))))
+  (let [prefix       (str turn-id "/toolcall/")
+        tool-call-id (str tool-call-id)]
+    (when (str/starts-with? tool-call-id prefix)
+      (decimal-string->long (subs tool-call-id (count prefix))))))
 
 (defn leading-recovered-text-block?
   [parsed-calls-key block]
