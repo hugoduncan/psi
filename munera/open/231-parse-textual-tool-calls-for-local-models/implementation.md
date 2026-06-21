@@ -243,3 +243,7 @@ No implementation work has been done yet.
 
 2026-06-20 implementation review:
 - added 1 step to be addressed.
+
+2026-06-20 implementation review follow-up execution:
+- addressed 1 review step: prefixed unterminated outer textual tool-call parameters now suppress nested valid textual calls instead of executing literal nested markup.
+- verified focused textual-tool-call/turn-runtime/session Scry suites and focused clj-kondo on changed Clojure/test files.

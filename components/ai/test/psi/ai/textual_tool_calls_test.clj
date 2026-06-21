@@ -203,6 +203,10 @@
 
   (testing "nested valid tool calls inside unterminated outer parameters are not recovered"
     (let [text "<tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"]
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "nested valid tool calls inside prefixed unterminated outer parameters are not recovered"
+    (let [text "prefix <tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"]
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
 
 (deftest normalize-assistant-message-test

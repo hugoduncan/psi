@@ -264,7 +264,8 @@
                       (and nested-in-parameter?
                            (duplicate-parameter-name? function-body))
                       (and nested-in-parameter?
-                           (zero? candidate-start)
+                           (or (zero? candidate-start)
+                               (= candidate-end (count text)))
                            (seq (parsed-parameter-pairs function-body))
                            (nil? (parsed-parameters function-body)))
                       (and nested-in-parameter?
