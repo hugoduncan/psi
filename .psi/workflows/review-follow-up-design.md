@@ -23,9 +23,8 @@ When finished, ask yourself: "What would the next review or
    minimalist entry to implementation.md to record important information
    for subsequent reviews or implementation.
    **What to add:**
-  - task information that deosn't belong in design.md, but helps with
+  - task information that doesn't belong in design.md, but helps with
     carrying out the task
-  - paths to important files
   - existing behaviour relevant to implementing the current task
   Avoid adding duplicate information already in the task files.
 

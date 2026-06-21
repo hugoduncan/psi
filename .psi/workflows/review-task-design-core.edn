@@ -11,7 +11,9 @@
     {:name "ambiguity",
      :prompt-workflow "review-task-design-ambiguity-review.md"}
     {:name "inconsistency",
-     :prompt-workflow "review-task-design-inconsistency-review.md"}],
+     :prompt-workflow "review-task-design-inconsistency-review.md"}
+    {:name "record-notes",
+     :prompt-workflow "review-task-note-info.md"}],
    :judge
    {:type :invoke,
     :operation "workflow/pass-feedback-routing",

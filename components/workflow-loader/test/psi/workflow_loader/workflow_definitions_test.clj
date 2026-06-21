@@ -99,7 +99,7 @@
       (is (= ["read" "bash" "edit" "write"] (:tools design-review)))
       (is (= ["work-independently" "review-task-architecture" "task-design"]
              (:skills design-review)))
-      (is (= ["architecture" "ambiguity" "inconsistency"]
+      (is (= ["architecture" "ambiguity" "inconsistency" "record-notes"]
              (mapv :name (:prompts design-review))))
       (is (= {:type :invoke
               :operation "workflow/pass-feedback-routing"
@@ -132,6 +132,7 @@
    ["review-task-design-architecture-review.md"
     "review-task-design-ambiguity-review.md"
     "review-task-design-inconsistency-review.md"
+    "review-task-note-info.md"
     "review-follow-up-design.md"]
    (fn [{:keys [definitions errors]}]
      (is (empty? errors))
@@ -187,7 +188,7 @@
            (mapv :type steps)))
     (is (= ["read" "bash" "edit" "write"] (:tools plan-review)))
     (is (= ["work-independently" "task-design"] (:skills plan-review)))
-    (is (= ["ambiguity" "inconsistency"] (mapv :name (:prompts plan-review))))
+    (is (= ["ambiguity" "inconsistency" "record-notes"] (mapv :name (:prompts plan-review))))
     (is (= {:type :invoke
             :operation "workflow/pass-feedback-routing"
             :args {:ambiguity-text {:from {:step "plan-review"
@@ -215,6 +216,7 @@
    "review-task-plan-core.edn"
    ["review-task-plan-ambiguity-review.md"
     "review-task-plan-inconsistency-review.md"
+    "review-task-note-info.md"
     "review-follow-up-plan.md"]
    (fn [{:keys [definitions errors]}]
      (is (empty? errors))
