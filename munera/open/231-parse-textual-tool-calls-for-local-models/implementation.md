@@ -333,3 +333,6 @@ No implementation work has been done yet.
 2026-06-21 implementation review follow-up execution:
 - addressed 1 review step: normalization now parses each source text block once and threads cached parsed-call metadata through id allocation/content rewriting.
 - verified focused textual-tool-call Scry suite and focused clj-kondo on changed Clojure/test files.
+
+2026-06-21 implementation review:
+- no new actionable issues.
