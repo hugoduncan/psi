@@ -22,5 +22,6 @@
 
 ## Review Follow-ups
 
-- [ ] Remove unnecessary `com.taoensso/timbre` dep from `extensions/context-manager/deps.edn` — code uses `(:log api)` exclusively, never requires timbre
-- [ ] Tighten test regex assertions in `context_manager_test.clj` — remove `(?i)` flag; log output is deterministic and case-sensitive
+- [x] Remove unnecessary `com.taoensso/timbre` dep from `extensions/context-manager/deps.edn` — code uses `(:log api)` exclusively, never requires timbre
+- [x] Tighten test regex assertions in `context_manager_test.clj` — remove `(?i)` flag; log output is deterministic and case-sensitive
+- [ ] Tighten regex patterns in `turn-finished-handler-fires-and-logs-test` — `#"s1"` and `#"t1"` are too broad; use `#"session-id=s1"` and `#"turn-id=t1"` to avoid false positives from unrelated log content
