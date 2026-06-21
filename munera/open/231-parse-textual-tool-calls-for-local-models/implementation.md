@@ -364,3 +364,6 @@ No implementation work has been done yet.
 2026-06-21 test review follow-up execution:
 - addressed 2 review steps: streaming textual-tool-call turn-runtime tests now use an injected AI provider context instead of redefining `do-stream!`, and canonical provider-emitted baseline comparisons now prove recovered unknown/known-unavailable tool calls produce the same tool-result error policy shape.
 - verified focused turn-runtime/session textual-tool-call Scry suites and focused clj-kondo on changed test files.
+
+2026-06-21 test review:
+- no new actionable issues.
