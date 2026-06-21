@@ -18,6 +18,22 @@
 (def ^:private tool-call-close "</tool_call>")
 (def ^:private function-pattern
   (re-pattern (str "(?s)^\\s*<function=(" identifier-pattern ")>(.*)</function>\\s*$")))
+
+(def ^:private max-candidate-closes-per-open
+  "Hard bound on ambiguous close tags considered for one textual tool-call open.
+
+  The parser intentionally supports a narrow compatibility format, not arbitrary
+  XML. A constant candidate bound prevents capability-enabled malformed output
+  with many open/close markers from forcing quadratic-plus candidate expansion."
+  8)
+
+(def ^:private max-candidate-span-chars
+  "Hard bound on one textual tool-call candidate block.
+
+  Larger blocks remain ordinary assistant text. This keeps malformed many-marker
+  scans linear in the response size with a fixed per-open work cap."
+  65536)
+
 (declare candidate-tool-call-spans)
 
 (defn- parameter-open-matches
@@ -300,17 +316,23 @@
 
 (defn- candidates-for-open
   [s open]
-  (loop [close-search-from (+ open (count tool-call-open))
-         candidates        []]
-    (if-let [close-start (str/index-of s tool-call-close close-search-from)]
-      (let [end       (+ close-start (count tool-call-close))
-            candidate {:start     open
-                       :end       end
-                       :match     (subs s open end)
-                       :groups    [(subs s (+ open (count tool-call-open)) close-start)]
-                       :full-text s}]
-        (recur end (conj candidates candidate)))
-      candidates)))
+  (let [max-end (+ open max-candidate-span-chars)]
+    (loop [close-search-from (+ open (count tool-call-open))
+           close-count       0
+           candidates        []]
+      (if (>= close-count max-candidate-closes-per-open)
+        candidates
+        (if-let [close-start (str/index-of s tool-call-close close-search-from)]
+          (let [end (+ close-start (count tool-call-close))]
+            (if (> end max-end)
+              candidates
+              (let [candidate {:start     open
+                               :end       end
+                               :match     (subs s open end)
+                               :groups    [(subs s (+ open (count tool-call-open)) close-start)]
+                               :full-text s}]
+                (recur end (inc close-count) (conj candidates candidate)))))
+          candidates)))))
 
 (defn- candidate-tool-call-spans
   [text]

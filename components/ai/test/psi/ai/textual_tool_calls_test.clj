@@ -1,6 +1,7 @@
 (ns psi.ai.textual-tool-calls-test
   (:require
    [cheshire.core :as json]
+   [clojure.string :as str]
    [clojure.test :refer [are deftest is testing]]
    [psi.ai.schemas :as schemas]
    [psi.ai.textual-tool-calls :as textual-tool-calls]
@@ -207,7 +208,15 @@
 
   (testing "nested valid tool calls inside prefixed unterminated outer parameters are not recovered"
     (let [text "prefix <tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"]
-      (is (empty? (textual-tool-calls/parse-xml-tool-calls text))))))
+      (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
+
+  (testing "malformed many-marker output is bounded"
+    (let [nested (str "prefix "
+                      (str/join (repeat 300 "<tool_call>"))
+                      "literal"
+                      (str/join (repeat 300 "</tool_call>")))
+          result (future (textual-tool-calls/parse-xml-tool-calls nested))]
+      (is (= [] (deref result 1000 ::timeout))))))
 
 (deftest normalize-assistant-message-test
   ;; Tests canonical recovery without invoking the tool execution machinery.
