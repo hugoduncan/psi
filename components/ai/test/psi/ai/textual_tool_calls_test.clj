@@ -218,8 +218,8 @@
           result (future (textual-tool-calls/parse-xml-tool-calls nested))]
       (is (= [] (deref result 1000 ::timeout)))))
 
-  (testing "literal close tags beyond the old per-open cap remain parameter text"
-    (let [literal-closes (str/join (repeat 12 "</tool_call>"))
+  (testing "literal close tags beyond the removed per-open cap remain parameter text"
+    (let [literal-closes (str/join (repeat 80 "</tool_call>"))
           command        (str "printf '" literal-closes "done'")
           text           (str "<tool_call><function=bash><parameter=command>"
                               command
