@@ -37,7 +37,7 @@
 
 ## Test Shaper Review (2026-06-22)
 
-- [ ] Wrap the three sub-cases in `handler-handles-missing-payload-keys-test` with individual `testing` blocks (e.g. `testing "missing both keys"`, `testing "missing only :turn-id"`, `testing "missing only :session-id"`) — codebase convention uses `testing` blocks for sub-cases (see `auto_session_name_test.clj`); without them a failure doesn't identify which sub-case violated the contract
+- [x] Wrap the three sub-cases in `handler-handles-missing-payload-keys-test` with individual `testing` blocks (e.g. `testing "missing both keys"`, `testing "missing only :turn-id"`, `testing "missing only :session-id"`) — codebase convention uses `testing` blocks for sub-cases (see `auto_session_name_test.clj`); without them a failure doesn't identify which sub-case violated the contract
 
 ## Test Shaper Review (2026-06-22, second pass)
 
@@ -50,3 +50,9 @@
 - [x] Tighten regex patterns in `turn-finished-handler-fires-and-logs-test` — `#"s1"` and `#"t1"` are too broad; use `#"session-id=s1"` and `#"turn-id=t1"` to avoid false positives from unrelated log content
 - [x] Make `init` idempotent for reload safety — design constraint requires clean reload without state corruption; currently `init` appends a new handler on every call (documented by `init-reload-safety-test` but not fixed); add a `compare-and-set!` guard on a private atom so repeated calls are no-ops
 - [x] Complete edge case test for partial missing keys — `handler-handles-missing-payload-keys-test` only exercises `{}` (both keys missing); add cases for `{:session-id "s1"}` (turn-id missing) and `{:turn-id "t1"}` (session-id missing) to confirm the `or` fallback works in each direction
+
+## Docs Review (2026-06-22)
+
+- [ ] Add `context-manager` to the built-in extensions list in `README.md` (under "Built-in extensions that ship with this repo")
+- [ ] Add `context-manager` entry to `doc/extensions.md` under "Built-in extensions in this repo" section with brief purpose description
+- [ ] Add `context-manager` extension entry to `CHANGELOG.md` under `[Unreleased]` > `Added` (new extension capability)

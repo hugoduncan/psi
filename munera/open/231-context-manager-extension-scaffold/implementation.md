@@ -64,5 +64,6 @@
 - test review log precision (2026-06-22): addressed 1 step — tightened handler-handles-missing-payload-keys-test to assert on (last (:log-lines @state)) per invocation instead of some over accumulated lines
 - test review (2026-06-22): no issues — all design behaviors covered, nullable API pattern correct, edge cases and negative tests present
 - test shaper review (2026-06-22): added 1 step to be addressed
+- docs review (2026-06-22): added 3 steps to be addressed
 - test shaper review (2026-06-22): no issues — tests are clear, consistent, robust, and economical; all design behaviors covered with precise assertions and no redundancy
 - test shaper review (2026-06-22): added 1 step to be addressed
