@@ -1,204 +1,209 @@
-{:paths ["bb" ".bbum/lib" "bases/main/src" "bases/main/resources"]
+{:paths    ["bb" ".bbum/lib" "bases/main/src" "bases/main/resources"]
  :bbin/bin {psi {:main-opts ["-m" "psi.launcher-main"]}}
  :tasks
  {:requires ([babashka.tasks :refer [shell]]
              [clojure.string :as str])
-  :init (do
-          (load-file "bb/dispatch_architecture_check.clj")
-          (load-file "bb/release.clj")
-          (load-file "bb/kaocha_runner.clj")
-          (def chiasmus-home
-            (str (System/getProperty "user.home") "/src/chiasmus"))
+  :init     (do
+              (load-file "bb/dispatch_architecture_check.clj")
+              (load-file "bb/release.clj")
+              (load-file "bb/kaocha_runner.clj")
+              (def chiasmus-home
+                (str (System/getProperty "user.home") "/src/chiasmus"))
 
-          (defn parse-review-plan-opts [args]
-            (loop [args args
-                   opts {:focus "quick" :limit nil}]
-              (if-let [arg (first args)]
-                (cond
-                  (= arg "--focus")
-                  (if-let [focus (second args)]
-                    (if (#{"all" "security" "architecture" "correctness" "quick"} focus)
-                      (recur (nnext args) (assoc opts :focus focus))
-                      (throw (ex-info "--focus must be one of: all, security, architecture, correctness, quick"
-                                      {:args args})))
-                    (throw (ex-info "Missing value for --focus" {:args args})))
+              (defn parse-review-plan-opts [args]
+                (loop [args args
+                       opts {:focus "quick" :limit nil}]
+                  (if-let [arg (first args)]
+                    (cond
+                      (= arg "--focus")
+                      (if-let [focus (second args)]
+                        (if (#{"all" "security" "architecture" "correctness" "quick"} focus)
+                          (recur (nnext args) (assoc opts :focus focus))
+                          (throw (ex-info "--focus must be one of: all, security, architecture, correctness, quick"
+                                          {:args args})))
+                        (throw (ex-info "Missing value for --focus" {:args args})))
 
-                  (= arg "--limit")
-                  (if-let [n (some-> (second args) parse-long)]
-                    (recur (nnext args) (assoc opts :limit n))
-                    (throw (ex-info "--limit requires an integer" {:args args})))
+                      (= arg "--limit")
+                      (if-let [n (some-> (second args) parse-long)]
+                        (recur (nnext args) (assoc opts :limit n))
+                        (throw (ex-info "--limit requires an integer" {:args args})))
 
-                  :else
-                  (throw (ex-info "Unknown argument" {:arg arg :args args})))
-                opts)))
+                      :else
+                      (throw (ex-info "Unknown argument" {:arg arg :args args})))
+                    opts)))
 
-          (defn parse-chiasmus-check-opts [args]
-            (loop [args args
-                   opts {:limit nil :full false}]
-              (if-let [arg (first args)]
-                (cond
-                  (= arg "--limit")
-                  (if-let [n (some-> (second args) parse-long)]
-                    (recur (nnext args) (assoc opts :limit n))
-                    (throw (ex-info "--limit requires an integer" {:args args})))
+              (defn parse-chiasmus-check-opts [args]
+                (loop [args args
+                       opts {:limit nil :full false}]
+                  (if-let [arg (first args)]
+                    (cond
+                      (= arg "--limit")
+                      (if-let [n (some-> (second args) parse-long)]
+                        (recur (nnext args) (assoc opts :limit n))
+                        (throw (ex-info "--limit requires an integer" {:args args})))
 
-                  (= arg "--full")
-                  (recur (next args) (assoc opts :full true))
+                      (= arg "--full")
+                      (recur (next args) (assoc opts :full true))
 
-                  :else
-                  (throw (ex-info "Unknown argument" {:arg arg :args args})))
-                opts)))
+                      :else
+                      (throw (ex-info "Unknown argument" {:arg arg :args args})))
+                    opts)))
 
-          (defn parse-top-files-opts [args]
-            (loop [args args
-                   opts {:n 10 :since 100 :match nil :path nil :merges? true :sort :count :by :commits}]
-              (if-let [arg (first args)]
-                (cond
-                  (= arg "--match")
-                  (if-let [pattern (second args)]
-                    (recur (nnext args) (assoc opts :match pattern))
-                    (throw (ex-info "Missing value for --match" {:args args})))
+              (defn parse-top-files-opts [args]
+                (loop [args args
+                       opts {:n 10 :since 100 :match nil :path nil :merges? true :sort :count :by :commits}]
+                  (if-let [arg (first args)]
+                    (cond
+                      (= arg "--match")
+                      (if-let [pattern (second args)]
+                        (recur (nnext args) (assoc opts :match pattern))
+                        (throw (ex-info "Missing value for --match" {:args args})))
 
-                  (= arg "--path")
-                  (if-let [path (second args)]
-                    (recur (nnext args) (assoc opts :path path))
-                    (throw (ex-info "Missing value for --path" {:args args})))
+                      (= arg "--path")
+                      (if-let [path (second args)]
+                        (recur (nnext args) (assoc opts :path path))
+                        (throw (ex-info "Missing value for --path" {:args args})))
 
-                  (= arg "--since")
-                  (if-let [n (some-> (second args) parse-long)]
-                    (recur (nnext args) (assoc opts :since n))
-                    (throw (ex-info "--since requires an integer" {:args args})))
+                      (= arg "--since")
+                      (if-let [n (some-> (second args) parse-long)]
+                        (recur (nnext args) (assoc opts :since n))
+                        (throw (ex-info "--since requires an integer" {:args args})))
 
-                  (= arg "--sort")
-                  (case (second args)
-                    "count" (recur (nnext args) (assoc opts :sort :count))
-                    "path" (recur (nnext args) (assoc opts :sort :path))
-                    (throw (ex-info "--sort must be one of: count, path" {:args args})))
+                      (= arg "--sort")
+                      (case (second args)
+                        "count" (recur (nnext args) (assoc opts :sort :count))
+                        "path"  (recur (nnext args) (assoc opts :sort :path))
+                        (throw (ex-info "--sort must be one of: count, path" {:args args})))
 
-                  (= arg "--by")
-                  (case (second args)
-                    "commits" (recur (nnext args) (assoc opts :by :commits))
-                    "churn" (recur (nnext args) (assoc opts :by :churn))
-                    (throw (ex-info "--by must be one of: commits, churn" {:args args})))
+                      (= arg "--by")
+                      (case (second args)
+                        "commits" (recur (nnext args) (assoc opts :by :commits))
+                        "churn"   (recur (nnext args) (assoc opts :by :churn))
+                        (throw (ex-info "--by must be one of: commits, churn" {:args args})))
 
-                  (= arg "--merges")
-                  (recur (next args) (assoc opts :merges? true))
+                      (= arg "--merges")
+                      (recur (next args) (assoc opts :merges? true))
 
-                  (= arg "--no-merges")
-                  (recur (next args) (assoc opts :merges? false))
+                      (= arg "--no-merges")
+                      (recur (next args) (assoc opts :merges? false))
 
-                  (parse-long arg)
-                  (recur (next args) (assoc opts :n (parse-long arg)))
+                      (parse-long arg)
+                      (recur (next args) (assoc opts :n (parse-long arg)))
 
-                  :else
-                  (throw (ex-info "Unknown argument" {:arg arg :args args})))
-                opts)))
+                      :else
+                      (throw (ex-info "Unknown argument" {:arg arg :args args})))
+                    opts)))
 
-          (defn top-files-path-match? [{:keys [match path]}]
-            (let [match? (if match
-                           (let [pattern (re-pattern match)]
-                             (fn [file-path] (boolean (re-find pattern file-path))))
-                           (constantly true))
-                  path?  (if path
-                           (fn [file-path] (str/includes? file-path path))
-                           (constantly true))]
-              (fn [file-path]
-                (and (match? file-path)
-                     (path? file-path)))))
+              (defn top-files-path-match? [{:keys [match path]}]
+                (let [match? (if match
+                               (let [pattern (re-pattern match)]
+                                 (fn [file-path] (boolean (re-find pattern file-path))))
+                               (constantly true))
+                      path?  (if path
+                               (fn [file-path] (str/includes? file-path path))
+                               (constantly true))]
+                  (fn [file-path]
+                    (and (match? file-path)
+                         (path? file-path)))))
 
-          (defn git-log-output [since merges? & args]
-            (:out (apply shell {:out :string}
-                         (concat ["git" "log" "-n" (str since)]
-                                 (when-not merges? ["--no-merges"])
-                                 args))))
+              (defn git-log-output [since merges? & args]
+                (:out (apply shell {:out :string}
+                             (concat ["git" "log" "-n" (str since)]
+                                     (when-not merges? ["--no-merges"])
+                                     args))))
 
-          (defn sort-top-file-rows [sort rows]
-            (case sort
-              :path (sort-by key rows)
-              :count (sort-by (juxt (comp - val) key) rows)))
+              (defn sort-top-file-rows [sort rows]
+                (case sort
+                  :path  (sort-by key rows)
+                  :count (sort-by (juxt (comp - val) key) rows)))
 
-          (defn top-file-rows [{:keys [by since merges?] :as opts}]
-            (let [path-match? (top-files-path-match? opts)]
-              (case by
-                :commits
-                (->> (git-log-output since merges? "--name-only" "--pretty=format:")
-                     str/split-lines
-                     (remove str/blank?)
-                     (filter path-match?)
-                     frequencies)
+              (defn top-file-rows [{:keys [by since merges?] :as opts}]
+                (let [path-match? (top-files-path-match? opts)]
+                  (case by
+                    :commits
+                    (->> (git-log-output since merges? "--name-only" "--pretty=format:")
+                         str/split-lines
+                         (remove str/blank?)
+                         (filter path-match?)
+                         frequencies)
 
-                :churn
-                (->> (git-log-output since merges? "--numstat" "--pretty=format:")
-                     str/split-lines
-                     (reduce (fn [totals line]
-                               (let [[added deleted path] (str/split line (re-pattern "\\t") 3)]
-                                 (if (and added deleted path
-                                          (re-matches (re-pattern "\\d+") added)
-                                          (re-matches (re-pattern "\\d+") deleted)
-                                          (path-match? path))
-                                   (update totals path (fnil + 0)
-                                           (+ (parse-long added) (parse-long deleted)))
-                                   totals)))
-                             {})))))
+                    :churn
+                    (->> (git-log-output since merges? "--numstat" "--pretty=format:")
+                         str/split-lines
+                         (reduce (fn [totals line]
+                                   (let [[added deleted path] (str/split line (re-pattern "\\t") 3)]
+                                     (if (and added deleted path
+                                              (re-matches (re-pattern "\\d+") added)
+                                              (re-matches (re-pattern "\\d+") deleted)
+                                              (path-match? path))
+                                       (update totals path (fnil + 0)
+                                               (+ (parse-long added) (parse-long deleted)))
+                                       totals)))
+                                 {})))))
 
-          (defn print-top-files [fmt rows]
-            (run! (fn [[path value]]
-                    (println (format fmt value path)))
-                  rows))
+              (defn print-top-files [fmt rows]
+                (run! (fn [[path value]]
+                        (println (format fmt value path)))
+                      rows))
 
-          (def scry-results-dir ".scry-results/")
+              (def scry-results-dir ".scry-results/")
 
-          (defn scry-runner-error? [result]
-            (and (pos? (:exit result))
-                 (str/includes? (or (:err result) "") "scry CLI error:")))
+              (defn scry-runner-error? [result]
+                (and (pos? (:exit result))
+                     (str/includes? (or (:err result) "") "scry CLI error:")))
 
-          (defn print-shell-result! [result]
-            (print (:out result))
-            (when (seq (:err result))
-              (binding [*out* *err*]
-                (print (:err result))))
-            (flush))
+              (defn print-shell-result! [result]
+                (print (:out result))
+                (when (seq (:err result))
+                  (binding [*out* *err*]
+                    (print (:err result))))
+                (flush))
 
-          (defn print-scry-results-hint! []
-            (binding [*out* *err*]
-              (println "Scry failure/error details are written under" scry-results-dir
-                       "as EDN files.")))
+              (defn print-scry-results-hint! []
+                (binding [*out* *err*]
+                  (println "Scry failure/error details are written under" scry-results-dir
+                           "as EDN files.")))
 
-          (defn scry-test-failure? [result]
-            (and (pos? (:exit result))
-                 (not (scry-runner-error? result))))
+              (defn scry-test-failure? [result]
+                (and (pos? (:exit result))
+                     (not (scry-runner-error? result))))
 
-          (defn run-scry-cli!
-            "Run focused clojure.test tests with Scry and point failures/errors
+              (defn run-scry-cli!
+                "Run focused clojure.test tests with Scry and point failures/errors
              at the structured result-data directory."
-            [args]
-            (let [result (apply shell {:continue true :out :string :err :string}
-                                "clojure" "-M:test-paths" "-m" "scry.cli"
-                                args)]
-              (print-shell-result! result)
-              (when (scry-test-failure? result)
-                (print-scry-results-hint!))
-              (:exit result)))
+                [args]
+                (let [result (apply shell {:continue true :out :string :err :string}
+                                    "clojure" "-M:test-paths" "-m" "scry.cli"
+                                    args)]
+                  (print-shell-result! result)
+                  (when (scry-test-failure? result)
+                    (print-scry-results-hint!))
+                  (:exit result)))
 
-          (defn run-scry-kaocha-suite!
-            "Run a Kaocha suite through Scry first, falling back to the existing
+              (defn run-scry-kaocha-suite!
+                "Run a Kaocha suite through Scry first, falling back to the existing
              Kaocha wrapper only when the Scry runner itself cannot execute. Test
              failures stay as Scry failures so the structured .scry-results data
              remains the default diagnostic path."
-            [suite kaocha-args]
-            (let [result (shell {:continue true :out :string :err :string}
-                                "clojure" "-X:test" "scry.cli/run"
-                                ":runner" ":kaocha" ":suite" (str ":" suite))]
-              (print-shell-result! result)
-              (if (scry-runner-error? result)
-                (do
-                  (binding [*out* *err*]
-                    (println "Scry runner unavailable; falling back to Kaocha."))
-                  (bb.kaocha-runner/run! kaocha-args))
-                (do
-                  (when (scry-test-failure? result)
-                    (print-scry-results-hint!))
-                  (:exit result))))))
+                [suite kaocha-args]
+                (let [args   (into
+                              ["clojure" "-M:test-paths" "-m" "scry.cli"
+                               "--runner" "kaocha" suite]
+                              kaocha-args)
+                      result (apply
+                              shell
+                              {:continue true :out :string :err :string}
+                              args)]
+                  (print-shell-result! result)
+                  (if (scry-runner-error? result)
+                    (do
+                      (binding [*out* *err*]
+                        (println "Scry runner unavailable; falling back to Kaocha."))
+                      (bb.kaocha-runner/run! kaocha-args))
+                    (do
+                      (when (scry-test-failure? result)
+                        (print-scry-results-hint!))
+                      (:exit result))))))
 
   fmt:check
   {:doc  "Check Clojure and EDN formatting with cljfmt CLI."
@@ -244,11 +249,15 @@
 
   clojure:test:unit
   {:doc  "Run Clojure unit tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
-   :task (System/exit (run-scry-kaocha-suite! "unit" ["--focus" "unit"]))}
+   :task  (System/exit (run-scry-kaocha-suite!
+                        "unit"
+                        (into [] *command-line-args*)))}
 
   clojure:test:extensions
   {:doc  "Run Clojure extension tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
-   :task (System/exit (run-scry-kaocha-suite! "extensions" ["--focus" "extensions"]))}
+   :task (System/exit (run-scry-kaocha-suite!
+                       "extensions"
+                       (into []  *command-line-args*)))}
 
   clojure:test:integration
   {:doc  "Run Clojure integration tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
@@ -364,9 +373,9 @@
   git:top-files
   {:doc  "Show top N files. Defaults: --by commits, N=10, --since 100, --merges, --sort count. Optional: --by commits|churn, --match REGEX, --path SUBSTRING, --no-merges, --sort count|path."
    :task (let [{:keys [n by] :as opts} (parse-top-files-opts *command-line-args*)
-               fmt                    (case by
-                                        :commits "%4d %s"
-                                        :churn "%6d %s")]
+               fmt                     (case by
+                                         :commits "%4d %s"
+                                         :churn   "%6d %s")]
            (->> (top-file-rows opts)
                 (sort-top-file-rows (:sort opts))
                 (take n)
@@ -486,9 +495,9 @@
   {:doc
    "Report public fns used only by tests and fns that could be private",
    :requires ([hugoduncan.bb-task-lib.ref-report :as ref-report]),
-   :task (ref-report/run)}
+   :task     (ref-report/run)}
   gordian
   {:doc
    "Analyze codebase architecture with gordian; all args passed through (run with --help for full usage)",
    :requires ([hugoduncan.bb-task-lib.gordian :as gordian]),
-   :task (gordian/run)}}}
+   :task     (gordian/run)}}}

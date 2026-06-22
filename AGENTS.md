@@ -432,6 +432,13 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
 `git status` -> evaluate current state
 `git log --oneline -5` -> evaluate past state
 
+
+## Run Tests
+
+`bb test`
+`bb test --focus some.namespace`
+`bb test --focus some.namespace/some-var`
+
 # Guide
 
 λ(worktree_path,cwd). authoritative(worktree_path) > authoritative(cwd)

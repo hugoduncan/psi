@@ -289,10 +289,30 @@
                              "extensions/logprobs/test"
                              "extensions/metrics/test"
                              "extensions/dev-http/test"
-                             "components/extension-test-helpers/src"]
-               :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
-                             nrepl/nrepl         {:mvn/version "1.5.1"}
-                             org.hugoduncan/scry {:mvn/version "0.1.28"}}
+                             "components/extension-test-helpers/src"
+                             "extensions/auto-session-name/src"
+                             "extensions/commit-checks/src"
+                             "extensions/context-manager/src"
+                             "extensions/hello-ext/src"
+                             "extensions/mcp-tasks-run/src"
+                             "extensions/mementum/src"
+                             "extensions/mementum/resources"
+                             "extensions/munera/src"
+                             "extensions/munera/resources"
+                             "extensions/plan-state-learning/src"
+                             "extensions/work-on/src"
+                             "extensions/github/src"
+                             "extensions/edit-clj/src"
+                             "extensions/logprobs/src"
+                             "extensions/metrics/src"
+                             "extensions/dev-http/src"
+                             "extensions/dev-http/resources"
+                             "extensions/dev-http/dev"
+                             "/Users/duncan/projects/hugoduncan/scry/scry-master/src-kaocha"]
+               :extra-deps  {lambdaisland/kaocha      {:mvn/version "1.91.1392"}
+                             nrepl/nrepl             {:mvn/version "1.5.1"}
+                             rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}
+                             org.hugoduncan/scry     {:local/root "/Users/duncan/projects/hugoduncan/scry/scry-master"}}
                :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]}
   :test  {:extra-paths ["test-support"
                         "bases/main/test"
@@ -405,11 +425,11 @@
                         "extensions/dev-http/src"
                         "extensions/dev-http/resources"
                         "extensions/dev-http/dev"
-                        "components/extension-test-helpers/src"]
+                        "components/extension-test-helpers/src"
+                        "/Users/duncan/projects/hugoduncan/scry/scry-master/src-kaocha"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
                         nrepl/nrepl                {:mvn/version "1.5.1"}
-                        org.hugoduncan/scry        {:mvn/version "0.1.28"}
-                        org.hugoduncan/scry-kaocha {:mvn/version "0.1.28"}
+                        org.hugoduncan/scry        {:local/root "/Users/duncan/projects/hugoduncan/scry/scry-master"}
                         rewrite-clj/rewrite-clj    {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "kaocha.runner"]}
