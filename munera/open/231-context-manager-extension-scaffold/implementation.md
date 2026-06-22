@@ -58,10 +58,4 @@
 
 ## Implementation Review
 
-- added 2 steps to be addressed
-- addressed 2 review follow-ups: made init idempotent with compare-and-set! guard on private atom; completed edge case test for partial missing keys (session-id-only and turn-id-only payloads)
-- review complete — no new issues
-- added 1 step to be addressed
-- addressed 1 review follow-up: tightened regex patterns in turn-finished-handler-fires-and-logs-test from #"s1"/#"t1" to #"session-id=s1"/#"turn-id=t1"
-- added 3 test review steps to be addressed
-- added 2 steps to be addressed
+- implementation review (2026-06-22): code matches design, follows auto-session-name pattern, idempotent init, nullable API tests with edge cases, catalogs in parity, lint clean — no issues
