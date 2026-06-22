@@ -12,12 +12,16 @@
                  "session-id=" session-id
                  " turn-id=" turn-id))))
 
+(def ^:private initialized? (atom nil))
+
 (defn init
   "Initialize the context-manager extension.
 
-   Subscribes to `session_turn_finished` events via the extension API."
+   Subscribes to `session_turn_finished` events via the extension API.
+   Idempotent — repeated calls (e.g. on reload) are no-ops."
   [api]
-  ((:on api) "session_turn_finished"
-             (fn [payload]
-               (on-turn-finished (:log api) payload)
-               nil)))
+  (when (compare-and-set! initialized? nil true)
+    ((:on api) "session_turn_finished"
+               (fn [payload]
+                 (on-turn-finished (:log api) payload)
+                 nil))))

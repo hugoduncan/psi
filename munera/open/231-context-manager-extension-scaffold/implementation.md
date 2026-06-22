@@ -24,6 +24,7 @@
 ### Key Decisions
 - **Logging via API `:log` fn, not timbre directly**: The nullable API captures log lines through `(:log api)`, not through `taoensso.timbre`. Using `timbre` directly would not be testable with the nullable API pattern. The handler accepts `log-fn` as a parameter and calls it with a formatted string.
 - **No timbre dependency needed in deps.edn**: Since we use the API's `:log` function, the extension doesn't actually need `com.taoensso/timbre` as a direct dependency. However, it's included since the runtime will have it available and the namespace requires it for potential future use.
+- **Idempotent init via compare-and-set!**: A private `initialized?` atom guards `init` so repeated calls (e.g. on REPL reload) are no-ops. Tests reset the atom via a `:each` fixture.
 
 ### Wiring Changes
 - Added `psi/context-manager` to both runtime and launcher catalogs (parity maintained)
@@ -58,6 +59,7 @@
 ## Implementation Review
 
 - added 2 steps to be addressed
+- addressed 2 review follow-ups: made init idempotent with compare-and-set! guard on private atom; completed edge case test for partial missing keys (session-id-only and turn-id-only payloads)
 - review complete — no new issues
 - added 1 step to be addressed
 - addressed 1 review follow-up: tightened regex patterns in turn-finished-handler-fires-and-logs-test from #"s1"/#"t1" to #"session-id=s1"/#"turn-id=t1"
