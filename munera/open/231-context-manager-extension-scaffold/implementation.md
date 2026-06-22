@@ -59,3 +59,4 @@
 ## Implementation Review
 
 - implementation review (2026-06-22): code matches design, follows auto-session-name pattern, idempotent init, nullable API tests with edge cases, catalogs in parity, lint clean — no issues
+- test review (2026-06-22): added 2 steps to be addressed

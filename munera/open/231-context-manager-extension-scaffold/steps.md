@@ -20,6 +20,11 @@
 - [x] Run `bb test` focused on `extensions.context-manager-test` — must pass
 - [x] Run the catalog parity test to confirm both catalogs are in sync
 
+## Test Review (2026-06-22)
+
+- [ ] Assert `nil` return value in `handler-handles-missing-payload-keys-test` for each of the three handler invocations — design says handler "returns nil" but this test only checks log lines
+- [ ] Rename `init-registers-no-commands-tools-or-prompts-test` to include "operations" (matching design scope) or add an in-test comment explaining that operations are not separately trackable in the nullable API
+
 ## Test Review Follow-ups
 
 - [x] Add reload safety test: verify calling `init` twice on the same nullable API does not register duplicate `session_turn_finished` handlers (design constraint: "load cleanly on reload without state corruption")
