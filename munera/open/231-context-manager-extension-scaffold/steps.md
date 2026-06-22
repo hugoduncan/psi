@@ -20,10 +20,14 @@
 - [x] Run `bb test` focused on `extensions.context-manager-test` — must pass
 - [x] Run the catalog parity test to confirm both catalogs are in sync
 
+## Test Review — Log Precision (2026-06-22)
+
+- [ ] Tighten `handler-handles-missing-payload-keys-test` assertions: `some` over accumulated `:log-lines` allows `turn-id=nil` (second invocation) and `session-id=nil` (third invocation) to match the first invocation's log line — use `(last (:log-lines @state))` or clear log lines between invocations so each assertion verifies the handler's output for that specific call
+
 ## Test Review (2026-06-22)
 
-- [ ] Assert `nil` return value in `handler-handles-missing-payload-keys-test` for each of the three handler invocations — design says handler "returns nil" but this test only checks log lines
-- [ ] Rename `init-registers-no-commands-tools-or-prompts-test` to include "operations" (matching design scope) or add an in-test comment explaining that operations are not separately trackable in the nullable API
+- [x] Assert `nil` return value in `handler-handles-missing-payload-keys-test` for each of the three handler invocations — design says handler "returns nil" but this test only checks log lines
+- [x] Rename `init-registers-no-commands-tools-or-prompts-test` to include "operations" (matching design scope) or add an in-test comment explaining that operations are not separately trackable in the nullable API
 
 ## Test Review Follow-ups
 

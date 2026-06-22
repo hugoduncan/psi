@@ -38,13 +38,16 @@
       (is (= 1 (count (get-in @state [:handlers "session_turn_finished"])))
           "init is idempotent: calling twice still registers only one handler"))))
 
-(deftest init-registers-no-commands-tools-or-prompts-test
+(deftest init-registers-no-commands-tools-operations-or-prompts-test
   (testing "init registers no commands, tools, operations, or prompt contributions"
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/context_manager.clj"})]
       (sut/init api)
       (is (empty? (:commands @state)) "no commands registered")
       (is (empty? (:tools @state)) "no tools registered")
+      ;; Operations are not separately trackable in the nullable API — they
+      ;; are dispatched through the same handler mechanism as other mutations,
+      ;; so there is no :operations key on the nullable state map.
       (is (empty? (:prompt-contributions @state)) "no prompt contributions registered"))))
 
 (deftest handler-handles-missing-payload-keys-test
@@ -54,7 +57,8 @@
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         ;; Missing both keys
-        (handler {})
+        (is (nil? (handler {}))
+            "handler returns nil")
         (is (some #(re-find #"session-id=nil" %)
                   (:log-lines @state))
             "logs session-id=nil when key is missing")
@@ -62,7 +66,8 @@
                   (:log-lines @state))
             "logs turn-id=nil when key is missing")
         ;; Missing only :turn-id
-        (handler {:session-id "s2"})
+        (is (nil? (handler {:session-id "s2"}))
+            "handler returns nil")
         (is (some #(re-find #"session-id=s2" %)
                   (:log-lines @state))
             "logs session-id=s2 when present")
@@ -70,7 +75,8 @@
                   (:log-lines @state))
             "logs turn-id=nil when :turn-id is missing")
         ;; Missing only :session-id
-        (handler {:turn-id "t2"})
+        (is (nil? (handler {:turn-id "t2"}))
+            "handler returns nil")
         (is (some #(re-find #"session-id=nil" %)
                   (:log-lines @state))
             "logs session-id=nil when :session-id is missing")
