@@ -22,12 +22,10 @@
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"})))
-        (is (some #(re-find #"session_turn_finished" %)
-                  (:log-lines @state)))
-        (is (some #(re-find #"session-id=s1" %)
-                  (:log-lines @state)))
-        (is (some #(re-find #"turn-id=t1" %)
-                  (:log-lines @state)))))))
+        (let [line (last (:log-lines @state))]
+          (is (re-find #"session_turn_finished" line))
+          (is (re-find #"session-id=s1" line))
+          (is (re-find #"turn-id=t1" line)))))))
 
 (deftest init-reload-safety-test
   (testing "calling init twice does not register duplicate handlers"
@@ -56,30 +54,27 @@
                                {:path "/test/context_manager.clj"})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
-        ;; Missing both keys
-        (is (nil? (handler {}))
-            "handler returns nil")
-        (is (some #(re-find #"session-id=nil" %)
-                  (:log-lines @state))
-            "logs session-id=nil when key is missing")
-        (is (some #(re-find #"turn-id=nil" %)
-                  (:log-lines @state))
-            "logs turn-id=nil when key is missing")
-        ;; Missing only :turn-id
-        (is (nil? (handler {:session-id "s2"}))
-            "handler returns nil")
-        (is (some #(re-find #"session-id=s2" %)
-                  (:log-lines @state))
-            "logs session-id=s2 when present")
-        (is (some #(re-find #"turn-id=nil" %)
-                  (:log-lines @state))
-            "logs turn-id=nil when :turn-id is missing")
-        ;; Missing only :session-id
-        (is (nil? (handler {:turn-id "t2"}))
-            "handler returns nil")
-        (is (some #(re-find #"session-id=nil" %)
-                  (:log-lines @state))
-            "logs session-id=nil when :session-id is missing")
-        (is (some #(re-find #"turn-id=t2" %)
-                  (:log-lines @state))
-            "logs turn-id=t2 when present")))))
+        (testing "missing both keys"
+          (is (nil? (handler {}))
+              "handler returns nil")
+          (let [line (last (:log-lines @state))]
+            (is (re-find #"session-id=nil" line)
+                "logs session-id=nil when key is missing")
+            (is (re-find #"turn-id=nil" line)
+                "logs turn-id=nil when key is missing")))
+        (testing "missing only :turn-id"
+          (is (nil? (handler {:session-id "s2"}))
+              "handler returns nil")
+          (let [line (last (:log-lines @state))]
+            (is (re-find #"session-id=s2" line)
+                "logs session-id=s2 when present")
+            (is (re-find #"turn-id=nil" line)
+                "logs turn-id=nil when :turn-id is missing")))
+        (testing "missing only :session-id"
+          (is (nil? (handler {:turn-id "t2"}))
+              "handler returns nil")
+          (let [line (last (:log-lines @state))]
+            (is (re-find #"session-id=nil" line)
+                "logs session-id=nil when :session-id is missing")
+            (is (re-find #"turn-id=t2" line)
+                "logs turn-id=t2 when present")))))))
