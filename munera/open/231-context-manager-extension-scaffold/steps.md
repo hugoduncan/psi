@@ -22,7 +22,7 @@
 
 ## Test Review — Log Precision (2026-06-22)
 
-- [ ] Tighten `handler-handles-missing-payload-keys-test` assertions: `some` over accumulated `:log-lines` allows `turn-id=nil` (second invocation) and `session-id=nil` (third invocation) to match the first invocation's log line — use `(last (:log-lines @state))` or clear log lines between invocations so each assertion verifies the handler's output for that specific call
+- [x] Tighten `handler-handles-missing-payload-keys-test` assertions: `some` over accumulated `:log-lines` allows `turn-id=nil` (second invocation) and `session-id=nil` (third invocation) to match the first invocation's log line — use `(last (:log-lines @state))` or clear log lines between invocations so each assertion verifies the handler's output for that specific call
 
 ## Test Review (2026-06-22)
 
@@ -34,6 +34,10 @@
 - [x] Add reload safety test: verify calling `init` twice on the same nullable API does not register duplicate `session_turn_finished` handlers (design constraint: "load cleanly on reload without state corruption")
 - [x] Add negative test: verify `init` registers no commands, tools, operations, or prompt contributions (design scope: "No commands, tools, operations, or prompt contributions yet")
 - [x] Add edge case test: handler invoked with payload missing `:session-id` or `:turn-id` — verify log output handles `nil` gracefully or document expected behaviour
+
+## Test Shaper Review (2026-06-22)
+
+- [ ] Align assertion style in `turn-finished-handler-fires-and-logs-test` — replace `(some #(re-find ... ) (:log-lines @state))` with `(re-find ... (last (:log-lines @state)))` to match the precise per-invocation pattern already used in `handler-handles-missing-payload-keys-test`
 
 ## Review Follow-ups
 
