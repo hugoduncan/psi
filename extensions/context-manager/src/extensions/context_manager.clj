@@ -6,9 +6,11 @@
 
 (defn- on-turn-finished
   [log-fn payload]
-  (log-fn (str "context-manager: session_turn_finished "
-               "session-id=" (:session-id payload)
-               " turn-id=" (:turn-id payload))))
+  (let [session-id (or (:session-id payload) "nil")
+        turn-id (or (:turn-id payload) "nil")]
+    (log-fn (str "context-manager: session_turn_finished "
+                 "session-id=" session-id
+                 " turn-id=" turn-id))))
 
 (defn init
   "Initialize the context-manager extension.
