@@ -37,7 +37,11 @@
 
 ## Test Shaper Review (2026-06-22)
 
-- [ ] Align assertion style in `turn-finished-handler-fires-and-logs-test` — replace `(some #(re-find ... ) (:log-lines @state))` with `(re-find ... (last (:log-lines @state)))` to match the precise per-invocation pattern already used in `handler-handles-missing-payload-keys-test`
+- [ ] Wrap the three sub-cases in `handler-handles-missing-payload-keys-test` with individual `testing` blocks (e.g. `testing "missing both keys"`, `testing "missing only :turn-id"`, `testing "missing only :session-id"`) — codebase convention uses `testing` blocks for sub-cases (see `auto_session_name_test.clj`); without them a failure doesn't identify which sub-case violated the contract
+
+## Test Shaper Review (2026-06-22, second pass)
+
+- [x] Align assertion style in `turn-finished-handler-fires-and-logs-test` — replace `(some #(re-find ... ) (:log-lines @state))` with `(re-find ... (last (:log-lines @state)))` to match the precise per-invocation pattern already used in `handler-handles-missing-payload-keys-test`
 
 ## Review Follow-ups
 
