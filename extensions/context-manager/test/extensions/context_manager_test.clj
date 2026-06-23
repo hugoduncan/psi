@@ -53,7 +53,7 @@
 (deftest handler-handles-missing-payload-keys-test
   (testing "handler logs gracefully when :session-id or :turn-id are missing"
     (let [{:keys [state]} (setup-api)
-          handler (first (get-in @state [:handlers "session_turn_finished"]))]
+          handler         (first (get-in @state [:handlers "session_turn_finished"]))]
       (testing "missing both keys"
         (is (nil? (handler {}))
             "handler returns nil")
@@ -77,4 +77,19 @@
           (is (re-find #"session-id=nil" line)
               "logs session-id=nil when :session-id is missing")
           (is (re-find #"turn-id=t2" line)
-              "logs turn-id=t2 when present")))))))
+              "logs turn-id=t2 when present"))))))
+
+(deftest init-robustness-test
+  (testing "init handles non-standard api gracefully"
+    (testing "missing :on key"
+      (is (nil? (sut/init {:log (fn [_] nil)}))
+          "should return nil and not throw NPE when :on is missing")
+      (reset! sut/initialized? nil))
+    (testing "missing :log key"
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+        (reset! sut/initialized? nil)
+        (sut/init (dissoc api :log))
+        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+              "handler should return nil and not throw NPE when log-fn is missing"))))))
+

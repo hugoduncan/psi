@@ -72,7 +72,7 @@
 - [x] Refactor `turn-finished-handler-fires-and-logs-test` and `handler-handles-missing-payload-keys-test` to use a shared helper for the "create-api-init-get-handler" ceremony to reduce incidental setup and improve signal
 - [x] Add a test case for `init` with a non-standard `api` (e.g. missing `:on` or `:log` keys) to verify robustness/failure mode, or document that the extension assumes a valid `nullable-api` contract
 - [x] Verify that `initialized?` atom is reset correctly in all test scenarios to prevent cross-test pollution (currently handled by `use-fixtures`, but verify if any tests bypass `setup-api` or use different initialization paths)
-- [ ] Refactor `init-robustness-test` to avoid `NullPointerException` — the current implementation throws NPE when `:on` or `:log` are missing; while the test documents this, the extension should ideally handle a malformed API more gracefully (e.g. by logging a warning or returning early) to avoid crashing the runtime during extension loading.
+- [x] Refactor `init-robustness-test` to avoid `NullPointerException` — the current implementation throws NPE when `:on` or `:log` are missing; while the test documents this, the extension should ideally handle a malformed API more gracefully (e.g. by logging a warning or returning early) to avoid crashing the runtime during extension loading.
 
 
 ## Docs Review (2026-06-22)
