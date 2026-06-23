@@ -142,3 +142,6 @@
 
 ## Code-shaper review (fifth pass) follow-up
 - addressed 1 review step: removed `frontmatter-flag` alias in skills.clj; inlined two call-sites to `pt/frontmatter-flag` (no external refs; kondo clean).
+
+## Code-shaper review (sixth pass)
+- no new actionable steps; partition single-sourced via `skill-registry` (`prompt-hidden?`/`visible-skills`/`hidden-skills`), coercion shared via `pt/frontmatter-flag` across skill + workflow-markdown surfaces, all formatters route through the canonical helpers. `skills/visible-skills`/`hidden-skills` are load-bearing facades (external callers), not dead aliases.
