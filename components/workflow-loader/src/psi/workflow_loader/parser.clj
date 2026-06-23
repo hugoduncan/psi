@@ -160,9 +160,7 @@
   (let [{:keys [frontmatter body]} (pt/extract-frontmatter (or raw ""))
         name (trim-non-empty-string (:name frontmatter))
         description (trim-non-empty-string (:description frontmatter))
-        advertise (not (= "false"
-                          (some-> (:advertise frontmatter)
-                                  str str/trim str/lower-case)))
+        advertise (pt/frontmatter-flag (:advertise frontmatter) true)
         body-text (some-> body str/trim not-empty)
         {parsed-vars :ok vars-error :error} (parse-vars-frontmatter (:vars frontmatter))]
     (cond

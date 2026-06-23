@@ -14,6 +14,7 @@
                     :session-profile :planning}
    :body "You are a planner."
    :vars nil
+   :advertise true
    :source-path "/tmp/planner.md"})
 
 (def edn-parsed
@@ -53,7 +54,9 @@
              (first (:steps definition))))
       (is (workflow-definition/target-authored-workflow-definition? definition))))
 
-  (testing "advertise defaults to true when absent from parsed markdown"
+  (testing "advertise propagates the parser-supplied boolean (true)"
+    ;; The markdown parser always coerces `:advertise` to an explicit boolean
+    ;; (default true), so the compiler propagates it verbatim with no defaulting.
     (let [{:keys [definition]} (compiler/compile-workflow-file markdown-parsed)]
       (is (true? (:advertise definition)))))
 

@@ -120,16 +120,8 @@
 ;; Parsing
 ;; ============================================================
 
-(defn- frontmatter-flag
-  "Coerce a frontmatter scalar to a boolean.
-   Recognises only the literal words `true`/`false` (case-insensitive,
-   whitespace-trimmed); any other value (including typos or an absent key)
-   yields `default`."
-  [value default]
-  (case (some-> value str str/trim str/lower-case)
-    "true"  true
-    "false" false
-    default))
+;; Re-use the shared boolean-frontmatter coercion from prompt-templates
+(def frontmatter-flag pt/frontmatter-flag)
 
 (defn parse-skill-file
   "Parse a SKILL.md or .md skill file at `path`.

@@ -126,3 +126,13 @@
 
 ## Code-shaper review (fourth pass)
 - added 2 follow-up steps: the workflow-markdown parser (`workflow_loader/parser.clj`) still uses the inline `(not (= "false" ...))` `advertise` coercion that the third pass replaced with the shared `frontmatter-flag` helper on the skill side (cross-surface idiom/rule divergence); and a dead `(if (nil? advertise) true advertise)` nil-default in `compile-markdown-workflow-file` (parser always yields boolean).
+
+## Code-shaper review follow-up (fourth pass) — addressed
+- Promoted `frontmatter-flag` to shared `prompt-templates`; skills.clj aliases it,
+  workflow-loader `parser.clj` now coerces `:advertise` via `pt/frontmatter-flag`
+  (one shape, symmetric true/false recognition across both surfaces).
+- Dropped the dead `(if (nil? advertise) true advertise)` guard in
+  `compile-markdown-workflow-file` (parser always supplies an explicit boolean);
+  reconciled the EDN-path comment and updated `compiler-test` fixture/assertion
+  to the parser-supplied-boolean contract.
+- addressed 2 review steps.
