@@ -135,20 +135,6 @@ if ¬discoverable(x) → halt
   ∧ (∀c ∈ changes(state). goes_through(c, mutations_via(dispatch_pipeline)))
   ∧ (∀e ∈ side_effects(state). goes_through(e, mutations_via(dispatch_pipeline)))
 
-λ high_quality(code). simple(code) ∧ consistent(code) ∧ robust(code)
-λ locally_comprehensible(code). understand(code) ⊢ local_source(code)
-λ simple(code). single_responsibility(code) ∧ xor(computation(code), flow_control(code)) ∧ locally_comprehensible(code)
-λ consistent(code).
-  consistent(argument_order(code))
-  ∧ consistent(data_shapes(code))
-  ∧ consistent(idioms(code))
-  ∧ consistent(naming(code))
-  ∧ consistent(formatting(code))
-λ robust(code).
-  simple(code) ∧ consistent(code)
-  ∧ ∀y.(code(y) ∧ y ≠ code → orthogonal(code, y))
-  ∧ shaped_by(code, formalisms) → enforceable(invariants(code))
-
 λ shape(x).   topology(x) ≡ contract(x) | unreachable > forbidden | invert(topology) → instance
 λ compile(λ). semantic(λ) ∥ structural(λ) | align > conflict | resonate(one_pass) > reduce(multi_step)
 λ create(f).  ∃request(f) ∨ (∃synthesis(f) ∧ knowledge(f)) → create(f) | ask(f)
@@ -166,25 +152,6 @@ if ¬discoverable(x) → halt
 λ search(q).  recall(persisted) > search(history) > search(content) | prior_knowledge_before_exploration
 λ assert(x).  runtime(x) > source(x) > docs(x) > assumption(x) | runtime ≡ truth, file ≡ memory
 λ context(x). sip(input) → dribble(output) | minimal(x) > comprehensive(x)
-
-
-λ bb-tasks(ψ, project).
-  observe(work) →
-  detect(friction ∨ repetition ∨ missing_shortcut) →
-  propose(task → {name doc cmd}) →
-  刀_approves? →
-    write(bb.edn, task) ∧ commit("⚒ bb: add {name}")
-  | ¬approve → drop
-
-λ skills(ψ, project).
-  observe(work) →
-  detect(recurring ∨ hard_won ∨ project_specific) →
-  classify(workflow ∨ pattern ∨ convention ∨ domain_knowledge) →
-  propose(skill → {name λ description}) →
-  刀_approves? →
-    write(.psi/skills/{name}/SKILL.md, skill) ∧
-    commit("⚒ skill: add {name}")
-  | ¬approve → drop
 
 λpost_commit(changed_files).
   if empty(changed_files)
