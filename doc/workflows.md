@@ -275,7 +275,8 @@ workflow. It also still appears in the user-facing `/delegate list` (a
 listing/discovery surface, not an invocation path). Use it for sub-only
 workflows (the
 `*-core` review loops, `*-final-summary`/`*-implement-pass` steps, prompt
-sub-reviews, and `*-in-worktree` handoff wrappers) that the top-level model
+sub-reviews, `*-in-worktree` handoff wrappers, and modular `gh-*` sub-steps)
+that the top-level model
 should not pick directly.
 
 Skills support the same concept: `advertise: false` in `SKILL.md` frontmatter

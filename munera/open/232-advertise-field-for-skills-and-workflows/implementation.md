@@ -100,3 +100,5 @@
 
 ## Docs review (review-task-docs, fourth pass)
 - added 1 follow-up step: `doc/workflows.md` sub-only-workflow example list omits the "modular `gh-*` sub-steps" category that the CHANGELOG includes (consistency/completeness gap between two user-facing docs for the same flipped set).
+
+- addressed 1 docs-review follow-up (4th pass): added `gh-*` sub-step category to doc/workflows.md advertise example list, matching the CHANGELOG.
