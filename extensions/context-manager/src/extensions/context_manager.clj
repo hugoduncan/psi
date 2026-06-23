@@ -6,8 +6,8 @@
 
 (defn- on-turn-finished
   [log-fn payload]
-  (let [session-id (or (:session-id payload) "nil")
-        turn-id (or (:turn-id payload) "nil")]
+  (let [session-id (get payload :session-id "nil")
+        turn-id (get payload :turn-id "nil")]
     (log-fn (str "context-manager: session_turn_finished "
                  "session-id=" session-id
                  " turn-id=" turn-id))))

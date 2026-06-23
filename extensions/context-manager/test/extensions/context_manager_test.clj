@@ -34,7 +34,12 @@
         (is (re-find #"session_turn_finished" line))
         (is (re-find #"session-id=s1" line))
         (is (re-find #"turn-id=t1" line)))
-      (testing "handler does not throw when payload is nil"
+      (testing "handler logs correctly when payload is an empty map"
+        (is (nil? (handler {}))
+            "handler returns nil")
+        (let [line (last (:log-lines @state))]
+          (is (re-find #"session-id=nil" line))
+          (is (re-find #"turn-id=nil" line)))
         (is (nil? (handler nil))
             "handler must return nil and not throw when payload is nil")))))
 
