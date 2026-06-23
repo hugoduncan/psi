@@ -258,6 +258,30 @@ For the formal grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
 For the conceptual explanation, see
 [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md).
 
+## Hiding a workflow from the model with `advertise`
+
+A workflow definition may declare `advertise` to control whether it appears in
+the model's **system context** (the `tool: delegate` listing the model sees each
+turn):
+
+- EDN workflows: top-level key `:advertise false`.
+- `.md` single-step workflows: frontmatter key `advertise: false`.
+
+Default is `true` (absent or any non-`false` value keeps the workflow
+advertised; only the literal `false` hides it). `advertise: false` affects the
+system-context listing **only** — the workflow stays registered and remains
+invocable via `/delegate <name>`, as a delegate sub-step of another workflow,
+and in the user-facing `/delegate list`. Use it for sub-only workflows (the
+`*-core` review loops, `*-final-summary`/`*-implement-pass` steps, prompt
+sub-reviews, and `*-in-worktree` handoff wrappers) that the top-level model
+should not pick directly.
+
+Skills support the same concept: `advertise: false` in `SKILL.md` frontmatter
+hides the skill from the system-prompt skill listing while keeping it
+discoverable in the registry and invocable by `/skill:name` or direct file read.
+This composes with the existing `disable-model-invocation` flag — a skill is
+hidden if **either** is set.
+
 ## Session profiles and inherited defaults are snapshotted at invoke time
 
 Workflow steps can request a named session profile with `:session-profile`. The
