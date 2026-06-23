@@ -83,3 +83,6 @@
 
 ## Test review (test-shaper pass 5)
 - no new actionable steps; tests well-shaped after passes 1-4 (anchored positives/negatives, concern-aligned EDN/markdown deftests, real/nullable deps, coverage of both skill formatters + workflow prompt-contribution + parse robustness + propagation + registered-and-invocable + execution-resolution). 28 tests / 246 assertions pass.
+
+## Docs review (review-task-docs)
+- added 1 follow-up step: CHANGELOG/doc/workflows.md describe flipped skills as `review-*`/`issue-*` but omit the two `task-*-review` skills actually flipped (accuracy/completeness gap).
