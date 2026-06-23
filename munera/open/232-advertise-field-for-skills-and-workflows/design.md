@@ -105,6 +105,9 @@ during planning — see open questions).
    sub-workflows (`*-core`, `review-step`, `*-final-summary`, `*-implement-pass`,
    `*-resolve`, …) should be flipped to `advertise: false`. Needs an explicit
    enumeration so the change is auditable.
-4. **Parse robustness.** Confirm the false-coercion rule (e.g. only the literal
-   `false` disables; any other value, including typos, defaults to advertised)
-   to avoid silently hiding a skill on a frontmatter typo.
+4. **Parse robustness.** Confirm the false-coercion rule: only the literal word
+   `false` (case-insensitive, whitespace-trimmed) disables; any other value,
+   including typos, defaults to advertised, to avoid silently hiding a skill on a
+   frontmatter typo. The same coercion is shared with `disable-model-invocation`
+   (literal `true`/`false`, case-insensitive, trimmed) via a single
+   `frontmatter-flag` helper so the two boolean keys use one consistent rule.

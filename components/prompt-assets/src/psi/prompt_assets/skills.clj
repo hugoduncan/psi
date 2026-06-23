@@ -120,6 +120,17 @@
 ;; Parsing
 ;; ============================================================
 
+(defn- frontmatter-flag
+  "Coerce a frontmatter scalar to a boolean.
+   Recognises only the literal words `true`/`false` (case-insensitive,
+   whitespace-trimmed); any other value (including typos or an absent key)
+   yields `default`."
+  [value default]
+  (case (some-> value str str/trim str/lower-case)
+    "true"  true
+    "false" false
+    default))
+
 (defn parse-skill-file
   "Parse a SKILL.md or .md skill file at `path`.
    Returns a parsed skill map or nil if the file doesn't exist.
@@ -134,11 +145,10 @@
             parent-dir-name        (.getName skill-dir)
             name                   (or (:name frontmatter) parent-dir-name)
             description            (:description frontmatter)
-            disable-model-invocation (= "true"
-                                        (str (get frontmatter :disable-model-invocation)))
-            advertise                (not (= "false"
-                                             (some-> (get frontmatter :advertise)
-                                                     str str/trim str/lower-case)))]
+            disable-model-invocation (frontmatter-flag
+                                      (get frontmatter :disable-model-invocation) false)
+            advertise                (frontmatter-flag
+                                      (get frontmatter :advertise) true)]
         {:name                     name
          :description              description
          :lambda-description       (:lambda frontmatter)

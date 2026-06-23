@@ -120,3 +120,6 @@
 
 ## Code-shaper review (third pass)
 - added 1 follow-up step: `parse-skill-file` uses divergent boolean-frontmatter coercion idioms for `disable-model-invocation` (case-sensitive, no trim) vs `advertise` (trim+lowercase), an in-function consistency gap and a secondary divergence from design Q4's "only the literal `false`" wording.
+
+## Code-shaper review follow-up (third pass execution)
+- addressed 1 code-shaper follow-up step. Extracted a shared `frontmatter-flag` helper in `parse-skill-file` recognising only literal `true`/`false` (case-insensitive, trimmed) and defaulting otherwise; routed both `disable-model-invocation` (default false) and `advertise` (default true) through it. Aligned design Q4 wording to the chosen case-insensitive/trimmed literal-`false` rule and noted the shared helper. clj-kondo clean; skills-test 17 tests / 115 assertions pass.
