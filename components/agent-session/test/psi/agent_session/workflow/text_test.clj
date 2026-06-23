@@ -41,3 +41,21 @@
       ;; Still present in the user-facing listing, hence still registered and
       ;; invocable by name via delegate.
       (is (str/includes? (text/available-workflows-text defs) "internal")))))
+
+(deftest resolve-runnable-definition-test
+  (testing "resolves an :advertise false workflow for execution by name"
+    (let [internal {:name "internal" :summary "Internal" :advertise false}
+          defs {"public"   {:name "public" :summary "Public"}
+                "internal" internal}]
+      ;; Execution resolution is the gate used by /delegate run and delegate
+      ;; sub-steps: a non-advertised workflow that is dropped from the
+      ;; agent-facing prompt contribution must still resolve-for-execution, so
+      ;; a future change that drops it from registration/execution is caught.
+      (is (not (str/includes? (text/build-prompt-contribution defs) "internal")))
+      (is (= internal (text/resolve-runnable-definition defs "internal")))
+      (is (= {:name "public" :summary "Public"}
+             (text/resolve-runnable-definition defs "public")))))
+
+  (testing "returns nil for an unregistered workflow name"
+    (is (nil? (text/resolve-runnable-definition
+               {"public" {:name "public"}} "missing")))))

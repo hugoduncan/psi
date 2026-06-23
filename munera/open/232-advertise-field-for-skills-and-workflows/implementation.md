@@ -57,3 +57,7 @@
 
 ## Test review (task-test-review, second pass)
 - added 1 follow-up step: workflow invocability is asserted only via a listing-presence proxy, not an actual run/sub-step, unlike the real `invoke-skill` skill test — gap against acceptance criterion 2.
+
+## Test review follow-up execution
+- addressed 1 test-review step: extracted `text/resolve-runnable-definition` (the by-name execution-resolution gate used by `delegate-run`), wired the `/delegate run` gate through it, and added `resolve-runnable-definition-test` asserting an `:advertise false` workflow is dropped from `build-prompt-contribution` yet still resolves-for-execution by name (and nil for unregistered names). Guards against a future change leaking the advertise filter into registration/execution.
+- verified: clj-kondo 0 warnings/errors; text-test 3 tests / 13 assertions pass.

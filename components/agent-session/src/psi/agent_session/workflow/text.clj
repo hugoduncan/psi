@@ -109,6 +109,17 @@
                                                (:description defn-map)
                                                ""))))))))
 
+(defn resolve-runnable-definition
+  "Resolve a workflow definition for execution by name.
+
+   Execution resolution is independent of `:advertise`: an `:advertise false`
+   workflow is omitted from the system-context listing (see
+   `build-prompt-contribution`) yet remains runnable via `/delegate <name>` and
+   as a delegate sub-step. Returns the definition map, or nil when no workflow
+   with that name is registered."
+  [definitions workflow-name]
+  (get definitions workflow-name))
+
 (defn parse-delegate-command
   "Parse `/delegate <workflow> [<prompt>]` args. prompt is optional."
   [args-str]

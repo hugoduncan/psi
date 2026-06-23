@@ -360,7 +360,8 @@
       (= ::invalid mode*)
       {:error "mode must be one of: sync, async"}
 
-      (nil? (get (runtime-state/loaded-definitions) workflow-name))
+      (nil? (text/resolve-runnable-definition
+             (runtime-state/loaded-definitions) workflow-name))
       {:error (str "Unknown workflow '" workflow-name "'. Use action=list to see available workflows.")}
 
       :else
