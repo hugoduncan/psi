@@ -36,29 +36,29 @@
 (deftest parse-xml-tool-calls-test
   ;; Tests the narrow XML-like parser without executing any tools.
   (testing "parses nominal bash call and trims parameter boundary whitespace"
-    (is (= [{:span [0 112]
-             :source "<tool_call>\n<function=bash>\n<parameter=command>\ncd /tmp && git diff --stat\n</parameter>\n</function>\n</tool_call>"
-             :name "bash"
+    (is (= [{:span      [0 112]
+             :source    "<tool_call>\n<function=bash>\n<parameter=command>\ncd /tmp && git diff --stat\n</parameter>\n</function>\n</tool_call>"
+             :name      "bash"
              :arguments {"command" "cd /tmp && git diff --stat"}}]
            (textual-tool-calls/parse-xml-tool-calls
             "<tool_call>\n<function=bash>\n<parameter=command>\ncd /tmp && git diff --stat\n</parameter>\n</function>\n</tool_call>"))))
 
   (testing "parses multiple calls in response order with multiple parameters"
     (let [text "before <tool_call><function=first-tool><parameter=a>one</parameter><parameter=b>two\n2</parameter></function></tool_call> middle <tool_call><function=second_tool><parameter=x>z</parameter></function></tool_call> after"]
-      (is (= [{:span [7 120]
-               :source "<tool_call><function=first-tool><parameter=a>one</parameter><parameter=b>two\n2</parameter></function></tool_call>"
-               :name "first-tool"
+      (is (= [{:span      [7 120]
+               :source    "<tool_call><function=first-tool><parameter=a>one</parameter><parameter=b>two\n2</parameter></function></tool_call>"
+               :name      "first-tool"
                :arguments {"a" "one" "b" "two\n2"}}
-              {:span [128 210]
-               :source "<tool_call><function=second_tool><parameter=x>z</parameter></function></tool_call>"
-               :name "second_tool"
+              {:span      [128 210]
+               :source    "<tool_call><function=second_tool><parameter=x>z</parameter></function></tool_call>"
+               :name      "second_tool"
                :arguments {"x" "z"}}]
              (textual-tool-calls/parse-xml-tool-calls text)))))
 
   (testing "accepts uppercase letters in identifiers and preserves case"
-    (is (= [{:span [0 93]
-             :source "<tool_call><function=Bash_Tool-1><parameter=CommandArg>pwd</parameter></function></tool_call>"
-             :name "Bash_Tool-1"
+    (is (= [{:span      [0 93]
+             :source    "<tool_call><function=Bash_Tool-1><parameter=CommandArg>pwd</parameter></function></tool_call>"
+             :name      "Bash_Tool-1"
              :arguments {"CommandArg" "pwd"}}]
            (textual-tool-calls/parse-xml-tool-calls
             "<tool_call><function=Bash_Tool-1><parameter=CommandArg>pwd</parameter></function></tool_call>"))))
@@ -163,11 +163,11 @@
       (is (empty? (textual-tool-calls/parse-xml-tool-calls text)))))
 
   (testing "malformed many-marker output uses bounded linear parser work"
-    (let [nested      (str "prefix "
-                           (str/join (repeat 300 "<tool_call>"))
-                           "literal"
-                           (str/join (repeat 300 "</tool_call>")))
-          work-count  (atom 0)
+    (let [nested       (str "prefix "
+                            (str/join (repeat 300 "<tool_call>"))
+                            "literal"
+                            (str/join (repeat 300 "</tool_call>")))
+          work-count   (atom 0)
           parse-result (binding [textual-tool-calls/*parse-work-counter* work-count]
                          (textual-tool-calls/parse-xml-tool-calls nested))]
       (is (= [] parse-result))
@@ -175,11 +175,11 @@
           (str "expected bounded scan work, got " @work-count))))
 
   (testing "many unclosed open markers before a far lone close use bounded linear parser work"
-    (let [open-count  3000
-          text        (str (str/join (repeat open-count "<tool_call>"))
-                           (apply str (repeat 70000 "x"))
-                           "</tool_call>")
-          work-count  (atom 0)
+    (let [open-count   3000
+          text         (str (str/join (repeat open-count "<tool_call>"))
+                            (apply str (repeat 70000 "x"))
+                            "</tool_call>")
+          work-count   (atom 0)
           parse-result (binding [textual-tool-calls/*parse-work-counter* work-count]
                          (textual-tool-calls/parse-xml-tool-calls text))]
       (is (= [] parse-result))
@@ -200,9 +200,9 @@
                                "</function></tool_call>")
           later-valid     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
           text            (str malformed-outer " after " later-valid)]
-      (is (= [{:span [(+ (count malformed-outer) 7) (count text)]
-               :source later-valid
-               :name "bash"
+      (is (= [{:span      [(+ (count malformed-outer) 7) (count text)]
+               :source    later-valid
+               :name      "bash"
                :arguments {"command" "pwd"}}]
              (textual-tool-calls/parse-xml-tool-calls text))))))
 
@@ -212,12 +212,12 @@
         disabled-model {:capabilities {}}]
     (testing "normalization parses each source text block once"
       (let [parse-count (atom 0)
-            assistant   {:role "assistant"
-                         :content [{:type :text
+            assistant   {:role    "assistant"
+                         :content [{:type          :text
                                     :content-index 2
-                                    :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
-                                               " middle "
-                                               "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}
+                                    :text          (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                                        " middle "
+                                                        "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}
             normalized  (binding [textual-tool-call-parser/*parse-work-counter* parse-count]
                           (textual-tool-calls/normalize-assistant-message "turn-parse" enabled-model assistant))]
         (is (pos? @parse-count))
@@ -226,14 +226,14 @@
                     (filter #(= :tool-call (:type %)))
                     (mapv :id))))))
     (testing "disabled models preserve textual markup unchanged"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= assistant
                (textual-tool-calls/normalize-assistant-message "turn-1" disabled-model assistant)))))
 
     (testing "disabled models do not invoke the XML parser"
-      (let [assistant  {:role "assistant"
+      (let [assistant  {:role    "assistant"
                         :content [{:type :text
                                    :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}
             parse-work (atom 0)]
@@ -243,14 +243,14 @@
           (is (zero? @parse-work)))))
 
     (testing "enabled models convert parsed calls to canonical tool-call blocks with JSON arguments"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :text
                                   :text "Before <tool_call><function=bash><parameter=command>pwd && echo hi</parameter></function></tool_call> after"}]}
             content   (:content (textual-tool-calls/normalize-assistant-message "turn-1" enabled-model assistant))]
         (is (= [{:type :text :text "Before "}
-                {:type :tool-call
-                 :id "turn-1/toolcall/1"
-                 :name "bash"
+                {:type      :tool-call
+                 :id        "turn-1/toolcall/1"
+                 :name      "bash"
                  :arguments "{\"command\":\"pwd && echo hi\"}"}
                 {:type :text :text " after"}]
                content))
@@ -258,14 +258,14 @@
                (json/parse-string (:arguments (second content)))))))
 
     (testing "multiple calls and mixed malformed markup preserve response order"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :text :content-index 0 :text "A "}
                                  {:type :tool-call :content-index 1 :id "provider-call" :name "read" :arguments "{}"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 2
-                                  :text (str " B <tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
-                                             " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call>"
-                                             " D <tool_call><function=second><parameter=y>2</parameter></function></tool_call> E")}]}]
+                                  :text          (str " B <tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                                      " C <tool_call><function=bad><parameter=x>1</parameter><parameter=x>2</parameter></function></tool_call>"
+                                                      " D <tool_call><function=second><parameter=y>2</parameter></function></tool_call> E")}]}]
         (is (= [{:type :text :text "A "}
                 {:type :tool-call :id "provider-call" :name "read" :arguments "{}"}
                 {:type :text :text " B "}
@@ -278,16 +278,16 @@
                (:content (textual-tool-calls/normalize-assistant-message "turn-2" enabled-model assistant))))))
 
     (testing "generated ids use source index when a text block is fully replaced by recovered calls"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :text :content-index 2 :text "between"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 3
-                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}
-                                 {:type :text
+                                  :text          "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}
+                                 {:type          :text
                                   :content-index 5
-                                  :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
-                                             "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
+                                  :text          (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                                      "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
         (is (= ["turn-3/toolcall/3" "turn-3/toolcall/5" "turn-3/toolcall/6"]
                (->> (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                     :content
@@ -296,17 +296,17 @@
                     (mapv :id))))))
 
     (testing "generated ids do not collide with existing canonical ids when reusing replaced source index"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :id "turn-3/toolcall/3" :name "provider" :arguments "{}"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 3
-                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+                                  :text          "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= "turn-3/toolcall/4"
                (get-in (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant)
                        [:content 1 :id])))))
 
     (testing "generated ids skip later provider indexes and count unindexed provider blocks"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :content-index 7 :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :tool-call :id "unindexed-provider" :name "generated-provider" :arguments "{}"}
                                  {:type :text
@@ -316,35 +316,35 @@
                        [:content 2 :id])))))
 
     (testing "generated ids skip a source text index when preceding residual text keeps that index"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 2
-                                  :text "before <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
+                                  :text          "before <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :text :text "before "}
                 {:type :tool-call :id "turn-3/toolcall/3" :name "bash" :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "generated ids use source index when recovered call precedes residual text"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 2
-                                  :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> after"}]}]
+                                  :text          "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> after"}]}]
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :tool-call :id "turn-3/toolcall/2" :name "bash" :arguments "{\"command\":\"pwd\"}"}
                 {:type :text :text " after"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "generated ids allocate later recovered calls after intervening residual text"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :content-index 1 :id "provider-call" :name "provider" :arguments "{}"}
-                                 {:type :text
+                                 {:type          :text
                                   :content-index 2
-                                  :text (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
-                                             " mid "
-                                             "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
+                                  :text          (str "<tool_call><function=first><parameter=x>1</parameter></function></tool_call>"
+                                                      " mid "
+                                                      "<tool_call><function=second><parameter=y>2</parameter></function></tool_call>")}]}]
         (is (= [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                 {:type :tool-call :id "turn-3/toolcall/2" :name "first" :arguments "{\"x\":\"1\"}"}
                 {:type :text :text " mid "}
@@ -352,7 +352,7 @@
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "generated ids count preceding unindexed provider blocks"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :id "provider-call" :name "provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
@@ -361,7 +361,7 @@
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "unindexed canonical provider ids occupy their generated index without an extra hidden position"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :id "turn-3/toolcall/0" :name "provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
@@ -370,7 +370,7 @@
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "provider ids with generated prefix and non-numeric suffix are ordinary provider ids"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :id "turn-3/toolcall/provider" :name "provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
@@ -379,7 +379,7 @@
                (:content (textual-tool-calls/normalize-assistant-message "turn-3" enabled-model assistant))))))
 
     (testing "provider ids with generated prefix and overflowing numeric suffix are ordinary provider ids"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :tool-call :id "turn-3/toolcall/9223372036854775808" :name "provider" :arguments "{}"}
                                  {:type :text
                                   :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]}]
@@ -389,7 +389,7 @@
 
     (testing "nested calls inside malformed prefixes remain text"
       (let [text      "broken <tool_call><function=bad><parameter=x>1 <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call> tail"
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -399,7 +399,7 @@
                            "<parameter=x>one <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                            "<parameter=x>two</parameter>"
                            "</function></tool_call>")
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -408,7 +408,7 @@
       (let [text      (str "<tool_call><function=outer>"
                            "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</function></tool_call>")
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -418,7 +418,7 @@
                            "<parameter=x>before <tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call></parameter>"
                            "<function=outer><parameter=y>after</parameter></function>"
                            "</tool_call>")
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -429,7 +429,7 @@
                            "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</parameter></function>"
                            "</tool_call>")
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -441,14 +441,14 @@
                            "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
                            "</parameter></function>"
                            "</tool_call>")
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
 
     (testing "nested valid calls inside unterminated outer parameters remain text"
       (let [text      "<tool_call><function=bash><parameter=command>printf <tool_call><function=literal><parameter=x>y</parameter></function></tool_call>"
-            assistant {:role "assistant"
+            assistant {:role    "assistant"
                        :content [{:type :text :text text}]}]
         (is (= [{:type :text :text text}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
@@ -459,23 +459,23 @@
                                  "<parameter=x>two</parameter>"
                                  "</function></tool_call>")
             later-valid     "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"
-            assistant       {:role "assistant"
+            assistant       {:role    "assistant"
                              :content [{:type :text :text (str malformed-outer " after " later-valid)}]}]
         (is (= [{:type :text :text (str malformed-outer " after ")}
-                {:type :tool-call
-                 :id "turn-4/toolcall/1"
-                 :name "bash"
+                {:type      :tool-call
+                 :id        "turn-4/toolcall/1"
+                 :name      "bash"
                  :arguments "{\"command\":\"pwd\"}"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))
 
     (testing "quotes adjacent to a well-formed block are preserved as surrounding text"
-      (let [assistant {:role "assistant"
+      (let [assistant {:role    "assistant"
                        :content [{:type :text
                                   :text "before '<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>' after"}]}]
         (is (= [{:type :text :text "before '"}
-                {:type :tool-call
-                 :id "turn-4/toolcall/1"
-                 :name "bash"
+                {:type      :tool-call
+                 :id        "turn-4/toolcall/1"
+                 :name      "bash"
                  :arguments "{\"command\":\"pwd\"}"}
                 {:type :text :text "' after"}]
                (:content (textual-tool-calls/normalize-assistant-message "turn-4" enabled-model assistant))))))))
