@@ -54,3 +54,8 @@
 - [x] Add `context-manager` to the built-in extensions list in `README.md` (under "Built-in extensions that ship with this repo")
 - [x] Add `context-manager` entry to `doc/extensions.md` under "Built-in extensions in this repo" section with brief purpose description
 - [x] Add `context-manager` extension entry to `CHANGELOG.md` under `[Unreleased]` > `Added` (new extension capability)
+
+## Implementation Review (2026-06-22)
+
+- [ ] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
+
