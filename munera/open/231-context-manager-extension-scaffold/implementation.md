@@ -6,3 +6,4 @@
 - added 1 step to be addressed (task-test-review).
 
 
+- addressed 1 review step: verified handler registration event name

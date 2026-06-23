@@ -20,7 +20,7 @@
 - [x] Run `bb test` focused on `extensions.context-manager-test` — must pass
 - [x] Run the catalog parity test to confirm both catalogs are in sync
 
-## Test Review — Log Precision (2026-06-22)
+- [x] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
 
 - [x] Tighten `handler-handles-missing-payload-keys-test` assertions: `some` over accumulated `:log-lines` allows `turn-id=nil` (second invocation) and `session-id=nil` (third invocation) to match the first invocation's log line — use `(last (:log-lines @state))` or clear log lines between invocations so each assertion verifies the handler's output for that specific call
 
