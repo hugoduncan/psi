@@ -97,5 +97,8 @@
         (sut/init (dissoc api :log))
         (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
           (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-              "handler should return nil and not throw NPE when log-fn is missing"))))))
+              "handler should return nil and not throw NPE when log-fn is missing"))))
+    (testing "api is nil"
+      (is (nil? (sut/init nil))
+          "should return nil and not throw NPE when api is nil"))))
 
