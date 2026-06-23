@@ -1,1 +1,1 @@
-- added 2 steps to be addressed
+- added 3 steps to be addressed (log-fn robustness and registration call verification)
