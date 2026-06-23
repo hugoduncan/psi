@@ -111,3 +111,6 @@
 
 ## Code-shaper review follow-up (execution)
 - addressed 2 code-shaper follow-up steps. Decision: system-context visibility is the single concept; promoted `prompt-hidden?` + `visible-skills`/`hidden-skills` into `psi.skill-registry.registry` (shared by prompt-assets and tui; tui cannot depend on prompt-assets). Routed skill-summary counts, visible/hidden-skills, and enrich-skill `:is-available-to-model` through it; tui `banner-rows` now reuses `skill-registry/visible-skills`. Added registry tests (`prompt-hidden?-test`, `visible-hidden-skills-test`) and advertise-false assertions to skills introspection tests. clj-kondo clean; 30 tests / 233 assertions pass.
+
+## Code-shaper review (second pass)
+- added 1 follow-up step: formatters + skill-summary recompute the system-context partition inline rather than reusing the canonical `visible-skills`/`hidden-skills` helpers (single-source-of-truth residual after first code-shaper pass).
