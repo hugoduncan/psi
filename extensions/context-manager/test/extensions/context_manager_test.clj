@@ -27,19 +27,20 @@
   (testing "handler fires on synthetic session_turn_finished event and logs session-id and turn-id"
     (let [{:keys [state]} (setup-api)
           handler (first (get-in @state [:handlers "session_turn_finished"]))]
-      (testing "handler returns nil for the nominal case"
+      (testing "nominal case"
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-            "handler must return nil as per design requirement"))
-      (let [line (last (:log-lines @state))]
-        (is (re-find #"session_turn_finished" line))
-        (is (re-find #"session-id=s1" line))
-        (is (re-find #"turn-id=t1" line)))
-      (testing "handler logs correctly when payload is an empty map"
+            "handler must return nil as per design requirement")
+        (let [line (last (:log-lines @state))]
+          (is (re-find #"session_turn_finished" line))
+          (is (re-find #"session-id=s1" line))
+          (is (re-find #"turn-id=t1" line))))
+      (testing "payload is an empty map"
         (is (nil? (handler {}))
             "handler returns nil")
         (let [line (last (:log-lines @state))]
           (is (re-find #"session-id=nil" line))
-          (is (re-find #"turn-id=nil" line)))
+          (is (re-find #"turn-id=nil" line))))
+      (testing "payload is nil"
         (is (nil? (handler nil))
             "handler must return nil and not throw when payload is nil")))))
 
@@ -109,7 +110,9 @@
         (sut/init (dissoc api :log))
         (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
           (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-              "handler should return nil and not throw NPE when log-fn is missing"))))
+              "handler should return nil and not throw NPE when log-fn is missing")
+          (is (empty? (:log-lines @state))
+              "handler should not log anything when :log is missing from API"))))
     (testing "api is nil"
       (is (nil? (sut/init nil))
           "should return nil and not throw NPE when api is nil"))

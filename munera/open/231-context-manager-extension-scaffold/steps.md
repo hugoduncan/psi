@@ -55,9 +55,9 @@
 
 ## Test Shaper Review (2026-06-22, fifth pass)
 
-- [ ] Refactor `turn-finished-handler-fires-and-logs-test` to use `testing` blocks for the nominal case and the `nil` payload case, ensuring failures are precisely located.
-- [ ] Add a test verifying that the handler does not log anything (and does not throw) when the `:log` function is missing from the API, ensuring the `(when (:log api) ...)` guard is effective.
-- [ ] Verify that `initialized?` is reset to `nil` in `use-fixtures` of `context_manager_test.clj` (it is, but ensure it's consistent across all test files if more are added).
+- [x] Refactor `turn-finished-handler-fires-and-logs-test` to use `testing` blocks for the nominal case and the `nil` payload case, ensuring failures are precisely located.
+- [x] Add a test verifying that the handler does not log anything (and does not throw) when the `:log` function is missing from the API, ensuring the `(when (:log api) ...)` guard is effective.
+- [x] Verify that `initialized?` is reset to `nil` in `use-fixtures` of `context_manager_test.clj` (it is, but ensure it's consistent across all test files if more are added).
 
 
 
