@@ -26,9 +26,8 @@
     (do
       ((:on api) "session_turn_finished"
                  (fn [payload]
-                   (if (:log api)
-                     (on-turn-finished (:log api) payload)
-                     (println "context-manager: log-fn missing in api"))
+                   (when (:log api)
+                     (on-turn-finished (:log api) payload))
                    nil))
       true)
     (if (and api (:on api))

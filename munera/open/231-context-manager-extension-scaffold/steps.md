@@ -57,5 +57,5 @@
 
 ## Implementation Review (2026-06-22)
 
-- [ ] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
+- [x] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
 
