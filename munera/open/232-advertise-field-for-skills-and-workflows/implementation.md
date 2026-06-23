@@ -11,3 +11,6 @@
   - Skills: `components/prompt-assets/src/psi/prompt_assets/skills.clj` — frontmatter parse (~L137) and `format-skills-for-prompt`/`-lambda` (~L502/527); existing `disable-model-invocation` filter is the pattern to mirror for `advertise`.
   - Workflows: `components/agent-session/src/psi/agent_session/workflow/text.clj` — `build-prompt-contribution` (~L93) is the system-context listing to filter on `:advertise false`.
   - `/delegate list` / `action=list` listing also lives in `text.clj` (`available-workflows-text`/`delegate-list-text`); design Open Question 2 governs whether those are affected — confirm before touching them.
+
+## Design-follow-up resolution (inconsistency step)
+- Resolved the byte-identical inconsistency by scoping the Constraints invariant to items whose `advertise` remains absent/`true`, and explicitly stating the in-task `review-*`/`issue-*` + sub-only-workflow flip is the intended exception. No scope change to the design — the frozen scope (which items get flipped) is unchanged; only the invariant wording was reconciled. Exact enumeration of flipped items remains deferred to planning per Open Question 3.

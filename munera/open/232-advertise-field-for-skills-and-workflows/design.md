@@ -63,8 +63,11 @@ during planning — see open questions).
 ## Constraints
 
 - Behaviour-preserving for the default (`advertise` absent / `true`): the
-  system context is byte-identical for all currently-advertised
-  skills/workflows.
+  system context is byte-identical for every skill/workflow whose `advertise`
+  remains absent/`true`. This task deliberately flips the `review-*`/`issue-*`
+  skills and sub-only workflows to `advertise: false` (see *Apply the field* and
+  the Acceptance criteria), so those items are intentionally removed from the
+  system context; the byte-identical invariant does not apply to them.
 - `advertise: false` must **only** affect system-context listing — never
   registration, discovery, invocability, or execution.
 - Field semantics, default, and naming are identical across skills and
