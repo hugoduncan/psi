@@ -91,3 +91,5 @@
 
 ## Docs review (review-task-docs, second pass)
 - added 1 follow-up step: CHANGELOG combines skill+workflow invocation paths into one list ("the skill/workflow"), implying skills are reachable via `/delegate` and workflows via `/skill:name` (accuracy gap; `doc/workflows.md` already separates the two surfaces).
+
+- addressed 1 docs-review (second pass) follow-up: split the CHANGELOG combined invocation-path sentence per surface — skills via `/skill:name` + direct file read; workflows via `/delegate <name>` + `/delegate list` + sub-step. `doc/workflows.md` already separates the surfaces, no change.
