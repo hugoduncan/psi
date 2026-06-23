@@ -71,3 +71,4 @@
 
 ## Test review (test-shaper pass 2)
 - added 1 follow-up step: EDN-config advertise tests are grouped under the markdown-named `compile-markdown-workflow-file-test` deftest (naming/concern mismatch) despite an existing `compile-edn-prompt-workflow-test` deftest.
+- addressed 1 test-shaper pass-2 follow-up step: moved the two EDN-config advertise tests ("advertise false in edn config propagates" / "advertise absent from edn config leaves advertise absent") out of `compile-markdown-workflow-file-test` into `compile-edn-prompt-workflow-test` so naming matches concern. Tests pass (63 assertions, 4 tests).

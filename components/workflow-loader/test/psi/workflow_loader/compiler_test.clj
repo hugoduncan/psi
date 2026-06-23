@@ -62,6 +62,12 @@
                                 (assoc markdown-parsed :advertise false))]
       (is (false? (:advertise definition)))))
 
+  (testing "batch compilation keeps markdown and edn successes together"
+    (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
+      (is (= 2 (count definitions)))
+      (is (empty? errors)))))
+
+(deftest compile-edn-prompt-workflow-test
   (testing "advertise false in edn config propagates into the compiled definition"
     (let [{:keys [definition error]}
           (compiler/compile-workflow-file
@@ -74,12 +80,6 @@
       (is (nil? error))
       (is (not (contains? definition :advertise)))))
 
-  (testing "batch compilation keeps markdown and edn successes together"
-    (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
-      (is (= 2 (count definitions)))
-      (is (empty? errors)))))
-
-(deftest compile-edn-prompt-workflow-test
   (testing "edn workflows require top-level name and description"
     (let [{missing-name-error :error}
           (compiler/compile-workflow-file
