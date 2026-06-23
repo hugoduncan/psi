@@ -19,3 +19,6 @@
 - [x] Add a test (or assert in an existing one) for the acceptance criterion that a non-advertised skill/workflow remains registered and invocable by name; this is currently only live-verified, not guarded by an automated test.
 - [x] Reconcile the markdown/EDN default asymmetry or document it: markdown compile sets explicit `:advertise true` when absent, while the EDN path leaves `:advertise` absent (nil). Behaviour is correct (filter uses `false?`), but the asymmetry is an inconsistency worth a deliberate decision.
 - [x] Resolve the untracked `doc/agent-facets.md` (overlaps the advertise/"conditionally advertised" topic but is not part of any task commit): commit it intentionally or remove it.
+
+## Test review follow-up
+- [ ] Add a test that `format-skills-for-prompt-lambda` excludes `advertise: false` skills. The acceptance criterion names both `format-skills-for-prompt` **and** `-lambda` as system-context formatters that must drop non-advertised skills, but `-lambda` currently has no test at all (neither advertise filtering nor general output). Shared `prompt-hidden?` is an implementation detail; a refactor could diverge the two formatters with no failing test.
