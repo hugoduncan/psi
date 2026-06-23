@@ -51,7 +51,7 @@
 - [x] Make `init` idempotent for reload safety — design constraint requires clean reload without state corruption; currently `init` appends a new handler on every call (documented by `init-reload-safety-test` but not fixed); add a `compare-and-set!` guard on a private atom so repeated calls are no-ops
 - [x] Complete edge case test for partial missing keys — `handler-handles-missing-payload-keys-test` only exercises `{}` (both keys missing); add cases for `{:session-id "s1"}` (turn-id missing) and `{:turn-id "t1"}` (session-id missing) to confirm the `or` fallback works in each direction
 - [x] Fix test fixture in `context_manager_test.clj`: `alter-var-root` was creating a new atom instead of resetting the existing one, which would fail if the atom was not replaced in the namespace
-- [ ] Refactor `turn-finished-handler-fires-and-logs-test` and `handler-handles-missing-payload-keys-test` to use a shared helper for the "create-api-init-get-handler" ceremony to reduce incidental setup and improve signal
+- [x] Refactor `turn-finished-handler-fires-and-logs-test` and `handler-handles-missing-payload-keys-test` to use a shared helper for the "create-api-init-get-handler" ceremony to reduce incidental setup and improve signal
 - [ ] Add a test case for `init` with a non-standard `api` (e.g. missing `:on` or `:log` keys) to verify robustness/failure mode, or document that the extension assumes a valid `nullable-api` contract
 
 ## Docs Review (2026-06-22)

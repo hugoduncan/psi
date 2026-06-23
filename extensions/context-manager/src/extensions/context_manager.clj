@@ -12,7 +12,7 @@
                  "session-id=" session-id
                  " turn-id=" turn-id))))
 
-(def ^:private initialized? (atom nil))
+(def initialized? (atom nil))
 
 (defn init
   "Initialize the context-manager extension.
