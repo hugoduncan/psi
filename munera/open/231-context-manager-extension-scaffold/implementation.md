@@ -67,3 +67,4 @@
 - docs review (2026-06-22): added 3 steps to be addressed
 - test shaper review (2026-06-22): no issues — tests are clear, consistent, robust, and economical; all design behaviors covered with precise assertions and no redundancy
 - test shaper review (2026-06-22): added 1 step to be addressed
+- implementation review (2026-06-22): fixed test fixture in `context_manager_test.clj` (reset! vs alter-var-root)
