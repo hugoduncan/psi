@@ -7,3 +7,5 @@
 
 
 - addressed 1 review step: verified handler registration event name
+- added 3 steps to be addressed (test-shaper).
+
