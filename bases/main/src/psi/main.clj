@@ -237,23 +237,30 @@
 
 (defn -main
   [& args]
-  (when (has-flag? args "--version")
-    (println (str "psi " (version/version-string)))
-    (System/exit 0))
-  (when (or (has-flag? args "--help")
-            (has-flag? args "-h"))
-    (print-help!)
-    (System/exit 0))
-  (set-log-level! (log-level-from-args args))
-  (let [tui?     (has-flag? args "--tui")
-        rpc-edn? (has-flag? args "--rpc-edn")]
-    (cond
-      tui?
-      (run-tui-session! args)
+  (cond
+    (has-flag? args "--version")
+    (do
+      (println (str "psi " (version/version-string)))
+      (exit! 0))
 
-      rpc-edn?
-      (run-rpc-session! args)
+    (or (has-flag? args "--help")
+        (has-flag? args "-h"))
+    (do
+      (print-help!)
+      (exit! 0))
 
-      :else
-      (run-console-session! args))
-    (exit! 0)))
+    :else
+    (do
+      (set-log-level! (log-level-from-args args))
+      (let [tui?     (has-flag? args "--tui")
+            rpc-edn? (has-flag? args "--rpc-edn")]
+        (cond
+          tui?
+          (run-tui-session! args)
+
+          rpc-edn?
+          (run-rpc-session! args)
+
+          :else
+          (run-console-session! args))
+        (exit! 0)))))
