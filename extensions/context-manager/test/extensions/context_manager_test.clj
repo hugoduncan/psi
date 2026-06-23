@@ -31,22 +31,25 @@
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil as per design requirement")
         (let [line (last (:log-lines @state))]
-          (is (re-find #"session_turn_finished" line))
-          (is (re-find #"session-id=s1" line))
-          (is (re-find #"turn-id=t1" line))))
+          (is (= "context-manager: session_turn_finished session-id=s1 turn-id=t1" line)
+              "log output must match exact project standard prefix and format")))
       (testing "payload is an empty map"
         (is (nil? (handler {}))
             "handler returns nil")
         (let [line (last (:log-lines @state))]
+          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))
           (is (re-find #"session-id=nil" line))
           (is (re-find #"turn-id=nil" line))))
       (testing "payload is nil"
         (is (nil? (handler nil))
-            "handler must return nil and not throw when payload is nil"))
+            "handler must return nil and not throw when payload is nil")
+        (let [line (last (:log-lines @state))]
+          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))))
       (testing "payload is not a map"
         (is (nil? (handler "not-a-map"))
             "handler must return nil and not throw when payload is not a map")
         (let [line (last (:log-lines @state))]
+          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))
           (is (re-find #"session-id=nil" line))
           (is (re-find #"turn-id=nil" line)))))))
 

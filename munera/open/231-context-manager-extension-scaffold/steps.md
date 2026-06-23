@@ -73,8 +73,8 @@
 
 ## Test Shaper Review (2026-06-23)
 
-- [ ] Add a test verifying that the handler does not throw when the payload is not a map (e.g. a string or number), ensuring robustness against malformed event payloads. (Note: `turn-finished-handler-fires-and-logs-test` has a "payload is not a map" case, but verify it's comprehensive).
-- [ ] Verify that the handler's log output is consistent with the project's logging standards (e.g. prefixing with `context-manager: `) and that this is explicitly asserted in tests. (Note: `on-turn-finished` uses the prefix, but tests use `re-find` for parts of the string; add a test for the exact prefix).
+- [x] Add a test verifying that the handler does not throw when the payload is not a map (e.g. a string or number), ensuring robustness against malformed event payloads. (Note: `turn-finished-handler-fires-and-logs-test` has a "payload is not a map" case, but verify it's comprehensive).
+- [x] Verify that the handler's log output is consistent with the project's logging standards (e.g. prefixing with `context-manager: `) and that this is explicitly asserted in tests. (Note: `on-turn-finished` uses the prefix, but tests use `re-find` for parts of the string; add a test for the exact prefix).
 - [ ] Refactor `init-registration-contract-test` to explicitly verify the registration call arguments (event name and handler function) using a spy or custom nullable API, rather than just inspecting the resulting state map.
 
 ## Task Test Review (2026-06-23)
