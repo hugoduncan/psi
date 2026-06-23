@@ -65,5 +65,5 @@
 
 ## Test Review (2026-06-22, final)
 
-- [ ] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
+- [x] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
 

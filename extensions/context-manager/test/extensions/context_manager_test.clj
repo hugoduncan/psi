@@ -21,7 +21,11 @@
     (let [{:keys [state]} (setup-api)]
       (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
       (is (contains? (get-in @state [:handlers]) "session_turn_finished")
-          "handler map must explicitly contain the session_turn_finished key"))))
+          "handler map must explicitly contain the session_turn_finished key")
+      (testing "handler is registered with the correct event name"
+        (let [handlers (get-in @state [:handlers])]
+          (is (contains? handlers "session_turn_finished")
+              "the registration must be under the key 'session_turn_finished'"))))))
 
 (deftest turn-finished-handler-fires-and-logs-test
   (testing "handler fires on synthetic session_turn_finished event and logs session-id and turn-id"
