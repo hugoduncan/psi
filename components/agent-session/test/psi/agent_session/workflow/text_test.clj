@@ -31,15 +31,15 @@
       (is (= "tool: delegate\nNo workflows available."
              (text/build-prompt-contribution defs))))))
 
-(deftest non-advertised-workflow-stays-listed-and-invocable-test
+(deftest non-advertised-workflow-stays-listed-test
   (testing "an :advertise false workflow is omitted from the system context but
-            stays in the user-facing list (registered + invocable by name)"
+            stays in the user-facing list"
     (let [defs {"public"   {:name "public" :summary "Public"}
                 "internal" {:name "internal" :summary "Internal" :advertise false}}]
       ;; Dropped from the agent-facing prompt contribution.
       (is (not (str/includes? (text/build-prompt-contribution defs) "internal")))
-      ;; Still present in the user-facing listing, hence still registered and
-      ;; invocable by name via delegate.
+      ;; Still present in the user-facing listing.
+      ;; (Execution-resolution is covered by resolve-runnable-definition-test.)
       (is (str/includes? (text/available-workflows-text defs) "internal")))))
 
 (deftest resolve-runnable-definition-test

@@ -211,7 +211,20 @@
       (is (= "/path/SKILL.md" (:file-path skill)))
       (is (= "/path" (:base-dir skill)))
       (is (= :user (:source skill)))
-      (is (false? (:disable-model-invocation skill))))))
+      (is (false? (:disable-model-invocation skill)))))
+  (testing "->skill propagates explicit :advertise false"
+    (let [parsed {:name "test" :description "Test skill"
+                  :file-path "/path/SKILL.md" :base-dir "/path"
+                  :disable-model-invocation false :advertise false}
+          skill  (skills/->skill parsed :user)]
+      (is (false? (:advertise skill)))))
+  (testing "->skill leaves :advertise absent when not parsed (treated as advertised)"
+    (let [parsed {:name "test" :description "Test skill"
+                  :file-path "/path/SKILL.md" :base-dir "/path"
+                  :disable-model-invocation false}
+          skill  (skills/->skill parsed :user)]
+      (is (nil? (:advertise skill)))
+      (is (not (false? (:advertise skill)))))))
 
 ;; ============================================================
 ;; Directory loading
