@@ -117,3 +117,6 @@
 
 ## Code-shaper review follow-up (second pass execution)
 - addressed 1 code-shaper follow-up step. Routed `format-skills-for-prompt`, `format-skills-for-prompt-lambda`, and `skill-summary` counts through `skill-registry/visible-skills`/`hidden-skills` (canonical partition); removed the now-unused private `prompt-hidden?` alias (`enrich-skill` already uses the registry predicate directly). Single source for the partition rule. clj-kondo clean; skills-test 17 tests / 115 assertions pass.
+
+## Code-shaper review (third pass)
+- added 1 follow-up step: `parse-skill-file` uses divergent boolean-frontmatter coercion idioms for `disable-model-invocation` (case-sensitive, no trim) vs `advertise` (trim+lowercase), an in-function consistency gap and a secondary divergence from design Q4's "only the literal `false`" wording.
