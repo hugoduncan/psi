@@ -12,34 +12,6 @@
   | disagree ⇔ warranted_by(analysis(x))
   | output(honest_assessment(x))
 
-λ intellect(x).
-  mode ∈ {
-    deductive,
-    inductive,
-    abductive,
-    critical,
-    socratic,
-    dialectical,
-    analytical,
-    synthetic,
-    empirical,
-    pragmatic,
-    creative,
-    systems,
-    probabilistic,
-    hermeneutic,
-    ethical,
-    metacognitive,
-    strategic,
-    causal,
-    counterfactual,
-    formal
-  }
-  | select(mode) according_to(task(x), uncertainty(x), evidence(x), goal(x))
-  | apply(mode, x)
-  | output(reasoned_assessment(x))
-
-
 Artifacts ≡ {meta spec tests code doc}
 MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own protocol⟩
   | change_chain ∉ MemoryArtifacts   ⟨change_chain governs {meta spec tests code doc}⟩
@@ -52,17 +24,6 @@ MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own pr
   | mementum governs MemoryArtifacts   ⟨gate-1 ∧ gate-2 ∧ (approval_gate ∨ autonomous_artifact_extraction) ∈ mementum⟩
   | working_memory(state.md) ≡ AI_updates_during_work   ⟨no approval gate⟩
   | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs; except autonomous_artifact_extraction⟩
-
-λ state_md(x).   ⟨project convention; mementum stays external/unchanged⟩
-  | state.md ≡ current_state_snapshot(features ∧ structure ∧ orientation)   ⟨bootloader⟩
-  | update(state.md) ≡ edit_in_place ∧ prune_stale   ⟨¬append_log⟩
-  | ¬contains(state.md, {task_pass_notes ∨ review_pass_log ∨ per_commit_history ∨ progress_entries})
-  | task_progress → munera_task_artifacts({implementation.md ∧ steps.md})   ⟨not state.md⟩
-  | durable_lesson → memories ∨ knowledge   ⟨not state.md⟩
-  | history(state.md) ≡ git   ⟨recover via git log, ¬accreted in-file⟩
-  | delegated_session(review ∨ implement ∨ plan) → ¬obligated(update(state.md))
-      ⟨write task_progress to task artifacts; touch state.md only on real feature/structure shift⟩
-  | size(state.md) → small ∧ scannable(≤ ~30s)   ⟨grows → prune, ¬accrete⟩
 
 role(meta) ≡ {why invariants boundaries ¬how ¬syntax}
 role(spec) ≡ {behaviour surfaces examples acceptance_criteria}
@@ -154,13 +115,6 @@ iterate_to_fix  spec_step matches intention spec0
 λintrospect(ψ). psi-tool ∨ nrepl ∨ rpc(logging)
 
 λ task_creation(x). initial(x) → create_only(design.md) ∧ ¬create(plan.md) ∧ ¬write(plan.md) ∧ ¬create(steps.md) ∧ ¬create(implementation.md)
-
-λ task_design_md(x).
-  describes(x,{intent ∧ scope ∧ overall_functionality})
-  ∧ ¬describes(x,code_changes)
-  ∧ refined_collaboratively_with_user(x)
-  ∧ unambiguous(x)
-  ∧ explicitly_covers_all_relevant_aspects(x)
 
 λ plan.md. MUST ¬exist ∨ ¬write
 | ¬complete(design.md) ∨ ∃ ambiguity(design.md)
@@ -418,13 +372,6 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
   ∧ ((shim(x) ∨ adapter(x)) → (violates(one_way_guideline) ∧ increases(complexity)))
   ∧ (change_requires(interface_mismatch) → (choose(explicit_contract_update) > compatibility_layer))
   ∧ ((exception(x) → (requires(user_intent) ∨ documented_design_decision(x))))
-
-### Frontier
-
-- **Handler purity**: pure-result shape (`{:root-state-update f :effects [...]}`) defined and validated; legacy handlers still perform side effects inline — migration ongoing
-- **Tool execution boundary**: actual tool execution is intentionally owned by the runtime boundary and has not moved under dispatch-owned runtime effects — blocks full replay fidelity
-- **Validation rollback**: validate-interceptor is post-apply; invalid results suppress effects but do not roll back already-applied state
-- **Manifest permissions**: `allowed-events` only enforced when explicitly declared; missing manifests get compatibility-allow — implicit permissions still exist
 
 ## Verify Runtime
 
