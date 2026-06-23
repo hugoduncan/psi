@@ -53,6 +53,12 @@
 - [x] Add test for `init` with `api` as a non-map (e.g. a string or number) — verify it returns `nil` and does not throw NPE (current `(and api (:on api))` will throw `ClassCastException` if `api` is not a map).
 - [x] Add test verifying that `init` returns `true` on successful first-time initialization (design says "returns true" implicitly via the `do` block, but no test explicitly asserts the return value of `init` on success).
 
+## Test Shaper Review (2026-06-22, fourth pass)
+
+- [ ] Refactor `on-turn-finished` to use `(get payload :session-id "nil")` instead of `(or (:session-id payload) "nil")` to correctly handle cases where the key is present but the value is explicitly `nil` or `false` (though unlikely for IDs, it's more robust).
+- [ ] Add a test case to `turn-finished-handler-fires-and-logs-test` verifying that the handler logs correctly when the payload is an empty map `{}` (currently covered by `handler-handles-missing-payload-keys-test`, but should be part of the nominal/edge-case suite for the handler itself).
+- [ ] Verify that `initialized?` is reset to `nil` in `use-fixtures` of `context_manager_test.clj` (it is, but ensure it's consistent across all test files if more are added).
+
 
 
 ## Docs Review (2026-06-22)
