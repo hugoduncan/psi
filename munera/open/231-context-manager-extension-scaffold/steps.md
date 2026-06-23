@@ -71,7 +71,10 @@
 
 - [x] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
 
-## Test Review (2026-06-22, final)
+## Test Shaper Review (2026-06-22, sixth pass)
 
-- [x] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
+- [ ] Add a test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call (e.g. using a spy or a custom nullable API) rather than just checking the resulting state map, to ensure the `(:on api)` call is made with the correct arguments.
+- [ ] Add a test verifying that the handler is registered as a function (not a map or other type) to ensure compatibility with the dispatch pipeline's expectation of a handler function.
+- [ ] Add a test verifying that the handler does not mutate any external state (beyond the provided log-fn) to ensure it remains a pure-result handler as per the VSM S1/S3 purity goals.
+
 
