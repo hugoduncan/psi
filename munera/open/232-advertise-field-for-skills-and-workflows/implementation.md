@@ -102,3 +102,6 @@
 - added 1 follow-up step: `doc/workflows.md` sub-only-workflow example list omits the "modular `gh-*` sub-steps" category that the CHANGELOG includes (consistency/completeness gap between two user-facing docs for the same flipped set).
 
 - addressed 1 docs-review follow-up (4th pass): added `gh-*` sub-step category to doc/workflows.md advertise example list, matching the CHANGELOG.
+
+## Docs review (review-task-docs, fifth pass)
+- no new actionable steps; CHANGELOG + doc/workflows.md accurate/complete/consistent (skill set `review-*`/`task-*-review`/`issue-*`, workflow sub-step set, surface-separated invocation vs `/delegate list` listing). README correctly defers detail to doc/workflows.md.
