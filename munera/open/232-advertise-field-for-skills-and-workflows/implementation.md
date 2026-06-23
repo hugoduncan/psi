@@ -108,3 +108,6 @@
 
 ## Code-shaper review
 - added 2 follow-up steps: skill-visibility partition (skill-summary/visible-skills/hidden-skills/enrich-skill) still keys off `:disable-model-invocation` only and diverges from the new canonical `prompt-hidden?` (advertise-false skills reported "visible"); and a third inline duplicate of the visibility filter in tui render `banner-rows`.
+
+## Code-shaper review follow-up (execution)
+- addressed 2 code-shaper follow-up steps. Decision: system-context visibility is the single concept; promoted `prompt-hidden?` + `visible-skills`/`hidden-skills` into `psi.skill-registry.registry` (shared by prompt-assets and tui; tui cannot depend on prompt-assets). Routed skill-summary counts, visible/hidden-skills, and enrich-skill `:is-available-to-model` through it; tui `banner-rows` now reuses `skill-registry/visible-skills`. Added registry tests (`prompt-hidden?-test`, `visible-hidden-skills-test`) and advertise-false assertions to skills introspection tests. clj-kondo clean; 30 tests / 233 assertions pass.

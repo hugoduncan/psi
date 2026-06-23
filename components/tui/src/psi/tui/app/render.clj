@@ -31,8 +31,7 @@
 
 (defn- banner-rows
   [model-text prompt-templates skills extension-summary]
-  (let [visible-skills (->> (skill-registry/all-skills skills)
-                            (remove :disable-model-invocation))
+  (let [visible-skills (skill-registry/visible-skills skills)
         ext-count      (:extension-count extension-summary 0)]
     [{:prefix "  Model: "
       :text model-text}

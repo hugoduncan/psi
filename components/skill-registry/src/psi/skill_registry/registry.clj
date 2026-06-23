@@ -32,6 +32,30 @@
   [skills skill-name]
   (some #(when (= (:name %) skill-name) %) (or skills [])))
 
+(defn prompt-hidden?
+  "Return true when `skill` must be excluded from the system-context listing:
+   either it disables model invocation, or it carries `advertise: false`.
+   Absent `:advertise` (or any non-false value) keeps the skill advertised.
+
+   Canonical system-context visibility predicate — all surfaces that report
+   or render which skills the model sees should route through this so they
+   cannot drift."
+  [skill]
+  (or (:disable-model-invocation skill)
+      (false? (:advertise skill))))
+
+(defn visible-skills
+  "Return the registered skills that appear in the system context, in canonical
+   skill-name order (those not `prompt-hidden?`)."
+  [skills]
+  (vec (remove prompt-hidden? (all-skills skills))))
+
+(defn hidden-skills
+  "Return the registered skills excluded from the system context, in canonical
+   skill-name order (those `prompt-hidden?`)."
+  [skills]
+  (vec (filter prompt-hidden? (all-skills skills))))
+
 (defn skill-names
   "Return the registered skill names in canonical skill-name order."
   [skills]

@@ -634,7 +634,13 @@
       (is (= 3 (:skill-count summary)))
       (is (= 2 (:visible-count summary)))
       (is (= 1 (:hidden-count summary)))
-      (is (= ["a" "b" "c"] (mapv :name (:skills summary)))))))
+      (is (= ["a" "b" "c"] (mapv :name (:skills summary))))))
+  (testing "advertise: false counts as hidden, not visible"
+    (let [all-skills [{:name "a" :description "A" :source :user :disable-model-invocation false :advertise false}
+                      {:name "b" :description "B" :source :user :disable-model-invocation false :advertise true}]
+          summary (skills/skill-summary all-skills)]
+      (is (= 1 (:visible-count summary)))
+      (is (= 1 (:hidden-count summary))))))
 
 (deftest skill-names-test
   (testing "returns canonical name vector"
@@ -663,7 +669,13 @@
     (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
                       {:name "z-hidden" :description "Z" :source :user :disable-model-invocation true}
                       {:name "a-hidden" :description "A" :source :user :disable-model-invocation true}]]
-      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills)))))))
+      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills))))))
+
+  (testing "advertise: false partitions as hidden, not visible"
+    (let [all-skills [{:name "shown" :description "S" :source :user :disable-model-invocation false :advertise true}
+                      {:name "unadvertised" :description "U" :source :user :disable-model-invocation false :advertise false}]]
+      (is (= ["shown"] (mapv :name (skills/visible-skills all-skills))))
+      (is (= ["unadvertised"] (mapv :name (skills/hidden-skills all-skills)))))))
 
 (deftest enrich-skill-test
   (testing "adds is-available-to-model"
@@ -673,6 +685,11 @@
 
   (testing "hidden skill is not available to model"
     (let [skill {:name "test" :description "Test" :source :user :disable-model-invocation true}
+          enriched (skills/enrich-skill skill)]
+      (is (false? (:is-available-to-model enriched)))))
+
+  (testing "advertise: false skill is not available to model"
+    (let [skill {:name "test" :description "Test" :source :user :disable-model-invocation false :advertise false}
           enriched (skills/enrich-skill skill)]
       (is (false? (:is-available-to-model enriched))))))
 

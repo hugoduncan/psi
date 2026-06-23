@@ -504,13 +504,10 @@
       (str/replace "\"" "&quot;")
       (str/replace "'" "&apos;")))
 
-(defn- prompt-hidden?
-  "True if a skill must be excluded from the system-prompt listing: either it
-   disables model invocation, or it carries `advertise: false`. Absent
-   `:advertise` (or any non-false value) keeps the skill advertised."
-  [skill]
-  (or (:disable-model-invocation skill)
-      (false? (:advertise skill))))
+(def ^:private prompt-hidden?
+  "Canonical system-context visibility predicate (see
+   `psi.skill-registry.registry/prompt-hidden?`)."
+  skill-registry/prompt-hidden?)
 
 (defn format-skills-for-prompt
   "Format skills for inclusion in a system prompt.
@@ -599,13 +596,14 @@
   [skills]
   (let [ordered-skills (skill-registry/all-skills skills)]
     {:skill-count       (count ordered-skills)
-     :visible-count     (count (remove :disable-model-invocation ordered-skills))
-     :hidden-count      (count (filter :disable-model-invocation ordered-skills))
+     :visible-count     (count (remove prompt-hidden? ordered-skills))
+     :hidden-count      (count (filter prompt-hidden? ordered-skills))
      :skills            (mapv (fn [s]
                                 {:name                     (:name s)
                                  :description              (:description s)
                                  :source                   (:source s)
-                                 :disable-model-invocation (:disable-model-invocation s)})
+                                 :disable-model-invocation (:disable-model-invocation s)
+                                 :advertise                (:advertise s)})
                               ordered-skills)}))
 
 (defn skill-names
@@ -619,17 +617,21 @@
   (group-by :source (skill-registry/all-skills skills)))
 
 (defn visible-skills
-  "Return skills that are available to the model (not disabled)."
+  "Return skills that appear in the model's system context (not `prompt-hidden?`)."
   [skills]
-  (vec (remove :disable-model-invocation (skill-registry/all-skills skills))))
+  (skill-registry/visible-skills skills))
 
 (defn hidden-skills
-  "Return skills with disable-model-invocation=true."
+  "Return skills excluded from the model's system context (those `prompt-hidden?`)."
   [skills]
-  (vec (filter :disable-model-invocation (skill-registry/all-skills skills))))
+  (skill-registry/hidden-skills skills))
 
 (defn enrich-skill
-  "Add derived fields to a Skill map for introspection."
+  "Add derived fields to a Skill map for introspection.
+
+   `:is-available-to-model` reflects system-context visibility: a skill carrying
+   `advertise: false` (or `disable-model-invocation`) is not surfaced to the
+   model and so is reported as unavailable to it."
   [skill]
   (assoc skill
-         :is-available-to-model (not (:disable-model-invocation skill))))
+         :is-available-to-model (not (skill-registry/prompt-hidden? skill))))
