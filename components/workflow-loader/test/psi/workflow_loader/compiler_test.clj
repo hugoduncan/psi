@@ -62,6 +62,18 @@
                                 (assoc markdown-parsed :advertise false))]
       (is (false? (:advertise definition)))))
 
+  (testing "advertise false in edn config propagates into the compiled definition"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           (assoc-in edn-parsed [:config :advertise] false))]
+      (is (nil? error))
+      (is (false? (:advertise definition)))))
+
+  (testing "advertise absent from edn config leaves advertise absent in the definition"
+    (let [{:keys [definition error]} (compiler/compile-workflow-file edn-parsed)]
+      (is (nil? error))
+      (is (not (contains? definition :advertise)))))
+
   (testing "batch compilation keeps markdown and edn successes together"
     (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
       (is (= 2 (count definitions)))

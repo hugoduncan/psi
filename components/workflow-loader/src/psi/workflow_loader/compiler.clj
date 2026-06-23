@@ -287,6 +287,11 @@
     {:error "Workflow EDN files must define top-level `:description` as a non-blank string"}
 
     :else
+    ;; `:advertise` passes through implicitly from `config`: when authored it is
+    ;; carried verbatim; when absent it stays absent (nil). This is deliberately
+    ;; asymmetric with the markdown path (which defaults absent → explicit
+    ;; `true`). Behaviour is identical because the prompt-contribution filter
+    ;; keys on `false?`, so nil and true both advertise.
     (let [{compiled-steps :ok step-error :error}
           (compile-edn-steps source-path (:steps config))
           workflow-definition (cond-> (-> config

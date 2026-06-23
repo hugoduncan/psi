@@ -531,6 +531,24 @@
           (is (some? result))
           (is (str/includes? (:content result) "Hidden content"))))))
 
+  (testing "non-advertised skills are still findable and invocable by name"
+    (with-temp-skills*
+      {"quiet-skill" "---\nname: quiet-skill\ndescription: Quiet\nadvertise: false\n---\nQuiet content"}
+      (fn [dir]
+        (let [all-skills [{:name "quiet-skill" :description "Quiet"
+                           :file-path (str dir "/quiet-skill/SKILL.md")
+                           :base-dir (str dir "/quiet-skill")
+                           :source :user :disable-model-invocation false
+                           :advertise false}]]
+          ;; Dropped from the system context prompt.
+          (is (not (str/includes? (skills/format-skills-for-prompt all-skills)
+                                  "<name>quiet-skill</name>")))
+          ;; Still registered (findable) and invocable by name.
+          (is (some? (skills/find-skill all-skills "quiet-skill")))
+          (let [result (skills/invoke-skill all-skills "/skill:quiet-skill")]
+            (is (some? result))
+            (is (str/includes? (:content result) "Quiet content")))))))
+
   (testing "returns nil for non-skill commands"
     (is (nil? (skills/invoke-skill [] "/help")))
     (is (nil? (skills/invoke-skill [] "regular text")))))
