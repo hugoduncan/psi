@@ -1,2 +1,5 @@
 - addressed 2 review steps (refactored tests to use shared helper, fixed public visibility of initialized? for test reset)
+- addressed 2 review steps (refactored tests to use shared helper, fixed public visibility of initialized? for test reset)
 - review: no new actionable issues found
+- added 1 step to be addressed (verify initialized? reset in all test scenarios)
+
