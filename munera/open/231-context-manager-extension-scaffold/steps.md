@@ -49,7 +49,7 @@
 - [x] Add a test case to `init-robustness-test` verifying that if `init` fails due to a missing `:on` key, a subsequent call with a valid API still succeeds (currently `initialized?` is not set on failure, but explicit verification is missing).
 - [x] Add test for `init` with `api` as `nil` — verify it returns `nil` and does not throw NPE (current `init` handles `(if (and api ...))` but explicit test coverage is missing).
 - [x] Add test for `init` with `api` as a non-map (e.g. a string or number) — verify it returns `nil` and does not throw NPE (current `(and api (:on api))` will throw `ClassCastException` if `api` is not a map).
-- [ ] Add test verifying that `init` returns `true` on successful first-time initialization (design says "returns true" implicitly via the `do` block, but no test explicitly asserts the return value of `init` on success).
+- [x] Add test verifying that `init` returns `true` on successful first-time initialization (design says "returns true" implicitly via the `do` block, but no test explicitly asserts the return value of `init` on success).
 
 
 

@@ -105,3 +105,9 @@
       (is (nil? (sut/init "not-a-map"))
           "should return nil and not throw NPE when api is not a map"))))
 
+(deftest init-return-value-test
+  (testing "init returns true on successful first-time initialization"
+    (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+      (is (true? (sut/init api))
+          "init should return true on successful first-time initialization"))))
+
