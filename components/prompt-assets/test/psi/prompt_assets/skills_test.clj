@@ -496,7 +496,7 @@
                        :source :user :disable-model-invocation false :advertise false}]
           result (skills/format-skills-for-prompt-lambda all-skills)]
       (is (str/includes? result "visible"))
-      (is (not (str/includes? result "internal")))))
+      (is (not (str/includes? result "internal → ")))))
 
   (testing "excludes skills with disable-model-invocation=true"
     (let [all-skills [{:name "visible" :description "Visible"
@@ -507,7 +507,7 @@
                        :source :user :disable-model-invocation true}]
           result (skills/format-skills-for-prompt-lambda all-skills)]
       (is (str/includes? result "visible"))
-      (is (not (str/includes? result "hidden")))))
+      (is (not (str/includes? result "hidden → ")))))
 
   (testing "absent :advertise keeps a skill advertised"
     (let [all-skills [{:name "legacy" :description "Legacy"

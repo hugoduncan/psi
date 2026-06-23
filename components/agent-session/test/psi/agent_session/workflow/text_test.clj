@@ -17,7 +17,7 @@
                 "internal" {:name "internal" :summary "Internal" :advertise false}}
           result (text/build-prompt-contribution defs)]
       (is (str/includes? result "- public: Public"))
-      (is (not (str/includes? result "internal")))))
+      (is (not (str/includes? result "- internal:")))))
 
   (testing "absent or true :advertise keeps a workflow advertised"
     (let [defs {"plain"   {:name "plain" :summary "Plain"}
@@ -37,7 +37,7 @@
     (let [defs {"public"   {:name "public" :summary "Public"}
                 "internal" {:name "internal" :summary "Internal" :advertise false}}]
       ;; Dropped from the agent-facing prompt contribution.
-      (is (not (str/includes? (text/build-prompt-contribution defs) "internal")))
+      (is (not (str/includes? (text/build-prompt-contribution defs) "- internal:")))
       ;; Still present in the user-facing listing.
       ;; (Execution-resolution is covered by resolve-runnable-definition-test.)
       (is (str/includes? (text/available-workflows-text defs) "internal")))))
@@ -51,7 +51,7 @@
       ;; sub-steps: a non-advertised workflow that is dropped from the
       ;; agent-facing prompt contribution must still resolve-for-execution, so
       ;; a future change that drops it from registration/execution is caught.
-      (is (not (str/includes? (text/build-prompt-contribution defs) "internal")))
+      (is (not (str/includes? (text/build-prompt-contribution defs) "- internal:")))
       (is (= internal (text/resolve-runnable-definition defs "internal")))
       (is (= {:name "public" :summary "Public"}
              (text/resolve-runnable-definition defs "public")))))

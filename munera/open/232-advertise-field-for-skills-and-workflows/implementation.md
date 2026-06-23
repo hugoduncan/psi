@@ -75,3 +75,4 @@
 
 ## Test review (test-shaper pass 3)
 - added 1 follow-up step: lambda-formatter and workflow-listing exclusion tests use bare-substring negatives, inconsistent with the delimited `<name>…</name>` negatives in the XML formatter tests and not anchored on the entry contract.
+- addressed 1 test-shaper pass-3 follow-up step: anchored the lambda-formatter negatives on the entry form (`"internal → "`, `"hidden → "`) and the workflow-listing negatives on `"- internal:"` in skills_test and text_test. Tests pass (text-test 13 assertions; skills-test 170 assertions; 0 failures).
