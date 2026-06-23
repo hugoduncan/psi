@@ -48,7 +48,7 @@
 - [x] Refactor `init` to use a more robust check for `api` keys (e.g. `(get api :on)`) and ensure `initialized?` is only set if registration actually succeeds, to avoid blocking subsequent `init` calls if the first one failed due to a malformed API.
 - [x] Add a test case to `init-robustness-test` verifying that if `init` fails due to a missing `:on` key, a subsequent call with a valid API still succeeds (currently `initialized?` is not set on failure, but explicit verification is missing).
 - [x] Add test for `init` with `api` as `nil` — verify it returns `nil` and does not throw NPE (current `init` handles `(if (and api ...))` but explicit test coverage is missing).
-- [ ] Add test for `init` with `api` as a non-map (e.g. a string or number) — verify it returns `nil` and does not throw NPE (current `(and api (:on api))` will throw `ClassCastException` if `api` is not a map).
+- [x] Add test for `init` with `api` as a non-map (e.g. a string or number) — verify it returns `nil` and does not throw NPE (current `(and api (:on api))` will throw `ClassCastException` if `api` is not a map).
 
 
 

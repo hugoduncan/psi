@@ -20,7 +20,7 @@
    Subscribes to `session_turn_finished` events via the extension API.
    Idempotent — repeated calls (e.g. on reload) are no-ops."
   [api]
-  (if (and api
+  (if (and (map? api)
            (:on api)
            (compare-and-set! initialized? nil true))
     (do
@@ -30,7 +30,7 @@
                      (on-turn-finished (:log api) payload))
                    nil))
       true)
-    (if (and api (:on api))
+    (if (and (map? api) (:on api))
       nil ; already initialized
       (do
         (reset! initialized? nil) ; ensure we don't block future attempts if this one failed

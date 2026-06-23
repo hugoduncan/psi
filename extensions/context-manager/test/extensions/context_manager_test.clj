@@ -100,5 +100,8 @@
               "handler should return nil and not throw NPE when log-fn is missing"))))
     (testing "api is nil"
       (is (nil? (sut/init nil))
-          "should return nil and not throw NPE when api is nil"))))
+          "should return nil and not throw NPE when api is nil"))
+    (testing "api is not a map"
+      (is (nil? (sut/init "not-a-map"))
+          "should return nil and not throw NPE when api is not a map"))))
 
