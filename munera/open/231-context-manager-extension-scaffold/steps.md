@@ -71,12 +71,11 @@
 
 - [x] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
 
-## Test Shaper Review (2026-06-22, seventh pass)
+## Test Shaper Review (2026-06-23)
 
-- [x] Add a test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call (e.g. using a spy or a custom nullable API) rather than just checking the resulting state map, to ensure the `(:on api)` call is made with the correct arguments. (Note: `init-registration-call-test` exists, but verify it is sufficient and not redundant with `init-registration-contract-test`).
-- [x] Refactor `init-registration-call-test` and `init-registration-contract-test` into a single, cohesive registration contract test to avoid redundancy and improve signal.
-- [x] Add a test verifying that the handler does not throw when the payload is not a map (e.g. a string or number), ensuring robustness against malformed event payloads.
-- [x] Verify that the handler's log output is consistent with the project's logging standards (e.g. prefixing with `context-manager: `) and that this is explicitly asserted in tests.
+- [ ] Add a test verifying that the handler does not throw when the payload is not a map (e.g. a string or number), ensuring robustness against malformed event payloads. (Note: `turn-finished-handler-fires-and-logs-test` has a "payload is not a map" case, but verify it's comprehensive).
+- [ ] Verify that the handler's log output is consistent with the project's logging standards (e.g. prefixing with `context-manager: `) and that this is explicitly asserted in tests. (Note: `on-turn-finished` uses the prefix, but tests use `re-find` for parts of the string; add a test for the exact prefix).
+- [ ] Refactor `init-registration-contract-test` to explicitly verify the registration call arguments (event name and handler function) using a spy or custom nullable API, rather than just inspecting the resulting state map.
 
 ## Task Test Review (2026-06-23)
 
