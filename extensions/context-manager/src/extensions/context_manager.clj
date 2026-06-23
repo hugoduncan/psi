@@ -6,11 +6,17 @@
 
 (defn- on-turn-finished
   [log-fn payload]
-  (let [session-id (get payload :session-id "nil")
-        turn-id (get payload :turn-id "nil")]
-    (log-fn (str "context-manager: session_turn_finished "
-                 "session-id=" session-id
-                 " turn-id=" turn-id))))
+  (try
+    (let [session-id (get payload :session-id "nil")
+          turn-id (get payload :turn-id "nil")]
+      (log-fn (str "context-manager: session_turn_finished "
+                   "session-id=" session-id
+                   " turn-id=" turn-id)))
+    (catch Exception e
+      (try
+        (log-fn (str "context-manager: handler error: " (.getMessage e)))
+        (catch Exception _ nil))
+      nil)))
 
 (def initialized? (atom nil))
 
