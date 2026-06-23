@@ -1,4 +1,4 @@
-(ns psi.agent-session.workflow-reload-runtime-test
+(ns ^:integration psi.agent-session.workflow-reload-runtime-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]

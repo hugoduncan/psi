@@ -1,4 +1,4 @@
-(ns psi.ai.providers.anthropic-live-structured-output-test
+(ns ^:integration psi.ai.providers.anthropic-live-structured-output-test
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]

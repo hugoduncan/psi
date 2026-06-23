@@ -1,4 +1,4 @@
-(ns psi.tui.tmux-integration-harness-test
+(ns ^:integration psi.tui.tmux-integration-harness-test
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.tui.test-harness.tmux :as tmux]

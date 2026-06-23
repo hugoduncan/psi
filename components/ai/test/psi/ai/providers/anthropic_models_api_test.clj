@@ -1,4 +1,4 @@
-(ns psi.ai.providers.anthropic-models-api-test
+(ns ^:integration psi.ai.providers.anthropic-models-api-test
   (:require
    [clj-http.client :as http]
    [clojure.string :as str]
