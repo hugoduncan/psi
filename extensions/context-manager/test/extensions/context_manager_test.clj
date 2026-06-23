@@ -85,6 +85,12 @@
       (is (nil? (sut/init {:log (fn [_] nil)}))
           "should return nil and not throw NPE when :on is missing")
       (reset! sut/initialized? nil))
+    (testing "recovery after missing :on key"
+      (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+        (is (nil? (sut/init {:log (fn [_] nil)})) "first call fails")
+        (is (true? (sut/init api)) "subsequent call with valid API succeeds")
+        (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
+        (reset! sut/initialized? nil)))
     (testing "missing :log key"
       (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
         (reset! sut/initialized? nil)

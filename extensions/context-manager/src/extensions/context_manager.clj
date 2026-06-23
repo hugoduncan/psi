@@ -20,12 +20,19 @@
    Subscribes to `session_turn_finished` events via the extension API.
    Idempotent — repeated calls (e.g. on reload) are no-ops."
   [api]
-  (when (and api
-             (:on api)
-             (compare-and-set! initialized? nil true))
-    ((:on api) "session_turn_finished"
-               (fn [payload]
-                 (if (:log api)
-                   (on-turn-finished (:log api) payload)
-                   (println "context-manager: log-fn missing in api"))
-                 nil))))
+  (if (and api
+           (:on api)
+           (compare-and-set! initialized? nil true))
+    (do
+      ((:on api) "session_turn_finished"
+                 (fn [payload]
+                   (if (:log api)
+                     (on-turn-finished (:log api) payload)
+                     (println "context-manager: log-fn missing in api"))
+                   nil))
+      true)
+    (if (and api (:on api))
+      nil ; already initialized
+      (do
+        (reset! initialized? nil) ; ensure we don't block future attempts if this one failed
+        nil))))

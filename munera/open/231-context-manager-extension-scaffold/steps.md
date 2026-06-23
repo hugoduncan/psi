@@ -45,8 +45,8 @@
 
 ## Review Follow-ups (2026-06-22)
 
-- [ ] Refactor `init` to use a more robust check for `api` keys (e.g. `(get api :on)`) and ensure `initialized?` is only set if registration actually succeeds, to avoid blocking subsequent `init` calls if the first one failed due to a malformed API.
-- [ ] Add a test case to `init-robustness-test` verifying that if `init` fails due to a missing `:on` key, a subsequent call with a valid API still succeeds (currently `initialized?` is not set on failure, but explicit verification is missing).
+- [x] Refactor `init` to use a more robust check for `api` keys (e.g. `(get api :on)`) and ensure `initialized?` is only set if registration actually succeeds, to avoid blocking subsequent `init` calls if the first one failed due to a malformed API.
+- [x] Add a test case to `init-robustness-test` verifying that if `init` fails due to a missing `:on` key, a subsequent call with a valid API still succeeds (currently `initialized?` is not set on failure, but explicit verification is missing).
 
 
 ## Docs Review (2026-06-22)
