@@ -15,6 +15,7 @@
 (def ^:private allowed-md-frontmatter-keys
   #{:name
     :description
+    :advertise
     :tools
     :skills
     :model
@@ -159,6 +160,9 @@
   (let [{:keys [frontmatter body]} (pt/extract-frontmatter (or raw ""))
         name (trim-non-empty-string (:name frontmatter))
         description (trim-non-empty-string (:description frontmatter))
+        advertise (not (= "false"
+                          (some-> (:advertise frontmatter)
+                                  str str/trim str/lower-case)))
         body-text (some-> body str/trim not-empty)
         {parsed-vars :ok vars-error :error} (parse-vars-frontmatter (:vars frontmatter))]
     (cond
@@ -187,6 +191,7 @@
       {:workflow-kind :single-step-markdown
        :name name
        :description description
+       :advertise advertise
        :session-config (single-step-frontmatter frontmatter)
        :body body-text
        :vars parsed-vars})))

@@ -20,6 +20,18 @@
       (is (= "4" (get-in result [:session-config :top-logprobs])))
       (is (= "You are a planner." (:body result)))))
 
+  (testing "advertise defaults to true when absent"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans tasks\n---\nBody")]
+      (is (true? (:advertise result)))))
+
+  (testing "advertise: false parses to false"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans tasks\nadvertise: false\n---\nBody")]
+      (is (false? (:advertise result)))))
+
+  (testing "advertise typo defaults to advertised"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans tasks\nadvertise: flase\n---\nBody")]
+      (is (true? (:advertise result)))))
+
   (testing "markdown workflow rejects missing name"
     (let [result (parser/parse-workflow-file :md "---\ndescription: Plans tasks\n---\nBody")]
       (is (= "Missing required frontmatter key: name" (:error result)))))

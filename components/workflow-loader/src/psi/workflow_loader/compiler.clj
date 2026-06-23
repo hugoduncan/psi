@@ -75,11 +75,12 @@
          session-config))
 
 (defn- compile-markdown-workflow-file
-  [{:keys [name description source-path] :as parsed}]
+  [{:keys [name description advertise source-path] :as parsed}]
   {:definition {:definition-id name
                 :name name
                 :summary description
                 :description description
+                :advertise (if (nil? advertise) true advertise)
                 :steps [(markdown-session-step parsed)]
                 :workflow-file-meta (cond-> {:file-kind :md}
                                       source-path (assoc :source-path source-path))}})

@@ -176,6 +176,27 @@
         (let [parsed (skills/parse-skill-file (str dir "/hidden/SKILL.md"))]
           (is (true? (:disable-model-invocation parsed)))))))
 
+  (testing "advertise defaults to true when absent"
+    (with-temp-skills*
+      {"plain" "---\nname: plain\ndescription: Plain\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/plain/SKILL.md"))]
+          (is (true? (:advertise parsed)))))))
+
+  (testing "advertise: false parses to false"
+    (with-temp-skills*
+      {"quiet" "---\nname: quiet\ndescription: Quiet\nadvertise: false\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/quiet/SKILL.md"))]
+          (is (false? (:advertise parsed)))))))
+
+  (testing "advertise typo defaults to advertised (only literal false disables)"
+    (with-temp-skills*
+      {"typo" "---\nname: typo\ndescription: Typo\nadvertise: flase\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/typo/SKILL.md"))]
+          (is (true? (:advertise parsed)))))))
+
   (testing "returns nil for non-existent file"
     (is (nil? (skills/parse-skill-file "/nonexistent/path/SKILL.md")))))
 
@@ -403,6 +424,24 @@
           result (skills/format-skills-for-prompt all-skills)]
       (is (str/includes? result "visible"))
       (is (not (str/includes? result "<name>hidden</name>")))))
+
+  (testing "excludes skills with advertise false"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false :advertise true}
+                      {:name "internal" :description "Internal"
+                       :file-path "/i/SKILL.md" :base-dir "/i"
+                       :source :user :disable-model-invocation false :advertise false}]
+          result (skills/format-skills-for-prompt all-skills)]
+      (is (str/includes? result "visible"))
+      (is (not (str/includes? result "<name>internal</name>")))))
+
+  (testing "absent :advertise keeps a skill advertised"
+    (let [all-skills [{:name "legacy" :description "Legacy"
+                       :file-path "/l/SKILL.md" :base-dir "/l"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt all-skills)]
+      (is (str/includes? result "<name>legacy</name>"))))
 
   (testing "returns empty string when no visible skills"
     (let [all-skills [{:name "hidden" :description "Hidden"

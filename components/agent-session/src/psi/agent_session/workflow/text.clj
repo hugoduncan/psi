@@ -91,16 +91,23 @@
     [top-line]))
 
 (defn build-prompt-contribution
-  "Build the prompt contribution text listing available workflows."
+  "Build the prompt contribution text listing available workflows.
+
+   Workflows whose definition carries `:advertise false` are omitted from the
+   system-context listing; they remain invocable via `/delegate <name>` and as
+   delegate sub-steps. Absent `:advertise` (or any non-false value) keeps the
+   workflow advertised."
   [definitions]
-  (if (empty? definitions)
-    "tool: delegate\nNo workflows available."
-    (str "tool: delegate\navailable workflows:\n"
-         (str/join "\n"
-                   (for [[name defn-map] (sort-by key definitions)]
-                     (str "- " name ": " (or (:summary defn-map)
-                                             (:description defn-map)
-                                             "")))))))
+  (let [advertised (remove (fn [[_ defn-map]] (false? (:advertise defn-map)))
+                           definitions)]
+    (if (empty? advertised)
+      "tool: delegate\nNo workflows available."
+      (str "tool: delegate\navailable workflows:\n"
+           (str/join "\n"
+                     (for [[name defn-map] (sort-by key advertised)]
+                       (str "- " name ": " (or (:summary defn-map)
+                                               (:description defn-map)
+                                               ""))))))))
 
 (defn parse-delegate-command
   "Parse `/delegate <workflow> [<prompt>]` args. prompt is optional."

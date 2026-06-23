@@ -135,7 +135,10 @@
             name                   (or (:name frontmatter) parent-dir-name)
             description            (:description frontmatter)
             disable-model-invocation (= "true"
-                                        (str (get frontmatter :disable-model-invocation)))]
+                                        (str (get frontmatter :disable-model-invocation)))
+            advertise                (not (= "false"
+                                             (some-> (get frontmatter :advertise)
+                                                     str str/trim str/lower-case)))]
         {:name                     name
          :description              description
          :lambda-description       (:lambda frontmatter)
@@ -147,6 +150,7 @@
          :allowed-tools            (when-let [at (:allowed-tools frontmatter)]
                                      (str/split (str/trim at) #"\s+"))
          :disable-model-invocation disable-model-invocation
+         :advertise                advertise
          :body                     body}))))
 
 ;; ============================================================
@@ -162,7 +166,8 @@
            :file-path                (:file-path parsed)
            :base-dir                 (:base-dir parsed)
            :source                   source
-           :disable-model-invocation (:disable-model-invocation parsed)}
+           :disable-model-invocation (:disable-model-invocation parsed)
+           :advertise                (:advertise parsed)}
     (:lambda-description parsed) (assoc :lambda-description (:lambda-description parsed))))
 
 ;; ============================================================
@@ -499,14 +504,23 @@
       (str/replace "\"" "&quot;")
       (str/replace "'" "&apos;")))
 
+(defn- prompt-hidden?
+  "True if a skill must be excluded from the system-prompt listing: either it
+   disables model invocation, or it carries `advertise: false`. Absent
+   `:advertise` (or any non-false value) keeps the skill advertised."
+  [skill]
+  (or (:disable-model-invocation skill)
+      (false? (:advertise skill))))
+
 (defn format-skills-for-prompt
   "Format skills for inclusion in a system prompt.
    Uses XML format per Agent Skills standard.
 
-   Skills with disable-model-invocation=true are excluded from the prompt
-   (they can only be invoked explicitly via /skill:name commands)."
+   Skills with disable-model-invocation=true or advertise: false are excluded
+   from the prompt (they can only be invoked explicitly via /skill:name
+   commands or read directly by a workflow step)."
   [skills]
-  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
+  (let [visible (remove prompt-hidden? (skill-registry/all-skills skills))]
     (if (empty? visible)
       ""
       (let [lines (into
@@ -529,7 +543,7 @@
    Uses compact lambda notation. Skills with a :lambda-description
    frontmatter field use that; otherwise falls back to name → description."
   [skills]
-  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
+  (let [visible (remove prompt-hidden? (skill-registry/all-skills skills))]
     (when (seq visible)
       (str "\n\nλ skills. match(task, description) → read(file) | resolve(relative_path, parent(file))\n"
            (str/join "\n"

@@ -19,3 +19,15 @@
 
 ## Design-follow-up resolution (inconsistency step)
 - Resolved the byte-identical inconsistency by scoping the Constraints invariant to items whose `advertise` remains absent/`true`, and explicitly stating the in-task `review-*`/`issue-*` + sub-only-workflow flip is the intended exception. No scope change to the design — the frozen scope (which items get flipped) is unchanged; only the invariant wording was reconciled. Exact enumeration of flipped items remains deferred to planning per Open Question 3.
+
+## Slice 1 — Mechanism (implemented)
+- Decisions on Open Questions recorded in plan.md (Q1=keep both fields; Q2=prompt-contribution only; Q3=enumerated in plan, applied slice 2; Q4=only literal `false` disables).
+- Design refinement: `advertise` is also supported in **markdown** workflow frontmatter (not just EDN), because many sub-only workflows are `.md` files. Uniform concept across both file kinds.
+- Skills (`prompt_assets/skills.clj`): `parse-skill-file` derives `:advertise` (default true; only `"false"` disables), `->skill` propagates it. New private `prompt-hidden?` = `disable-model-invocation OR (false? :advertise)`; both `format-skills-for-prompt` and `-lambda` use it. Absent `:advertise` ⇒ advertised (robust for skills built elsewhere).
+- EDN workflows: `:advertise` already flows through `compile-edn-workflow-file` (config passthrough). `text/build-prompt-contribution` now removes `(false? (:advertise defn-map))`. User-facing `available-workflows-text`/`delegate-list-text` deliberately unchanged (Q2).
+- Markdown workflows: `:advertise` added to `allowed-md-frontmatter-keys`; parsed with same false-coercion; `compile-markdown-workflow-file` sets `:advertise (if (nil? advertise) true advertise)`.
+- Filter predicate uses `false?` (not `not`) so absent values stay advertised — byte-identical default behaviour preserved.
+- Verified: clj-kondo clean; 30 tests / 269 assertions pass (skills, parser, compiler, text).
+
+## Remaining (Slice 2 — Apply the field)
+- Flip enumerated review-*/issue-* skills and sub-only workflows to `advertise: false` and verify drop-from-context + still-invocable.

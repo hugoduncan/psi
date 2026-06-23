@@ -53,6 +53,15 @@
              (first (:steps definition))))
       (is (workflow-definition/target-authored-workflow-definition? definition))))
 
+  (testing "advertise defaults to true when absent from parsed markdown"
+    (let [{:keys [definition]} (compiler/compile-workflow-file markdown-parsed)]
+      (is (true? (:advertise definition)))))
+
+  (testing "advertise false propagates into the markdown definition"
+    (let [{:keys [definition]} (compiler/compile-workflow-file
+                                (assoc markdown-parsed :advertise false))]
+      (is (false? (:advertise definition)))))
+
   (testing "batch compilation keeps markdown and edn successes together"
     (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
       (is (= 2 (count definitions)))
