@@ -62,3 +62,8 @@
 ## Implementation Review (2026-06-22)
 
 - [x] Refactor `init` to avoid `println` when `:log` is missing in `api`; use a fallback log-fn or simply no-op, as `println` violates the "ui-agnostic" and "pure core" ethos of the VSM (S5/S1).
+
+## Task Test Review (2026-06-22)
+
+- [ ] Add test verifying that the handler is registered with the correct event name `session_turn_finished` (currently `init-registers-turn-finished-handler-test` checks the count of handlers for that key, but a more explicit check of the registration call itself or the resulting state map's structure would be more robust).
+- [ ] Add test verifying that the handler returns `nil` for the nominal case (currently `turn-finished-handler-fires-and-logs-test` asserts `(nil? (handler ...))`, but this should be explicitly linked to the design requirement "returns nil").
