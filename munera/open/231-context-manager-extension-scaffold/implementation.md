@@ -5,3 +5,4 @@
 - review complete: implementation matches design and follows architecture.
 - added 1 step to be addressed (Task Test Review 2026-06-23)
 - addressed 1 review step: added init-registration-call-test to verify registration call arguments
+- added 2 steps to be addressed (Task Test Review 2026-06-23)
