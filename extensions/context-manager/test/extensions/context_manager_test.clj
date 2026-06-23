@@ -5,7 +5,7 @@
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
 (use-fixtures :each (fn [f]
-                      (alter-var-root #'sut/initialized? (fn [_] (atom nil)))
+                      (reset! sut/initialized? nil)
                       (f)))
 
 (deftest init-registers-turn-finished-handler-test
