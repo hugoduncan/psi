@@ -136,3 +136,6 @@
   reconciled the EDN-path comment and updated `compiler-test` fixture/assertion
   to the parser-supplied-boolean contract.
 - addressed 2 review steps.
+
+## Code-shaper review (fifth pass)
+- added 1 follow-up step: residual `frontmatter-flag` re-export alias in skills.clj (L124) adds an unnecessary public-var indirection over the canonical `pt/frontmatter-flag`; two internal call-sites can use `pt/` directly.
