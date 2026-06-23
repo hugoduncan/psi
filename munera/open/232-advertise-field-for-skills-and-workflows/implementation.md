@@ -88,3 +88,6 @@
 - added 1 follow-up step: CHANGELOG/doc/workflows.md describe flipped skills as `review-*`/`issue-*` but omit the two `task-*-review` skills actually flipped (accuracy/completeness gap).
 
 - addressed 1 docs-review follow-up: corrected CHANGELOG flipped-skill description to `review-*`, `task-*-review`, `issue-*` (was only `review-*`/`issue-*`, omitting `task-implementation-review`/`task-test-review`). `doc/workflows.md` describes the field generically without enumerating flipped skills, so no change needed there.
+
+## Docs review (review-task-docs, second pass)
+- added 1 follow-up step: CHANGELOG combines skill+workflow invocation paths into one list ("the skill/workflow"), implying skills are reachable via `/delegate` and workflows via `/skill:name` (accuracy gap; `doc/workflows.md` already separates the two surfaces).
