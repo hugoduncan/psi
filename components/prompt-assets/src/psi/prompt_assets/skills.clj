@@ -504,11 +504,6 @@
       (str/replace "\"" "&quot;")
       (str/replace "'" "&apos;")))
 
-(def ^:private prompt-hidden?
-  "Canonical system-context visibility predicate (see
-   `psi.skill-registry.registry/prompt-hidden?`)."
-  skill-registry/prompt-hidden?)
-
 (defn format-skills-for-prompt
   "Format skills for inclusion in a system prompt.
    Uses XML format per Agent Skills standard.
@@ -517,7 +512,7 @@
    from the prompt (they can only be invoked explicitly via /skill:name
    commands or read directly by a workflow step)."
   [skills]
-  (let [visible (remove prompt-hidden? (skill-registry/all-skills skills))]
+  (let [visible (skill-registry/visible-skills skills)]
     (if (empty? visible)
       ""
       (let [lines (into
@@ -540,7 +535,7 @@
    Uses compact lambda notation. Skills with a :lambda-description
    frontmatter field use that; otherwise falls back to name → description."
   [skills]
-  (let [visible (remove prompt-hidden? (skill-registry/all-skills skills))]
+  (let [visible (skill-registry/visible-skills skills)]
     (when (seq visible)
       (str "\n\nλ skills. match(task, description) → read(file) | resolve(relative_path, parent(file))\n"
            (str/join "\n"
@@ -596,8 +591,8 @@
   [skills]
   (let [ordered-skills (skill-registry/all-skills skills)]
     {:skill-count       (count ordered-skills)
-     :visible-count     (count (remove prompt-hidden? ordered-skills))
-     :hidden-count      (count (filter prompt-hidden? ordered-skills))
+     :visible-count     (count (skill-registry/visible-skills skills))
+     :hidden-count      (count (skill-registry/hidden-skills skills))
      :skills            (mapv (fn [s]
                                 {:name                     (:name s)
                                  :description              (:description s)

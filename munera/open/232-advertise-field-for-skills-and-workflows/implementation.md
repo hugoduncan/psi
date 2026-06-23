@@ -114,3 +114,6 @@
 
 ## Code-shaper review (second pass)
 - added 1 follow-up step: formatters + skill-summary recompute the system-context partition inline rather than reusing the canonical `visible-skills`/`hidden-skills` helpers (single-source-of-truth residual after first code-shaper pass).
+
+## Code-shaper review follow-up (second pass execution)
+- addressed 1 code-shaper follow-up step. Routed `format-skills-for-prompt`, `format-skills-for-prompt-lambda`, and `skill-summary` counts through `skill-registry/visible-skills`/`hidden-skills` (canonical partition); removed the now-unused private `prompt-hidden?` alias (`enrich-skill` already uses the registry predicate directly). Single source for the partition rule. clj-kondo clean; skills-test 17 tests / 115 assertions pass.
