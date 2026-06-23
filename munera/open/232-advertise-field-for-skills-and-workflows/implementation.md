@@ -39,3 +39,6 @@
   - edn (8): review-task-{design,implementation,plan}-core, review-step, review-design-turn, gh-bug-request-more-info, review-implementation-in-worktree, task-lifecycle-in-worktree.
 - Left advertised (shared sub-loops/ambiguous, conservative): gh-pr-heal-check-loop, resolve-task-design-entities (top-level wrapper), review-task-{design,plan,implementation} (standalone-summary wrappers).
 - Live verification (loader + text/build-prompt-contribution on this worktree): all flipped workflows registered but absent from prompt contribution; plan-build-review/task-lifecycle still advertised. Pre-existing 7 markdown-body load errors are unrelated to this change.
+
+## Implementation review (task-implementation-review)
+- added 4 follow-up steps: EDN advertise passthrough test gap, missing automated invocability assertion, markdown/EDN default asymmetry, and untracked doc/agent-facets.md.
