@@ -1,11 +1,11 @@
 (ns extensions.context-manager-test
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [extensions.context-manager :as sut]
+   [extensions.context-manager :as context-manager]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
 (use-fixtures :each (fn [f]
-                      (reset! sut/initialized? nil)
+                      (reset! context-manager/initialized? nil)
                       (f)))
 
 (defn- setup-api
@@ -13,7 +13,7 @@
   []
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
                              {:path "/test/context_manager.clj"})]
-    (sut/init api)
+    (context-manager/init api)
     {:api api :state state}))
 
 (deftest init-registers-turn-finished-handler-test
@@ -48,8 +48,8 @@
   (testing "calling init twice does not register duplicate handlers"
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/context_manager.clj"})]
-      (sut/init api)
-      (sut/init api)
+      (context-manager/init api)
+      (context-manager/init api)
       (is (= 1 (count (get-in @state [:handlers "session_turn_finished"])))
           "init is idempotent: calling twice still registers only one handler"))))
 
@@ -95,34 +95,58 @@
 (deftest init-robustness-test
   (testing "init handles non-standard api gracefully"
     (testing "missing :on key"
-      (is (nil? (sut/init {:log (fn [_] nil)}))
+      (is (nil? (context-manager/init {:log (fn [_] nil)}))
           "should return nil and not throw NPE when :on is missing")
-      (reset! sut/initialized? nil))
+      (reset! context-manager/initialized? nil))
     (testing "recovery after missing :on key"
       (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
-        (is (nil? (sut/init {:log (fn [_] nil)})) "first call fails")
-        (is (true? (sut/init api)) "subsequent call with valid API succeeds")
+        (is (nil? (context-manager/init {:log (fn [_] nil)})) "first call fails")
+        (is (true? (context-manager/init api)) "subsequent call with valid API succeeds")
         (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
-        (reset! sut/initialized? nil)))
+        (reset! context-manager/initialized? nil)))
     (testing "missing :log key"
       (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
-        (reset! sut/initialized? nil)
-        (sut/init (dissoc api :log))
+        (reset! context-manager/initialized? nil)
+        (context-manager/init (dissoc api :log))
         (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
           (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
               "handler should return nil and not throw NPE when log-fn is missing")
           (is (empty? (:log-lines @state))
               "handler should not log anything when :log is missing from API"))))
     (testing "api is nil"
-      (is (nil? (sut/init nil))
+      (is (nil? (context-manager/init nil))
           "should return nil and not throw NPE when api is nil"))
     (testing "api is not a map"
-      (is (nil? (sut/init "not-a-map"))
+      (is (nil? (context-manager/init "not-a-map"))
           "should return nil and not throw NPE when api is not a map"))))
 
 (deftest init-return-value-test
   (testing "init returns true on successful first-time initialization"
     (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
-      (is (true? (sut/init api))
+      (is (true? (context-manager/init api))
           "init should return true on successful first-time initialization"))))
 
+(deftest init-registration-contract-test
+  (testing "init registration contract"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init api)
+      (let [handlers (get-in @state [:handlers])]
+        (testing "registered with correct event name"
+          (is (contains? handlers "session_turn_finished")
+              "must register handler for session_turn_finished"))
+        (testing "handler is a function"
+          (let [handler (first (get handlers "session_turn_finished"))]
+            (is (fn? handler)
+                "registered handler must be a function to be compatible with dispatch pipeline")))))))
+
+(deftest handler-purity-test
+  (testing "handler does not mutate external state"
+    (let [{:keys [state]} (setup-api)
+          handler         (first (get-in @state [:handlers "session_turn_finished"]))
+          before-state    @state]
+      (handler {:session-id "s1" :turn-id "t1"})
+      (is (= (dissoc before-state :log-lines) (dissoc @state :log-lines))
+          "handler must not mutate the API state map; it should only use the provided log-fn")
+      (is (= (count (:log-lines before-state)) (dec (count (@state :log-lines))))
+          "the provided log-fn is used"))))
