@@ -19,13 +19,17 @@
 (deftest init-registers-turn-finished-handler-test
   (testing "init registers a session_turn_finished handler"
     (let [{:keys [state]} (setup-api)]
-      (is (= 1 (count (get-in @state [:handlers "session_turn_finished"])))))))
+      (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
+      (is (contains? (get-in @state [:handlers]) "session_turn_finished")
+          "handler map must explicitly contain the session_turn_finished key"))))
 
 (deftest turn-finished-handler-fires-and-logs-test
   (testing "handler fires on synthetic session_turn_finished event and logs session-id and turn-id"
     (let [{:keys [state]} (setup-api)
           handler (first (get-in @state [:handlers "session_turn_finished"]))]
-      (is (nil? (handler {:session-id "s1" :turn-id "t1"})))
+      (testing "handler returns nil for the nominal case"
+        (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+            "handler must return nil as per design requirement"))
       (let [line (last (:log-lines @state))]
         (is (re-find #"session_turn_finished" line))
         (is (re-find #"session-id=s1" line))
