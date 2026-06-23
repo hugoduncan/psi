@@ -64,3 +64,6 @@
 
 ## Test review (task-test-review, third pass)
 - no new actionable steps; tests well-formed, cover design behaviours (both skill formatters, workflow prompt-contribution, parse robustness, EDN/md propagation, registered-and-invocable, execution-resolution), real/nullable deps without mocks. text-test 3 tests/13 assertions pass.
+
+## Test review (test-shaper pass)
+- added 2 follow-up steps: untested `->skill` `:advertise` propagation (skill-construction-test gap), and name/assertion mismatch in `non-advertised-workflow-stays-listed-and-invocable-test` (overclaims "invocable", now redundant with resolve-runnable-definition-test).
