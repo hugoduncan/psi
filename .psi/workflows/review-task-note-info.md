@@ -8,6 +8,7 @@ tools:
   - write
 skills:
   - work-independently
+advertise: false
 ---
 
 Ask yourself:

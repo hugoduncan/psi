@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - task-design
+advertise: false
 ---
 For the Munera task identified by {{input}}, run the inconsistency review as the second turn of the shared `plan-review` multi-prompt session. Work independently. Use the already-loaded task plan.md, steps.md, implementation.md, and ambiguity-review reply from the shared session context by default. Perform only targeted re-reads for specific missing or stale referenced material needed to decide an inconsistency; do not unconditionally re-read the whole task plan and referenced source set.
 

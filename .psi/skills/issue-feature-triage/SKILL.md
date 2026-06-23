@@ -1,6 +1,7 @@
 ---
 name: issue-feature-triage
 description: Triage a feature request issue into intent, problem statement, scope, and acceptance criteria. Use when a GitHub issue or similar request needs a concise feature-analysis reply without implementation planning.
+advertise: false
 ---
 
 A good feature triage will answer the following:

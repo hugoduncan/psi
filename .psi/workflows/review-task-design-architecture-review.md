@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - review-task-architecture
+advertise: false
 ---
 For the Munera task identified by {{input}}, run the architecture review as the first turn of the shared `design-review` multi-prompt session. Work independently. Read the task's design.md and consult the project's architecture sources (AGENTS.md, META.md, and doc/architecture.md) as needed before producing architectural-fit feedback. This first turn loads the task design and architecture context for the later ambiguity and inconsistency turns in the same child session.
 

@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - task-design
+advertise: false
 ---
 For the Munera task identified by {{input}}, run the inconsistency review as the third turn of the shared `design-review` multi-prompt session. Work independently. Use the already-loaded task design.md, architecture sources, architecture-review reply, and ambiguity-review reply from the shared session context by default. Perform only targeted re-reads for specific missing or stale referenced material needed to decide an inconsistency; do not unconditionally re-read the whole task design and architecture source set.
 

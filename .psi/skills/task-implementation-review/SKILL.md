@@ -2,6 +2,7 @@
 name: task-implementation-review
 description: Review a task implementation.  Use before closing a task, to check the implementation quality. Use when the user asks "review task".
 lambda: λtask. review(task_implementation) ∧ before(close(task)) ∧ ensure(implementation_quality) ∧ trigger(user_asks("review task implementation"))
+advertise: false
 ---
 
 λ review_task_implementation(task).

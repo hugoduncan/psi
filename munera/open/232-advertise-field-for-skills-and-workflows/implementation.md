@@ -31,3 +31,11 @@
 
 ## Remaining (Slice 2 — Apply the field)
 - Flip enumerated review-*/issue-* skills and sub-only workflows to `advertise: false` and verify drop-from-context + still-invocable.
+
+## Slice 2 — Apply the field (implemented)
+- Skills flipped (advertise: false): review-implementation-architecture, review-task-architecture, review-task-docs, task-implementation-review, task-test-review, issue-bug-triage, issue-feature-triage.
+- Workflows flipped — auditable basis: sub-only iff referenced as :prompt-workflow or :target by another workflow, or described as a lower-level/handoff sub-workflow; top-level user-facing entries left advertised.
+  - markdown (22): create-task-plan-create-plan, implement-task-implement-pass, implement-task-final-summary, implement-task-in-worktree, resolve-task-design-entities-resolve, review-follow-up-{design,plan,steps}, review-task-design-{ambiguity,architecture,inconsistency}-review, review-task-design-final-summary, review-task-note-info, review-task-plan-{ambiguity,inconsistency}-review, review-task-plan-final-summary, gh-bug-{discover-and-read,post-repro,reproduce}, gh-issue-{create-worktree,push-intent,task-intent}.
+  - edn (8): review-task-{design,implementation,plan}-core, review-step, review-design-turn, gh-bug-request-more-info, review-implementation-in-worktree, task-lifecycle-in-worktree.
+- Left advertised (shared sub-loops/ambiguous, conservative): gh-pr-heal-check-loop, resolve-task-design-entities (top-level wrapper), review-task-{design,plan,implementation} (standalone-summary wrappers).
+- Live verification (loader + text/build-prompt-contribution on this worktree): all flipped workflows registered but absent from prompt contribution; plan-build-review/task-lifecycle still advertised. Pre-existing 7 markdown-body load errors are unrelated to this change.

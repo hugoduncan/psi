@@ -4,6 +4,7 @@ description: Produce the user-facing final result for a Munera task plan review
 tools:
   - read
   - bash
+advertise: false
 ---
 Produce the user-facing final result for the Munera task identified by {{input}} after a plan review. Independently inspect that specific task's plan.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.
 

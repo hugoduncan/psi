@@ -25,6 +25,7 @@
      :text
      "Produce the user-facing final result for the Munera task. Independently inspect that specific task's artifacts, especially steps.md, implementation.md, design.md, and plan.md when present, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user. Include:\n- whether all five review passes completed cleanly\n- the key issues found and resolved across the five passes (task-implementation-review, task-test-review, test-shaper, review-task-docs, code-shaper)\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step outputs",
      :vars {}}]}],
+ :advertise false,
  :name "review-implementation-in-worktree",
  :description
  "Resolve worktree from a structured handoff, then review a Munera task implementation via the review-task-implementation workflow"}

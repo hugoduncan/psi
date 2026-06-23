@@ -4,6 +4,7 @@ description: Produce the user-facing final result for a completed Munera task im
 tools:
   - read
   - bash
+advertise: false
 ---
 Produce the user-facing final result for the specific Munera task described by {{input}}. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and use the prior implementation-pass output as supporting context.
 

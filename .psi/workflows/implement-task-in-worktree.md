@@ -1,6 +1,7 @@
 ---
 name: implement-task-in-worktree
 description: Resolve worktree from a structured handoff, then implement a Munera task via the implement-task workflow
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "resolve-worktree"

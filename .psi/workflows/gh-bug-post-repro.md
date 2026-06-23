@@ -1,6 +1,7 @@
 ---
 name: gh-bug-post-repro
 description: Classify a bug after reproduction: either request more information or publish a reproducible branch and relabel for fixing
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "classify"

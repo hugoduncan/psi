@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - task-design
+advertise: false
 ---
 For the Munera task identified by {{input}}, run the ambiguity review as the first turn of the shared `plan-review` multi-prompt session. Work independently. Read the task artifacts, especially plan.md, steps.md, and implementation.md, plus any referenced code/tests/docs needed for the batch review. This first turn loads the task plan context for the later inconsistency turn in the same child session.
 

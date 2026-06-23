@@ -2,6 +2,7 @@
 name: review-task-architecture
 description: Reviews a Munera task design for architectural fit with the project's architecture and principles
 lambda: "λtask. review(design_architectural_fit) ∧ judge(fit, ¬correctness ∧ ¬clarity) ∧ consult(in_context_architecture_sources)"
+advertise: false
 ---
 
 # review-task-architecture

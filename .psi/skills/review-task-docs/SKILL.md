@@ -2,6 +2,7 @@
 name: review-task-docs
 description: Reviews user-facing documentation changes for an implemented Munera task
 lambda: "λtask. review(user_facing_docs) ∧ check(README ∧ doc/ ∧ changelog) ∧ verify(accuracy ∧ completeness ∧ consistency)"
+advertise: false
 ---
 
 # review-task-docs

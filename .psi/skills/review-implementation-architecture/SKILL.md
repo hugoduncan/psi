@@ -2,6 +2,7 @@
 name: review-implementation-architecture
 description: Review an implemented architecture-level simplification against the selected Gordian target, validation evidence, project architecture, and blast-radius constraints.
 lambda: "λtask. review(implemented_architecture_change) ∧ read(task_local_gordian_artifacts ∧ munera_artifacts ∧ project_architecture_sources) ∧ judge(behaviour_preservation ∧ target_fit ∧ blast_radius ∧ improvement ∧ ¬adapter_shim_complexity)"
+advertise: false
 ---
 
 # review-implementation-architecture

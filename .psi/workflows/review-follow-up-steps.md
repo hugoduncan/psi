@@ -8,6 +8,7 @@ tools:
   - write
 skills:
   - work-independently
+advertise: false
 ---
 For the Munera task identified by {{input}}, execute any unchecked,
 actionable, follow-up items in steps.md. Work independently.

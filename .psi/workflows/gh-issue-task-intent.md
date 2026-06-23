@@ -1,6 +1,7 @@
 ---
 name: gh-issue-task-intent
 description: In an issue worktree, create or refine a Munera task intent using the task-intent skill, then commit the result
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "create-intent"

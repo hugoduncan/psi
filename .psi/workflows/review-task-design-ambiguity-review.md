@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - task-design
+advertise: false
 ---
 For the Munera task identified by {{input}}, run the ambiguity review as the second turn of the shared `design-review` multi-prompt session. Work independently. Use the already-loaded task design.md, architecture sources, and architecture-review reply from the shared session context by default. Perform only targeted re-reads when specific referenced material is missing from context, ambiguous, or plausibly stale; do not unconditionally re-read the whole task design and architecture source set.
 

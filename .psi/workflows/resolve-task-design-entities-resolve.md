@@ -8,6 +8,7 @@ tools:
   - write
 skills:
   - entity-resolution
+advertise: false
 ---
 Use the entity-resolution skill to process the Munera task design
 identified by {{input}} and update that task's design.md with resolved

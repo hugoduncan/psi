@@ -9,6 +9,7 @@ tools:
 skills:
   - task-design
   - work-independently
+advertise: false
 ---
 For the Munera task identified by {{input}}, execute the unchecked,
 actionable plan-review follow-up items in steps.md with updates to plan.md and

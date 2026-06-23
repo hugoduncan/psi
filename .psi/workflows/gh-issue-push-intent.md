@@ -1,6 +1,7 @@
 ---
 name: gh-issue-push-intent
 description: Push an intent branch and post a GitHub issue comment with the refined task intent
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "push-and-comment"
