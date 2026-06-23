@@ -250,6 +250,12 @@ Purpose: automate munera + mementum working-memory follow-up after non-PSL commi
   - `/psl` lists active PSL workflows by rendering that public display through `psi.agent-session.workflow.display/text-lines`
 - Widget: shows `⊕ PSL` header with workflow display lines for active runs
 
+### `extensions/context-manager/src/extensions/context_manager.clj` (`extensions.context-manager`)
+
+Purpose: scaffold extension that subscribes to `session_turn_finished` events
+and logs session-id and turn-id via `(:log api)`. Idempotent init for reload
+safety. No commands, tools, operations, or prompt contributions yet.
+
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)
 
 Purpose: minimal example extension used in docs/tests.

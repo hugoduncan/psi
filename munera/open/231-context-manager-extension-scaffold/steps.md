@@ -53,6 +53,6 @@
 
 ## Docs Review (2026-06-22)
 
-- [ ] Add `context-manager` to the built-in extensions list in `README.md` (under "Built-in extensions that ship with this repo")
-- [ ] Add `context-manager` entry to `doc/extensions.md` under "Built-in extensions in this repo" section with brief purpose description
-- [ ] Add `context-manager` extension entry to `CHANGELOG.md` under `[Unreleased]` > `Added` (new extension capability)
+- [x] Add `context-manager` to the built-in extensions list in `README.md` (under "Built-in extensions that ship with this repo")
+- [x] Add `context-manager` entry to `doc/extensions.md` under "Built-in extensions in this repo" section with brief purpose description
+- [x] Add `context-manager` extension entry to `CHANGELOG.md` under `[Unreleased]` > `Added` (new extension capability)
