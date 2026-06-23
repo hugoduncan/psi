@@ -41,9 +41,9 @@
 
 ## Test Shaper Review (2026-06-22, third pass)
 
-- [ ] Add a test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
-- [ ] Refactor `init-registers-turn-finished-handler-test` to remove redundant nested `testing` block that repeats the same `contains?` check on the handler map.
-- [ ] Add a test case to `turn-finished-handler-fires-and-logs-test` verifying that the handler does not throw an exception when the event payload is `nil` (current tests check empty map `{}`, but not `nil`).
+- [x] Add a test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call or the resulting state map's structure more explicitly than just counting handlers.
+- [x] Refactor `init-registers-turn-finished-handler-test` to remove redundant nested `testing` block that repeats the same `contains?` check on the handler map.
+- [x] Add a test case to `turn-finished-handler-fires-and-logs-test` verifying that the handler does not throw an exception when the event payload is `nil` (current tests check empty map `{}`, but not `nil`).
 
 ## Review Follow-ups (2026-06-22)
 
