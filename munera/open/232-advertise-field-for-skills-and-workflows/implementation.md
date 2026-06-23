@@ -43,6 +43,9 @@
 ## Implementation review (task-implementation-review)
 - added 4 follow-up steps: EDN advertise passthrough test gap, missing automated invocability assertion, markdown/EDN default asymmetry, and untracked doc/agent-facets.md.
 
+## Implementation review (second pass)
+- no new actionable steps; mechanism + tests + docs verified (28 tests/265 assertions pass, clj-kondo clean). Prior 4 follow-ups confirmed addressed.
+
 ## Review follow-up execution
 - addressed 4 review steps: added EDN `:advertise false` propagation + absent-stays-absent compiler tests; added automated registered-and-invocable assertions for non-advertised workflow (text-test) and skill (skills-test); documented the deliberate markdown(explicit-true)/EDN(passthrough-nil) default asymmetry in `compile-edn-workflow-file`; removed stray untracked `doc/agent-facets.md` (incomplete stub, not a task deliverable — `doc/workflows.md` is the task doc).
 - verified: clj-kondo 0 errors; 26 tests / 229 assertions pass (compiler-test, text-test, skills-test).
