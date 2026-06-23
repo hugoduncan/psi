@@ -61,3 +61,6 @@
 ## Test review follow-up execution
 - addressed 1 test-review step: extracted `text/resolve-runnable-definition` (the by-name execution-resolution gate used by `delegate-run`), wired the `/delegate run` gate through it, and added `resolve-runnable-definition-test` asserting an `:advertise false` workflow is dropped from `build-prompt-contribution` yet still resolves-for-execution by name (and nil for unregistered names). Guards against a future change leaking the advertise filter into registration/execution.
 - verified: clj-kondo 0 warnings/errors; text-test 3 tests / 13 assertions pass.
+
+## Test review (task-test-review, third pass)
+- no new actionable steps; tests well-formed, cover design behaviours (both skill formatters, workflow prompt-contribution, parse robustness, EDN/md propagation, registered-and-invocable, execution-resolution), real/nullable deps without mocks. text-test 3 tests/13 assertions pass.
