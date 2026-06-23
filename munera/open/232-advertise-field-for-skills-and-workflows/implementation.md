@@ -123,3 +123,6 @@
 
 ## Code-shaper review follow-up (third pass execution)
 - addressed 1 code-shaper follow-up step. Extracted a shared `frontmatter-flag` helper in `parse-skill-file` recognising only literal `true`/`false` (case-insensitive, trimmed) and defaulting otherwise; routed both `disable-model-invocation` (default false) and `advertise` (default true) through it. Aligned design Q4 wording to the chosen case-insensitive/trimmed literal-`false` rule and noted the shared helper. clj-kondo clean; skills-test 17 tests / 115 assertions pass.
+
+## Code-shaper review (fourth pass)
+- added 2 follow-up steps: the workflow-markdown parser (`workflow_loader/parser.clj`) still uses the inline `(not (= "false" ...))` `advertise` coercion that the third pass replaced with the shared `frontmatter-flag` helper on the skill side (cross-surface idiom/rule divergence); and a dead `(if (nil? advertise) true advertise)` nil-default in `compile-markdown-workflow-file` (parser always yields boolean).
