@@ -105,3 +105,6 @@
 
 ## Docs review (review-task-docs, fifth pass)
 - no new actionable steps; CHANGELOG + doc/workflows.md accurate/complete/consistent (skill set `review-*`/`task-*-review`/`issue-*`, workflow sub-step set, surface-separated invocation vs `/delegate list` listing). README correctly defers detail to doc/workflows.md.
+
+## Code-shaper review
+- added 2 follow-up steps: skill-visibility partition (skill-summary/visible-skills/hidden-skills/enrich-skill) still keys off `:disable-model-invocation` only and diverges from the new canonical `prompt-hidden?` (advertise-false skills reported "visible"); and a third inline duplicate of the visibility filter in tui render `banner-rows`.
