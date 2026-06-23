@@ -126,6 +126,19 @@
       (is (true? (context-manager/init api))
           "init should return true on successful first-time initialization"))))
 
+(deftest init-registration-call-test
+  (testing "init calls (:on api) with correct event name"
+    (let [on-spy (atom nil)
+          api {:on (fn [event handler] (reset! on-spy [event handler]))
+               :log (fn [_] nil)}]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init api)
+      (let [[event handler] @on-spy]
+        (is (= "session_turn_finished" event)
+            "must call registration with event name 'session_turn_finished'")
+        (is (fn? handler)
+            "must register a function as the handler")))))
+
 (deftest init-registration-contract-test
   (testing "init registration contract"
     (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]

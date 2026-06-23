@@ -79,7 +79,7 @@
 
 ## Task Test Review (2026-06-23)
 
-- [ ] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call (e.g. using a spy or a custom nullable API) rather than just checking the resulting state map. (Note: `init-registration-contract-test` checks the state map, but not the call itself as requested in the 6th pass).
+- [x] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call (e.g. using a spy or a custom nullable API) rather than just checking the resulting state map. (Note: `init-registration-contract-test` checks the state map, but not the call itself as requested in the 6th pass).
 
 
 
