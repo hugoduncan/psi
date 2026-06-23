@@ -4,3 +4,10 @@
 - architectural review: no architectural review feedback (design fits the existing prompt-contribution presentation pattern; advertise is orthogonal to registration/discovery/invocation; advertise-vs-disable-model-invocation overlap is already captured in design.md Open Question 1, so not a new finding)
 - ambiguity review: no ambiguity review feedback (substantive ambiguities — disable-model-invocation overlap, interactive-listing scope, exact set to mark, false-coercion rule — are already enumerated as design.md Open Questions 1-4)
 - inconsistency review added 1 new design step (Constraints "byte-identical for all currently-advertised" contradicts the in-task flip of currently-advertised items to advertise:false; invariant should be scoped to advertise absent/true items)
+
+## Context for addressing design-steps
+- The flagged design-step is a design.md wording fix (Constraints section) — keep the byte-identical invariant scoped to `advertise` absent/`true`; do not widen/narrow the frozen scope while doing so.
+- Relevant non-task source files (for later implementation, not the wording fix):
+  - Skills: `components/prompt-assets/src/psi/prompt_assets/skills.clj` — frontmatter parse (~L137) and `format-skills-for-prompt`/`-lambda` (~L502/527); existing `disable-model-invocation` filter is the pattern to mirror for `advertise`.
+  - Workflows: `components/agent-session/src/psi/agent_session/workflow/text.clj` — `build-prompt-contribution` (~L93) is the system-context listing to filter on `:advertise false`.
+  - `/delegate list` / `action=list` listing also lives in `text.clj` (`available-workflows-text`/`delegate-list-text`); design Open Question 2 governs whether those are affected — confirm before touching them.
