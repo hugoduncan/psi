@@ -14,5 +14,8 @@
   - Workflows: `components/agent-session/src/psi/agent_session/workflow/text.clj` — `build-prompt-contribution` (~L93) is the system-context listing to filter on `:advertise false`.
   - `/delegate list` / `action=list` listing also lives in `text.clj` (`available-workflows-text`/`delegate-list-text`); design Open Question 2 governs whether those are affected — confirm before touching them.
 
+## Plan-review session outcome
+- Plan-review (ambiguity + inconsistency) added no new design-steps; no unchecked design-steps remain — task is design-stable and ready to advance to plan.md/steps.md creation, where Open Questions 1-4 (esp. exact set to flip, Q3) must be resolved.
+
 ## Design-follow-up resolution (inconsistency step)
 - Resolved the byte-identical inconsistency by scoping the Constraints invariant to items whose `advertise` remains absent/`true`, and explicitly stating the in-task `review-*`/`issue-*` + sub-only-workflow flip is the intended exception. No scope change to the design — the frozen scope (which items get flipped) is unchanged; only the invariant wording was reconciled. Exact enumeration of flipped items remains deferred to planning per Open Question 3.
