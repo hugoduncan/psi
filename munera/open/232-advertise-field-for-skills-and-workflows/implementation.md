@@ -97,3 +97,6 @@
 ## Docs review (review-task-docs, third pass)
 - added 1 follow-up step: CHANGELOG + `doc/workflows.md` list the user-facing `/delegate list` as an invocation path for hidden workflows, but it is a listing/discovery surface, not an invocation path (category error).
 - addressed 1 docs review follow-up (third pass): separated `/delegate list` listing surface from invocation paths in CHANGELOG + doc/workflows.md
+
+## Docs review (review-task-docs, fourth pass)
+- added 1 follow-up step: `doc/workflows.md` sub-only-workflow example list omits the "modular `gh-*` sub-steps" category that the CHANGELOG includes (consistency/completeness gap between two user-facing docs for the same flipped set).
