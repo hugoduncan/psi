@@ -120,9 +120,6 @@
 ;; Parsing
 ;; ============================================================
 
-;; Re-use the shared boolean-frontmatter coercion from prompt-templates
-(def frontmatter-flag pt/frontmatter-flag)
-
 (defn parse-skill-file
   "Parse a SKILL.md or .md skill file at `path`.
    Returns a parsed skill map or nil if the file doesn't exist.
@@ -137,9 +134,9 @@
             parent-dir-name        (.getName skill-dir)
             name                   (or (:name frontmatter) parent-dir-name)
             description            (:description frontmatter)
-            disable-model-invocation (frontmatter-flag
+            disable-model-invocation (pt/frontmatter-flag
                                       (get frontmatter :disable-model-invocation) false)
-            advertise                (frontmatter-flag
+            advertise                (pt/frontmatter-flag
                                       (get frontmatter :advertise) true)]
         {:name                     name
          :description              description

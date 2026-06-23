@@ -139,3 +139,6 @@
 
 ## Code-shaper review (fifth pass)
 - added 1 follow-up step: residual `frontmatter-flag` re-export alias in skills.clj (L124) adds an unnecessary public-var indirection over the canonical `pt/frontmatter-flag`; two internal call-sites can use `pt/` directly.
+
+## Code-shaper review (fifth pass) follow-up
+- addressed 1 review step: removed `frontmatter-flag` alias in skills.clj; inlined two call-sites to `pt/frontmatter-flag` (no external refs; kondo clean).
