@@ -457,6 +457,61 @@
       (is (str/includes? result "&lt;special&gt;"))
       (is (str/includes? result "&quot;chars&quot;")))))
 
+(deftest format-skills-for-prompt-lambda-test
+  (testing "formats visible skills in lambda notation"
+    (let [all-skills [{:name "alpha" :description "Alpha skill"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "λ skills."))
+      (is (str/includes? result "alpha → Alpha skill @ /alpha/SKILL.md"))))
+
+  (testing "uses :lambda-description when present"
+    (let [all-skills [{:name "alpha" :description "Alpha skill"
+                       :lambda-description "λx. alpha(x)"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "alpha → λx. alpha(x) @ /alpha/SKILL.md"))))
+
+  (testing "excludes skills with advertise false"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false :advertise true}
+                      {:name "internal" :description "Internal"
+                       :file-path "/i/SKILL.md" :base-dir "/i"
+                       :source :user :disable-model-invocation false :advertise false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "visible"))
+      (is (not (str/includes? result "internal")))))
+
+  (testing "excludes skills with disable-model-invocation=true"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false}
+                      {:name "hidden" :description "Hidden"
+                       :file-path "/h/SKILL.md" :base-dir "/h"
+                       :source :user :disable-model-invocation true}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "visible"))
+      (is (not (str/includes? result "hidden")))))
+
+  (testing "absent :advertise keeps a skill advertised"
+    (let [all-skills [{:name "legacy" :description "Legacy"
+                       :file-path "/l/SKILL.md" :base-dir "/l"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "legacy → Legacy @ /l/SKILL.md"))))
+
+  (testing "returns nil when no visible skills"
+    (let [all-skills [{:name "hidden" :description "Hidden"
+                       :file-path "/h/SKILL.md" :base-dir "/h"
+                       :source :user :disable-model-invocation true}]]
+      (is (nil? (skills/format-skills-for-prompt-lambda all-skills)))))
+
+  (testing "returns nil for empty skills"
+    (is (nil? (skills/format-skills-for-prompt-lambda [])))))
+
 ;; ============================================================
 ;; Skill command parsing
 ;; ============================================================

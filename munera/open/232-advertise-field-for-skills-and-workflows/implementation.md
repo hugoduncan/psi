@@ -52,3 +52,5 @@
 
 ## Test review (task-test-review)
 - added 1 follow-up step: `format-skills-for-prompt-lambda` advertise-exclusion is untested despite being a named acceptance-criterion surface.
+
+- addressed 1 test-review follow-up: added `format-skills-for-prompt-lambda-test` covering advertise-false / disable-model-invocation exclusion, lambda-description, absent-default, and nil-on-empty cases (21 tests, 167 assertions pass; kondo clean).
