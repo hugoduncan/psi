@@ -40,7 +40,7 @@
       (is (not (str/includes? (text/build-prompt-contribution defs) "- internal:")))
       ;; Still present in the user-facing listing.
       ;; (Execution-resolution is covered by resolve-runnable-definition-test.)
-      (is (str/includes? (text/available-workflows-text defs) "internal")))))
+      (is (str/includes? (text/available-workflows-text defs) "  internal — ")))))
 
 (deftest resolve-runnable-definition-test
   (testing "resolves an :advertise false workflow for execution by name"

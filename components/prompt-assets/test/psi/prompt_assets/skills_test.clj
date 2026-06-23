@@ -431,7 +431,7 @@
                        :file-path "/h/SKILL.md" :base-dir "/h"
                        :source :user :disable-model-invocation true}]
           result (skills/format-skills-for-prompt all-skills)]
-      (is (str/includes? result "visible"))
+      (is (str/includes? result "<name>visible</name>"))
       (is (not (str/includes? result "<name>hidden</name>")))))
 
   (testing "excludes skills with advertise false"
@@ -442,7 +442,7 @@
                        :file-path "/i/SKILL.md" :base-dir "/i"
                        :source :user :disable-model-invocation false :advertise false}]
           result (skills/format-skills-for-prompt all-skills)]
-      (is (str/includes? result "visible"))
+      (is (str/includes? result "<name>visible</name>"))
       (is (not (str/includes? result "<name>internal</name>")))))
 
   (testing "absent :advertise keeps a skill advertised"
@@ -495,7 +495,7 @@
                        :file-path "/i/SKILL.md" :base-dir "/i"
                        :source :user :disable-model-invocation false :advertise false}]
           result (skills/format-skills-for-prompt-lambda all-skills)]
-      (is (str/includes? result "visible"))
+      (is (str/includes? result "visible → "))
       (is (not (str/includes? result "internal → ")))))
 
   (testing "excludes skills with disable-model-invocation=true"
@@ -506,7 +506,7 @@
                        :file-path "/h/SKILL.md" :base-dir "/h"
                        :source :user :disable-model-invocation true}]
           result (skills/format-skills-for-prompt-lambda all-skills)]
-      (is (str/includes? result "visible"))
+      (is (str/includes? result "visible → "))
       (is (not (str/includes? result "hidden → ")))))
 
   (testing "absent :advertise keeps a skill advertised"

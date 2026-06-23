@@ -79,3 +79,4 @@
 
 ## Test review (test-shaper pass 4)
 - added 1 follow-up step: exclusion-test positives stay bare substrings while pass-3 anchored the negatives — internal assertion-style inconsistency within each exclusion test.
+- addressed 1 test-shaper pass-4 follow-up step: anchored the exclusion-test positives on the entry form (`"<name>visible</name>"` for the XML formatter, `"visible → "` for the lambda formatter, `"  internal — "` for the workflow listing) in skills_test and text_test. Tests pass (24 tests, 183 assertions; 0 failures).
