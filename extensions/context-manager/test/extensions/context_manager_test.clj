@@ -42,7 +42,13 @@
           (is (re-find #"turn-id=nil" line))))
       (testing "payload is nil"
         (is (nil? (handler nil))
-            "handler must return nil and not throw when payload is nil")))))
+            "handler must return nil and not throw when payload is nil"))
+      (testing "payload is not a map"
+        (is (nil? (handler "not-a-map"))
+            "handler must return nil and not throw when payload is not a map")
+        (let [line (last (:log-lines @state))]
+          (is (re-find #"session-id=nil" line))
+          (is (re-find #"turn-id=nil" line)))))))
 
 (deftest init-reload-safety-test
   (testing "calling init twice does not register duplicate handlers"
@@ -125,19 +131,6 @@
     (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
       (is (true? (context-manager/init api))
           "init should return true on successful first-time initialization"))))
-
-(deftest init-registration-call-test
-  (testing "init calls (:on api) with correct event name"
-    (let [on-spy (atom nil)
-          api {:on (fn [event handler] (reset! on-spy [event handler]))
-               :log (fn [_] nil)}]
-      (reset! context-manager/initialized? nil)
-      (context-manager/init api)
-      (let [[event handler] @on-spy]
-        (is (= "session_turn_finished" event)
-            "must call registration with event name 'session_turn_finished'")
-        (is (fn? handler)
-            "must register a function as the handler")))))
 
 (deftest init-registration-contract-test
   (testing "init registration contract"
