@@ -77,4 +77,9 @@
 - [x] Add a test verifying that the handler is registered as a function (not a map or other type) to ensure compatibility with the dispatch pipeline's expectation of a handler function.
 - [x] Add a test verifying that the handler does not mutate any external state (beyond the provided log-fn) to ensure it remains a pure-result handler as per the VSM S1/S3 purity goals.
 
+## Task Test Review (2026-06-23)
+
+- [ ] Add test verifying that the handler is registered with the correct event name `session_turn_finished` by inspecting the registration call (e.g. using a spy or a custom nullable API) rather than just checking the resulting state map. (Note: `init-registration-contract-test` checks the state map, but not the call itself as requested in the 6th pass).
+
+
 
