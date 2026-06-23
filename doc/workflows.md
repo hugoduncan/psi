@@ -270,8 +270,10 @@ turn):
 Default is `true` (absent or any non-`false` value keeps the workflow
 advertised; only the literal `false` hides it). `advertise: false` affects the
 system-context listing **only** — the workflow stays registered and remains
-invocable via `/delegate <name>`, as a delegate sub-step of another workflow,
-and in the user-facing `/delegate list`. Use it for sub-only workflows (the
+invocable via `/delegate <name>` and as a delegate sub-step of another
+workflow. It also still appears in the user-facing `/delegate list` (a
+listing/discovery surface, not an invocation path). Use it for sub-only
+workflows (the
 `*-core` review loops, `*-final-summary`/`*-implement-pass` steps, prompt
 sub-reviews, and `*-in-worktree` handoff wrappers) that the top-level model
 should not pick directly.
