@@ -68,3 +68,6 @@
 ## Test review (test-shaper pass)
 - added 2 follow-up steps: untested `->skill` `:advertise` propagation (skill-construction-test gap), and name/assertion mismatch in `non-advertised-workflow-stays-listed-and-invocable-test` (overclaims "invocable", now redundant with resolve-runnable-definition-test).
 - addressed 2 test-shaper review follow-up steps: added `:advertise` propagation assertions to `skill-construction-test` (explicit false + absent cases); renamed `non-advertised-workflow-stays-listed-and-invocable-test` -> `non-advertised-workflow-stays-listed-test` and dropped the redundant invocability inference (execution-resolution covered by `resolve-runnable-definition-test`).
+
+## Test review (test-shaper pass 2)
+- added 1 follow-up step: EDN-config advertise tests are grouped under the markdown-named `compile-markdown-workflow-file-test` deftest (naming/concern mismatch) despite an existing `compile-edn-prompt-workflow-test` deftest.
