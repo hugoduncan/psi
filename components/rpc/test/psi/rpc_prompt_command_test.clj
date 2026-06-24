@@ -417,8 +417,18 @@
                                                :input input
                                                :login-state login-state})
                       {:type :oauth :access "tok" :refresh "ref" :expires (+ (System/currentTimeMillis) 60000)})]
-        (support/run-loop "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"/login\"}}\n"
-                          handler state 250)
+        (let [{:keys [out-lines]} (support/run-loop "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"/login\"}}\n"
+                                                    handler state 250)
+              texts (->> out-lines support/parse-frames
+                         (filter #(= "assistant/message" (:event %)))
+                         (mapcat #(map :text (get-in % [:data :content])))
+                         (filter some?))]
+          ;; emacs coalesces consecutive assistant messages, so the URL and the
+          ;; paste instruction must arrive in a SINGLE message.
+          (is (some #(and (str/includes? % "https://example.com/auth")
+                          (str/includes? % "Paste the authorization code"))
+                    texts)
+              "manual login-start must emit URL and paste instruction in one assistant/message"))
         (is (some? (:pending-login (sa/oauth-projection-in ctx)))
             "manual login-start should set canonical pending-login state")
 

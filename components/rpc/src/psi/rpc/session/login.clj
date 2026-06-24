@@ -107,13 +107,15 @@
                           (some-> provider-id name)
                           "provider")
         login-state   (:login-state cmd-result)
-        callback?     (boolean (:uses-callback-server cmd-result))]
-    (emit/emit-assistant-text! emit! session-id
-                               (str "Login: " provider-name
-                                    " — open URL: " (:url cmd-result)))
+        callback?     (boolean (:uses-callback-server cmd-result))
+        url-line      (str "Login: " provider-name
+                           " — open URL: " (:url cmd-result))]
+    ;; Emit a single combined message per branch: emacs coalesces consecutive
+    ;; assistant messages, so a separate follow-up line would be dropped.
     (if callback?
       (do
-        (emit/emit-assistant-text! emit! session-id "Waiting for browser callback…")
+        (emit/emit-assistant-text! emit! session-id
+                                   (str url-line "\n\nWaiting for browser callback…"))
         (if-let [oauth-ctx (:oauth-ctx ctx)]
           (let [worker (start-daemon-thread!
                         (fn []
@@ -135,4 +137,6 @@
                                         {:provider-id provider-id
                                          :provider-name provider-name
                                          :login-state login-state})
-        (emit/emit-assistant-text! emit! session-id "Paste authorization code as your next prompt message.")))))
+        (emit/emit-assistant-text! emit! session-id
+                                   (str url-line
+                                        "\n\nPaste the authorization code as your next prompt message."))))))
