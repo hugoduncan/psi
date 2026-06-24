@@ -19,6 +19,11 @@
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
 (def ^:private prompt-caching-beta "prompt-caching-2024-07-31")
 (def ^:private prompt-caching-scope-beta "prompt-caching-scope-2026-01-05")
+;; Anthropic OAuth (subscription) tokens are authorized only for Claude Code.
+;; The API rejects (HTTP 429 rate_limit_error) any OAuth request whose first
+;; system block is not this exact identity string.
+(def ^:private claude-code-system-prompt
+  "You are Claude Code, Anthropic's official CLI for Claude.")
 (defn- anthropic-cache-control
   [cache-control]
   (when (= :ephemeral (:type cache-control))
@@ -158,6 +163,21 @@
       :else
       nil)))
 
+(defn- prepend-claude-code-system
+  "Prepend the Claude Code identity as the first system block for OAuth
+   requests. Anthropic OAuth tokens are authorized only for Claude Code;
+   the API rejects requests whose first system block is not this identity.
+   No-op for API-key auth."
+  [oauth? system-body]
+  (if-not oauth?
+    system-body
+    (let [head {:type "text" :text claude-code-system-prompt}]
+      (cond
+        (nil? system-body)        [head]
+        (string? system-body)     [head {:type "text" :text system-body}]
+        (sequential? system-body) (into [head] system-body)
+        :else                     [head]))))
+
 (defn- resolve-api-key
   [options]
   (let [api-key (or (:api-key options) (System/getenv "ANTHROPIC_API_KEY"))]
@@ -168,7 +188,7 @@
     api-key))
 
 (defn- request-body
-  [conversation model options stream?]
+  [conversation model options stream? oauth?]
   (let [structured-request (structured-output/structured-output-request options)
         strategy           (structured-output/select-strategy model structured-request)
         thinking           (thinking-param model options)
@@ -183,7 +203,8 @@
                              (anthropic-structured-output/structured-tool structured-request tool-defs))
         tool-defs          (cond-> (vec (or tool-defs []))
                              structured-tool (conj structured-tool))
-        system-body        (system-prompt-body conversation)]
+        system-body        (prepend-claude-code-system
+                            oauth? (system-prompt-body conversation))]
     (cond-> {:model      (:id model)
              :max_tokens (or (:max-tokens options) (:max-tokens model))
              :messages   (transform-messages conversation fallback-request)}
@@ -213,9 +234,10 @@
          thinking           (thinking-param model options)
          adaptive?          (adaptive-thinking? model)
          api-key            (resolve-api-key options)
+         oauth?             (oauth-api-key? api-key)
          prompt-caching?    (prompt-caching? conversation)
          json-schema-output? (anthropic-structured-output/json-schema-output-mechanism? strategy)
-         body               (request-body conversation model options stream?)
+         body               (request-body conversation model options stream? oauth?)
          body*              (request-schema/validate-request-body! body)
          base-hdrs          (if (:no-auth-header options)
                               ;; Strip auth headers when explicitly disabled

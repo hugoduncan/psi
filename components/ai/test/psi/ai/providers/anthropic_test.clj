@@ -137,6 +137,29 @@
       (is (some? (re-find #"interleaved-thinking" (get headers "anthropic-beta")))
           "oauth requests with thinking must include interleaved-thinking beta"))))
 
+(def ^:private claude-code-system
+  "You are Claude Code, Anthropic's official CLI for Claude.")
+
+(deftest build-request-oauth-injects-claude-code-system-test
+  (testing "oauth requests prepend the Claude Code identity as the first system block"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "Custom Psi system prompt.")
+          req   (#'anthropic/build-request convo model {:api-key "sk-ant-oat-test-token"})
+          system (:system (json/parse-string (:body req) true))]
+      (is (vector? system) "oauth system must be block form to carry the identity first")
+      (is (= claude-code-system (:text (first system)))
+          "first system block must be the exact Claude Code identity")
+      (is (= "Custom Psi system prompt." (:text (second system)))
+          "the caller's system prompt follows the injected identity")))
+
+  (testing "api-key requests are unchanged — no Claude Code identity injected"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "Custom Psi system prompt.")
+          req   (#'anthropic/build-request convo model {:api-key "sk-ant-api-test-key"})
+          system (:system (json/parse-string (:body req) true))]
+      (is (= "Custom Psi system prompt." system)
+          "api-key system prompt is sent as-is, without the Claude Code identity"))))
+
 ;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
 
 (deftest build-request-adaptive-thinking-test
