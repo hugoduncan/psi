@@ -1,2 +1,3 @@
 - added 3 steps to be addressed (log-fn robustness and registration call verification)
 - implementation review complete: code matches design, follows architecture, no unnecessary abstractions or performance issues
+- added 2 steps to be addressed (vacuous prompt-contributions assertion, redundant re-find assertions)
