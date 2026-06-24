@@ -14,6 +14,8 @@
 
 (def ^:private anthropic-version "2023-06-01")
 (def ^:private claude-code-beta "claude-code-20250219")
+;; OAuth requests present as the Claude Code CLI (see claude-code-system-prompt).
+(def ^:private claude-code-version "2.1.75")
 (def ^:private oauth-beta "oauth-2025-04-20")
 (def ^:private context-management-beta "context-management-2025-06-27")
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
@@ -121,7 +123,11 @@
         base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
-                       (assoc base-headers "Authorization" (str "Bearer " api-key))
+                       (assoc base-headers
+                              "Authorization" (str "Bearer " api-key)
+                              ;; Present as the Claude Code CLI, which OAuth tokens are scoped to.
+                              "user-agent" (str "claude-cli/" claude-code-version)
+                              "x-app" "cli")
                        (assoc base-headers "x-api-key" api-key))
         beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output? speed-mode)]
     (cond-> headers

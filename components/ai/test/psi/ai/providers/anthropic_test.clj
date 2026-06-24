@@ -135,7 +135,18 @@
       (is (some? (re-find #"prompt-caching-scope-2026-01-05" (get headers "anthropic-beta")))
           "prompt-caching-scope beta retained for oauth compatibility")
       (is (some? (re-find #"interleaved-thinking" (get headers "anthropic-beta")))
-          "oauth requests with thinking must include interleaved-thinking beta"))))
+          "oauth requests with thinking must include interleaved-thinking beta")
+      (is (some? (re-find #"^claude-cli/" (get headers "user-agent")))
+          "oauth requests present as the claude-cli user-agent")
+      (is (= "cli" (get headers "x-app"))
+          "oauth requests carry the x-app: cli header")))
+
+  (testing "api-key requests do not carry the Claude Code CLI headers"
+    (let [model   (models/get-model :sonnet-4.6)
+          convo   (conv/create "sys")
+          headers (:headers (#'anthropic/build-request convo model {:api-key "sk-ant-api-key"}))]
+      (is (nil? (get headers "user-agent")) "api-key requests must not spoof the claude-cli user-agent")
+      (is (nil? (get headers "x-app")) "api-key requests must not carry x-app"))))
 
 (def ^:private claude-code-system
   "You are Claude Code, Anthropic's official CLI for Claude.")
