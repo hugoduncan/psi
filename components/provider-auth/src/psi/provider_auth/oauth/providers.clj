@@ -142,12 +142,11 @@
 
 ;;; Anthropic OAuth provider
 
-(def ^:private anthropic-default-client-id "a473d7bb-17ac-43a7-abc0-a1343d7c2805")
-(def ^:private anthropic-legacy-client-id "9d1c250a-e61b-44d9-88ed-5944d1962f5e")
+(def ^:private anthropic-default-client-id "9d1c250a-e61b-44d9-88ed-5944d1962f5e")
 (def ^:private anthropic-default-authorize-url "https://claude.ai/oauth/authorize")
 (def ^:private anthropic-default-token-url "https://console.anthropic.com/v1/oauth/token")
 (def ^:private anthropic-default-redirect-uri "https://console.anthropic.com/oauth/code/callback")
-(def ^:private anthropic-default-scopes "user:inference user:file_upload")
+(def ^:private anthropic-default-scopes "org:create_api_key user:profile user:inference")
 
 (defn- get-env
   [k]
@@ -270,26 +269,13 @@
                                      [:client-id :token-url :redirect-uri :scopes])
         oauth-config    (merge (anthropic-oauth-config) stored-config)
         refresh-token   (:refresh credential)
-        [response client-id]
-        (try
-          [(refresh-anthropic-token oauth-config refresh-token)
-           (:client-id oauth-config)]
-          (catch Exception e
-            ;; Backward compatibility: refresh legacy credentials that predate
-            ;; metadata pinning by retrying with the old Claude Code client id.
-            (if (and (nil? (:client-id stored-config))
-                     (not= (:client-id oauth-config) anthropic-legacy-client-id))
-              (let [legacy-config (assoc oauth-config :client-id anthropic-legacy-client-id)]
-                [(refresh-anthropic-token legacy-config refresh-token)
-                 anthropic-legacy-client-id])
-              (throw e))))
+        response        (refresh-anthropic-token oauth-config refresh-token)
         {:keys [access_token refresh_token expires_in]} (:body response)]
     {:type     :oauth
      :refresh  (or refresh_token (:refresh credential))
      :access   access_token
      :expires  (expires-at-from-seconds expires_in)
-     :metadata (anthropic-credential-metadata
-                (assoc oauth-config :client-id client-id))}))
+     :metadata (anthropic-credential-metadata oauth-config)}))
 
 (def anthropic-provider
   {:id                   :anthropic

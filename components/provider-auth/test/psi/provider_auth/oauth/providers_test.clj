@@ -21,11 +21,11 @@
       (let [{:keys [url login-state]}
             (#'psi.provider-auth.oauth.providers/anthropic-begin-login)]
         (is (str/includes? url "claude.ai/oauth/authorize"))
-        (is (str/includes? url "client_id=a473d7bb-17ac-43a7-abc0-a1343d7c2805"))
+        (is (str/includes? url "client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e"))
         (is (str/includes? url "redirect_uri=https%3A%2F%2Fconsole.anthropic.com%2Foauth%2Fcode%2Fcallback"))
-        (is (str/includes? url "scope=user%3Ainference+user%3Afile_upload"))
+        (is (str/includes? url "scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainference"))
         (is (string? (:verifier login-state)))
-        (is (= "a473d7bb-17ac-43a7-abc0-a1343d7c2805" (:client-id login-state)))
+        (is (= "9d1c250a-e61b-44d9-88ed-5944d1962f5e" (:client-id login-state)))
         (is (= "https://console.anthropic.com/v1/oauth/token" (:token-url login-state)))
         (is (= "https://console.anthropic.com/oauth/code/callback" (:redirect-uri login-state)))))))
 
