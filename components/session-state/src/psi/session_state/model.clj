@@ -241,7 +241,7 @@
    :auto-retry-max-retries         3
    :auto-retry-base-delay-ms       2000
    :auto-retry-max-delay-ms        60000
-   :llm-stream-idle-timeout-ms     600000
+   :llm-stream-idle-timeout-ms     1200000
    :tool-batch-max-parallelism     4
    :default-active-tools           #{"read" "bash" "edit" "write"}})
 
