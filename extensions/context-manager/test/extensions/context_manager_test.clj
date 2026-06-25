@@ -37,9 +37,7 @@
         (is (nil? (handler {}))
             "handler returns nil")
         (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))
-          (is (re-find #"session-id=nil" line))
-          (is (re-find #"turn-id=nil" line))))
+          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))))
       (testing "payload is nil"
         (is (nil? (handler nil))
             "handler must return nil and not throw when payload is nil")
@@ -49,9 +47,7 @@
         (is (nil? (handler "not-a-map"))
             "handler must return nil and not throw when payload is not a map")
         (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))
-          (is (re-find #"session-id=nil" line))
-          (is (re-find #"turn-id=nil" line)))))))
+          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line)))))))
 
 (deftest init-reload-safety-test
   (testing "calling init twice does not register duplicate handlers"
@@ -64,13 +60,15 @@
 
 (deftest init-registers-no-commands-tools-operations-or-prompts-test
   (testing "init registers no commands, tools, operations, or prompt contributions"
-    (let [{:keys [state]} (setup-api)]
+    (let [{:keys [api state]} (setup-api)]
       (is (empty? (:commands @state)) "no commands registered")
       (is (empty? (:tools @state)) "no tools registered")
       ;; Operations are not separately trackable in the nullable API — they
       ;; are dispatched through the same handler mechanism as other mutations,
       ;; so there is no :operations key on the nullable state map.
-      (is (empty? (:prompt-contributions @state)) "no prompt contributions registered"))))
+      ;; Prompt contributions live in :root-state, not directly on the state map;
+      ;; use :list-prompt-contributions on the API to query them.
+      (is (empty? ((:list-prompt-contributions api))) "no prompt contributions registered"))))
 
 (deftest handler-handles-missing-payload-keys-test
   (testing "handler logs gracefully when :session-id or :turn-id are missing"
@@ -137,17 +135,23 @@
 
 (deftest init-registration-contract-test
   (testing "init registration contract"
-    (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+    ;; Use a spy on :on to verify call arguments explicitly,
+    ;; rather than inspecting the resulting state map.
+    (let [call-args (atom nil)
+          spy-on    (fn [event-name handler-fn]
+                      (reset! call-args {:event-name event-name
+                                         :handler-fn handler-fn})
+                      handler-fn)
+          base-api  (nullable/create-nullable-extension-api
+                     {:path "/test/context_manager.clj"})]
       (reset! context-manager/initialized? nil)
-      (context-manager/init api)
-      (let [handlers (get-in @state [:handlers])]
-        (testing "registered with correct event name"
-          (is (contains? handlers "session_turn_finished")
-              "must register handler for session_turn_finished"))
-        (testing "handler is a function"
-          (let [handler (first (get handlers "session_turn_finished"))]
-            (is (fn? handler)
-                "registered handler must be a function to be compatible with dispatch pipeline")))))))
+      (context-manager/init (assoc (:api base-api) :on spy-on))
+      (testing "registered with correct event name"
+        (is (= "session_turn_finished" (:event-name @call-args))
+            "(:on api) must be called with event name session_turn_finished"))
+      (testing "handler is a function"
+        (is (fn? (:handler-fn @call-args))
+            "registered handler must be a function to be compatible with dispatch pipeline")))))
 
 (deftest handler-purity-test
   (testing "handler does not mutate external state"
@@ -158,4 +162,28 @@
       (is (= (dissoc before-state :log-lines) (dissoc @state :log-lines))
           "handler must not mutate the API state map; it should only use the provided log-fn")
       (is (= (count (:log-lines before-state)) (dec (count (@state :log-lines))))
-          "the provided log-fn is used"))))
+          "the provided log-fn is used")))
+
+  (deftest handler-log-fn-throws-test
+    (testing "handler does not throw when log-fn itself throws an exception"
+      (let [throwing-log (fn [_] (throw (ex-info "deliberate" {})))
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/context_manager.clj"})
+            api-with-throwing-log (assoc api :log throwing-log)]
+        (reset! context-manager/initialized? nil)
+        (context-manager/init api-with-throwing-log)
+        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+              "handler must return nil and not throw when log-fn throws")))))
+
+  (deftest handler-log-fn-returns-non-nil-test
+    (testing "handler returns nil even when log-fn returns a non-nil value"
+      (let [returning-log (fn [text] (str "not-nil-" text))
+            {:keys [api state]} (nullable/create-nullable-extension-api
+                                 {:path "/test/context_manager.clj"})
+            api-with-returning-log (assoc api :log returning-log)]
+        (reset! context-manager/initialized? nil)
+        (context-manager/init api-with-returning-log)
+        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+              "handler must return nil regardless of what log-fn returns"))))))

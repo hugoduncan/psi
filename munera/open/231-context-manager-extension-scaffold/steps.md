@@ -98,14 +98,14 @@
 - [x] Add test verifying that the handler does not mutate any external state (beyond the provided log-fn) to ensure it remains a pure-result handler as per the VSM S1/S3 purity goals.
 - [x] Verify that the handler's return value is explicitly asserted as `nil` in all test cases (nominal, empty map, nil payload) to ensure compliance with the design requirement "returns nil".
 
-- [ ] Add test verifying that the handler does not throw when the `log-fn` itself throws an exception (as requested in the 6th pass of Test Shaper Review, but not yet implemented in `context_manager_test.clj`).
-- [ ] Add test verifying that the handler returns `nil` even if the `log-fn` returns a non-nil value (as requested in the 6th pass of Test Shaper Review, but not yet implemented).
-- [ ] Refactor `init-registration-contract-test` to use a spy/custom API to verify the *call* to `(:on api)` rather than the *result* in the state map (as requested in both Test Shaper and Task Test reviews).
+- [x] Add test verifying that the handler does not throw when the `log-fn` itself throws an exception (as requested in the 6th pass of Test Shaper Review, but not yet implemented in `context_manager_test.clj`).
+- [x] Add test verifying that the handler returns `nil` even if the `log-fn` returns a non-nil value (as requested in the 6th pass of Test Shaper Review, but not yet implemented).
+- [x] Refactor `init-registration-contract-test` to use a spy/custom API to verify the *call* to `(:on api)` rather than the *result* in the state map (as requested in both Test Shaper and Task Test reviews).
 
 ## Test Review (2026-06-24)
 
-- [ ] Fix `init-registers-no-commands-tools-operations-or-prompts-test`: `(:prompt-contributions @state)` is a non-existent key on the nullable API state (prompt contributions live in `:root-state`); the test passes vacuously because `(empty? nil)` is `true` — use `(:list-prompt-contributions api)` or check the root-state instead.
-- [ ] Remove redundant `re-find` assertions in `turn-finished-handler-fires-and-logs-test` "payload is an empty map" sub-case — exact equality check already covers what `re-find` asserts.
+- [x] Fix `init-registers-no-commands-tools-operations-or-prompts-test`: `(:prompt-contributions @state)` is a non-existent key on the nullable API state (prompt contributions live in `:root-state`); the test passes vacuously because `(empty? nil)` is `true` — use `(:list-prompt-contributions api)` or check the root-state instead.
+- [x] Remove redundant `re-find` assertions in `turn-finished-handler-fires-and-logs-test` "payload is an empty map" sub-case — exact equality check already covers what `re-find` asserts.
 
 
 
