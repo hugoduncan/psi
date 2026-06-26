@@ -231,6 +231,33 @@
     (should (string-match-p (regexp-quote "ψ: [error] Validation failed")
                             (buffer-string)))))
 
+(ert-deftest psi-replay-session-messages-tool-only-turn-renders-tool-row-not-empty-assistant-line ()
+  "Workflow child-session replay must show tool calls/results as tool rows."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil))
+    (psi-emacs--ensure-input-area)
+    (setf (psi-emacs-state-tool-output-view-mode psi-emacs--state) 'expanded)
+    (psi-emacs--replay-session-messages
+     '(((:role . "assistant")
+        (:content . [((:type . "tool-call")
+                      (:id . "tc-1")
+                      (:name . "read")
+                      (:arguments . "{\"path\":\"README.md\"}"))]))
+       ((:role . "toolResult")
+        (:tool-call-id . "tc-1")
+        (:tool-name . "read")
+        (:content . [((:type . "text") (:text . "file text"))])
+        (:result-text . "file text")
+        (:is-error . nil))))
+    (let ((text (buffer-string)))
+      (should (string-match-p "read README\.md success" text))
+      (should (string-match-p "file text" text))
+      (should-not (string-match-p "ψ: *$" text))
+      (should-not (string-match-p "ψ: file text" text)))))
+
 (ert-deftest psi-input-history-m-p-m-n-navigates-submissions ()
   (with-temp-buffer
     (psi-emacs-mode)

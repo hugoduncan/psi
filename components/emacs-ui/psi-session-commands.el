@@ -6,6 +6,7 @@
 ;;; Code:
 
 (require 'subr-x)
+(require 'seq)
 (require 'psi-globals)
 
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
@@ -15,6 +16,8 @@
 (declare-function psi-emacs--upsert-tool-row "psi-tool-rows" (tool-id stage text &optional tool-name arguments parsed-args is-error details call-summary))
 (declare-function psi-emacs--assistant-delta "psi-assistant-render" (text))
 (declare-function psi-emacs--assistant-content->text "psi-assistant-render" (content))
+(declare-function psi-emacs--assistant-content-blocks "psi-assistant-render" (content))
+(declare-function psi-emacs--assistant-content-kind "psi-assistant-render" (value))
 (declare-function psi-emacs--draft-anchor-at-end-p "psi-compose")
 (declare-function psi-emacs--ensure-newline-before-append "psi-compose")
 (declare-function psi-emacs--mark-region-read-only "psi-compose" (start end))
@@ -886,6 +889,65 @@ since the backend serialises role as the string \"user\" which
             (if (psi-emacs--role-is-user-p role-raw) "User" "ψ")
             text)))
 
+(defun psi-emacs--message-tool-call-blocks (message)
+  "Return assistant tool-call blocks from MESSAGE content."
+  (when (and (listp message)
+             (let ((role-raw (or (alist-get :role message nil nil #'equal)
+                                 (alist-get 'role message nil nil #'equal))))
+               (or (equal role-raw "assistant")
+                   (eq role-raw 'assistant)
+                   (eq role-raw :assistant))))
+    (let ((content (or (alist-get :content message nil nil #'equal)
+                       (alist-get 'content message nil nil #'equal))))
+      (seq-filter
+       (lambda (block)
+         (let ((kind (psi-emacs--assistant-content-kind block)))
+           (memq kind '(:tool-call tool-call))))
+       (or (psi-emacs--assistant-content-blocks content) '())))))
+
+(defun psi-emacs--replay-message-tool-calls (message)
+  "Replay assistant tool-call blocks from MESSAGE as tool rows."
+  (dolist (block (psi-emacs--message-tool-call-blocks message))
+    (let ((tool-id (or (alist-get :id block nil nil #'equal)
+                       (alist-get 'id block nil nil #'equal)))
+          (tool-name (or (alist-get :name block nil nil #'equal)
+                         (alist-get 'name block nil nil #'equal)))
+          (arguments (or (alist-get :arguments block nil nil #'equal)
+                         (alist-get 'arguments block nil nil #'equal)
+                         ""))
+          (call-summary (or (alist-get :call-summary block nil nil #'equal)
+                            (alist-get 'call-summary block nil nil #'equal))))
+      (when tool-id
+        (psi-emacs--upsert-tool-row tool-id "start" "" tool-name arguments nil nil nil call-summary)))))
+
+(defun psi-emacs--message-role-tool-result-p (message)
+  "Return non-nil when MESSAGE has a toolResult role."
+  (let ((role-raw (or (alist-get :role message nil nil #'equal)
+                      (alist-get 'role message nil nil #'equal))))
+    (or (equal role-raw "toolResult")
+        (eq role-raw 'toolResult)
+        (eq role-raw :toolResult))))
+
+(defun psi-emacs--replay-tool-result-message (message)
+  "Replay MESSAGE, when it is a toolResult, as a completed tool row."
+  (when (psi-emacs--message-role-tool-result-p message)
+    (let* ((tool-id (or (alist-get :tool-call-id message nil nil #'equal)
+                        (alist-get 'tool-call-id message nil nil #'equal)))
+           (tool-name (or (alist-get :tool-name message nil nil #'equal)
+                          (alist-get 'tool-name message nil nil #'equal)))
+           (content (or (alist-get :content message nil nil #'equal)
+                        (alist-get 'content message nil nil #'equal)))
+           (text (or (alist-get :result-text message nil nil #'equal)
+                     (alist-get 'result-text message nil nil #'equal)
+                     (psi-emacs--message-text-from-content content)
+                     ""))
+           (is-error (or (alist-get :is-error message nil nil #'equal)
+                         (alist-get 'is-error message nil nil #'equal)))
+           (details (or (alist-get :details message nil nil #'equal)
+                        (alist-get 'details message nil nil #'equal))))
+      (when tool-id
+        (psi-emacs--upsert-tool-row tool-id "result" text tool-name nil nil is-error details nil)))))
+
 (defun psi-emacs--replay-session-messages (messages)
   "Replay MESSAGES into transcript in deterministic input order."
   (let ((follow-anchor (psi-emacs--draft-anchor-at-end-p)))
@@ -894,17 +956,27 @@ since the backend serialises role as the string \"user\" which
         (when (listp message)
           (let* ((role-raw (or (alist-get :role message nil nil #'equal)
                                (alist-get 'role message nil nil #'equal)
-                               :assistant)))
-            (let ((inhibit-read-only t))
-              (psi-emacs--ensure-newline-before-append)
-              (let ((line-start (point)))
-                (insert (psi-emacs--message->transcript-line message))
-                (psi-emacs--mark-region-read-only line-start (point))
-                (save-excursion
-                  (goto-char line-start)
-                  (if (psi-emacs--role-is-user-p role-raw)
-                      (psi-emacs--apply-prefix-overlay line-start "User: " 'psi-emacs-user-prompt-face)
-                    (psi-emacs--apply-prefix-overlay line-start "ψ: " 'psi-emacs-assistant-reply-face)))))))))
+                               :assistant))
+                 (tool-result? (psi-emacs--message-role-tool-result-p message))
+                 (tool-call-blocks (psi-emacs--message-tool-call-blocks message))
+                 (text-line (psi-emacs--message->transcript-line message))
+                 (text-empty? (string-empty-p
+                               (string-trim
+                                (replace-regexp-in-string "\\`[^:]+:" "" text-line)))))
+            (if tool-result?
+                (psi-emacs--replay-tool-result-message message)
+              (psi-emacs--replay-message-tool-calls message)
+              (unless (and tool-call-blocks text-empty?)
+                (let ((inhibit-read-only t))
+                  (psi-emacs--ensure-newline-before-append)
+                  (let ((line-start (point)))
+                    (insert text-line)
+                    (psi-emacs--mark-region-read-only line-start (point))
+                    (save-excursion
+                      (goto-char line-start)
+                      (if (psi-emacs--role-is-user-p role-raw)
+                          (psi-emacs--apply-prefix-overlay line-start "User: " 'psi-emacs-user-prompt-face)
+                        (psi-emacs--apply-prefix-overlay line-start "ψ: " 'psi-emacs-assistant-reply-face)))))))))))
     (when follow-anchor
       (psi-emacs--set-draft-anchor-to-end))))
 
