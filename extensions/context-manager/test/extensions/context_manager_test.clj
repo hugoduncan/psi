@@ -162,28 +162,28 @@
       (is (= (dissoc before-state :log-lines) (dissoc @state :log-lines))
           "handler must not mutate the API state map; it should only use the provided log-fn")
       (is (= (count (:log-lines before-state)) (dec (count (@state :log-lines))))
-          "the provided log-fn is used")))
+          "the provided log-fn is used"))))
 
-  (deftest handler-log-fn-throws-test
-    (testing "handler does not throw when log-fn itself throws an exception"
-      (let [throwing-log (fn [_] (throw (ex-info "deliberate" {})))
-            {:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/context_manager.clj"})
-            api-with-throwing-log (assoc api :log throwing-log)]
-        (reset! context-manager/initialized? nil)
-        (context-manager/init api-with-throwing-log)
-        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
-          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-              "handler must return nil and not throw when log-fn throws")))))
+(deftest handler-log-fn-throws-test
+  (testing "handler does not throw when log-fn itself throws an exception"
+    (let [throwing-log (fn [_] (throw (ex-info "deliberate" {})))
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/context_manager.clj"})
+          api-with-throwing-log (assoc api :log throwing-log)]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init api-with-throwing-log)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+            "handler must return nil and not throw when log-fn throws")))))
 
-  (deftest handler-log-fn-returns-non-nil-test
-    (testing "handler returns nil even when log-fn returns a non-nil value"
-      (let [returning-log (fn [text] (str "not-nil-" text))
-            {:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/context_manager.clj"})
-            api-with-returning-log (assoc api :log returning-log)]
-        (reset! context-manager/initialized? nil)
-        (context-manager/init api-with-returning-log)
-        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
-          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-              "handler must return nil regardless of what log-fn returns"))))))
+(deftest handler-log-fn-returns-non-nil-test
+  (testing "handler returns nil even when log-fn returns a non-nil value"
+    (let [returning-log (fn [text] (str "not-nil-" text))
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/context_manager.clj"})
+          api-with-returning-log (assoc api :log returning-log)]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init api-with-returning-log)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+            "handler must return nil regardless of what log-fn returns")))))
