@@ -3,3 +3,4 @@
 - added 2 steps to be addressed (vacuous prompt-contributions assertion, redundant re-find assertions)
 - added 1 step to be addressed (error logging not verified in handler-log-fn-throws-test)
 - implementation review (2026-06-25): no new issues found
+- test review (2026-06-25): no new issues
