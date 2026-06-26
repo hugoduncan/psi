@@ -4,3 +4,4 @@
 - added 1 step to be addressed (error logging not verified in handler-log-fn-throws-test)
 - implementation review (2026-06-25): no new issues found
 - test review (2026-06-25): no new issues
+- test shaper review (2026-06-25): added 5 steps to be addressed
