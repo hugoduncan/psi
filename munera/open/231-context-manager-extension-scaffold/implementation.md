@@ -15,3 +15,4 @@
 - test shaper review (2026-06-25, fourth pass): no issues found
 - test shaper review (2026-06-25, fifth pass): no issues found
 - test shaper review (2026-06-25, sixth pass): no issues found
+- docs review (2026-06-25): fixed README.md extension list alphabetical ordering (context-manager was after metrics, moved to correct position between commit-checks and dev-http)
