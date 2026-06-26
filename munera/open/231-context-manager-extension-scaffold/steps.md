@@ -133,6 +133,10 @@
 - [x] Extract the "recovery after missing :on key" sub-case from `init-robustness-test` into its own test — it tests a distinct behavior (init recovery after failure) separate from the malformed-API boundary contract tested by the other sub-cases
 - [x] Extract the "missing :log key" sub-case from `init-robustness-test` into a handler-focused test — it tests handler behavior (works without `:log`), not init behavior; mixes concerns
 
+## Code Shaper Review (2026-06-25)
+
+- [x] Change `def initialized?` to `defonce initialized?` — without `defonce`, namespace reload creates a new atom, defeating the CAS-based reload safety guarantee; `auto-session-name` uses `defonce ^:private` for its state atom
+
 
 
 

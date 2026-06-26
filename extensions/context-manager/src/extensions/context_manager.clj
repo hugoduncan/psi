@@ -18,7 +18,7 @@
         (catch Exception _ nil))
       nil)))
 
-(def initialized? (atom nil))
+(defonce initialized? (atom nil))
 
 (defn init
   "Initialize the context-manager extension.
