@@ -176,6 +176,29 @@
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil and not throw when log-fn throws")))))
 
+(deftest handler-log-fn-throws-logs-error-test
+  (testing "handler logs error message when log-fn throws during normal logging"
+    (let [call-count (atom 0)
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/context_manager.clj"})
+          real-log (:log api)
+          flaky-log  (fn [text]
+                       (swap! call-count inc)
+                       (if (= @call-count 1)
+                         (throw (ex-info "first call fails" {}))
+                         (real-log text)))
+          api-with-flaky-log (assoc api :log flaky-log)]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init api-with-flaky-log)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+            "handler must return nil and not throw")
+        (let [lines (:log-lines @state)]
+          (is (= 1 (count lines))
+              "exactly one log line recorded (the error recovery message)")
+          (is (some #(re-find #"context-manager: handler error: " %) lines)
+              "error message with 'context-manager: handler error: ' prefix is logged"))))))
+
 (deftest handler-log-fn-returns-non-nil-test
   (testing "handler returns nil even when log-fn returns a non-nil value"
     (let [returning-log (fn [text] (str "not-nil-" text))

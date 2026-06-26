@@ -109,7 +109,7 @@
 
 ## Test Review (2026-06-25)
 
-- [ ] Add test verifying that `on-turn-finished` logs an error message (with `"context-manager: handler error: "` prefix) to `:log-lines` when the `log-fn` itself throws during normal logging — current `handler-log-fn-throws-test` asserts the handler returns `nil` and doesn't propagate the exception, but does not verify the error is recorded in `(:log-lines @state)`.
+- [x] Add test verifying that `on-turn-finished` logs an error message (with `"context-manager: handler error: "` prefix) to `:log-lines` when the `log-fn` itself throws during normal logging — current `handler-log-fn-throws-test` asserts the handler returns `nil` and doesn't propagate the exception, but does not verify the error is recorded in `(:log-lines @state)`.
 
 
 
