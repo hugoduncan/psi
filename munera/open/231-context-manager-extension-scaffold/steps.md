@@ -121,7 +121,7 @@
 
 ## Test Shaper Review (2026-06-25, second pass)
 
-- [ ] Standardize assertion style in `handler-log-fn-throws-logs-error-test`: replace `(some #(re-find #"context-manager: handler error: " %) (:log-lines @state))` with exact equality `(= "context-manager: handler error: first call fails" (last (:log-lines @state)))` — `re-find` + `some` is weaker and inconsistent with the exact equality style used in every other test in this file
+- [x] Standardize assertion style in `handler-log-fn-throws-logs-error-test`: replace `(some #(re-find #"context-manager: handler error: " %) (:log-lines @state))` with exact equality `(= "context-manager: handler error: first call fails" (last (:log-lines @state)))` — `re-find` + `some` is weaker and inconsistent with the exact equality style used in every other test in this file
 
 
 

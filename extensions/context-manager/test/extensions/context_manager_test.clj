@@ -182,8 +182,9 @@
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil and not throw")
-        (is (some #(re-find #"context-manager: handler error: " %) (:log-lines @state))
-            "error message with 'context-manager: handler error: ' prefix is logged")))))
+        (is (= "context-manager: handler error: first call fails"
+               (last (:log-lines @state)))
+            "error message with exact prefix and exception message is logged")))))
 
 (deftest handler-log-fn-returns-non-nil-test
   (testing "handler returns nil even when log-fn returns a non-nil value"

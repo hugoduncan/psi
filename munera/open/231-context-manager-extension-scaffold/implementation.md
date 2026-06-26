@@ -7,3 +7,4 @@
 - test shaper review (2026-06-25): added 5 steps to be addressed
 - addressed 5 test shaper review (2026-06-25) steps: standardized assertions, removed redundant/implementation-detail assertions
 - test shaper review (2026-06-25, second pass): added 1 step to be addressed
+- addressed 1 test shaper review (2026-06-25, second pass) step: standardized assertion in handler-log-fn-throws-logs-error-test to exact equality
