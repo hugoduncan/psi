@@ -125,8 +125,8 @@
 
 ## Test Shaper Review (2026-06-25, third pass)
 
-- [ ] Remove redundant "missing both keys" sub-case from `handler-handles-missing-payload-keys-test` — passes `{}` and asserts `"session-id=nil turn-id=nil"`, which is identical to the "payload is an empty map" sub-case in `turn-finished-handler-fires-and-logs-test`; violates `minimal(redundant_tests)`
-- [ ] Add sub-case to `init-return-value-test` verifying that a second call to `init` (after successful first call) returns `nil` — currently only the first-call `true` return is asserted; `init-reload-safety-test` checks handler count but not return value
+- [x] Remove redundant "missing both keys" sub-case from `handler-handles-missing-payload-keys-test` — passes `{}` and asserts `"session-id=nil turn-id=nil"`, which is identical to the "payload is an empty map" sub-case in `turn-finished-handler-fires-and-logs-test`; violates `minimal(redundant_tests)`
+- [x] Add sub-case to `init-return-value-test` verifying that a second call to `init` (after successful first call) returns `nil` — currently only the first-call `true` return is asserted; `init-reload-safety-test` checks handler count but not return value
 
 
 

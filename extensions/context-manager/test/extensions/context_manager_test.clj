@@ -72,11 +72,6 @@
   (testing "handler logs gracefully when :session-id or :turn-id are missing"
     (let [{:keys [state]} (setup-api)
           handler         (first (get-in @state [:handlers "session_turn_finished"]))]
-      (testing "missing both keys"
-        (is (nil? (handler {}))
-            "handler returns nil")
-        (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil"
-               (last (:log-lines @state)))))
       (testing "missing only :turn-id"
         (is (nil? (handler {:session-id "s2"}))
             "handler returns nil")
@@ -120,7 +115,12 @@
   (testing "init returns true on successful first-time initialization"
     (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
       (is (true? (context-manager/init api))
-          "init should return true on successful first-time initialization"))))
+          "init should return true on successful first-time initialization"))
+    (testing "init returns nil on second call after successful initialization"
+      (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+        (context-manager/init api)
+        (is (nil? (context-manager/init api))
+            "init should return nil on subsequent calls after successful initialization")))))
 
 (deftest init-registration-contract-test
   (testing "init registration contract"
