@@ -113,11 +113,11 @@
 
 ## Test Shaper Review (2026-06-25)
 
-- [ ] Standardize assertion style: replace `re-find` in `handler-handles-missing-payload-keys-test` with exact equality assertions (matching `turn-finished-handler-fires-and-logs-test`) — `re-find` is weaker and doesn't catch format deviations in unmatched portions
-- [ ] Remove redundant `contains?` assertion in `init-registers-turn-finished-handler-test` — `count=1` on the handler vector already implies the key exists
-- [ ] Add assertion to `handler-log-fn-throws-test` verifying `:log-lines` is empty — when the log-fn always throws, the inner catch also fails, so no log output should be produced
-- [ ] Remove implementation-detail assertion `= 1 (count lines)` from `handler-log-fn-throws-logs-error-test` — this tests the error recovery mechanism's call count, not observable behavior; keep only the assertion that the error message content is present
-- [ ] Remove secondary log-lines count assertion from `handler-purity-test` — it's incidental to the purity concern and obscures the test's single concern
+- [x] Standardize assertion style: replace `re-find` in `handler-handles-missing-payload-keys-test` with exact equality assertions (matching `turn-finished-handler-fires-and-logs-test`) — `re-find` is weaker and doesn't catch format deviations in unmatched portions
+- [x] Remove redundant `contains?` assertion in `init-registers-turn-finished-handler-test` — `count=1` on the handler vector already implies the key exists
+- [x] Add assertion to `handler-log-fn-throws-test` verifying `:log-lines` is empty — when the log-fn always throws, the inner catch also fails, so no log output should be produced
+- [x] Remove implementation-detail assertion `= 1 (count lines)` from `handler-log-fn-throws-logs-error-test` — this tests the error recovery mechanism's call count, not observable behavior; keep only the assertion that the error message content is present
+- [x] Remove secondary log-lines count assertion from `handler-purity-test` — it's incidental to the purity concern and obscures the test's single concern
 
 
 
