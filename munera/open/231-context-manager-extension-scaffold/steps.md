@@ -119,6 +119,10 @@
 - [x] Remove implementation-detail assertion `= 1 (count lines)` from `handler-log-fn-throws-logs-error-test` — this tests the error recovery mechanism's call count, not observable behavior; keep only the assertion that the error message content is present
 - [x] Remove secondary log-lines count assertion from `handler-purity-test` — it's incidental to the purity concern and obscures the test's single concern
 
+## Test Shaper Review (2026-06-25, second pass)
+
+- [ ] Standardize assertion style in `handler-log-fn-throws-logs-error-test`: replace `(some #(re-find #"context-manager: handler error: " %) (:log-lines @state))` with exact equality `(= "context-manager: handler error: first call fails" (last (:log-lines @state)))` — `re-find` + `some` is weaker and inconsistent with the exact equality style used in every other test in this file
+
 
 
 
