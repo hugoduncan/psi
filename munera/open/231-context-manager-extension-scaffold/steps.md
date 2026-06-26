@@ -123,6 +123,11 @@
 
 - [x] Standardize assertion style in `handler-log-fn-throws-logs-error-test`: replace `(some #(re-find #"context-manager: handler error: " %) (:log-lines @state))` with exact equality `(= "context-manager: handler error: first call fails" (last (:log-lines @state)))` — `re-find` + `some` is weaker and inconsistent with the exact equality style used in every other test in this file
 
+## Test Shaper Review (2026-06-25, third pass)
+
+- [ ] Remove redundant "missing both keys" sub-case from `handler-handles-missing-payload-keys-test` — passes `{}` and asserts `"session-id=nil turn-id=nil"`, which is identical to the "payload is an empty map" sub-case in `turn-finished-handler-fires-and-logs-test`; violates `minimal(redundant_tests)`
+- [ ] Add sub-case to `init-return-value-test` verifying that a second call to `init` (after successful first call) returns `nil` — currently only the first-call `true` return is asserted; `init-reload-safety-test` checks handler count but not return value
+
 
 
 
