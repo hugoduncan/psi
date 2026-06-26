@@ -113,11 +113,11 @@
 
 ## Test Shaper Review (2026-06-25)
 
-- [ ] Refactor `handler-handles-missing-payload-keys-test` to use exact equality assertions instead of `re-find` — inconsistent with `turn-finished-handler-fires-and-logs-test` which uses exact string equality; `re-find` is weaker and doesn't catch format deviations in unmatched portions of the log line
+- [ ] Standardize assertion style: replace `re-find` in `handler-handles-missing-payload-keys-test` with exact equality assertions (matching `turn-finished-handler-fires-and-logs-test`) — `re-find` is weaker and doesn't catch format deviations in unmatched portions
 - [ ] Remove redundant `contains?` assertion in `init-registers-turn-finished-handler-test` — `count=1` on the handler vector already implies the key exists
-- [ ] Add assertion to `handler-log-fn-throws-test` verifying `:log-lines` is empty — when the log-fn always throws, the inner catch swallows the error recovery attempt too; the observable outcome is no log output
+- [ ] Add assertion to `handler-log-fn-throws-test` verifying `:log-lines` is empty — when the log-fn always throws, the inner catch also fails, so no log output should be produced
 - [ ] Remove implementation-detail assertion `= 1 (count lines)` from `handler-log-fn-throws-logs-error-test` — this tests the error recovery mechanism's call count, not observable behavior; keep only the assertion that the error message content is present
-- [ ] Remove secondary log-lines count assertion from `handler-purity-test` — it's incidental to the purity concern and violates single-concern; the test should focus only on verifying no external state mutation beyond the provided log-fn
+- [ ] Remove secondary log-lines count assertion from `handler-purity-test` — it's incidental to the purity concern and obscures the test's single concern
 
 
 
