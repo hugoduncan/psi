@@ -107,6 +107,10 @@
 - [x] Fix `init-registers-no-commands-tools-operations-or-prompts-test`: `(:prompt-contributions @state)` is a non-existent key on the nullable API state (prompt contributions live in `:root-state`); the test passes vacuously because `(empty? nil)` is `true` — use `(:list-prompt-contributions api)` or check the root-state instead.
 - [x] Remove redundant `re-find` assertions in `turn-finished-handler-fires-and-logs-test` "payload is an empty map" sub-case — exact equality check already covers what `re-find` asserts.
 
+## Test Review (2026-06-25)
+
+- [ ] Add test verifying that `on-turn-finished` logs an error message (with `"context-manager: handler error: "` prefix) to `:log-lines` when the `log-fn` itself throws during normal logging — current `handler-log-fn-throws-test` asserts the handler returns `nil` and doesn't propagate the exception, but does not verify the error is recorded in `(:log-lines @state)`.
+
 
 
 
