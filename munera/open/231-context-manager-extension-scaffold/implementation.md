@@ -11,5 +11,6 @@
 - test shaper review (2026-06-25, third pass): added 2 steps to be addressed
 - addressed 2 test shaper review (2026-06-25, third pass) steps: removed redundant "missing both keys" sub-case, added second-call nil return assertion to init-return-value-test
 - test shaper review (2026-06-25, fourth pass): added 2 steps to be addressed
+- addressed 2 test shaper review (2026-06-25, fourth pass) steps: extracted recovery-after-missing-on-key into init-recovery-after-missing-on-key-test, extracted missing-log-key into handler-works-without-log-key-test
 - test shaper review (2026-06-25, fourth pass): no issues found
 - test shaper review (2026-06-25, fourth pass): no issues found

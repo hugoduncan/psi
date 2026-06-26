@@ -89,27 +89,31 @@
       (is (nil? (context-manager/init {:log (fn [_] nil)}))
           "should return nil and not throw NPE when :on is missing")
       (reset! context-manager/initialized? nil))
-    (testing "recovery after missing :on key"
-      (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
-        (is (nil? (context-manager/init {:log (fn [_] nil)})) "first call fails")
-        (is (true? (context-manager/init api)) "subsequent call with valid API succeeds")
-        (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
-        (reset! context-manager/initialized? nil)))
-    (testing "missing :log key"
-      (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
-        (reset! context-manager/initialized? nil)
-        (context-manager/init (dissoc api :log))
-        (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
-          (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
-              "handler should return nil and not throw NPE when log-fn is missing")
-          (is (empty? (:log-lines @state))
-              "handler should not log anything when :log is missing from API"))))
     (testing "api is nil"
       (is (nil? (context-manager/init nil))
           "should return nil and not throw NPE when api is nil"))
     (testing "api is not a map"
       (is (nil? (context-manager/init "not-a-map"))
           "should return nil and not throw NPE when api is not a map"))))
+
+(deftest init-recovery-after-missing-on-key-test
+  (testing "init recovers after a failed call due to missing :on key"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+      (is (nil? (context-manager/init {:log (fn [_] nil)})) "first call fails")
+      (is (true? (context-manager/init api)) "subsequent call with valid API succeeds")
+      (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
+      (reset! context-manager/initialized? nil))))
+
+(deftest handler-works-without-log-key-test
+  (testing "handler works correctly when :log is missing from API"
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/test/context_manager.clj"})]
+      (reset! context-manager/initialized? nil)
+      (context-manager/init (dissoc api :log))
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+            "handler should return nil and not throw NPE when log-fn is missing")
+        (is (empty? (:log-lines @state))
+            "handler should not log anything when :log is missing from API")))))
 
 (deftest init-return-value-test
   (testing "init returns true on successful first-time initialization"
