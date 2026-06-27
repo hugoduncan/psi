@@ -1,3 +1,4 @@
 - no architectural review feedback
 - ambiguity review added 1 new design step
 - no inconsistency review feedback
+- follow-up principle: resolve eligibility via the smallest explicit session metadata/query contract available; preserve extension isolation (no direct atom reads). Relevant files: `extensions/auto-session-name/src/extensions/auto_session_name.clj`, `components/session-state/src/psi/session_state/model.clj`, `components/agent-session/src/psi/agent_session/child_session_state.clj`.
