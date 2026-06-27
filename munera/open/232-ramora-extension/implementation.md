@@ -1,6 +1,9 @@
 - architectural review added 3 new design steps
 - architectural review (2nd pass) added 2 new design steps: missing psi-owned-extension-catalog registrations (launcher + runtime)
 - extension discovery architecture: extensions are discovered via two synchronized psi-owned-extension-catalog maps (launcher: psi.launcher.extensions, runtime: psi.agent-session.extension-installs), not via extensions/deps.edn. The catalogs map lib keys to :psi/init vars and :source-policies. A parity test enforces both catalogs stay in sync. extensions/deps.edn is only for bb test classpath wiring.
+- catalog entry shape (follow munera/mementum pattern): `'psi/ramora {:psi/init 'extensions.ramora/init :source-policies {:development {:local/root "extensions/ramora"} :installed {:local/root "extensions/ramora"} :jar {:mvn/version :psi/release-version}}}`
+- catalog files: bases/main/src/psi/launcher/extensions.clj (launcher), components/agent-session/src/psi/agent_session/extension_installs.clj (runtime)
+- parity test: components/agent-session/test/psi/agent_session/extension_installs_test.clj (test `psi-owned-extension-catalog-parity-with-launcher`)
 - no inconsistency review feedback
 - ambiguity review added 4 new design steps
 - design-steps context: steps 8 and 9 (internal inconsistencies) are subsumed by resolving step 1 (adopt single-file pattern); no separate action needed once step 1 is addressed
