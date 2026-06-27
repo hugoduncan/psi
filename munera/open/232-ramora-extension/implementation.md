@@ -1,3 +1,4 @@
+- no ambiguity review feedback
 - architectural review (4th pass): no new architectural feedback; all 12 prior design-steps resolved; catalog registrations, deps.edn wiring, single-file pattern, static-at-init content, prompt-mode query, engage prefix, priority 52, and error handling all align with munera/mementum reference implementations
 - architectural review added 3 new design steps
 - architectural review (2nd pass) added 2 new design steps: missing psi-owned-extension-catalog registrations (launcher + runtime)
