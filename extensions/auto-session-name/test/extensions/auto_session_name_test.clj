@@ -794,6 +794,37 @@
         (is (= {} (:turn-counts @@#'sut/state)))
         (is (= [] (:scheduled-events @state)))))))
 
+(deftest unresolved-source-session-is-ignored-test
+  (testing "source sessions with unresolved ownership metadata do not count turns or run checkpoints"
+    (doseq [[case-name query-result]
+            {"empty result" {}
+             "not-found nil" nil
+             "query failure" ::throw}]
+      (testing case-name
+        (reset-state!)
+        (let [calls (atom [])
+              {:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/auto_session_name.clj"
+                                    :query-fn (fn [req]
+                                                (swap! calls conj [:query req])
+                                                (when (= query-result ::throw)
+                                                  (throw (ex-info "query failed" {:req req})))
+                                                query-result)
+                                    :mutate-fn (fn [op params]
+                                                 (swap! calls conj [:mutate op params])
+                                                 {})})]
+          (sut/init api)
+          (reset! calls [])
+          (swap! state assoc :notifications [])
+          (let [turn-handler       (first (get-in @state [:handlers "session_turn_finished"]))
+                checkpoint-handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+            (is (nil? (turn-handler {:session-id "missing-1" :turn-id "t1"})))
+            (is (nil? (checkpoint-handler {:session-id "missing-1" :turn-count 2})))
+            (is (= {} (:turn-counts @@#'sut/state)))
+            (is (= [] (:scheduled-events @state)))
+            (is (= [] (:notifications @state)))
+            (is (every? #(= :query (first %)) @calls))))))))
+
 (deftest delegated-checkpoint-is-silent-no-op-test
   (testing "checkpoint for delegated/workflow-owned sessions does not query history, create helpers, rename, close, or notify"
     (reset-state!)

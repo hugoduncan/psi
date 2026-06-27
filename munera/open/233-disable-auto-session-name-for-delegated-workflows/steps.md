@@ -47,4 +47,4 @@
 
 ## Implementation review follow-up
 
-- [ ] Make `eligible-source-session?` conservative when ownership metadata cannot be resolved: an empty/not-found/failed `query-session` result for a source session should be treated as ineligible rather than as a root top-level session, and add a regression test for that no-op path.
+- [x] Make `eligible-source-session?` conservative when ownership metadata cannot be resolved: an empty/not-found/failed `query-session` result for a source session should be treated as ineligible rather than as a root top-level session, and add a regression test for that no-op path.

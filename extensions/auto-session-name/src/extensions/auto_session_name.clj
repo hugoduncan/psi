@@ -173,25 +173,37 @@
   (:psi.agent-session/session-name
    ((:query-session api) session-id [:psi.agent-session/session-name])))
 
+(def ^:private session-ownership-query
+  [:psi.agent-session/parent-session-id
+   :psi.agent-session/workflow-run-id
+   :psi.agent-session/workflow-step-id
+   :psi.agent-session/workflow-attempt-id
+   :psi.agent-session/workflow-owned?])
+
 (defn- query-session-ownership [api session-id]
-  ((:query-session api) session-id [:psi.agent-session/parent-session-id
-                                    :psi.agent-session/workflow-run-id
-                                    :psi.agent-session/workflow-step-id
-                                    :psi.agent-session/workflow-attempt-id
-                                    :psi.agent-session/workflow-owned?]))
+  ((:query-session api) session-id session-ownership-query))
+
+(defn- authoritative-ownership? [ownership]
+  (and (map? ownership)
+       (every? #(contains? ownership %) session-ownership-query)))
 
 (defn- eligible-source-session? [api session-id]
-  (let [{:psi.agent-session/keys [parent-session-id
-                                  workflow-run-id
-                                  workflow-step-id
-                                  workflow-attempt-id
-                                  workflow-owned?]} (query-session-ownership api session-id)]
-    (and (not (helper-session? session-id))
-         (nil? parent-session-id)
-         (nil? workflow-run-id)
-         (nil? workflow-step-id)
-         (nil? workflow-attempt-id)
-         (not (true? workflow-owned?)))))
+  (try
+    (let [{:psi.agent-session/keys [parent-session-id
+                                    workflow-run-id
+                                    workflow-step-id
+                                    workflow-attempt-id
+                                    workflow-owned?]
+           :as ownership} (query-session-ownership api session-id)]
+      (and (authoritative-ownership? ownership)
+           (not (helper-session? session-id))
+           (nil? parent-session-id)
+           (nil? workflow-run-id)
+           (nil? workflow-step-id)
+           (nil? workflow-attempt-id)
+           (false? workflow-owned?)))
+    (catch Exception _
+      false)))
 
 (defn- query-session-model-context [api session-id]
   ((:query-session api) session-id [:psi.agent-session/model-provider
