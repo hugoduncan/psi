@@ -5,3 +5,4 @@
 - design follow-up completed: existing session model already defaults root/non-workflow fields (`:parent-session-id nil`, workflow ids nil, `:workflow-owned? false`), so the fallback can use those extension-safe metadata fields as the interactivity predicate instead of introducing a new projection solely for this task.
 - architectural review rerun: no new feedback
 - ambiguity review rerun: no new feedback
+- inconsistency review rerun: no new feedback
