@@ -28,3 +28,5 @@
 - test review rerun: added 1 step to be addressed.
 
 - addressed 1 test review follow-up step: added per-field regression coverage proving workflow run, step, and attempt ids each independently make an otherwise root session ineligible.
+
+- test review rerun: added 1 step to be addressed.
