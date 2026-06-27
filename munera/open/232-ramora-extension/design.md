@@ -27,7 +27,22 @@ The extension mirrors the pattern used by `munera` and `mementum`: a single bund
 - Prompt contribution section name: "Ramora Protocol"
 - Priority: 52 (after mementum=50, munera=51)
 - The extension is a prompt-contribution-only extension (no resolvers, mutations, or operations)
-- Add `psi/ramora` to `extensions/deps.edn` `:deps` and `ramora/test` to the `:test` alias `:extra-paths`
+- Add `psi/ramora` to `extensions/deps.edn` `:deps` only (not `:extra-paths` — matching mementum/munera pattern)
+- Register `psi/ramora` in `psi.launcher.extensions/psi-owned-extension-catalog` (launcher-side) with:
+  ```clojure
+  'psi/ramora
+   {:psi/init 'extensions.ramora/init
+    :source-policies
+    {:development {:local/root "extensions/ramora"}
+     :installed   {:local/root "extensions/ramora"}
+     :jar         {:mvn/version :psi/release-version}}}
+  ```
+- Register `psi/ramora` in `psi.agent-session.extension-installs/psi-owned-extension-catalog` (runtime-side) with:
+  ```clojure
+  'psi/ramora {:psi/init 'extensions.ramora/init
+               :source-policies {:installed {:local/root "extensions/ramora"}}}
+  ```
+  Both catalogs must be updated together; the parity test `psi-owned-extension-catalog-parity-with-launcher` in `agent_session/extension_installs_test.clj` enforces this.
 - Protocol text source: the Ramora protocol lambda-form content (to be provided; placeholder acceptable for initial implementation)
 
 ## Acceptance
