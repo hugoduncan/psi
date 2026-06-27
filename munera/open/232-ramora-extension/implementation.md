@@ -1,3 +1,8 @@
 - architectural review added 3 new design steps
 - ambiguity review added 4 new design steps
 - no inconsistency review feedback
+- design-steps context: steps 8 and 9 (internal inconsistencies) are subsumed by resolving step 1 (adopt single-file pattern); no separate action needed once step 1 is addressed
+- reference implementations: extensions/munera/src/extensions/munera.clj, extensions/mementum/src/extensions/mementum.clj
+- reference tests: extensions/munera/test/extensions/munera_test.clj, extensions/mementum/test/extensions/mementum_test.clj
+- extensions wiring: extensions/deps.edn (:deps and :test alias :extra-paths)
+- engage prefix value (shared by munera/mementum): "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy] | OODA\nHuman ⊗ AI\n\n"
