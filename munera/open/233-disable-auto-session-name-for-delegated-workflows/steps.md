@@ -52,3 +52,6 @@
 ## Test review follow-up
 
 - [x] Update the existing positive-path auto-session-name tests so their nullable `query-session` fixtures return authoritative root ownership metadata for `session-ownership-query`; `bb clojure:test:extensions --focus extensions.auto-session-name-test` currently fails 10 pre-existing positive-path tests because the conservative eligibility gate treats their `{}` ownership query fallback as ineligible.
+- [ ] Make the delegated-child and workflow-owned turn-finished regression fixtures return a complete authoritative ownership map, so the tests prove the parent/workflow fields themselves make an otherwise resolved session ineligible rather than passing because incomplete metadata is conservatively ineligible.
+- [ ] Make the delegated/workflow checkpoint no-op regression fixture return a complete authoritative ownership map, so the test proves delegated/workflow ownership short-circuits later checkpoint work rather than passing because incomplete metadata is conservatively ineligible.
+- [ ] Make the helper-session turn-finished regression fixture return complete root ownership metadata for the helper session, so the test proves the helper-session guard itself prevents recursive scheduling rather than passing because ownership metadata is unresolved.

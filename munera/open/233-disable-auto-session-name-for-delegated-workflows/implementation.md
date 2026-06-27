@@ -20,3 +20,5 @@
 - test review: added 1 step to be addressed.
 
 - addressed 1 test review step: positive-path auto-session-name fixtures now return authoritative root ownership metadata for ownership queries. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 976 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
+
+- test review rerun: added 3 steps to be addressed.
