@@ -36,3 +36,5 @@
 - test review rerun: added 1 step to be addressed.
 
 - addressed 1 test review follow-up step: `stale-checkpoint-does-not-start-helper-test` now returns authoritative root ownership metadata for the ownership query, so it exercises the eligible-session stale-checkpoint guard. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 989 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
+
+- test review: added 1 step to be addressed.
