@@ -50,3 +50,5 @@
 - addressed 1 test review follow-up step: added real `agent-session-workflow-linkage` query coverage for ordinary root sessions and child workflow-owned sessions. Verification: `bb clojure:test:unit --focus psi.agent-session.eql-introspection-test` passed; `clj-kondo --lint components/agent-session/test/psi/agent_session/eql_introspection_test.clj components/agent-session/src/psi/agent_session/resolvers/session.clj` clean.
 
 - test review rerun: added 1 step to be addressed.
+
+- addressed 1 test review follow-up step: removed duplicate workflow-linkage query coverage from `eql_introspection_test.clj`, keeping `workflow_linkage_query_test.clj` as the authoritative projection contract home. Verification: focused workflow-linkage test command produced passing dots but timed out under the Scry wrapper; clj-kondo on both test files clean.
