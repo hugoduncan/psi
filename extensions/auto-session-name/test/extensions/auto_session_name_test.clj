@@ -764,11 +764,16 @@
     (reset-state!)
     (swap! @#'sut/state assoc :helper-session-ids #{"child-1"})
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "child-1" session-id)
+                                                       (session-ownership-query? query))
+                                              root-session-ownership))})]
       (sut/init api)
       (swap! @#'sut/state assoc :helper-session-ids #{"child-1"})
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
         (is (= [] (:scheduled-events @state)))))))
 
 (deftest delegated-child-turn-finished-is-ignored-test
@@ -778,14 +783,9 @@
                                {:path "/test/auto_session_name.clj"
                                 :query-fn (fn [{:keys [session-id query]}]
                                             (when (and (= "child-1" session-id)
-                                                       (= [:psi.agent-session/parent-session-id
-                                                           :psi.agent-session/workflow-run-id
-                                                           :psi.agent-session/workflow-step-id
-                                                           :psi.agent-session/workflow-attempt-id
-                                                           :psi.agent-session/workflow-owned?]
-                                                          query))
-                                              {:psi.agent-session/parent-session-id "root-1"
-                                               :psi.agent-session/workflow-owned? false}))})]
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/parent-session-id "root-1")))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
@@ -799,16 +799,12 @@
                                {:path "/test/auto_session_name.clj"
                                 :query-fn (fn [{:keys [session-id query]}]
                                             (when (and (= "wf-1" session-id)
-                                                       (= [:psi.agent-session/parent-session-id
-                                                           :psi.agent-session/workflow-run-id
-                                                           :psi.agent-session/workflow-step-id
-                                                           :psi.agent-session/workflow-attempt-id
-                                                           :psi.agent-session/workflow-owned?]
-                                                          query))
-                                              {:psi.agent-session/workflow-run-id "run-1"
-                                               :psi.agent-session/workflow-step-id "step-1"
-                                               :psi.agent-session/workflow-attempt-id "attempt-1"
-                                               :psi.agent-session/workflow-owned? true}))})]
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/workflow-run-id "run-1"
+                                                     :psi.agent-session/workflow-step-id "step-1"
+                                                     :psi.agent-session/workflow-attempt-id "attempt-1"
+                                                     :psi.agent-session/workflow-owned? true)))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "wf-1" :turn-id "t1"})))
@@ -854,7 +850,14 @@
                                {:path "/test/auto_session_name.clj"
                                 :query-fn (fn [req]
                                             (swap! calls conj [:query req])
-                                            {:psi.agent-session/parent-session-id "root-1"})
+                                            (when (and (= "child-1" (:session-id req))
+                                                       (session-ownership-query? (:query req)))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/parent-session-id "root-1"
+                                                     :psi.agent-session/workflow-run-id "run-1"
+                                                     :psi.agent-session/workflow-step-id "step-1"
+                                                     :psi.agent-session/workflow-attempt-id "attempt-1"
+                                                     :psi.agent-session/workflow-owned? true)))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [:mutate op params])
                                              {})})]
