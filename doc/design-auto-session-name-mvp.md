@@ -103,15 +103,24 @@ Payload should be opaque extension data.
 ## Extension behavior
 
 The extension maintains in-memory state:
-- per-session completed-turn counts
+- per-session completed-turn counts for eligible source sessions only
 - configured threshold `N`
 - configured delay
 
+Current automatic naming/counting is limited to top-level user-interactive
+source sessions. Delegated workflow sessions, workflow-step sessions, nested
+workflow sessions, and auto-session-name helper sessions are ineligible and do
+not increment counters or produce rename checkpoints, even when they contain
+visible user or assistant messages.
+
 Behavior:
 1. observe `session_turn_finished`
-2. increment per-session turn counter
-3. when count is a multiple of `N`, request a scheduled extension event
-4. when the scheduled event fires, show a transient UI notification
+2. ignore the event unless the source session is an eligible top-level
+   user-interactive session
+3. increment the eligible source-session turn counter
+4. when count is a multiple of `N`, request a scheduled extension event
+5. when the scheduled event fires, first re-check eligibility; ineligible
+   checkpoint events silently no-op
 
 If UI is absent:
 - log instead of notify, or no-op
@@ -140,8 +149,13 @@ If notification fails because UI is absent:
 - prompt lifecycle completion emits a canonical extension event
 - an extension can request a delayed extension event through runtime mutation
 - `auto-session-name` extension registers both handlers on init
-- after every 2 completed turns, a delayed event is scheduled
-- when the delayed event fires, the extension shows a transient UI notification
+- after every 2 completed turns in an eligible top-level user-interactive
+  source session, a delayed event is scheduled
+- delegated workflow, workflow-step, nested workflow, and helper sessions do not
+  count toward rename checkpoints
+- when the delayed event fires for an eligible session, the extension shows a
+  transient UI notification
+- when the delayed event fires for an ineligible session, it silently no-ops
 - no source-session transcript mutation occurs
 - no session renaming occurs yet
 

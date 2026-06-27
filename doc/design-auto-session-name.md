@@ -52,10 +52,20 @@ If it fails, the original session remains unchanged.
 
 ### Eligible session
 
-A session is eligible when all of the following hold:
-- it is a normal user session, not an internal helper session
+Current automatic naming is intentionally limited to top-level,
+user-interactive source sessions. A session is eligible when all of the
+following hold:
+- it has no parent session relationship
+- it is not owned by a delegated workflow, workflow step, workflow attempt, or
+  nested workflow run
+- it is not an internal auto-session-name helper session
 - automatic renaming is enabled for that session/project/runtime
 - it is not currently protected by a manual-name policy
+
+Delegated workflow sessions, workflow-step sessions, nested workflow sessions,
+and helper sessions are excluded even when they contain visible user or
+assistant messages. Their names are authored by workflow/runtime context rather
+than by this extension.
 
 ### Completed turn
 

@@ -65,4 +65,4 @@
 
 ## Documentation review follow-up
 
-- [ ] Update historical auto-session-name design documentation (`doc/design-auto-session-name.md` and/or `doc/design-auto-session-name-mvp.md`) so its eligibility/user-visible behavior sections do not imply automatic naming/counting applies to every non-helper session; it should mention that current automatic naming is limited to top-level user-interactive source sessions and excludes delegated workflow, workflow-step, nested workflow, and helper sessions.
+- [x] Update historical auto-session-name design documentation (`doc/design-auto-session-name.md` and/or `doc/design-auto-session-name-mvp.md`) so its eligibility/user-visible behavior sections do not imply automatic naming/counting applies to every non-helper session; it should mention that current automatic naming is limited to top-level user-interactive source sessions and excludes delegated workflow, workflow-step, nested workflow, and helper sessions.
