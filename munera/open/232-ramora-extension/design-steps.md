@@ -7,3 +7,5 @@
 - [x] Confirm priority 52 — design says "seems right" (hedged); needs definitive value
 - [x] Resolve internal inconsistency: constraints say "Two resource files" but acceptance says "follows the same structural pattern as munera/mementum" which uses a single resource file — resolved by adopting single-file pattern in step 1
 - [x] Resolve internal inconsistency: prose mode acceptance says "engage prefix + RAMORA.md" but munera/mementum pattern uses lambda form as base with engage-prefix prepended — design's two-file approach contradicts stated goal of mirroring the pattern — resolved by adopting single-file pattern in step 1
+- [ ] Register psi/ramora in psi.launcher.extensions/psi-owned-extension-catalog (launcher-side) with :psi/init and :source-policies — design only mentions extensions/deps.edn which is the bb test deps file, not the runtime extension discovery mechanism
+- [ ] Register psi/ramora in psi.agent-session.extension-installs/psi-owned-extension-catalog (runtime-side) with :psi/init and :source-policies — both catalogs must be updated for extension to load; parity test enforces this

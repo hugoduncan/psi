@@ -1,4 +1,6 @@
 - architectural review added 3 new design steps
+- architectural review (2nd pass) added 2 new design steps: missing psi-owned-extension-catalog registrations (launcher + runtime)
+- extension discovery architecture: extensions are discovered via two synchronized psi-owned-extension-catalog maps (launcher: psi.launcher.extensions, runtime: psi.agent-session.extension-installs), not via extensions/deps.edn. The catalogs map lib keys to :psi/init vars and :source-policies. A parity test enforces both catalogs stay in sync. extensions/deps.edn is only for bb test classpath wiring.
 - ambiguity review added 4 new design steps
 - no inconsistency review feedback
 - design-steps context: steps 8 and 9 (internal inconsistencies) are subsumed by resolving step 1 (adopt single-file pattern); no separate action needed once step 1 is addressed
