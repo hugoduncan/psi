@@ -46,3 +46,5 @@
 - addressed 1 test review follow-up step: added checkpoint no-op regression coverage proving workflow run, step, and attempt ids each independently short-circuit a resolved root session before history/model/helper/rename/notify work. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 1001 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
 
 - test review: added 1 step to be addressed.
+
+- addressed 1 test review follow-up step: added real `agent-session-workflow-linkage` query coverage for ordinary root sessions and child workflow-owned sessions. Verification: `bb clojure:test:unit --focus psi.agent-session.eql-introspection-test` passed; `clj-kondo --lint components/agent-session/test/psi/agent_session/eql_introspection_test.clj components/agent-session/src/psi/agent_session/resolvers/session.clj` clean.
