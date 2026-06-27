@@ -59,3 +59,5 @@
 - addressed 1 documentation review follow-up step: historical auto-session-name design docs now state current top-level user-interactive eligibility and delegated/workflow/helper exclusions.
 
 - docs review rerun: no new actionable feedback.
+
+- code-shaper review: no new actionable feedback.
