@@ -339,7 +339,9 @@
     (let [calls (atom [])
           {:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/auto_session_name.clj"
-                                :query-fn (fn [_] {})
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              {})})]
