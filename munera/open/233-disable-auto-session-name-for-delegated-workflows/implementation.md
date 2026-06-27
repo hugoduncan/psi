@@ -52,3 +52,5 @@
 - test review rerun: added 1 step to be addressed.
 
 - addressed 1 test review follow-up step: removed duplicate workflow-linkage query coverage from `eql_introspection_test.clj`, keeping `workflow_linkage_query_test.clj` as the authoritative projection contract home. Verification: focused workflow-linkage test command produced passing dots but timed out under the Scry wrapper; clj-kondo on both test files clean.
+
+- test-shaper review: no new actionable feedback.
