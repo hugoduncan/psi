@@ -415,17 +415,19 @@
 
 (defn- workflow-session-link-attrs
   [sd]
-  {:psi.agent-session/workflow-run-id     (:workflow-run-id sd)
-   :psi.agent-session/workflow-step-id    (:workflow-step-id sd)
-   :psi.agent-session/workflow-attempt-id (:workflow-attempt-id sd)
-   :psi.agent-session/workflow-owned?     (:workflow-owned? sd false)})
+  {:psi.agent-session/parent-session-id    (:parent-session-id sd)
+   :psi.agent-session/workflow-run-id      (:workflow-run-id sd)
+   :psi.agent-session/workflow-step-id     (:workflow-step-id sd)
+   :psi.agent-session/workflow-attempt-id  (:workflow-attempt-id sd)
+   :psi.agent-session/workflow-owned?      (:workflow-owned? sd false)})
 
 (pco/defresolver agent-session-workflow-linkage
-  "Resolve workflow linkage attrs carried by canonical sessions.
-   Ordinary sessions expose nil linkage attrs and false workflow-owned?."
+  "Resolve parent/workflow linkage attrs carried by canonical sessions.
+   Ordinary root sessions expose nil linkage attrs and false workflow-owned?."
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
-   ::pco/output [:psi.agent-session/workflow-run-id
+   ::pco/output [:psi.agent-session/parent-session-id
+                 :psi.agent-session/workflow-run-id
                  :psi.agent-session/workflow-step-id
                  :psi.agent-session/workflow-attempt-id
                  :psi.agent-session/workflow-owned?]}

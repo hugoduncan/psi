@@ -173,6 +173,26 @@
   (:psi.agent-session/session-name
    ((:query-session api) session-id [:psi.agent-session/session-name])))
 
+(defn- query-session-ownership [api session-id]
+  ((:query-session api) session-id [:psi.agent-session/parent-session-id
+                                    :psi.agent-session/workflow-run-id
+                                    :psi.agent-session/workflow-step-id
+                                    :psi.agent-session/workflow-attempt-id
+                                    :psi.agent-session/workflow-owned?]))
+
+(defn- eligible-source-session? [api session-id]
+  (let [{:psi.agent-session/keys [parent-session-id
+                                  workflow-run-id
+                                  workflow-step-id
+                                  workflow-attempt-id
+                                  workflow-owned?]} (query-session-ownership api session-id)]
+    (and (not (helper-session? session-id))
+         (nil? parent-session-id)
+         (nil? workflow-run-id)
+         (nil? workflow-step-id)
+         (nil? workflow-attempt-id)
+         (not (true? workflow-owned?)))))
+
 (defn- query-session-model-context [api session-id]
   ((:query-session api) session-id [:psi.agent-session/model-provider
                                     :psi.agent-session/model-id]))
@@ -284,7 +304,7 @@
 
 (defn- on-turn-finished [api payload]
   (when-let [session-id (normalize-session-id payload)]
-    (when-not (helper-session? session-id)
+    (when (eligible-source-session? api session-id)
       (let [n        (increment-turn-count! session-id)
             interval (:turn-interval @state)]
         (when (checkpoint-due? n interval)
@@ -292,7 +312,7 @@
 
 (defn- on-checkpoint [api payload]
   (when-let [session-id (normalize-session-id payload)]
-    (when-not (helper-session? session-id)
+    (when (eligible-source-session? api session-id)
       (or (infer-session-title api session-id (:turn-count payload))
           (when-let [count* (:turn-count payload)]
             (notify! (checkpoint-text {:session-id session-id

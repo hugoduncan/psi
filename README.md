@@ -175,7 +175,8 @@ Built-in extensions that ship with this repo (activated via
 `.psi/extensions.edn`):
 
 - **auto-session-name** — derive a session name automatically from early
-  conversation context.
+  conversation context for top-level user-interactive sessions only; delegated
+  workflow, workflow-step, nested workflow, and helper sessions are excluded.
 - **commit-checks** — run project-local checks after a local commit and feed
   failures back into the session.
 - **dev-http** — dev-time localhost HTTP side channel (`/dev-http`,

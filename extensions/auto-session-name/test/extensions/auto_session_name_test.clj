@@ -749,3 +749,73 @@
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
         (is (= [] (:scheduled-events @state)))))))
+
+(deftest delegated-child-turn-finished-is-ignored-test
+  (testing "turn-finished for delegated child sessions does not increment counts or schedule checkpoints"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "child-1" session-id)
+                                                       (= [:psi.agent-session/parent-session-id
+                                                           :psi.agent-session/workflow-run-id
+                                                           :psi.agent-session/workflow-step-id
+                                                           :psi.agent-session/workflow-attempt-id
+                                                           :psi.agent-session/workflow-owned?]
+                                                          query))
+                                              {:psi.agent-session/parent-session-id "root-1"
+                                               :psi.agent-session/workflow-owned? false}))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
+(deftest workflow-owned-turn-finished-is-ignored-test
+  (testing "turn-finished for workflow-owned sessions does not increment counts or schedule checkpoints"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "wf-1" session-id)
+                                                       (= [:psi.agent-session/parent-session-id
+                                                           :psi.agent-session/workflow-run-id
+                                                           :psi.agent-session/workflow-step-id
+                                                           :psi.agent-session/workflow-attempt-id
+                                                           :psi.agent-session/workflow-owned?]
+                                                          query))
+                                              {:psi.agent-session/workflow-run-id "run-1"
+                                               :psi.agent-session/workflow-step-id "step-1"
+                                               :psi.agent-session/workflow-attempt-id "attempt-1"
+                                               :psi.agent-session/workflow-owned? true}))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "wf-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
+(deftest delegated-checkpoint-is-silent-no-op-test
+  (testing "checkpoint for delegated/workflow-owned sessions does not query history, create helpers, rename, close, or notify"
+    (reset-state!)
+    (let [calls (atom [])
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [req]
+                                            (swap! calls conj [:query req])
+                                            {:psi.agent-session/parent-session-id "root-1"})
+                                :mutate-fn (fn [op params]
+                                             (swap! calls conj [:mutate op params])
+                                             {})})]
+      (sut/init api)
+      (reset! calls [])
+      (swap! state assoc :notifications [])
+      (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+        (is (nil? (handler {:session-id "child-1" :turn-count 2})))
+        (is (= [[:query {:session-id "child-1"
+                         :query [:psi.agent-session/parent-session-id
+                                 :psi.agent-session/workflow-run-id
+                                 :psi.agent-session/workflow-step-id
+                                 :psi.agent-session/workflow-attempt-id
+                                 :psi.agent-session/workflow-owned?]}]]
+               @calls))
+        (is (= [] (:notifications @state)))))))

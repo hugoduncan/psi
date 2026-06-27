@@ -444,10 +444,12 @@ embedding provider/id fallback chains locally. Extensions do not need a
 core-defined role to do this: they may submit a fully explicit request, or
 construct their own local preset/request builder.
 
-The current `auto-session-name` extension is the reference example: it queries
-the source session model context, builds its own explicit helper-model request,
-and passes the resulting candidate explicitly into
-`psi.extension/run-agent-loop-in-session`.
+The current `auto-session-name` extension is the reference example: it runs only
+for top-level user-interactive source sessions, explicitly excluding delegated
+workflow sessions, workflow-step sessions, nested workflow sessions, and its own
+helper sessions. For eligible source sessions it queries the source session
+model context, builds its own explicit helper-model request, and passes the
+resulting candidate explicitly into `psi.extension/run-agent-loop-in-session`.
 
 Example:
 
