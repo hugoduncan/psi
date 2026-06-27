@@ -24,3 +24,5 @@
 - test review rerun: added 3 steps to be addressed.
 
 - addressed 3 test review follow-up steps: delegated child, workflow-owned, delegated checkpoint, and helper-session fixtures now return complete authoritative ownership metadata so regressions prove the intended ineligibility reasons. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 977 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
+
+- test review rerun: added 1 step to be addressed.
