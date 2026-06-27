@@ -39,3 +39,4 @@
 - [x] Run `bb test` — all tests pass including `psi-owned-extension-catalog-parity-with-launcher`
 - [x] Run `clj-kondo --lint src` — no new lint errors
 - [x] Verify extension loads without error in a running session (manual or via test)
+- [ ] Add CHANGELOG.md entry for ramora extension under [Unreleased] → Added

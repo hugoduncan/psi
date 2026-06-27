@@ -1,3 +1,4 @@
+- implementation review: added 1 step to be addressed
 - all slices implemented in one pass: skeleton, source, tests, wiring, validation
 - extensions.ramora mirrors extensions.munera exactly: same structure, same error handling, same prompt-mode query pattern
 - protocol.txt contains placeholder lambda-form ramora protocol content (can be swapped later without code changes)
