@@ -1,3 +1,5 @@
+- nullable API for tests: components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj — use `nullable/create-nullable-extension-api` with `:query-fn` returning `{:psi.agent-session/prompt-mode :lambda}` or `:prose` to mock prompt mode; registered contributions accessible via `(:prompt-contributions @state)`
+- extension deps.edn pattern: each extension has its own `deps.edn` with `{:paths ["src" "resources"] :deps {org.clojure/clojure {:mvn/version "1.12.0"}}}` — see extensions/munera/deps.edn
 - no inconsistency review feedback
 - no ambiguity review feedback
 - architectural review (4th pass): no new architectural feedback; all 12 prior design-steps resolved; catalog registrations, deps.edn wiring, single-file pattern, static-at-init content, prompt-mode query, engage prefix, priority 52, and error handling all align with munera/mementum reference implementations
