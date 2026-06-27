@@ -830,6 +830,22 @@
             (is (= {} (:turn-counts @@#'sut/state)))
             (is (= [] (:scheduled-events @state)))))))))
 
+(deftest workflow-owned-flag-independently-makes-root-session-ineligible-test
+  (testing "workflow-owned? true prevents turn-finished scheduling for an otherwise root session"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "wf-flag-1" session-id)
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/workflow-owned? true)))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "wf-flag-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
 (deftest unresolved-source-session-is-ignored-test
   (testing "source sessions with unresolved ownership metadata do not count turns or run checkpoints"
     (doseq [[case-name query-result]

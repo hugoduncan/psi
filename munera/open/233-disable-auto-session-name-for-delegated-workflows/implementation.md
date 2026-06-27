@@ -30,3 +30,5 @@
 - addressed 1 test review follow-up step: added per-field regression coverage proving workflow run, step, and attempt ids each independently make an otherwise root session ineligible.
 
 - test review rerun: added 1 step to be addressed.
+
+- addressed 1 test review follow-up step: added independent `:workflow-owned? true` root-session regression coverage. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 989 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
