@@ -44,3 +44,7 @@
 - [x] Run `clj-kondo` on touched Clojure paths.
 - [x] Re-read modified files after formatting/tooling to verify the intended content remains coherent.
 - [x] Update `implementation.md` with implementation decisions and verification results during the build phase.
+
+## Implementation review follow-up
+
+- [ ] Make `eligible-source-session?` conservative when ownership metadata cannot be resolved: an empty/not-found/failed `query-session` result for a source session should be treated as ineligible rather than as a root top-level session, and add a regression test for that no-op path.
