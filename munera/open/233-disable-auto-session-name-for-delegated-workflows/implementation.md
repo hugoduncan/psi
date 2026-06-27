@@ -8,3 +8,4 @@
 - inconsistency review rerun: no new feedback
 - follow-up handoff: when converting the resolved design step into implementation, keep the predicate as a single extension-local decision point and prove both event-time and checkpoint-time no-op behavior; likely test homes are `extensions/auto-session-name/test/extensions/auto_session_name_guards_test.clj`, `auto_session_name_runtime_test.clj`, and `auto_session_name_test.clj`.
 - plan ambiguity review: no new feedback
+- plan inconsistency review: no new feedback
