@@ -3,3 +3,4 @@
 - no inconsistency review feedback
 - follow-up principle: resolve eligibility via the smallest explicit session metadata/query contract available; preserve extension isolation (no direct atom reads). Relevant files: `extensions/auto-session-name/src/extensions/auto_session_name.clj`, `components/session-state/src/psi/session_state/model.clj`, `components/agent-session/src/psi/agent_session/child_session_state.clj`.
 - design follow-up completed: existing session model already defaults root/non-workflow fields (`:parent-session-id nil`, workflow ids nil, `:workflow-owned? false`), so the fallback can use those extension-safe metadata fields as the interactivity predicate instead of introducing a new projection solely for this task.
+- architectural review rerun: no new feedback
