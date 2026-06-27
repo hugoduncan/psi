@@ -48,3 +48,7 @@
 ## Implementation review follow-up
 
 - [x] Make `eligible-source-session?` conservative when ownership metadata cannot be resolved: an empty/not-found/failed `query-session` result for a source session should be treated as ineligible rather than as a root top-level session, and add a regression test for that no-op path.
+
+## Test review follow-up
+
+- [ ] Update the existing positive-path auto-session-name tests so their nullable `query-session` fixtures return authoritative root ownership metadata for `session-ownership-query`; `bb clojure:test:extensions --focus extensions.auto-session-name-test` currently fails 10 pre-existing positive-path tests because the conservative eligibility gate treats their `{}` ownership query fallback as ineligible.

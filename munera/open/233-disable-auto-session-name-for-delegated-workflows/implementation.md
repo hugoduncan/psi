@@ -16,3 +16,5 @@
 - addressed 1 implementation review step: unresolved/empty/failed source-session ownership queries are now ineligible; focused auto-session-name test and clj-kondo passed.
 
 - implementation review rerun: no new actionable feedback.
+
+- test review: added 1 step to be addressed.
