@@ -33,3 +33,4 @@
 - design.md acceptance section updated to reference protocol.txt instead of RAMORA-LAMBDA.md/RAMORA.md, added missing-resource test acceptance criterion
 - steps 8 and 9 in design-steps.md remain unchecked (added after review batch commit; subsumed by step 1 resolution)
 - addressed 1 review follow-up: added CHANGELOG.md entry for ramora extension under [Unreleased] → Added
+- implementation review (2nd pass): no issues found
