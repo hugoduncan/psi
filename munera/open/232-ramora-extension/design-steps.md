@@ -1,0 +1,3 @@
+- [ ] Use single resource file (lambda form) with engage-prefix for prose mode, matching munera/mementum pattern — design specifies two resource files which diverges from established convention
+- [ ] Clarify whether prompt-mode changes at runtime should trigger content update, or if static-at-init (matching munera/mementum) is acceptable
+- [ ] Add ramora to extensions/deps.edn (:deps and :test alias :extra-paths) for discoverability
