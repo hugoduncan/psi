@@ -940,3 +940,35 @@
                                  :psi.agent-session/workflow-owned?]}]]
                @calls))
         (is (= [] (:notifications @state)))))))
+
+(deftest workflow-ownership-ids-checkpoint-are-silent-no-ops-test
+  (testing "each workflow ownership id independently makes a checkpoint for an otherwise root session a silent no-op"
+    (doseq [[field value] [[:psi.agent-session/workflow-run-id "run-1"]
+                           [:psi.agent-session/workflow-step-id "step-1"]
+                           [:psi.agent-session/workflow-attempt-id "attempt-1"]]]
+      (testing (name field)
+        (reset-state!)
+        (let [calls (atom [])
+              {:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/auto_session_name.clj"
+                                    :query-fn (fn [req]
+                                                (swap! calls conj [:query req])
+                                                (when (and (= "wf-id-1" (:session-id req))
+                                                           (session-ownership-query? (:query req)))
+                                                  (assoc root-session-ownership field value)))
+                                    :mutate-fn (fn [op params]
+                                                 (swap! calls conj [:mutate op params])
+                                                 {})})]
+          (sut/init api)
+          (reset! calls [])
+          (swap! state assoc :notifications [])
+          (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+            (is (nil? (handler {:session-id "wf-id-1" :turn-count 2})))
+            (is (= [[:query {:session-id "wf-id-1"
+                             :query [:psi.agent-session/parent-session-id
+                                     :psi.agent-session/workflow-run-id
+                                     :psi.agent-session/workflow-step-id
+                                     :psi.agent-session/workflow-attempt-id
+                                     :psi.agent-session/workflow-owned?]}]]
+                   @calls))
+            (is (= [] (:notifications @state)))))))))

@@ -42,3 +42,5 @@
 - addressed 1 test review follow-up step: added checkpoint no-op regression coverage proving `:workflow-owned? true` independently short-circuits a resolved root session before history/model/helper/rename/notify work. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 992 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
 
 - test review: added 1 step to be addressed.
+
+- addressed 1 test review follow-up step: added checkpoint no-op regression coverage proving workflow run, step, and attempt ids each independently short-circuit a resolved root session before history/model/helper/rename/notify work. Verification: `bb clojure:test:extensions --focus extensions.auto-session-name-test` reports 1001 pass / 0 fail / 0 error with Scry's existing 1 unknown/nonzero wrapper; `clj-kondo --lint extensions/auto-session-name/test/extensions/auto_session_name_test.clj` clean.
