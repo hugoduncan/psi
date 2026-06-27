@@ -32,3 +32,4 @@
 - design follow-up (2nd batch) resolved 3 items: added launcher catalog registration entry to design.md, added runtime catalog registration entry to design.md, corrected deps.edn constraint to :deps only (removed :extra-paths instruction)
 - design.md acceptance section updated to reference protocol.txt instead of RAMORA-LAMBDA.md/RAMORA.md, added missing-resource test acceptance criterion
 - steps 8 and 9 in design-steps.md remain unchecked (added after review batch commit; subsumed by step 1 resolution)
+- addressed 1 review follow-up: added CHANGELOG.md entry for ramora extension under [Unreleased] → Added
