@@ -2,6 +2,7 @@
 - architectural review (2nd pass) added 2 new design steps: missing psi-owned-extension-catalog registrations (launcher + runtime)
 - architectural review (3rd pass): no new architectural feedback; extension pattern (static-at-init prompt contribution, single resource file, prompt-mode query, engage prefix, priority 52) aligns with munera/mementum; only outstanding architectural items are the two existing unchecked catalog-registration steps
 - no ambiguity review feedback
+- inconsistency review added 1 new design step: extensions/deps.edn :extra-paths instruction diverges from mementum/munera reference pattern
 - extension discovery architecture: extensions are discovered via two synchronized psi-owned-extension-catalog maps (launcher: psi.launcher.extensions, runtime: psi.agent-session.extension-installs), not via extensions/deps.edn. The catalogs map lib keys to :psi/init vars and :source-policies. A parity test enforces both catalogs stay in sync. extensions/deps.edn is only for bb test classpath wiring.
 - catalog entry shape (follow munera/mementum pattern): `'psi/ramora {:psi/init 'extensions.ramora/init :source-policies {:development {:local/root "extensions/ramora"} :installed {:local/root "extensions/ramora"} :jar {:mvn/version :psi/release-version}}}`
 - catalog files: bases/main/src/psi/launcher/extensions.clj (launcher), components/agent-session/src/psi/agent_session/extension_installs.clj (runtime)
