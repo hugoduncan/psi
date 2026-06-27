@@ -553,13 +553,15 @@ tracks transcript growth like a terminal footer."
                      (psi-emacs--input-separator-needs-refresh-p))
             (psi-emacs--refresh-input-separator-line))
           (let* ((rendered (psi-emacs--projection-render-block psi-emacs--state))
-                 (previous (psi-emacs-state-projection-rendered psi-emacs--state))
                  (bounds (psi-emacs--region-bounds 'projection 'main))
                  (projection-at-end-p (and bounds (= (cdr bounds) (point-max))))
-                 (empty-without-region-p (and (string-empty-p rendered) (null bounds))))
+                 (empty-without-region-p (and (string-empty-p rendered) (null bounds)))
+                 (previous (cond
+                            (bounds
+                             (buffer-substring (car bounds) (cdr bounds)))
+                            (empty-without-region-p ""))))
             (unless (and (equal rendered previous)
                          (or projection-at-end-p empty-without-region-p))
-              (setf (psi-emacs-state-projection-rendered psi-emacs--state) rendered)
               (let* ((follow-anchor (psi-emacs--draft-anchor-at-end-p))
                      (range (when bounds
                               (cons (copy-marker (car bounds) nil)
