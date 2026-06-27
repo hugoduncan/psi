@@ -14,6 +14,7 @@
         psi/mcp-tasks-run           {:local/root "mcp-tasks-run"}
         psi/mementum                {:local/root "mementum"}
         psi/munera                  {:local/root "munera"}
+        psi/ramora                  {:local/root "ramora"}
         psi/plan-state-learning     {:local/root "plan-state-learning"}
         psi/work-on                 {:local/root "work-on"}
         psi/metrics                 {:local/root "metrics"}

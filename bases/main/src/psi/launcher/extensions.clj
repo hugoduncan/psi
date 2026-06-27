@@ -70,6 +70,13 @@
      :installed   {:local/root "extensions/munera"}
      :jar         {:mvn/version :psi/release-version}}}
 
+   'psi/ramora
+   {:psi/init 'extensions.ramora/init
+    :source-policies
+    {:development {:local/root "extensions/ramora"}
+     :installed   {:local/root "extensions/ramora"}
+     :jar         {:mvn/version :psi/release-version}}}
+
    'psi/plan-state-learning
    {:psi/init 'extensions.plan-state-learning/init
     :source-policies

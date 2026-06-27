@@ -1,3 +1,11 @@
+- all slices implemented in one pass: skeleton, source, tests, wiring, validation
+- extensions.ramora mirrors extensions.munera exactly: same structure, same error handling, same prompt-mode query pattern
+- protocol.txt contains placeholder lambda-form ramora protocol content (can be swapped later without code changes)
+- catalog registrations added to both launcher and runtime catalogs (after munera entries); parity test passes
+- extensions/deps.edn: psi/ramora added to :deps only (not :extra-paths), matching mementum/munera pattern
+- clj-kondo lint clean on extensions/ramora/src
+- all tests pass: extensions.ramora-test (3 tests) + psi-owned-extension-catalog-parity-with-launcher
+- no deviations from design
 - nullable API for tests: components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj — use `nullable/create-nullable-extension-api` with `:query-fn` returning `{:psi.agent-session/prompt-mode :lambda}` or `:prose` to mock prompt mode; registered contributions accessible via `(:prompt-contributions @state)`
 - extension deps.edn pattern: each extension has its own `deps.edn` with `{:paths ["src" "resources"] :deps {org.clojure/clojure {:mvn/version "1.12.0"}}}` — see extensions/munera/deps.edn
 - no inconsistency review feedback

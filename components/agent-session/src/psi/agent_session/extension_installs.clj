@@ -102,6 +102,8 @@
                   :source-policies {:installed {:local/root "extensions/mementum"}}}
    'psi/munera {:psi/init 'extensions.munera/init
                 :source-policies {:installed {:local/root "extensions/munera"}}}
+   'psi/ramora {:psi/init 'extensions.ramora/init
+                :source-policies {:installed {:local/root "extensions/ramora"}}}
    'psi/plan-state-learning {:psi/init 'extensions.plan-state-learning/init
                              :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
    'psi/github {:psi/init 'psi.github.extension/init
