@@ -31,6 +31,21 @@
            :ui nil})
   (model-registry/init! {}))
 
+(def root-session-ownership
+  {:psi.agent-session/parent-session-id nil
+   :psi.agent-session/workflow-run-id nil
+   :psi.agent-session/workflow-step-id nil
+   :psi.agent-session/workflow-attempt-id nil
+   :psi.agent-session/workflow-owned? false})
+
+(defn- session-ownership-query? [query]
+  (= [:psi.agent-session/parent-session-id
+      :psi.agent-session/workflow-run-id
+      :psi.agent-session/workflow-step-id
+      :psi.agent-session/workflow-attempt-id
+      :psi.agent-session/workflow-owned?]
+     query))
+
 (deftest helper-model-selection-request-test
   (testing "extension defines its own explicit resolver request"
     (is (= {:mode :resolve
@@ -78,7 +93,10 @@
   (testing "init registers handlers and emits load notification"
     (reset-state!)
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))})]
       (sut/init api)
       (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
       (is (= 1 (count (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))))
@@ -89,7 +107,10 @@
   (testing "every second completed turn schedules a delayed checkpoint event"
     (reset-state!)
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"})))
@@ -136,7 +157,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [:mutate op params])
                                              (case op
@@ -234,7 +255,7 @@
                                                   {:psi.agent-session/model-provider "anthropic"
                                                    :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                  :else {}))
+                                                  :else root-session-ownership))
                                     :mutate-fn (fn [op params]
                                                  (swap! calls conj [op params])
                                                  (case op
@@ -291,7 +312,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -358,7 +379,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -405,7 +426,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -451,7 +472,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -504,7 +525,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -564,7 +585,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -615,7 +636,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                {})})]
@@ -661,7 +682,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -717,7 +738,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op

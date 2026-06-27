@@ -51,4 +51,4 @@
 
 ## Test review follow-up
 
-- [ ] Update the existing positive-path auto-session-name tests so their nullable `query-session` fixtures return authoritative root ownership metadata for `session-ownership-query`; `bb clojure:test:extensions --focus extensions.auto-session-name-test` currently fails 10 pre-existing positive-path tests because the conservative eligibility gate treats their `{}` ownership query fallback as ineligible.
+- [x] Update the existing positive-path auto-session-name tests so their nullable `query-session` fixtures return authoritative root ownership metadata for `session-ownership-query`; `bb clojure:test:extensions --focus extensions.auto-session-name-test` currently fails 10 pre-existing positive-path tests because the conservative eligibility gate treats their `{}` ownership query fallback as ineligible.
