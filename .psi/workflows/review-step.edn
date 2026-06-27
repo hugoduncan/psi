@@ -1,6 +1,7 @@
 {:steps
  [{:name   "review",
    :type   :session,
+   :thinking-level :off,
    :tools  ["read" "bash" "edit" "write"],
    :skills ["work-independently"],
    :contributions
@@ -18,6 +19,7 @@
             "REPEAT" {:goto "follow-up"}}}
   {:name            "follow-up",
    :type            :session,
+   :thinking-level  :off,
    :prompt-workflow "review-follow-up-steps.md",
    :judge           {:type      :invoke
                      :operation "workflow/constant-routing"

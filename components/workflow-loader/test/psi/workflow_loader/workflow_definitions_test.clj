@@ -412,6 +412,9 @@
          (is (= 2 (count steps)))
          (is (= ["review" "follow-up"] (mapv :name steps)))
          (is (= [:session :session] (mapv :type steps))))
+       (testing "review-step actor sessions disable thinking so PASS_STATUS is not starved"
+         (is (= :off (:thinking-level review-step)))
+         (is (= :off (:thinking-level follow-up-step))))
        (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
