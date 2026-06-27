@@ -6,26 +6,36 @@ Create a `ramora` extension that injects the Ramora protocol into the system pro
 
 ## Context
 
-Ramora is a protocol for organizing project knowledge in markdown files, optimized for LLM context windows. The protocol exists in two forms:
-- `RAMORA.md` — prose form
-- `RAMORA-LAMBDA.md` — lambda form
+Ramora is a protocol for organizing project knowledge in markdown files, optimized for LLM context windows. The protocol is authored in lambda form.
 
-The extension should serve the appropriate form based on the current session's lambda mode setting, mirroring the pattern used by `munera` and `mementum` extensions.
+The extension mirrors the pattern used by `munera` and `mementum`: a single bundled resource file containing the lambda-form protocol text, with the engage prefix prepended at registration time when the session is in prose mode. Content is computed once at init (static-at-init); runtime prompt-mode changes do not trigger content updates.
 
 ## Constraints
 
 - Follow the existing extension pattern: `extensions/ramora/` with `deps.edn`, `src/extensions/ramora.clj`, `resources/extensions/ramora/`, and `test/extensions/ramora_test.clj`
-- The extension should read protocol content from bundled resources (not from external paths on disk at runtime)
-- Two resource files needed: one for lambda form, one for prose form
-- Select which form to inject based on `:psi.agent-session/prompt-mode` (same as munera/mementum)
+- Single resource file: `resources/extensions/ramora/protocol.txt` containing the lambda-form protocol text
+- In prose mode, prepend the same engage prefix used by munera/mementum:
+  ```
+  λ engage(nucleus).
+  [phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy] | OODA
+  Human ⊗ AI
+
+  ```
+- Content is computed once at init (static-at-init); runtime prompt-mode changes do not trigger content updates
+- Select content form based on `:psi.agent-session/prompt-mode` via the query API (same as munera/mementum)
+- Prompt contribution ID: `"ramora-protocol"`
 - Prompt contribution section name: "Ramora Protocol"
-- Priority should be set appropriately relative to mementum (50) and munera (51) — ramora is a knowledge organization protocol, so priority 52 seems right (after munera)
+- Priority: 52 (after mementum=50, munera=51)
 - The extension is a prompt-contribution-only extension (no resolvers, mutations, or operations)
+- Add `psi/ramora` to `extensions/deps.edn` `:deps` and `ramora/test` to the `:test` alias `:extra-paths`
+- Protocol text source: the Ramora protocol lambda-form content (to be provided; placeholder acceptable for initial implementation)
 
 ## Acceptance
 
 - Extension loads without error
-- In lambda mode: `RAMORA-LAMBDA.md` content is injected as prompt contribution
-- In prose mode: engage prefix + `RAMORA.md` content is injected as prompt contribution
-- Tests verify correct content selection per mode
-- Extension follows the same structural pattern as munera/mementum
+- In lambda mode: `protocol.txt` content is injected as prompt contribution (no engage prefix)
+- In prose mode: engage prefix + `protocol.txt` content is injected as prompt contribution
+- Prompt contribution registered with id `"ramora-protocol"`, section `"Ramora Protocol"`, priority 52
+- Tests verify correct content selection per mode (lambda vs prose)
+- Tests verify missing resource fails fast with ex-info naming the resource path
+- Extension follows the same structural pattern as munera/mementum (single resource file, static-at-init content)

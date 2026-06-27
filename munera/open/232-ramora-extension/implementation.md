@@ -6,3 +6,6 @@
 - reference tests: extensions/munera/test/extensions/munera_test.clj, extensions/mementum/test/extensions/mementum_test.clj
 - extensions wiring: extensions/deps.edn (:deps and :test alias :extra-paths)
 - engage prefix value (shared by munera/mementum): "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy] | OODA\nHuman ⊗ AI\n\n"
+- design follow-up resolved all 7 review-batch items: adopted single-file pattern (protocol.txt with lambda form), confirmed static-at-init content, specified deps.edn wiring, confirmed priority 52, specified prompt contribution ID "ramora-protocol", specified engage prefix (same as munera/mementum), noted protocol text source TBD
+- design.md acceptance section updated to reference protocol.txt instead of RAMORA-LAMBDA.md/RAMORA.md, added missing-resource test acceptance criterion
+- steps 8 and 9 in design-steps.md remain unchecked (added after review batch commit; subsumed by step 1 resolution)
