@@ -43,5 +43,5 @@
 
 ## Docs review follow-ups
 
-- [ ] Add **ramora** to the built-in extensions list in `README.md` (after munera, describing it as a prompt-contribution extension that injects the Ramora protocol)
-- [ ] Add a ramora extension entry to `doc/extensions.md` under the built-in extensions section (after context-manager or hello-ext, describing purpose and that it is prompt-contribution-only)
+- [x] Add **ramora** to the built-in extensions list in `README.md` (after munera, describing it as a prompt-contribution extension that injects the Ramora protocol)
+- [x] Add a ramora extension entry to `doc/extensions.md` under the built-in extensions section (after context-manager or hello-ext, describing purpose and that it is prompt-contribution-only)

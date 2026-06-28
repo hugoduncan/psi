@@ -192,6 +192,8 @@ Built-in extensions that ship with this repo (activated via
 - **metrics** — accumulate persistent per-capability usage counters (`/metrics`).
 - **munera** — git-native Markdown task protocol (design → plan → implement →
   review) under `munera/`.
+- **ramora** — prompt-contribution extension that injects the Ramora protocol
+  (lambda-form project knowledge organization) into the system prompt.
 
 For the extension list, configuration, and authoring details, see:
 - [`doc/extensions.md`](doc/extensions.md)

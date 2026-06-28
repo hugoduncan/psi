@@ -267,6 +267,19 @@ Purpose: minimal example extension used in docs/tests.
   - `hello-upper`
   - `hello-wrap`
 
+### `extensions/ramora/src/extensions/ramora.clj` (`extensions.ramora`)
+
+Purpose: prompt-contribution-only extension that injects the Ramora protocol
+(lambda-form project knowledge organization) into the system prompt.
+
+- Prompt contribution:
+  - ID: `ramora-protocol`
+  - Section: `Ramora Protocol`
+  - Priority: 52 (after mementum=50, munera=51)
+  - In lambda mode: raw `protocol.txt` content
+  - In prose mode: engage prefix + `protocol.txt` content
+- No commands, tools, operations, or event handlers
+
 ## Install manifests
 
 Psi now supports launcher-owned `extensions.edn` install manifests for explicit
