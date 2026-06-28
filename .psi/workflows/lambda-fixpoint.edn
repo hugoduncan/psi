@@ -44,7 +44,7 @@
      :allowed-routes ["FIXED" "CHANGED"]}},
    :on
    {"FIXED" {:goto "report"},
-    "CHANGED" {:goto "iterate-decompile", :max-iterations 10}}}
+    "CHANGED" {:goto "iterate-decompile", :max-iterations 5, :on-max-iterations "diagnose-churn"}}}
   {:name "iterate-decompile",
    :type :delegate,
    :temperature 0,
@@ -90,7 +90,65 @@
      :allowed-routes ["FIXED" "CHANGED"]}},
    :on
    {"FIXED" {:goto "report"},
-    "CHANGED" {:goto "iterate-decompile", :max-iterations 10}}}
+    "CHANGED" {:goto "iterate-decompile", :max-iterations 5, :on-max-iterations "diagnose-churn"}}}
+
+  {:name "diagnose-churn",
+   :type :session,
+   :tools ["read" "bash"],
+   :skills ["lambda-compiler"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "iterate-decompile", :yield :text}}
+    {:type :source, :from {:step "iterate-compile", :yield :text}}
+    {:type :source, :from {:step "iterate-compare", :output :final-llm-reply}}
+    {:type :template,
+     :text
+     "Produce a non-convergence report for the lambda fixpoint workflow.
+
+The workflow exhausted its iteration limit because decompile/recompile cycles kept changing the lambda instead of reaching a stable fixpoint.
+
+## Original Lambda
+{{original}}
+
+## Latest Decompiled Prose
+{{latest_prose}}
+
+## Latest Compiled Lambda
+{{latest_lambda}}
+
+## Latest Comparison
+{{latest_comparison}}
+
+Your task:
+1. State clearly that no fixpoint was reached within the configured iteration limit.
+2. Identify the symbols, names, operators, or structural forms that appear to be churning between iterations.
+3. Identify the underlying concepts or semantic distinctions that appear unstable (for example: recursion vs iteration, self/other boundaries, order vs entropy, implementation detail vs intent).
+4. For each churn item, explain the likely cause of non-convergence and what constraint or wording would likely stabilize it.
+5. If the evidence is insufficient for a confident diagnosis, say what comparison evidence is missing instead of guessing.
+
+Format your output as:
+
+## No Fixpoint Reached
+<one-sentence summary>
+
+## Churning Symbols / Forms
+- `<symbol-or-form>` — <how it is changing and why it matters>
+
+## Churning Concepts
+- `<concept>` — <unstable interpretation and likely stabilizing constraint>
+
+## Stabilization Advice
+<minimal advice for making the lambda converge>",
+     :vars
+     {"original" {:from :workflow-input, :path [:input]},
+      "latest_prose" {:from {:step "iterate-decompile", :yield :text}},
+      "latest_lambda" {:from {:step "iterate-compile", :yield :text}},
+      "latest_comparison" {:from {:step "iterate-compare", :output :final-llm-reply}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
   {:name "report",
    :type :session,
    :tools ["read" "bash"],
