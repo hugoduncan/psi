@@ -243,6 +243,25 @@
                  (println line)))
              (System/exit 1)))}
 
+  commit-check:ramora-word-limit
+  {:doc  "Fail when any .md file under ramora/ exceeds 1000 words."
+   :task (let [result (shell {:out :string}
+                             "find" "ramora" "-type" "f" "-name" "*.md"
+                             "-exec" "wc" "-w" "{}" ";")
+               lines  (str/split-lines (:out result))
+               bad    (->> lines
+                           (keep (fn [line]
+                                   (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)]
+                                     (when (and n path (> (Long/parseLong n) 1000))
+                                       (str path " (" n " words)")))))
+                           vec)]
+           (when (seq bad)
+             (binding [*out* *err*]
+               (println "Ramora files exceeding 1000 words:")
+               (doseq [line bad]
+                 (println line)))
+             (System/exit 1)))}
+
   commit-check:dispatch-architecture
   {:doc  "Run psi-specific dispatch architecture checks. Fails on effect parity drift; reports handler purity and canonical state write boundary advisories."
    :task (System/exit (bb.dispatch-architecture-check/run! *command-line-args*))}
