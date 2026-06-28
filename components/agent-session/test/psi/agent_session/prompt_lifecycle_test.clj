@@ -363,7 +363,7 @@
       (is (= "dev" (get-in prepared [:prepared-request/prompt-layers 1 :content])))
       (is (= :explicit (get-in prepared [:prepared-request/prompt-layers 1 :source])))
       (is (= "Hint A" (get-in prepared [:prepared-request/prompt-layers 2 :content])))
-      (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c1\" ext_path=\"/ext/a\">\nHint A\n</prompt_contribution>"
+      (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\nHint A"
              (:prepared-request/system-prompt prepared)))
       (is (= "dev" (get-in prepared [:prepared-request/session-snapshot :developer-prompt])))
       (is (= :explicit (get-in prepared [:prepared-request/session-snapshot :developer-prompt-source]))))))
@@ -387,7 +387,7 @@
                     ctx session-id {:turn-id "t2"
                                     :user-message {:role "user"
                                                    :content [{:type :text :text "hello"}]}})]
-      (is (= "base\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c2\" ext_path=\"/ext/a\">\nHint B\n</prompt_contribution>"
+      (is (= "base\n\n# Extension Prompt Contributions\n\nHint B"
              (:prepared-request/system-prompt prepared)))
       (is (= (:prepared-request/system-prompt prepared)
              (get-in prepared [:prepared-request/provider-conversation :system-prompt]))))))

@@ -134,16 +134,7 @@
       (str "\n\n# Extension Prompt Contributions\n\n"
            (str/join
             "\n\n"
-            (map (fn [{:keys [id ext-path section content]}]
-                   (str "<prompt_contribution"
-                        " id=\"" (or id "") "\""
-                        " ext_path=\"" (or ext-path "") "\""
-                        (when (some? section)
-                          (str " section=\"" section "\""))
-                        ">\n"
-                        (or content "")
-                        "\n</prompt_contribution>"))
-                 enabled))))))
+            (map #(or (:content %) "") enabled))))))
 
 (defn apply-prompt-contributions
   "Append the rendered extension contribution layer to an already assembled

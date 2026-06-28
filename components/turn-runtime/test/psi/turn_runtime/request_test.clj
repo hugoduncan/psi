@@ -33,7 +33,7 @@
     (is (= "s1" (:prepared-request/session-id prepared)))
     (is (= [:system/base :system/developer :system/contributions]
            (mapv :id (:prepared-request/prompt-layers prepared))))
-    (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c1\" ext_path=\"/ext/a\">\nHint A\n</prompt_contribution>"
+    (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\nHint A"
            (:prepared-request/system-prompt prepared)))
     (is (= (:prepared-request/system-prompt prepared)
            (get-in prepared [:prepared-request/provider-conversation :system-prompt])))
