@@ -5,8 +5,7 @@ STATE.md - Current state and context.
 TESTING.md - Testing approach and conventions.
 
 ## Design docs
-design-auto-session-name.md - Auto session name design.
-design-auto-session-name-mvp.md - Auto session name MVP design.
+design-auto-session-name/ - Auto session name design (split into sub-files).
 design-multi-session.md - Multi-session design.
 design-workflow-session-prompts.md - Workflow session prompts design.
 
