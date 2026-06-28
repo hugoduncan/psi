@@ -40,3 +40,8 @@
 - [x] Run `clj-kondo --lint src` — no new lint errors
 - [x] Verify extension loads without error in a running session (manual or via test)
 - [x] Add CHANGELOG.md entry for ramora extension under [Unreleased] → Added
+
+## Docs review follow-ups
+
+- [ ] Add **ramora** to the built-in extensions list in `README.md` (after munera, describing it as a prompt-contribution extension that injects the Ramora protocol)
+- [ ] Add a ramora extension entry to `doc/extensions.md` under the built-in extensions section (after context-manager or hello-ext, describing purpose and that it is prompt-contribution-only)

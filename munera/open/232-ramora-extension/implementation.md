@@ -18,3 +18,4 @@
 - implementation review (5th pass): no issues found — all acceptance criteria verified, code/tests/wiring/docs coherent, 0 new steps added
 - test review: tests mirror munera/mementum pattern, cover all design acceptance criteria, use nullable API (no mocks), 0 new steps added
 - test-shaper review: tests are simple, consistent, robust, and economical — no issues found, 0 new steps added
+- docs review: CHANGELOG.md entry present and accurate; ramora missing from README.md built-in extensions list and doc/extensions.md built-in extensions section — added 2 steps to be addressed
