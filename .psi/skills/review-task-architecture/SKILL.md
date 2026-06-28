@@ -14,6 +14,6 @@ internally clear and self-consistent yet *fight the architecture* the project
 already establishes.
 
 Consult the architecture sources already in your context — `AGENTS.md`,
-`META.md`, `ramora/architecture.md` — for the principles and boundaries to judge fit
+`ramora/META.md`, `ramora/architecture.md` — for the principles and boundaries to judge fit
 against. Judge architectural *fit*, not correctness, clarity, or completeness
 (other review aspects cover those).

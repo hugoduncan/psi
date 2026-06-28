@@ -690,7 +690,7 @@ one shared `design-review` multi-prompt session step:
 
 The three prompts run as back-to-back turns in the same workflow-owned child
 session. The first architecture turn reads the task `design.md` and consults the
-in-context architecture sources (`AGENTS.md`, `META.md`, and
+in-context architecture sources (`AGENTS.md`, `ramora/META.md`, and
 `doc/architecture.md`) as needed. The later ambiguity and inconsistency turns use
 that already-loaded design/architecture context and prior review replies by
 default, performing only targeted re-reads for missing, ambiguous, or stale facts.

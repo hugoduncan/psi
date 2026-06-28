@@ -213,8 +213,9 @@ README.md - primary top-level user documentation
 
 doc/ - user-facing documentation (guides, references, workflows)
 
-META.md - psi meta model (internal)
+ramora/META.md - psi meta model (internal)
 munera/plan.md - active task orchestration (internal)
+
 λ changelog(δ).
   format(keep-a-changelog) ∧ user_facing
   | sections: [Unreleased] → stamp([MAJOR.MINOR.PATCH], YYYY-MM-DD) @ release

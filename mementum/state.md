@@ -82,7 +82,7 @@ Architecture follows a Viable System Model (see `AGENTS.md` → Architecture):
 ## Orientation
 
 - Active task work: read `munera/plan.md`, then the relevant `munera/open/NNN-*`.
-- Architecture/principles: `AGENTS.md`, `META.md`, `doc/architecture.md`.
+- Architecture/principles: `AGENTS.md`, `ramora/META.md`, `doc/architecture.md`.
 - User docs: `README.md`, `doc/`.
 - Deeper recall: `git log`/`git grep` over `mementum/` and task artifacts.
 
