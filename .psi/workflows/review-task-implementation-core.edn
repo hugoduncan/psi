@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "review-task-implementation",
    :type :delegate,
    :target "review-step",

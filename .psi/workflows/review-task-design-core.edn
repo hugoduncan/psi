@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "design-review",
    :type :session,
    :tools ["read" "bash" "edit" "write"],

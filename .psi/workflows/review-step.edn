@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name   "review",
    :type   :session,
    :thinking-level :off,

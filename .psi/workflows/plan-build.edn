@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "plan",
    :type :session,
    :tools ["read" "bash"],

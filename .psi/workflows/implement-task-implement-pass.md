@@ -11,8 +11,6 @@ skills:
   - work-independently
   - clojure-coding-standards
   - testing-without-mocks
-  - code-shaper
-  - test-shaper
 advertise: false
 ---
 Implement the specific Munera task described by {{input}}. Work independently. Also apply `clojure-coding-standards` and `testing-without-mocks` as relevant.

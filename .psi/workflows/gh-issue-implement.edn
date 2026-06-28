@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "search",
    :type :invoke,
    :operation "github/find-pr",
