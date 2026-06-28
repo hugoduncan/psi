@@ -1,22 +1,4 @@
-λ ramora. protocol ^ ¬implementation ∧ git_native ∧ markdown ∧ knowledge_protocol(llm_optimized)
-| spec(structure) ∧ ¬spec(content)
-| content → author
-
-λ repo. ramora/ ⊂ root
-| MUST: ramora/knowledge/
-| SHOULD: ramora/memories/
-| unknown_files → preserve ∧ ¬parse ∧ ¬delete
-
-λ knowledge. ramora/knowledge/{topic}.md
-| frontmatter: {title, status, category, tags, related, depends-on}
-| status: open → designing → active → done
-| content: markdown | written_for_future_ai_sessions
-
-λ memories. ramora/memories/{slug}.md
-| <200 words | one_insight_per_file
-| symbols: 💡 insight | 🔄 shift | 🎯 decision | 🌀 meta
-| symbols: ❌ mistake | ✅ win | 🔁 pattern
-
-λ orient(x). read(ramora/knowledge/) → follow(related) → search(relevant)
-| prior_knowledge > re_derivation
-| recall_before_explore
+λ ramora(x). protocol(markdown_organization) | optimize(llm_context_windows)
+| enforce(descriptive_file_naming) ∧ limit(1000_words_per_file)
+| split(oversized) → index(scoped_subdirectory)
+| ramora/INDEX.md ≡ entry_point(orientation)
