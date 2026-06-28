@@ -2,3 +2,6 @@
 | enforce(descriptive_file_naming) ∧ limit(1000_words_per_file)
 | split(oversized) → index(scoped_subdirectory)
 | ramora/INDEX.md ≡ entry_point(orientation)
+
+λ orient(x). read(ramora/INDEX.md)
+| after(mementum/orient) when(mementum ∈ context)
