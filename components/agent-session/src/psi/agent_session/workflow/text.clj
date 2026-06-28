@@ -8,17 +8,23 @@
     ("async" "asynchronous" nil) :async
     ::invalid))
 
+(defn- advertised?
+  "A workflow is advertised unless it explicitly declares `:advertise false`."
+  [defn-map]
+  (not (false? (:advertise defn-map))))
+
 (defn available-workflows-text
-  "Return human-readable list of available workflows."
+  "Return human-readable list of advertised workflows."
   [definitions]
-  (if (empty? definitions)
-    "No workflows loaded."
-    (str/join "\n"
-              (for [[name defn-map] (sort-by key definitions)]
-                (let [step-count (count (:step-order defn-map))]
-                  (str "  " name " — " (or (:summary defn-map) "")
-                       (when (> step-count 1)
-                         (str " (" step-count " steps)"))))))))
+  (let [advertised (filter (comp advertised? val) (sort-by key definitions))]
+    (if (empty? advertised)
+      "No workflows loaded."
+      (str/join "\n"
+                (for [[name defn-map] advertised]
+                  (let [step-count (count (:step-order defn-map))]
+                    (str "  " name " — " (or (:summary defn-map) "")
+                         (when (> step-count 1)
+                           (str " (" step-count " steps)")))))))))
 
 (defn active-runs-text
   "Return human-readable list of visible delegate workflow runs."
@@ -91,20 +97,19 @@
     [top-line]))
 
 (defn build-prompt-contribution
-  "Build the prompt contribution text listing available workflows.
+  "Build the prompt contribution text listing advertised workflows.
 
    Workflows whose definition carries `:advertise false` are omitted from the
    system-context listing; they remain invocable via `/delegate <name>` and as
    delegate sub-steps. Absent `:advertise` (or any non-false value) keeps the
    workflow advertised."
   [definitions]
-  (let [advertised (remove (fn [[_ defn-map]] (false? (:advertise defn-map)))
-                           definitions)]
+  (let [advertised (filter (comp advertised? val) (sort-by key definitions))]
     (if (empty? advertised)
       "tool: delegate\nNo workflows available."
       (str "tool: delegate\navailable workflows:\n"
            (str/join "\n"
-                     (for [[name defn-map] (sort-by key advertised)]
+                     (for [[name defn-map] advertised]
                        (str "- " name ": " (or (:summary defn-map)
                                                (:description defn-map)
                                                ""))))))))
