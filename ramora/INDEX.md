@@ -20,7 +20,7 @@ model-selection-concepts.md - Model selection concepts.
 model-selection-grammar.md - Model selection grammar.
 rpc-edn-op-mapping-contract.md - RPC EDN op mapping contract.
 tui-text-width-policy.md - TUI text width policy.
-workflow-grammar.md - Workflow grammar spec.
+workflow-grammar/ - Workflow grammar spec (split into sub-files).
 workflow-grammar-concepts.md - Workflow grammar concepts.
 workflow-ir.md - Workflow intermediate representation.
 workflow_statechart_canonical.md - Workflow statechart canonical form.
