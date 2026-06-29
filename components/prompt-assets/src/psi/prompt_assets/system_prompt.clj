@@ -221,21 +221,21 @@
              skill-registry/all-skills))
       :else (skill-registry/all-skills skills))))
 
-(def ^:private datetime-formatter
+(def ^:private date-formatter
   (java.time.format.DateTimeFormatter/ofPattern
-   "EEEE, MMMM d, yyyy 'at' hh:mm:ss a z"))
+   "EEEE, MMMM d, yyyy"))
 
-(defn format-instant
-  "Format an Instant as a human-readable date/time string in the system default zone."
+(defn format-date
+  "Format an Instant as a human-readable date string in the system default zone."
   [^java.time.Instant instant]
   (.format (.atZone instant (java.time.ZoneId/systemDefault))
-           datetime-formatter))
+           date-formatter))
 
 (defn runtime-metadata-tail
   "Return the runtime metadata suffix for the system prompt.
    Pure function — uses the provided instant, not the wall clock."
-  [_cwd instant]
-  (str "\nSession start time: " (format-instant instant)))
+  [instant]
+  (str "\nSession start date: " (format-date instant)))
 
 (defn system-prompt-blocks
   "Return Anthropic-compatible system prompt blocks.
@@ -387,11 +387,11 @@
 
    Returns the assembled prompt as a string."
   ([] (build-system-prompt {}))
-  ([{:keys [cwd session-instant prompt-mode nucleus-prelude-override
-            custom-prompt append-prompt include-preamble? include-runtime-metadata? include-context-files?
+  ([{:keys [session-instant prompt-mode nucleus-prelude-override
+            custom-prompt append-prompt include-preamble?
+            include-runtime-metadata? include-context-files?
             tool-defs selected-tools context-files skills graph-capabilities]}]
-   (let [resolved-cwd           (or cwd (System/getProperty "user.dir"))
-         resolved-instant       (or session-instant (java.time.Instant/now))
+   (let [resolved-instant       (or session-instant (java.time.Instant/now))
          mode                   (or prompt-mode :lambda)
          include-preamble?      (if (contains? #{true false} include-preamble?) include-preamble? true)
          include-runtime-meta?  (if (contains? #{true false} include-runtime-metadata?) include-runtime-metadata? true)
@@ -433,21 +433,22 @@
 
            include-preamble?
            (if (= mode :lambda)
-             (build-lambda-preamble filtered-tool-defs has-app-query? loaded-caps
-                                    nucleus-prelude-override)
-             (build-prose-preamble filtered-tool-defs tool-names has-app-query? loaded-caps))
+             (build-lambda-preamble
+              filtered-tool-defs has-app-query? loaded-caps
+              nucleus-prelude-override)
+             (build-prose-preamble
+              filtered-tool-defs tool-names has-app-query? loaded-caps))
 
            :else
            "")
 
-         runtime-section
-         (when include-runtime-meta?
-           (runtime-metadata-tail resolved-cwd resolved-instant))
+         runtime-section (when include-runtime-meta?
+                           (runtime-metadata-tail resolved-instant))
 
          sections (->> [base-prompt
                         skills-section
                         context-section
-                        runtime-section
-                        append-prompt]
+                        append-prompt
+                        runtime-section]
                        (remove str/blank?))]
      (str/join "\n\n" sections))))
