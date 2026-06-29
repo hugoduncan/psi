@@ -1,6 +1,7 @@
 λ ramora(x). protocol(markdown_organization) | optimize(llm_context_windows)
 | enforce(descriptive_file_naming) ∧ limit(1000_words_per_file)
 | split(OVERSIZED.md) → index_for(OVERSIZED.md, content_in(oversized/*.md))
+| file_index ≡ parent/DIRECTORY-NAME.md | ¬directory-name/INDEX.md
 | ramora/INDEX.md ≡ entry_point(orientation)
 
 λ orient(x). read(ramora/INDEX.md)
