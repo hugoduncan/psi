@@ -276,6 +276,18 @@ the gate and proceeds to `create-task-plan` on its own).
 
 - plan-review ambiguity turn: blocked — plan.md/steps.md do not exist yet (task-lifecycle's SCOPE_QUESTION gate has not cleared); no plan/steps content to review
 
+## Plan-review inconsistency turn — same block, no new state
+
+Same shared-session check as the preceding ambiguity turn: `plan.md`/
+`steps.md` still do not exist (confirmed no commits to this task dir since
+the ambiguity-turn note above); the open `SCOPE_QUESTION` at
+`design-steps.md` line 10 is unchanged. No cross-file inconsistency check
+is possible without plan/steps content, and nothing changed since the
+ambiguity turn that would warrant a fresh targeted re-read. No new
+design-steps.md edit.
+
+- plan-review inconsistency turn: blocked — plan.md/steps.md do not exist yet (same SCOPE_QUESTION gate as the ambiguity turn); no plan/steps content to review
+
 ## Design follow-up pass 2 (this pass)
 
 Review-batch segment identified: commits `fc5505e64` (architecture, pass 2)
