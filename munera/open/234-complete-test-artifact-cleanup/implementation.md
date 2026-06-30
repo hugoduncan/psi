@@ -104,3 +104,21 @@ Resolutions applied to `design.md`:
   `clojure.test/use-fixtures :each` per `clojure-coding-standards`.
 
 No SCOPE_QUESTION items were present this pass.
+
+## Design-review pass 2 — architecture turn
+
+Re-reviewed the post-resolution `design.md` (commit `6406a1188`) against
+AGENTS.md (VSM layers, change_chain), `ramora/META.md`, `doc/architecture.md`,
+and `clojure-coding-standards`. The prior architecture finding (Key Question
+3's `:each`-fixture conflict with the "no use-fixtures" testing standard) is
+already resolved in `design.md` — it now says "with-xxx-style or
+explicit-call mechanism, not `clojure.test/use-fixtures :each`". The pass-1
+wording edits (prefix split, AC1/AC3 clarifications, `delete-recursively!`
+replacing `Files/deleteIfExists`) are wording-only and introduce no new
+architectural surface: this task remains test-infrastructure-only (finally-
+block cleanup fixes), touches no production code, dispatch, the atom, or any
+S1-S5 layer, and its stated cleanup primitive (`delete-recursively!`) and
+safety-net guidance (`with-xxx`, not fixtures) already match project
+convention.
+
+- no new architectural review feedback
