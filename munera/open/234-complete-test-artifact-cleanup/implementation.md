@@ -39,3 +39,34 @@ wording against each other, and Constraints against the suggested
   dirs and conflicts with the delete-recursively!-reuse constraint, and the
   Context section's single "psi-agent-session" prefix doesn't match the two
   distinct literal prefixes actually in code.
+
+## Notes for resolving the 6 open design-steps
+
+No `plan.md`/`steps.md` exist yet — resolving these design-steps means
+editing `design.md` itself (wording/Context/AC fixes), not writing code.
+
+Principles to hold while resolving:
+- Keep the frozen scope boundary (the 4 listed in-scope files) untouched —
+  these are wording/content fixes inside that boundary, not scope edits.
+- Resolve toward `delete-recursively!` as the only cleanup primitive
+  everywhere (drop `Files/deleteIfExists`); resolve toward `with-xxx`-style
+  helpers, never `clojure.test/use-fixtures`, per `clojure-coding-standards`.
+- When resolving the AC3(c)/Constraints contradiction, prefer narrowing
+  AC3(c) (drop the removal option) over loosening the cleanup-paths-only
+  constraint — removal-as-cleanup-strategy is the outlier vs. the rest of
+  the design's intent (verify/fix in place).
+
+Facts confirmed during review, not in design.md (use directly, no need to
+re-derive):
+- `temp-cwd` builds paths from literal `"psi-agent-session-test-"`;
+  `temp-session-root` from `"psi-agent-session-store-"` — both in
+  `components/agent-session/test/psi/agent_session/test_support.clj` (~L111-122).
+- `with-null-context`'s `finally` (`components/history/test/psi/history/git_test.clj`
+  ~L63-71) already recursively deletes `:repo-dir`; Pattern A's "should
+  already work" claim checked out against current code.
+- The two query-graph worktree tests (`components/agent-session/test/psi/agent_session/query_graph_test.clj`
+  ~L57-118) each already have their own `finally` + `delete-recursively!`,
+  confirming Pattern C's description is accurate as written.
+- Relevant non-task reference: `.psi/skills/clojure-coding-standards/SKILL.md`
+  ("No use-fixtures" rule) — cite this, not the VSM docs, when resolving the
+  ARCHITECTURE step.
