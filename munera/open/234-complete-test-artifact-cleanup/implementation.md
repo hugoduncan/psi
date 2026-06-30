@@ -187,3 +187,27 @@ already covers these same directories regardless of the mislabel, so no
 verification gap results. Not filed as a design step.
 
 - inconsistency review added 1 new design step
+
+## Notes for resolving the 2 open design-steps (INCONSISTENCY + SCOPE_QUESTION)
+
+Principles:
+- The INCONSISTENCY item (wrong file reference) is resolvable the same way
+  as pass 1's items — edit `design.md`'s Context/In-Scope wording directly;
+  it's a factual correction, not a scope change.
+- The SCOPE_QUESTION item is **not** resolvable by editing `design.md`.
+  Per `mementum`'s approval-gate model, scope-boundary correctness is a
+  human decision — this item must stay open until a human answers it, even
+  though "resolve open design-steps" normally means editing `design.md`.
+  Do not silently pick an interpretation (exhaustive list vs. illustrative
+  list) and edit scope to match.
+
+Paths (not in design.md, needed to act on the INCONSISTENCY item):
+- `components/history/test/psi/history/git_worktree_test.clj` — `linked-worktree-path` (~L57), `with-null-context` (~L65), six worktree-prefix tests (~L245-575).
+- `components/history/test/psi/history/git_test.clj` — docstring (~L1-9) is the citable source for "split from git_test.clj"; contains none of the worktree prefixes itself.
+- Caution: `components/history/test/psi/history/resolvers_test.clj` (~L33) defines its own *separate* `linked-worktree-path` helper using different prefixes (`resolver-feature`, `resolver-merge`, `resolver-rebase`, `missing-worktree`) — not one of the 10 listed prefixes, out of this task's scope; don't conflate it with `git_worktree_test.clj`'s helper of the same name when searching.
+
+Path (context for the SCOPE_QUESTION item, beyond what's already in its
+design-steps.md entry): the 13 un-listed caller files and their cleanup
+status are enumerated directly in the design-steps.md item text — no need
+to re-derive; re-grep `temp-cwd\|temp-session-root` under `components/` only
+if design.md or the caller set may have changed since this pass.
