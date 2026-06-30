@@ -494,3 +494,19 @@ is also self-contained (lists all 13 caller files inline); no external
 project file beyond `components/agent-session/test/psi/agent_session/test_support.clj`
 (`temp-cwd`/`temp-session-root` definitions) is needed to act on it once a
 human decides the scope question.
+
+## Plan-review follow-up re-invocation — no new state since last completion
+
+Re-invoked to execute "unchecked, actionable plan-review follow-up items in
+steps.md". Checked `git log -1` against this task dir: HEAD is still
+`63d6fbd21` (the commit that recorded the prior plan-review slice's
+follow-up as complete-with-nothing-actionable). Zero commits to this task
+dir since then, and `plan.md`/`steps.md` still do not exist — same
+`SCOPE_QUESTION` gate (`design-steps.md` line 10) is still open, unchanged.
+
+There is no new `plan-review` batch to derive a candidate work set from:
+the immediately preceding batch (ambiguity + inconsistency turns,
+`d388c582d`/`8445b77e0`) was already fully resolved by `63d6fbd21`, and
+nothing has happened since. Re-running the same blocked conclusion would
+be a duplicate, not a new finding. No file changes made this pass; nothing
+to mark done.
