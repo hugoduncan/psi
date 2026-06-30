@@ -34,3 +34,8 @@ Verification update:
 - Pricing: Anthropic pricing documentation, `https://docs.anthropic.com/en/docs/about-claude/pricing`, accessed 2026-06-26; Claude Sonnet 5 / Sonnet tier values recorded in psi catalog units: input 3.0, output 15.0, cache read 0.3, cache write 3.75.
 - addressed 1 review step.
 2026-06-26 test review: added 1 step to be addressed.
+
+2026-06-26 test-review follow-up: added non-live model-selection coverage for Claude Sonnet 5.
+- Extended `psi.ai.model-selection-test/resolve-selection-test` to resolve `claude-sonnet-5` through `resolve-selection` in explicit built-in selection mode and assert the selected Anthropic candidate metadata.
+- Ran `bb test:ai --focus psi.ai.model-selection-test` → green: 153 tests, 1102 assertions, 0 failures.
+- addressed 1 review step.
