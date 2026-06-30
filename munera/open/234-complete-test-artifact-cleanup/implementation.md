@@ -533,6 +533,41 @@ one. No `design-steps.md` edit made.
 
 - plan-review inconsistency turn: blocked — plan.md/steps.md do not exist yet (same open SCOPE_QUESTION gate); no plan/steps content to review
 
+## Implement-task re-invocation — still blocked, no new state
+
+Re-invoked directly as "implement the task" (not via a plan-review turn).
+`git log -1` for this task dir is `d056d1d00`; confirmed unchanged since
+the prior plan-review slice. Re-verified (not just trusted prior notes):
+`design-steps.md` still has exactly one unchecked item, the pass-2
+`SCOPE_QUESTION` (line 10) — every other item is `[x]`. `plan.md`/
+`steps.md` still do not exist. Re-grepped `temp-cwd\|temp-session-root`
+call sites project-wide outside `test_support.clj`: now **16** files (was
+13 when the SCOPE_QUESTION was filed — drift, not a contradiction; new
+callers added since, e.g. `session_lifecycle_test.clj`,
+`agent_session_test.clj` under `introspection`, `app_runtime_test.clj`,
+`app_runtime_tui_startup_test.clj`,
+`extension_installs_relative_local_root_test.clj`), confirming the
+SCOPE_QUESTION's underlying claim is still accurate and, if anything,
+stronger than when filed.
+
+Per `AGENTS.md`'s plan.md gate (`¬complete(design.md) ∨ ∃ ambiguity(design.md)
+→ plan.md MUST NOT exist/be written`) and the `work-independently` skill
+(`stop_only_if(needs_user_decision)`), this task cannot progress past
+`design.md`/`design-steps.md` until a human answers the open
+`SCOPE_QUESTION`: is the In-Scope file list (4 files) exhaustive, or are
+the 16 (now) un-listed `temp-cwd`/`temp-session-root` callers implicitly
+in scope for AC1? No design.md edit made — per established precedent
+(pass-2 through pass-4 notes above), this question is not resolvable by
+editing design.md. No code changes made this pass.
+
+**For the human**: answering this unblocks `create-task-plan` (via
+`task-lifecycle`'s `check-scope-question-status` gate) and lets
+implementation begin. Recommendation based on the evidence gathered across
+passes: prefer the "add an optional `with-xxx`-style safety-net sweep in
+`test_support.clj`" path already left open in design.md's In-Scope wording
+— it satisfies AC1 without editing 16+ unrelated caller files, and was the
+designer's own escape hatch for exactly this situation.
+
 ## Notes for resolving the design-steps after this slice (plan-review, both turns)
 
 This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
