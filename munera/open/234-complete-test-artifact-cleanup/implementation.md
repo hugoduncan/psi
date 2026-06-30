@@ -593,6 +593,40 @@ silently picking an interpretation and proceeding to `plan.md`/`steps.md`.
   (`design-steps.md` line 10), no new state since `a0990fc2e`; no files
   changed this pass.
 
+## Implement-task re-invocation 3 — still blocked, no new state
+
+Re-invoked directly as "implement the task" again. `git log -1` for this
+task dir is `91a06549b`, matching the prior pass's conclusion. Re-verified
+independently: `design-steps.md` still has exactly one unchecked item (the
+pass-2 `SCOPE_QUESTION`, line 10); `plan.md`/`steps.md` still do not exist.
+Re-grepped `temp-cwd\|temp-session-root` call sites outside
+`test_support.clj` under `agent-session`/`app-runtime` tests: 15 files now
+(small drift from the prior pass's 16 — not a contradiction, the
+underlying claim — un-listed callers exist and AC1 likely can't be
+satisfied within the frozen 4-file scope without the safety-net mechanism
+becoming mandatory — is unchanged).
+
+Per the unbroken precedent set by every prior `implement-task`
+re-invocation on this task (3 prior instances, all reaching the same
+conclusion) and `AGENTS.md`'s plan.md gate (`¬complete(design.md) ∨
+∃ ambiguity(design.md) → plan.md MUST NOT exist/be written`), declining to
+unilaterally resolve the `SCOPE_QUESTION` or fabricate `plan.md`/`steps.md`
+ahead of the gate. This is a `stop_only_if(needs_user_decision)` case per
+`work-independently`; surfacing to the user rather than guessing. No
+design.md or code changes made this pass.
+
+**Ask for the human**: `munera/open/234-complete-test-artifact-cleanup/design-steps.md`
+line 10 has one open `SCOPE_QUESTION` — is the design's 4-file In-Scope
+list (`git_worktree_test.clj`, `test_support.clj`, `query_graph_test.clj`,
+`work_on_test.clj`) exhaustive for AC1, or are the ~15 other
+`temp-cwd`/`temp-session-root` caller files implicitly in scope too? The
+evidence and a concrete recommendation (add an optional `with-xxx`-style
+safety-net sweep inside `test_support.clj`, satisfying AC1 without editing
+the 15 other files) are already recorded in this file's "Implement-task
+re-invocation" section above. Checking this item off in `design-steps.md`
+(with rationale in `design.md`) unblocks `create-task-plan` and lets
+implementation proceed.
+
 ## Notes for resolving the design-steps after this slice (plan-review, both turns)
 
 This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
