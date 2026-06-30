@@ -153,7 +153,22 @@ already fall under AC1's other "/tmp/ (or OS temp dir)" branch instead.
 Functionally harmless (both branches end up covering the same dirs), so
 likely not actionable, but worth the inconsistency pass checking.
 
-- ambiguity review added 1 new design step (SCOPE_QUESTION)
+- ambiguity review added 1 new design step
+
+## Design-review pass 3 — inconsistency turn
+
+`design.md` unchanged since the architecture/ambiguity turns this pass.
+Targeted re-read: re-verified the 4 in-scope files still exist, and
+re-grepped `git_worktree_test.clj`/`query_graph_test.clj`/`work_on_test.clj`/
+`test_support.clj` directly (not relying on cached pass-1/pass-2 findings)
+for the exact prefix literals, `linked-worktree-path`/`with-null-context`
+locations, and Pattern D's stubbed-path claim. `git log` on the 4 in-scope
+files shows no commits since before the task started (`b064d4414`), so no
+code drift to account for. All design.md claims (prefix literals, file
+locations post pass-2 fix, Pattern A-D descriptions) still match source
+exactly.
+
+- no inconsistency review feedback (SCOPE_QUESTION)
 
 ## Design-review pass 2 — inconsistency turn
 
