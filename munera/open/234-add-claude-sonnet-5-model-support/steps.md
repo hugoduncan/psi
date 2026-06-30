@@ -56,3 +56,7 @@
 - [x] Run `clj-kondo --lint src test components` or the repository-standard lint command; record the exact command and result in `implementation.md`.
 - [x] Check coherence across `models.clj`, native structured-output key-set membership, non-live tests, live target ids, changelog, and docs.
 - [x] Commit the implementation with a task-referencing `⚒` commit message. (`31d93c55c ⚒ add Claude Sonnet 5 model support`)
+
+## Test-shaper follow-up
+
+- [ ] Add a public command-path test proving `/model anthropic claude-sonnet-5` selects Claude Sonnet 5 and persists the session model, so the new built-in is covered at the same user-facing selection boundary as existing `/model` command tests rather than only at registry/model-selection helper layers.
