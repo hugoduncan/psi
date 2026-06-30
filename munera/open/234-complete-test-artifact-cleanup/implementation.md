@@ -313,3 +313,40 @@ invocation detail — it must be doing scoping work, and which reading
 applies isn't stated.
 
 - ambiguity review added 1 new design step
+
+## Design follow-up pass 3 (this pass)
+
+Review-batch segment identified: commits `054dc609a` (architecture, pass 3)
+→ `0ba3059ee` (ambiguity, pass 3) → `1d1cd11d5` (inconsistency, pass 3),
+plus `f0e77d423` (notes appended after the pass-3 inconsistency turn; no
+`design-steps.md` change in that commit). Baseline = `054dc609a^`
+(`8354dd4fc`, the prior follow-up-pass resolution commit, i.e. the previous
+design-follow-up completion). `git diff 8354dd4fc..HEAD -- design-steps.md`
+shows exactly 1 added line: the AC5 lint-scope AMBIGUITY item. The
+pre-existing `SCOPE_QUESTION` item (filed in the pass-2 batch) is unchanged
+by this diff — it predates the pass-3 batch, so it's excluded from this
+pass's candidate work set per task instructions (and would be excluded
+regardless, as a `SCOPE_QUESTION:` item). Left unchecked, untouched.
+
+- AMBIGUITY (AC5) item: resolved by editing `design.md`. Picked reading (2)
+  — changed-files-only scope — since the design's "on changed files"
+  wording is otherwise meaningless filler under reading (1) (the project's
+  `clj-kondo`/`bb lint` invocation has no changed-files mode, per the
+  pass-3 ambiguity-turn finding above), and reading (2) keeps AC5 scoped to
+  this task's own edits rather than blocking on pre-existing unrelated repo
+  lint findings (confirmed present: 2 pre-existing dev-http warnings, per
+  the earlier "Notes for resolving the 2 open design-steps" entry). AC5 now
+  reads: no new errors/warnings in this task's changed files; pre-existing
+  findings elsewhere are out of scope.
+- SCOPE_QUESTION item: left unchecked — out of this pass's candidate work
+  set (predates the pass-3 batch) and, independently, not resolvable by
+  editing `design.md` per task instructions; scope-boundary correctness
+  remains deferred to the user, as already recorded in earlier notes in
+  this file.
+
+Note for the next reviewer/implementer: `implementation.md`'s section order
+is not strictly chronological — some earlier passes inserted notes
+mid-file rather than appending at the end (e.g. the pass-2/pass-3 turn
+write-ups interleave). Section headers self-identify the pass/turn; rely on
+those and on git history (`git log -- design-steps.md`), not file position,
+to reconstruct order.

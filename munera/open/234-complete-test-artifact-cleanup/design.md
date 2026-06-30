@@ -49,7 +49,7 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 2. **No leaked git worktrees**: After running the full test suite, `git worktree list` shows no test-created worktrees (only the real project worktrees).
 3. **All listed prefixes addressed**: Each of the 10 prefixes is either (a) confirmed not to leak (false positive), or (b) fixed with proper cleanup.
 4. **Tests pass**: `bb test` passes with no regressions.
-5. **Lint clean**: `clj-kondo --lint src test` passes on changed files.
+5. **Lint clean**: `clj-kondo --lint src test` reports no new errors or warnings introduced in this task's changed files. Pre-existing lint findings elsewhere in `src`/`test` (unrelated to this task's changes) are out of scope and do not block this criterion.
 
 ## Scope
 
