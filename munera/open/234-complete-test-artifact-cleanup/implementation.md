@@ -288,6 +288,23 @@ design-steps.md edit.
 
 - plan-review inconsistency turn: blocked — plan.md/steps.md do not exist yet (same SCOPE_QUESTION gate as the ambiguity turn); no plan/steps content to review
 
+## Notes for the design-steps follow-up after this slice
+
+This slice (plan-review ambiguity + inconsistency turns) added **zero** new
+design-steps. The only open item in `design-steps.md` is the pre-existing
+`SCOPE_QUESTION` (line 10) — it predates this slice and is not in this
+slice's candidate work set.
+
+Principle to hold: there is nothing for a follow-up pass to execute here.
+In particular, do not attempt to "resolve" this slice's block by creating
+`plan.md`/`steps.md` directly — that is `create-task-plan`'s job, gated by
+`task-lifecycle`'s `check-scope-question-status` step, which only proceeds
+once the line-10 `SCOPE_QUESTION` is checked off in `design-steps.md` with
+its rationale recorded in `design.md` by a human. Editing plan/steps files
+ahead of that gate would bypass the scope decision the gate exists to
+enforce. Leave `SCOPE_QUESTION` unchecked; no design.md/plan.md edit is
+warranted from this slice.
+
 ## Design follow-up pass 2 (this pass)
 
 Review-batch segment identified: commits `fc5505e64` (architecture, pass 2)
