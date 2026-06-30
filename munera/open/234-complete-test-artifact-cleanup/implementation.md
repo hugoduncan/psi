@@ -122,3 +122,35 @@ safety-net guidance (`with-xxx`, not fixtures) already match project
 convention.
 
 - no new architectural review feedback
+
+## Design-review pass 2 — ambiguity turn
+
+Used the already-loaded `design.md` (unchanged since the architecture turn,
+commit `6406a1188`) and `design-steps.md`; no architecture-source re-read
+needed. Targeted re-read: grepped the codebase for actual `temp-cwd`/
+`temp-session-root` call sites (not previously loaded) to check the Scope
+section's "ensure ... callers always clean up" claim against reality.
+
+Finding: `test-support/temp-cwd` and `test-support/temp-session-root` are
+called directly, with **no cleanup at all**, from 13 test files across
+`agent-session` and `app-runtime` that are entirely absent from the design's
+frozen In-Scope file list (which names only `git_test.clj`,
+`test_support.clj`, `query_graph_test.clj`, `work_on_test.clj`). AC1's
+"after a single `bb test` run" wording is a whole-suite property, so these
+un-listed leak sources mean the frozen scope likely cannot satisfy AC1 via
+its stated primary mechanism (per-caller `finally`). Filed as the one
+permitted `SCOPE_QUESTION` (boundary-correctness concern, not a wording
+ambiguity) rather than an ordinary ambiguity item, per task instructions —
+do not raise variants of this concern in later passes.
+
+Also noticed, but did not file (factual-mismatch-with-code class, belongs to
+the inconsistency turn per pass-1 precedent): AC1's parenthetical "any
+temporary git repository directory created by a test (e.g. via
+`with-null-context`, `temp-cwd`, or `temp-session-root`)" lists `temp-cwd`/
+`temp-session-root` as examples of git-repo-directory creators, but they
+just create plain `Files/createTempDirectory` dirs (no `git init`) — they
+already fall under AC1's other "/tmp/ (or OS temp dir)" branch instead.
+Functionally harmless (both branches end up covering the same dirs), so
+likely not actionable, but worth the inconsistency pass checking.
+
+- ambiguity review added 1 new design step (SCOPE_QUESTION)
