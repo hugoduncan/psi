@@ -44,7 +44,7 @@
 
 ## Review follow-up
 
-- [ ] Record the authoritative Claude Sonnet 5 discovery sources in `implementation.md` for the resolved canonical id, capability, limits, and pricing facts; the current implementation note records values but not the sources required by the design.
+- [x] Record the authoritative Claude Sonnet 5 discovery sources in `implementation.md` for the resolved canonical id, capability, limits, and pricing facts; the current implementation note records values but not the sources required by the design.
 
 ## Slice 6 — Verification and final coherence
 
