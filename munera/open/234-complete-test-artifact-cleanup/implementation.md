@@ -568,6 +568,31 @@ passes: prefer the "add an optional `with-xxx`-style safety-net sweep in
 — it satisfies AC1 without editing 16+ unrelated caller files, and was the
 designer's own escape hatch for exactly this situation.
 
+## Implement-task re-invocation 2 — still blocked, no new state
+
+Re-invoked directly as "implement the task" again. `git log -1` for this
+task dir is `a0990fc2e`, matching the prior pass's conclusion exactly (no
+drift recorded since). Re-verified independently: `design-steps.md` still
+has exactly one unchecked item (the pass-2 `SCOPE_QUESTION`, line 10);
+`plan.md`/`steps.md` still do not exist; re-grepped
+`temp-cwd\|temp-session-root` call sites outside `test_support.clj` —
+still 16 files, unchanged from the prior pass's count. Working tree clean
+before and after this pass; no code or design.md changes made.
+
+Declined to unilaterally resolve the `SCOPE_QUESTION` myself: every prior
+pass that touched this item explicitly recorded that scope-boundary
+correctness is a human decision under `mementum`'s approval-gate model
+(see pass-2 "Notes for resolving the 2 open design-steps" above), not an
+implementer judgment call, even though a concrete recommendation has
+already been recorded for whoever makes that call. Per
+`work-independently`'s `stop_only_if(needs_user_decision)`, this is that
+case — surfacing the same still-open question to the human rather than
+silently picking an interpretation and proceeding to `plan.md`/`steps.md`.
+
+- implement-task re-invocation 2: blocked — same open `SCOPE_QUESTION`
+  (`design-steps.md` line 10), no new state since `a0990fc2e`; no files
+  changed this pass.
+
 ## Notes for resolving the design-steps after this slice (plan-review, both turns)
 
 This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
