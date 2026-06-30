@@ -23,3 +23,19 @@ it's a factual mismatch with the code, not a multi-reading wording issue.
   auto-cleanup mention is required or optional, and what AC1's verification
   protocol (single vs. repeated `bb test` runs; scope of "test repo
   directory") actually requires.
+
+Inconsistency review: verified Pattern A/B/C claims in design.md's Root
+Cause Analysis against the actual `git_test.clj`/`query_graph_test.clj`
+source — all accurate (with-null-context's finally, the two inline
+worktree tests' own finally blocks, and the exact `ext-mutation-worktree-`
+/ `fix-repeated-thinking-output-` literals all match). No new findings
+there. Findings instead came from cross-checking AC3/Constraints/Out-of-Scope
+wording against each other, and Constraints against the suggested
+`Files/deleteIfExists` mechanism.
+
+- inconsistency review added 3 new design steps: AC3(c)'s test-removal
+  option contradicts the cleanup-paths-only constraint, the suggested
+  `Files/deleteIfExists` mechanism can't recursively clean populated temp
+  dirs and conflicts with the delete-recursively!-reuse constraint, and the
+  Context section's single "psi-agent-session" prefix doesn't match the two
+  distinct literal prefixes actually in code.
