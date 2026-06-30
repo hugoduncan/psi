@@ -168,7 +168,35 @@ code drift to account for. All design.md claims (prefix literals, file
 locations post pass-2 fix, Pattern A-D descriptions) still match source
 exactly.
 
-- no inconsistency review feedback (SCOPE_QUESTION)
+- no inconsistency review feedback
+
+## Notes for resolving the 2 open design-steps (AMBIGUITY + SCOPE_QUESTION)
+
+Principles:
+- The AMBIGUITY item (AC5 lint scope) is resolvable by editing `design.md`
+  directly — it's wording clarification, not a scope change. Pick one
+  reading and state it explicitly in AC5 (e.g. "no new errors/warnings in
+  changed files; pre-existing issues elsewhere are out of scope" vs. "the
+  literal command must report zero errors/warnings repo-wide").
+- The SCOPE_QUESTION item is **not** resolvable by editing `design.md` —
+  scope-boundary correctness is a human decision (per the precedent set in
+  the pass-2 resolution notes above). Leave it open/unchecked.
+
+Fact confirmed during this pass, useful for resolving the AMBIGUITY item
+(no need to re-derive): running the project's actual lint command
+(`clojure -M:lint`, i.e. `bb lint`) on the whole repo right now reports
+**0 errors, 2 warnings** — both pre-existing and unrelated to this task
+(`extensions/dev-http/test/extensions/dev_http_test.clj:572` and `:737`,
+"Unresolved var: http-client/get`/`post`"), plus a couple of unrelated
+`info`-level "Redundant ignore" findings in
+`workflow_delegate_review_step_live_test.clj`. So today, reading (1)
+(literal whole-tree command) would currently still "pass" if "passes" means
+zero *errors* — the ambiguity only bites if "passes" is meant to include
+zero warnings, or if new warnings get introduced by this task's own changes
+in the 4 in-scope files. Whoever resolves AC5 should decide whether
+"passes" includes warnings and whether pre-existing unrelated
+warnings/info findings (like the dev-http ones above) should block this
+task regardless of the chosen reading. (SCOPE_QUESTION)
 
 ## Design-review pass 2 — inconsistency turn
 
