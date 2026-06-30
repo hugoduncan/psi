@@ -532,3 +532,17 @@ performed — nothing changed since the ambiguity turn that would warrant
 one. No `design-steps.md` edit made.
 
 - plan-review inconsistency turn: blocked — plan.md/steps.md do not exist yet (same open SCOPE_QUESTION gate); no plan/steps content to review
+
+## Notes for resolving the design-steps after this slice (plan-review, both turns)
+
+This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
+`b232569b3`) added **zero** new design-steps — nothing new to act on.
+`design-steps.md` line 10's `SCOPE_QUESTION` remains the only open item,
+unchanged by this slice and not addressable by editing `design.md` (human
+scope decision required; see pass-2 notes earlier in this file for full
+reasoning/evidence). No project paths beyond what's already cited in
+earlier notes are needed to act on it. Until that `SCOPE_QUESTION` is
+checked off (with rationale in `design.md`), `create-task-plan` cannot run,
+so there is nothing for a design-steps-resolving task to do this slice
+produced — it should simply confirm the gate is still open and stop, as
+this and prior plan-review slices have done.
