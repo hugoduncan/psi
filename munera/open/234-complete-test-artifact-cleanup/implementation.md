@@ -593,6 +593,39 @@ silently picking an interpretation and proceeding to `plan.md`/`steps.md`.
   (`design-steps.md` line 10), no new state since `a0990fc2e`; no files
   changed this pass.
 
+## Implement-task re-invocation 4 — still blocked, no new state
+
+Re-invoked directly as "implement the task" again. `git log -1` for this
+task dir is `dbdbe0096`, matching the prior pass's conclusion. Re-verified
+independently: `design-steps.md` still has exactly one unchecked item (the
+`SCOPE_QUESTION`, line 10); `plan.md`/`steps.md` still do not exist.
+Re-grepped `temp-cwd\|temp-session-root` call sites outside
+`test_support.clj` under `components`/`app-runtime`: 16 files, matching the
+prior 2nd-re-invocation count exactly — no drift.
+
+This is the 4th consecutive `implement-task` invocation reaching the
+identical conclusion. Per the unbroken precedent (4 prior instances) and
+`AGENTS.md`'s plan.md gate plus `work-independently`'s
+`stop_only_if(needs_user_decision)`, declining again to unilaterally
+resolve the `SCOPE_QUESTION` or fabricate `plan.md`/`steps.md` ahead of the
+gate. No design.md or code changes made this pass. Not adding further
+re-verification notes on future blocked re-invocations unless the
+underlying evidence (caller-file count, design-steps.md state) actually
+changes — repeating an identical confirmation each pass is noise once the
+pattern is established; future blocked passes should check this section
+and the human-facing ask below before re-deriving anything.
+
+**Ask for the human** (unchanged): `munera/open/234-complete-test-artifact-cleanup/design-steps.md`
+line 10 has one open `SCOPE_QUESTION` — is the design's 4-file In-Scope
+list (`git_worktree_test.clj`, `test_support.clj`, `query_graph_test.clj`,
+`work_on_test.clj`) exhaustive for AC1, or are the ~16 other
+`temp-cwd`/`temp-session-root` caller files implicitly in scope too?
+Recommendation (recorded previously, unchanged): add an optional
+`with-xxx`-style safety-net sweep inside `test_support.clj`, satisfying
+AC1 without editing the other caller files. Checking this item off in
+`design-steps.md` (with rationale in `design.md`) unblocks
+`create-task-plan` and lets implementation proceed.
+
 ## Implement-task re-invocation 3 — still blocked, no new state
 
 Re-invoked directly as "implement the task" again. `git log -1` for this
