@@ -510,3 +510,14 @@ the immediately preceding batch (ambiguity + inconsistency turns,
 nothing has happened since. Re-running the same blocked conclusion would
 be a duplicate, not a new finding. No file changes made this pass; nothing
 to mark done.
+
+## Plan-review ambiguity turn — same block, no new state (re-invocation)
+
+Re-invoked as the ambiguity turn of a fresh `plan-review` session.
+`git log -1` for this task dir is still `3e8283985`; no commits since the
+prior re-invocation note above. `plan.md`/`steps.md` still do not exist —
+the `SCOPE_QUESTION` gate (`design-steps.md` line 10) is unchanged and
+still open, so `create-task-plan` has not run. No plan/steps content exists
+to review for ambiguity. No `design-steps.md` edit made.
+
+- plan-review ambiguity turn: blocked — plan.md/steps.md do not exist yet (same open SCOPE_QUESTION gate); no plan/steps content to review
