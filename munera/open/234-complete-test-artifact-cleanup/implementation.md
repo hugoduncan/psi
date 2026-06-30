@@ -395,3 +395,26 @@ covers both "temp directories *or worktree artifacts*", so AC2's
 single-run reading parallels AC1's and isn't a fresh ambiguity.
 
 - no ambiguity review feedback (pass 4)
+
+## Design-review pass 4 — inconsistency turn
+
+`design.md`/`design-steps.md` unchanged since the pass-4 architecture/
+ambiguity turns. Targeted re-read: confirmed via `git log` that none of the
+4 in-scope files have changed since the pass-3 inconsistency turn's
+baseline (the only intervening commit touching those paths,
+`4847c7a04`, predates pass 3's check) — no drift to re-verify against.
+Spot-checked the `ext-mutation-worktree-` literal directly in
+`query_graph_test.clj` (~L66) to confirm it still matches Context's claim.
+
+Considered but not filed: Context's bullet for the `fix-repeated-thinking`
+prefix omits the `-output` suffix that the actual literal
+(`"fix-repeated-thinking-output-"` / `"fix-repeated-thinking-output"`) has
+in both `query_graph_test.clj` and `work_on_test.clj` (and that Pattern
+C/D's own prose already uses correctly). Unlike the pass-1
+`psi-agent-session` case, this isn't actionable: `fix-repeated-thinking` is
+still a true string prefix of the real literal, so AC1's "no directories
+matching the listed prefixes" check still correctly catches the actual
+artifacts, and the count/file attribution (2 files, 1 underlying name) is
+unaffected — purely a harmless abbreviation, not a verification gap.
+
+- no inconsistency review feedback (pass 4)
