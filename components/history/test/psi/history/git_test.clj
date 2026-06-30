@@ -4,8 +4,9 @@
    Uses create-null-context — an isolated temp git repo with seeded commits.
    No mocks, no dependency on the real project repo, no shared state."
   (:require
-   [clojure.test :refer [deftest testing is]]
+   [babashka.fs :as fs]
    [clojure.string :as str]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [psi.history.git :as git])
   (:import
    (java.io File)
@@ -27,6 +28,13 @@
   "Delayed null context for read-only tests. Created once per test run."
   (delay (git/create-null-context seed-commits)))
 
+(use-fixtures :once
+  (fn [f]
+    (try
+      (f)
+      (finally
+        (fs/delete-tree (:repo-dir @shared-ro-ctx))))))
+
 (defn- canonical-path
   [path]
   (.getCanonicalPath (File. (str path))))
@@ -37,13 +45,30 @@
             (canonical-path (:git.worktree/path %)))
         worktrees))
 
+(defn- delete-recursively!
+  [path]
+  (let [f (File. (str path))]
+    (when (.exists f)
+      (doseq [child (reverse (file-seq f))]
+        (.delete ^java.io.File child)))))
+
 (defn- linked-worktree-path
   [ctx name]
-  (let [repo-file (File. (:repo-dir ctx))
-        parent    (.getCanonicalPath (.getParentFile repo-file))
-        suffix    (.getName repo-file)
-        uniq      (str (java.util.UUID/randomUUID))]
-    (str parent File/separator name "-" suffix "-" uniq)))
+  (let [repo-dir (:repo-dir ctx)
+        wt-dir   (str repo-dir File/separator "worktrees")
+        uniq     (str (java.util.UUID/randomUUID))]
+    (.mkdirs (File. wt-dir))
+    (str wt-dir File/separator name "-" uniq)))
+
+(defmacro with-null-context
+  "Create a null context, bind it to sym, and clean up the repo dir in finally."
+  [[sym commits-or-nil] & body]
+  `(let [ctx# (git/create-null-context ~commits-or-nil)
+         ~sym ctx#]
+     (try
+       ~@body
+       (finally
+         (delete-recursively! (:repo-dir ctx#))))))
 
 (defn- append-and-commit!
   [repo-dir rel-path content message]
@@ -93,10 +118,13 @@
   (testing "create-null-context"
     (let [ctx     (git/create-null-context)
           commits (git/log ctx)]
-      (testing "creates a usable git repository"
-        (is (true? (git/inside-repo? ctx))))
-      (testing "seeds the default commit set"
-        (is (= 3 (count commits)))))))
+      (try
+        (testing "creates a usable git repository"
+          (is (true? (git/inside-repo? ctx))))
+        (testing "seeds the default commit set"
+          (is (= 3 (count commits))))
+        (finally
+          (delete-recursively! (:repo-dir ctx)))))))
 
 (deftest log-returns-commits
   ;; Tests log for default arity, required fields, and path filtering.
@@ -352,14 +380,17 @@
   ;; Tests worktree listing behavior outside a git repository.
   (testing "worktree-list"
     (let [tmp (str (Files/createTempDirectory "psi-no-git-"
-                                              (make-array FileAttribute 0)))
-          ctx (git/create-context tmp)]
-      (testing "reports the context as outside a repo"
-        (is (false? (git/inside-repo? ctx))))
-      (testing "returns no worktrees"
-        (is (= [] (git/worktree-list ctx))))
-      (testing "returns no current worktree"
-        (is (nil? (git/current-worktree ctx)))))))
+                                              (make-array FileAttribute 0)))]
+      (try
+        (let [ctx (git/create-context tmp)]
+          (testing "reports the context as outside a repo"
+            (is (false? (git/inside-repo? ctx))))
+          (testing "returns no worktrees"
+            (is (= [] (git/worktree-list ctx))))
+          (testing "returns no current worktree"
+            (is (nil? (git/current-worktree ctx)))))
+        (finally
+          (delete-recursively! tmp))))))
 
 (deftest worktree-list-command-failure-emits-telemetry-and-empty
   ;; Tests worktree-list failure handling and telemetry callback behavior.
@@ -402,190 +433,190 @@
 (deftest worktree-add-and-remove-roundtrip
   ;; Tests linked worktree creation, listing, removal, and no-upstream default.
   (testing "worktree add/remove"
-    (let [ctx      (git/create-null-context seed-commits)
-          wt-path  (linked-worktree-path ctx "feature-alpha")
-          added    (git/worktree-add ctx {:path wt-path
-                                          :branch "feature-alpha"})
-          listed   (git/worktree-list ctx)
-          upstream (upstream-branch wt-path)
-          removed  (git/worktree-remove ctx {:path wt-path})]
-      (testing "adds the worktree successfully"
-        (is (true? (:success added)))
-        (is (= wt-path (:path added)))
-        (is (= "feature-alpha" (:branch added)))
-        (is (string? (:head added))))
-      (testing "newly created branches do not inherit tracking by default"
-        (is (nil? upstream)))
-      (testing "lists the added worktree"
-        (is (worktree-listed? listed wt-path)))
-      (testing "removes the worktree successfully"
-        (is (true? (:success removed))))
-      (testing "removes the worktree directory from disk"
-        (is (false? (.exists (File. wt-path))))))))
+    (with-null-context [ctx seed-commits]
+      (let [wt-path  (linked-worktree-path ctx "feature-alpha")
+            added    (git/worktree-add ctx {:path wt-path
+                                            :branch "feature-alpha"})
+            listed   (git/worktree-list ctx)
+            upstream (upstream-branch wt-path)
+            removed  (git/worktree-remove ctx {:path wt-path})]
+        (testing "adds the worktree successfully"
+          (is (true? (:success added)))
+          (is (= wt-path (:path added)))
+          (is (= "feature-alpha" (:branch added)))
+          (is (string? (:head added))))
+        (testing "newly created branches do not inherit tracking by default"
+          (is (nil? upstream)))
+        (testing "lists the added worktree"
+          (is (worktree-listed? listed wt-path)))
+        (testing "removes the worktree successfully"
+          (is (true? (:success removed))))
+        (testing "removes the worktree directory from disk"
+          (is (false? (.exists (File. wt-path)))))))))
 
 (deftest worktree-add-fails-when-path-already-exists
   ;; Tests worktree-add path validation before invoking git.
   (testing "worktree-add"
     (testing "rejects an existing target path"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "existing-path")
-            _       (.mkdirs (File. wt-path))
-            result  (git/worktree-add ctx {:path wt-path
-                                           :branch "feature-existing-path"})]
-        (is (false? (:success result)))
-        (is (= "worktree path already exists" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "existing-path")
+              _       (.mkdirs (File. wt-path))
+              result  (git/worktree-add ctx {:path wt-path
+                                             :branch "feature-existing-path"})]
+          (is (false? (:success result)))
+          (is (= "worktree path already exists" (:error result))))))))
 
 (deftest worktree-add-fails-when-branch-exists
   ;; Tests worktree-add branch validation when creating a new branch.
   (testing "worktree-add"
     (testing "rejects creating a worktree for an existing branch"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "main-dup")
-            result  (git/worktree-add ctx {:path wt-path
-                                           :branch "main"})]
-        (is (false? (:success result)))
-        (is (= "branch already exists" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "main-dup")
+              result  (git/worktree-add ctx {:path wt-path
+                                             :branch "main"})]
+          (is (false? (:success result)))
+          (is (= "branch already exists" (:error result))))))))
 
 (deftest worktree-add-supports-legacy-create-branch-key
   ;; Tests worktree-add compatibility with the legacy :create_branch request key.
   (testing "worktree-add"
     (testing "accepts the legacy create_branch flag"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "legacy-create-branch")
-            result  (git/worktree-add ctx {:path wt-path
-                                           :branch "legacy-create-branch"
-                                           :create_branch true})]
-        (is (true? (:success result)))
-        (is (= "legacy-create-branch" (:branch result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "legacy-create-branch")
+              result  (git/worktree-add ctx {:path wt-path
+                                             :branch "legacy-create-branch"
+                                             :create_branch true})]
+          (is (true? (:success result)))
+          (is (= "legacy-create-branch" (:branch result))))))))
 
 (deftest worktree-add-with-existing-branch-fails-while-branch-is-checked-out-elsewhere
   ;; Tests worktree-add refusal when attaching to a branch already checked out elsewhere.
   (testing "worktree-add"
-    (let [ctx     (git/create-null-context seed-commits)
-          wt-src  (linked-worktree-path ctx "feature-attached-src")
-          wt-path (linked-worktree-path ctx "feature-attached")
-          _       (git/worktree-add ctx {:path wt-src :branch "feature-attached-src"})
-          result  (git/worktree-add ctx {:path wt-path
-                                         :branch "feature-attached-src"
-                                         :create-branch false})
-          listed  (git/worktree-list ctx)]
-      (testing "fails when the target branch is already checked out elsewhere"
-        (is (false? (:success result)))
-        (is (string? (:error result))))
-      (testing "does not add the rejected worktree"
-        (is (not (worktree-listed? listed wt-path)))))))
+    (with-null-context [ctx seed-commits]
+      (let [wt-src  (linked-worktree-path ctx "feature-attached-src")
+            wt-path (linked-worktree-path ctx "feature-attached")
+            _       (git/worktree-add ctx {:path wt-src :branch "feature-attached-src"})
+            result  (git/worktree-add ctx {:path wt-path
+                                           :branch "feature-attached-src"
+                                           :create-branch false})
+            listed  (git/worktree-list ctx)]
+        (testing "fails when the target branch is already checked out elsewhere"
+          (is (false? (:success result)))
+          (is (string? (:error result))))
+        (testing "does not add the rejected worktree"
+          (is (not (worktree-listed? listed wt-path))))))))
 
 (deftest worktree-add-with-existing-branch-succeeds-after-branch-is-no-longer-checked-out-elsewhere
   ;; Tests worktree-add success after the branch is detached from another worktree.
   (testing "worktree-add"
-    (let [ctx     (git/create-null-context seed-commits)
-          wt-src  (linked-worktree-path ctx "feature-attached-src")
-          wt-path (linked-worktree-path ctx "feature-attached")
-          _       (git/worktree-add ctx {:path wt-src :branch "feature-attached-src"})
-          _       (git/worktree-remove ctx {:path wt-src})
-          result  (git/worktree-add ctx {:path wt-path
-                                         :branch "feature-attached-src"
-                                         :create-branch false})
-          listed  (git/worktree-list ctx)]
-      (testing "succeeds once the branch is no longer checked out elsewhere"
-        (is (true? (:success result)))
-        (is (= wt-path (:path result)))
-        (is (= "feature-attached-src" (:branch result))))
-      (testing "adds the new worktree to the registry"
-        (is (worktree-listed? listed wt-path))))))
+    (with-null-context [ctx seed-commits]
+      (let [wt-src  (linked-worktree-path ctx "feature-attached-src")
+            wt-path (linked-worktree-path ctx "feature-attached")
+            _       (git/worktree-add ctx {:path wt-src :branch "feature-attached-src"})
+            _       (git/worktree-remove ctx {:path wt-src})
+            result  (git/worktree-add ctx {:path wt-path
+                                           :branch "feature-attached-src"
+                                           :create-branch false})
+            listed  (git/worktree-list ctx)]
+        (testing "succeeds once the branch is no longer checked out elsewhere"
+          (is (true? (:success result)))
+          (is (= wt-path (:path result)))
+          (is (= "feature-attached-src" (:branch result))))
+        (testing "adds the new worktree to the registry"
+          (is (worktree-listed? listed wt-path)))))))
 
 (deftest worktree-remove-fails-when-path-is-unknown
   ;; Tests worktree-remove lookup behavior when the target path is absent.
   (testing "worktree-remove"
     (testing "rejects a path that is not a known worktree"
-      (let [ctx    (git/create-null-context seed-commits)
-            result (git/worktree-remove ctx {:path (linked-worktree-path ctx "missing")})]
-        (is (false? (:success result)))
-        (is (= "worktree path not found" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [result (git/worktree-remove ctx {:path (linked-worktree-path ctx "missing")})]
+          (is (false? (:success result)))
+          (is (= "worktree path not found" (:error result))))))))
 
 (deftest worktree-remove-fails-for-main-worktree
   ;; Tests worktree-remove protection of the primary worktree.
   (testing "worktree-remove"
     (testing "rejects removing the main worktree"
-      (let [ctx    (git/create-null-context seed-commits)
-            result (git/worktree-remove ctx {:path (:repo-dir ctx)})]
-        (is (false? (:success result)))
-        (is (= "cannot remove main worktree" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [result (git/worktree-remove ctx {:path (:repo-dir ctx)})]
+          (is (false? (:success result)))
+          (is (= "cannot remove main worktree" (:error result))))))))
 
 (deftest worktree-remove-command-failure-returns-error-map
   ;; Tests worktree-remove error reporting when git removal fails.
   (testing "worktree-remove"
     (testing "returns a failure map with the git error"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "remove-fail")
-            _       (git/worktree-add ctx {:path wt-path :branch "remove-fail"})
-            listed  [{:git.worktree/path wt-path}]]
-        (with-redefs [psi.history.git/worktree-list (fn [_] listed)
-                      psi.history.git/main-worktree-path (fn [_] "/definitely-not-the-target")
-                      psi.history.git/run-git (fn [_ _]
-                                                (throw (ex-info "remove failed" {:err "cannot remove now"})))]
-          (let [result (git/worktree-remove ctx {:path wt-path})]
-            (is (false? (:success result)))
-            (is (= "cannot remove now" (:error result)))))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "remove-fail")
+              _       (git/worktree-add ctx {:path wt-path :branch "remove-fail"})
+              listed  [{:git.worktree/path wt-path}]]
+          (with-redefs [psi.history.git/worktree-list (fn [_] listed)
+                        psi.history.git/main-worktree-path (fn [_] "/definitely-not-the-target")
+                        psi.history.git/run-git (fn [_ _]
+                                                  (throw (ex-info "remove failed" {:err "cannot remove now"})))]
+            (let [result (git/worktree-remove ctx {:path wt-path})]
+              (is (false? (:success result)))
+              (is (= "cannot remove now" (:error result))))))))))
 
 (deftest branch-merge-fast-forward
   ;; Tests branch-merge on a simple fast-forwardable feature branch.
   (testing "branch-merge"
-    (let [ctx     (git/create-null-context seed-commits)
-          wt-path (linked-worktree-path ctx "feature-merge")
-          _       (git/worktree-add ctx {:path wt-path :branch "feature-merge"})
-          _       (append-and-commit! wt-path "src/merge_feature.clj" "(ns merge-feature)\n" "⚒ feature merge commit")
-          result  (git/branch-merge ctx {:branch "feature-merge"})
-          files   (git/ls-files ctx)]
-      (testing "reports a successful fast-forward merge"
-        (is (true? (:merged result)))
-        (is (true? (:fast-forward result)))
-        (is (false? (:conflict result)))
-        (is (nil? (:error result))))
-      (testing "makes merged files visible on the target branch"
-        (is (some #(= % "src/merge_feature.clj") files))))))
+    (with-null-context [ctx seed-commits]
+      (let [wt-path (linked-worktree-path ctx "feature-merge")
+            _       (git/worktree-add ctx {:path wt-path :branch "feature-merge"})
+            _       (append-and-commit! wt-path "src/merge_feature.clj" "(ns merge-feature)\n" "⚒ feature merge commit")
+            result  (git/branch-merge ctx {:branch "feature-merge"})
+            files   (git/ls-files ctx)]
+        (testing "reports a successful fast-forward merge"
+          (is (true? (:merged result)))
+          (is (true? (:fast-forward result)))
+          (is (false? (:conflict result)))
+          (is (nil? (:error result))))
+        (testing "makes merged files visible on the target branch"
+          (is (some #(= % "src/merge_feature.clj") files)))))))
 
 (deftest branch-merge-rejects-dirty-working-tree
   ;; Tests branch-merge precondition enforcement for dirty worktrees.
   (testing "branch-merge"
     (testing "rejects merge when the working tree is dirty"
-      (let [ctx  (git/create-null-context seed-commits)
-            file (File. (str (:repo-dir ctx) File/separator "README.md"))]
-        (spit file "dirty\n")
-        (let [result (git/branch-merge ctx {:branch "main"})]
-          (is (false? (:merged result)))
-          (is (= "working tree is dirty" (:error result))))))))
+      (with-null-context [ctx seed-commits]
+        (let [file (File. (str (:repo-dir ctx) File/separator "README.md"))]
+          (spit file "dirty\n")
+          (let [result (git/branch-merge ctx {:branch "main"})]
+            (is (false? (:merged result)))
+            (is (= "working tree is dirty" (:error result)))))))))
 
 (deftest branch-merge-supports-ff-strategy
   ;; Tests branch-merge support for the explicit :ff strategy.
   (testing "branch-merge"
     (testing "supports the :ff strategy on a fast-forwardable branch"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-merge-ff")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-merge-ff"})
-            _       (append-and-commit! wt-path "src/merge_ff.clj" "(ns merge-ff)\n" "⚒ feature merge ff")
-            result  (git/branch-merge ctx {:branch "feature-merge-ff"
-                                           :strategy :ff})]
-        (is (true? (:merged result)))
-        (is (true? (:fast-forward result)))
-        (is (nil? (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-merge-ff")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-merge-ff"})
+              _       (append-and-commit! wt-path "src/merge_ff.clj" "(ns merge-ff)\n" "⚒ feature merge ff")
+              result  (git/branch-merge ctx {:branch "feature-merge-ff"
+                                             :strategy :ff})]
+          (is (true? (:merged result)))
+          (is (true? (:fast-forward result)))
+          (is (nil? (:error result))))))))
 
 (deftest branch-merge-supports-no-ff-strategy
   ;; Tests branch-merge support for the explicit :no_ff strategy and merge commit message.
   (testing "branch-merge"
     (testing "supports the :no_ff strategy"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-merge-no-ff")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-merge-no-ff"})
-            _       (append-and-commit! wt-path "src/merge_no_ff.clj" "(ns merge-no-ff)\n" "⚒ feature merge no ff")
-            _       (append-and-commit! (:repo-dir ctx) "src/main_no_ff.clj" "(ns main-no-ff)\n" "⚒ main no ff base")
-            result  (git/branch-merge ctx {:branch "feature-merge-no-ff"
-                                           :strategy :no_ff
-                                           :message "⚒ merge feature-merge-no-ff"})
-            detail  (git/show ctx (git/current-commit ctx))]
-        (is (true? (:merged result)))
-        (is (false? (:fast-forward result)))
-        (is (= "⚒ merge feature-merge-no-ff" (:git.commit/subject detail)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-merge-no-ff")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-merge-no-ff"})
+              _       (append-and-commit! wt-path "src/merge_no_ff.clj" "(ns merge-no-ff)\n" "⚒ feature merge no ff")
+              _       (append-and-commit! (:repo-dir ctx) "src/main_no_ff.clj" "(ns main-no-ff)\n" "⚒ main no ff base")
+              result  (git/branch-merge ctx {:branch "feature-merge-no-ff"
+                                             :strategy :no_ff
+                                             :message "⚒ merge feature-merge-no-ff"})
+              detail  (git/show ctx (git/current-commit ctx))]
+          (is (true? (:merged result)))
+          (is (false? (:fast-forward result)))
+          (is (= "⚒ merge feature-merge-no-ff" (:git.commit/subject detail))))))))
 
 (deftest branch-merge-conflict-path-reports-abort
   ;; Tests branch-merge conflict handling and abort reporting.
@@ -613,68 +644,68 @@
 (deftest branch-merge-rejects-false-positive-success-when-run-on-source-branch
   ;; Tests branch-merge guard against reporting success when HEAD does not change.
   (testing "branch-merge"
-    (let [ctx         (git/create-null-context seed-commits)
-          wt-path     (linked-worktree-path ctx "feature-self")
-          _           (git/worktree-add ctx {:path wt-path :branch "feature-self"})
-          _           (append-and-commit! wt-path "src/feature_self.clj" "(ns feature-self)\n" "⚒ feature self commit")
-          feature-ctx (git/create-context wt-path)
-          result      (git/branch-merge feature-ctx {:branch "feature-self"})]
-      (testing "does not report a merge when the target head did not change"
-        (is (false? (:merged result)))
-        (is (false? (:conflict result))))
-      (testing "returns a diagnostic explaining the false positive"
-        (is (re-find #"merge reported success but target HEAD did not absorb branch"
-                     (:error result)))))))
+    (with-null-context [ctx seed-commits]
+      (let [wt-path     (linked-worktree-path ctx "feature-self")
+            _           (git/worktree-add ctx {:path wt-path :branch "feature-self"})
+            _           (append-and-commit! wt-path "src/feature_self.clj" "(ns feature-self)\n" "⚒ feature self commit")
+            feature-ctx (git/create-context wt-path)
+            result      (git/branch-merge feature-ctx {:branch "feature-self"})]
+        (testing "does not report a merge when the target head did not change"
+          (is (false? (:merged result)))
+          (is (false? (:conflict result))))
+        (testing "returns a diagnostic explaining the false positive"
+          (is (re-find #"merge reported success but target HEAD did not absorb branch"
+                       (:error result))))))))
 
 (deftest branch-merge-ff-only-fails-when-not-fast-forwardable
   ;; Tests branch-merge ff-only behavior on diverged histories.
   (testing "branch-merge"
     (testing "rejects non-fast-forward merges under ff-only strategy"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-diverged")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-diverged"})
-            _       (append-and-commit! wt-path "src/diverged_feature.clj" "(ns diverged-feature)\n" "⚒ feature diverged commit")
-            _       (append-and-commit! (:repo-dir ctx) "src/main_side.clj" "(ns main-side)\n" "⚒ main side commit")
-            result  (git/branch-merge ctx {:branch "feature-diverged"
-                                           :strategy :ff_only})]
-        (is (false? (:merged result)))
-        (is (false? (:conflict result)))
-        (is (= "not fast-forwardable; rebase first" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-diverged")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-diverged"})
+              _       (append-and-commit! wt-path "src/diverged_feature.clj" "(ns diverged-feature)\n" "⚒ feature diverged commit")
+              _       (append-and-commit! (:repo-dir ctx) "src/main_side.clj" "(ns main-side)\n" "⚒ main side commit")
+              result  (git/branch-merge ctx {:branch "feature-diverged"
+                                             :strategy :ff_only})]
+          (is (false? (:merged result)))
+          (is (false? (:conflict result)))
+          (is (= "not fast-forwardable; rebase first" (:error result))))))))
 
 (deftest branch-rebase-success
   ;; Tests branch-rebase on a feature branch rebased onto main.
   (testing "branch-rebase"
     (testing "rebases the feature branch onto main"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-rebase")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-rebase"})
-            _       (append-and-commit! wt-path "src/rebase_feature.clj" "(ns rebase-feature)\n" "⚒ feature before rebase")
-            _       (append-and-commit! (:repo-dir ctx) "src/main_rebase.clj" "(ns main-rebase)\n" "⚒ main before rebase")
-            wt-ctx  (git/create-context wt-path)
-            result  (git/branch-rebase wt-ctx {:onto "main"})]
-        (is (true? (:success result)))
-        (is (= "feature-rebase" (:branch result)))
-        (is (false? (:conflict result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-rebase")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-rebase"})
+              _       (append-and-commit! wt-path "src/rebase_feature.clj" "(ns rebase-feature)\n" "⚒ feature before rebase")
+              _       (append-and-commit! (:repo-dir ctx) "src/main_rebase.clj" "(ns main-rebase)\n" "⚒ main before rebase")
+              wt-ctx  (git/create-context wt-path)
+              result  (git/branch-rebase wt-ctx {:onto "main"})]
+          (is (true? (:success result)))
+          (is (= "feature-rebase" (:branch result)))
+          (is (false? (:conflict result))))))))
 
 (deftest branch-rebase-rejects-dirty-working-tree
   ;; Tests branch-rebase precondition enforcement for dirty worktrees.
   (testing "branch-rebase"
     (testing "rejects rebase when the working tree is dirty"
-      (let [ctx  (git/create-null-context seed-commits)
-            file (File. (str (:repo-dir ctx) File/separator "README.md"))]
-        (spit file "dirty\n")
-        (let [result (git/branch-rebase ctx {:onto "main"})]
-          (is (false? (:success result)))
-          (is (= "working tree is dirty" (:error result))))))))
+      (with-null-context [ctx seed-commits]
+        (let [file (File. (str (:repo-dir ctx) File/separator "README.md"))]
+          (spit file "dirty\n")
+          (let [result (git/branch-rebase ctx {:onto "main"})]
+            (is (false? (:success result)))
+            (is (= "working tree is dirty" (:error result)))))))))
 
 (deftest branch-rebase-requires-target
   ;; Tests branch-rebase request validation for a missing target branch.
   (testing "branch-rebase"
     (testing "requires an onto target"
-      (let [ctx    (git/create-null-context seed-commits)
-            result (git/branch-rebase ctx {:onto nil})]
-        (is (false? (:success result)))
-        (is (= "missing rebase target" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [result (git/branch-rebase ctx {:onto nil})]
+          (is (false? (:success result)))
+          (is (= "missing rebase target" (:error result))))))))
 
 (deftest branch-rebase-conflict-path-reports-abort
   ;; Tests branch-rebase conflict handling and abort reporting.
@@ -696,45 +727,45 @@
   ;; Tests branch-delete for a removable non-current branch.
   (testing "branch-delete"
     (testing "deletes a non-current local branch"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-delete")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-delete"})
-            _       (git/worktree-remove ctx {:path wt-path})
-            result  (git/branch-delete ctx {:branch "feature-delete"})]
-        (is (true? (:deleted result)))
-        (is (nil? (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-delete")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-delete"})
+              _       (git/worktree-remove ctx {:path wt-path})
+              result  (git/branch-delete ctx {:branch "feature-delete"})]
+          (is (true? (:deleted result)))
+          (is (nil? (:error result))))))))
 
 (deftest branch-delete-fails-when-branch-is-missing
   ;; Tests branch-delete validation for a missing branch.
   (testing "branch-delete"
     (testing "rejects deletion of a branch that does not exist"
-      (let [ctx    (git/create-null-context seed-commits)
-            result (git/branch-delete ctx {:branch "missing-branch"})]
-        (is (false? (:deleted result)))
-        (is (= "branch not found" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [result (git/branch-delete ctx {:branch "missing-branch"})]
+          (is (false? (:deleted result)))
+          (is (= "branch not found" (:error result))))))))
 
 (deftest branch-delete-fails-for-current-branch
   ;; Tests branch-delete guard against deleting the checked-out branch.
   (testing "branch-delete"
     (testing "rejects deletion of the current branch"
-      (let [ctx    (git/create-null-context seed-commits)
-            result (git/branch-delete ctx {:branch "main"})]
-        (is (false? (:deleted result)))
-        (is (= "cannot delete current branch" (:error result)))))))
+      (with-null-context [ctx seed-commits]
+        (let [result (git/branch-delete ctx {:branch "main"})]
+          (is (false? (:deleted result)))
+          (is (= "cannot delete current branch" (:error result))))))))
 
 (deftest branch-delete-command-failure-uses-error-message
   ;; Tests branch-delete catch-path error shaping when git deletion fails.
   (testing "branch-delete"
     (testing "returns the exception message when ex-data has no :err"
-      (let [ctx     (git/create-null-context seed-commits)
-            wt-path (linked-worktree-path ctx "feature-delete-failure")
-            _       (git/worktree-add ctx {:path wt-path :branch "feature-delete-failure"})
-            _       (git/worktree-remove ctx {:path wt-path})]
-        (with-redefs [psi.history.git/run-git (fn [_ _]
-                                                (throw (ex-info "delete failed" {})))]
-          (let [result (git/branch-delete ctx {:branch "feature-delete-failure"})]
-            (is (false? (:deleted result)))
-            (is (= "delete failed" (:error result)))))))))
+      (with-null-context [ctx seed-commits]
+        (let [wt-path (linked-worktree-path ctx "feature-delete-failure")
+              _       (git/worktree-add ctx {:path wt-path :branch "feature-delete-failure"})
+              _       (git/worktree-remove ctx {:path wt-path})]
+          (with-redefs [psi.history.git/run-git (fn [_ _]
+                                                  (throw (ex-info "delete failed" {})))]
+            (let [result (git/branch-delete ctx {:branch "feature-delete-failure"})]
+              (is (false? (:deleted result)))
+              (is (= "delete failed" (:error result))))))))))
 
 (deftest default-branch-prefers-symbolic-ref
   ;; Tests default-branch resolution priority for origin/HEAD symbolic refs.
@@ -784,14 +815,18 @@
                                            :files   {"a.txt" "a\n"}}])
           ctx-b (git/create-null-context [{:message "only in B"
                                            :files   {"b.txt" "b\n"}}])]
-      (testing "ctx-a sees only its own commit history"
-        (is (str/includes?
-             (:git.commit/subject (first (git/log ctx-a {})))
-             "only in A")))
-      (testing "ctx-b sees only its own commit history"
-        (is (str/includes?
-             (:git.commit/subject (first (git/log ctx-b {})))
-             "only in B")))
-      (testing "ctx-a does not see ctx-b commits"
-        (is (not (some #(str/includes? (:git.commit/subject %) "only in B")
-                       (git/log ctx-a {}))))))))
+      (try
+        (testing "ctx-a sees only its own commit history"
+          (is (str/includes?
+               (:git.commit/subject (first (git/log ctx-a {})))
+               "only in A")))
+        (testing "ctx-b sees only its own commit history"
+          (is (str/includes?
+               (:git.commit/subject (first (git/log ctx-b {})))
+               "only in B")))
+        (testing "ctx-a does not see ctx-b commits"
+          (is (not (some #(str/includes? (:git.commit/subject %) "only in B")
+                         (git/log ctx-a {})))))
+        (finally
+          (delete-recursively! (:repo-dir ctx-a))
+          (delete-recursively! (:repo-dir ctx-b)))))))
