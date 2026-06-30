@@ -255,6 +255,27 @@ status are enumerated directly in the design-steps.md item text — no need
 to re-derive; re-grep `temp-cwd\|temp-session-root` under `components/` only
 if design.md or the caller set may have changed since this pass.
 
+## Plan-review ambiguity turn — blocked, no plan.md/steps.md yet
+
+Invoked as the ambiguity turn of a `plan-review` session, but this task has
+no `plan.md`/`steps.md` (only `design.md`, `design-steps.md`,
+`implementation.md` exist) — there is nothing to review for plan/steps
+ambiguity. This is the expected gated state, not a missing-artifact bug:
+`task-lifecycle.edn`'s `check-scope-question-status` step
+(`workflow/scope-question-gate-routing` over `design-steps.md`) halts the
+lifecycle before `create-task-plan` runs whenever an unchecked
+`SCOPE_QUESTION:` item remains in `design-steps.md`. Line 10's
+`SCOPE_QUESTION` (AC1 in-scope-file-list exhaustive-vs-illustrative
+question) is still open, so `create-task-plan` has never run for this task.
+
+No design-steps.md edit made (nothing new to add — the existing open
+SCOPE_QUESTION already fully explains the block; resolution is: a human
+decides that question, checks it off in `design-steps.md` with rationale
+recorded in `design.md`, then re-invokes `task-lifecycle`, which re-scans
+the gate and proceeds to `create-task-plan` on its own).
+
+- plan-review ambiguity turn: blocked — plan.md/steps.md do not exist yet (task-lifecycle's SCOPE_QUESTION gate has not cleared); no plan/steps content to review
+
 ## Design follow-up pass 2 (this pass)
 
 Review-batch segment identified: commits `fc5505e64` (architecture, pass 2)
