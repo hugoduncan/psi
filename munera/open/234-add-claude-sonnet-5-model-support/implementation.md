@@ -16,3 +16,9 @@ Verification update:
 - `bb test:ai --focus psi.ai.model-registry-test --focus psi.ai.providers.anthropic-models-api-test` → green: 153 tests, 1095 assertions, 0 failures. This covers the model registry tests and the Anthropic Models API default ungated skip path.
 - `bb lint` → repository lint task exited 2 from pre-existing repo-wide warnings/unresolved vars in unrelated files (`workflow_delegate_review_step_live_test.clj`, `extensions/dev-http/test/extensions/dev_http_test.clj`); no errors reported.
 - `clj-kondo --lint components/ai/src components/ai/test` → clean: errors 0, warnings 0.
+
+2026-06-26 follow-up slice: synchronized task checklist after reviewing committed implementation state.
+- Confirmed implementation commit exists: `31d93c55c ⚒ add Claude Sonnet 5 model support`.
+- Marked previously stale Slice 1 discovery checklist items complete because the catalog/tests/docs commit already used and recorded the resolved Claude Sonnet 5 facts in this file.
+- Marked Anthropic Models API default ungated skip-path verification complete based on the recorded focused AI test command.
+- No production/test/doc code changes in this follow-up slice; optional live Anthropic verification remains manual/not run without credentials.

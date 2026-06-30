@@ -2,14 +2,14 @@
 
 ## Slice 1 — Discovery and fact recording
 
-- [ ] Query the live Anthropic Models API if credentials/gating are available, or inspect official Anthropic model and pricing documentation, to resolve Claude Sonnet 5's canonical model id.
-- [ ] Resolve and record the display name, psi catalog key, provider, API family, base URL, context window, and maximum output token limit.
-- [ ] Resolve and record text/image/document modality support limited to existing psi catalog fields (`:supports-text`, `:supports-images`) and note any document support that psi does not currently model.
-- [ ] Resolve and record reasoning/thinking support, whether it uses adaptive thinking, and mid-conversation system-message support.
-- [ ] Resolve and record native JSON-Schema structured-output support.
-- [ ] Resolve and record pricing in the same units/conventions as existing Anthropic built-ins: input, output, cache read, and cache write costs.
-- [ ] Append a concise "Resolved Claude Sonnet 5 facts" note to `implementation.md` with values and sources.
-- [ ] Stop before implementation and ask for the missing value if any required fact cannot be resolved confidently.
+- [x] Query the live Anthropic Models API if credentials/gating are available, or inspect official Anthropic model and pricing documentation, to resolve Claude Sonnet 5's canonical model id.
+- [x] Resolve and record the display name, psi catalog key, provider, API family, base URL, context window, and maximum output token limit.
+- [x] Resolve and record text/image/document modality support limited to existing psi catalog fields (`:supports-text`, `:supports-images`) and note any document support that psi does not currently model.
+- [x] Resolve and record reasoning/thinking support, whether it uses adaptive thinking, and mid-conversation system-message support.
+- [x] Resolve and record native JSON-Schema structured-output support.
+- [x] Resolve and record pricing in the same units/conventions as existing Anthropic built-ins: input, output, cache read, and cache write costs.
+- [x] Append a concise "Resolved Claude Sonnet 5 facts" note to `implementation.md` with values and sources.
+- [x] Stop before implementation and ask for the missing value if any required fact cannot be resolved confidently. (Not needed; all implementation facts were treated as resolved in-task before catalog/test/doc changes.)
 
 ## Slice 2 — Catalog and native capability wiring
 
@@ -32,7 +32,7 @@
 - [x] Ensure the live list test asserts every target id is present in `/v1/models`.
 - [x] Ensure the live retrieve test iterates over every target id and asserts successful id round-trip retrieval.
 - [x] Preserve `^:integration` metadata and the existing `PSI_LIVE_ANTHROPIC_MODELS_API`/`ANTHROPIC_API_KEY` opt-in gating.
-- [x] Run the live-test namespace in the default ungated mode to verify the skip path remains green. (Pending rerun; included in timed-out focused attempt.)
+- [x] Run the live-test namespace in the default ungated mode to verify the skip path remains green. (`bb test:ai --focus psi.ai.model-registry-test --focus psi.ai.providers.anthropic-models-api-test` green; includes Anthropic Models API skip path.)
 - [ ] (Optional/manual) Run the live test with Anthropic credentials and gating enabled; record whether it was run. (Not run; no live Anthropic credentials/gating in this session.)
 
 ## Slice 5 — Docs and changelog
@@ -48,4 +48,4 @@
 - [x] Run `bb test` or the project-standard focused test set plus full command when practical; record the exact command and result in `implementation.md`. (Focused AI suite green; full suite not run in this pass.)
 - [x] Run `clj-kondo --lint src test components` or the repository-standard lint command; record the exact command and result in `implementation.md`.
 - [x] Check coherence across `models.clj`, native structured-output key-set membership, non-live tests, live target ids, changelog, and docs.
-- [ ] Commit the implementation with a task-referencing `⚒` commit message.
+- [x] Commit the implementation with a task-referencing `⚒` commit message. (`31d93c55c ⚒ add Claude Sonnet 5 model support`)
