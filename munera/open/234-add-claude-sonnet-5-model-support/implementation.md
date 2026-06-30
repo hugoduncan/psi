@@ -39,3 +39,5 @@ Verification update:
 - Extended `psi.ai.model-selection-test/resolve-selection-test` to resolve `claude-sonnet-5` through `resolve-selection` in explicit built-in selection mode and assert the selected Anthropic candidate metadata.
 - Ran `bb test:ai --focus psi.ai.model-selection-test` → green: 153 tests, 1102 assertions, 0 failures.
 - addressed 1 review step.
+
+2026-06-26 test review: added 0 steps.
