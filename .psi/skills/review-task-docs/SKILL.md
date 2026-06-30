@@ -1,19 +1,19 @@
 ---
 name: review-task-docs
 description: Reviews user-facing documentation changes for an implemented Munera task
-lambda: "λtask. review(user_facing_docs) ∧ check(README ∧ doc/ ∧ changelog) ∧ verify(accuracy ∧ completeness ∧ consistency)"
+lambda: "λtask. review(user_facing_docs) ∧ check(README ∧ doc ∧ ramora/ ∧ changelog) ∧ verify(accuracy ∧ completeness ∧ consistency)"
 advertise: false
 ---
 
 # review-task-docs
 
-λtask. review(user_facing_docs) ∧ check(README ∧ doc/ ∧ changelog) ∧ verify(accuracy ∧ completeness ∧ consistency)
+λtask. review(user_facing_docs) ∧ check(README ∧ doc ∧ ramora/ ∧ changelog) ∧ verify(accuracy ∧ completeness ∧ consistency)
 
 ## Review checklist
 
 For the implemented Munera task, review all user-facing documentation:
 
-1. **New/changed behaviours**: Are all new or changed behaviours reflected in `README.md` and `doc/`?
+1. **New/changed behaviours**: Are all new or changed behaviours reflected in `README.md` and `ramora/`?
 2. **Removed behaviours**: Are removed behaviours cleaned up from docs (no stale references)?
 3. **Changelog**: When `CHANGELOG.md` exists, is `CHANGELOG.md` updated if the change is user-visible (commands, flags, behaviours, breaking changes, bug fixes, extension capabilities)?
 4. **Examples**: Are any examples in docs accurate and consistent with the implementation?
@@ -22,7 +22,8 @@ For the implemented Munera task, review all user-facing documentation:
 ## Scope
 
 - `README.md` — primary user documentation
-- `doc/` — guides, references, workflow docs
+- `doc/` — user facing guides and references
+- `ramora/` — AI facing docs
 - `CHANGELOG.md` — user-visible change log (only if user-visible change)
 - Any other user-facing `.md` files referenced from the above
 
