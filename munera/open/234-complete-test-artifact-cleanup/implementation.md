@@ -12,3 +12,14 @@ AGENTS.md's skill list), not the VSM docs.
   fixture idea conflicts with the project's "no use-fixtures" testing
   standard; flagged so later plan/steps work picks a `with-xxx`-style
   alternative instead.
+
+Ambiguity review: `test_support.clj`'s `temp-cwd`/`temp-session-root` use two
+distinct prefixes ("psi-agent-session-test-" and "psi-agent-session-store-"),
+not the single "psi-agent-session" prefix the Context section names — noted
+here for the inconsistency pass rather than re-raised as ambiguity, since
+it's a factual mismatch with the code, not a multi-reading wording issue.
+
+- ambiguity review added 2 new design steps: whether the OS-level temp-dir
+  auto-cleanup mention is required or optional, and what AC1's verification
+  protocol (single vs. repeated `bb test` runs; scope of "test repo
+  directory") actually requires.
