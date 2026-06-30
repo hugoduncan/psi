@@ -70,3 +70,37 @@ re-derive):
 - Relevant non-task reference: `.psi/skills/clojure-coding-standards/SKILL.md`
   ("No use-fixtures" rule) — cite this, not the VSM docs, when resolving the
   ARCHITECTURE step.
+
+## Design follow-up pass (this pass)
+
+Review-batch segment identified: commits `a7906538e` (architecture) →
+`b84e4c5af` (ambiguity) → `6c29d3db9` (inconsistency); baseline =
+`a7906538e^` (`48f0ff0f3`). `design-steps.md` was created fresh in that
+segment (`git diff a7906538e^..HEAD -- design-steps.md` shows the whole file
+as new), so all 6 checklist items qualified as in-batch candidate work; none
+were `SCOPE_QUESTION:`. All 6 resolved by editing `design.md`; no plan.md/
+steps.md exist yet, so this was wording-only, no code changed.
+
+Resolutions applied to `design.md`:
+- Context: split the single `psi-agent-session` line into the two literal
+  prefixes (`psi-agent-session-test-`, `psi-agent-session-store-`); prefix
+  count is now **10**, not 9 — updated in AC3 and Out-of-Scope wording too.
+  Any future step referencing "9 prefixes" is stale; the design now says 10.
+- AC1: clarified single-`bb test`-run scope, defined "test repo directory"
+  as temp git repos created by tests (excludes the project's own working
+  repo), and explicitly deferred the repeated-run non-accumulation property
+  to Constraints (not duplicated in AC1).
+- AC3: dropped option (c) (test removal) per implementation.md's prior
+  resolution guidance — only (a) false-positive or (b) fixed-with-cleanup
+  remain. If a later step finds a prefix's test is genuinely obsolete, that
+  is now out of this design's frozen acceptance criteria and would need a
+  separate scope decision, not an AC3(c) shortcut.
+- In-Scope `test_support.clj` item: replaced the `Files/deleteIfExists`
+  example with `delete-recursively!`, and made any extra safety-net helper
+  explicitly optional (not required if per-caller `finally` cleanup alone
+  satisfies the ACs).
+- Key Question 3: reworded away from "`:each` fixture" to a
+  `with-xxx`-style/explicit-call safety-net sweep, ruling out
+  `clojure.test/use-fixtures :each` per `clojure-coding-standards`.
+
+No SCOPE_QUESTION items were present this pass.

@@ -16,7 +16,8 @@ We are partway through rectifying test artifact cleanup. The following prefixes 
 - `feature-rebase` — in `git_test.clj`, linked worktree path
 - `fix-repeated-thinking` — in `query_graph_test.clj` and `work_on_test.clj`, branch names and worktree paths
 - `legacy-create-branch` — in `git_test.clj`, linked worktree path
-- `psi-agent-session` — in `test_support.clj`, `temp-cwd` and `temp-session-root` create OS temp dirs
+- `psi-agent-session-test-` — in `test_support.clj`, `temp-cwd` creates OS temp dirs
+- `psi-agent-session-store-` — in `test_support.clj`, `temp-session-root` creates OS temp dirs
 
 ### Root Cause Analysis
 
@@ -44,9 +45,9 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 
 ## Acceptance Criteria
 
-1. **No leaked temp directories**: After running the full test suite, no directories matching the listed prefixes exist under `/tmp/` or any test repo directory.
+1. **No leaked temp directories**: After a single `bb test` run, no directories matching the listed prefixes exist under `/tmp/` (or the OS temp dir) or under any temporary git repository directory created by a test (e.g. via `with-null-context`, `temp-cwd`, or `temp-session-root`) — the project's own working repository is excluded. The repeated-run non-accumulation property (running `bb test` a second time in succession must show the same result) is a separate check, already covered by Constraints, not a re-statement of this criterion.
 2. **No leaked git worktrees**: After running the full test suite, `git worktree list` shows no test-created worktrees (only the real project worktrees).
-3. **All listed prefixes addressed**: Each of the 9 prefixes is either (a) confirmed not to leak (false positive), (b) fixed with proper cleanup, or (c) removed if the test is no longer needed.
+3. **All listed prefixes addressed**: Each of the 10 prefixes is either (a) confirmed not to leak (false positive), or (b) fixed with proper cleanup.
 4. **Tests pass**: `bb test` passes with no regressions.
 5. **Lint clean**: `clj-kondo --lint src test` passes on changed files.
 
@@ -54,12 +55,12 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 
 ### In Scope
 - `components/history/test/psi/history/git_test.clj` — verify `linked-worktree-path` worktrees are cleaned by `with-null-context` finally; fix any gaps.
-- `components/agent-session/test/psi/agent_session/test_support.clj` — ensure `temp-cwd` and `temp-session-root` callers always clean up; consider adding OS-level temp dir auto-cleanup (e.g., `Files/deleteIfExists` in finally).
+- `components/agent-session/test/psi/agent_session/test_support.clj` — ensure `temp-cwd` and `temp-session-root` callers always clean up via `delete-recursively!` in a `finally`. Optionally, a `with-xxx`-style helper that wraps creation and `delete-recursively!` cleanup may be added as a safety net; this is not required in-scope work if per-caller `finally` cleanup alone satisfies the acceptance criteria.
 - `components/agent-session/test/psi/agent_session/query_graph_test.clj` — verify `ext-mutation-worktree-` and `fix-repeated-thinking-output-` worktrees are cleaned by the test's finally block.
 - `extensions/work-on/test/extensions/work_on_test.clj` — confirm `fix-repeated-thinking-output` references are assertion-only (no real artifacts).
 
 ### Out of Scope
-- Other test artifact cleanup not involving these 9 prefixes.
+- Other test artifact cleanup not involving these 10 prefixes.
 - Changing test logic or assertions.
 - Adding new tests (only fix cleanup in existing tests).
 
@@ -67,4 +68,4 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 
 1. Are the `linked-worktree-path` worktrees actually leaking, or is the `with-null-context` finally already cleaning them? Need to verify by running tests and checking for leftover dirs.
 2. For `temp-cwd` / `temp-session-root`: which callers fail to clean up? Is it a missing `finally` in a specific test, or a systemic issue where `safe-context-opts` creates a default `temp-cwd` that callers don't track?
-3. Should we add an `:each` fixture that sweeps known temp prefixes after every test, as a safety net?
+3. Should we add a safety-net sweep of known temp prefixes after every test? Per `clojure-coding-standards` ("No use-fixtures — prefer `with-xxx` macros for setup/teardown"), any such sweep must be a `with-xxx`-style macro or explicit-call mechanism, not `clojure.test/use-fixtures :each`.
