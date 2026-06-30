@@ -375,3 +375,23 @@ design's own root-cause analysis (Patterns A-D are all local
 finally-block/cleanup-path gaps, not structural issues).
 
 - no architectural review feedback (pass 4)
+
+## Design-review pass 4 — ambiguity turn
+
+Used the already-loaded `design.md`/`design-steps.md` from the shared
+session context (unchanged since the pass-4 architecture turn). No targeted
+re-read needed — ambiguity review is wording-only against `design.md`
+itself, not the architecture sources. Re-checked candidate wording spots
+flagged-but-not-filed by prior passes (AC1's git-repo-directory
+parenthetical, Goal's "every test" breadth vs. Scope's 4-file/10-prefix
+boundary) — both remain non-actionable for the reasons already recorded in
+pass-2/pass-3 notes above (the parenthetical is harmless per the other AC1
+branch; the Goal/Scope breadth gap is the same underlying concern as the
+filed `SCOPE_QUESTION`, not a new wording ambiguity). Also checked AC2
+("After running the full test suite, no test-created worktrees") against
+AC1's explicit single-run scoping for a possible single-vs-repeated-run gap;
+Constraints already states the repeated-run non-accumulation property
+covers both "temp directories *or worktree artifacts*", so AC2's
+single-run reading parallels AC1's and isn't a fresh ambiguity.
+
+- no ambiguity review feedback (pass 4)
