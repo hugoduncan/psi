@@ -33,3 +33,4 @@ Verification update:
 - Native JSON-Schema structured-output support: Anthropic structured output documentation, `https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency`, accessed 2026-06-26; used for Claude family JSON-Schema/tool-schema constrained output support represented in psi as `:anthropic/json-schema-output`.
 - Pricing: Anthropic pricing documentation, `https://docs.anthropic.com/en/docs/about-claude/pricing`, accessed 2026-06-26; Claude Sonnet 5 / Sonnet tier values recorded in psi catalog units: input 3.0, output 15.0, cache read 0.3, cache write 3.75.
 - addressed 1 review step.
+2026-06-26 test review: added 1 step to be addressed.
