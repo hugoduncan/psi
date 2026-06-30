@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is testing]]))
 
 (def ^:private models-url "https://api.anthropic.com/v1/models")
-(def ^:private target-model-ids #{"claude-opus-4-8" "claude-fable-5"})
+(def ^:private target-model-ids #{"claude-opus-4-8" "claude-fable-5" "claude-sonnet-5"})
 (def ^:private anthropic-version "2023-06-01")
 
 (defn- enabled?

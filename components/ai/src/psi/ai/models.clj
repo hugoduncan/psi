@@ -202,7 +202,25 @@
     :input-cost 10.0
     :output-cost 50.0
     :cache-read-cost 1.0
-    :cache-write-cost 12.5}})
+    :cache-write-cost 12.5}
+
+   :sonnet-5
+   {:id "claude-sonnet-5"
+    :name "Claude Sonnet 5"
+    :provider :anthropic
+    :api :anthropic-messages
+    :base-url "https://api.anthropic.com"
+    :supports-reasoning true
+    :adaptive-thinking true
+    :supports-mid-conversation-system-messages true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 3.0
+    :output-cost 15.0
+    :cache-read-cost 0.3
+    :cache-write-cost 3.75}})
 
 (def openai-models
   {:gpt-4o
@@ -612,7 +630,8 @@
     :haiku-4.5
     :opus-4.7
     :opus-4.8
-    :fable-5})
+    :fable-5
+    :sonnet-5})
 
 (defn- built-in-structured-output-capability
   [model-key model]
