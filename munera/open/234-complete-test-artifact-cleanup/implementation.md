@@ -211,3 +211,29 @@ design-steps.md entry): the 13 un-listed caller files and their cleanup
 status are enumerated directly in the design-steps.md item text — no need
 to re-derive; re-grep `temp-cwd\|temp-session-root` under `components/` only
 if design.md or the caller set may have changed since this pass.
+
+## Design follow-up pass 2 (this pass)
+
+Review-batch segment identified: commits `fc5505e64` (architecture, pass 2)
+→ `306fd0ec7` (ambiguity, pass 2) → `ac3f63c46` (inconsistency, pass 2);
+baseline = `fc5505e64^` (`6406a1188`, the prior follow-up-pass resolution
+commit). `git diff fc5505e64^..HEAD -- design-steps.md` shows exactly 2
+added lines: the INCONSISTENCY (`git_test.clj`→`git_worktree_test.clj`) and
+the SCOPE_QUESTION item — both still unchecked at this pass's start, both
+in-batch, neither pre-existing/stale.
+
+- INCONSISTENCY item: resolved by editing `design.md`. Replaced
+  `git_test.clj` with `git_worktree_test.clj` in: Context's six
+  worktree-prefix bullets (`existing-path`, `feature-attached`,
+  `feature-diverged`, `feature-merge`, `feature-rebase`,
+  `legacy-create-branch`), the "Pattern A" heading/body, and the In-Scope
+  bullet's file path. Verified against current source before editing:
+  `linked-worktree-path` (~L57) and `with-null-context` (~L65) are defined
+  in `git_worktree_test.clj`, and all six prefixes appear only there
+  (confirmed `feature-diverged` at ~L474, others nearby per pass-2 review
+  notes above). `git_test.clj`'s own docstring (~L1-9) confirms the split.
+  Key Question 1 and AC1 reference `linked-worktree-path`/
+  `with-null-context` without naming a file, so they needed no edit.
+- SCOPE_QUESTION item: left unchecked, per task instructions — scope-
+  boundary correctness is deferred to the user/human, not resolved by
+  editing design.md.

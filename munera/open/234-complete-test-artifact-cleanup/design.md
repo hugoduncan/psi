@@ -9,13 +9,13 @@ Eliminate all remaining test artifact prefixes that are not being deleted after 
 We are partway through rectifying test artifact cleanup. The following prefixes are known to leak:
 
 - `ext-mutation-worktree` — in `query_graph_test.clj`, worktree path created under `repo-dir/worktrees/`
-- `existing-path` — in `git_test.clj`, linked worktree path
-- `feature-attached` — in `git_test.clj`, linked worktree paths (src + target)
-- `feature-diverged` — in `git_test.clj`, linked worktree path
-- `feature-merge` — in `git_test.clj`, linked worktree paths (merge, merge-ff, merge-no-ff)
-- `feature-rebase` — in `git_test.clj`, linked worktree path
+- `existing-path` — in `git_worktree_test.clj`, linked worktree path
+- `feature-attached` — in `git_worktree_test.clj`, linked worktree paths (src + target)
+- `feature-diverged` — in `git_worktree_test.clj`, linked worktree path
+- `feature-merge` — in `git_worktree_test.clj`, linked worktree paths (merge, merge-ff, merge-no-ff)
+- `feature-rebase` — in `git_worktree_test.clj`, linked worktree path
 - `fix-repeated-thinking` — in `query_graph_test.clj` and `work_on_test.clj`, branch names and worktree paths
-- `legacy-create-branch` — in `git_test.clj`, linked worktree path
+- `legacy-create-branch` — in `git_worktree_test.clj`, linked worktree path
 - `psi-agent-session-test-` — in `test_support.clj`, `temp-cwd` creates OS temp dirs
 - `psi-agent-session-store-` — in `test_support.clj`, `temp-session-root` creates OS temp dirs
 
@@ -23,7 +23,7 @@ We are partway through rectifying test artifact cleanup. The following prefixes 
 
 There are two distinct leak patterns:
 
-**Pattern A: `linked-worktree-path` in `git_test.clj`**
+**Pattern A: `linked-worktree-path` in `git_worktree_test.clj`**
 The `linked-worktree-path` helper creates paths under `repo-dir/worktrees/<name>-<uuid>`. The `with-null-context` macro cleans up `:repo-dir` recursively in its `finally`, which should include the worktrees subdirectory. However, if a test creates a worktree via `git/worktree-add` and then the test throws before reaching the `finally`, or if the worktree is outside the `repo-dir` tree, cleanup fails. Need to verify: are all `linked-worktree-path` worktrees actually under `repo-dir`? If so, the `delete-recursively!` in `with-null-context` should handle them — the leak may be in tests that don't use `with-null-context` or that have early returns/exceptions.
 
 **Pattern B: `Files/createTempDirectory` in `test_support.clj`**
@@ -54,7 +54,7 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 ## Scope
 
 ### In Scope
-- `components/history/test/psi/history/git_test.clj` — verify `linked-worktree-path` worktrees are cleaned by `with-null-context` finally; fix any gaps.
+- `components/history/test/psi/history/git_worktree_test.clj` — verify `linked-worktree-path` worktrees are cleaned by `with-null-context` finally; fix any gaps.
 - `components/agent-session/test/psi/agent_session/test_support.clj` — ensure `temp-cwd` and `temp-session-root` callers always clean up via `delete-recursively!` in a `finally`. Optionally, a `with-xxx`-style helper that wraps creation and `delete-recursively!` cleanup may be added as a safety net; this is not required in-scope work if per-caller `finally` cleanup alone satisfies the acceptance criteria.
 - `components/agent-session/test/psi/agent_session/query_graph_test.clj` — verify `ext-mutation-worktree-` and `fix-repeated-thinking-output-` worktrees are cleaned by the test's finally block.
 - `extensions/work-on/test/extensions/work_on_test.clj` — confirm `fix-repeated-thinking-output` references are assertion-only (no real artifacts).
