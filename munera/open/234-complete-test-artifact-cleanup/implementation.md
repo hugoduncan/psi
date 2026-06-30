@@ -350,3 +350,28 @@ mid-file rather than appending at the end (e.g. the pass-2/pass-3 turn
 write-ups interleave). Section headers self-identify the pass/turn; rely on
 those and on git history (`git log -- design-steps.md`), not file position,
 to reconstruct order.
+
+## Design-review pass 4 — architecture turn
+
+`design.md` unchanged since the pass-3 follow-up resolution (commit
+`288451216`, the AC5 lint-scope wording fix) — that edit was wording-only
+(clarified AC5's changed-files-only reading) and introduces no new
+architectural surface. Re-checked against AGENTS.md (VSM layers,
+change_chain, `λfix(bug)` local-vs-structural guidance), `ramora/META.md`,
+`doc/architecture.md`, and `clojure-coding-standards`: task remains
+test-infrastructure-only (finally-block cleanup in existing tests under
+`history`, `agent-session`, `work-on`), touches no production code,
+dispatch, the atom, or any S1-S5 layer — `doc/architecture.md`'s
+component/adapter-convergence material doesn't apply. Confirmed the
+design's optional `with-xxx`-style safety-net helper (if added to
+`test_support.clj`) fits the project's actual macro-placement convention —
+existing `with-xxx` macros are defined per-test-file (`with-temp-dir`,
+`with-user-dir`, `with-null-context`) while `test_support.clj` already
+holds shared plain-function helpers (`temp-cwd`, `temp-session-root`,
+`delete-recursively!`); a shared `with-xxx` macro there would be a natural,
+non-divergent home, not a new pattern. The frozen scope's cleanup-only
+intent (`λfix(bug)`: local cause → patch, not redesign) matches the
+design's own root-cause analysis (Patterns A-D are all local
+finally-block/cleanup-path gaps, not structural issues).
+
+- no architectural review feedback (pass 4)
