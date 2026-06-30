@@ -250,3 +250,23 @@ matches the "no use-fixtures, prefer with-xxx" standard from the prior
 pass's fix.
 
 - no architectural review feedback
+
+## Design-review pass 3 — ambiguity turn
+
+Used the already-loaded `design.md`/`design-steps.md` from the shared
+session context (unchanged since the pass-3 architecture turn). Re-checked
+each design-steps.md item's claims for currency (e.g. `safe-context-opts`
+still has ~20+ real call sites project-wide, consistent with the open
+SCOPE_QUESTION's evidentiary basis — no targeted re-read needed there).
+
+Finding (actionable, new): AC5 ("`clj-kondo --lint src test` passes on
+changed files") is ambiguous between (a) running the literal whole-tree
+command and requiring it to pass outright, vs (b) only requiring no new
+lint findings in this task's changed files, tolerating pre-existing
+unrelated issues elsewhere. Confirmed via `bb.edn`'s `lint` task
+(`clojure -M:lint`) that the project's own lint tooling has no
+changed-files-only mode, so "on changed files" can't be read as a literal
+invocation detail — it must be doing scoping work, and which reading
+applies isn't stated.
+
+- ambiguity review added 1 new design step
