@@ -59,4 +59,4 @@
 
 ## Test-shaper follow-up
 
-- [ ] Add a public command-path test proving `/model anthropic claude-sonnet-5` selects Claude Sonnet 5 and persists the session model, so the new built-in is covered at the same user-facing selection boundary as existing `/model` command tests rather than only at registry/model-selection helper layers.
+- [x] Add a public command-path test proving `/model anthropic claude-sonnet-5` selects Claude Sonnet 5 and persists the session model, so the new built-in is covered at the same user-facing selection boundary as existing `/model` command tests rather than only at registry/model-selection helper layers.

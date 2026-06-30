@@ -405,6 +405,15 @@
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
 
+(deftest dispatch-model-set-claude-sonnet-5-test
+  (let [[ctx session-id] (make-test-ctx)
+        result     (commands/dispatch-in ctx session-id "/model anthropic claude-sonnet-5" cmd-opts)
+        session    (ss/get-session-data-in ctx session-id)]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "✓ Model set to"))
+    (is (= "anthropic" (get-in session [:model :provider])))
+    (is (= "claude-sonnet-5" (get-in session [:model :id])))))
+
 (deftest dispatch-model-invalid-arity-test
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai" cmd-opts)]

@@ -43,3 +43,9 @@ Verification update:
 2026-06-26 test review: added 0 steps.
 
 2026-06-26 test-shaper review: added 1 step to be addressed.
+
+2026-06-26 test-shaper follow-up: added public `/model` command-path coverage for Claude Sonnet 5.
+- Extended `psi.agent-session.commands-test` to dispatch `/model anthropic claude-sonnet-5` and assert the session model persists with provider `anthropic` and id `claude-sonnet-5`.
+- `bb test:agent-session --focus psi.agent-session.commands-test` could not run because no such Babashka task exists (`File does not exist: test:agent-session`).
+- Ran `bb test --focus psi.agent-session.commands-test` → command completed successfully.
+- addressed 1 review step.
