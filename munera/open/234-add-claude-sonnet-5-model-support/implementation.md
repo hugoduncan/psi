@@ -22,3 +22,5 @@ Verification update:
 - Marked previously stale Slice 1 discovery checklist items complete because the catalog/tests/docs commit already used and recorded the resolved Claude Sonnet 5 facts in this file.
 - Marked Anthropic Models API default ungated skip-path verification complete based on the recorded focused AI test command.
 - No production/test/doc code changes in this follow-up slice; optional live Anthropic verification remains manual/not run without credentials.
+
+2026-06-26 implementation review: added 1 step to be addressed.

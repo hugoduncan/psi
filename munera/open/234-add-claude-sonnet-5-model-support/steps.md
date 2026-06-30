@@ -42,6 +42,10 @@
 - [x] Update only definitive enumerations that are incomplete or misleading; leave illustrative examples unchanged.
 - [x] Re-read edited docs/changelog for consistency with the resolved model facts.
 
+## Review follow-up
+
+- [ ] Record the authoritative Claude Sonnet 5 discovery sources in `implementation.md` for the resolved canonical id, capability, limits, and pricing facts; the current implementation note records values but not the sources required by the design.
+
 ## Slice 6 — Verification and final coherence
 
 - [x] Run focused AI tests covering model registry, structured output, and Anthropic Models API skip-path coverage.
