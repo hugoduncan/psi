@@ -521,3 +521,14 @@ still open, so `create-task-plan` has not run. No plan/steps content exists
 to review for ambiguity. No `design-steps.md` edit made.
 
 - plan-review ambiguity turn: blocked — plan.md/steps.md do not exist yet (same open SCOPE_QUESTION gate); no plan/steps content to review
+
+## Plan-review inconsistency turn — same block, no new state (re-invocation)
+
+Second turn of the same `plan-review` session as the ambiguity turn above;
+HEAD unchanged (`11cb239e1`). `plan.md`/`steps.md` still do not exist, same
+open `SCOPE_QUESTION` gate. No plan/steps content exists to cross-check
+against design.md/design-steps.md for inconsistency. No targeted re-read
+performed — nothing changed since the ambiguity turn that would warrant
+one. No `design-steps.md` edit made.
+
+- plan-review inconsistency turn: blocked — plan.md/steps.md do not exist yet (same open SCOPE_QUESTION gate); no plan/steps content to review
