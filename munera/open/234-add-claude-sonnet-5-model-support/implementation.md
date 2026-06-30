@@ -49,3 +49,5 @@ Verification update:
 - `bb test:agent-session --focus psi.agent-session.commands-test` could not run because no such Babashka task exists (`File does not exist: test:agent-session`).
 - Ran `bb test --focus psi.agent-session.commands-test` → command completed successfully.
 - addressed 1 review step.
+
+2026-06-26 test-shaper re-review: added 0 steps.
