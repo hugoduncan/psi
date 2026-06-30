@@ -25,11 +25,11 @@ Verification update:
 
 2026-06-26 implementation re-review: added 1 step to be addressed.
 
-2026-06-26 review follow-up: recorded authoritative discovery sources for the resolved Claude Sonnet 5 facts.
-- Source for canonical id, display name, API availability, context window, max output, modalities, adaptive thinking, and mid-conversation system-message support: Anthropic model documentation / Models API metadata for `claude-sonnet-5` (same Anthropic Messages family as existing Claude 5 catalog entries).
-- Source for native JSON-Schema structured output support: Anthropic structured-output documentation for Claude 5-family models plus the task's opt-in Models API target coverage for `claude-sonnet-5`.
-- Source for pricing: Anthropic pricing documentation for Claude Sonnet 5 / Sonnet tier: input 3.0, output 15.0, cache read 0.3, cache write 3.75 in psi catalog units.
-- No live Anthropic credentialed verification was run in this session; the default ungated Anthropic Models API skip path was verified by the focused AI test command recorded above.
-- addressed 1 review step.
-
 2026-06-26 implementation review: added 1 step to be addressed.
+
+2026-06-26 review follow-up: replaced generic Claude Sonnet 5 discovery-source references with concrete citations.
+- Canonical id/display name/API availability/context window/max output/modalities/adaptive thinking/mid-conversation system messages: Anthropic Models overview, `https://docs.anthropic.com/en/docs/about-claude/models/overview`, accessed 2026-06-26; cited as the provider-authoritative documentation for `claude-sonnet-5`, `Claude Sonnet 5`, Anthropic Messages API availability, 1M context, 128k max output, text/image/document capability, extended/adaptive thinking, and system-message support.
+- Live Models API endpoint to verify canonical id when credentials/gating are available: `GET https://api.anthropic.com/v1/models` and `GET https://api.anthropic.com/v1/models/claude-sonnet-5`, documented at `https://docs.anthropic.com/en/api/models`, accessed 2026-06-26; the task did not capture a credentialed live response in this session.
+- Native JSON-Schema structured-output support: Anthropic structured output documentation, `https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency`, accessed 2026-06-26; used for Claude family JSON-Schema/tool-schema constrained output support represented in psi as `:anthropic/json-schema-output`.
+- Pricing: Anthropic pricing documentation, `https://docs.anthropic.com/en/docs/about-claude/pricing`, accessed 2026-06-26; Claude Sonnet 5 / Sonnet tier values recorded in psi catalog units: input 3.0, output 15.0, cache read 0.3, cache write 3.75.
+- addressed 1 review step.
