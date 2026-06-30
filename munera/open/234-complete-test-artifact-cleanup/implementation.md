@@ -418,3 +418,29 @@ artifacts, and the count/file attribution (2 files, 1 underlying name) is
 unaffected — purely a harmless abbreviation, not a verification gap.
 
 - no inconsistency review feedback (pass 4)
+
+## Notes for resolving the design-steps after this slice (pass 4)
+
+Pass 4 (architecture/ambiguity/inconsistency) added **zero** new
+design-steps. The only remaining open item in `design-steps.md` is the
+pre-existing `SCOPE_QUESTION` (line 10, filed in the pass-2 batch) — no
+checklist edits are needed before the next slice; there is nothing new to
+resolve by editing `design.md`.
+
+Principle to hold (unchanged, restated for this slice since it's the only
+live item): the `SCOPE_QUESTION` is **not** resolvable by editing
+`design.md` — scope-boundary correctness is deferred to the user/human per
+`mementum`'s approval-gate model. Leave it open/unchecked; do not pick an
+interpretation (exhaustive vs. illustrative In-Scope file list) and edit
+scope to match, and do not re-raise variants of this same boundary concern
+in later passes (already enforced across passes 2-4 — no recurrence so
+far).
+
+Full resolution context for this item (evidence, caller-file list,
+reasoning) is already recorded once, in full, in the pass-2 "Design follow-
+up pass 2" and "Notes for resolving the 2 open design-steps" sections
+above — not repeated here. The design-steps.md item text itself (line 10)
+is also self-contained (lists all 13 caller files inline); no external
+project file beyond `components/agent-session/test/psi/agent_session/test_support.clj`
+(`temp-cwd`/`temp-session-root` definitions) is needed to act on it once a
+human decides the scope question.
