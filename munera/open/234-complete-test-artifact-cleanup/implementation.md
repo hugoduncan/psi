@@ -154,3 +154,36 @@ Functionally harmless (both branches end up covering the same dirs), so
 likely not actionable, but worth the inconsistency pass checking.
 
 - ambiguity review added 1 new design step (SCOPE_QUESTION)
+
+## Design-review pass 2 — inconsistency turn
+
+Used the already-loaded `design.md`/`design-steps.md` from the shared
+session context (unchanged since the architecture turn). Targeted re-read:
+followed up on the ambiguity-turn breadcrumb (AC1's git-repo-directory
+parenthetical) and independently checked the Context/In-Scope file
+attributions for the six worktree prefixes against actual `components/
+history/test/psi/history/` source.
+
+Finding (actionable): Context and the In-Scope bullet both name
+`git_test.clj` as the home of `linked-worktree-path`, `with-null-context`,
+and the six worktree prefixes (`existing-path`, `feature-attached`,
+`feature-diverged`, `feature-merge`, `feature-rebase`,
+`legacy-create-branch`). All of that actually lives in
+`git_worktree_test.clj` — `git_test.clj`'s own docstring documents the split
+("Worktree parsing, worktree mutations, branch operations, and context
+isolation tests live in `git_worktree_test.clj`"). `git_test.clj` has no
+worktree code or matching prefixes at all. Filed as a plain INCONSISTENCY
+(design.md vs. actual code), not a SCOPE_QUESTION: the conceptual work
+(verify/fix `linked-worktree-path` cleanup for these six prefixes) was
+already part of the design's intent via Context/AC3 — only the file-path
+label is wrong, so correcting it doesn't redraw what's in/out of scope.
+
+Resolved (not filed): re-checked AC1's parenthetical listing `temp-cwd`/
+`temp-session-root` as examples of "temporary git repository directory"
+creators (they actually just create plain `Files/createTempDirectory` dirs,
+no `git init`). Confirmed this is a real wording inaccuracy, but it's
+non-actionable: AC1's other branch ("under `/tmp/` (or the OS temp dir)")
+already covers these same directories regardless of the mislabel, so no
+verification gap results. Not filed as a design step.
+
+- inconsistency review added 1 new design step
