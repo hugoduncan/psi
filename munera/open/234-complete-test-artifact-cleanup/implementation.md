@@ -237,3 +237,16 @@ in-batch, neither pre-existing/stale.
 - SCOPE_QUESTION item: left unchecked, per task instructions — scope-
   boundary correctness is deferred to the user/human, not resolved by
   editing design.md.
+
+## Design-review pass 3 — architecture turn
+
+`design.md`/`design-steps.md` unchanged since the pass-2 architecture turn
+(no commits since `8354dd4fc`). Re-checked against AGENTS.md (VSM layers,
+change_chain), `ramora/META.md`, `doc/architecture.md`, and
+`clojure-coding-standards`: task remains test-infrastructure-only
+(finally-block cleanup in existing tests), touches no production code,
+dispatch, the atom, or any S1-S5 layer. Key Question 3's wording already
+matches the "no use-fixtures, prefer with-xxx" standard from the prior
+pass's fix.
+
+- no architectural review feedback
