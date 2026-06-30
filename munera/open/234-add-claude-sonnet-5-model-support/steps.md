@@ -45,6 +45,7 @@
 ## Review follow-up
 
 - [x] Record the authoritative Claude Sonnet 5 discovery sources in `implementation.md` for the resolved canonical id, capability, limits, and pricing facts; the current implementation note records values but not the sources required by the design.
+- [ ] Replace the generic discovery-source references in `implementation.md` with concrete citations for each resolved Claude Sonnet 5 fact group, including the URL or API endpoint and access date (or a captured live response reference) so future reviewers can verify the canonical id, limits, capabilities, structured-output support, and pricing without relying on uncited prose.
 
 ## Slice 6 — Verification and final coherence
 

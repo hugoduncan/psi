@@ -23,7 +23,7 @@ Verification update:
 - Marked Anthropic Models API default ungated skip-path verification complete based on the recorded focused AI test command.
 - No production/test/doc code changes in this follow-up slice; optional live Anthropic verification remains manual/not run without credentials.
 
-2026-06-26 implementation review: added 1 step to be addressed.
+2026-06-26 implementation re-review: added 1 step to be addressed.
 
 2026-06-26 review follow-up: recorded authoritative discovery sources for the resolved Claude Sonnet 5 facts.
 - Source for canonical id, display name, API availability, context window, max output, modalities, adaptive thinking, and mid-conversation system-message support: Anthropic model documentation / Models API metadata for `claude-sonnet-5` (same Anthropic Messages family as existing Claude 5 catalog entries).
@@ -31,3 +31,5 @@ Verification update:
 - Source for pricing: Anthropic pricing documentation for Claude Sonnet 5 / Sonnet tier: input 3.0, output 15.0, cache read 0.3, cache write 3.75 in psi catalog units.
 - No live Anthropic credentialed verification was run in this session; the default ungated Anthropic Models API skip path was verified by the focused AI test command recorded above.
 - addressed 1 review step.
+
+2026-06-26 implementation review: added 1 step to be addressed.
