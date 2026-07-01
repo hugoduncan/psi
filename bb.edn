@@ -224,9 +224,9 @@
              (System/exit (:exit result))))}
 
   commit-check:file-lengths
-  {:doc  "Fail when any src/ or test/ file under components/ or bases/ exceeds 800 lines."
+  {:doc  "Fail when any src/ or test/ file under components/, bases/, or extensions/ exceeds 800 lines."
    :task (let [result (shell {:out :string}
-                             "find" "components" "bases" "-type" "f"
+                             "find" "components" "bases" "extensions" "-type" "f"
                              "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
                              "-exec" "wc" "-l" "{}" ";")
                lines  (str/split-lines (:out result))
