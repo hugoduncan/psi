@@ -2,3 +2,5 @@
 - ambiguity review added 2 new design steps
 - ambiguity review observed additional existing oversized `extensions/` src/test files; this matters for interpreting the widened file-length check's expected final pass/fail state.
 - inconsistency review added 1 new design step
+- design-step handoff: keep follow-up resolution as design clarification, not scope reshaping; let a human answer the `SCOPE_QUESTION` before adding/removing doc/changelog work. Preserve `work_on_test.clj` test behaviour while choosing cohesive split namespaces; treat current filesystem counts as truth over stale prose. Relevant non-task files: `AGENTS.md`, `.psi/skills/clojure-coding-standards/SKILL.md`, `bb.edn`, `extensions/work-on/test/extensions/work_on_test.clj`.
+- 2026-07-01 design follow-up: review-batch baseline identified as parent of `7fdbfe742` (`2c5477fe5`); candidate checklist was the four lines added to `design-steps.md` by `git diff 2c5477fe5..HEAD -- <task>/design-steps.md`. Completed the three non-scope design clarifications; left the `SCOPE_QUESTION` unchecked/deferred to the user.
