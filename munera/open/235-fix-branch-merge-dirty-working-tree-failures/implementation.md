@@ -1,3 +1,4 @@
 - no architectural review feedback
 - ambiguity review added 1 new design step
 - no inconsistency review feedback
+- Design-step handoff: when resolving the dirty-check ambiguity, preserve root-cause-first/no-mocks isolated-temp-repo testing; inspect `components/history/src/psi/history/git.clj` (`status`, `dirty-working-tree?`, `branch-merge`) and `components/history/test/psi/history/git_worktree_test.clj` (`linked-worktree-path`, `branch-merge-*`) before choosing fixture cleanup/configuration vs production status semantics.
