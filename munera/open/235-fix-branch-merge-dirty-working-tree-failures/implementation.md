@@ -42,3 +42,4 @@
 - added 1 step to be addressed
 
 - addressed 1 code-shaper review step: replaced `git/status` substring-based porcelain classification with line/XY-slot parsing; added coverage for path text containing staged markers and real staged index changes; verified focused status test, full `psi.history.git-worktree-test`, and clj-kondo on edited files pass.
+- added 1 code-shaper step to be addressed

@@ -47,3 +47,4 @@
 
 - [x] Add executable coverage that `with-null-context` cleans up an actual external linked worktree created via `git/worktree-add`, not only an arbitrary file under `linked-worktree-root`.
 - [x] Replace `git/status`'s substring-based porcelain classification with line/XY-slot parsing so staged detection is not affected by path text while preserving untracked-path dirty semantics.
+- [ ] Preserve Git porcelain XY slots when classifying `git/status` (or use an untrimmed status command) and add coverage that a worktree-only tracked-file modification reports `:modified`, not `:staged`.
