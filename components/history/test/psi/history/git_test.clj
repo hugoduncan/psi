@@ -147,6 +147,27 @@
       (let [ctx @shared-ro-ctx]
         (is (= :clean (git/status ctx)))))))
 
+(deftest status-parses-porcelain-xy-slots
+  ;; Tests status classification from porcelain XY slots, not path substrings.
+  (testing "status"
+    (testing "reports untracked paths as modified even when path text contains staged markers"
+      (let [ctx (git/create-null-context seed-commits)]
+        (try
+          (spit (File. (str (:repo-dir ctx) File/separator "M misleading.txt"))
+                "untracked\n")
+          (is (= :modified (git/status ctx)))
+          (finally
+            (delete-recursively! (:repo-dir ctx))))))
+    (testing "reports index changes as staged from the porcelain index slot"
+      (let [ctx (git/create-null-context seed-commits)]
+        (try
+          (spit (File. (str (:repo-dir ctx) File/separator "staged.txt"))
+                "staged\n")
+          (#'psi.history.git/run-git ctx ["add" "staged.txt"])
+          (is (= :staged (git/status ctx)))
+          (finally
+            (delete-recursively! (:repo-dir ctx))))))))
+
 ;;; git/current-commit
 
 (deftest current-commit-is-40-char-sha

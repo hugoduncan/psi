@@ -680,15 +680,23 @@
      :git.commit/diff    diff
      :git.commit/symbols (extract-symbols (str subject " " body))}))
 
+(defn- staged-porcelain-line?
+  [line]
+  (let [index-status (first line)]
+    (and index-status
+         (not= \space index-status)
+         (not= \? index-status))))
+
 (defn status
   "Return :clean | :modified | :staged | :error for `ctx`."
   [ctx]
   (try
-    (let [out (run-git ctx ["status" "--porcelain"])]
+    (let [out   (run-git ctx ["status" "--porcelain"])
+          lines (remove str/blank? (str/split-lines out))]
       (cond
-        (str/includes? out "M ") :staged
-        (seq out)                :modified
-        :else                    :clean))
+        (some staged-porcelain-line? lines) :staged
+        (seq lines)                         :modified
+        :else                               :clean))
     (catch Exception _ :error)))
 
 (defn current-branch
