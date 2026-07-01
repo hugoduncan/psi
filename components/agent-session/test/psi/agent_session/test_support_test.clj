@@ -25,13 +25,9 @@
                      "test-support-shutdown-hook-test-"
                      (make-array java.nio.file.attribute.FileAttribute 0)))
           hook (#'test-support/register-cleanup-shutdown-hook! dir)]
-      (try
-        (is (.exists (java.io.File. dir)))
-        (.start hook)
-        (.join hook)
-        (is (not (.exists (java.io.File. dir))))
-        (finally
-          (.removeShutdownHook (Runtime/getRuntime) hook))))))
+      (is (.exists (java.io.File. dir)))
+      (start-join-and-deregister! hook)
+      (is (not (.exists (java.io.File. dir)))))))
 
 (deftest temp-cwd-registers-cleanup-shutdown-hook-test
   (testing "temp-cwd itself (not just register-cleanup-shutdown-hook! in isolation) registers a hook that deletes the directory"

@@ -203,7 +203,7 @@
 
 ## Test review follow-up (task-test-review skill, this pass)
 
-- [ ] `components/agent-session/test/psi/agent_session/query_graph_test.clj`'s
+- [x] `components/agent-session/test/psi/agent_session/query_graph_test.clj`'s
       `ext-mutation-attach-worktree-to-existing-branch-test` (Pattern C,
       `fix-repeated-thinking-output-` prefix) creates a real worktree via
       `git.worktree/add!` and cleans up `repo-dir` in `finally` via
@@ -217,10 +217,14 @@
       pass fixed for the other Pattern C/A/D tests but missed here. Add the
       same trailing `(is (not (.exists (File. ^String repo-dir))) ...)`
       assertion after this test's `try`/`finally`.
+      Added the same trailing `testing` block + `(is (not (.exists (File.
+      ^String repo-dir))) ...)` assertion after this test's
+      `try`/`finally`, mirroring
+      `register-mutations-in!-includes-history-mutations-test`.
 
 ## Test-shaper review follow-up
 
-- [ ] `test_support_test.clj`'s
+- [x] `test_support_test.clj`'s
       `register-cleanup-shutdown-hook-deletes-directory-test` manually
       inlines a `try`/`.start`/`.join`/`finally`/`removeShutdownHook`
       sequence instead of calling the `start-join-and-deregister!` helper
@@ -229,7 +233,10 @@
       `temp-session-root-registers-cleanup-shutdown-hook-test`, both use).
       Inconsistent test-abstraction usage within one file. Refactor the
       first test to call `start-join-and-deregister!` like the other two.
-- [ ] The cleanup-wiring guard assertions added to
+      Done: `register-cleanup-shutdown-hook-deletes-directory-test` now
+      calls `start-join-and-deregister!` instead of inlining the
+      start/join/removeShutdownHook sequence.
+- [x] The cleanup-wiring guard assertions added to
       `query_graph_test.clj`'s `register-mutations-in!-includes-history-mutations-test`
       and `work_on_test.clj`'s `work-on-command-with-remote-base-ref-integration-test`
       (each a single `(is (not (.exists ...)) ...)` appended after the
@@ -246,7 +253,14 @@
       their own dedicated tests (or at minimum their own `testing` block
       with a cleanup-specific description) for consistency and meaningful
       failure messages.
-- [ ] The cleanup-guard comments in `git_worktree_test.clj`
+      Took the "own `testing` block" branch (not a separate `deftest`,
+      to avoid duplicating each test's non-trivial setup): both guard
+      assertions are now wrapped in their own
+      `(testing "cleanup wiring: ... is removed once the try/finally
+      above completes" ...)` block, sibling to (not nested in) the
+      pre-existing behaviour `testing` block, so a failure reports a
+      cleanup-specific description.
+- [x] The cleanup-guard comments in `git_worktree_test.clj`
       ("Guards the cleanup wiring itself (Pattern A)..."),
       `query_graph_test.clj` ("...Pattern C...") and `work_on_test.clj`
       ("...Pattern D...") reference this task's `design.md` Root Cause
@@ -256,3 +270,6 @@
       etc. means. Reword the comments to be self-contained (describe what
       is being guarded — finally-block/cleanup-path regression — without
       relying on the design doc's pattern taxonomy).
+      Reworded all three comments to drop the "(Pattern A/C/D)"
+      references, describing what's guarded (finally-block /
+      try-finally cleanup wiring) in self-contained terms instead.

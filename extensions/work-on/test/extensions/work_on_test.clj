@@ -964,11 +964,12 @@
                 "new branch should not auto-track the base ref when created from origin/master")))
         (finally
           (delete-recursively! base-dir)))
-      ;; Guards the cleanup wiring itself (Pattern D), not just the work-on
-      ;; behaviour above: a regression that dropped this try/finally's
-      ;; delete-recursively! call would not otherwise be caught by bb test.
-      (is (not (.exists (java.io.File. base-dir)))
-          "base-dir should be deleted once the try/finally above completes"))))
+      (testing "cleanup wiring: base-dir is removed once the try/finally above completes"
+        ;; Guards the try/finally cleanup wiring itself, not the work-on
+        ;; behaviour above: a regression that dropped this try/finally's
+        ;; delete-recursively! call would not otherwise be caught by bb test.
+        (is (not (.exists (java.io.File. base-dir)))
+            "base-dir should be deleted once the try/finally above completes")))))
 
 (deftest work-done-and-rebase-commands-test
   (testing "/work-done fast-forwards onto the cached default branch, switches sessions, and /work-rebase emits notifications"

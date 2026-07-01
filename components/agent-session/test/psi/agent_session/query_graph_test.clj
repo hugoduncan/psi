@@ -79,11 +79,12 @@
             (is (true? (:success result)))))
         (finally
           (test-support/delete-recursively! repo-dir)))
-      ;; Guards the cleanup wiring itself (Pattern C), not just the mutation
-      ;; behaviour above: a regression that dropped this try/finally's
-      ;; delete-recursively! call would not otherwise be caught by bb test.
-      (is (not (.exists (File. ^String repo-dir)))
-          "repo-dir should be deleted once the try/finally above completes"))))
+      (testing "cleanup wiring: repo-dir is removed once the try/finally above completes"
+        ;; Guards the try/finally cleanup wiring itself, not the mutation
+        ;; behaviour above: a regression that dropped this try/finally's
+        ;; delete-recursively! call would not otherwise be caught by bb test.
+        (is (not (.exists (File. ^String repo-dir)))
+            "repo-dir should be deleted once the try/finally above completes")))))
 
 (deftest ext-mutation-attach-worktree-to-existing-branch-test
   (testing "isolated extension mutation path can attach a worktree to an existing branch"
@@ -116,7 +117,13 @@
             (is (true? (:success attach)) (pr-str attach))
             (is (= branch-name (:branch attach)) (pr-str attach))))
         (finally
-          (test-support/delete-recursively! repo-dir))))))
+          (test-support/delete-recursively! repo-dir)))
+      (testing "cleanup wiring: repo-dir is removed once the try/finally above completes"
+        ;; Guards the try/finally cleanup wiring itself, not the mutation
+        ;; behaviour above: a regression that dropped this try/finally's
+        ;; delete-recursively! call would not otherwise be caught by bb test.
+        (is (not (.exists (File. ^String repo-dir)))
+            "repo-dir should be deleted once the try/finally above completes")))))
 
 (deftest rpc-trace-mutation-and-resolver-test
   (let [[ctx session-id] (create-session-context {:persist? false})

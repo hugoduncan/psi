@@ -973,3 +973,65 @@ test-only additions.
 ## Test-shaper review
 
 - added 3 steps to be addressed
+
+## Follow-up pass: leak-freeness assertion for ext-mutation-attach-worktree-to-existing-branch-test (this pass)
+
+Executed the single unchecked "Test review follow-up (task-test-review
+skill, this pass)" item (commit `c65a2ae01`), the immediately preceding
+review pass's follow-up. The 3 unchecked "Test-shaper review follow-up"
+items predate that pass (added by `754318503`, an earlier commit) and are
+left unchecked per this pass's scope.
+
+Added a trailing `testing` block + `(is (not (.exists (File. ^String
+repo-dir))) ...)` assertion to
+`query_graph_test.clj`'s `ext-mutation-attach-worktree-to-existing-branch-test`,
+after its existing `try`/`finally`, mirroring the equivalent guard already
+present in `register-mutations-in!-includes-history-mutations-test`.
+
+Verified: `clj-paren-repair` reports no changes needed;
+`clj-kondo --lint` on the file reports 0 errors/0 warnings;
+`bb test --focus psi.agent-session.query-graph-test` (9 tests, 57
+assertions — was 56 before this change — 0 failures).
+
+- addressed 1 review step
+
+## Test-shaper review follow-up (this pass)
+
+Executed all 3 unchecked "Test-shaper review follow-up" items added by the
+immediately preceding review pass (commit `754318503`):
+
+- Duplicated helper-usage item: `test_support_test.clj`'s
+  `register-cleanup-shutdown-hook-deletes-directory-test` now calls the
+  shared `start-join-and-deregister!` helper instead of inlining its own
+  `try`/`.start`/`.join`/`finally`/`removeShutdownHook` sequence, matching
+  the other two tests in the file.
+- Mixed-concern guard-assertion item: in `query_graph_test.clj`'s
+  `register-mutations-in!-includes-history-mutations-test` and
+  `work_on_test.clj`'s `work-on-command-with-remote-base-ref-integration-test`,
+  moved the trailing cleanup-wiring `is` assertion into its own sibling
+  `(testing "cleanup wiring: ... is removed once the try/finally above
+  completes" ...)` block (not nested inside the pre-existing behaviour
+  `testing` block), so a guard failure now reports a cleanup-specific
+  description. Kept it as a `testing` block rather than a separate
+  `deftest` (the item's own "at minimum" fallback) to avoid duplicating
+  each test's non-trivial fixture setup.
+- Task-internal "Pattern" labels item: reworded the cleanup-guard comments
+  in `git_worktree_test.clj`, `query_graph_test.clj`, and `work_on_test.clj`
+  to drop the "(Pattern A/C/D)" references to `design.md`'s Root Cause
+  Analysis taxonomy, describing what's guarded (finally-block / try-finally
+  cleanup wiring) in self-contained terms instead.
+
+Verified: `clj-paren-repair` reports no changes needed on all 4 touched
+files; `clj-kondo --lint` on all 4 files reports 0 errors/0 warnings;
+`bb test --focus psi.agent-session.test-support-test` (3 tests, 6
+assertions, 0 failures); `bb test --focus psi.agent-session.query-graph-test`
+(9 tests, 57 assertions, 0 failures); `bb test --focus
+psi.history.git-worktree-test` (34 tests, 94 assertions, 0 failures; 4
+pre-existing `branch-merge` failures unchanged, already tracked by
+`munera/open/235-...`); `bb test --focus extensions.work-on-test` (21
+tests, 119 assertions, 0 failures). Checked `/tmp` after all runs — no
+leaked `psi-agent-session-*`/`psi-work-on-remote-base-*`/
+`test-support-shutdown-hook-test-*` directories; `git worktree list`
+shows no leaked test worktrees.
+
+- addressed 3 review steps

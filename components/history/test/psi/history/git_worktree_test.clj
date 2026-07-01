@@ -73,9 +73,9 @@
          (delete-recursively! (:repo-dir ctx#))))))
 
 (deftest with-null-context-deletes-repo-dir-in-finally-test
-  ;; Guards the cleanup wiring itself (Pattern A), not just the behaviour it
-  ;; wraps: a regression that dropped with-null-context's finally block would
-  ;; not otherwise be caught by bb test.
+  ;; Guards the finally-block cleanup wiring itself, not just the behaviour
+  ;; it wraps: a regression that dropped with-null-context's finally block
+  ;; would not otherwise be caught by bb test.
   (testing "with-null-context removes its repo-dir immediately after the body returns"
     (let [repo-dir* (atom nil)]
       (with-null-context [ctx nil]
