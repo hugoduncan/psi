@@ -21,6 +21,7 @@
 - [x] If status classification is the cause, update `components/history/src/psi/history/git.clj` so `status` accurately reports clean/dirty while still treating untracked files and directories as dirty — not applicable; status correctly reported a real untracked path.
 - [x] If repo configuration is the cause, pin the minimal relevant config in `create-null-context` or the test fixture without depending on user-global config — not applicable; no config issue was implicated.
 - [x] Ensure cleanup still removes both the main null repo and any linked worktree directories created by the fixture.
+- [ ] Add executable coverage that `with-null-context` removes the external `linked-worktree-root` it now creates, not only the main repo dir.
 - [x] Run `clj-paren-repair` on any edited Clojure files.
 
 ## Slice 4 — Lock behaviour with tests
