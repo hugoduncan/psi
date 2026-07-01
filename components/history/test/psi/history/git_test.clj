@@ -166,6 +166,14 @@
           (#'psi.history.git/run-git ctx ["add" "staged.txt"])
           (is (= :staged (git/status ctx)))
           (finally
+            (delete-recursively! (:repo-dir ctx))))))
+    (testing "reports worktree-only tracked-file changes as modified from the worktree slot"
+      (let [ctx (git/create-null-context seed-commits)]
+        (try
+          (spit (File. (str (:repo-dir ctx) File/separator "README.md"))
+                "# psi\nchanged\n")
+          (is (= :modified (git/status ctx)))
+          (finally
             (delete-recursively! (:repo-dir ctx))))))))
 
 ;;; git/current-commit
