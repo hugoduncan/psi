@@ -84,3 +84,36 @@
       avoid a second run at real JVM exit) and asserts the directory is
       gone. `register-cleanup-shutdown-hook!` now returns the `Thread` (was
       previously `void`) to make this possible.
+
+## Implementation review follow-up (task-implementation-review skill)
+
+- [ ] `components/agent-session/test/psi/agent_session/query_graph_test.clj`
+      (~lines 82-96): the `fix-repeated-thinking-output` worktree-attach
+      test ("isolated extension mutation path can attach a worktree to an
+      existing branch") is a top-level `(testing ...)` form, not wrapped in
+      a `(deftest ...)`. It is not registered as a test var, so it does not
+      run as part of `bb test`/kaocha's reported suite (the namespace has
+      exactly 8 `deftest`s, matching implementation.md's "8 tests, 0
+      failures" claim — this 9th block is excluded). It only executes once
+      at namespace load/compile time, so its `try`/`finally` cleanup and
+      `is` assertions provide no ongoing regression protection despite
+      appearing to verify Pattern C's `fix-repeated-thinking-output`
+      prefix. Wrap it in `deftest` (with a suitable test name) so it is
+      actually exercised by the test suite.
+- [ ] `extensions/work-on/test/extensions/work_on_test.clj`'s
+      `work-on-command-with-remote-base-ref-integration-test` creates a
+      `Files/createTempDirectory "psi-work-on-remote-base-"` directory,
+      clones real git repos into it, and calls the real (non-stubbed)
+      `git/worktree-add` to create an actual git worktree inside it — with
+      no `try`/`finally` and no `delete-recursively!` cleanup anywhere in
+      the test. Confirmed empirically: running this test in isolation
+      leaves a `psi-work-on-remote-base-*` directory (containing the
+      clones and the added worktree) under the OS temp dir after the test
+      completes. This prefix isn't one of design.md's 10 originally-listed
+      prefixes, so it falls outside AC1/AC3's literal scope, but it is a
+      genuine leak in one of this task's 4 in-scope files that this task's
+      own `work_on_test.clj` verification step missed (that step was
+      scoped only to confirming Pattern D's `fix-repeated-thinking-output`
+      literals are assertion-only, not to auditing the rest of the file).
+      Add `try`/`finally` + `test-support/delete-recursively!` (or
+      equivalent) cleanup for `base-dir` in this test.

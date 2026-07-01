@@ -783,7 +783,7 @@ this pass only closes the documentation branch of the follow-up item.
 
 - addressed 1 review step
 
-## Implementation review (task-implementation-review skill)
+## Implementation review (task-implementation-review skill, this pass)
 
 - added 2 steps to be addressed
 
@@ -833,3 +833,7 @@ this session; the working-tree content already matched the "ours" (stage 2)
 side byte-for-byte on both files. Staged them as-is (no content change) via
 `git add` to clear the conflict and allow this task's own commit to proceed;
 did not touch their content.
+
+## Implementation review (task-implementation-review skill)
+
+- added 2 steps to be addressed
