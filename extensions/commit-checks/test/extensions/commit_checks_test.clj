@@ -116,6 +116,7 @@
         (eval form))
       (let [workspace      (io/file (temp-dir))
             find-roots     (ns-resolve eval-ns-sym 'file-length-find-roots)
+            find-args      (ns-resolve eval-ns-sym 'file-length-find-args)
             violations     (ns-resolve eval-ns-sym 'file-length-violations)
             scan-roots-var (ns-resolve eval-ns-sym 'file-length-scan-roots)]
         (doseq [root ["components" "bases" "extensions"]]
@@ -126,7 +127,13 @@
           (.mkdirs (io/file workspace root "docs"))
           (is (= [(.getPath (io/file workspace root))]
                  (vec (find-roots))) root)
-          (is (= [] (violations "")) root))))))
+          (let [result (apply proc/shell
+                              {:continue true :out :string :err :string}
+                              "find"
+                              (find-args))]
+            (is (zero? (:exit result)) (str root ": " (combined-output result)))
+            (is (= "" (:out result)) root)
+            (is (= [] (violations (:out result))) root)))))))
 
 (deftest file-length-check-scans-extensions-with-real-task-test
   ;; Verifies the real bb.edn commit-check:file-lengths task scans extensions/
