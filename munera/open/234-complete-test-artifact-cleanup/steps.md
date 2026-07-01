@@ -273,3 +273,16 @@
       Reworded all three comments to drop the "(Pattern A/C/D)"
       references, describing what's guarded (finally-block /
       try-finally cleanup wiring) in self-contained terms instead.
+
+## Docs review follow-up
+
+- [ ] `ramora/TESTING.md` recommends warm REPL/nREPL Scry runs to amortize
+      startup cost, but it does not document this task's new
+      `temp-cwd`/`temp-session-root` shutdown-hook cleanup limitation:
+      `psi-agent-session-test-`/`psi-agent-session-store-` directories
+      created during long-lived REPL/in-process test runs may remain under
+      the OS temp dir until the REPL JVM exits (unlike `bb test` CLI runs,
+      where the short-lived JVM exits after the run). Add a brief note near
+      the Scry REPL/performance guidance so future agents know to restart
+      the REPL/nREPL process or manually sweep those prefixes when using
+      in-process test iteration.

@@ -1055,3 +1055,7 @@ shows no leaked test worktrees.
 ## Test-shaper review (this pass)
 
 - no new actionable issues found; 0 steps added
+
+## Docs review (review-task-docs skill, this pass)
+
+- added 1 step to be addressed
