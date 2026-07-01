@@ -34,3 +34,5 @@
 - addressed 1 test-review step: added focused fixture regression proving `git/worktree-add` through `linked-worktree-path` leaves the target null repo `git/status` clean before merge; verified focused test passes (`1 tests, 2 assertions, 0 failures`) and full `psi.history.git-worktree-test` passes (`41 tests, 112 assertions, 0 failures`).
 
 - no new docs review feedback
+
+- added 1 step to be addressed

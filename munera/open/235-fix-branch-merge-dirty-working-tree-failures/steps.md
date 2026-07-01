@@ -42,3 +42,7 @@
 
 - [x] Add executable coverage that an untracked target-worktree directory, not only an untracked file, makes `branch-merge` reject with `"working tree is dirty"`.
 - [x] Add a focused fixture regression proving that `git/worktree-add` through `linked-worktree-path` leaves the target null repo `git/status` clean before any `branch-merge` call, so a future nested-worktree regression fails at the fixture invariant instead of only through merge behaviour.
+
+## Code-shaper review follow-up
+
+- [ ] Add executable coverage that `with-null-context` cleans up an actual external linked worktree created via `git/worktree-add`, not only an arbitrary file under `linked-worktree-root`.
