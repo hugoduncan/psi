@@ -200,3 +200,42 @@
       added two new tests calling `temp-cwd-with-hook`/
       `temp-session-root-with-hook` directly, asserting the returned hook
       deletes the directory when started+joined.
+
+## Test-shaper review follow-up
+
+- [ ] `test_support_test.clj`'s
+      `register-cleanup-shutdown-hook-deletes-directory-test` manually
+      inlines a `try`/`.start`/`.join`/`finally`/`removeShutdownHook`
+      sequence instead of calling the `start-join-and-deregister!` helper
+      defined earlier in the same file (which the other two tests in the
+      file, `temp-cwd-registers-cleanup-shutdown-hook-test` and
+      `temp-session-root-registers-cleanup-shutdown-hook-test`, both use).
+      Inconsistent test-abstraction usage within one file. Refactor the
+      first test to call `start-join-and-deregister!` like the other two.
+- [ ] The cleanup-wiring guard assertions added to
+      `query_graph_test.clj`'s `register-mutations-in!-includes-history-mutations-test`
+      and `work_on_test.clj`'s `work-on-command-with-remote-base-ref-integration-test`
+      (each a single `(is (not (.exists ...)) ...)` appended after the
+      test's existing `try`/`finally`) are nested inside those tests'
+      pre-existing `(testing "...")` block, whose description names the
+      unrelated behaviour under test (mutation registration / `--base`
+      ref handling). A failure of the guard assertion reports that
+      unrelated description, not "cleanup didn't run", misleading
+      diagnosis. This also mixes two orthogonal concerns (behaviour +
+      cleanup-wiring invariant) in one test, unlike
+      `git_worktree_test.clj`'s `with-null-context-deletes-repo-dir-in-finally-test`,
+      which extracted the equivalent guard into its own dedicated
+      `deftest`/`testing` pair. Extract the two guard assertions into
+      their own dedicated tests (or at minimum their own `testing` block
+      with a cleanup-specific description) for consistency and meaningful
+      failure messages.
+- [ ] The cleanup-guard comments in `git_worktree_test.clj`
+      ("Guards the cleanup wiring itself (Pattern A)..."),
+      `query_graph_test.clj` ("...Pattern C...") and `work_on_test.clj`
+      ("...Pattern D...") reference this task's `design.md` Root Cause
+      Analysis pattern labels (A/C/D) without local explanation. Once this
+      task closes and `design.md` moves under `munera/closed/`, a future
+      reader of the test file has no local way to resolve what "Pattern A"
+      etc. means. Reword the comments to be self-contained (describe what
+      is being guarded — finally-block/cleanup-path regression — without
+      relying on the design doc's pattern taxonomy).
