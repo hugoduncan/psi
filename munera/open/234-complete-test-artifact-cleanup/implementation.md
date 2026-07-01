@@ -1043,3 +1043,7 @@ shows no leaked test worktrees.
 ## Test-shaper review (this pass)
 
 - no new issues found; 0 steps added
+
+## Implementation review (task-implementation-review skill, this pass)
+
+- no new actionable issues found; 0 steps added
