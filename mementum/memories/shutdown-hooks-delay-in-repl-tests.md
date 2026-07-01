@@ -1,0 +1,3 @@
+💡 JVM shutdown hooks are only prompt cleanup for short-lived CLI test runs. In psi's long-lived REPL/nREPL/Scry workflow, temp dirs registered for shutdown-hook cleanup remain under the OS temp dir until that JVM exits, which may be hours later.
+
+When choosing shutdown hooks as a test-artifact safety net, document the REPL limitation and consider a per-run cleanup path (explicit sweep, `with-...` wrapper, or post-run hook) if in-process iteration needs immediate leak-freeness. Otherwise `bb test` can look clean while REPL-based development accumulates artifacts until restart/manual sweep.
