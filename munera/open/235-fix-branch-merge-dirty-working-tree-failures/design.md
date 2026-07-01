@@ -73,6 +73,16 @@ stash` re-runs, rather than trusting a green `bb test`).
   local cause → patch) — do not paper over the symptom (e.g. do not just
   retry the merge or add a sleep) without understanding why the tree is
   reported dirty.
+- `branch-merge`'s dirty-working-tree precondition should treat untracked
+  files and directories in the target worktree as dirty, matching
+  `git status --porcelain` and preserving protection against accidental
+  merges with untracked local work. Linked worktrees created by tests under
+  the target repo's directory are fixture artifacts, not a reason for
+  production dirty-check semantics to ignore arbitrary untracked directories;
+  if those nested linked-worktree directories are the root cause, prefer
+  fixing the fixture layout/configuration (for example by placing linked
+  worktrees outside the target worktree or otherwise isolating the fixture)
+  over weakening genuine dirty-tree rejection.
 
 ## Acceptance Criteria
 
