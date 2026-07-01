@@ -82,3 +82,8 @@
 - [x] TT2: Add executable coverage that `bb commit-check:file-lengths` still scans `components/*/{src,test}/` and `bases/*/{src,test}/` after the `extensions/` widening, using controlled oversized files or an equivalent isolated fixture so regressions in the original roots fail.
 - [x] TT3: Change the executable `bb commit-check:file-lengths` coverage so it exercises the repository's real task implementation (or a shared function used by that task) instead of a copied task expression in a synthetic `bb.edn`; the test should fail if the real `bb.edn` task drifts from the expected widened scan/ratchet behavior.
 - [x] TT4: Add executable coverage for each real legacy ratchet path currently recorded by `bb commit-check:file-lengths`, proving each path passes at its recorded line count and fails when it grows beyond that path's recorded limit.
+
+## Test review follow-ups — 2026-07-01
+
+- [ ] TT5: Make `extensions.commit-checks-test` clean up the temporary probe directories it creates under `components/commit_check_file_lengths_probe/` and `bases/commit_check_file_lengths_probe/`, not just the oversized probe files, so the test leaves the worktree exactly as it found it.
+- [ ] TT6: Remove the duplicated hardcoded legacy file-length ratchet map from `extensions.commit-checks-test`; derive the expected legacy ratchet paths/limits from the real `bb commit-check:file-lengths` implementation or a shared source so the test fails if the real ratchet set changes without matching coverage.
