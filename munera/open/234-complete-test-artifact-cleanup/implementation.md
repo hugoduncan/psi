@@ -1035,3 +1035,7 @@ leaked `psi-agent-session-*`/`psi-work-on-remote-base-*`/
 shows no leaked test worktrees.
 
 - addressed 3 review steps
+
+## Test review (task-test-review skill, this pass)
+
+- no new issues found; 0 steps added
