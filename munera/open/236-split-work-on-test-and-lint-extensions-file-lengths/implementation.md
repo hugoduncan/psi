@@ -16,3 +16,5 @@
 - `bb.edn` `commit-check:file-lengths` now scans `components`, `bases`, and `extensions` with the same `*/src/*`/`*/test/*` filter. A controlled 801-line file under `extensions/work-on/test/extensions/` made the check exit 1 and report that path, then the controlled file was removed.
 - Real-tree `bb commit-check:file-lengths` now fails only on pre-existing out-of-scope oversized extension files: `extensions/auto-session-name/test/extensions/auto_session_name_test.clj` (974), `extensions/dev-http/test/extensions/dev_http_test.clj` (816), `extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj` (1020), and `extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj` (2058). It no longer reports the split work-on test files.
 - Broader extension-suite check: `bb clojure:test:extensions` executed the suite and reported `Assertions: 1037 passed, 0 failed, 0 errored; Tests: 271 passed, 0 failed, 0 errored, 1 unknown`, then exited non-zero with an empty `.scry-results/`; focused split work-on tests are green and provide the task-specific pass signal.
+
+- 2026-07-01 implementation review: no new actionable issues.
