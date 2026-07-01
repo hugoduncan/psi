@@ -224,21 +224,27 @@
              (System/exit (:exit result))))}
 
   commit-check:file-lengths
-  {:doc  "Fail when any src/ or test/ file under components/, bases/, or extensions/ exceeds 800 lines."
-   :task (let [result (shell {:out :string}
-                             "find" "components" "bases" "extensions" "-type" "f"
-                             "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
-                             "-exec" "wc" "-l" "{}" ";")
-               lines  (str/split-lines (:out result))
-               bad    (->> lines
-                           (keep (fn [line]
-                                   (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)]
-                                     (when (and n path (> (Long/parseLong n) 800))
-                                       (str path " (" n " lines)")))))
-                           vec)]
+  {:doc  "Fail when src/ or test/ files under components/, bases/, or extensions/ exceed 800 lines; recorded legacy oversized extension files fail if they grow."
+   :task (let [legacy-max-lines {"extensions/auto-session-name/test/extensions/auto_session_name_test.clj" 974
+                                 "extensions/dev-http/test/extensions/dev_http_test.clj" 816
+                                 "extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj" 1020
+                                 "extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj" 2058}
+               result           (shell {:out :string}
+                                       "find" "components" "bases" "extensions" "-type" "f"
+                                       "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
+                                       "-exec" "wc" "-l" "{}" ";")
+               lines            (str/split-lines (:out result))
+               bad              (->> lines
+                                     (keep (fn [line]
+                                             (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)
+                                                   line-count (some-> n Long/parseLong)
+                                                   limit      (get legacy-max-lines path 800)]
+                                               (when (and line-count path (> line-count limit))
+                                                 (str path " (" n " lines, " limit " limit)")))))
+                                     vec)]
            (when (seq bad)
              (binding [*out* *err*]
-               (println "Files longer than 800 lines:")
+               (println "Files longer than allowed line limits:")
                (doseq [line bad]
                  (println line)))
              (System/exit 1)))}

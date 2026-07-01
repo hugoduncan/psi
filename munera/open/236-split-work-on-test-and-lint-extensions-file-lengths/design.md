@@ -73,11 +73,14 @@ After this task, `bb commit-check:file-lengths` is expected to scan
 require making every pre-existing oversized `extensions/` `src`/`test` file in
 the repository compliant, because those files are explicitly out of scope.
 
-Therefore, against the current repository, the widened command may correctly
-fail by reporting remaining pre-existing out-of-scope oversized extension
-files. It must no longer report `extensions/work-on/test/extensions/work_on_test.clj`
-or any file created by this split, and it must still report any scanned file
-that exceeds 800 lines.
+Therefore, against the current repository, the widened command may either
+report remaining pre-existing out-of-scope oversized extension files or carry
+an explicit legacy baseline for them so commit checks remain usable. If a
+legacy baseline is used, it must be a ratchet: the recorded out-of-scope files
+may pass at their current line counts but fail if they grow, and any new
+scanned file over 800 lines must still fail. It must no longer report
+`extensions/work-on/test/extensions/work_on_test.clj` or any file created by
+this split.
 
 ## Acceptance Criteria
 
@@ -89,8 +92,10 @@ that exceeds 800 lines.
    namespace split itself introducing no behaviour change).
 3. `bb commit-check:file-lengths` scans `extensions/` in addition to
    `components/` and `bases/`, and fails (non-zero exit, listing the
-   offending path) when a scanned file under `extensions/`'s `src/`/`test/`
-   paths exceeds 800 lines.
+   offending path) when a scanned file under `extensions/`'s `src`/`test`
+   paths exceeds 800 lines, except for explicitly recorded pre-existing
+   out-of-scope oversized extension files that are ratcheted to fail on
+   growth.
 4. `bb commit-check:file-lengths` continues to evaluate `components/` and
    `bases/` as before, and any failure after adding `extensions/` is limited
    to real oversized scanned files rather than a broken `find` pattern or

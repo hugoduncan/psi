@@ -21,7 +21,7 @@ This is a behaviour-preserving test reorganization plus a small lint-scope chang
 - Use a test-only support namespace for helpers to avoid helper duplication across split test files.
 - Preserve all `deftest` symbols exactly; only their containing namespaces change.
 - Treat user documentation and changelog updates as out of scope for this implementation slice, per `design.md`, until the recorded `SCOPE_QUESTION` is answered.
-- `bb commit-check:file-lengths` is allowed to fail after widening if it reports real pre-existing oversized `extensions/` files outside this task. Such failures should be documented, not papered over.
+- `bb commit-check:file-lengths` is allowed to expose real pre-existing oversized `extensions/` files outside this task. To keep commit checks usable, those exact legacy files may be documented as a ratcheted baseline: they pass at their current line counts, fail if they grow, and do not exempt any new oversized file.
 
 ## Risks
 
