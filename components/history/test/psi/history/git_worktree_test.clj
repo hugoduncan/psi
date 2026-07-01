@@ -429,10 +429,18 @@
 (deftest branch-merge-rejects-untracked-working-tree-path
   ;; Tests branch-merge precondition enforcement for untracked target paths.
   (testing "branch-merge"
-    (testing "rejects merge when the working tree contains an untracked path"
+    (testing "rejects merge when the working tree contains an untracked file"
       (with-null-context [ctx seed-commits]
         (spit (File. (str (:repo-dir ctx) File/separator "UNTRACKED.md"))
               "untracked\n")
+        (let [result (git/branch-merge ctx {:branch "main"})]
+          (is (false? (:merged result)))
+          (is (= "working tree is dirty" (:error result))))))
+    (testing "rejects merge when the working tree contains an untracked directory"
+      (with-null-context [ctx seed-commits]
+        (let [dir (File. (str (:repo-dir ctx) File/separator "untracked-dir"))]
+          (.mkdirs dir)
+          (spit (File. dir "artifact.txt") "untracked directory artifact\n"))
         (let [result (git/branch-merge ctx {:branch "main"})]
           (is (false? (:merged result)))
           (is (= "working tree is dirty" (:error result))))))))

@@ -40,4 +40,4 @@
 
 ## Test review follow-up
 
-- [ ] Add executable coverage that an untracked target-worktree directory, not only an untracked file, makes `branch-merge` reject with `"working tree is dirty"`.
+- [x] Add executable coverage that an untracked target-worktree directory, not only an untracked file, makes `branch-merge` reject with `"working tree is dirty"`.
