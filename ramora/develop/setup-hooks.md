@@ -120,8 +120,12 @@ when `rama-cc` reports zero matched files.
 
 ### `commit-check:file-lengths`
 
-Scans `components/` and `bases/` for files under `src/` or `test/` and fails if
-any exceed 800 lines.
+Scans `components/`, `bases/`, and `extensions/` for files under `src/` or
+`test/` and fails if any exceed 800 lines.
+
+Explicitly recorded legacy oversized extension files are ratcheted: they pass at
+their recorded line counts, but fail if they grow. New oversized files still fail
+at the 800-line limit.
 
 When it fails it prints the matching files to stderr and exits non-zero.
 

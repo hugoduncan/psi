@@ -197,7 +197,8 @@ The example project config in this repo defines these bb tasks:
   - runs `rama-cc components/ --threshold 21 --fail-above 20`
   - then runs `rama-cc bases/ --threshold 21 --fail-above 20`
 - `bb commit-check:file-lengths`
-  - fails if any file under `components/` or `bases/` in a `src/` or `test/` path exceeds 800 lines
+  - fails if any file under `components/`, `bases/`, or `extensions/` in a `src/` or `test/` path exceeds 800 lines
+  - explicitly recorded legacy oversized extension files are ratcheted: they pass at their recorded line counts, but fail if they grow
 - `bb commit-check:dispatch-architecture`
   - fails on dispatch effect parity drift in `agent-session`
   - reports advisory warnings for handler side-effect candidates and direct canonical state writes outside an allowlist
