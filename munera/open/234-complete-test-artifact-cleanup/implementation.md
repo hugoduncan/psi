@@ -901,13 +901,15 @@ opening a separate tracked task.
 
 - no new issues found; 0 steps added
 
-## Test review (task-test-review skill)
+## Test review (task-test-review skill, this pass)
 
-- re-verified against current diff (test_support.clj, test_support_test.clj,
-  query_graph_test.clj, work_on_test.clj); no code changes since the prior
-  test-review pass's findings — 0 new steps added. The 2 pre-existing
-  unchecked items under "Test review follow-up (task-test-review skill)"
-  in steps.md remain outstanding.
+Reviewed concurrently with commit `132507a24` (an in-flight implementation
+pass that landed mid-review, addressing both prior "Test review follow-up"
+items — temp-cwd/temp-session-root wiring coverage and per-pattern
+leak-freeness assertions). Re-verified against the resulting final state
+(`test_support.clj`, `test_support_test.clj`, `query_graph_test.clj`,
+`git_worktree_test.clj`, `work_on_test.clj`): 0 new issues found, 0 steps
+added.
 
 ## Test review (task-test-review skill)
 
