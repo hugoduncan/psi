@@ -88,6 +88,20 @@
       (is (not (.exists (File. ^String @repo-dir*)))
           "repo-dir should be deleted once with-null-context's body returns"))))
 
+(deftest with-null-context-deletes-linked-worktree-root-in-finally-test
+  ;; Guards cleanup for linked worktrees created outside the target repo.
+  (testing "with-null-context removes its external linked-worktree-root"
+    (let [root* (atom nil)]
+      (with-null-context [ctx nil]
+        (let [root (linked-worktree-root ctx)]
+          (reset! root* root)
+          (.mkdirs (File. root))
+          (spit (File. (str root File/separator "artifact.txt")) "temporary linked worktree artifact\n")
+          (is (.exists (File. root))
+              "linked-worktree-root should exist while the body runs")))
+      (is (not (.exists (File. ^String @root*)))
+          "linked-worktree-root should be deleted once with-null-context's body returns"))))
+
 (defn- append-and-commit!
   [repo-dir rel-path content message]
   (let [f (File. (str repo-dir File/separator rel-path))
