@@ -900,3 +900,7 @@ opening a separate tracked task.
 ## Implementation review (task-implementation-review skill)
 
 - no new issues found; 0 steps added
+
+## Implementation review (task-implementation-review skill)
+
+- no new issues found; 0 steps added
