@@ -57,3 +57,12 @@ and the Scope Decision (shutdown-hook safety net for `temp-cwd`/
   JVM calls `temp-cwd` many times across a session; acceptable since the
   hooks are lightweight (only run at JVM exit) and `bb test` is a
   short-lived process per run.
+- Shutdown hooks only fire at JVM exit, so `temp-cwd`/`temp-session-root`
+  dirs created without their own `finally` cleanup are not removed
+  promptly when tests run via a long-lived REPL/nREPL process (Scry's
+  REPL/in-process workflow) — they accumulate under the OS temp dir until
+  that process exits, which can be hours/days later. Accepted for this
+  task's frozen scope (no per-invocation sweep added); documented directly
+  on `register-cleanup-shutdown-hook!`/`temp-cwd`/`temp-session-root` in
+  `test_support.clj` per the review follow-up
+  (`munera/open/234-complete-test-artifact-cleanup/steps.md`).

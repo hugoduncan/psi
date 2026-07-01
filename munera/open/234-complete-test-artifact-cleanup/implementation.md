@@ -746,3 +746,39 @@ checked off (with rationale in `design.md`), `create-task-plan` cannot run,
 so there is nothing for a design-steps-resolving task to do this slice
 produced — it should simply confirm the gate is still open and stop, as
 this and prior plan-review slices have done.
+
+## Review follow-up — documented REPL/in-process cleanup-delay limitation
+
+Executed the one unchecked "Review follow-up" item added by the immediately
+preceding review pass (commit `92e3f0182`): the shutdown-hook safety net
+only fires at JVM exit, so `temp-cwd`/`temp-session-root` dirs without their
+own `finally` cleanup are not removed promptly when tests run via Scry's
+long-lived REPL/in-process workflow.
+
+Chose the "explicitly document the limitation" branch offered by the
+follow-up item, not the "build a per-invocation cleanup fallback" branch:
+building a Scry pre/post-run sweep would mean editing files outside this
+task's frozen 4-file In-Scope list, which the design's own "Scope Decision"
+section already argued against for the closely related SCOPE_QUESTION
+(prefer a centralized, already-in-scope fix over touching unrelated files).
+Documentation-only stays inside `test_support.clj`, the in-scope file that
+owns the mechanism.
+
+- Added a "Known limitation" paragraph to `register-cleanup-shutdown-hook!`'s
+  docstring in `components/agent-session/test/psi/agent_session/test_support.clj`,
+  explaining the REPL/nREPL cleanup-delay gap and pointing at manual
+  mitigation (restart the REPL/nREPL process, or manually sweep
+  `psi-agent-session-test-`/`psi-agent-session-store-` dirs).
+- Extended plan.md's Risks section with the cleanup-delay risk (previously
+  only accumulation was recorded; the two are related but distinct
+  concerns) and a pointer to where it's documented.
+- Verified: `clj-paren-repair` reports no changes needed, `clj-kondo --lint`
+  reports 0 errors/0 warnings on the changed file, and
+  `psi.agent-session.query-graph-test` (exercises `temp-cwd`/
+  `temp-session-root` call paths) passes (8 tests, 0 failures).
+
+No `with-xxx`/Scry-side fallback mechanism was built — that remains a
+possible future task if the delay proves to be a real problem in practice;
+this pass only closes the documentation branch of the follow-up item.
+
+- addressed 1 review step

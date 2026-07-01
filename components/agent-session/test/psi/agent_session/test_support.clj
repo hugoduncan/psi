@@ -124,7 +124,19 @@
   JVM process), without requiring every caller to track and clean up the
   path itself. Per-caller `finally` cleanup (where present) still runs
   first and remains the fast path; this hook only matters when that never
-  happens."
+  happens.
+
+  Known limitation: this hook only fires at JVM exit. When tests run via a
+  long-lived REPL/nREPL process (the `.psi/skills/scry/SKILL.md` \"REPL /
+  in-process workflow\", used while iterating), the JVM may stay up for
+  hours or days, so directories created via `temp-cwd`/`temp-session-root`
+  without their own `finally` cleanup accumulate under the OS temp dir
+  until that process eventually exits. This does not affect `bb test`'s
+  CLI invocation (one short-lived JVM per run), only interactive
+  REPL-based iteration. No automated per-invocation sweep exists for that
+  path yet; if it becomes a problem, periodically restart the REPL/nREPL
+  process, or manually sweep `psi-agent-session-test-`/
+  `psi-agent-session-store-` dirs from the OS temp dir."
   [path]
   (.addShutdownHook (Runtime/getRuntime)
                     (Thread. ^Runnable (fn [] (delete-recursively! path)))))

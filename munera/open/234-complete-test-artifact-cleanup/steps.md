@@ -27,7 +27,7 @@
 
 ## Review follow-up
 
-- [ ] The shutdown-hook safety net in `temp-cwd`/`temp-session-root` only
+- [x] The shutdown-hook safety net in `temp-cwd`/`temp-session-root` only
       fires at JVM exit, so it satisfies AC1 for `bb test`'s CLI invocation
       (one subprocess per run, confirmed empirically: temp dirs are gone
       immediately after the `clojure -M:test-paths ...` subprocess exits)
