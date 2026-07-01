@@ -45,3 +45,5 @@
 - added 1 code-shaper step to be addressed
 
 - addressed 1 code-shaper review step: preserved Git porcelain XY slots for `git/status` by using untrimmed stdout and added coverage that a worktree-only tracked-file modification reports `:modified`, not `:staged`; verified focused status test, focused git-test namespace, full `psi.history.git-worktree-test`, and clj-kondo on edited files pass.
+
+- no new code-shaper review feedback
