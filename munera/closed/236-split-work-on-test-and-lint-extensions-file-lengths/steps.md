@@ -89,3 +89,8 @@
 - [x] TT6: Remove the duplicated hardcoded legacy file-length ratchet map from `extensions.commit-checks-test`; derive the expected legacy ratchet paths/limits from the real `bb commit-check:file-lengths` implementation or a shared source so the test fails if the real ratchet set changes without matching coverage.
 - [x] TT7: Add executable coverage for `bb commit-check:file-lengths` when a scanned root has no matching `src`/`test` files and/or an optional scanned root is absent, so the design constraint that the widened `find` pattern does not break in sparse repo/subtree shapes is proven instead of only testing the full current repository layout.
 - [x] TT8: Strengthen sparse-shape coverage for `bb commit-check:file-lengths` by executing the real shared `file-length-find-args`/`find` path against a temporary present scan root that has no matching `src`/`test` files, so malformed `find` argument construction in sparse repos fails the test instead of only proving helper return values.
+## Docs review follow-ups — 2026-07-01
+
+- [ ] DT1: Update `doc/extensions.md`'s `bb commit-check:file-lengths` description so it matches the implemented command: it scans `components/`, `bases/`, and `extensions/` `src`/`test` paths, with explicitly recorded legacy oversized extension files ratcheted to fail only if they grow.
+- [ ] DT2: Update `ramora/develop/setup-hooks.md`'s `commit-check:file-lengths` section so it no longer says only `components/` and `bases/`, and documents the `extensions/` scan plus legacy ratchet behavior.
+- [ ] DT3: Add a `CHANGELOG.md` `[Unreleased]` entry for the `bb commit-check:file-lengths` behavior change, unless the open scope question is explicitly resolved as internal-only/no-changelog.
