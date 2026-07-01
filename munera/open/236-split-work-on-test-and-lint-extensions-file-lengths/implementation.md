@@ -6,3 +6,4 @@
 - 2026-07-01 design follow-up: review-batch baseline identified as parent of `7fdbfe742` (`2c5477fe5`); candidate checklist was the four lines added to `design-steps.md` by `git diff 2c5477fe5..HEAD -- <task>/design-steps.md`. Completed the three non-scope design clarifications; left the `SCOPE_QUESTION` unchecked/deferred to the user.
 - 2026-07-01 architecture review: no new architectural-fit feedback.
 - 2026-07-01 ambiguity review shared-session turn: no new ambiguity feedback.
+- 2026-07-01 inconsistency review shared-session turn: no new inconsistency feedback.
