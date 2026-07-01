@@ -293,6 +293,17 @@
         (testing "removes the worktree directory from disk"
           (is (false? (.exists (File. wt-path)))))))))
 
+(deftest worktree-add-via-fixture-keeps-target-status-clean
+  ;; Guards the branch-merge fixture invariant directly: linked worktrees must
+  ;; not appear as untracked paths in the target null repo before merge.
+  (testing "worktree add through linked-worktree-path leaves the target repo clean"
+    (with-null-context [ctx seed-commits]
+      (let [wt-path (linked-worktree-path ctx "feature-clean-status")
+            added   (git/worktree-add ctx {:path wt-path
+                                           :branch "feature-clean-status"})]
+        (is (true? (:success added)))
+        (is (= :clean (git/status ctx)))))))
+
 (deftest worktree-add-fails-when-path-already-exists
   ;; Tests worktree-add path validation before invoking git.
   (testing "worktree-add"
