@@ -1064,3 +1064,7 @@ shows no leaked test worktrees.
 ## Docs review (review-task-docs skill, this pass)
 
 - no new docs issues found; 0 steps added
+
+## Code-shaper review (this pass)
+
+- no new actionable issues found; 0 steps added
