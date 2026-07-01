@@ -18,98 +18,95 @@
     (spit f (pr-str cfg))
     (.getCanonicalPath f)))
 
-(defn- mkdirs! [path]
-  (.mkdirs (io/file path))
-  path)
-
 (defn- write-lines! [path line-count]
   (.mkdirs (.getParentFile (io/file path)))
   (spit path (str (str/join "\n" (repeat line-count "x")) "\n"))
   path)
 
-(defn- write-bb-edn! [workspace-dir]
-  (spit (io/file workspace-dir "bb.edn")
-        (pr-str
-         {:tasks
-          {'commit-check:file-lengths
-           {:doc "Fail when src/ or test/ files under components/, bases/, or extensions/ exceed 800 lines; recorded legacy oversized extension files fail if they grow."
-            :requires '([babashka.tasks :refer [shell]]
-                        [clojure.string :as str])
-            :task
-            '(let [legacy-max-lines {"extensions/legacy/test/extensions/legacy_test.clj" 974}
-                   result (shell {:out :string}
-                                 "find" "components" "bases" "extensions" "-type" "f"
-                                 "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
-                                 "-exec" "wc" "-l" "{}" ";")
-                   lines (str/split-lines (:out result))
-                   bad (->> lines
-                            (keep (fn [line]
-                                    (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)
-                                          line-count (some-> n Long/parseLong)
-                                          limit (get legacy-max-lines path 800)]
-                                      (when (and line-count path (> line-count limit))
-                                        (str path " (" n " lines, " limit " limit)")))))
-                            vec)]
-               (when (seq bad)
-                 (binding [*out* *err*]
-                   (println "Files longer than allowed line limits:")
-                   (doseq [line bad]
-                     (println line)))
-                 (System/exit 1)))}}})))
+(def repo-root
+  (.getCanonicalPath (io/file ".")))
 
-(defn- run-file-length-check [workspace-dir]
-  (proc/shell {:dir workspace-dir
+(def legacy-file-length-limits
+  {"extensions/auto-session-name/test/extensions/auto_session_name_test.clj" 974
+   "extensions/dev-http/test/extensions/dev_http_test.clj" 816
+   "extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj" 1020
+   "extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj" 2058})
+
+(defn- run-file-length-check []
+  (proc/shell {:dir repo-root
                :continue true
                :out :string
                :err :string}
               "bb" "commit-check:file-lengths"))
 
+(defn- delete-file-if-exists! [path]
+  (let [f (io/file repo-root path)]
+    (when (.exists f)
+      (io/delete-file f))))
+
+(defn- with-temporary-oversized-file! [path f]
+  (let [file (io/file repo-root path)]
+    (try
+      (write-lines! file 801)
+      (f)
+      (finally
+        (delete-file-if-exists! path)))))
+
+(defn- with-temporary-growth! [path f]
+  (let [file     (io/file repo-root path)
+        original (slurp file)]
+    (try
+      (spit file (str original "x\n"))
+      (f)
+      (finally
+        (spit file original)))))
+
 (defn- combined-output [{:keys [out err]}]
   (str out err))
 
-(deftest file-length-check-scans-extensions-and-enforces-legacy-ratchet-test
-  ;; Verifies that commit-check:file-lengths scans extensions/ and preserves
-  ;; legacy ratchet semantics for recorded oversized extension files.
-  (let [workspace-dir (temp-dir)
-        offender "extensions/sample/test/extensions/too_long_test.clj"
-        legacy "extensions/legacy/test/extensions/legacy_test.clj"
-        legacy-file (io/file workspace-dir legacy)]
-    (write-bb-edn! workspace-dir)
-    (doseq [root ["components" "bases" "extensions"]]
-      (mkdirs! (io/file workspace-dir root)))
-    (write-lines! (io/file workspace-dir offender) 801)
-    (write-lines! legacy-file 974)
-    (let [result (run-file-length-check workspace-dir)
-          output (combined-output result)]
-      (is (pos? (:exit result)))
-      (is (str/includes? output offender))
-      (is (str/includes? output "800 limit"))
-      (is (not (str/includes? output legacy))))
-    (io/delete-file (io/file workspace-dir offender))
-    (let [result (run-file-length-check workspace-dir)]
-      (is (zero? (:exit result)) (combined-output result)))
-    (write-lines! legacy-file 975)
-    (let [result (run-file-length-check workspace-dir)
-          output (combined-output result)]
-      (is (pos? (:exit result)))
-      (is (str/includes? output legacy))
-      (is (str/includes? output "974 limit")))))
+(deftest file-length-check-scans-extensions-with-real-task-test
+  ;; Verifies the real bb.edn commit-check:file-lengths task scans extensions/
+  ;; and reports a controlled oversized test file with the default 800 limit.
+  (let [offender "extensions/commit-checks/test/extensions/too_long_real_task_probe.clj"]
+    (with-temporary-oversized-file!
+      offender
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)))
+          (is (str/includes? output offender))
+          (is (str/includes? output "800 limit")))))))
 
-(deftest file-length-check-still-scans-components-and-bases-test
-  ;; Verifies that widening the commit check to extensions/ did not regress the
-  ;; original components/ and bases/ src/test scan roots.
-  (doseq [[root file] {"components" "components/sample/src/sample/core.clj"
-                       "bases" "bases/sample/test/sample/base_test.clj"}]
-    (let [workspace-dir (temp-dir)]
-      (write-bb-edn! workspace-dir)
-      (doseq [root* ["components" "bases" "extensions"]]
-        (mkdirs! (io/file workspace-dir root*)))
-      (write-lines! (io/file workspace-dir file) 801)
-      (let [result (run-file-length-check workspace-dir)
-            output (combined-output result)]
-        (is (pos? (:exit result)) root)
-        (is (str/includes? output file))
-        (is (str/includes? output "800 limit"))))))
+(deftest file-length-check-still-scans-components-and-bases-with-real-task-test
+  ;; Verifies the real bb.edn task still scans the original components/ and
+  ;; bases/ src/test roots after the extensions/ widening.
+  (doseq [[root file] {"components" "components/commit_check_file_lengths_probe/src/probe/core.clj"
+                       "bases" "bases/commit_check_file_lengths_probe/test/probe/base_test.clj"}]
+    (with-temporary-oversized-file!
+      file
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)) root)
+          (is (str/includes? output file))
+          (is (str/includes? output "800 limit")))))))
+
+(deftest file-length-check-enforces-real-legacy-ratchets-test
+  ;; Verifies every real legacy ratchet path in bb.edn passes at its recorded
+  ;; line count and fails when it grows beyond its path-specific limit.
+  (let [baseline (run-file-length-check)]
+    (is (zero? (:exit baseline)) (combined-output baseline)))
+  (doseq [[path limit] legacy-file-length-limits]
+    (with-temporary-growth!
+      path
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)) path)
+          (is (str/includes? output path))
+          (is (str/includes? output (str limit " limit")))))))
+  (let [restored (run-file-length-check)]
+    (is (zero? (:exit restored)) (combined-output restored))))
 
 (deftest init-registers-handler-test
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
