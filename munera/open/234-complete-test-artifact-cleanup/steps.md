@@ -148,3 +148,37 @@
       `design.md`, which is read-only context for this pass. Opened
       `munera/open/236-split-work-on-test-and-lint-extensions-file-lengths/`
       (design-only) to track both.
+
+## Test review follow-up (task-test-review skill)
+
+- [ ] No automated test asserts the core AC1/AC2 leak-freeness invariant
+      end-to-end. `with-null-context` (`git_worktree_test.clj`), the
+      `try`/`finally` blocks in `query_graph_test.clj`, and the new
+      `try`/`finally` in `work_on_test.clj` are all trusted to actually
+      remove their directories/worktrees, but no test asserts
+      `(.exists (io/file repo-dir))` (or `git worktree list`) is
+      false/empty after the macro/body completes — every "no leak"
+      confirmation in `implementation.md`/`steps.md` is a manual
+      `ls /tmp`/`git worktree list` check, not an executable assertion. A
+      future change that broke `with-null-context`'s `finally`, or
+      dropped one of the new `try`/`finally` wraps, would not be caught by
+      `bb test`. Consider adding one representative assertion per pattern
+      (e.g. assert `repo-dir` is gone immediately after a
+      `with-null-context` body returns) to guard the cleanup wiring
+      itself, not just the behaviour it wraps.
+- [ ] `test_support_test.clj`'s regression test invokes the private
+      `register-cleanup-shutdown-hook!` directly
+      (`#'test-support/register-cleanup-shutdown-hook!`) against a
+      manually created temp dir — it never calls `temp-cwd`/
+      `temp-session-root`. It therefore verifies the hook mechanism works
+      in isolation, but not that `temp-cwd`/`temp-session-root` actually
+      invoke it: a refactor that dropped the
+      `(register-cleanup-shutdown-hook! p)` call from either function
+      (while leaving `register-cleanup-shutdown-hook!` itself intact)
+      would not be caught by this test. Consider extending the test (or
+      adding a second one) that calls `temp-cwd`/`temp-session-root`
+      directly and confirms a shutdown hook for that exact path is
+      registered (e.g. via `Runtime.getRuntime()`'s hook set through
+      reflection, or by having `temp-cwd`/`temp-session-root` return the
+      hook alongside the path in a test-only variant) and cleans up the
+      directory when run.

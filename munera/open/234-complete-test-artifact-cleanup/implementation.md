@@ -901,6 +901,10 @@ opening a separate tracked task.
 
 - no new issues found; 0 steps added
 
+## Test review (task-test-review skill)
+
+- added 2 steps to be addressed
+
 ## Implementation review (task-implementation-review skill)
 
 - no new issues found; 0 steps added
