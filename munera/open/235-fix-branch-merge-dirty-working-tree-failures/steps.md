@@ -37,3 +37,7 @@
 - [x] Update `munera/open/235-fix-branch-merge-dirty-working-tree-failures/implementation.md` with the root cause, patch summary, and verification commands/results.
 - [x] Review the final diff for minimality and for preserving production dirty-tree semantics.
 - [x] Commit the implementation changes separately from this planning commit when the fix is complete.
+
+## Test review follow-up
+
+- [ ] Add executable coverage that an untracked target-worktree directory, not only an untracked file, makes `branch-merge` reject with `"working tree is dirty"`.
