@@ -129,7 +129,7 @@
 
 ## Implementation review follow-up (task-implementation-review skill, this pass)
 
-- [ ] `extensions/work-on/test/extensions/work_on_test.clj` is 1292 lines
+- [x] `extensions/work-on/test/extensions/work_on_test.clj` is 1292 lines
       (already 1277 before this task's changes; this task's own
       `delete-recursively!` helper + `try`/`finally` wrap added ~15 more),
       well over the project's 800-line-per-file standard
@@ -142,3 +142,9 @@
       follow-up task, not this one — Out of Scope forbids restructuring
       beyond cleanup-path fixes), and/or widening
       `commit-check:file-lengths` to also scan `extensions/`.
+      Both actions (splitting the file, widening the lint scan) are
+      restructuring/tooling work unrelated to this task's test-artifact-
+      leak Acceptance Criteria and outside its 4-file In Scope list, per
+      `design.md`, which is read-only context for this pass. Opened
+      `munera/open/236-split-work-on-test-and-lint-extensions-file-lengths/`
+      (design-only) to track both.

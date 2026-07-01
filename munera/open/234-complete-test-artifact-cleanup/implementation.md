@@ -879,3 +879,20 @@ failures (implementation.md's "Implement-task" section); re-confirming
 that baseline isn't needed to validate these two changes.
 
 - addressed 2 review steps
+
+## Follow-up pass: file-length review item (this pass)
+
+The remaining unchecked item ("Implementation review follow-up
+(task-implementation-review skill, this pass)") flags
+`work_on_test.clj`'s 1292-line size (over the 800-line standard) and
+`commit-check:file-lengths`'s `extensions/`-blind scan. Both suggested
+actions — splitting the test file and widening the lint scan — are
+restructuring/tooling changes outside this task's 4-file In Scope list
+and unrelated to its test-artifact-leak Acceptance Criteria (`design.md`,
+read-only context this pass). Rather than execute out-of-scope work,
+opened `munera/open/236-split-work-on-test-and-lint-extensions-file-lengths/`
+(design-only) to track it, mirroring the AC4 follow-up's precedent of
+opening a separate tracked task.
+
+- addressed 1 review step (opened follow-up task 236; not directly
+  actionable in this task's scope)
