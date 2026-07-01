@@ -36,3 +36,5 @@
 - no new docs review feedback
 
 - added 1 step to be addressed
+
+- addressed 1 code-shaper review step: updated `with-null-context-deletes-linked-worktree-root-in-finally-test` to create an actual external linked worktree via `git/worktree-add` and assert both the worktree path and root are removed after the fixture; verified focused test passes (`1 tests, 5 assertions, 0 failures`), full `psi.history.git-worktree-test` passes (`41 tests, 115 assertions, 0 failures`), and clj-kondo passes for the edited test.

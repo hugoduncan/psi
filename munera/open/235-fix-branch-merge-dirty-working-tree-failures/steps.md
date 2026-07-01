@@ -45,4 +45,4 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Add executable coverage that `with-null-context` cleans up an actual external linked worktree created via `git/worktree-add`, not only an arbitrary file under `linked-worktree-root`.
+- [x] Add executable coverage that `with-null-context` cleans up an actual external linked worktree created via `git/worktree-add`, not only an arbitrary file under `linked-worktree-root`.
