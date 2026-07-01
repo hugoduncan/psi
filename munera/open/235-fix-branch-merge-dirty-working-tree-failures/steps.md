@@ -46,3 +46,4 @@
 ## Code-shaper review follow-up
 
 - [x] Add executable coverage that `with-null-context` cleans up an actual external linked worktree created via `git/worktree-add`, not only an arbitrary file under `linked-worktree-root`.
+- [ ] Replace `git/status`'s substring-based porcelain classification with line/XY-slot parsing so staged detection is not affected by path text while preserving untracked-path dirty semantics.
