@@ -69,3 +69,35 @@ The `fix-repeated-thinking-output` references in `work_on_test.clj` are string l
 1. Are the `linked-worktree-path` worktrees actually leaking, or is the `with-null-context` finally already cleaning them? Need to verify by running tests and checking for leftover dirs.
 2. For `temp-cwd` / `temp-session-root`: which callers fail to clean up? Is it a missing `finally` in a specific test, or a systemic issue where `safe-context-opts` creates a default `temp-cwd` that callers don't track?
 3. Should we add a safety-net sweep of known temp prefixes after every test? Per `clojure-coding-standards` ("No use-fixtures — prefer `with-xxx` macros for setup/teardown"), any such sweep must be a `with-xxx`-style macro or explicit-call mechanism, not `clojure.test/use-fixtures :each`.
+
+## Scope Decision: `temp-cwd` / `temp-session-root` safety net (resolves prior SCOPE_QUESTION)
+
+Resolved: the In-Scope file list stays exactly the 4 files named above (it is
+not extended to the ~15-16 other `temp-cwd`/`temp-session-root` caller
+files). AC1 is satisfied for these two prefixes by making the optional
+`test_support.clj` safety net **mandatory**, implemented as a JVM shutdown
+hook registered at the point of directory creation:
+
+- `temp-cwd` and `temp-session-root` each register
+  `(.addShutdownHook (Runtime/getRuntime) (Thread. (fn [] (delete-recursively! p))))`
+  for the directory they just created, before returning its path.
+- This guarantees `delete-recursively!` runs when the JVM process exits,
+  regardless of which test file calls `temp-cwd`/`temp-session-root` or
+  whether that caller has its own `finally` cleanup. Each `bb test`
+  invocation runs Clojure tests in a single JVM process (`clojure
+  -M:test-paths ...`) that exits after the run, so the hook fires before
+  the process — and thus the `bb test` run — completes, satisfying AC1's
+  "after a single `bb test` run" wording without editing any of the
+  ~15-16 un-listed caller files.
+- This is an "explicit-call mechanism" registered at resource-creation time
+  (not `clojure.test/use-fixtures`, not a new `with-xxx` macro every caller
+  must adopt), consistent with Key Question 3's resolution.
+- Per-caller `finally`/`with-temp-session-root` cleanup (where it already
+  exists) still runs first and remains the fast path; the shutdown hook is
+  a true safety net for callers that have none.
+- Rationale for not extending the In-Scope file list: a centralized fix
+  inside the already-in-scope `test_support.clj` is strictly less invasive
+  than touching 15-16 unrelated test files for an unrelated task, fully
+  satisfies AC1 for these two prefixes, and matches the design's own
+  escape-hatch wording ("a with-xxx-style helper ... may be added as a
+  safety net").

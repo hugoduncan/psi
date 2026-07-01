@@ -108,11 +108,33 @@
    :execution-result/tool-calls       []
    :execution-result/stop-reason      :stop})
 
+(defn delete-recursively!
+  [path]
+  (let [f (java.io.File. (str path))]
+    (when (.exists f)
+      (doseq [child (reverse (file-seq f))]
+        (.delete ^java.io.File child)))))
+
+(defn- register-cleanup-shutdown-hook!
+  "Register a JVM shutdown hook that recursively deletes `path`.
+
+  Safety net for callers of `temp-cwd`/`temp-session-root` that have no
+  `finally`-based cleanup of their own: guarantees the directory is removed
+  when the JVM process exits (each `bb test` run is a single short-lived
+  JVM process), without requiring every caller to track and clean up the
+  path itself. Per-caller `finally` cleanup (where present) still runs
+  first and remains the fast path; this hook only matters when that never
+  happens."
+  [path]
+  (.addShutdownHook (Runtime/getRuntime)
+                    (Thread. ^Runnable (fn [] (delete-recursively! path)))))
+
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory
                 "psi-agent-session-test-"
                 (make-array java.nio.file.attribute.FileAttribute 0)))]
     (.mkdirs (java.io.File. p))
+    (register-cleanup-shutdown-hook! p)
     p))
 
 (defn temp-session-root []
@@ -120,14 +142,8 @@
                 "psi-agent-session-store-"
                 (make-array java.nio.file.attribute.FileAttribute 0)))]
     (.mkdirs (java.io.File. p))
+    (register-cleanup-shutdown-hook! p)
     p))
-
-(defn delete-recursively!
-  [path]
-  (let [f (java.io.File. (str path))]
-    (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete ^java.io.File child)))))
 
 (defn with-temp-session-root
   "Run f with a test-owned temporary session root. Cleans it up in finally.

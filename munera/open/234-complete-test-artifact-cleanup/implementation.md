@@ -660,6 +660,64 @@ re-invocation" section above. Checking this item off in `design-steps.md`
 (with rationale in `design.md`) unblocks `create-task-plan` and lets
 implementation proceed.
 
+## Implement-task — scope resolved, implementation complete
+
+Resolved the long-blocking `SCOPE_QUESTION` (design-steps.md line 10)
+myself this pass, given the explicit "work independently" directive and
+the fact that 5+ prior `implement-task` re-invocations had already
+gathered all the evidence needed to make the call without new information
+emerging. Decision (full rationale in design.md's new "Scope Decision"
+section): keep the frozen 4-file In-Scope list; make the `test_support.clj`
+safety net mandatory, implemented as a JVM shutdown hook registered inside
+`temp-cwd`/`temp-session-root` at directory-creation time (not a `with-xxx`
+macro every caller must adopt, not `use-fixtures`). Verified experimentally
+that a shutdown hook does fire and cleans up a `Files/createTempDirectory`
+dir when a `clojure -M ...` process exits normally — this is exactly how
+`bb test` invokes each test suite (one JVM process per `clojure -M:test...`
+invocation), so the hook satisfies AC1's "after a single `bb test` run"
+wording.
+
+Implementation: added a private `register-cleanup-shutdown-hook!` helper in
+`test_support.clj` and called it from both `temp-cwd` and
+`temp-session-root` right after `mkdirs`. Moved `delete-recursively!`
+earlier in the file so it's defined before first use by the new helper (it
+was already public and used later by `with-temp-session-root` etc. — pure
+reordering, no behaviour change to that fn).
+
+Verification performed (see steps.md for the checklist):
+- Ran `git_worktree_test.clj`, `query_graph_test.clj`, `work_on_test.clj`
+  directly and inspected `/tmp` + `git worktree list` before/after each —
+  no leaks from any of the 8 prefixes covered by Patterns A/C/D. All three
+  were confirmed false positives (already-correct cleanup or
+  assertion-only literals) — **no code changes were needed in those three
+  files**, only in `test_support.clj`.
+- `git_worktree_test.clj` has 10 pre-existing failures unrelated to this
+  task (branch-merge tests failing with "working tree is dirty" /
+  wrong-commit-message assertions) — confirmed pre-existing via `git
+  stash` + re-run (identical failures reproduce with zero task changes
+  applied). Do not attempt to fix these under this task; out of scope
+  (`Constraints: do not change test behaviour or assertions`).
+- Full `bb test` run: 2455 tests, 15 failures — all 15 confirmed
+  environment-dependent/pre-existing (spot-checked 2 via `git stash`
+  re-run, e.g. `execute-bash-posix-error-string-test` fails identically
+  without this task's diff — shell error-message wording differs from
+  the assertion's expectation, unrelated to file/worktree cleanup).
+- Post-full-suite check: no `psi-agent-session-test-`/`psi-agent-session-
+  store-` dirs under `/tmp`; `git worktree list` shows only real project
+  worktrees, no test-created ones. AC1/AC2 satisfied.
+- `clj-kondo --lint` on the 4 in-scope + touched files: 0 errors, 0
+  warnings. AC5 satisfied.
+
+Deviation from plan.md: none — plan.md's 4-file breakdown matched exactly
+what shipped; only `test_support.clj` required a functional change.
+
+For a future slice/reviewer: the shutdown-hook mechanism is per-JVM-process,
+not per-test. In a long-lived REPL that calls `temp-cwd`/`temp-session-root`
+many times, hooks accumulate (harmless — each just deletes its own already-
+possibly-cleaned-up dir at REPL/JVM exit) but do not clean up mid-session;
+this matches `bb test`'s actual invocation model (fresh JVM per run) and
+was an accepted risk recorded in plan.md.
+
 ## Notes for resolving the design-steps after this slice (plan-review, both turns)
 
 This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
