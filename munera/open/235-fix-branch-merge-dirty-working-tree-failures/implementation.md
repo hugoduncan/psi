@@ -8,3 +8,5 @@
 - no new ambiguity review feedback
 
 - Design-step carry-forward: no open design follow-ups remain; implementation should treat the resolved untracked-file decision as a constraint, not a scope change. If the fix touches the EQL mutation surface, `components/history/src/psi/history/resolvers.clj` only delegates to `git/branch-merge`; keep behaviour owned in `components/history/src/psi/history/git.clj` and proof in `components/history/test/psi/history/git_worktree_test.clj`.
+
+- Plan-review ambiguity turn: no new actionable ambiguity feedback; no design-steps added.
