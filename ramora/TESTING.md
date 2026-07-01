@@ -68,3 +68,11 @@ iteration.
 ## Performance Notes
 
 The startup cost is incurred once per JVM instance. Using a warm REPL or nREPL connection can amortize this cost across multiple test runs.
+
+When iterating in a long-lived REPL/nREPL process, `temp-cwd` and
+`temp-session-root` shutdown-hook cleanup only runs when that JVM exits.
+Temporary directories with the `psi-agent-session-test-` and
+`psi-agent-session-store-` prefixes may therefore remain under the OS temp
+directory until the REPL is restarted or the prefixes are swept manually;
+short-lived `bb test` CLI runs exit the JVM after the run and trigger the
+cleanup promptly.
