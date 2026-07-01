@@ -903,6 +903,14 @@ opening a separate tracked task.
 
 ## Test review (task-test-review skill)
 
+- re-verified against current diff (test_support.clj, test_support_test.clj,
+  query_graph_test.clj, work_on_test.clj); no code changes since the prior
+  test-review pass's findings — 0 new steps added. The 2 pre-existing
+  unchecked items under "Test review follow-up (task-test-review skill)"
+  in steps.md remain outstanding.
+
+## Test review (task-test-review skill)
+
 - added 2 steps to be addressed
 
 ## Implementation review (task-implementation-review skill)
