@@ -45,3 +45,30 @@
       test runs (e.g. a Scry pre/post-run hook that sweeps known
       `psi-agent-session-*` temp dirs) or explicitly document the
       limitation for REPL-based iteration.
+
+## Implementation review follow-up
+
+- [ ] AC4 ("`bb test` passes with no regressions") is not literally
+      satisfied — `bb test`/`clojure -M:test` currently exits non-zero
+      with pre-existing failures (10 confirmed in
+      `psi.history.git-worktree-test` alone, matching implementation.md's
+      claim of 15 full-suite failures), all in files untouched by this
+      task. This wording ambiguity (does "passes" require a clean exit, or
+      only "no *new* regressions" relative to a pre-existing-failure
+      baseline?) parallels AC5's lint-scope ambiguity, which was formally
+      raised and resolved in design.md — AC4 never received the same
+      treatment. Clarify AC4's wording (e.g. explicitly carve out
+      pre-existing/unrelated failures, mirroring AC5), and/or open a
+      separate tracked task for the pre-existing `branch-merge`
+      "working tree is dirty" failures in `git_worktree_test.clj` (none
+      currently exists under `munera/open/` or `munera/closed/`) so the
+      project's overall `bb test` health isn't silently treated as green.
+- [ ] No automated regression test exists for the new shutdown-hook
+      cleanup behaviour added to `temp-cwd`/`temp-session-root`
+      (`register-cleanup-shutdown-hook!` in `test_support.clj`) —
+      verification was manual/empirical only (per implementation.md's
+      "Verification performed" notes). A future refactor of `temp-cwd`/
+      `temp-session-root` could silently drop the hook registration with
+      nothing failing. Consider a minimal follow-up test (e.g. asserting
+      the created dir no longer exists after invoking the registered
+      shutdown-hook thread directly, without waiting for real JVM exit).
