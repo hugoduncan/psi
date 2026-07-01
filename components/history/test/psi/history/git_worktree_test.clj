@@ -54,23 +54,27 @@
       (doseq [child (reverse (file-seq f))]
         (.delete ^java.io.File child)))))
 
+(defn- linked-worktree-root
+  [ctx]
+  (str (:repo-dir ctx) "-worktrees"))
+
 (defn- linked-worktree-path
   [ctx name]
-  (let [repo-dir (:repo-dir ctx)
-        wt-dir   (str repo-dir File/separator "worktrees")
-        uniq     (str (java.util.UUID/randomUUID))]
+  (let [wt-dir (linked-worktree-root ctx)
+        uniq   (str (java.util.UUID/randomUUID))]
     (.mkdirs (File. wt-dir))
     (str wt-dir File/separator name "-" uniq)))
 
 (defmacro with-null-context
-  "Create a null context, bind it to sym, and clean up the repo dir in finally."
+  "Create a null context, bind it to sym, and clean up fixture dirs in finally."
   [[sym commits-or-nil] & body]
   `(let [ctx# (git/create-null-context ~commits-or-nil)
          ~sym ctx#]
      (try
        ~@body
        (finally
-         (delete-recursively! (:repo-dir ctx#))))))
+         (delete-recursively! (:repo-dir ctx#))
+         (delete-recursively! (linked-worktree-root ctx#))))))
 
 (deftest with-null-context-deletes-repo-dir-in-finally-test
   ;; Guards the finally-block cleanup wiring itself, not just the behaviour
@@ -407,6 +411,17 @@
           (let [result (git/branch-merge ctx {:branch "main"})]
             (is (false? (:merged result)))
             (is (= "working tree is dirty" (:error result)))))))))
+
+(deftest branch-merge-rejects-untracked-working-tree-path
+  ;; Tests branch-merge precondition enforcement for untracked target paths.
+  (testing "branch-merge"
+    (testing "rejects merge when the working tree contains an untracked path"
+      (with-null-context [ctx seed-commits]
+        (spit (File. (str (:repo-dir ctx) File/separator "UNTRACKED.md"))
+              "untracked\n")
+        (let [result (git/branch-merge ctx {:branch "main"})]
+          (is (false? (:merged result)))
+          (is (= "working tree is dirty" (:error result))))))))
 
 (deftest branch-merge-supports-ff-strategy
   ;; Tests branch-merge support for the explicit :ff strategy.
