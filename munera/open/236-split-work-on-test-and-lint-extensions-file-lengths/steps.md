@@ -78,5 +78,5 @@
 
 ## Test review follow-ups
 
-- [ ] TT1: Add executable coverage for `bb commit-check:file-lengths`'s widened `extensions/` scan, using a controlled oversized file under `extensions/*/{src,test}/` and asserting the task exits non-zero and reports the offending path with the 800-line limit; if legacy oversized extension files remain ratcheted, assert each recorded baseline path passes at its current count but fails if it grows.
-- [ ] TT2: Add executable coverage that `bb commit-check:file-lengths` still scans `components/*/{src,test}/` and `bases/*/{src,test}/` after the `extensions/` widening, using controlled oversized files or an equivalent isolated fixture so regressions in the original roots fail.
+- [x] TT1: Add executable coverage for `bb commit-check:file-lengths`'s widened `extensions/` scan, using a controlled oversized file under `extensions/*/{src,test}/` and asserting the task exits non-zero and reports the offending path with the 800-line limit; if legacy oversized extension files remain ratcheted, assert each recorded baseline path passes at its current count but fails if it grows.
+- [x] TT2: Add executable coverage that `bb commit-check:file-lengths` still scans `components/*/{src,test}/` and `bases/*/{src,test}/` after the `extensions/` widening, using controlled oversized files or an equivalent isolated fixture so regressions in the original roots fail.
