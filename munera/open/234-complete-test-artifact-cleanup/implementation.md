@@ -1047,3 +1047,7 @@ shows no leaked test worktrees.
 ## Implementation review (task-implementation-review skill, this pass)
 
 - no new actionable issues found; 0 steps added
+
+## Test review (task-test-review skill, this pass)
+
+- added 0 test-review steps
