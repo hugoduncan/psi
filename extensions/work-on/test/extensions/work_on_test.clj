@@ -78,6 +78,18 @@
       (throw (ex-info "git helper failed" {:args args :err err :exit exit})))
     out))
 
+(defn- delete-recursively!
+  "Recursively delete `path` (file or directory tree). No-op if it does not
+  exist. Local to this namespace: `psi.agent-session.test-support`'s
+  equivalent helper lives on agent-session's `test` classpath, which is not
+  on this namespace's classpath (only agent-session's `src` path is a
+  declared dep here)."
+  [path]
+  (let [f (java.io.File. (str path))]
+    (when (.exists f)
+      (doseq [child (reverse (file-seq f))]
+        (.delete ^java.io.File child)))))
+
 (deftest mechanical-slug-test
   (testing "slug is mechanical and limited to four significant words"
     (is (= {:raw-description "Fix the footer not displayed after tree session switch"
@@ -883,72 +895,75 @@
           clone-dir    (str (java.io.File. base-dir "clone"))
           repo-dir     (str (java.io.File. clone-dir))
           mutate-calls (atom [])]
-      (.mkdirs (java.io.File. seed-dir))
-      (run-git! base-dir "init" "--bare" remote-dir)
-      (run-git! base-dir "clone" remote-dir seed-dir)
-      (spit (str seed-dir "/README.md") "# seeded\n")
-      (run-git! seed-dir "add" "README.md")
-      (run-git! seed-dir "commit" "-m" "seed main")
-      (run-git! seed-dir "push" "origin" "HEAD:master")
-      (run-git! base-dir "clone" remote-dir clone-dir)
-      (run-git! clone-dir "checkout" "-b" "main" "origin/master")
-      (run-git! clone-dir "branch" "--set-upstream-to=origin/master" "main")
-      ;; Advance local HEAD without updating origin/master so the test can distinguish
-      ;; whether work-on actually uses the requested base ref or silently falls back to HEAD.
-      (spit (str clone-dir "/LOCAL_ONLY.md") "local only\n")
-      (run-git! clone-dir "add" "LOCAL_ONLY.md")
-      (run-git! clone-dir "commit" "-m" "advance local main only")
-      (let [origin-master-sha (str/trim (run-git! clone-dir "rev-parse" "origin/master"))
-            local-head-sha    (str/trim (run-git! clone-dir "rev-parse" "HEAD"))
-            {:keys [api state]} (nullable/create-nullable-extension-api
-                                 {:path "/test/work_on.clj"
-                                  :query-fn (with-session-query
-                                              {:psi.agent-session/session-id "s-main"
-                                               :psi.agent-session/worktree-path repo-dir
-                                               :psi.agent-session/system-prompt "prompt"
-                                               :psi.agent-session/host-sessions [{:psi.session-info/id "s-main"
-                                                                                  :psi.session-info/worktree-path repo-dir
-                                                                                  :psi.session-info/name "main"}]
-                                               :git.worktree/current {:git.worktree/path repo-dir
+      (try
+        (.mkdirs (java.io.File. seed-dir))
+        (run-git! base-dir "init" "--bare" remote-dir)
+        (run-git! base-dir "clone" remote-dir seed-dir)
+        (spit (str seed-dir "/README.md") "# seeded\n")
+        (run-git! seed-dir "add" "README.md")
+        (run-git! seed-dir "commit" "-m" "seed main")
+        (run-git! seed-dir "push" "origin" "HEAD:master")
+        (run-git! base-dir "clone" remote-dir clone-dir)
+        (run-git! clone-dir "checkout" "-b" "main" "origin/master")
+        (run-git! clone-dir "branch" "--set-upstream-to=origin/master" "main")
+        ;; Advance local HEAD without updating origin/master so the test can distinguish
+        ;; whether work-on actually uses the requested base ref or silently falls back to HEAD.
+        (spit (str clone-dir "/LOCAL_ONLY.md") "local only\n")
+        (run-git! clone-dir "add" "LOCAL_ONLY.md")
+        (run-git! clone-dir "commit" "-m" "advance local main only")
+        (let [origin-master-sha (str/trim (run-git! clone-dir "rev-parse" "origin/master"))
+              local-head-sha    (str/trim (run-git! clone-dir "rev-parse" "HEAD"))
+              {:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/work_on.clj"
+                                    :query-fn (with-session-query
+                                                {:psi.agent-session/session-id "s-main"
+                                                 :psi.agent-session/worktree-path repo-dir
+                                                 :psi.agent-session/system-prompt "prompt"
+                                                 :psi.agent-session/host-sessions [{:psi.session-info/id "s-main"
+                                                                                    :psi.session-info/worktree-path repo-dir
+                                                                                    :psi.session-info/name "main"}]
+                                                 :git.worktree/current {:git.worktree/path repo-dir
+                                                                        :git.worktree/branch-name "main"
+                                                                        :git.worktree/current? true}
+                                                 :git.worktree/list [{:git.worktree/path repo-dir
                                                                       :git.worktree/branch-name "main"
-                                                                      :git.worktree/current? true}
-                                               :git.worktree/list [{:git.worktree/path repo-dir
-                                                                    :git.worktree/branch-name "main"
-                                                                    :git.worktree/current? true}]})
-                                  :mutate-fn (fn [op params]
-                                               (swap! mutate-calls conj [op params])
-                                               (case op
-                                                 git.branch/default {:branch "main" :source :fallback}
-                                                 git.worktree/add! (git/worktree-add (git/create-context repo-dir)
-                                                                                     (:input params))
-                                                 psi.extension/set-worktree-path {:psi.agent-session/worktree-path (:worktree-path params)}
-                                                 psi.extension/append-message {:psi.extension/message params}
-                                                 psi.extension/create-session {:psi.agent-session/session-id "s-created"
-                                                                               :psi.agent-session/session-name (:session-name params)
-                                                                               :psi.agent-session/worktree-path (:worktree-path params)}
-                                                 nil))})]
-        (is (not= origin-master-sha local-head-sha)
-            "test setup must diverge local HEAD from origin/master")
-        (sut/init api)
-        ((get-in @state [:commands "work-on" :handler]) "--base origin/master fix flakey test")
-        (let [worktree-add-call (first @mutate-calls)
-              worktree-path     (get-in worktree-add-call [1 :input :path])
-              created-ctx       (git/create-context worktree-path)
-              head-sha          (git/current-commit created-ctx)
-              branch-name       (git/current-branch created-ctx)]
-          (is (= 'git.worktree/add! (first worktree-add-call)))
-          (is (= "origin/master" (get-in worktree-add-call [1 :input :base_ref])))
-          (is (= "fix-flakey-test" branch-name))
-          (is (= origin-master-sha head-sha)
-              "fresh worktree branch should start at origin/master, not the current local HEAD")
-          (is (not= local-head-sha head-sha)
-              "if this equals local HEAD then the requested base ref was ignored")
-          (is (= "fatal: no upstream configured for branch 'fix-flakey-test'"
-                 (try
-                   (str/trim (run-git! worktree-path "rev-parse" "--abbrev-ref" "--symbolic-full-name" "@{u}"))
-                   (catch clojure.lang.ExceptionInfo e
-                     (-> e ex-data :err str/trim))))
-              "new branch should not auto-track the base ref when created from origin/master"))))))
+                                                                      :git.worktree/current? true}]})
+                                    :mutate-fn (fn [op params]
+                                                 (swap! mutate-calls conj [op params])
+                                                 (case op
+                                                   git.branch/default {:branch "main" :source :fallback}
+                                                   git.worktree/add! (git/worktree-add (git/create-context repo-dir)
+                                                                                       (:input params))
+                                                   psi.extension/set-worktree-path {:psi.agent-session/worktree-path (:worktree-path params)}
+                                                   psi.extension/append-message {:psi.extension/message params}
+                                                   psi.extension/create-session {:psi.agent-session/session-id "s-created"
+                                                                                 :psi.agent-session/session-name (:session-name params)
+                                                                                 :psi.agent-session/worktree-path (:worktree-path params)}
+                                                   nil))})]
+          (is (not= origin-master-sha local-head-sha)
+              "test setup must diverge local HEAD from origin/master")
+          (sut/init api)
+          ((get-in @state [:commands "work-on" :handler]) "--base origin/master fix flakey test")
+          (let [worktree-add-call (first @mutate-calls)
+                worktree-path     (get-in worktree-add-call [1 :input :path])
+                created-ctx       (git/create-context worktree-path)
+                head-sha          (git/current-commit created-ctx)
+                branch-name       (git/current-branch created-ctx)]
+            (is (= 'git.worktree/add! (first worktree-add-call)))
+            (is (= "origin/master" (get-in worktree-add-call [1 :input :base_ref])))
+            (is (= "fix-flakey-test" branch-name))
+            (is (= origin-master-sha head-sha)
+                "fresh worktree branch should start at origin/master, not the current local HEAD")
+            (is (not= local-head-sha head-sha)
+                "if this equals local HEAD then the requested base ref was ignored")
+            (is (= "fatal: no upstream configured for branch 'fix-flakey-test'"
+                   (try
+                     (str/trim (run-git! worktree-path "rev-parse" "--abbrev-ref" "--symbolic-full-name" "@{u}"))
+                     (catch clojure.lang.ExceptionInfo e
+                       (-> e ex-data :err str/trim))))
+                "new branch should not auto-track the base ref when created from origin/master")))
+        (finally
+          (delete-recursively! base-dir))))))
 
 (deftest work-done-and-rebase-commands-test
   (testing "/work-done fast-forwards onto the cached default branch, switches sessions, and /work-rebase emits notifications"

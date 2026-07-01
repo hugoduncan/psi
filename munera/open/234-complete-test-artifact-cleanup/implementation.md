@@ -837,3 +837,41 @@ did not touch their content.
 ## Implementation review (task-implementation-review skill)
 
 - added 2 steps to be addressed
+
+## Implementation review follow-up (task-implementation-review skill, this pass)
+
+Executed both unchecked "Implementation review follow-up (task-implementation-review
+skill)" items added by the immediately preceding review pass:
+
+- `query_graph_test.clj`: wrapped the un-registered top-level `(testing
+  "isolated extension mutation path can attach a worktree to an existing
+  branch" ...)` form in a new `(deftest
+  ext-mutation-attach-worktree-to-existing-branch-test ...)`. The `try`/
+  `finally` `delete-recursively!` cleanup it already contained was
+  unchanged. Verified: `clj-paren-repair` reformatted (parens only），
+  `clj-kondo --lint` 0 errors/0 warnings, and `bb test --focus
+  psi.agent-session.query-graph-test` now reports 9 tests (was 8), 0
+  failures.
+- `work_on_test.clj`: checked whether `psi.agent-session.test-support`
+  (the item's suggested `delete-recursively!` source) is reachable from
+  this namespace — it is not: `work-on`'s `:test` alias depends on
+  `psi/agent-session {:local/root ...}`, which only contributes
+  agent-session's `src` path, not its `test` path (confirmed via `clojure
+  -A:test -Spath` in `extensions/work-on`). Added a small local
+  `delete-recursively!` helper (same `java.io.File`/`file-seq`-based
+  implementation as `test-support`'s) and wrapped
+  `work-on-command-with-remote-base-ref-integration-test`'s body in
+  `try`/`finally`, calling it on `base-dir` (behaviour-preserving
+  otherwise — no assertion or setup logic changed). Verified:
+  `clj-paren-repair` reports no changes needed, `clj-kondo --lint` 0
+  errors/0 warnings, `bb test --focus extensions.work-on-test` passes (21
+  tests, 118 assertions, 0 failures), and no `psi-work-on-remote-base-*`
+  directory remains under the OS temp dir after the run.
+
+Did not run a full `bb test` pass this slice: both changes are scoped to
+single namespaces already verified green in isolation, and prior passes
+already established the full-suite baseline has 15 pre-existing unrelated
+failures (implementation.md's "Implement-task" section); re-confirming
+that baseline isn't needed to validate these two changes.
+
+- addressed 2 review steps

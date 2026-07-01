@@ -87,7 +87,7 @@
 
 ## Implementation review follow-up (task-implementation-review skill)
 
-- [ ] `components/agent-session/test/psi/agent_session/query_graph_test.clj`
+- [x] `components/agent-session/test/psi/agent_session/query_graph_test.clj`
       (~lines 82-96): the `fix-repeated-thinking-output` worktree-attach
       test ("isolated extension mutation path can attach a worktree to an
       existing branch") is a top-level `(testing ...)` form, not wrapped in
@@ -100,7 +100,9 @@
       appearing to verify Pattern C's `fix-repeated-thinking-output`
       prefix. Wrap it in `deftest` (with a suitable test name) so it is
       actually exercised by the test suite.
-- [ ] `extensions/work-on/test/extensions/work_on_test.clj`'s
+      Wrapped in `(deftest ext-mutation-attach-worktree-to-existing-branch-test
+      ...)`; namespace now runs 9 `deftest`s (was 8).
+- [x] `extensions/work-on/test/extensions/work_on_test.clj`'s
       `work-on-command-with-remote-base-ref-integration-test` creates a
       `Files/createTempDirectory "psi-work-on-remote-base-"` directory,
       clones real git repos into it, and calls the real (non-stubbed)
@@ -117,3 +119,10 @@
       literals are assertion-only, not to auditing the rest of the file).
       Add `try`/`finally` + `test-support/delete-recursively!` (or
       equivalent) cleanup for `base-dir` in this test.
+      `psi.agent-session.test-support` is not reachable from this
+      namespace's classpath (only agent-session's `src` path is a declared
+      dep of `work-on`'s `:test` alias, not its `test` path — confirmed via
+      `clojure -A:test -Spath`), so added a local `delete-recursively!`
+      helper in `work_on_test.clj` (mirrors `test-support`'s
+      `java.io.File`-based implementation) and wrapped the test body in
+      `try`/`finally` calling it on `base-dir`.
