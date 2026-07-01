@@ -12,3 +12,5 @@
 - Plan-review ambiguity turn: no new actionable ambiguity feedback; no design-steps added.
 
 - Plan-review inconsistency turn: no new actionable inconsistency feedback; no design-steps added.
+
+- Design-step handoff addendum: the only design follow-up is already resolved; subsequent implementation should not reopen production dirty semantics unless new root-cause evidence contradicts the `git status --porcelain` observation.
