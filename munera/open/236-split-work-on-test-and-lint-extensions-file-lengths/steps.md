@@ -67,11 +67,16 @@
 - [x] Update the `find` root arguments in `commit-check:file-lengths` to include `extensions` while preserving the existing `src`/`test` path filter.
 - [x] Verify the widened `find` expression lists files under `extensions/*/src/*` and `extensions/*/test/*` without changing the intended `components/`/`bases/` matches.
 - [x] Create or use a controlled oversized file under an `extensions/*/test/` or `extensions/*/src/` path and confirm `bb commit-check:file-lengths` exits non-zero and reports that path, then remove the controlled file if one was created.
-- [x] Run `bb commit-check:file-lengths` against the real tree and record whether it passes or fails only on real out-of-scope oversized scanned files.
+- [x] Run `bb commit-check:file-lengths` against the real tree and record whether it passes, fails only on real out-of-scope oversized scanned files, or uses an explicit legacy ratchet for those files.
 
 ## Slice 8 — Final validation and notes
 
 - [x] Run the focused work-on extension tests one final time and record the result in `implementation.md`.
 - [x] Run final line-count checks for all new split files and record the results in `implementation.md`.
-- [x] Record any expected out-of-scope `bb commit-check:file-lengths` failures in `implementation.md`.
+- [x] Record any expected out-of-scope `bb commit-check:file-lengths` failures or legacy ratchet baselines in `implementation.md`.
 - [x] Confirm `git status --short` contains only intended changes for this task before committing the implementation work.
+
+## Test review follow-ups
+
+- [ ] TT1: Add executable coverage for `bb commit-check:file-lengths`'s widened `extensions/` scan, using a controlled oversized file under `extensions/*/{src,test}/` and asserting the task exits non-zero and reports the offending path with the 800-line limit; if legacy oversized extension files remain ratcheted, assert each recorded baseline path passes at its current count but fails if it grows.
+- [ ] TT2: Add executable coverage that `bb commit-check:file-lengths` still scans `components/*/{src,test}/` and `bases/*/{src,test}/` after the `extensions/` widening, using controlled oversized files or an equivalent isolated fixture so regressions in the original roots fail.
