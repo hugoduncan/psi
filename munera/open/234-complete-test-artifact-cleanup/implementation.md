@@ -1051,3 +1051,7 @@ shows no leaked test worktrees.
 ## Test review (task-test-review skill, this pass)
 
 - added 0 test-review steps
+
+## Test-shaper review (this pass)
+
+- no new actionable issues found; 0 steps added
