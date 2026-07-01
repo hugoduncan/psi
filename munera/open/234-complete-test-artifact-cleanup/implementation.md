@@ -718,6 +718,21 @@ possibly-cleaned-up dir at REPL/JVM exit) but do not clean up mid-session;
 this matches `bb test`'s actual invocation model (fresh JVM per run) and
 was an accepted risk recorded in plan.md.
 
+## Implementation review
+
+Verified the shutdown-hook mechanism cleans up correctly for `bb test`'s
+CLI/subprocess invocation (empirically confirmed: no leaked
+`psi-agent-session-*` dirs immediately after the test subprocess exits) and
+re-confirmed Patterns A/C/D's false-positive claims against current source
+(`git_worktree_test.clj`, `query_graph_test.clj`, `work_on_test.clj` — all
+match). Added 1 follow-up step: the shutdown hook does not promptly clean
+up `temp-cwd`/`temp-session-root` dirs when tests are run via this
+project's own recommended in-process/REPL workflow (`scry`'s REPL/in-process
+API) rather than `bb test`'s CLI subprocess — that gap was not previously
+considered in design.md/plan.md's risk analysis, which only addressed hook
+*accumulation* in a long-lived REPL, not that cleanup itself is deferred
+indefinitely for that path.
+
 ## Notes for resolving the design-steps after this slice (plan-review, both turns)
 
 This slice (plan-review ambiguity turn `11cb239e1` + inconsistency turn
