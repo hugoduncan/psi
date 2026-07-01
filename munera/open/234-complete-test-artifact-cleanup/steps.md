@@ -126,3 +126,19 @@
       helper in `work_on_test.clj` (mirrors `test-support`'s
       `java.io.File`-based implementation) and wrapped the test body in
       `try`/`finally` calling it on `base-dir`.
+
+## Implementation review follow-up (task-implementation-review skill, this pass)
+
+- [ ] `extensions/work-on/test/extensions/work_on_test.clj` is 1292 lines
+      (already 1277 before this task's changes; this task's own
+      `delete-recursively!` helper + `try`/`finally` wrap added ~15 more),
+      well over the project's 800-line-per-file standard
+      (`clojure-coding-standards` SKILL.md: "File size limit: 800 lines
+      maximum per file"). `bb commit-check:file-lengths` does not catch
+      this because it only scans `components/` and `bases/`, not
+      `extensions/`, so the violation goes unenforced. Not caused by this
+      task, but this task's edit nudged it further over the limit.
+      Consider splitting `work_on_test.clj` into multiple files (a
+      follow-up task, not this one — Out of Scope forbids restructuring
+      beyond cleanup-path fixes), and/or widening
+      `commit-check:file-lengths` to also scan `extensions/`.

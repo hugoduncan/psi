@@ -825,6 +825,10 @@ immediately preceding review pass (commit `a43afd35a`):
 
 - addressed 2 review steps
 
+## Implementation review (task-implementation-review skill, this pass)
+
+- added 1 step to be addressed
+
 Note (unrelated to this task's steps): the worktree had two pre-existing
 `git` index conflicts (`components/app-runtime/test/psi/app_runtime/test_support.clj`,
 `components/app-runtime_test.clj`) blocking any commit — no `MERGE_HEAD`/
