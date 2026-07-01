@@ -786,3 +786,50 @@ this pass only closes the documentation branch of the follow-up item.
 ## Implementation review (task-implementation-review skill)
 
 - added 2 steps to be addressed
+
+## Implementation review follow-up (this pass)
+
+Executed both unchecked "Implementation review follow-up" items added by the
+immediately preceding review pass (commit `a43afd35a`):
+
+- AC4 pass-wording item: `design.md` is read-only context for this pass (per
+  the invoking instructions), so did not edit AC4's wording (the
+  edit-design.md branch the item offered). Took the other branch instead:
+  opened `munera/open/235-fix-branch-merge-dirty-working-tree-failures/`
+  (design.md only, per task-creation convention) to track the 10
+  pre-existing `branch-merge`/"working tree is dirty" failures in
+  `git_worktree_test.clj`. Re-confirmed the failure count/content is
+  unchanged and reproduces in isolation (`--focus
+  psi.history.git-worktree-test/branch-merge-fast-forward` alone still
+  fails 4/5 assertions the same way), consistent with implementation.md's
+  earlier `git stash` confirmation that these predate this task's diff.
+- Missing shutdown-hook regression-test item: added
+  `components/agent-session/test/psi/agent_session/test_support_test.clj`.
+  Changed `register-cleanup-shutdown-hook!` (private, in `test_support.clj`)
+  to return the registered `Thread` instead of `void` (both existing
+  callers, `temp-cwd`/`temp-session-root`, already ignored the return
+  value, so this is behaviour-preserving for them). The new test accesses
+  the private fn via `#'test-support/register-cleanup-shutdown-hook!`,
+  creates a temp dir, starts+joins the returned hook `Thread` directly
+  (no wait for real JVM exit), asserts the dir is gone, then calls
+  `(.removeShutdownHook (Runtime/getRuntime) hook)` in a `finally` so the
+  already-terminated `Thread` is never handed to the JVM's real shutdown
+  sequence (which would call `.start` on it a second time and throw
+  `IllegalThreadStateException`, potentially aborting other processes'
+  shutdown hooks registered in the same JVM).
+  Verified: `clj-paren-repair` clean, `clj-kondo --lint` 0 errors/0
+  warnings on both changed files, new test passes (1 test, 2 assertions,
+  0 failures), and `psi.agent-session.query-graph-test` (exercises
+  `temp-cwd`/`temp-session-root` call paths) still passes (8 tests, 0
+  failures).
+
+- addressed 2 review steps
+
+Note (unrelated to this task's steps): the worktree had two pre-existing
+`git` index conflicts (`components/app-runtime/test/psi/app_runtime/test_support.clj`,
+`components/app-runtime_test.clj`) blocking any commit — no `MERGE_HEAD`/
+`REBASE_HEAD`/`CHERRY_PICK_HEAD` present, so not an in-progress operation of
+this session; the working-tree content already matched the "ours" (stage 2)
+side byte-for-byte on both files. Staged them as-is (no content change) via
+`git add` to clear the conflict and allow this task's own commit to proceed;
+did not touch their content.

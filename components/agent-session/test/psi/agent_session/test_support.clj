@@ -136,10 +136,17 @@
   REPL-based iteration. No automated per-invocation sweep exists for that
   path yet; if it becomes a problem, periodically restart the REPL/nREPL
   process, or manually sweep `psi-agent-session-test-`/
-  `psi-agent-session-store-` dirs from the OS temp dir."
+  `psi-agent-session-store-` dirs from the OS temp dir.
+
+  Returns the registered `Thread` (untouched by `temp-cwd`/
+  `temp-session-root`, which ignore it) so tests can invoke it directly
+  (`.start` + `.join`, then `removeShutdownHook` to avoid a second run at
+  real JVM exit) to exercise the cleanup behaviour without waiting for
+  actual process exit."
   [path]
-  (.addShutdownHook (Runtime/getRuntime)
-                    (Thread. ^Runnable (fn [] (delete-recursively! path)))))
+  (let [hook (Thread. ^Runnable (fn [] (delete-recursively! path)))]
+    (.addShutdownHook (Runtime/getRuntime) hook)
+    hook))
 
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory

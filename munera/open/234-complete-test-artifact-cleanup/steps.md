@@ -48,7 +48,7 @@
 
 ## Implementation review follow-up
 
-- [ ] AC4 ("`bb test` passes with no regressions") is not literally
+- [x] AC4 ("`bb test` passes with no regressions") is not literally
       satisfied — `bb test`/`clojure -M:test` currently exits non-zero
       with pre-existing failures (10 confirmed in
       `psi.history.git-worktree-test` alone, matching implementation.md's
@@ -63,7 +63,13 @@
       "working tree is dirty" failures in `git_worktree_test.clj` (none
       currently exists under `munera/open/` or `munera/closed/`) so the
       project's overall `bb test` health isn't silently treated as green.
-- [ ] No automated regression test exists for the new shutdown-hook
+      Resolved via the second branch only: this task's `design.md` is
+      read-only context for this pass (per the invoking instructions), so
+      the wording-clarification branch was not taken; opened
+      `munera/open/235-fix-branch-merge-dirty-working-tree-failures/`
+      (design-only) to track the 10 pre-existing `branch-merge`/"working
+      tree is dirty" failures instead.
+- [x] No automated regression test exists for the new shutdown-hook
       cleanup behaviour added to `temp-cwd`/`temp-session-root`
       (`register-cleanup-shutdown-hook!` in `test_support.clj`) —
       verification was manual/empirical only (per implementation.md's
@@ -72,3 +78,9 @@
       nothing failing. Consider a minimal follow-up test (e.g. asserting
       the created dir no longer exists after invoking the registered
       shutdown-hook thread directly, without waiting for real JVM exit).
+      Added `components/agent-session/test/psi/agent_session/test_support_test.clj`
+      with a regression test that starts+joins the registered shutdown-hook
+      `Thread` directly (then deregisters it via `removeShutdownHook` to
+      avoid a second run at real JVM exit) and asserts the directory is
+      gone. `register-cleanup-shutdown-hook!` now returns the `Thread` (was
+      previously `void`) to make this possible.
