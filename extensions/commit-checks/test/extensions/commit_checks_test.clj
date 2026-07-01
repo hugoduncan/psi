@@ -26,23 +26,32 @@
 (def repo-root
   (.getCanonicalPath (io/file ".")))
 
-(defn- bb-edn []
-  (read-string (slurp (io/file repo-root "bb.edn"))))
+(defn- read-bb-init-form []
+  (get-in (read-string (slurp (io/file repo-root "bb.edn"))) [:tasks :init]))
 
-(defn- find-let-bindings [form binding-symbol]
+(defn- find-top-level-def [form var-symbol]
   (some (fn [node]
-          (when (and (seq? node) (= 'let (first node)))
-            (some (fn [[sym value]]
-                    (when (= binding-symbol sym)
-                      value))
-                  (partition 2 (second node)))))
+          (when (and (seq? node) (= 'def (first node)) (= var-symbol (second node)))
+            (nth node 2)))
         (tree-seq coll? seq form)))
 
+(defn- file-length-helper-forms []
+  (let [wanted #{'file-length-scan-roots
+                 'file-length-legacy-max-lines
+                 'file-length-find-roots
+                 'file-length-find-args
+                 'file-length-violations}]
+    (->> (tree-seq coll? seq (read-bb-init-form))
+         (filter (fn [node]
+                   (and (seq? node)
+                        (#{'def 'defn} (first node))
+                        (contains? wanted (second node)))))
+         vec)))
+
 (defn- legacy-file-length-limits []
-  (or (find-let-bindings (get-in (bb-edn) [:tasks 'commit-check:file-lengths :task])
-                         'legacy-max-lines)
+  (or (find-top-level-def (read-bb-init-form) 'file-length-legacy-max-lines)
       (throw (ex-info "Unable to find commit-check:file-lengths legacy ratchet map"
-                      {:task 'commit-check:file-lengths}))))
+                      {:var 'file-length-legacy-max-lines}))))
 
 (defn- run-file-length-check []
   (proc/shell {:dir repo-root
@@ -90,6 +99,34 @@
 
 (defn- combined-output [{:keys [out err]}]
   (str out err))
+
+(deftest file-length-check-helpers-handle-sparse-repo-shapes-test
+  ;; Verifies the shared implementation used by the real bb.edn task skips
+  ;; absent optional scan roots and treats empty/matchless scanned roots as no
+  ;; violations. This protects sparse checkout/subtree shapes without relying
+  ;; on the full current repository layout.
+  (let [forms       (file-length-helper-forms)
+        eval-ns-sym (gensym "psi.commit-checks-test.bb-eval")
+        eval-ns     (create-ns eval-ns-sym)]
+    (binding [*ns* eval-ns]
+      (refer 'clojure.core)
+      (eval '(require '[clojure.java.io :as io]))
+      (eval '(require '[clojure.string :as str]))
+      (doseq [form forms]
+        (eval form))
+      (let [workspace      (io/file (temp-dir))
+            find-roots     (ns-resolve eval-ns-sym 'file-length-find-roots)
+            violations     (ns-resolve eval-ns-sym 'file-length-violations)
+            scan-roots-var (ns-resolve eval-ns-sym 'file-length-scan-roots)]
+        (doseq [root ["components" "bases" "extensions"]]
+          (alter-var-root scan-roots-var
+                          (constantly [(.getPath (io/file workspace root))]))
+          (is (= [] (find-roots)) root)
+          (is (= [] (violations "")) root)
+          (.mkdirs (io/file workspace root "docs"))
+          (is (= [(.getPath (io/file workspace root))]
+                 (vec (find-roots))) root)
+          (is (= [] (violations "")) root))))))
 
 (deftest file-length-check-scans-extensions-with-real-task-test
   ;; Verifies the real bb.edn commit-check:file-lengths task scans extensions/

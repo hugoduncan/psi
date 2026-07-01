@@ -2,6 +2,7 @@
  :bbin/bin {psi {:main-opts ["-m" "psi.launcher-main"]}}
  :tasks
  {:requires ([babashka.tasks :refer [shell]]
+             [clojure.java.io :as io]
              [clojure.string :as str])
   :init     (do
               (load-file "bb/dispatch_architecture_check.clj")
@@ -9,6 +10,35 @@
               (load-file "bb/kaocha_runner.clj")
               (def chiasmus-home
                 (str (System/getProperty "user.home") "/src/chiasmus"))
+
+              (def file-length-scan-roots ["components" "bases" "extensions"])
+
+              (def file-length-legacy-max-lines
+                {"extensions/auto-session-name/test/extensions/auto_session_name_test.clj" 974
+                 "extensions/dev-http/test/extensions/dev_http_test.clj" 816
+                 "extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj" 1020
+                 "extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj" 2058})
+
+              (defn file-length-find-roots []
+                (filter (fn [root]
+                          (.exists (io/file root)))
+                        file-length-scan-roots))
+
+              (defn file-length-find-args []
+                (concat (file-length-find-roots)
+                        ["-type" "f"
+                         "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
+                         "-exec" "wc" "-l" "{}" ";"]))
+
+              (defn file-length-violations [wc-output]
+                (->> (str/split-lines wc-output)
+                     (keep (fn [line]
+                             (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)
+                                   line-count (some-> n Long/parseLong)
+                                   limit      (get file-length-legacy-max-lines path 800)]
+                               (when (and line-count path (> line-count limit))
+                                 (str path " (" n " lines, " limit " limit)")))))
+                     vec))
 
               (defn parse-review-plan-opts [args]
                 (loop [args args
@@ -225,23 +255,13 @@
 
   commit-check:file-lengths
   {:doc  "Fail when src/ or test/ files under components/, bases/, or extensions/ exceed 800 lines; recorded legacy oversized extension files fail if they grow."
-   :task (let [legacy-max-lines {"extensions/auto-session-name/test/extensions/auto_session_name_test.clj" 974
-                                 "extensions/dev-http/test/extensions/dev_http_test.clj" 816
-                                 "extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj" 1020
-                                 "extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj" 2058}
-               result           (shell {:out :string}
-                                       "find" "components" "bases" "extensions" "-type" "f"
-                                       "(" "-path" "*/src/*" "-o" "-path" "*/test/*" ")"
-                                       "-exec" "wc" "-l" "{}" ";")
-               lines            (str/split-lines (:out result))
-               bad              (->> lines
-                                     (keep (fn [line]
-                                             (let [[_ n path] (re-matches (re-pattern "\\s*(\\d+)\\s+(.+)") line)
-                                                   line-count (some-> n Long/parseLong)
-                                                   limit      (get legacy-max-lines path 800)]
-                                               (when (and line-count path (> line-count limit))
-                                                 (str path " (" n " lines, " limit " limit)")))))
-                                     vec)]
+   :task (let [roots (file-length-find-roots)
+               bad   (if (seq roots)
+                       (file-length-violations
+                        (:out (apply shell {:out :string}
+                                     "find"
+                                     (file-length-find-args))))
+                       [])]
            (when (seq bad)
              (binding [*out* *err*]
                (println "Files longer than allowed line limits:")
