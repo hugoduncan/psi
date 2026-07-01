@@ -9,6 +9,16 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.test-support :as test-support]))
 
+(defn- start-join-and-deregister!
+  "Start `hook`, join it, then deregister it from the real JVM shutdown
+  sequence so it never runs a second time at actual process exit."
+  [hook]
+  (try
+    (.start hook)
+    (.join hook)
+    (finally
+      (.removeShutdownHook (Runtime/getRuntime) hook))))
+
 (deftest register-cleanup-shutdown-hook-deletes-directory-test
   (testing "invoking the registered shutdown-hook thread directly deletes the directory, without waiting for JVM exit"
     (let [dir  (str (java.nio.file.Files/createTempDirectory
@@ -22,3 +32,17 @@
         (is (not (.exists (java.io.File. dir))))
         (finally
           (.removeShutdownHook (Runtime/getRuntime) hook))))))
+
+(deftest temp-cwd-registers-cleanup-shutdown-hook-test
+  (testing "temp-cwd itself (not just register-cleanup-shutdown-hook! in isolation) registers a hook that deletes the directory"
+    (let [[dir hook] (test-support/temp-cwd-with-hook)]
+      (is (.exists (java.io.File. dir)))
+      (start-join-and-deregister! hook)
+      (is (not (.exists (java.io.File. dir)))))))
+
+(deftest temp-session-root-registers-cleanup-shutdown-hook-test
+  (testing "temp-session-root itself (not just register-cleanup-shutdown-hook! in isolation) registers a hook that deletes the directory"
+    (let [[dir hook] (test-support/temp-session-root-with-hook)]
+      (is (.exists (java.io.File. dir)))
+      (start-join-and-deregister! hook)
+      (is (not (.exists (java.io.File. dir)))))))

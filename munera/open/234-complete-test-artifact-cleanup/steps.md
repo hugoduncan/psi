@@ -151,7 +151,7 @@
 
 ## Test review follow-up (task-test-review skill)
 
-- [ ] No automated test asserts the core AC1/AC2 leak-freeness invariant
+- [x] No automated test asserts the core AC1/AC2 leak-freeness invariant
       end-to-end. `with-null-context` (`git_worktree_test.clj`), the
       `try`/`finally` blocks in `query_graph_test.clj`, and the new
       `try`/`finally` in `work_on_test.clj` are all trusted to actually
@@ -166,7 +166,17 @@
       (e.g. assert `repo-dir` is gone immediately after a
       `with-null-context` body returns) to guard the cleanup wiring
       itself, not just the behaviour it wraps.
-- [ ] `test_support_test.clj`'s regression test invokes the private
+      Added one representative assertion per pattern: a new
+      `with-null-context-deletes-repo-dir-in-finally-test` in
+      `git_worktree_test.clj` (Pattern A); an added assertion after the
+      existing `try`/`finally` in `query_graph_test.clj`'s
+      `register-mutations-in!-includes-history-mutations-test` (Pattern C);
+      and an added assertion after the existing `try`/`finally` in
+      `work_on_test.clj`'s
+      `work-on-command-with-remote-base-ref-integration-test` (Pattern D),
+      each asserting the directory no longer exists once the
+      macro/try-finally body has returned.
+- [x] `test_support_test.clj`'s regression test invokes the private
       `register-cleanup-shutdown-hook!` directly
       (`#'test-support/register-cleanup-shutdown-hook!`) against a
       manually created temp dir — it never calls `temp-cwd`/
@@ -182,3 +192,11 @@
       reflection, or by having `temp-cwd`/`temp-session-root` return the
       hook alongside the path in a test-only variant) and cleans up the
       directory when run.
+      Took the test-only-variant branch: extracted the shared
+      `create-temp-dir-with-cleanup-hook!` helper in `test_support.clj`
+      (used by both `temp-cwd`/`temp-session-root` and their new
+      `temp-cwd-with-hook`/`temp-session-root-with-hook` test-only
+      variants, so a dropped hook-registration call would break both), and
+      added two new tests calling `temp-cwd-with-hook`/
+      `temp-session-root-with-hook` directly, asserting the returned hook
+      deletes the directory when started+joined.

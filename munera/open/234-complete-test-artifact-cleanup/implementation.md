@@ -916,3 +916,50 @@ opening a separate tracked task.
 ## Implementation review (task-implementation-review skill)
 
 - no new issues found; 0 steps added
+
+## Test review follow-up (task-test-review skill, this pass)
+
+Executed both unchecked "Test review follow-up (task-test-review skill)"
+items added by the immediately preceding review pass (commit `2401d0c4f`):
+
+- Leak-freeness invariant item: added one representative "cleanup wiring"
+  assertion per pattern rather than a manual `ls`/`git worktree list`
+  check — `with-null-context-deletes-repo-dir-in-finally-test` (new, in
+  `git_worktree_test.clj`, Pattern A) captures `repo-dir` from inside the
+  macro body and asserts it exists during the body and is gone once the
+  macro returns; `query_graph_test.clj`'s
+  `register-mutations-in!-includes-history-mutations-test` (Pattern C) and
+  `work_on_test.clj`'s
+  `work-on-command-with-remote-base-ref-integration-test` (Pattern D) each
+  got one added assertion, after their existing `try`/`finally`, that the
+  directory is gone.
+- Shutdown-hook wiring item: took the "test-only variant" branch the item
+  offered. Extracted `create-temp-dir-with-cleanup-hook!` (private) in
+  `test_support.clj`, shared by `temp-cwd`/`temp-session-root` and two new
+  test-only variants (`temp-cwd-with-hook`/`temp-session-root-with-hook`)
+  that return `[path hook]` instead of just `path`. Added two new tests in
+  `test_support_test.clj` calling the `-with-hook` variants directly,
+  starting+joining the returned hook, and asserting the directory is gone
+  — this now fails if a future refactor drops the hook-registration call
+  from the shared helper (both `temp-cwd`/`temp-session-root` and the
+  `-with-hook` variants would regress together).
+
+Verified: `clj-paren-repair` reports no changes needed on all 5 touched
+files; `clj-kondo --lint` on all 5 files reports 0 errors/0 warnings;
+`bb test --focus psi.agent-session.test-support-test` (3 tests, 6
+assertions, 0 failures); `bb test --focus psi.history.git-worktree-test`
+(new test passes; pre-existing 4 `branch-merge` failures unchanged,
+already tracked by `munera/open/235-...`); `bb test --focus
+psi.agent-session.query-graph-test` (9 tests, 56 assertions, 0 failures);
+`bb test --focus extensions.work-on-test` (21 tests, 119 assertions, 0
+failures). Checked `/tmp` after all runs — no leaked
+`psi-agent-session-*`/`psi-work-on-remote-base-*`/
+`test-support-shutdown-hook-test-*` directories.
+
+Did not run a full `bb test` pass this slice: all 4 changed files were
+verified green in isolation, and prior passes already established the
+full-suite baseline has pre-existing unrelated failures (now tracked by
+task 235); re-confirming that baseline isn't needed to validate these
+test-only additions.
+
+- addressed 2 review steps

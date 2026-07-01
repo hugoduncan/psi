@@ -78,7 +78,12 @@
             (is (contains? syms 'git.worktree/add!))
             (is (true? (:success result)))))
         (finally
-          (test-support/delete-recursively! repo-dir))))))
+          (test-support/delete-recursively! repo-dir)))
+      ;; Guards the cleanup wiring itself (Pattern C), not just the mutation
+      ;; behaviour above: a regression that dropped this try/finally's
+      ;; delete-recursively! call would not otherwise be caught by bb test.
+      (is (not (.exists (File. ^String repo-dir)))
+          "repo-dir should be deleted once the try/finally above completes"))))
 
 (deftest ext-mutation-attach-worktree-to-existing-branch-test
   (testing "isolated extension mutation path can attach a worktree to an existing branch"

@@ -148,21 +148,40 @@
     (.addShutdownHook (Runtime/getRuntime) hook)
     hook))
 
-(defn temp-cwd []
+(defn- create-temp-dir-with-cleanup-hook!
+  "Create a temp directory under `prefix`, register a cleanup shutdown hook
+  for it (see `register-cleanup-shutdown-hook!`), and return `[path hook]`.
+
+  Shared by `temp-cwd`/`temp-session-root` and their `-with-hook` test-only
+  variants, so both stay wired to the same hook-registration call — a
+  regression that dropped the hook call here would be caught by any test
+  exercising either variant."
+  [prefix]
   (let [p (str (java.nio.file.Files/createTempDirectory
-                "psi-agent-session-test-"
+                prefix
                 (make-array java.nio.file.attribute.FileAttribute 0)))]
     (.mkdirs (java.io.File. p))
-    (register-cleanup-shutdown-hook! p)
-    p))
+    [p (register-cleanup-shutdown-hook! p)]))
+
+(defn temp-cwd []
+  (first (create-temp-dir-with-cleanup-hook! "psi-agent-session-test-")))
+
+(defn temp-cwd-with-hook
+  "Test-only variant of `temp-cwd` that also returns the registered shutdown
+  hook `Thread` as `[path hook]`, so tests can confirm `temp-cwd` itself
+  registers a cleanup hook (not just that the hook mechanism works in
+  isolation via `register-cleanup-shutdown-hook!` directly)."
+  []
+  (create-temp-dir-with-cleanup-hook! "psi-agent-session-test-"))
 
 (defn temp-session-root []
-  (let [p (str (java.nio.file.Files/createTempDirectory
-                "psi-agent-session-store-"
-                (make-array java.nio.file.attribute.FileAttribute 0)))]
-    (.mkdirs (java.io.File. p))
-    (register-cleanup-shutdown-hook! p)
-    p))
+  (first (create-temp-dir-with-cleanup-hook! "psi-agent-session-store-")))
+
+(defn temp-session-root-with-hook
+  "Test-only variant of `temp-session-root` that also returns the registered
+  shutdown hook `Thread` as `[path hook]` — see `temp-cwd-with-hook`."
+  []
+  (create-temp-dir-with-cleanup-hook! "psi-agent-session-store-"))
 
 (defn with-temp-session-root
   "Run f with a test-owned temporary session root. Cleans it up in finally.
