@@ -85,5 +85,5 @@
 
 ## Test review follow-ups — 2026-07-01
 
-- [ ] TT5: Make `extensions.commit-checks-test` clean up the temporary probe directories it creates under `components/commit_check_file_lengths_probe/` and `bases/commit_check_file_lengths_probe/`, not just the oversized probe files, so the test leaves the worktree exactly as it found it.
-- [ ] TT6: Remove the duplicated hardcoded legacy file-length ratchet map from `extensions.commit-checks-test`; derive the expected legacy ratchet paths/limits from the real `bb commit-check:file-lengths` implementation or a shared source so the test fails if the real ratchet set changes without matching coverage.
+- [x] TT5: Make `extensions.commit-checks-test` clean up the temporary probe directories it creates under `components/commit_check_file_lengths_probe/` and `bases/commit_check_file_lengths_probe/`, not just the oversized probe files, so the test leaves the worktree exactly as it found it.
+- [x] TT6: Remove the duplicated hardcoded legacy file-length ratchet map from `extensions.commit-checks-test`; derive the expected legacy ratchet paths/limits from the real `bb commit-check:file-lengths` implementation or a shared source so the test fails if the real ratchet set changes without matching coverage.

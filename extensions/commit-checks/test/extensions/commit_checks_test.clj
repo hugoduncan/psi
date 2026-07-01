@@ -26,11 +26,23 @@
 (def repo-root
   (.getCanonicalPath (io/file ".")))
 
-(def legacy-file-length-limits
-  {"extensions/auto-session-name/test/extensions/auto_session_name_test.clj" 974
-   "extensions/dev-http/test/extensions/dev_http_test.clj" 816
-   "extensions/mcp-tasks-run/test/extensions/mcp_tasks_run_test.clj" 1020
-   "extensions/mcp-tasks-run/src/extensions/mcp_tasks_run.clj" 2058})
+(defn- bb-edn []
+  (read-string (slurp (io/file repo-root "bb.edn"))))
+
+(defn- find-let-bindings [form binding-symbol]
+  (some (fn [node]
+          (when (and (seq? node) (= 'let (first node)))
+            (some (fn [[sym value]]
+                    (when (= binding-symbol sym)
+                      value))
+                  (partition 2 (second node)))))
+        (tree-seq coll? seq form)))
+
+(defn- legacy-file-length-limits []
+  (or (find-let-bindings (get-in (bb-edn) [:tasks 'commit-check:file-lengths :task])
+                         'legacy-max-lines)
+      (throw (ex-info "Unable to find commit-check:file-lengths legacy ratchet map"
+                      {:task 'commit-check:file-lengths}))))
 
 (defn- run-file-length-check []
   (proc/shell {:dir repo-root
@@ -44,6 +56,15 @@
     (when (.exists f)
       (io/delete-file f))))
 
+(defn- delete-empty-parents! [path stop-path]
+  (let [stop-file (.getCanonicalFile (io/file repo-root stop-path))]
+    (loop [dir (.getParentFile (.getCanonicalFile (io/file repo-root path)))]
+      (when (and dir
+                 (str/starts-with? (.getPath dir) (.getPath stop-file))
+                 (empty? (seq (.list dir))))
+        (io/delete-file dir)
+        (recur (.getParentFile dir))))))
+
 (defn- with-temporary-oversized-file! [path f]
   (let [file (io/file repo-root path)]
     (try
@@ -51,6 +72,12 @@
       (f)
       (finally
         (delete-file-if-exists! path)))))
+
+(defn- with-temporary-oversized-file-and-cleanup! [path cleanup-root f]
+  (try
+    (with-temporary-oversized-file! path f)
+    (finally
+      (delete-empty-parents! path cleanup-root))))
 
 (defn- with-temporary-growth! [path f]
   (let [file     (io/file repo-root path)
@@ -82,8 +109,9 @@
   ;; bases/ src/test roots after the extensions/ widening.
   (doseq [[root file] {"components" "components/commit_check_file_lengths_probe/src/probe/core.clj"
                        "bases" "bases/commit_check_file_lengths_probe/test/probe/base_test.clj"}]
-    (with-temporary-oversized-file!
+    (with-temporary-oversized-file-and-cleanup!
       file
+      (str root "/commit_check_file_lengths_probe")
       (fn []
         (let [result (run-file-length-check)
               output (combined-output result)]
@@ -96,7 +124,7 @@
   ;; line count and fails when it grows beyond its path-specific limit.
   (let [baseline (run-file-length-check)]
     (is (zero? (:exit baseline)) (combined-output baseline)))
-  (doseq [[path limit] legacy-file-length-limits]
+  (doseq [[path limit] (legacy-file-length-limits)]
     (with-temporary-growth!
       path
       (fn []
