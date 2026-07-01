@@ -1,1 +1,3 @@
 - architectural review added 1 new design step
+- ambiguity review added 2 new design steps
+- ambiguity review observed additional existing oversized `extensions/` src/test files; this matters for interpreting the widened file-length check's expected final pass/fail state.
