@@ -224,7 +224,7 @@ Project-local extension/config examples in this repo include:
 - [`.psi/extensions.edn`](.psi/extensions.edn)
 - [`.psi/commit-checks.edn`](.psi/commit-checks.edn)
 - `bb commit-check:rama-cc`
-- `bb commit-check:file-lengths`
+- `bb commit-check:file-lengths` — scans `components/`, `bases/`, and `extensions/` `src/`/`test/` paths; legacy oversized extension files are ratcheted to fail if they grow
 - `bb commit-check:dispatch-architecture`
 
 ### Architecture

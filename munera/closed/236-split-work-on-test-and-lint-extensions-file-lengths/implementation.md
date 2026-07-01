@@ -34,3 +34,4 @@
 - 2026-07-01 docs follow-up pass: addressed 3 docs-review steps. Updated `doc/extensions.md`, `ramora/develop/setup-hooks.md`, and `CHANGELOG.md` to document that `bb commit-check:file-lengths` scans `components/`, `bases/`, and `extensions/` `src`/`test` paths, with legacy oversized extension files ratcheted to fail if they grow.
 
 - 2026-07-01 docs review: added 1 step to be addressed.
+- 2026-07-01 docs follow-up pass: addressed 1 docs-review step. Updated `README.md` so primary docs mention that `bb commit-check:file-lengths` scans `components/`, `bases/`, and `extensions/` `src`/`test` paths, with legacy oversized extension files ratcheted to fail if they grow.
