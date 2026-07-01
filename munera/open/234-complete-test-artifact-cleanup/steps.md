@@ -201,6 +201,23 @@
       `temp-session-root-with-hook` directly, asserting the returned hook
       deletes the directory when started+joined.
 
+## Test review follow-up (task-test-review skill, this pass)
+
+- [ ] `components/agent-session/test/psi/agent_session/query_graph_test.clj`'s
+      `ext-mutation-attach-worktree-to-existing-branch-test` (Pattern C,
+      `fix-repeated-thinking-output-` prefix) creates a real worktree via
+      `git.worktree/add!` and cleans up `repo-dir` in `finally` via
+      `test-support/delete-recursively!`, but — unlike its sibling
+      `register-mutations-in!-includes-history-mutations-test` in the same
+      file, which asserts `(is (not (.exists (File. repo-dir))) ...)` right
+      after its `try`/`finally` — it has no leak-freeness assertion. A
+      regression that dropped this test's own `delete-recursively!` call
+      would not be caught by `bb test`; only a manual `/tmp` check would
+      catch it, which is the exact gap the prior "Test review follow-up"
+      pass fixed for the other Pattern C/A/D tests but missed here. Add the
+      same trailing `(is (not (.exists (File. ^String repo-dir))) ...)`
+      assertion after this test's `try`/`finally`.
+
 ## Test-shaper review follow-up
 
 - [ ] `test_support_test.clj`'s
