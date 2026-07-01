@@ -7,5 +7,6 @@
 - 2026-07-01 architecture review: no new architectural-fit feedback.
 - 2026-07-01 ambiguity review shared-session turn: no new ambiguity feedback.
 - 2026-07-01 inconsistency review shared-session turn: no new inconsistency feedback.
+- 2026-07-01 design-step resolution handoff: keep the open `SCOPE_QUESTION` limited to doc/changelog artifact synchronization; if the human answers in-scope, apply AGENTS.md changelog/user-doc rules without changing the frozen split/enforcement boundary. Relevant non-task files: `CHANGELOG.md`, `README.md`, `doc/extensions.md`, `.psi/commit-checks.edn`.
 - 2026-07-01 plan-review ambiguity turn: no new ambiguity feedback.
 - 2026-07-01 plan-review inconsistency turn: no new inconsistency feedback.
