@@ -1060,3 +1060,7 @@ shows no leaked test worktrees.
 
 - added 1 step to be addressed
 - addressed 1 docs review follow-up: documented the REPL/nREPL temp-dir shutdown-hook cleanup limitation in `ramora/TESTING.md`.
+
+## Docs review (review-task-docs skill, this pass)
+
+- no new docs issues found; 0 steps added
