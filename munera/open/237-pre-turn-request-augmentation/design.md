@@ -21,9 +21,9 @@ We need a different mechanism: a synchronous-in-lifecycle, two-phase augmentatio
 
 Introduce a new request-augmentation contract, not a new event-bus notification.
 
-The contract lets privileged extensions register as turn augmenters. A turn augmenter receives a bounded core-owned turn projection, may perform internal work, including launching augmentation child sessions through the core session lifecycle, and returns data only. Core validates, records, orders, diagnoses, and applies the returned augmentation operations.
+The contract lets privileged extensions register as turn augmenters. A turn augmenter receives a bounded core-owned turn projection, may perform internal work, including launching helper/child sessions through the existing extension session APIs, and returns data only. Core validates, records, orders, diagnoses, and applies the returned augmentation operations.
 
-Replay uses the recorded augmentation operations and diagnostics and never reruns augmenters, child sessions, file reads, model calls, or other live augmentation work.
+Replay uses the recorded augmentation operations and diagnostics and never reruns augmenters, helper sessions, file reads, model calls, or other live augmentation work.
 
 ## Scope
 
@@ -41,12 +41,12 @@ In scope:
 - Apply recorded augmentation operations when building the prepared request.
 - Make augmentation turn-scoped and tied to a specific `turn-id`.
 - Ensure replay uses recorded augmentation operations instead of rerunning augmentation providers.
-- Support augmentation providers that launch independent/child sessions to compute context.
-- Route augmentation child-session creation through the core/session lifecycle with parent session/turn provenance.
-- Suppress pre-turn augmentation inside augmentation child sessions by default to avoid recursion.
+- Support augmentation providers that launch independent/helper sessions with the existing extension session APIs to compute context.
+- Do not add a dedicated v1 child-session creation or child-run API for turn augmentation.
+- Require extensions that create helper sessions to avoid recursive augmentation for those helper sessions, for example by tracking their helper session ids and returning `:no-op` when invoked for them.
 - Ensure cancellation/stale-result handling prevents late augmentation results from applying to the wrong turn.
 - Update the `extensions/context-manager` scaffold to use the new mechanism for a minimal augmentation behavior.
-- Add tests proving lifecycle ordering, registration gating, recording/replay behavior, deterministic ordering, recursion suppression, cancellation/stale-result guarding, diagnostics, and request inclusion.
+- Add tests proving lifecycle ordering, registration gating, recording/replay behavior, deterministic ordering, helper-session no-op recursion avoidance, cancellation/stale-result guarding, diagnostics, and request inclusion.
 
 ## Out of scope
 
@@ -69,13 +69,12 @@ The parent turn follows this shape:
 1. user submits a prompt;
 2. `:session/prompt-submit` creates or returns the canonical `turn-id` for that submitted prompt and appends the prompt/repair journal entries;
 3. core enters `:session/pre-turn-augment` with the same `session-id`, `turn-id`, submitted user message, and workflow run id if any;
-4. if the session is an augmentation child session with `:suppress-turn-augmentation? true`, core records a suppressed augmentation record and skips augmenter invocation;
-5. otherwise, runtime considers currently registered turn augmenters, diagnoses unauthorized ones for this parent session, and invokes only authorized turn augmenters;
-6. augmenters return augmentation data or failures;
-7. core validates, deterministically orders, and records accepted operations plus provider diagnostics for the `turn-id`;
-8. `:session/prompt-prepare-request` receives the same `turn-id` and builds the prepared request from the original prompt plus recorded accepted augmentation operations;
-9. augmentation state remains addressable by `turn-id` for replay/diagnostics but is never read for later turns;
-10. normal prompt execution and post-turn notification lifecycle continues.
+4. runtime considers currently registered turn augmenters, diagnoses unauthorized ones for this parent session, and invokes only authorized turn augmenters;
+5. augmenters return augmentation data or failures;
+6. core validates, deterministically orders, and records accepted operations plus provider diagnostics for the `turn-id`;
+7. `:session/prompt-prepare-request` receives the same `turn-id` and builds the prepared request from the original prompt plus recorded accepted augmentation operations;
+8. augmentation state remains addressable by `turn-id` for replay/diagnostics but is never read for later turns;
+9. normal prompt execution and post-turn notification lifecycle continues.
 
 `prompt-prepare-request` must not run live augmentation itself. It only reads the canonical augmentation record for its `turn-id`.
 
@@ -243,7 +242,7 @@ Envelope rules:
 - `:turn-augmentation/status` is required and must be `:success` or `:no-op` when returned by a handler.
 - `:turn-augmentation/operations` is required and must be a vector.
 - `:success` requires at least one operation; `:no-op` requires an empty operations vector.
-- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created by this same provider invocation through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`. Malformed ids, ids not created through the augmentation child-session API, ids created by a different provider invocation, and ids whose recorded parent session/turn differs from the active augmentation invocation make the provider result invalid with provider status `:invalid-operation`, diagnostic reason `:invalid-child-session-ids`, and no accepted operations from that provider.
+- `:turn-augmentation/child-session-ids` is optional provenance supplied by the provider. When present it must be a vector of non-blank session-id strings. Missing is treated as `[]`. Malformed ids make the provider result invalid with provider status `:invalid-operation`, diagnostic reason `:invalid-child-session-ids`, and no accepted operations from that provider. In v1 core does not require these ids to have been created through a special augmentation API, because no such API exists; providers that use existing session APIs are responsible for reporting truthful provenance.
 - `:turn-augmentation/diagnostic` is optional; when present it must be a string and is copied into the provider diagnostic summary.
 - Malformed envelopes are treated as invalid provider results: core records provider status `:invalid-operation`, accepts no operations from that provider, and continues with other providers.
 - Unsupported operation `:op` values are treated as provider status `:unsupported-operation`, accept no operations from that provider, and continue with other providers.
@@ -261,8 +260,7 @@ The only supported v1 operation is `:append-context-block`:
  :source {:type :extension
           :extension-id "context-manager"
           :augmenter-id "project-context"
-          :child-session-ids [...]}
- :trust :project-derived}
+          :child-session-ids [...]}}
 ```
 
 Required properties:
@@ -271,18 +269,12 @@ Required properties:
 - turn-scoped;
 - `:id`, `:title`, and `:content` are non-blank strings;
 - source/provenance is captured;
-- project-derived context is distinguishable from privileged instructions;
+- the operation appends extension-returned content for the current turn;
 - the operation does not alter system/developer policy, model selection, tools, API options, runtime metadata, conversation history, or the submitted user message.
 
 Unsupported operation types are rejected with diagnostics and are never silently ignored.
 
-Core owns trust normalization for accepted operations:
-
-- every accepted v1 `:append-context-block` operation is recorded with `:trust :project-derived`;
-- handlers may omit `:trust`; omission is normal and core injects `:project-derived` in the recorded operation;
-- if a handler supplies `:trust`, it must exactly equal `:project-derived`;
-- an explicit `nil`, unsupported value, or spoofed stronger trust value rejects the provider result atomically with provider status `:invalid-operation`, diagnostic reason `:invalid-trust`, and no accepted operations from that provider;
-- `:trust` is request-rendering metadata only. It does not grant policy authority, tool authority, or instruction priority. Request rendering uses it only to choose the non-privileged user-role turn-context rendering described below.
+V1 has no trust model for augmentation operations. Handlers do not supply `:trust`, core does not inject `:trust`, and request rendering does not branch on trust metadata. Accepted extension-returned content is injected as turn augmentation context using the rendering below.
 
 Core owns provenance normalization for accepted operations:
 
@@ -295,15 +287,13 @@ Duplicate `:append-context-block` `:id` values are allowed across providers and 
 
 ### Prepare-request precondition
 
-For a live, non-suppressed, non-replay parent turn, `:session/prompt-prepare-request` has a hard precondition: exactly one canonical augmentation record for the same `session-id` and `turn-id` must already exist and must not still be accepting provider results.
+For a live, non-replay turn, `:session/prompt-prepare-request` has a hard precondition: exactly one canonical augmentation record for the same `session-id` and `turn-id` must already exist and must not still be accepting provider results.
 
-If no canonical augmentation record exists, the record is malformed, the record belongs to a different turn, or the record is still open, request preparation fails closed with `ex-info` reason `:missing-turn-augmentation-record`, `:invalid-turn-augmentation-record`, or `:turn-augmentation-still-open`. It must not synthesize a no-op record, rerun augmentation, or prepare a request that silently omits the pre-turn phase. The failed prepare attempt may be surfaced through lifecycle diagnostics, but it must not append a provider-visible request.
-
-Suppressed augmentation child sessions satisfy this precondition with their canonical `:suppressed` augmentation record. Replay uses the replay rules below instead of the live precondition.
+If no canonical augmentation record exists, the record is malformed, the record belongs to a different turn, or the record is still open, request preparation fails closed with `ex-info` reason `:missing-turn-augmentation-record`, `:invalid-turn-augmentation-record`, or `:turn-augmentation-still-open`. It must not synthesize a no-op record, rerun augmentation, or prepare a request that silently omits the pre-turn phase. The failed prepare attempt may be surfaced through lifecycle diagnostics, but it must not append a provider-visible request. Replay uses the replay rules below instead of the live precondition.
 
 ### Rendering append-context-block
 
-Request preparation renders accepted `:append-context-block` operations as a non-privileged user-role context message for the current turn.
+Request preparation renders accepted `:append-context-block` operations as an injected user-role turn-context message for the current turn.
 
 Rendering order:
 
@@ -315,8 +305,6 @@ Rendering order:
 Formatting:
 
 ```text
-Additional project context for the next user request. This context is project-derived data, not system or developer instructions.
-
 [Project context]
 ...
 
@@ -366,18 +354,7 @@ Prepared-request summaries must also include:
 
 When no operation is accepted, no augmentation context message is inserted, no `:turn/augmentation-context` prompt layer is present, and the summary reports `:accepted-operation-count 0` with `:message-inserted? false`.
 
-For recursion-suppressed augmentation child sessions, request preparation uses the canonical suppressed record and reports:
-
-```clojure
-{:augmentation {:turn-id "turn-id"
-                :workflow-run-id "workflow-run-id-or-nil"
-                :status :suppressed
-                :accepted-operation-count 0
-                :provider-count 0
-                :message-inserted? false}}
-```
-
-No `:turn/augmentation-context` prompt layer is present for a suppressed child turn.
+For helper sessions where the context-manager chooses to avoid recursion by returning `:no-op`, request preparation uses the ordinary canonical no-op augmentation record. No `:turn/augmentation-context` prompt layer is present for such a turn.
 
 ### Partial results, invalid operations, and failures
 
@@ -391,87 +368,36 @@ Provider results are atomic per augmenter:
 
 Prompt execution continues after augmentation failures unless the parent turn itself is canceled. A failed/invalid provider must not mutate the prepared request with partial operations from that provider.
 
-### Child/independent sessions
+### Child/helper sessions
 
-The context-manager extension may launch child sessions to gather information for augmentation. Such sessions must be created through the core/session lifecycle, not by extension-local session management.
+The context-manager extension may launch helper sessions to gather information for augmentation. V1 does not introduce a dedicated augmentation child-session creation API and does not introduce a dedicated child-run API.
 
-The extension API exposes augmentation child creation through a dedicated function:
-
-```clojure
-((:create-turn-augmentation-child-session api)
- {:parent-session-id (:turn-augmentation/session-id turn-projection)
-  :parent-turn-id    (:turn-augmentation/turn-id turn-projection)
-  :session-name      "context-manager augmentation"
-  :system-prompt     "optional child prompt"
-  :tool-ids          ["read" "bash"]})
-;; => {:psi.agent-session/session-id "child-session-id"}
-```
-
-API rules:
-
-- The API map exposes `:create-turn-augmentation-child-session` as a stable guarded function so a single-argument augmenter handler may close over `api` at extension-load or registration time; the function value is not itself an ambient session handle and does not contain parent turn authority.
-- The function can succeed only while core is actively invoking the registered provider for the current parent turn and that provider is authorized by both manifest/effective permission and the parent session's available capabilities.
-- Core threads enforcement through an internal active augmentation invocation context established immediately around the handler call and cleared in `finally`. The context contains the registered `extension-id`, `augmenter-id`, `parent-session-id`, and `parent-turn-id`; it is runtime-held, not included in the turn projection, and not supplied by the extension. If implementation executes providers concurrently, the context must be per invocation/task and must not be a shared mutable global that can leak across providers.
-- The active context is valid only for the synchronous dynamic extent of that provider handler invocation. Background work or callbacks that outlive the handler must create any needed augmentation child sessions before the handler returns; calls after return are outside invocation.
-- Calls outside an active provider invocation, after the handler has returned, or from an extension/provider that is not the active registered provider throw `ex-info` with `:reason :no-active-turn-augmentation-invocation` and create no child session. If such an exception escapes an augmenter handler, the provider is recorded as `:failed` with that diagnostic reason; outside the parent lifecycle it only fails the API call and must not create session state.
-- `:parent-session-id` and `:parent-turn-id` are required and must match the active augmentation invocation. Mismatches throw `ex-info` with `:reason :invalid-parent-provenance` and create no child session.
-- The function dispatches through the canonical `:session/create-child` lifecycle. It must not allocate extension-local sessions.
-- Core supplies or enforces these child-session fields regardless of caller options:
+Instead, an augmenter that needs model help may use the same existing extension session facilities used by `extensions/auto-session-name`, such as:
 
 ```clojure
-{:parent-session-id "parent-session"
- :parent-turn-id "turn-id"
- :purpose :turn-augmentation
- :suppress-turn-augmentation? true}
+((:mutate-session api) parent-session-id
+                       'psi.extension/create-child-session
+                       {:session-name "context-manager augmentation"
+                        :system-prompt "optional helper prompt"
+                        :tool-ids []
+                        :prompt-component-selection {:agents-md? false
+                                                     :extension-prompt-contributions []
+                                                     :tool-names []
+                                                     :skill-names []
+                                                     :components #{}}})
+
+((:mutate-session api) helper-session-id
+                       'psi.extension/run-agent-loop-in-session
+                       {:prompt "Summarize the project context relevant to the parent request."})
 ```
 
-- Caller options may narrow the child prompt/tool/model shape, but must not remove parent provenance, enable parent-state mutation, or disable recursion suppression.
-- Creation is allocation-only. It records and initializes a child session but does not submit a child prompt, execute a model call, or wait for child work.
-- The returned child session id is data; if the provider wants it represented in augmentation diagnostics, it must include that id in `:turn-augmentation/child-session-ids` in its result envelope.
+The exact helper-session prompt, model choice, tools, cleanup, and caching strategy are extension-owned in v1, subject to whatever authority and validation the existing extension session mutations already enforce. The pre-turn augmentation mechanism only cares about the provider's final returned data envelope.
 
-Child-session option defaults and validation:
+Because helper sessions created this way are ordinary sessions, recursion avoidance is the extension's responsibility in v1. A context-manager implementation should track helper session ids it creates, like `auto-session-name` tracks `helper-session-ids`, and return a valid `:no-op` augmentation result when its augmenter is invoked for one of those helper sessions. This prevents the extension from recursively launching helper sessions for its own helper turns without requiring a new core child-session API.
 
-- `:session-name` is optional; when omitted, core uses a deterministic name derived from the provider key, such as `"turn augmentation: context-manager/project-context"`.
-- `:system-prompt` is optional; when present it must be a non-blank string and becomes only the child session's prompt, never parent-turn prompt material.
-- `:tool-ids` is optional; when omitted, the child inherits the parent session's effective tool ids through the normal child-session prompt derivation. When supplied, it must be a vector of known tool id strings and a subset of the parent session's effective tool ids. Unknown tools or tools not available to the parent session are rejected with `ex-info` reason `:unauthorized-child-session-options` and create no child session.
-- `:model` is optional; when omitted, the child inherits the parent session model. In v1 an explicit model may only equal the parent session model; changing model identity for augmentation children is out of scope and is rejected with `ex-info` reason `:unauthorized-child-session-options`.
-- The v1 API accepts only `:parent-session-id`, `:parent-turn-id`, `:session-name`, `:system-prompt`, `:tool-ids`, and `:model`. `:prompt-mode`, `:response-mode`, `:thinking-level`, `:speed-mode`, `:effort-override`, `:temperature`, cache options, and any other unrecognized caller option are rejected with `ex-info` reason `:invalid-child-session-options` or `:unauthorized-child-session-options` and create no child session; the resulting child uses the existing core child-session defaults/inheritance for those fields.
-- The provider must still be authorized for `:psi.capability/turn-augmentation` for the parent session at the moment the child creation request is handled. Tool and model options never grant capabilities that the parent session lacks.
+If the provider wants helper sessions represented in parent augmentation diagnostics, it includes their session ids in `:turn-augmentation/child-session-ids`. In v1 those ids are provenance only. Core validates their shape but does not treat them as replay dependencies and does not require them to come from a dedicated augmentation allocation path.
 
-Tests should assert both the successful narrowed-tool path and rejection for unknown tools, tools outside the parent tool set, mismatched parent provenance, explicit different model, and attempts to unset `:suppress-turn-augmentation?`.
-
-Driving child work is a second explicit API step. The extension API exposes exactly one dedicated function, `:run-turn-augmentation-child-session`:
-
-```clojure
-((:run-turn-augmentation-child-session api)
- {:child-session-id "child-session-id"
-  :user-text "Summarize the project context relevant to the parent request."})
-;; => {:psi.agent-session/session-id "child-session-id"
-;;     :turn-id "child-turn-id"
-;;     :status :completed
-;;     :assistant-text "bounded final assistant text"}
-```
-
-Run API rules:
-
-- The function can succeed only during the same active authorized provider invocation that created the child session. It verifies that `:child-session-id` was created by that provider invocation for the same parent session and turn.
-- The v1 run request accepts exactly `:child-session-id` and `:user-text`. `:user-text` must be a non-blank string. Unrecognized keys, unknown child ids, children from another provider invocation, or children whose parent provenance does not match the active invocation throw `ex-info` with `:reason :invalid-child-session-run` and do not submit child work.
-- The function submits the child prompt through the canonical core prompt lifecycle for that child session: `:session/prompt-submit`, suppressed pre-turn augmentation record creation for the child turn, `:session/prompt-prepare-request`, execution, recording, and finish. It must not call a model directly, expose child `ctx`, or hand the extension a child runtime handle.
-- The function waits for the child turn to reach a terminal result before returning to the provider handler. The parent pre-turn augmentation barrier therefore waits indirectly for child work because it waits for the provider handler to return.
-- The provider may observe only the returned child-run summary: child session id, child turn id, status, optional diagnostic, and the final assistant text normalized by core and capped at 8,000 characters. It does not receive raw child journal entries, tool transcripts, credentials, dispatch functions, or atom access.
-- Child run statuses are `:completed`, `:failed`, or `:canceled`. Child execution failure is returned as `:failed` data unless the run API request itself is invalid; the provider decides whether to return no-op, failure diagnostic, or an augmentation operation derived from the failure.
-- Parent-turn cancellation requests cancellation of any in-flight augmentation child run, unblocks the run wait with status `:canceled` or `ex-info` reason `:parent-turn-canceled`, closes the parent augmentation record with overall `:canceled`, and prevents any later provider result from applying. Correctness must not depend on interrupting the underlying child work.
-- Child run diagnostics are not parent augmentation operations. Parent augmentation diagnostics record the verified `:child-session-ids` supplied in the provider result envelope; detailed child execution history remains in the child session's own canonical records.
-
-Augmentation child sessions must be distinguishable from ordinary user sessions. They carry parent provenance:
-
-- parent session id;
-- parent turn id;
-- creating provider key (`extension-id` and `augmenter-id`);
-- purpose `:turn-augmentation`;
-- marker `:suppress-turn-augmentation? true` by default.
-
-Child augmentation sessions must not recursively trigger pre-turn augmentation unless a future explicit opt-in mechanism is designed. Canceling the parent turn prevents child results from being applied to that parent turn.
+Parent-turn cancellation prevents any later provider result from applying to the parent turn through the normal cancellation/stale-result rules. V1 does not require core to cancel or interrupt helper sessions created through the existing generic session APIs; providers should perform best-effort cleanup if they create temporary helper sessions. Correctness comes from refusing to apply late/canceled provider output, not from guaranteed helper-session interruption.
 
 ### Cancellation and stale results
 
@@ -499,7 +425,6 @@ The v1 augmentation record shape is:
  :workflow-run-id "workflow-run-id-or-nil"
  :status :success
  :replay? false
- :suppressed? false
  :accepted-operation-count 1
  :operations [<accepted-operation>]
  :providers [{:extension-id "context-manager"
@@ -516,13 +441,12 @@ The optional `:workflow-run-id` is copied from the prompt lifecycle when present
 
 Minimum status taxonomy:
 
-- overall statuses: `:success`, `:no-op`, `:partial`, `:failed`, `:canceled`, `:suppressed`, `:replay-used`, `:replay-missing`, `:replay-invalid`;
+- overall statuses: `:success`, `:no-op`, `:partial`, `:failed`, `:canceled`, `:replay-used`, `:replay-missing`, `:replay-invalid`;
 - provider statuses: `:success`, `:no-op`, `:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, `:canceled`, `:stale`.
 
-Overall status aggregation is deterministic and computed once when the canonical augmentation record first reaches a terminal closed state. Late provider diagnostic updates after closure do not recompute or rewrite the overall status. Aggregation rules after replay/suppression/cancellation checks:
+Overall status aggregation is deterministic and computed once when the canonical augmentation record first reaches a terminal closed state. Late provider diagnostic updates after closure do not recompute or rewrite the overall status. Aggregation rules after replay/cancellation checks:
 
 - replay outcomes override live aggregation: valid recorded replay uses `:replay-used`; missing or malformed/wrong-turn replay uses `:replay-missing` or `:replay-invalid`;
-- an augmentation child session with `:suppress-turn-augmentation? true` records `:status :suppressed`, `:suppressed? true`, `:accepted-operation-count 0`, `:operations []`, and `:providers []`;
 - parent-turn cancellation records `:canceled`, accepts no operations from pending or late results, and skips request preparation/execution;
 - no registered augmenters records `:no-op` with `:providers []` and zero accepted operations;
 - registered providers that are unauthorized for the parent session appear in `:providers` with status `:unauthorized` and are not invoked;
@@ -541,7 +465,7 @@ Replay mode is detected from the dispatch/replay context that suppresses effects
 During replay for a turn:
 
 - pre-turn augmentation looks up the recorded augmentation record by `session-id` and `turn-id`;
-- augmenters, child sessions, file reads, model calls, and other live work are not invoked;
+- augmenters, helper sessions, file reads, model calls, and other live work are not invoked;
 - if the record exists, is well-formed, and matches the requested `turn-id`, request preparation uses its accepted operations and records/returns replay status `:replay-used`;
 - if the record is missing, malformed, or for a different `turn-id`, replay fails closed with `:replay-missing` or `:replay-invalid`; core must not rerun augmenters or prepare a silently different replay request.
 
@@ -554,28 +478,26 @@ Child session ids and diagnostics are provenance, not replay dependencies.
 - Unauthorized registration from missing manifest/effective permission does not leave a callable augmenter; unauthorized stale or session-unavailable registrations are skipped at invocation with diagnostics.
 - Augmenters receive only the bounded v1 input contract fields, not raw `ctx`, direct atom access, credentials, or dispatch/runtime handles.
 - The prompt lifecycle includes a pre-turn augmentation phase after `:session/prompt-submit` assigns `turn-id` and before prepared-request construction.
-- A registered augmenter can return an `:append-context-block` operation that appears in the prepared request for that turn as non-privileged user-role context before the current user message.
+- A registered augmenter can return an `:append-context-block` operation that appears in the prepared request for that turn as injected user-role turn context before the current user message.
 - Multiple augmenters and multiple operations are recorded/applied in deterministic order.
 - The exact operations applied to the request and diagnostics for rejected/failed/no-op providers are recorded before request execution.
 - Replaying the relevant lifecycle uses the recorded operation and does not invoke the augmenter again.
 - Replay with missing, malformed, or wrong-turn augmentation records fails closed and does not rerun live augmentation work.
-- Live request preparation for a non-suppressed turn fails closed when its canonical augmentation record is missing, malformed, wrong-turn, or still open; it does not synthesize a no-op record or silently omit augmentation.
+- Live request preparation fails closed when its canonical augmentation record is missing, malformed, wrong-turn, or still open; it does not synthesize a no-op record or silently omit augmentation.
 - Augmentation output is scoped to one `turn-id` and does not leak into a later turn.
-- Augmentation child sessions are created through the core/session lifecycle and marked with parent session/turn provenance.
-- The augmentation child-session API is a guarded extension API closure: it may be captured by a single-argument handler, but succeeds only during the active authorized provider invocation; calls outside that invocation throw `ex-info` with `:reason :no-active-turn-augmentation-invocation` and create no session.
-- Pre-turn augmentation is suppressed by default inside augmentation child sessions.
+- V1 adds no dedicated augmentation child-session creation API and no dedicated augmentation child-run API.
+- Augmenters may create and run helper sessions using existing extension session APIs, as `auto-session-name` does.
+- The context-manager implementation avoids recursive augmentation for helper sessions it creates, for example by tracking helper session ids and returning `:no-op` for those sessions.
 - Parent cancellation unblocks the pre-turn barrier, records overall `:canceled`, records pending selected providers as `:canceled`, skips request preparation/execution for that turn, and prevents late augmentation results from being applied.
 - Turn mismatch or stale late results prevent operation application and record/omit diagnostics according to the cancellation/stale rules above.
 - Extension failures are captured as diagnostics and do not mutate the prepared request with partial/invalid data from the failed provider.
 - Unsupported operations from an extension are rejected with diagnostics.
-- Accepted append-context-block operations are recorded with core-normalized `:trust :project-derived`; missing trust is injected, and unsupported or spoofed trust is rejected with provider status `:invalid-operation`.
-- A resolver or summary surface exposes augmentation status, accepted operation count, provider statuses, child-session ids, and replay status.
+- Append-context-block operations use no `:trust` field; accepted extension-returned content is injected as turn augmentation context, and request rendering does not branch on trust metadata.
+- A resolver or summary surface exposes augmentation status, accepted operation count, provider statuses, provider-supplied child/helper session ids, and replay status.
 - Extension unload/disable/reload removes or replaces turn-augmenter registrations according to the extension live-registry lifecycle; failed activation leaves no callable registration.
-- Augmentation child-session option validation prevents tools, model selection, prompt/session options, or recursion settings from expanding beyond parent-session authority.
-- Augmentation child-session creation is allocation-only; child execution uses a guarded run API that submits through the canonical child prompt lifecycle, waits for terminal child work, returns only a bounded summary, and participates in parent cancellation/barrier semantics.
 - Late stale provider results can update provider diagnostics only; they never set overall status `:stale`, rewrite accepted operations, or affect prepared-request input.
 - The context-manager extension demonstrates the new mechanism with a minimal safe context block.
-- Tests cover normal augmentation, no-op augmentation, extension failure, invalid operation, unsupported operation, multiple-augmenter ordering, replay success, replay missing/invalid fail-closed behavior, recursion suppression, diagnostics, and stale/canceled turn handling.
+- Tests cover normal augmentation, no-op augmentation, extension failure, invalid operation, unsupported operation, multiple-augmenter ordering, replay success, replay missing/invalid fail-closed behavior, helper-session no-op recursion avoidance, diagnostics, and stale/canceled turn handling.
 
 ## Design constraints
 
