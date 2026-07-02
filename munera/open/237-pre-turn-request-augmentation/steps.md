@@ -18,4 +18,4 @@
   - [x] Diagnose session-unavailable registered providers as `:unauthorized` without invoking handlers.
   - [x] Add explicit parent-cancellation close/result handling for open augmentation phases.
 - [x] Replace compatibility no-op prompt-submit record with the explicit pre-turn barrier once lifecycle scheduling is in place.
-- [ ] Add replay close-payload handling and replay missing/invalid fail-closed tests.
+- [x] Add replay close-payload handling and replay missing/invalid fail-closed tests.

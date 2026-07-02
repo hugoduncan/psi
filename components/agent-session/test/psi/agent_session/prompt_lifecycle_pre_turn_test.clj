@@ -403,6 +403,185 @@
       (is (= :turn/submitted
              (get-in session-data [:prompt-turns "turn-direct" :state]))))))
 
+(defn- replayable-close-record
+  [session-id turn-id]
+  {:session-id session-id
+   :turn-id turn-id
+   :workflow-run-id nil
+   :status :success
+   :replay? false
+   :accepted-operation-count 1
+   :operations [{:op :append-context-block
+                 :id "recorded-context"
+                 :title "Recorded context"
+                 :content "Recorded replay context"
+                 :source {:type :extension
+                          :extension-id "manifest:psi/context-manager"
+                          :augmenter-id "project-context"
+                          :child-session-ids []}}]
+   :providers [{:extension-id "manifest:psi/context-manager"
+                :augmenter-id "project-context"
+                :status :success
+                :operation-count 1
+                :accepted-operation-count 1
+                :rejected-operation-count 0
+                :child-session-ids []
+                :reasons []}]})
+
+(deftest replayed-turn-augmentation-uses-close-payload-without-live-invocation-test
+  ;; Replay recreates the open phase, consumes the recorded terminal close
+  ;; payload, and never invokes live turn augmenters.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        invoked? (atom false)
+        ext-id "manifest:psi/context-manager"
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}
+        close-record (replayable-close-record session-id "turn-replay")]
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (ss/update-state-value-in!
+     ctx
+     (ss/session-data-path session-id)
+     assoc-in
+     [:available-extension-capabilities :extensions ext-id]
+     #{ext/turn-augmentation-capability})
+    (ext/register-turn-augmenter-in!
+     (:extension-registry ctx)
+     ext-id
+     {:augmenter-id "project-context"
+      :handler (fn [_]
+                 (reset! invoked? true)
+                 {:turn-augmentation/status :success
+                  :turn-augmentation/operations
+                  [{:op :append-context-block
+                    :id "live"
+                    :title "Live"
+                    :content "must not run"}]})})
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _pq]
+                    {:execution-result/turn-id (:prepared-request/id prepared)
+                     :execution-result/session-id sid
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "ok"}]
+                                                          :stop-reason :stop
+                                                          :timestamp (java.time.Instant/now)}
+                     :execution-result/turn-outcome :turn.outcome/stop
+                     :execution-result/tool-calls []
+                     :execution-result/stop-reason :stop})]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-replay"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-replay"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/close-pre-turn-augmentation
+                            {:session-id session-id
+                             :turn-id "turn-replay"
+                             :user-msg user-msg
+                             :close-record close-record}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/prompt-prepare-request
+                            {:session-id session-id
+                             :turn-id "turn-replay"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true}))
+    (let [session-data (ss/get-session-data-in ctx session-id)
+          record (get-in session-data [:turn-augmentations "turn-replay"])
+          summary (:last-prepared-request-summary session-data)]
+      (is (false? @invoked?))
+      (is (= :turn/augmentation-closed
+             (get-in session-data [:prompt-turns "turn-replay" :state])))
+      (is (= :replay-used (:status record)))
+      (is (true? (:replay? record)))
+      (is (= "recorded-context" (get-in record [:operations 0 :id])))
+      (is (= :replay-used (get-in summary [:augmentation :status])))
+      (is (= 1 (get-in summary [:augmentation :accepted-operation-count]))))))
+
+(deftest replayed-turn-augmentation-fails-closed-for-missing-close-payload-test
+  ;; Missing replay close payload records replay-missing and does not prepare a request.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [& _]
+                    (throw (ex-info "must not prepare" {})))]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-replay-missing"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-replay-missing"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/close-pre-turn-augmentation
+                            {:session-id session-id
+                             :turn-id "turn-replay-missing"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true}))
+    (let [session-data (ss/get-session-data-in ctx session-id)
+          record (get-in session-data [:turn-augmentations "turn-replay-missing"])]
+      (is (= :turn/augmentation-failed
+             (get-in session-data [:prompt-turns "turn-replay-missing" :state])))
+      (is (= :replay-missing (:status record)))
+      (is (true? (:replay? record)))
+      (is (= [:missing-record] (get-in record [:providers 0 :reasons])))
+      (is (nil? (:last-prepared-request-summary session-data))))))
+
+(deftest replayed-turn-augmentation-fails-closed-for-wrong-turn-close-payload-test
+  ;; Wrong-turn replay close payload records replay-invalid and does not prepare a request.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [& _]
+                    (throw (ex-info "must not prepare" {})))]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-replay-invalid"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-replay-invalid"
+                             :user-msg user-msg}
+                            {:origin :core
+                             :replaying? true})
+      (session/dispatch-in! ctx :session/close-pre-turn-augmentation
+                            {:session-id session-id
+                             :turn-id "turn-replay-invalid"
+                             :user-msg user-msg
+                             :close-record (replayable-close-record session-id "other-turn")}
+                            {:origin :core
+                             :replaying? true}))
+    (let [session-data (ss/get-session-data-in ctx session-id)
+          record (get-in session-data [:turn-augmentations "turn-replay-invalid"])]
+      (is (= :turn/augmentation-failed
+             (get-in session-data [:prompt-turns "turn-replay-invalid" :state])))
+      (is (= :replay-invalid (:status record)))
+      (is (true? (:replay? record)))
+      (is (= [:wrong-turn-id] (get-in record [:providers 0 :reasons])))
+      (is (nil? (:last-prepared-request-summary session-data))))))
+
 (deftest prompt-prepare-request-consumes-queued-steering-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
     (session/dispatch-in! ctx :session/enqueue-steering-message

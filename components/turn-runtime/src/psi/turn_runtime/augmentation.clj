@@ -7,6 +7,7 @@
 (def known-capabilities #{turn-augmentation-capability})
 
 (def preparable-statuses #{:success :no-op :partial :failed :replay-used})
+(def replay-failed-statuses #{:replay-missing :replay-invalid})
 
 (def provider-statuses
   #{:success
@@ -296,6 +297,30 @@
      :accepted-operation-count (count operations)
      :operations operations
      :providers providers}))
+
+(defn replay-used-record
+  [record]
+  (assoc record
+         :status :replay-used
+         :replay? true))
+
+(defn replay-failed-record
+  [session-id turn-id workflow-run-id status reason]
+  {:session-id session-id
+   :turn-id turn-id
+   :workflow-run-id workflow-run-id
+   :status status
+   :replay? true
+   :accepted-operation-count 0
+   :operations []
+   :providers [{:extension-id "replay"
+                :augmenter-id "record"
+                :status :failed
+                :operation-count 0
+                :accepted-operation-count 0
+                :rejected-operation-count 0
+                :child-session-ids []
+                :reasons (ordered-reasons [reason])}]})
 
 (defn canceled-record
   [session-id turn-id workflow-run-id selected-providers]

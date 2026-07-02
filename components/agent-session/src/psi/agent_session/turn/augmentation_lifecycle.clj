@@ -158,6 +158,48 @@
            :origin :core}
     workflow-run-id (assoc :workflow-run-id workflow-run-id)))
 
+(defn replay-open-phase-result
+  [session-id turn-id workflow-run-id]
+  {:root-state-update
+   (session/session-update
+    session-id
+    (open-phase-update session-id turn-id workflow-run-id []))
+   :return {:replay-opened? true
+            :session-id session-id
+            :turn-id turn-id}
+   :return-effect-result? true})
+
+(defn replay-close-record
+  [session-id turn-id workflow-run-id close-record]
+  (cond
+    (nil? close-record)
+    (turn-augmentation/replay-failed-record
+     session-id
+     turn-id
+     workflow-run-id
+     :replay-missing
+     :missing-record)
+
+    (not (and (= session-id (:session-id close-record))
+              (= turn-id (:turn-id close-record))))
+    (turn-augmentation/replay-failed-record
+     session-id
+     turn-id
+     workflow-run-id
+     :replay-invalid
+     :wrong-turn-id)
+
+    (turn-augmentation/well-formed-record? session-id turn-id close-record)
+    (turn-augmentation/replay-used-record close-record)
+
+    :else
+    (turn-augmentation/replay-failed-record
+     session-id
+     turn-id
+     workflow-run-id
+     :replay-invalid
+     :malformed-record)))
+
 (defn open-phase-result
   [reg session-id turn-id workflow-run-id prepare-event-data session-data]
   (let [selected             (selected-providers reg session-data)
@@ -187,7 +229,12 @@
 
 (defn close-phase-result
   [session-id turn-id workflow-run-id close-record prepare-event-data]
-  (let [canceled? (= :canceled (:status close-record))]
+  (let [canceled? (= :canceled (:status close-record))
+        replay-failed? (contains? turn-augmentation/replay-failed-statuses (:status close-record))
+        terminal-state (cond
+                         canceled? :turn/canceled
+                         replay-failed? :turn/augmentation-failed
+                         :else :turn/augmentation-closed)]
     (cond-> {:root-state-update
              (session/session-update
               session-id
@@ -195,16 +242,19 @@
                                   turn-id
                                   workflow-run-id
                                   close-record
-                                  (if canceled?
-                                    :turn/canceled
-                                    :turn/augmentation-closed)))
+                                  terminal-state))
              :return-effect-result? true}
-      (not canceled?)
+      (not (or canceled? replay-failed?))
       (assoc :effects [(prepare-effect (assoc prepare-event-data
                                               :session-id session-id
                                               :turn-id turn-id
                                               :workflow-run-id workflow-run-id))])
       canceled?
       (assoc :return {:canceled? true
+                      :session-id session-id
+                      :turn-id turn-id})
+      replay-failed?
+      (assoc :return {:replay-failed? true
+                      :status (:status close-record)
                       :session-id session-id
                       :turn-id turn-id}))))

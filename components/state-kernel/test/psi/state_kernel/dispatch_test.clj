@@ -88,6 +88,20 @@
             :event/dispatch-id "d-123"}
            event*))))
 
+(deftest replay-dispatch-marks-handler-data
+  ;; Replayed handlers receive explicit replay context so pure lifecycle code can
+  ;; rebuild recorded state without rerunning live effects.
+  (let [seen (atom nil)]
+    (dispatch/register-handler! :demo/replay-aware
+                                (fn [_ data]
+                                  (reset! seen data)
+                                  :ok))
+    (is (= :ok (dispatch/dispatch! {} :demo/replay-aware {:x 1} {:replaying? true})))
+    (is (= {:x 1
+            :replaying? true
+            :dispatch-id (:dispatch-id @seen)}
+           @seen))))
+
 (deftest interceptor-chain-runs-before-in-order-after-in-reverse-and-stops-after-block
   (testing "before fns run in order and after fns run in reverse"
     (let [order (atom [])
