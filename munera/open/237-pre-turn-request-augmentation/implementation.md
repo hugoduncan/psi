@@ -19,3 +19,5 @@
 - second-pass design follow-up completion: latest review batch identified as `fdd602ecf`..`6c0ed17ac` with baseline `6f9a0f16c`; the 4 current unchecked checklist lines added by that batch were resolved. Implementation should add concrete extension API entries for `:register-turn-augmenter` and `:create-turn-augmentation-child-session`, validate explicit result envelopes, and expose the exact `:turn/augmentation-context` prepared-request layer/summary fields.
 
 - no architectural review feedback (design-review architecture turn)
+
+- ambiguity review (design-review turn) added 7 new design steps
