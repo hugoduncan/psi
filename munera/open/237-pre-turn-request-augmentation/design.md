@@ -78,6 +78,21 @@ The parent turn follows this shape:
 
 `prompt-prepare-request` must not run live augmentation itself. It only reads the canonical augmentation record for its `turn-id`.
 
+### Statechart-visible lifecycle barrier
+
+Pre-turn augmentation is an explicit prompt-lifecycle statechart phase, not only a request-preparation precondition. The statechart owns the critical-path barrier and rejects invalid prepare-before-augmentation transitions before request construction is attempted.
+
+The v1 prompt turn topology is:
+
+1. `:session/prompt-submit` creates or reuses the canonical `turn-id`, records the submitted prompt/repair entries, and leaves the turn in state `:turn/submitted`.
+2. `:session/pre-turn-augment` is valid only from `:turn/submitted`; it opens the canonical augmentation phase, records state `:turn/augmentation-open`, and emits provider-invocation effects or records an immediate terminal no-op/replay/canceled result when no invocation is needed.
+3. Provider result events and cancellation events are valid while the turn is `:turn/augmentation-open`; they update the open canonical phase through dispatch-owned state changes.
+4. `:session/close-pre-turn-augmentation` is valid from `:turn/augmentation-open` when every selected provider has a terminal outcome, when parent cancellation closes the turn, or when replay fails closed. It writes the terminal canonical augmentation record and transitions the turn to `:turn/augmentation-closed` for non-canceled live/replay-used outcomes or to the existing canceled/failure lifecycle path for canceled/replay-failed outcomes.
+5. The statechart action on the non-canceled `:turn/augmentation-closed` transition is the only automatic scheduling path for `:session/prompt-prepare-request`.
+6. `:session/prompt-prepare-request` is valid only from `:turn/augmentation-closed` for the same `session-id`/`turn-id`; direct prepare attempts from `:turn/submitted`, `:turn/augmentation-open`, another turn, or no turn state are rejected as `ex-info` with reason `:invalid-prompt-lifecycle-transition` and must not build a provider-visible request.
+
+The request-preparation record checks below remain as a fail-closed backstop for malformed or missing canonical augmentation records, but they are not the primary lifecycle gate.
+
 ### Dispatch/effect boundary
 
 Live turn-augmenter invocation is impure runtime work and must not run inside a pure dispatch handler. Pure handlers may select providers, create/open a canonical augmentation phase, and emit effects-as-data, but arbitrary extension handlers, helper-session runs, file/model access, futures, and late-result callbacks run only at the dispatch effect/runtime boundary.
@@ -105,9 +120,12 @@ Turn augmentation is a privileged extension capability.
 Concrete permission schema:
 
 - Manifest/effective extension permissions use a vector or set of capability keywords under `:permissions`, for example `{psi/context-manager {:permissions [:psi.capability/turn-augmentation]}}` in the extension install manifest/effective projection.
-- The effective permission set is normalized to a set of keywords on the live extension record, for example `:effective-permissions #{:psi.capability/turn-augmentation}`. Unknown capability keywords are rejected or diagnosed during effective-state construction; they are not silently granted.
+- The effective permission set is normalized to a set of keywords on the live extension record, for example `:effective-permissions #{:psi.capability/turn-augmentation}`.
+- Unknown capability keywords fail closed during extension effective-permission construction. The activation/effective-state update fails with diagnostic reason `:unknown-capability`, the extension is not live/enabled for that activation, its initialization is not allowed to register a turn augmenter, and existing sessions receive no available capability entry for that failed activation. Unknown capability keywords are never silently dropped or granted.
 - A session's available extension capabilities are extension-scoped, not one global session flag. The session state/projection uses a map equivalent to `{:extensions {<extension-id> #{:psi.capability/turn-augmentation}}}`.
-- Session creation may initialize that map from the extension effective permissions and session policy may narrow it. Absence of the extension id or capability in this map means unavailable for that session.
+- Session creation initializes that map from the currently live/enabled extensions' effective permissions intersected with the session policy. The default session policy allows declared live extension capabilities; a narrower session policy may remove capabilities or entire extension entries, but it must not grant capabilities absent from the extension's effective permissions and the core capability catalog.
+- When an extension is loaded, enabled, or successfully reloaded after a session exists, core recomputes that extension's entry for every existing session from the new effective permissions intersected with each session's policy. When an extension is unloaded, disabled, or fails activation/reload, core removes that extension id from every session's available extension capabilities. Session-policy changes likewise recompute the affected session's extension capability map.
+- Absence of the extension id or capability in the parent session's available capability map means unavailable for that session.
 - Invocation is allowed only when both checks pass: the live extension effective permissions contain `:psi.capability/turn-augmentation` and the parent session's available extension capabilities contain the same capability for that exact extension id.
 
 ### Extension identity
@@ -144,8 +162,8 @@ Registration contract:
 - Optional registration keys are metadata only: `:description` and `:version`. They do not affect ordering or authorization.
 - `extension-id` is derived by core from the registering extension identity; callers must not supply or spoof it.
 - A successful call returns `{:extension-id <extension-id> :augmenter-id <augmenter-id> :registered? true}`.
-- Invalid registration arguments throw `ex-info` with `:reason :invalid-registration` and leave no registration.
-- Missing manifest/effective permission throws `ex-info` with `:reason :unauthorized` and leaves no callable registration.
+- Invalid registration arguments throw `ex-info` with `:reason :invalid-registration`. Replacement is validate-before-swap: if a callable registration for the same stable key already exists and the replacement arguments are invalid, the previous registration remains unchanged.
+- Missing manifest/effective permission throws `ex-info` with `:reason :unauthorized`. Authorization failure removes any existing registration for that same stable key before throwing, so an unauthorized extension cannot retain a callable turn augmenter through a failed replacement attempt.
 - Handler exceptions during pre-turn invocation do not escape the parent turn lifecycle; core records that provider with status `:failed` and accepts no operations from it.
 
 Registrations are extension-scoped entries in the runtime registration table. They are not session-scoped, and they do not capture whichever session happened to be active when the extension loaded. Per-session authorization is checked at invocation time, so a registered augmenter can be skipped as `:unauthorized` for a session where its capability is unavailable.
@@ -154,7 +172,7 @@ Registrations are extension-scoped entries in the runtime registration table. Th
 
 Turn-augmenter registrations follow the extension live-registry lifecycle:
 
-- registration with the same stable key replaces the previous registration for that key;
+- registration with the same stable key replaces the previous registration for that key only after the new arguments validate and the registering extension is authorized; invalid replacement arguments preserve the previous registration, while authorization failure removes that key as described above;
 - extension unload or disable removes every turn-augmenter registration owned by that extension;
 - extension reload first removes the extension's existing registrations, then successful initialization may register replacement augmenters;
 - failed initial load or failed reload rolls back the extension's live registry entry and leaves no callable turn-augmenter registrations from the failed activation;
@@ -171,7 +189,7 @@ Each registered augmenter has a stable key:
  :augmenter-id  "project-context"}
 ```
 
-Registration with the same stable key replaces the previous registration for that key. Invocation and result application order are deterministic:
+Successful registration with the same stable key replaces the previous registration for that key according to the validation and authorization rules above. Invocation and result application order are deterministic:
 
 1. sort registered authorized augmenters by `extension-id`, then `augmenter-id`;
 2. keep operations in provider-returned order within one augmenter result;
@@ -259,7 +277,7 @@ Core owns:
 
 An augmenter handler must return one data envelope. Core must not infer provider outcome from arbitrary return shapes.
 
-Valid v1 envelopes are exactly:
+Valid v1 envelopes have required status and operation keys plus optional provenance/diagnostic keys. These are canonical full examples:
 
 ```clojure
 {:turn-augmentation/status :success
@@ -272,6 +290,8 @@ Valid v1 envelopes are exactly:
  :turn-augmentation/child-session-ids []
  :turn-augmentation/diagnostic "optional terse provider diagnostic"}
 ```
+
+The `:turn-augmentation/child-session-ids` key is optional in returned envelopes; the examples include it to show the normalized full shape.
 
 Envelope rules:
 
@@ -323,7 +343,7 @@ Duplicate `:append-context-block` `:id` values are allowed across providers and 
 
 ### Prepare-request precondition
 
-For a live, non-replay turn, `:session/prompt-prepare-request` has a hard precondition: exactly one canonical augmentation record for the same `session-id` and `turn-id` must already exist and must not still be accepting provider results.
+In addition to the statechart gate, for a live, non-replay turn, `:session/prompt-prepare-request` has a hard precondition: exactly one canonical augmentation record for the same `session-id` and `turn-id` must already exist and must not still be accepting provider results.
 
 If no canonical augmentation record exists, the record is malformed, the record belongs to a different turn, or the record is still open, request preparation fails closed with `ex-info` reason `:missing-turn-augmentation-record`, `:invalid-turn-augmentation-record`, or `:turn-augmentation-still-open`. It must not synthesize a no-op record, rerun augmentation, or prepare a request that silently omits the pre-turn phase. The failed prepare attempt may be surfaced through lifecycle diagnostics, but it must not append a provider-visible request. Replay uses the replay rules below instead of the live precondition.
 
@@ -570,10 +590,10 @@ Child session ids and diagnostics are provenance, not replay dependencies.
 ## Acceptance criteria
 
 - A new turn-augmentation registration path exists for extensions and is distinct from event notification subscription.
-- Registration is gated by `:psi.capability/turn-augmentation` manifest/effective permissions; invocation is gated by the parent session's session-available capabilities.
+- Registration is gated by `:psi.capability/turn-augmentation` manifest/effective permissions; unknown capability keywords fail extension effective-state construction; invocation is gated by the parent session's extension-scoped session-available capabilities.
 - Unauthorized registration from missing manifest/effective permission does not leave a callable augmenter; unauthorized stale or session-unavailable registrations are skipped at invocation with diagnostics.
 - Augmenters receive only the bounded v1 input contract fields, not raw `ctx`, direct atom access, credentials, or dispatch/runtime handles.
-- The prompt lifecycle includes a pre-turn augmentation phase after `:session/prompt-submit` assigns `turn-id` and before prepared-request construction.
+- The prompt lifecycle includes a statechart-visible, statechart-enforced pre-turn augmentation barrier after `:session/prompt-submit` assigns `turn-id` and before prepared-request construction; direct prepare-before-closed-augmentation transitions are rejected.
 - A registered augmenter can return an `:append-context-block` operation that appears in the prepared request for that turn as injected user-role turn context before the current user message.
 - Multiple augmenters and multiple operations are recorded/applied in deterministic order.
 - The exact operations applied to the request and diagnostics for rejected/failed/no-op providers are recorded before request execution.
