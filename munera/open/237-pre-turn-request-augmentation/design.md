@@ -223,7 +223,7 @@ Envelope rules:
 - `:turn-augmentation/status` is required and must be `:success` or `:no-op` when returned by a handler.
 - `:turn-augmentation/operations` is required and must be a vector.
 - `:success` requires at least one operation; `:no-op` requires an empty operations vector.
-- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`. Malformed ids, ids not created through the augmentation child-session API, and ids whose recorded parent session/turn differs from the active augmentation invocation make the provider result invalid with provider status `:invalid-operation`, diagnostic reason `:invalid-child-session-ids`, and no accepted operations from that provider.
+- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created by this same provider invocation through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`. Malformed ids, ids not created through the augmentation child-session API, ids created by a different provider invocation, and ids whose recorded parent session/turn differs from the active augmentation invocation make the provider result invalid with provider status `:invalid-operation`, diagnostic reason `:invalid-child-session-ids`, and no accepted operations from that provider.
 - `:turn-augmentation/diagnostic` is optional; when present it must be a string and is copied into the provider diagnostic summary.
 - Malformed envelopes are treated as invalid provider results: core records provider status `:invalid-operation`, accepts no operations from that provider, and continues with other providers.
 - Unsupported operation `:op` values are treated as provider status `:unsupported-operation`, accept no operations from that provider, and continue with other providers.
@@ -371,7 +371,11 @@ The extension API exposes augmentation child creation through a dedicated functi
 
 API rules:
 
-- The function is available only to a registered, currently invoked turn augmenter with `:psi.capability/turn-augmentation`.
+- The API map exposes `:create-turn-augmentation-child-session` as a stable guarded function so a single-argument augmenter handler may close over `api` at extension-load or registration time; the function value is not itself an ambient session handle and does not contain parent turn authority.
+- The function can succeed only while core is actively invoking the registered provider for the current parent turn and that provider is authorized by both manifest/effective permission and the parent session's available capabilities.
+- Core threads enforcement through an internal active augmentation invocation context established immediately around the handler call and cleared in `finally`. The context contains the registered `extension-id`, `augmenter-id`, `parent-session-id`, and `parent-turn-id`; it is runtime-held, not included in the turn projection, and not supplied by the extension. If implementation executes providers concurrently, the context must be per invocation/task and must not be a shared mutable global that can leak across providers.
+- The active context is valid only for the synchronous dynamic extent of that provider handler invocation. Background work or callbacks that outlive the handler must create any needed augmentation child sessions before the handler returns; calls after return are outside invocation.
+- Calls outside an active provider invocation, after the handler has returned, or from an extension/provider that is not the active registered provider throw `ex-info` with `:reason :no-active-turn-augmentation-invocation` and create no child session. If such an exception escapes an augmenter handler, the provider is recorded as `:failed` with that diagnostic reason; outside the parent lifecycle it only fails the API call and must not create session state.
 - `:parent-session-id` and `:parent-turn-id` are required and must match the active augmentation invocation. Mismatches throw `ex-info` with `:reason :invalid-parent-provenance` and create no child session.
 - The function dispatches through the canonical `:session/create-child` lifecycle. It must not allocate extension-local sessions.
 - Core supplies or enforces these child-session fields regardless of caller options:
@@ -390,6 +394,7 @@ Augmentation child sessions must be distinguishable from ordinary user sessions.
 
 - parent session id;
 - parent turn id;
+- creating provider key (`extension-id` and `augmenter-id`);
 - purpose `:turn-augmentation`;
 - marker `:suppress-turn-augmentation? true` by default.
 
@@ -476,6 +481,7 @@ Child session ids and diagnostics are provenance, not replay dependencies.
 - Replay with missing, malformed, or wrong-turn augmentation records fails closed and does not rerun live augmentation work.
 - Augmentation output is scoped to one `turn-id` and does not leak into a later turn.
 - Augmentation child sessions are created through the core/session lifecycle and marked with parent session/turn provenance.
+- The augmentation child-session API is a guarded extension API closure: it may be captured by a single-argument handler, but succeeds only during the active authorized provider invocation; calls outside that invocation throw `ex-info` with `:reason :no-active-turn-augmentation-invocation` and create no session.
 - Pre-turn augmentation is suppressed by default inside augmentation child sessions.
 - Parent cancellation or turn mismatch prevents late augmentation results from being applied and records/omits diagnostics according to the cancellation/stale rules above.
 - Extension failures are captured as diagnostics and do not mutate the prepared request with partial/invalid data from the failed provider.
