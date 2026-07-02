@@ -141,3 +141,23 @@
   (is (= (disj (set (keys launcher.extensions/psi-owned-extension-catalog))
                'psi/workflow-loader)
          (set (keys installs/psi-owned-extension-catalog)))))
+
+(deftest unknown-extension-capability-fails-effective-entry-test
+  ;; Unknown extension capabilities fail closed during effective-state
+  ;; construction instead of being silently dropped or granted.
+  (let [cwd  (.getAbsolutePath (tmp-dir))
+        home (tmp-dir)]
+    (with-redefs [installs/user-manifest-file (fn [] (manifest-file home ".psi/agent/extensions.edn"))
+                  installs/project-manifest-file (fn [_] (manifest-file cwd ".psi/extensions.edn"))]
+      (spit (installs/project-manifest-file cwd)
+            (pr-str {:deps {'psi/bad-capability {:local/root "extensions/context-manager"
+                                                 :psi/init 'extensions.context-manager/init
+                                                 :permissions [:psi.capability/not-real]}}}))
+      (let [entry (get-in (installs/compute-install-state cwd)
+                          [:psi.extensions/effective :entries-by-lib 'psi/bad-capability])]
+        (is (= :failed (:status entry)))
+        (is (re-find #"Unknown extension capability" (:load-error entry)))
+        (is (= :unknown-capability
+               (->> (:psi.extensions/diagnostics (installs/compute-install-state cwd))
+                    (map :category)
+                    (some #{:unknown-capability}))))))))

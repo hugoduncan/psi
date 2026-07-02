@@ -85,9 +85,9 @@ Pre-turn augmentation is an explicit prompt-lifecycle statechart phase, not only
 The v1 prompt turn topology is:
 
 1. `:session/prompt-submit` creates or reuses the canonical `turn-id`, records the submitted prompt/repair entries, and leaves the turn in state `:turn/submitted`.
-2. `:session/pre-turn-augment` is valid only from `:turn/submitted`; it opens the canonical augmentation phase, records state `:turn/augmentation-open`, and emits provider-invocation effects or records an immediate terminal no-op/replay/canceled result when no invocation is needed.
+2. `:session/pre-turn-augment` is valid only from `:turn/submitted`; it opens the canonical augmentation phase, records state `:turn/augmentation-open`, selects providers, and emits provider-invocation effects plus a close-phase dispatch when needed. Even no-provider, replay, and already-canceled cases create the open phase first; they are closed by `:session/close-pre-turn-augmentation` rather than by an immediate terminal write in `:session/pre-turn-augment`.
 3. Provider result events and cancellation events are valid while the turn is `:turn/augmentation-open`; they update the open canonical phase through dispatch-owned state changes.
-4. `:session/close-pre-turn-augmentation` is valid from `:turn/augmentation-open` when every selected provider has a terminal outcome, when parent cancellation closes the turn, or when replay fails closed. It writes the terminal canonical augmentation record and transitions the turn to `:turn/augmentation-closed` for non-canceled live/replay-used outcomes or to the existing canceled/failure lifecycle path for canceled/replay-failed outcomes.
+4. `:session/close-pre-turn-augmentation` is the single terminal writer for v1. It is valid from `:turn/augmentation-open` when every selected provider has a terminal outcome, when no providers were selected, when parent cancellation closes the turn, or when replay uses/fails a recorded close payload. It writes the terminal canonical augmentation record and transitions the turn to `:turn/augmentation-closed` for non-canceled live/replay-used outcomes or to the existing canceled/failure lifecycle path for canceled/replay-failed outcomes.
 5. The statechart action on the non-canceled `:turn/augmentation-closed` transition is the only automatic scheduling path for `:session/prompt-prepare-request`.
 6. `:session/prompt-prepare-request` is valid only from `:turn/augmentation-closed` for the same `session-id`/`turn-id`; direct prepare attempts from `:turn/submitted`, `:turn/augmentation-open`, another turn, or no turn state are rejected as `ex-info` with reason `:invalid-prompt-lifecycle-transition` and must not build a provider-visible request.
 
@@ -123,8 +123,8 @@ Concrete permission schema:
 - The effective permission set is normalized to a set of keywords on the live extension record, for example `:effective-permissions #{:psi.capability/turn-augmentation}`.
 - Unknown capability keywords fail closed during extension effective-permission construction. The activation/effective-state update fails with diagnostic reason `:unknown-capability`, the extension is not live/enabled for that activation, its initialization is not allowed to register a turn augmenter, and existing sessions receive no available capability entry for that failed activation. Unknown capability keywords are never silently dropped or granted.
 - A session's available extension capabilities are extension-scoped, not one global session flag. The session state/projection uses a map equivalent to `{:extensions {<extension-id> #{:psi.capability/turn-augmentation}}}`.
-- Session creation initializes that map from the currently live/enabled extensions' effective permissions intersected with the session policy. The default session policy allows declared live extension capabilities; a narrower session policy may remove capabilities or entire extension entries, but it must not grant capabilities absent from the extension's effective permissions and the core capability catalog.
-- When an extension is loaded, enabled, or successfully reloaded after a session exists, core recomputes that extension's entry for every existing session from the new effective permissions intersected with each session's policy. When an extension is unloaded, disabled, or fails activation/reload, core removes that extension id from every session's available extension capabilities. Session-policy changes likewise recompute the affected session's extension capability map.
+- Session creation initializes that map from the currently live/enabled extensions' effective permissions under the v1 default policy: allow declared live extension capabilities. V1 has no user-facing or persisted session-policy narrowing/update path for turn augmentation. The state shape may reserve room for a future narrower policy, but this task only implements default allow-declared-live and must not invent UI/API controls for granting or narrowing capabilities.
+- When an extension is loaded, enabled, or successfully reloaded after a session exists, core recomputes that extension's entry for every existing session from the new effective permissions under the default allow-declared-live policy. When an extension is unloaded, disabled, or fails activation/reload, core removes that extension id from every session's available extension capabilities. There is no v1 session-policy-change event to implement.
 - Absence of the extension id or capability in the parent session's available capability map means unavailable for that session.
 - Invocation is allowed only when both checks pass: the live extension effective permissions contain `:psi.capability/turn-augmentation` and the parent session's available extension capabilities contain the same capability for that exact extension id.
 
@@ -196,6 +196,8 @@ Successful registration with the same stable key replaces the previous registrat
 3. apply accepted operations in the sorted provider order.
 
 The implementation may execute augmenters sequentially in that order or execute them concurrently and sort the collected results before validation/recording. In both cases, the same state and same turn event must produce the same recorded operation order.
+
+Each selected provider snapshot records the stable provider key plus a core-generated activation/registration token from the live registration entry, for example `:activation-id` and `:registration-token`. A provider result is accepted only if the owning extension remains live/enabled, still authorized for the parent session, and the current registration for the stable key has the same token selected for this phase. If the extension was unloaded, disabled, reloaded, or replaced under the same stable key before result recording, the result is diagnosed as `:unauthorized` when the owner is no longer authorized/live, otherwise `:stale` with reason `:late-stale-result`; no operations are accepted.
 
 ### Augmenter input contract
 
@@ -275,7 +277,7 @@ Core owns:
 
 ### Augmenter result envelope
 
-An augmenter handler must return one data envelope. Core must not infer provider outcome from arbitrary return shapes.
+An augmenter handler must return one data envelope. Core must not infer provider outcome from arbitrary return shapes. A handler may return the envelope map directly or return an `IDeref` value such as a future, promise, or delay that yields the envelope. The effect executor waits by dereferencing returned `IDeref` values with no explicit deadline in v1. Exceptions thrown by the handler or raised while dereferencing are provider failures with status `:failed` and reason `:handler-exception`; canceled futures/promises that throw on deref are handled the same way unless parent-turn cancellation has already assigned provider status `:canceled`.
 
 Valid v1 envelopes have required status and operation keys plus optional provenance/diagnostic keys. These are canonical full examples:
 
@@ -578,12 +580,17 @@ The latest summary returns the most recent turn-scoped augmentation record for t
 
 Replay mode is detected from the dispatch/replay context that suppresses effects, or an explicit replay flag on the lifecycle event if the replay path already carries one. Replay must not rely on timing, extension registry state, or live runtime availability.
 
+The replay source for augmentation is the replayed terminal close record, not the live extension registry and not an out-of-band lookup before the event log has recreated state. During normal live execution `:session/close-pre-turn-augmentation` records the terminal augmentation record as part of its event/state payload. During event-log replay, the replayed `:session/pre-turn-augment` recreates the open phase without invocation effects; the replayed `:session/close-pre-turn-augmentation` then validates and writes that same terminal record into reconstructed turn-scoped state. `:session/prompt-prepare-request` reads the reconstructed state after the close event has replayed.
+
 During replay for a turn:
 
-- pre-turn augmentation looks up the recorded augmentation record by `session-id` and `turn-id`;
+- pre-turn augmentation opens the phase but suppresses live provider invocation effects;
 - augmenters, helper sessions, file reads, model calls, and other live work are not invoked;
-- if the record exists, is well-formed, and matches the requested `turn-id`, request preparation uses its accepted operations and records/returns replay status `:replay-used`;
-- if the record is missing, malformed, or for a different `turn-id`, replay fails closed with `:replay-missing` or `:replay-invalid`; core must not rerun augmenters or prepare a silently different replay request.
+- close-pre-turn consumes the replayed terminal record payload for the same `session-id` and `turn-id`;
+- if the payload is present, well-formed, terminal, and matches the requested `turn-id`, request preparation uses its accepted operations and records/returns replay status `:replay-used`;
+- if the close payload is missing, malformed, non-terminal, or for a different `turn-id`, replay fails closed with `:replay-missing` or `:replay-invalid`; core must not rerun augmenters or prepare a silently different replay request.
+
+The shared augmentation-record well-formedness predicate used by live prepare and replay requires: non-blank matching `:session-id` and `:turn-id`; terminal overall status in `#{:success :no-op :partial :failed :replay-used}` for request preparation (`:canceled`, `:replay-missing`, and `:replay-invalid` are valid terminal diagnostics but not request-preparable); boolean `:replay?`; vector `:operations`; `:accepted-operation-count` equal to `(count :operations)`; accepted operations in deterministic order; every operation a supported normalized `:append-context-block` with non-blank `:id`, `:title`, `:content`, and core-normalized extension source; vector `:providers`; provider entries with valid provider key, status, counts consistent with their accepted/rejected outcome, vector `:reasons`, and vector `:child-session-ids`; and no `:accepting?`/open marker. Failed, no-op, and partial records are well-formed for request preparation when terminal and count/order-consistent; they may insert zero operations.
 
 Child session ids and diagnostics are provenance, not replay dependencies.
 

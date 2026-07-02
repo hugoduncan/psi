@@ -6,6 +6,7 @@
 
 (use-fixtures :each (fn [f]
                       (reset! context-manager/initialized? nil)
+                      (reset! context-manager/helper-session-ids #{})
                       (f)))
 
 (defn- setup-api
@@ -19,7 +20,8 @@
 (deftest init-registers-turn-finished-handler-test
   (testing "init registers a session_turn_finished handler"
     (let [{:keys [state]} (setup-api)]
-      (is (= 1 (count (get-in @state [:handlers "session_turn_finished"])))))))
+      (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
+      (is (contains? (:turn-augmenters @state) "project-context")))))
 
 (deftest turn-finished-handler-fires-and-logs-test
   (testing "handler fires on synthetic session_turn_finished event and logs session-id and turn-id"
@@ -66,7 +68,9 @@
       ;; so there is no :operations key on the nullable state map.
       ;; Prompt contributions live in :root-state, not directly on the state map;
       ;; use :list-prompt-contributions on the API to query them.
-      (is (empty? ((:list-prompt-contributions api))) "no prompt contributions registered"))))
+      (is (empty? ((:list-prompt-contributions api))) "no prompt contributions registered")
+      (is (= ["project-context"] (-> @state :turn-augmenters keys sort vec))
+          "one turn augmenter is registered"))))
 
 (deftest handler-handles-missing-payload-keys-test
   (testing "handler logs gracefully when :session-id or :turn-id are missing"
@@ -201,3 +205,46 @@
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil regardless of what log-fn returns")))))
+
+(deftest project-context-augmentation-test
+  (testing "returns working-directory append-context-block"
+    (is (= {:turn-augmentation/status :success
+            :turn-augmentation/operations
+            [{:op :append-context-block
+              :id "project-context"
+              :title "Project context"
+              :content "Working directory: /repo"}]
+            :turn-augmentation/child-session-ids []}
+           (context-manager/project-context-augmentation
+            {:turn-augmentation/session-id "s1"
+             :turn-augmentation/effective-cwd "/repo"}))))
+
+  (testing "returns no-op when effective cwd is absent"
+    (is (= {:turn-augmentation/status :no-op
+            :turn-augmentation/operations []
+            :turn-augmentation/child-session-ids []
+            :turn-augmentation/diagnostic "no effective cwd"}
+           (context-manager/project-context-augmentation
+            {:turn-augmentation/session-id "s1"
+             :turn-augmentation/effective-cwd ""}))))
+
+  (testing "returns no-op for tracked helper sessions to avoid recursion"
+    (swap! context-manager/helper-session-ids conj "helper-1")
+    (is (= {:turn-augmentation/status :no-op
+            :turn-augmentation/operations []
+            :turn-augmentation/child-session-ids []}
+           (context-manager/project-context-augmentation
+            {:turn-augmentation/session-id "helper-1"
+             :turn-augmentation/effective-cwd "/repo"})))))
+
+(deftest init-registers-turn-augmenter-test
+  (testing "init registers project-context with the dedicated augmentation API"
+    (let [{:keys [state]} (setup-api)
+          registration (get-in @state [:turn-augmenters "project-context"])]
+      (is (= "project-context" (:augmenter-id registration)))
+      (is (fn? (:handler registration)))
+      (is (= :success
+             (:turn-augmentation/status
+              ((:handler registration)
+               {:turn-augmentation/session-id "s"
+                :turn-augmentation/effective-cwd "/repo"})))))))

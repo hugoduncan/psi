@@ -15,6 +15,17 @@
 (defn- register-core-handler! [event handler]
   (kernel/register-handler! event handler))
 
+(defn- no-op-augmentation-record
+  [session-id turn-id workflow-run-id]
+  {:session-id session-id
+   :turn-id turn-id
+   :workflow-run-id workflow-run-id
+   :status :no-op
+   :replay? false
+   :accepted-operation-count 0
+   :operations []
+   :providers []})
+
 (defn register!
   "Register prompt lifecycle handlers. Called once during context creation."
   [_ctx]
@@ -30,9 +41,10 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+   (fn [ctx {:keys [session-id user-msg workflow-run-id turn-id]}]
      (let [run-id   (or workflow-run-id
                         (:workflow-run-id (ss/get-session-data-in ctx session-id)))
+           turn-id  (or turn-id (str (java.util.UUID/randomUUID)))
            journal  (persist/all-entries-in ctx session-id)
            messages (into []
                           (keep (fn [entry]
@@ -45,8 +57,12 @@
                            (map #(journal-append-effect/append-message-effect session-id % run-id) repairs)
                            [(journal-append-effect/append-message-effect session-id user-msg run-id)]))]
        {:effects effects
+        :root-state-update (ss/session-update
+                            session-id
+                            #(assoc-in % [:turn-augmentations turn-id]
+                                       (no-op-augmentation-record session-id turn-id run-id)))
         :return {:submitted? true
-                 :turn-id (str (java.util.UUID/randomUUID))
+                 :turn-id turn-id
                  :user-msg user-msg
                  :repaired-tool-result-count (count repairs)}})))
 

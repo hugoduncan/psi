@@ -5,6 +5,7 @@
    [psi.deterministic-operation-registry.defs :as deterministic-op-defs]
    [psi.agent-session.extensions.api :as api]
    [psi.agent-session.extensions.loader :as loader]
+   [clojure.string :as str]
    [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
    [psi.tool-runtime.core :as tool-runtime]
@@ -39,7 +40,65 @@
    (atom {:extensions         {}
           :registration-order []
           :flag-values        {}
-          :event-bus          {}})))
+          :event-bus          {}
+          :turn-augmenters     {}})))
+
+(def turn-augmentation-capability :psi.capability/turn-augmentation)
+
+(defn set-effective-permissions-in!
+  "Replace the effective permission set for an extension record."
+  [reg ext-path permissions]
+  (swap! (:state reg)
+         assoc-in [:extensions ext-path :effective-permissions]
+         (set (or permissions #{})))
+  reg)
+
+(defn effective-permissions-in
+  [reg ext-path]
+  (get-in @(:state reg) [:extensions ext-path :effective-permissions] #{}))
+
+(defn- valid-turn-augmenter-registration?
+  [registration]
+  (and (map? registration)
+       (string? (:augmenter-id registration))
+       (not (str/blank? (:augmenter-id registration)))
+       (fn? (:handler registration))))
+
+(defn register-turn-augmenter-in!
+  "Register or replace a turn augmenter owned by `ext-path`.
+   Invalid replacement preserves the previous callable registration; missing
+   permission removes the stable key before throwing."
+  [reg ext-path registration]
+  (let [augmenter-id (:augmenter-id registration)]
+    (when-not (valid-turn-augmenter-registration? registration)
+      (throw (ex-info "Invalid turn augmenter registration"
+                      {:reason :invalid-registration
+                       :extension-id ext-path
+                       :augmenter-id augmenter-id})))
+    (when-not (contains? (effective-permissions-in reg ext-path)
+                         turn-augmentation-capability)
+      (swap! (:state reg) update :turn-augmenters dissoc [ext-path augmenter-id])
+      (throw (ex-info "Turn augmentation permission is required"
+                      {:reason :unauthorized
+                       :extension-id ext-path
+                       :augmenter-id augmenter-id})))
+    (let [entry {:extension-id ext-path
+                 :augmenter-id augmenter-id
+                 :handler (:handler registration)
+                 :description (:description registration)
+                 :version (:version registration)
+                 :registration-token (str (java.util.UUID/randomUUID))}]
+      (swap! (:state reg) assoc-in [:turn-augmenters [ext-path augmenter-id]] entry)
+      {:extension-id ext-path
+       :augmenter-id augmenter-id
+       :registered? true})))
+
+(defn turn-augmenters-in
+  "Return registered turn augmenters sorted by extension-id then augmenter-id."
+  [reg]
+  (->> (vals (:turn-augmenters @(:state reg)))
+       (sort-by (juxt :extension-id :augmenter-id))
+       vec))
 
 (defn register-extension-in!
   "Register a new extension by path into `reg`.
@@ -63,7 +122,8 @@
                            :flags          {}
                            :shortcuts      {}
                            :operations     {}
-                           :allowed-events default-allowed-events}))
+                           :allowed-events default-allowed-events
+                           :effective-permissions #{}}))
                (not registered?)
                (update :registration-order conj path)))))
   reg)
@@ -164,6 +224,11 @@
           (fn [s]
             (-> s
                 (update :extensions dissoc path)
+                (update :turn-augmenters (fn [augmenters]
+                                           (into {}
+                                                 (remove (fn [[[owner _] _]]
+                                                           (= owner path)))
+                                                 augmenters)))
                 (update :registration-order (fn [order]
                                               (vec (remove #(= path %) order)))))))
    reg))
@@ -183,7 +248,7 @@
        (deterministic-op-registry/unregister-operations-by-extension-in!
         deterministic-operation-registry
         path)))
-   (swap! (:state reg) assoc :extensions {} :registration-order [])
+   (swap! (:state reg) assoc :extensions {} :registration-order [] :turn-augmenters {})
    reg))
 
 (defn get-flag-in
@@ -471,7 +536,10 @@
          :flag-names      (into (sorted-set) (keys (:flags ext)))
          :flag-count      (count (:flags ext))
          :shortcut-count  (count (:shortcuts ext))
-         :allowed-events  (:allowed-events ext)}))))
+         :allowed-events  (:allowed-events ext)
+         :effective-permissions (:effective-permissions ext)
+         :turn-augmenter-count (count (filter #(= ext-path (:extension-id %))
+                                              (turn-augmenters-in reg)))}))))
 
 (defn extension-details-in
   "Return vector of detail maps for all registered extensions."
@@ -510,6 +578,7 @@
     :register-shortcut-in!    register-shortcut-in!
     :register-flag-in!        register-flag-in!
     :set-allowed-events-in!   set-allowed-events-in!
+    :register-turn-augmenter-in! register-turn-augmenter-in!
     :get-flag-in              get-flag-in
     :bus-emit-in!             bus-emit-in!
     :bus-on-in!               bus-on-in!}
@@ -550,7 +619,13 @@
                                  reg*
                                  ext-id*
                                  (:deterministic-operation-registry runtime-fns)))]
-    (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns register-extension-in! unregister-extension* create-extension-api)))
+    (loader/load-init-var-extension-in! reg ext-id init-var runtime-fns
+                                        (fn [reg* ext-id*]
+                                          (register-extension-in! reg* ext-id*)
+                                          (set-effective-permissions-in!
+                                           reg* ext-id* (:permissions runtime-fns)))
+                                        unregister-extension*
+                                        create-extension-api)))
 
 (defn load-extension-init-in!
   "Compatibility alias for init-var-backed manifest activation."
@@ -562,12 +637,20 @@
    See `psi.agent-session.extensions.loader/activate-extensions-in!` for the
    supported entry shapes."
   [reg runtime-fns activation-entries]
-  (let [unregister-extension* (fn [reg* ext-id*]
+  (let [permissions-by-id     (into {}
+                                    (map (fn [{:keys [id path permissions]}]
+                                           [(or id path) permissions]))
+                                    activation-entries)
+        register-extension* (fn [reg* ext-id*]
+                              (register-extension-in! reg* ext-id*)
+                              (set-effective-permissions-in!
+                               reg* ext-id* (get permissions-by-id ext-id*)))
+        unregister-extension* (fn [reg* ext-id*]
                                 (unregister-extension-in!
                                  reg*
                                  ext-id*
                                  (:deterministic-operation-registry runtime-fns)))]
-    (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension-in! unregister-extension* create-extension-api)))
+    (loader/activate-extensions-in! reg runtime-fns activation-entries register-extension* unregister-extension* create-extension-api)))
 
 (defn load-extensions-in!
   "Discover and load all extensions into `reg`.

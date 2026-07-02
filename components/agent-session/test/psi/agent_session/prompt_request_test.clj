@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.prompt-request :as prompt-request]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.session-persistence.core :as persist]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.turn-runtime.conversation :as conversation]))
@@ -421,3 +422,123 @@
              (-> (rebuilt-tool-results messages "id-contig")
                  first :content :text))
           "first occurrence wins (kept first-contig, not dup-contig)"))))
+
+;; ── Turn augmentation request rendering ─────────────────────────────────────
+
+(defn- augmentation-record
+  [session-id turn-id operations]
+  {:session-id session-id
+   :turn-id turn-id
+   :status (if (seq operations) :success :no-op)
+   :replay? false
+   :accepted-operation-count (count operations)
+   :operations operations
+   :providers [{:extension-id "manifest:psi/context-manager"
+                :augmenter-id "project-context"
+                :status (if (seq operations) :success :no-op)
+                :operation-count (count operations)
+                :accepted-operation-count (count operations)
+                :rejected-operation-count 0
+                :child-session-ids []
+                :reasons []}]})
+
+(defn- context-operation
+  [id title content]
+  {:op :append-context-block
+   :id id
+   :title title
+   :content content
+   :source {:type :extension
+            :extension-id "manifest:psi/context-manager"
+            :augmenter-id "project-context"
+            :child-session-ids []}})
+
+(deftest turn-augmentation-record-well-formedness-test
+  ;; Tests the canonical record predicate shared by live prepare and replay.
+  (testing "accepts failed and no-op terminal records when counts and shapes are coherent"
+    (is (true? (turn-augmentation/well-formed-record?
+                "s" "t"
+                (assoc (augmentation-record "s" "t" []) :status :failed)))))
+
+  (testing "rejects open, wrong-turn, and malformed operation records"
+    (is (false? (turn-augmentation/well-formed-record?
+                 "s" "t"
+                 (assoc (augmentation-record "s" "t" []) :accepting? true))))
+    (is (false? (turn-augmentation/well-formed-record?
+                 "s" "t"
+                 (augmentation-record "s" "other" []))))
+    (is (false? (turn-augmentation/well-formed-record?
+                 "s" "t"
+                 (augmentation-record "s" "t" [(dissoc (context-operation "ctx" "Ctx" "Body") :source)]))))))
+
+(deftest build-prepared-request-inserts-turn-augmentation-context-test
+  ;; Accepted append-context-block operations render as a user-role turn context
+  ;; message before the submitted user message, with prompt-layer and summary
+  ;; introspection.
+  (let [session-id "sid-aug"
+        turn-id    "turn-aug"
+        op         (context-operation "project-context" "Project context" "Working directory: /repo")
+        record     (augmentation-record session-id turn-id [op])
+        journal    [(persist/message-entry {:role "assistant"
+                                            :content [{:type :text :text "previous"}]})
+                    (persist/message-entry {:role "user"
+                                            :content [{:type :text :text "raw current"}]})]
+        state      {:agent-session {:sessions {session-id {:data {:session-id session-id
+                                                                  :model {:provider :openai :id "gpt-4.1"}
+                                                                  :thinking-level :off
+                                                                  :turn-augmentations {turn-id record}}
+                                                           :persistence {:journal journal}}}}}
+        ctx        {:state* (atom state)}
+        prepared   (prompt-request/build-prepared-request
+                    ctx
+                    session-id
+                    {:turn-id turn-id
+                     :user-message {:role "user"
+                                    :content [{:type :text :text "current"}]}
+                     :runtime-opts {}})
+        messages   (:prepared-request/messages prepared)
+        layer      (some #(when (= :turn/augmentation-context (:id %)) %)
+                         (:prepared-request/prompt-layers prepared))]
+    (is (= [:assistant :user :user]
+           (mapv :role messages)))
+    (is (= "[Project context]\nWorking directory: /repo"
+           (get-in messages [1 :content :text])))
+    (is (= "current" (get-in messages [2 :content :text])))
+    (is (= {:id :turn/augmentation-context
+            :kind :turn-context
+            :role "user"
+            :stable? false
+            :turn-id turn-id
+            :position :after-history-and-repairs-before-current-user
+            :status :success
+            :operation-count 1
+            :provider-count 1
+            :operation-ids ["project-context"]
+            :content "[Project context]\nWorking directory: /repo"}
+           layer))
+    (is (= {:turn-id turn-id
+            :workflow-run-id nil
+            :status :success
+            :accepted-operation-count 1
+            :message-inserted? true}
+           (:prepared-request/augmentation prepared)))))
+
+(deftest build-prepared-request-fails-closed-for-missing-augmentation-record-test
+  ;; Live request preparation refuses to silently omit the pre-turn phase.
+  (let [session-id "sid-missing"
+        turn-id "turn-missing"
+        ctx {:state* (atom {:agent-session {:sessions {session-id {:data {:session-id session-id
+                                                                          :model {:provider :openai :id "gpt-4.1"}
+                                                                          :thinking-level :off
+                                                                          :turn-augmentations {}}
+                                                                   :persistence {:journal []}}}}})}]
+    (try
+      (prompt-request/build-prepared-request
+       ctx
+       session-id
+       {:turn-id turn-id
+        :user-message {:role "user" :content [{:type :text :text "hello"}]}
+        :runtime-opts {}})
+      (is false "request preparation must fail closed")
+      (catch clojure.lang.ExceptionInfo e
+        (is (= :missing-turn-augmentation-record (:reason (ex-data e))))))))

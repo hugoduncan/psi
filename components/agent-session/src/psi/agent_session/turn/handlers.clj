@@ -15,6 +15,17 @@
    [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
 
+(defn- no-op-augmentation-record
+  [session-id turn-id workflow-run-id]
+  {:session-id session-id
+   :turn-id turn-id
+   :workflow-run-id workflow-run-id
+   :status :no-op
+   :replay? false
+   :accepted-operation-count 0
+   :operations []
+   :providers []})
+
 (defn- now-inst []
   (java.time.Instant/now))
 
@@ -55,10 +66,12 @@
   ([session-id user-msg]
    (synthetic-user-prompt-effects session-id user-msg nil))
   ([session-id user-msg workflow-run-id]
-   (let [guard #(with-workflow-guard % workflow-run-id)]
+   (let [guard   #(with-workflow-guard % workflow-run-id)
+         turn-id (str (java.util.UUID/randomUUID))]
      [(guard {:effect/type :runtime/dispatch-event-with-effect-result
               :event-type :session/prompt-submit
               :event-data (cond-> {:session-id session-id
+                                   :turn-id turn-id
                                    :user-msg user-msg}
                             workflow-run-id (assoc :workflow-run-id workflow-run-id))
               :origin :core})
@@ -69,7 +82,7 @@
       (guard {:effect/type :runtime/dispatch-event-with-effect-result
               :event-type :session/prompt-prepare-request
               :event-data {:session-id session-id
-                           :turn-id (str (java.util.UUID/randomUUID))
+                           :turn-id turn-id
                            :user-msg user-msg}
               :origin :core})])))
 
@@ -81,6 +94,7 @@
    :tool-count          (count (:prepared-request/tools prepared-request))
    :cache-breakpoints   (get-in prepared-request [:prepared-request/session-snapshot :cache-breakpoints])
    :input-expansion     (:prepared-request/input-expansion prepared-request)
+   :augmentation       (:prepared-request/augmentation prepared-request)
    :prepared-at         (now-inst)})
 
 (defn prepared-request-query-text
@@ -235,7 +249,12 @@
   (let [turn-id (str (java.util.UUID/randomUUID))
         run-id  (:workflow-run-id (session/get-session-data-in ctx session-id))
         guard   #(with-workflow-guard % run-id)]
-    {:effects [(guard {:effect/type :runtime/prompt-continue-chain
+    {:root-state-update
+     (session/session-update
+      session-id
+      #(assoc-in % [:turn-augmentations turn-id]
+                 (no-op-augmentation-record session-id turn-id run-id)))
+     :effects [(guard {:effect/type :runtime/prompt-continue-chain
                        :execution-result execution-result
                        :progress-queue progress-queue})
                (guard {:effect/type :runtime/dispatch-event-with-effect-result

@@ -11,6 +11,7 @@
    [psi.prompt-assets.skills :as prompt-skills]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.prompt-assets.system-prompt :as system-prompt]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]))
@@ -296,18 +297,54 @@
       {:user-message user-message
        :expansion nil}))
 
+(defn- augmentation-record-in
+  [session-data turn-id]
+  (get-in session-data [:turn-augmentations turn-id]))
+
+(defn- live-augmentation-record!
+  [session-id session-data turn-id]
+  (let [record (augmentation-record-in session-data turn-id)]
+    (cond
+      (and (nil? record) (contains? session-data :turn-augmentations))
+      (throw (ex-info "Missing turn augmentation record"
+                      {:reason :missing-turn-augmentation-record
+                       :session-id session-id
+                       :turn-id turn-id}))
+
+      (nil? record)
+      nil
+
+      (:accepting? record)
+      (throw (ex-info "Turn augmentation is still open"
+                      {:reason :turn-augmentation-still-open
+                       :session-id session-id
+                       :turn-id turn-id}))
+
+      (not (turn-augmentation/well-formed-record? session-id turn-id record))
+      (throw (ex-info "Invalid turn augmentation record"
+                      {:reason :invalid-turn-augmentation-record
+                       :session-id session-id
+                       :turn-id turn-id}))
+
+      :else
+      record)))
+
 (defn- prepared-turn-messages
-  [ctx session-id session-data user-message]
-  (let [base-messages     (-> (session->provider-messages ctx session-id)
-                              (replace-current-user-message user-message))
-        steering-messages (queued-steering-messages session-data user-message)
-        messages          (cond-> base-messages
-                            (seq steering-messages) (into steering-messages))]
+  [ctx session-id session-data turn-id user-message]
+  (let [augmentation-record (when turn-id
+                              (live-augmentation-record! session-id session-data turn-id))
+        base-messages       (-> (session->provider-messages ctx session-id)
+                                (replace-current-user-message user-message))
+        with-augmentation   (turn-augmentation/insert-augmentation-message base-messages augmentation-record)
+        steering-messages   (queued-steering-messages session-data user-message)
+        messages            (cond-> with-augmentation
+                              (seq steering-messages) (into steering-messages))]
     {:messages (if (and user-message (empty? messages)) [user-message] messages)
-     :queued-steering-messages steering-messages}))
+     :queued-steering-messages steering-messages
+     :augmentation-record augmentation-record}))
 
 (defn- normalized-turn-input
-  [ctx session-id session-data {:keys [turn-id user-message expansion runtime-opts runtime-model messages queued-steering-messages]}]
+  [ctx session-id session-data {:keys [turn-id user-message expansion runtime-opts runtime-model messages queued-steering-messages augmentation-record]}]
   (let [cache-bps (set (or (:cache-breakpoints session-data) #{}))]
     {:turn/id                           turn-id
      :turn/session-id                   session-id
@@ -315,6 +352,7 @@
      :turn/input-expansion              expansion
      :turn/queued-steering-messages     queued-steering-messages
      :turn/messages                     messages
+     :turn/augmentation-record          augmentation-record
      :turn/runtime-model                (or runtime-model
                                             (resolve-runtime-model ctx (:model session-data)))
      :turn/ai-options                   (session->request-options ctx session-data (or runtime-opts {}))
@@ -345,7 +383,7 @@
   (let [root-state @(:state* ctx)
         session-data (ss/get-session-data-in ctx session-id)
         {:keys [user-message expansion]} (expanded-turn-input root-state session-data user-message commands)
-        {:keys [messages queued-steering-messages]} (prepared-turn-messages ctx session-id session-data user-message)
+        {:keys [messages queued-steering-messages augmentation-record]} (prepared-turn-messages ctx session-id session-data turn-id user-message)
         normalized-turn (normalized-turn-input ctx session-id session-data
                                                {:turn-id turn-id
                                                 :user-message user-message
@@ -353,5 +391,6 @@
                                                 :runtime-opts runtime-opts
                                                 :runtime-model runtime-model
                                                 :messages messages
-                                                :queued-steering-messages queued-steering-messages})]
+                                                :queued-steering-messages queued-steering-messages
+                                                :augmentation-record augmentation-record})]
     (turn-request/build-prepared-request normalized-turn)))

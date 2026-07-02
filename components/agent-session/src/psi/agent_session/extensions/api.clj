@@ -103,6 +103,7 @@
            register-shortcut-in!
            register-flag-in!
            set-allowed-events-in!
+           register-turn-augmenter-in!
            get-flag-in
            bus-emit-in!
            bus-on-in!]}
@@ -181,6 +182,11 @@
           (mutate-local 'psi.extension/set-allowed-events
                         {:allowed-events (vec allowed-events)}
                         #(set-allowed-events-in! reg ext-path allowed-events)))
+        register-turn-augmenter!
+        (fn [registration]
+          (mutate-local 'psi.extension/register-turn-augmenter
+                        {:registration registration}
+                        #(register-turn-augmenter-in! reg ext-path registration)))
         get-flag
         (fn [name]
           (get-flag-in reg name))
@@ -337,6 +343,7 @@
      :register-shortcut              register-shortcut!
      :register-flag                  register-flag!
      :set-allowed-events             set-allowed-events!
+     :register-turn-augmenter       register-turn-augmenter!
      :get-flag                       get-flag
      :register-post-tool-processor   register-post-tool-processor!
      :ensure-service                 ensure-service!

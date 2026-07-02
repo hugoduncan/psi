@@ -28,6 +28,7 @@
     'psi.extension/update-prompt-contribution
     'psi.extension/unregister-prompt-contribution
     'psi.extension/set-allowed-events
+    'psi.extension/register-turn-augmenter
     'psi.extension.tool/read
     'psi.extension.tool/bash
     'psi.extension.tool/write
