@@ -98,3 +98,5 @@
 - no new ambiguity review feedback in plan-review turn; `plan.md` and `steps.md` were absent, so the pass used current design/design-steps context.
 
 - no new inconsistency review feedback in plan-review turn.
+
+- plan-review handoff for resolving open design-steps: no additional plan-review feedback was added; `plan.md` and `steps.md` are absent, so treat `design-steps.md` as the active follow-up surface and update `design.md` before creating any execution plan. Preserve replay determinism by choosing one persisted replay source, one shared record-validity predicate, one provider return/wait contract, and one terminal-close path. Additional useful code paths: `components/agent-session/src/psi/agent_session/dispatch_schema.clj`, `components/agent-session/src/psi/agent_session/dispatch.clj`, `components/agent-session/src/psi/agent_session/prompt_turn.clj`, `components/agent-session/src/psi/agent_session/resolvers/extensions.clj`, `components/agent-session/src/psi/agent_session/mutations/extensions.clj`.
