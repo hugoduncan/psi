@@ -40,3 +40,5 @@
 - design follow-up completion (current ambiguity batch): latest task-scoped design-review batch identified as `d6e3975ff`..`3cffacf82` with baseline `482ff803f`; the 5 current unchecked checklist lines added by that batch were resolved. Implementation should treat pre-turn augmentation as a terminal barrier: live prepare requires a closed canonical record, cancellation closes with `:canceled` and no request execution, workflow run id is provenance only, extension reload/unload owns registration cleanup, and augmentation child sessions may only narrow parent tools/model authority.
 
 - no new architectural review feedback after current resolved follow-ups
+
+- ambiguity review added 2 new design steps
