@@ -42,3 +42,5 @@
 - no new architectural review feedback after current resolved follow-ups
 
 - ambiguity review added 2 new design steps
+
+- inconsistency review added 1 new design step
