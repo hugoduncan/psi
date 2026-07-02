@@ -62,3 +62,5 @@
 - design scope update after user clarification: remove the dedicated v1 augmentation child-session API. Do not implement `:create-turn-augmentation-child-session` or a special paired child-run API for this task. Context-manager may create/run helper sessions with the existing extension session APIs, as `auto-session-name` does; recursion avoidance is extension-owned by tracking helper session ids and returning `:no-op` for them. Provider-supplied child/helper ids in augmentation results are provenance only and receive shape validation, not dedicated-origin validation.
 
 - architectural review added 1 new design step: live augmenter invocation must sit on the dispatch effect/runtime boundary, not in a pure handler, because handlers may perform arbitrary extension/helper-session work before recorded operations influence request preparation.
+
+- ambiguity review added 5 new design steps: concrete extension identity/capability schemas, diagnostic reason/query surfaces, and minimal context-manager scaffold behavior remain underspecified.
