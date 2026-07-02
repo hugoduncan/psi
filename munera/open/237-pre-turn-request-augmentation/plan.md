@@ -10,4 +10,4 @@ Implement task 237 in vertical slices, preserving the core-owned/replayable boun
 6. Add resolver/summary exposure for augmentation records.
 7. Verify focused request, extension API, extension install, context-manager, and prompt lifecycle tests.
 
-This pass implements a compatibility first slice: `prompt-submit` creates a canonical no-op augmentation record so existing prompt flows keep working while the explicit pre-turn invocation/effect/statechart barrier is added in later slices.
+Current slice status: the compatibility prompt-submit no-op seeding has been replaced by an explicit dispatch-visible pre-turn barrier. `prompt-submit` records `:turn/submitted`; `:session/pre-turn-augment` opens a turn-scoped augmentation phase; `:session/close-pre-turn-augmentation` is the terminal writer for the current no-provider/no-op path and schedules `prompt-prepare-request`. Live provider invocation/result validation remains for the next slice.

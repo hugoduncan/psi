@@ -10,8 +10,8 @@
 - [x] Add focused tests for rendering, fail-closed checks, registration gating, unknown capabilities, and context-manager envelopes.
 - [x] Run focused Scry tests for affected namespaces.
 - [x] Run clj-kondo on affected files.
-- [ ] Implement explicit `:session/pre-turn-augment` and `:session/close-pre-turn-augmentation` dispatch lifecycle and statechart-visible barrier.
+- [x] Implement explicit `:session/pre-turn-augment` and `:session/close-pre-turn-augmentation` dispatch lifecycle and statechart-visible barrier.
 - [ ] Move live augmenter invocation to dispatch effects and record provider diagnostics/results through dispatch-owned events.
 - [ ] Add full validation/diagnostics for invalid/unsupported provider operations and stale/canceled late results.
-- [ ] Replace compatibility no-op prompt-submit record with the explicit pre-turn barrier once lifecycle scheduling is in place.
+- [x] Replace compatibility no-op prompt-submit record with the explicit pre-turn barrier once lifecycle scheduling is in place.
 - [ ] Add replay close-payload handling and replay missing/invalid fail-closed tests.

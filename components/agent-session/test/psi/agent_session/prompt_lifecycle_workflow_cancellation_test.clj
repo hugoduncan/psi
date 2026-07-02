@@ -669,9 +669,9 @@
         "regression must exercise the synthetic follow-up prompt lifecycle effects")
     (is (= [:session/prompt-submit
             :session/prompt
-            :session/prompt-prepare-request]
+            :session/pre-turn-augment]
            (mapv :event-type (:effects handler-result)))
-        "synthetic follow-up handler starts with prompt-submit, prompt, and prepare effects")
+        "synthetic follow-up handler starts with prompt-submit, prompt, and pre-turn augmentation effects")
     (is (every? #(= run-id (:workflow-run-id %)) (:effects handler-result))
         "workflow-owned synthetic follow-up effects carry the workflow guard")
     (is (every? #(= run-id (get-in % [:event-data :workflow-run-id]))

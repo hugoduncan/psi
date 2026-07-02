@@ -127,6 +127,7 @@
    [:statechart/send-event
     [:map [:effect/type [:= :statechart/send-event]]
      [:event :any]
+     [:session-id {:optional true} :string]
      [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-thread-sleep-send-event
     [:map [:effect/type [:= :runtime/schedule-thread-sleep-send-event]]
