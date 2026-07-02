@@ -12,7 +12,7 @@
 - [x] Run clj-kondo on affected files.
 - [x] Implement explicit `:session/pre-turn-augment` and `:session/close-pre-turn-augmentation` dispatch lifecycle and statechart-visible barrier.
 - [x] Move live augmenter invocation to dispatch effects and record provider diagnostics/results through dispatch-owned events.
-- [ ] Add full validation/diagnostics for invalid/unsupported provider operations and stale/canceled late results.
+- [x] Add full validation/diagnostics for invalid/unsupported provider operations and stale/canceled late results.
   - [x] Validate provider envelopes/operations and record invalid/unsupported diagnostics.
   - [x] Reject replaced registration-token late results as `:stale` without accepting operations.
   - [x] Diagnose session-unavailable registered providers as `:unauthorized` without invoking handlers.
