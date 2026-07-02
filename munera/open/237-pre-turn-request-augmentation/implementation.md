@@ -72,3 +72,5 @@
 - design follow-up completion (current design-review batch): latest task-scoped review batch identified as `52ee30772`..`93e3a9f95` with baseline `9e164f5d8`; the 8 current unchecked checklist lines added by that batch were resolved. Implementation should use canonical extension ids (`manifest:<lib>` or `path:<canonical-absolute-path>`), extension-scoped session capability lookup, dispatch-effect-boundary provider invocation, machine-readable provider `:reasons`, the specified EQL summary attributes, and a minimal context-manager `project-context` block from effective cwd. Current-turn history projection excludes the submitted user and current repair entries; rendering places repair entries before augmentation context and the submitted user last.
 
 - architectural review added 1 new design step: make pre-turn augmentation statechart-visible/enforced so the critical-path barrier remains dispatch/statechart-owned rather than only a request-preparation precondition.
+
+- ambiguity review added 4 new design steps

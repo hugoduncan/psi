@@ -44,3 +44,8 @@
 - [x] INC: Reconcile the data-only rule that turn augmenters must not mutate parent session state directly and must return data to core with the helper-session path that calls existing session mutations during augmentation; explicitly distinguish allowed helper-session side effects from forbidden parent request/session mutation.
 
 - [ ] ARCH: Make the pre-turn augmentation phase statechart-visible/enforced in the prompt lifecycle, not only a request-preparation precondition, so the critical-path barrier remains dispatch/statechart-owned and invalid prepare-before-augmentation transitions are rejected by protocol.
+
+- [ ] AMB: Define the exact prompt-lifecycle/statechart topology for the pre-turn augmentation barrier, including which state/event represents an open augmentation phase, which transition schedules or permits `:session/prompt-prepare-request` after terminal closure, and how direct prepare-before-closed-record attempts are rejected.
+- [ ] AMB: Choose one behavior for unknown capability keywords during extension effective-permission construction for this mechanism: activation/effective-state failure versus diagnostic-and-drop, including the resulting registration and invocation consequences.
+- [ ] AMB: Define how session-available extension capabilities for `:psi.capability/turn-augmentation` are populated and updated, including default session creation, extensions loaded or reloaded after a session exists, and session-policy narrowing.
+- [ ] AMB: Define replacement failure semantics for `:register-turn-augmenter` when the same stable key already has a callable registration: whether invalid arguments or missing permission preserve the previous registration or remove it before throwing.
