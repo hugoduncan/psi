@@ -82,3 +82,5 @@
 - design follow-up completion (statechart/capability/envelope batch): latest task-scoped review batch identified as `b4c793495`..`e3fd34b07` with baseline `aa1123a71`; the 6 current unchecked checklist lines added by that batch were resolved. Implementation should model pre-turn augmentation as explicit statechart states/events (`:turn/submitted` → `:turn/augmentation-open` → `:turn/augmentation-closed`) with prepare scheduled only after closure; unknown capability keywords fail extension effective-state construction; session-available extension capabilities are recomputed from live effective permissions ∩ session policy; invalid replacement registrations preserve the previous callable, while unauthorized replacement removes that key; `:turn-augmentation/child-session-ids` is optional and normalized to `[]`.
 
 - no new architectural review feedback after statechart/capability/envelope design updates
+
+- ambiguity review added 5 new design steps
