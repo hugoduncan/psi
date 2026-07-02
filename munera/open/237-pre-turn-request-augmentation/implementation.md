@@ -29,3 +29,5 @@
 - no new architectural review feedback after resolved design-review follow-ups
 
 - ambiguity review added 1 new design step
+
+- no new inconsistency review feedback after latest ambiguity follow-up
