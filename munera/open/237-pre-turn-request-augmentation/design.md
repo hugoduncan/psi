@@ -276,6 +276,14 @@ Required properties:
 
 Unsupported operation types are rejected with diagnostics and are never silently ignored.
 
+Core owns trust normalization for accepted operations:
+
+- every accepted v1 `:append-context-block` operation is recorded with `:trust :project-derived`;
+- handlers may omit `:trust`; omission is normal and core injects `:project-derived` in the recorded operation;
+- if a handler supplies `:trust`, it must exactly equal `:project-derived`;
+- an explicit `nil`, unsupported value, or spoofed stronger trust value rejects the provider result atomically with provider status `:invalid-operation`, diagnostic reason `:invalid-trust`, and no accepted operations from that provider;
+- `:trust` is request-rendering metadata only. It does not grant policy authority, tool authority, or instruction priority. Request rendering uses it only to choose the non-privileged user-role turn-context rendering described below.
+
 Core owns provenance normalization for accepted operations:
 
 - accepted operations are recorded with `:source` injected from the registered provider key and the verified `:turn-augmentation/child-session-ids` for that provider;
@@ -418,6 +426,7 @@ API rules:
 ```
 
 - Caller options may narrow the child prompt/tool/model shape, but must not remove parent provenance, enable parent-state mutation, or disable recursion suppression.
+- Creation is allocation-only. It records and initializes a child session but does not submit a child prompt, execute a model call, or wait for child work.
 - The returned child session id is data; if the provider wants it represented in augmentation diagnostics, it must include that id in `:turn-augmentation/child-session-ids` in its result envelope.
 
 Child-session option defaults and validation:
@@ -430,6 +439,29 @@ Child-session option defaults and validation:
 - The provider must still be authorized for `:psi.capability/turn-augmentation` for the parent session at the moment the child creation request is handled. Tool and model options never grant capabilities that the parent session lacks.
 
 Tests should assert both the successful narrowed-tool path and rejection for unknown tools, tools outside the parent tool set, mismatched parent provenance, explicit different model, and attempts to unset `:suppress-turn-augmentation?`.
+
+Driving child work is a second explicit API step. The extension API exposes exactly one dedicated function, `:run-turn-augmentation-child-session`:
+
+```clojure
+((:run-turn-augmentation-child-session api)
+ {:child-session-id "child-session-id"
+  :user-text "Summarize the project context relevant to the parent request."})
+;; => {:psi.agent-session/session-id "child-session-id"
+;;     :turn-id "child-turn-id"
+;;     :status :completed
+;;     :assistant-text "bounded final assistant text"}
+```
+
+Run API rules:
+
+- The function can succeed only during the same active authorized provider invocation that created the child session. It verifies that `:child-session-id` was created by that provider invocation for the same parent session and turn.
+- The v1 run request accepts exactly `:child-session-id` and `:user-text`. `:user-text` must be a non-blank string. Unrecognized keys, unknown child ids, children from another provider invocation, or children whose parent provenance does not match the active invocation throw `ex-info` with `:reason :invalid-child-session-run` and do not submit child work.
+- The function submits the child prompt through the canonical core prompt lifecycle for that child session: `:session/prompt-submit`, suppressed pre-turn augmentation record creation for the child turn, `:session/prompt-prepare-request`, execution, recording, and finish. It must not call a model directly, expose child `ctx`, or hand the extension a child runtime handle.
+- The function waits for the child turn to reach a terminal result before returning to the provider handler. The parent pre-turn augmentation barrier therefore waits indirectly for child work because it waits for the provider handler to return.
+- The provider may observe only the returned child-run summary: child session id, child turn id, status, optional diagnostic, and the final assistant text normalized by core and capped at 8,000 characters. It does not receive raw child journal entries, tool transcripts, credentials, dispatch functions, or atom access.
+- Child run statuses are `:completed`, `:failed`, or `:canceled`. Child execution failure is returned as `:failed` data unless the run API request itself is invalid; the provider decides whether to return no-op, failure diagnostic, or an augmentation operation derived from the failure.
+- Parent-turn cancellation requests cancellation of any in-flight augmentation child run, unblocks the run wait with status `:canceled` or `ex-info` reason `:parent-turn-canceled`, closes the parent augmentation record with overall `:canceled`, and prevents any later provider result from applying. Correctness must not depend on interrupting the underlying child work.
+- Child run diagnostics are not parent augmentation operations. Parent augmentation diagnostics record the verified `:child-session-ids` supplied in the provider result envelope; detailed child execution history remains in the child session's own canonical records.
 
 Augmentation child sessions must be distinguishable from ordinary user sessions. They carry parent provenance:
 
@@ -453,7 +485,7 @@ Core applies an augmentation result only when all are true at record time:
 
 When parent cancellation is observed before all selected providers have returned, core closes the pre-turn phase immediately: any collected/validated operations not yet committed to a terminal augmentation record for that turn are discarded, providers without accepted results are recorded with status `:canceled`, overall status becomes `:canceled`, and request preparation is not invoked for that parent turn. Sequential implementations must not invoke later providers after cancellation is observed. Concurrent implementations may let already-started provider work finish in the background, but those late results cannot reopen the closed phase.
 
-If a result arrives for a known but canceled turn, core records or updates that provider diagnostic with status `:canceled` and accepts no operations from that result. If a result arrives after the phase closed for any non-canceled reason, core records or updates that provider diagnostic with status `:stale` and accepts no operations from that result. Diagnostic updates for late results must preserve the canonical closed overall status and must not mutate prepared-request input. If the session/turn record no longer exists, the result is ignored and only bounded runtime logging is allowed; no new turn state is recreated for the late result.
+If a result arrives for a known but canceled turn, core records or updates that provider diagnostic with status `:canceled` and accepts no operations from that result. If a result arrives after the phase closed for any non-canceled reason, core records or updates that provider diagnostic with status `:stale` and accepts no operations from that result. Diagnostic updates for late results must preserve the canonical closed overall status and must not mutate prepared-request input. No v1 transition sets the overall augmentation record status to `:stale`; stale is only a provider diagnostic for late results after a terminal record already exists. If the session/turn record no longer exists, the result is ignored and only bounded runtime logging is allowed; no new turn state is recreated for the late result.
 
 ### Canonical storage and diagnostics
 
@@ -484,20 +516,21 @@ The optional `:workflow-run-id` is copied from the prompt lifecycle when present
 
 Minimum status taxonomy:
 
-- overall statuses: `:success`, `:no-op`, `:partial`, `:failed`, `:canceled`, `:stale`, `:suppressed`, `:replay-used`, `:replay-missing`, `:replay-invalid`;
+- overall statuses: `:success`, `:no-op`, `:partial`, `:failed`, `:canceled`, `:suppressed`, `:replay-used`, `:replay-missing`, `:replay-invalid`;
 - provider statuses: `:success`, `:no-op`, `:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, `:canceled`, `:stale`.
 
-Overall status aggregation is deterministic and computed from the recorded provider outcomes after replay/suppression/cancellation checks:
+Overall status aggregation is deterministic and computed once when the canonical augmentation record first reaches a terminal closed state. Late provider diagnostic updates after closure do not recompute or rewrite the overall status. Aggregation rules after replay/suppression/cancellation checks:
 
 - replay outcomes override live aggregation: valid recorded replay uses `:replay-used`; missing or malformed/wrong-turn replay uses `:replay-missing` or `:replay-invalid`;
 - an augmentation child session with `:suppress-turn-augmentation? true` records `:status :suppressed`, `:suppressed? true`, `:accepted-operation-count 0`, `:operations []`, and `:providers []`;
-- parent-turn cancellation or stale phase closure records `:canceled` or `:stale` and accepts no operations from late results;
+- parent-turn cancellation records `:canceled`, accepts no operations from pending or late results, and skips request preparation/execution;
 - no registered augmenters records `:no-op` with `:providers []` and zero accepted operations;
 - registered providers that are unauthorized for the parent session appear in `:providers` with status `:unauthorized` and are not invoked;
 - if at least one operation is accepted and every provider status is `:success` or `:no-op`, overall status is `:success`;
-- if at least one operation is accepted and any provider status is a rejection/failure status (`:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, `:canceled`, or `:stale`), overall status is `:partial`;
+- if at least one operation is accepted and any provider status is a rejection/failure status (`:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, or `:canceled`), overall status is `:partial`;
 - if no operation is accepted and every provider status is `:no-op`, overall status is `:no-op`;
-- if no operation is accepted and any provider status is a rejection/failure status, including the all-unauthorized and all-failed/invalid cases, overall status is `:failed`.
+- if no operation is accepted and any provider status is a rejection/failure status, including the all-unauthorized and all-failed/invalid cases, overall status is `:failed`;
+- `:stale` is not a terminal overall status in v1. It can only be written as a provider diagnostic for a late result after the canonical record has already closed, and it must preserve the previously closed overall status and accepted operations.
 
 A resolver/query surface must expose the latest or addressed turn augmentation summary, including `session-id`, `turn-id`, `workflow-run-id` when present, overall status, accepted operation count, provider statuses, child-session ids, and replay status. The prepared-request summary should include the augmentation status and accepted operation count for the prepared turn.
 
@@ -535,9 +568,12 @@ Child session ids and diagnostics are provenance, not replay dependencies.
 - Turn mismatch or stale late results prevent operation application and record/omit diagnostics according to the cancellation/stale rules above.
 - Extension failures are captured as diagnostics and do not mutate the prepared request with partial/invalid data from the failed provider.
 - Unsupported operations from an extension are rejected with diagnostics.
+- Accepted append-context-block operations are recorded with core-normalized `:trust :project-derived`; missing trust is injected, and unsupported or spoofed trust is rejected with provider status `:invalid-operation`.
 - A resolver or summary surface exposes augmentation status, accepted operation count, provider statuses, child-session ids, and replay status.
 - Extension unload/disable/reload removes or replaces turn-augmenter registrations according to the extension live-registry lifecycle; failed activation leaves no callable registration.
 - Augmentation child-session option validation prevents tools, model selection, prompt/session options, or recursion settings from expanding beyond parent-session authority.
+- Augmentation child-session creation is allocation-only; child execution uses a guarded run API that submits through the canonical child prompt lifecycle, waits for terminal child work, returns only a bounded summary, and participates in parent cancellation/barrier semantics.
+- Late stale provider results can update provider diagnostics only; they never set overall status `:stale`, rewrite accepted operations, or affect prepared-request input.
 - The context-manager extension demonstrates the new mechanism with a minimal safe context block.
 - Tests cover normal augmentation, no-op augmentation, extension failure, invalid operation, unsupported operation, multiple-augmenter ordering, replay success, replay missing/invalid fail-closed behavior, recursion suppression, diagnostics, and stale/canceled turn handling.
 

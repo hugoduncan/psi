@@ -44,3 +44,5 @@
 - ambiguity review added 2 new design steps
 
 - inconsistency review added 1 new design step
+
+- design follow-up completion (trust/child-run/stale-status): latest task-scoped design-review batch identified as `0886778a7`..`52302f529` with baseline `79d506e5a`; the 3 current unchecked checklist lines added by that batch were resolved. Implementation should core-normalize append-block `:trust` to `:project-derived`, treat child-session creation as allocation-only with a guarded run API through the canonical child prompt lifecycle, and never use `:stale` as an overall terminal record status.
