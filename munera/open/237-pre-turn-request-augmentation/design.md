@@ -69,8 +69,8 @@ The parent turn follows this shape:
 1. user submits a prompt;
 2. `:session/prompt-submit` creates or returns the canonical `turn-id` for that submitted prompt and appends the prompt/repair journal entries;
 3. core enters `:session/pre-turn-augment` with the same `session-id`, `turn-id`, submitted user message, and workflow run id if any;
-4. if the session is an augmentation child session with `:suppress-turn-augmentation? true`, core records a suppressed/no-op augmentation record and skips augmenter invocation;
-5. otherwise, runtime invokes currently registered and authorized turn augmenters;
+4. if the session is an augmentation child session with `:suppress-turn-augmentation? true`, core records a suppressed augmentation record and skips augmenter invocation;
+5. otherwise, runtime considers currently registered turn augmenters, diagnoses unauthorized ones for this parent session, and invokes only authorized turn augmenters;
 6. augmenters return augmentation data or failures;
 7. core validates, deterministically orders, and records accepted operations plus provider diagnostics for the `turn-id`;
 8. `:session/prompt-prepare-request` receives the same `turn-id` and builds the prepared request from the original prompt plus recorded accepted augmentation operations;
@@ -84,10 +84,9 @@ The parent turn follows this shape:
 Turn augmentation is a privileged extension capability.
 
 - Core adds a named capability, `:psi.capability/turn-augmentation`, to the capability catalog.
-- An extension may register a turn augmenter only when both are true:
-  - the extension manifest/effective permissions declare `:psi.capability/turn-augmentation`;
-  - the current session's available capabilities include `:psi.capability/turn-augmentation` for that extension.
-- Invocation is gated again at pre-turn execution time; stale registrations whose extension is no longer authorized are skipped and diagnosed as `:unauthorized`.
+- An extension may register a turn augmenter only when its manifest/effective permissions declare `:psi.capability/turn-augmentation`.
+- Registration-time authorization is not tied to an ambient active/default session and does not inspect session-available capabilities. Extension-load registration is therefore manifest/effective-permission gated only.
+- Invocation is gated at pre-turn execution time for the parent session being augmented: the session's available capabilities must include `:psi.capability/turn-augmentation` for that extension. Stale registrations whose extension is no longer authorized for that session are skipped and diagnosed as `:unauthorized`.
 - Registration is exposed by a new API function such as `(:register-turn-augmenter api)`, not by `(:on api)` and not by generic event-bus subscription.
 - Permission failure must not leave a callable augmenter registration.
 
@@ -114,10 +113,10 @@ Registration contract:
 - `extension-id` is derived by core from the registering extension identity; callers must not supply or spoof it.
 - A successful call returns `{:extension-id <extension-id> :augmenter-id <augmenter-id> :registered? true}`.
 - Invalid registration arguments throw `ex-info` with `:reason :invalid-registration` and leave no registration.
-- Missing manifest/effective permission or missing session-available capability throws `ex-info` with `:reason :unauthorized` and leaves no callable registration.
+- Missing manifest/effective permission throws `ex-info` with `:reason :unauthorized` and leaves no callable registration.
 - Handler exceptions during pre-turn invocation do not escape the parent turn lifecycle; core records that provider with status `:failed` and accepts no operations from it.
 
-Registrations are extension-scoped entries in the runtime registration table. They are not session-scoped. Per-session authorization is checked again at invocation time, so a registered augmenter can be skipped as `:unauthorized` for a session where its capability is unavailable.
+Registrations are extension-scoped entries in the runtime registration table. They are not session-scoped, and they do not capture whichever session happened to be active when the extension loaded. Per-session authorization is checked at invocation time, so a registered augmenter can be skipped as `:unauthorized` for a session where its capability is unavailable.
 
 ### Registration and deterministic ordering
 
@@ -172,6 +171,15 @@ Rules for the projection:
 - `:turn-augmentation/history` is a bounded core projection equivalent to existing context-message summaries: message count plus tail summaries with snippets capped by core. It is not raw journal access.
 - Extensions needing more information must request a future resolver-backed field; they must not receive `ctx`, root state, or mutable session data.
 
+History projection bounds are fixed for v1 so tests can assert them:
+
+- `:message-count` is the count of canonical prior agent-core messages visible to request preparation before the current submitted user message is added;
+- `:tail` contains at most the last 8 of those prior messages, in chronological order;
+- each `:tail` entry uses the zero-based `:index` from the full prior-message vector;
+- `:content-types` is the vector of each content block's `:type`;
+- `:snippet` is built by a core helper equivalent to `psi.agent-session.message-text/content-display-text`, normalized to single-space whitespace, trimmed, and truncated to at most 200 characters; messages with no displayable text use `""`;
+- the projection helper is core-owned, for example `build-turn-augmentation-history-projection`, so augmenter tests do not depend on UI telemetry resolver defaults.
+
 ### Critical path without deadline
 
 Pre-turn augmentation is on the critical path. The parent turn waits for augmentation to return, fail, or be canceled.
@@ -215,7 +223,7 @@ Envelope rules:
 - `:turn-augmentation/status` is required and must be `:success` or `:no-op` when returned by a handler.
 - `:turn-augmentation/operations` is required and must be a vector.
 - `:success` requires at least one operation; `:no-op` requires an empty operations vector.
-- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`.
+- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`. Malformed ids, ids not created through the augmentation child-session API, and ids whose recorded parent session/turn differs from the active augmentation invocation make the provider result invalid with provider status `:invalid-operation`, diagnostic reason `:invalid-child-session-ids`, and no accepted operations from that provider.
 - `:turn-augmentation/diagnostic` is optional; when present it must be a string and is copied into the provider diagnostic summary.
 - Malformed envelopes are treated as invalid provider results: core records provider status `:invalid-operation`, accepts no operations from that provider, and continues with other providers.
 - Unsupported operation `:op` values are treated as provider status `:unsupported-operation`, accept no operations from that provider, and continue with other providers.
@@ -247,6 +255,15 @@ Required properties:
 - the operation does not alter system/developer policy, model selection, tools, API options, runtime metadata, conversation history, or the submitted user message.
 
 Unsupported operation types are rejected with diagnostics and are never silently ignored.
+
+Core owns provenance normalization for accepted operations:
+
+- accepted operations are recorded with `:source` injected from the registered provider key and the verified `:turn-augmentation/child-session-ids` for that provider;
+- handlers may omit `:source`; omission is normal and does not affect acceptance;
+- if a handler supplies `:source`, it must exactly match the core-normalized source for that provider and verified child-session id set;
+- a mismatched or spoofed `:source` rejects the provider result atomically with provider status `:invalid-operation`, diagnostic reason `:provenance-mismatch`, and no accepted operations from that provider.
+
+Duplicate `:append-context-block` `:id` values are allowed across providers and within one turn. The id is a provider-local label, not a global unique key. Core does not rewrite ids; deterministic provider/order position disambiguates them. Prepared-request summaries expose `:operation-ids` in accepted operation order and may therefore contain repeated strings.
 
 ### Rendering append-context-block
 
@@ -311,6 +328,18 @@ Prepared-request summaries must also include:
 ```
 
 When no operation is accepted, no augmentation context message is inserted, no `:turn/augmentation-context` prompt layer is present, and the summary reports `:accepted-operation-count 0` with `:message-inserted? false`.
+
+For recursion-suppressed augmentation child sessions, request preparation uses the canonical suppressed record and reports:
+
+```clojure
+{:augmentation {:turn-id "turn-id"
+                :status :suppressed
+                :accepted-operation-count 0
+                :provider-count 0
+                :message-inserted? false}}
+```
+
+No `:turn/augmentation-context` prompt layer is present for a suppressed child turn.
 
 ### Partial results, invalid operations, and failures
 
@@ -388,6 +417,8 @@ The v1 augmentation record shape is:
  :session-id "..."
  :status :success
  :replay? false
+ :suppressed? false
+ :accepted-operation-count 1
  :operations [<accepted-operation>]
  :providers [{:extension-id "context-manager"
               :augmenter-id "project-context"
@@ -403,6 +434,18 @@ Minimum status taxonomy:
 
 - overall statuses: `:success`, `:no-op`, `:partial`, `:failed`, `:canceled`, `:stale`, `:suppressed`, `:replay-used`, `:replay-missing`, `:replay-invalid`;
 - provider statuses: `:success`, `:no-op`, `:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, `:canceled`, `:stale`.
+
+Overall status aggregation is deterministic and computed from the recorded provider outcomes after replay/suppression/cancellation checks:
+
+- replay outcomes override live aggregation: valid recorded replay uses `:replay-used`; missing or malformed/wrong-turn replay uses `:replay-missing` or `:replay-invalid`;
+- an augmentation child session with `:suppress-turn-augmentation? true` records `:status :suppressed`, `:suppressed? true`, `:accepted-operation-count 0`, `:operations []`, and `:providers []`;
+- parent-turn cancellation or stale phase closure records `:canceled` or `:stale` and accepts no operations from late results;
+- no registered augmenters records `:no-op` with `:providers []` and zero accepted operations;
+- registered providers that are unauthorized for the parent session appear in `:providers` with status `:unauthorized` and are not invoked;
+- if at least one operation is accepted and every provider status is `:success` or `:no-op`, overall status is `:success`;
+- if at least one operation is accepted and any provider status is a rejection/failure status (`:failed`, `:invalid-operation`, `:unsupported-operation`, `:unauthorized`, `:canceled`, or `:stale`), overall status is `:partial`;
+- if no operation is accepted and every provider status is `:no-op`, overall status is `:no-op`;
+- if no operation is accepted and any provider status is a rejection/failure status, including the all-unauthorized and all-failed/invalid cases, overall status is `:failed`.
 
 A resolver/query surface must expose the latest or addressed turn augmentation summary, including `session-id`, `turn-id`, overall status, accepted operation count, provider statuses, child-session ids, and replay status. The prepared-request summary should include the augmentation status and accepted operation count for the prepared turn.
 
@@ -422,8 +465,8 @@ Child session ids and diagnostics are provenance, not replay dependencies.
 ## Acceptance criteria
 
 - A new turn-augmentation registration path exists for extensions and is distinct from event notification subscription.
-- Registration and invocation are gated by `:psi.capability/turn-augmentation` manifest/effective permissions and session-available capabilities.
-- Unauthorized registration does not leave a callable augmenter; unauthorized stale registrations are skipped with diagnostics.
+- Registration is gated by `:psi.capability/turn-augmentation` manifest/effective permissions; invocation is gated by the parent session's session-available capabilities.
+- Unauthorized registration from missing manifest/effective permission does not leave a callable augmenter; unauthorized stale or session-unavailable registrations are skipped at invocation with diagnostics.
 - Augmenters receive only the bounded v1 input contract fields, not raw `ctx`, direct atom access, credentials, or dispatch/runtime handles.
 - The prompt lifecycle includes a pre-turn augmentation phase after `:session/prompt-submit` assigns `turn-id` and before prepared-request construction.
 - A registered augmenter can return an `:append-context-block` operation that appears in the prepared request for that turn as non-privileged user-role context before the current user message.
