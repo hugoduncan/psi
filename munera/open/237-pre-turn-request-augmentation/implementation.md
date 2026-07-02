@@ -74,3 +74,5 @@
 - architectural review added 1 new design step: make pre-turn augmentation statechart-visible/enforced so the critical-path barrier remains dispatch/statechart-owned rather than only a request-preparation precondition.
 
 - ambiguity review added 4 new design steps
+
+- inconsistency review added 1 new design step

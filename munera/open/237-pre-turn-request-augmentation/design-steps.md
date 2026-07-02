@@ -49,3 +49,5 @@
 - [ ] AMB: Choose one behavior for unknown capability keywords during extension effective-permission construction for this mechanism: activation/effective-state failure versus diagnostic-and-drop, including the resulting registration and invocation consequences.
 - [ ] AMB: Define how session-available extension capabilities for `:psi.capability/turn-augmentation` are populated and updated, including default session creation, extensions loaded or reloaded after a session exists, and session-policy narrowing.
 - [ ] AMB: Define replacement failure semantics for `:register-turn-augmenter` when the same stable key already has a callable registration: whether invalid arguments or missing permission preserve the previous registration or remove it before throwing.
+
+- [ ] INC: Reconcile the augmenter result envelope section's "Valid v1 envelopes are exactly" examples, which include `:turn-augmentation/child-session-ids`, with the later rule that `:turn-augmentation/child-session-ids` is optional and missing is treated as `[]`; define whether the key is required in valid envelopes or optional.
