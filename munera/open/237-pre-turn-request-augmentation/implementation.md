@@ -84,3 +84,5 @@
 - no new architectural review feedback after statechart/capability/envelope design updates
 
 - ambiguity review added 5 new design steps
+
+- inconsistency review added 1 new design step
