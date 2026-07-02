@@ -78,16 +78,49 @@ The parent turn follows this shape:
 
 `prompt-prepare-request` must not run live augmentation itself. It only reads the canonical augmentation record for its `turn-id`.
 
+### Dispatch/effect boundary
+
+Live turn-augmenter invocation is impure runtime work and must not run inside a pure dispatch handler. Pure handlers may select providers, create/open a canonical augmentation phase, and emit effects-as-data, but arbitrary extension handlers, helper-session runs, file/model access, futures, and late-result callbacks run only at the dispatch effect/runtime boundary.
+
+The live path is:
+
+1. dispatch handles `:session/pre-turn-augment` for the parent `session-id`/`turn-id`, records an open turn-scoped augmentation phase, selects currently registered providers, diagnoses providers that are not authorized for the parent session, and returns one or more invocation effects for authorized providers;
+2. the effect executor invokes selected extension handlers with the bounded turn projection and no raw dispatch context;
+3. provider returns, exceptions, cancellations, unload/disable checks, and late results are fed back through dispatch-owned state updates, for example a provider-result or close-phase event/mutation;
+4. dispatch validation records the terminal canonical augmentation record before request preparation is allowed to continue.
+
+Replay suppresses the invocation effect and uses the replay lookup rules instead. No pure handler may call an augmenter handler, run a helper session, dereference provider futures, read files for augmentation, or mutate canonical augmentation records outside the dispatch update path. Late-result handling must preserve the same boundary: background callbacks may enqueue/dispatch data, but canonical state changes still go through dispatch.
+
 ### Capability and permission gating
 
 Turn augmentation is a privileged extension capability.
 
-- Core adds a named capability, `:psi.capability/turn-augmentation`, to the capability catalog.
+- Core adds exactly one named capability for this mechanism, `:psi.capability/turn-augmentation`, to the capability catalog.
 - An extension may register a turn augmenter only when its manifest/effective permissions declare `:psi.capability/turn-augmentation`.
 - Registration-time authorization is not tied to an ambient active/default session and does not inspect session-available capabilities. Extension-load registration is therefore manifest/effective-permission gated only.
-- Invocation is gated at pre-turn execution time for the parent session being augmented: the session's available capabilities must include `:psi.capability/turn-augmentation` for that extension. Stale registrations whose extension is no longer authorized for that session are skipped and diagnosed as `:unauthorized`.
+- Invocation is gated at pre-turn execution time for the parent session being augmented: the session's available extension-scoped capabilities must include `:psi.capability/turn-augmentation` for the registering extension id. Stale registrations whose extension is no longer authorized for that session are skipped and diagnosed as `:unauthorized`.
 - Registration is exposed by a new API function such as `(:register-turn-augmenter api)`, not by `(:on api)` and not by generic event-bus subscription.
 - Permission failure must not leave a callable augmenter registration.
+
+Concrete permission schema:
+
+- Manifest/effective extension permissions use a vector or set of capability keywords under `:permissions`, for example `{psi/context-manager {:permissions [:psi.capability/turn-augmentation]}}` in the extension install manifest/effective projection.
+- The effective permission set is normalized to a set of keywords on the live extension record, for example `:effective-permissions #{:psi.capability/turn-augmentation}`. Unknown capability keywords are rejected or diagnosed during effective-state construction; they are not silently granted.
+- A session's available extension capabilities are extension-scoped, not one global session flag. The session state/projection uses a map equivalent to `{:extensions {<extension-id> #{:psi.capability/turn-augmentation}}}`.
+- Session creation may initialize that map from the extension effective permissions and session policy may narrow it. Absence of the extension id or capability in this map means unavailable for that session.
+- Invocation is allowed only when both checks pass: the live extension effective permissions contain `:psi.capability/turn-augmentation` and the parent session's available extension capabilities contain the same capability for that exact extension id.
+
+### Extension identity
+
+Core derives one canonical `extension-id` for every live extension and uses it for turn-augmenter stable keys, deterministic sorting, provenance, diagnostics, authorization lookup, and unload/disable/reload cleanup. Extension code cannot supply or override it.
+
+Canonical identity rules:
+
+- Manifest-installed extensions use the manifest activation id `manifest:<lib>`, where `<lib>` is the dependency lib symbol string, for example `manifest:psi/context-manager`.
+- Path-loaded extensions use `path:<canonical-absolute-path>` after filesystem canonicalization. They do not use basename, namespace, package name, or user-supplied display labels for authority.
+- The normalized id must be a non-blank string and is stored on the live extension record separately from display/path metadata.
+- Loading a second live extension with the same normalized id is a duplicate-extension-id activation error; the later activation is rolled back and leaves no callable registrations.
+- Registration replacement, unload, disable, and reload match registrations by this exact canonical `extension-id`. Manifest and path activations of the same code are distinct extensions unless they normalize to the same id.
 
 ### Registration API
 
@@ -134,7 +167,7 @@ Removed registrations are absent from later pre-turn provider enumeration and th
 Each registered augmenter has a stable key:
 
 ```clojure
-{:extension-id "context-manager"
+{:extension-id "manifest:psi/context-manager"
  :augmenter-id  "project-context"}
 ```
 
@@ -170,7 +203,7 @@ An augmenter receives exactly one bounded map, not raw runtime context. The v1 i
                                      :role "assistant"
                                      :content-types [:text]
                                      :snippet "bounded snippet"}]}
- :turn-augmentation/provider {:extension-id "context-manager"
+ :turn-augmentation/provider {:extension-id "manifest:psi/context-manager"
                               :augmenter-id "project-context"}}
 ```
 
@@ -186,7 +219,8 @@ Rules for the projection:
 
 History projection bounds are fixed for v1 so tests can assert them:
 
-- `:message-count` is the count of canonical prior agent-core messages visible to request preparation before the current submitted user message is added;
+- `:message-count` is the count of canonical prior agent-core messages visible to request preparation before the current turn's prompt-submit additions are considered;
+- the projection excludes both the current submitted user message and any prompt-submit repair entries generated for that current turn; the submitted user message is provided separately as `:turn-augmentation/user-message` and `:turn-augmentation/user-text`;
 - `:tail` contains at most the last 8 of those prior messages, in chronological order;
 - each `:tail` entry uses the zero-based `:index` from the full prior-message vector;
 - `:content-types` is the vector of each content block's `:type`;
@@ -207,7 +241,9 @@ Cancellation is the only required unblocking mechanism for in-flight providers u
 
 ### Data-only extension output
 
-Turn augmenters must not mutate parent session state directly. They must not dispatch arbitrary parent mutations. They must return data to core.
+Turn augmenters must return augmentation data to core and must not mutate the parent request or parent session state directly. They must not append parent messages, inject parent system/developer content, alter the parent model/tools/options, rewrite the submitted user message, write parent augmentation records, or dispatch arbitrary parent-session mutations that affect request preparation.
+
+Allowed helper-session side effects are narrower and distinct from parent mutation: an augmenter may use existing extension session APIs to create and run helper sessions, then return the final helper-derived content as data in its result envelope. The parent `session-id` may be used as provenance or as the parent reference for helper allocation, but the helper session is the mutation target for helper prompts/results. Any effect on the parent turn comes only from the validated operations that core records and later renders.
 
 Core owns:
 
@@ -258,7 +294,7 @@ The only supported v1 operation is `:append-context-block`:
  :title "Project context"
  :content "..."
  :source {:type :extension
-          :extension-id "context-manager"
+          :extension-id "manifest:psi/context-manager"
           :augmenter-id "project-context"
           :child-session-ids [...]}}
 ```
@@ -298,9 +334,10 @@ Request preparation renders accepted `:append-context-block` operations as an in
 Rendering order:
 
 1. system prompt layers remain unchanged: base system prompt, developer prompt, extension prompt contributions, and runtime metadata keep their existing order;
-2. prior conversation history is projected as today;
-3. the turn augmentation context message is inserted after prior history and before the submitted current user message;
-4. the submitted current user message remains the final user message for the turn.
+2. prior conversation history before the current prompt-submit additions is projected as today;
+3. prompt-submit repair entries for the current turn, if any, are rendered after prior history and before augmentation context so structural tool-result repairs still precede the new user turn;
+4. the turn augmentation context message is inserted after prior history/current-turn repair entries and before the submitted current user message;
+5. the submitted current user message remains the final user message for the turn.
 
 Formatting:
 
@@ -332,7 +369,7 @@ The prepared request exposes this exact introspection prompt layer when at least
  :role "user"
  :stable? false
  :turn-id "turn-id"
- :position :after-history-before-current-user
+ :position :after-history-and-repairs-before-current-user
  :status :success
  :operation-count 2
  :provider-count 1
@@ -399,6 +436,25 @@ If the provider wants helper sessions represented in parent augmentation diagnos
 
 Parent-turn cancellation prevents any later provider result from applying to the parent turn through the normal cancellation/stale-result rules. V1 does not require core to cancel or interrupt helper sessions created through the existing generic session APIs; providers should perform best-effort cleanup if they create temporary helper sessions. Correctness comes from refusing to apply late/canceled provider output, not from guaranteed helper-session interruption.
 
+### Minimal context-manager v1 behavior
+
+The `extensions/context-manager` scaffold demonstrates the mechanism with one registered turn augmenter and no helper-session model run in v1. It registers `:augmenter-id "project-context"` through `:register-turn-augmenter` when its effective permissions include `:psi.capability/turn-augmentation`.
+
+Invocation behavior:
+
+- if the current `:turn-augmentation/session-id` is in the extension's internally tracked helper-session id set, return a valid `:no-op` envelope with no operations and no child-session ids;
+- if `:turn-augmentation/effective-cwd` is blank or nil, return a valid `:no-op` envelope with diagnostic `"no effective cwd"`;
+- otherwise return `:success` with exactly one operation:
+
+```clojure
+{:op :append-context-block
+ :id "project-context"
+ :title "Project context"
+ :content "Working directory: <effective-cwd>"}
+```
+
+The scaffold omits `:source`; core injects normalized provenance. It returns `:turn-augmentation/child-session-ids []`. It intentionally does not create or run helper sessions in this task; helper-session recursion avoidance is still specified and testable by seeding the helper-session id set or by future context-manager helper work.
+
 ### Cancellation and stale results
 
 Core applies an augmentation result only when all are true at record time:
@@ -427,17 +483,29 @@ The v1 augmentation record shape is:
  :replay? false
  :accepted-operation-count 1
  :operations [<accepted-operation>]
- :providers [{:extension-id "context-manager"
+ :providers [{:extension-id "manifest:psi/context-manager"
               :augmenter-id "project-context"
               :status :success
               :operation-count 1
               :accepted-operation-count 1
               :rejected-operation-count 0
               :child-session-ids ["..."]
-              :diagnostic "optional terse message"}]}
+              :reasons []
+              :diagnostic "optional terse provider message"}]}
 ```
 
 The optional `:workflow-run-id` is copied from the prompt lifecycle when present. It is provenance for diagnostics/review and for workflow cancellation guard integration; augmentation record lookup remains keyed by `session-id` and `turn-id`.
+
+Provider diagnostics are machine-readable. Every provider entry contains `:status`; rejected, failed, unauthorized, canceled, or stale providers also contain `:reasons`, a vector of reason keywords in the fixed order below. The optional provider-supplied `:turn-augmentation/diagnostic` string is copied to `:diagnostic` only as human-readable context and is never parsed for behavior.
+
+Reason keywords for v1 are:
+
+- lifecycle/runtime: `:unauthorized`, `:handler-exception`, `:provider-canceled`, `:late-stale-result`;
+- envelope validation: `:invalid-envelope`, `:invalid-status`, `:invalid-operations`, `:invalid-child-session-ids`, `:invalid-diagnostic`;
+- operation validation: `:invalid-operation-shape`, `:invalid-append-context-block`, `:provenance-mismatch`, `:unsupported-operation`;
+- replay validation: `:missing-record`, `:malformed-record`, `:wrong-turn-id`.
+
+When a returned provider result has multiple validation failures, core records all applicable reasons in the fixed order listed above. Status precedence for returned results is deterministic: lifecycle states (`:unauthorized`, `:canceled`, `:stale`) are assigned before result validation; handler exceptions become `:failed`; otherwise any malformed envelope, malformed child-session ids, provenance mismatch, or invalid supported operation shape yields provider status `:invalid-operation`; if the envelope and supported-operation fields are otherwise valid but any operation uses an unsupported `:op`, provider status is `:unsupported-operation`. Invalid-operation therefore wins over unsupported-operation when both are present, while `:reasons` still exposes every detected cause.
 
 Minimum status taxonomy:
 
@@ -456,7 +524,35 @@ Overall status aggregation is deterministic and computed once when the canonical
 - if no operation is accepted and any provider status is a rejection/failure status, including the all-unauthorized and all-failed/invalid cases, overall status is `:failed`;
 - `:stale` is not a terminal overall status in v1. It can only be written as a provider diagnostic for a late result after the canonical record has already closed, and it must preserve the previously closed overall status and accepted operations.
 
-A resolver/query surface must expose the latest or addressed turn augmentation summary, including `session-id`, `turn-id`, `workflow-run-id` when present, overall status, accepted operation count, provider statuses, child-session ids, and replay status. The prepared-request summary should include the augmentation status and accepted operation count for the prepared turn.
+The resolver/query surface exposes both the latest summary for a session and an addressed summary for a specific turn.
+
+Session query attributes:
+
+```clojure
+[:psi.agent-session/latest-turn-augmentation-summary
+ {(:psi.agent-session/turn-augmentation-summary {:turn-id "turn-id"})
+  [:psi.turn-augmentation/session-id
+   :psi.turn-augmentation/turn-id
+   :psi.turn-augmentation/workflow-run-id
+   :psi.turn-augmentation/status
+   :psi.turn-augmentation/replay?
+   :psi.turn-augmentation/replay-status
+   :psi.turn-augmentation/accepted-operation-count
+   :psi.turn-augmentation/message-inserted?
+   :psi.turn-augmentation/operation-ids
+   {:psi.turn-augmentation/providers
+    [:psi.turn-augmentation.provider/extension-id
+     :psi.turn-augmentation.provider/augmenter-id
+     :psi.turn-augmentation.provider/status
+     :psi.turn-augmentation.provider/reasons
+     :psi.turn-augmentation.provider/operation-count
+     :psi.turn-augmentation.provider/accepted-operation-count
+     :psi.turn-augmentation.provider/rejected-operation-count
+     :psi.turn-augmentation.provider/child-session-ids
+     :psi.turn-augmentation.provider/diagnostic]}]}]
+```
+
+The latest summary returns the most recent turn-scoped augmentation record for that session or `nil`. The addressed summary returns the record for the supplied `turn-id` or `nil`. `:psi.turn-augmentation/replay-status` is `:replay-used`, `:replay-missing`, `:replay-invalid`, or `nil` for non-replay live records. The prepared-request summary includes the same turn's augmentation status, accepted operation count, and `:message-inserted?` flag.
 
 ### Replay
 
