@@ -13,3 +13,5 @@
 - no architectural review feedback
 
 - ambiguity review (second pass) added 4 new design steps
+
+- no inconsistency review feedback (second pass)
