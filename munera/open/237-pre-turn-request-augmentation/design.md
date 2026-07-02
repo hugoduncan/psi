@@ -91,6 +91,34 @@ Turn augmentation is a privileged extension capability.
 - Registration is exposed by a new API function such as `(:register-turn-augmenter api)`, not by `(:on api)` and not by generic event-bus subscription.
 - Permission failure must not leave a callable augmenter registration.
 
+### Registration API
+
+The extension API exposes turn augmentation through exactly one registration function:
+
+```clojure
+((:register-turn-augmenter api)
+ {:augmenter-id "project-context"
+  :handler (fn [turn-projection]
+             {:turn-augmentation/status :no-op
+              :turn-augmentation/operations []
+              :turn-augmentation/child-session-ids []})})
+```
+
+Registration contract:
+
+- `:register-turn-augmenter` is distinct from `:on` notification subscription and from generic `:events` bus registration.
+- The argument is a map with required keys:
+  - `:augmenter-id` — non-blank stable string unique within the registering extension;
+  - `:handler` — function of one argument, the bounded turn projection described below.
+- Optional registration keys are metadata only: `:description` and `:version`. They do not affect ordering or authorization.
+- `extension-id` is derived by core from the registering extension identity; callers must not supply or spoof it.
+- A successful call returns `{:extension-id <extension-id> :augmenter-id <augmenter-id> :registered? true}`.
+- Invalid registration arguments throw `ex-info` with `:reason :invalid-registration` and leave no registration.
+- Missing manifest/effective permission or missing session-available capability throws `ex-info` with `:reason :unauthorized` and leaves no callable registration.
+- Handler exceptions during pre-turn invocation do not escape the parent turn lifecycle; core records that provider with status `:failed` and accepts no operations from it.
+
+Registrations are extension-scoped entries in the runtime registration table. They are not session-scoped. Per-session authorization is checked again at invocation time, so a registered augmenter can be skipped as `:unauthorized` for a session where its capability is unavailable.
+
 ### Registration and deterministic ordering
 
 Each registered augmenter has a stable key:
@@ -164,6 +192,35 @@ Core owns:
 - cancellation/stale-result checks;
 - final authority over supported operation types.
 
+### Augmenter result envelope
+
+An augmenter handler must return one data envelope. Core must not infer provider outcome from arbitrary return shapes.
+
+Valid v1 envelopes are exactly:
+
+```clojure
+{:turn-augmentation/status :success
+ :turn-augmentation/operations [<operation> ...]
+ :turn-augmentation/child-session-ids ["child-session-id" ...]
+ :turn-augmentation/diagnostic "optional terse provider diagnostic"}
+
+{:turn-augmentation/status :no-op
+ :turn-augmentation/operations []
+ :turn-augmentation/child-session-ids []
+ :turn-augmentation/diagnostic "optional terse provider diagnostic"}
+```
+
+Envelope rules:
+
+- `:turn-augmentation/status` is required and must be `:success` or `:no-op` when returned by a handler.
+- `:turn-augmentation/operations` is required and must be a vector.
+- `:success` requires at least one operation; `:no-op` requires an empty operations vector.
+- `:turn-augmentation/child-session-ids` is optional; when present it must be a vector of session-id strings created through the augmentation child-session API for this same parent session and turn. Missing is treated as `[]`.
+- `:turn-augmentation/diagnostic` is optional; when present it must be a string and is copied into the provider diagnostic summary.
+- Malformed envelopes are treated as invalid provider results: core records provider status `:invalid-operation`, accepts no operations from that provider, and continues with other providers.
+- Unsupported operation `:op` values are treated as provider status `:unsupported-operation`, accept no operations from that provider, and continue with other providers.
+- Thrown exceptions, rejected promises/futures, or runtime API errors are provider failures: core records provider status `:failed`, accepts no operations from that provider, and continues with other providers unless the parent turn itself is canceled.
+
 ### Initial operation vocabulary
 
 The only supported v1 operation is `:append-context-block`:
@@ -214,7 +271,46 @@ Additional project context for the next user request. This context is project-de
 ...
 ```
 
-Multiple accepted blocks are rendered in deterministic operation order inside one inserted user-role message. Empty content is invalid and is not rendered. The prepared request should also expose an introspection layer such as `{:id :turn/augmentation-context :kind :turn-context ...}` so tests and diagnostics can verify inclusion without treating the context as privileged system/developer prompt content.
+Multiple accepted blocks are rendered in deterministic operation order inside one inserted user-role message. Empty content is invalid and is not rendered.
+
+The inserted provider-visible message has this exact agent-message representation before lower provider conversion:
+
+```clojure
+{:id :turn/augmentation-context
+ :kind :turn-context
+ :role "user"
+ :turn-id "turn-id"
+ :content [{:type :text :text rendered-augmentation-context}]}
+```
+
+The prepared request exposes this exact introspection prompt layer when at least one operation is accepted:
+
+```clojure
+{:id :turn/augmentation-context
+ :kind :turn-context
+ :role "user"
+ :stable? false
+ :turn-id "turn-id"
+ :position :after-history-before-current-user
+ :status :success
+ :operation-count 2
+ :provider-count 1
+ :operation-ids ["project-context" "other-context"]
+ :content rendered-augmentation-context}
+```
+
+`:status` is the actual overall status from the canonical augmentation record (for example `:success` or `:partial`), not a separately inferred prepared-request status.
+
+Prepared-request summaries must also include:
+
+```clojure
+{:augmentation {:turn-id "turn-id"
+                :status :success
+                :accepted-operation-count 2
+                :message-inserted? true}}
+```
+
+When no operation is accepted, no augmentation context message is inserted, no `:turn/augmentation-context` prompt layer is present, and the summary reports `:accepted-operation-count 0` with `:message-inserted? false`.
 
 ### Partial results, invalid operations, and failures
 
@@ -232,7 +328,24 @@ Prompt execution continues after augmentation failures unless the parent turn it
 
 The context-manager extension may launch child sessions to gather information for augmentation. Such sessions must be created through the core/session lifecycle, not by extension-local session management.
 
-Core must provide an augmentation child-session path or options equivalent to:
+The extension API exposes augmentation child creation through a dedicated function:
+
+```clojure
+((:create-turn-augmentation-child-session api)
+ {:parent-session-id (:turn-augmentation/session-id turn-projection)
+  :parent-turn-id    (:turn-augmentation/turn-id turn-projection)
+  :session-name      "context-manager augmentation"
+  :system-prompt     "optional child prompt"
+  :tool-ids          ["read" "bash"]})
+;; => {:psi.agent-session/session-id "child-session-id"}
+```
+
+API rules:
+
+- The function is available only to a registered, currently invoked turn augmenter with `:psi.capability/turn-augmentation`.
+- `:parent-session-id` and `:parent-turn-id` are required and must match the active augmentation invocation. Mismatches throw `ex-info` with `:reason :invalid-parent-provenance` and create no child session.
+- The function dispatches through the canonical `:session/create-child` lifecycle. It must not allocate extension-local sessions.
+- Core supplies or enforces these child-session fields regardless of caller options:
 
 ```clojure
 {:parent-session-id "parent-session"
@@ -240,6 +353,9 @@ Core must provide an augmentation child-session path or options equivalent to:
  :purpose :turn-augmentation
  :suppress-turn-augmentation? true}
 ```
+
+- Caller options may narrow the child prompt/tool/model shape, but must not remove parent provenance, enable parent-state mutation, or disable recursion suppression.
+- The returned child session id is data; if the provider wants it represented in augmentation diagnostics, it must include that id in `:turn-augmentation/child-session-ids` in its result envelope.
 
 Augmentation child sessions must be distinguishable from ordinary user sessions. They carry parent provenance:
 
