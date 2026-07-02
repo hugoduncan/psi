@@ -24,3 +24,5 @@
 - [x] AMB: Define duplicate `:append-context-block` `:id` behavior across accepted operations/providers for one turn: allowed with deterministic order, namespaced/rewritten by core, or rejected with provider diagnostics.
 - [x] AMB: Define validation and diagnostic behavior for result envelopes whose `:turn-augmentation/child-session-ids` are malformed, were not created through the augmentation child-session API, or belong to a different parent session/turn.
 - [x] AMB: Define the concrete bounds and source helper for the `:turn-augmentation/history` tail/snippet projection so tests can assert bounded augmenter input without relying on implementation-default choices.
+
+- [ ] AMB: Define how invocation-scoped augmentation API context is threaded and enforced for `:create-turn-augmentation-child-session` when turn-augmenter handlers are single-argument closures over the extension API, including whether the API function is present outside augmentation invocation and what error/status it returns when called outside the active provider invocation.

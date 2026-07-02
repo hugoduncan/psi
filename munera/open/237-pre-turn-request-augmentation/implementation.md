@@ -27,3 +27,5 @@
 - design follow-up completion (third review batch): latest task-scoped design-review batch identified as `4ae9bea9b`..`1ee9c586f` with baseline `6501d40f9`; the 7 current unchecked checklist lines added by that batch were resolved. Implementation should treat turn-augmenter registration as manifest/effective-permission gated only, with per-session capability gating at invocation; core normalizes append-block provenance, permits duplicate block ids, invalidates bad child-session ids, uses fixed history projection bounds (last 8 prior messages, 200-char normalized snippets), and records suppressed child turns with `:status :suppressed`, no providers, and no inserted request message.
 
 - no new architectural review feedback after resolved design-review follow-ups
+
+- ambiguity review added 1 new design step
