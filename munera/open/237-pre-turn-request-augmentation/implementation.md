@@ -90,3 +90,5 @@
 - no new architectural review feedback after current design-review architecture pass
 
 - no new ambiguity review feedback after current design-review ambiguity pass
+
+- no new inconsistency review feedback after current design-review inconsistency pass
