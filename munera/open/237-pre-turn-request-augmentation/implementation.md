@@ -86,3 +86,5 @@
 - ambiguity review added 5 new design steps
 
 - inconsistency review added 1 new design step
+
+- no new architectural review feedback after current design-review architecture pass
