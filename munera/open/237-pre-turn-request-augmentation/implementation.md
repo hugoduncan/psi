@@ -11,3 +11,5 @@
 - design follow-up completion: latest review batch identified as `597c0accf`..`c6b6a8583` with baseline `597c0accf^`; all 13 current unchecked added design steps resolved. New implementation-critical choices: user-role augmentation context before current user message, atomic per-augmenter acceptance, unsupported ops rejected, replay fails closed.
 
 - no architectural review feedback
+
+- ambiguity review (second pass) added 4 new design steps
