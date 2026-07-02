@@ -100,6 +100,20 @@
 
 ;; ── Session lifecycle ───────────────────────────────────────────────────────
 
+(deftest new-session-seeds-live-extension-capabilities-test
+  ;; New parent sessions default to the declared capabilities of live extensions.
+  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))
+        ext-id "manifest:psi/context-manager"]
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (let [session-id (:session-id (session/new-session-in! ctx nil {}))]
+      (is (= {ext-id #{ext/turn-augmentation-capability}}
+             (get-in (ss/get-session-data-in ctx session-id)
+                     [:available-extension-capabilities :extensions]))))))
+
 (deftest with-temp-session-root-cleans-up-after-body-test
   (let [root* (atom nil)
         existed-during-body?* (atom false)]

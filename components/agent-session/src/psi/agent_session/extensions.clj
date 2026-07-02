@@ -57,6 +57,17 @@
   [reg ext-path]
   (get-in @(:state reg) [:extensions ext-path :effective-permissions] #{}))
 
+(defn live-extension-capabilities-in
+  "Return extension-scoped capabilities currently declared by live extensions."
+  [reg]
+  (let [state @(:state reg)]
+    (into {}
+          (keep (fn [ext-path]
+                  (let [permissions (set (get-in state [:extensions ext-path :effective-permissions]))]
+                    (when (seq permissions)
+                      [ext-path permissions]))))
+          (:registration-order state))))
+
 (defn- valid-turn-augmenter-registration?
   [registration]
   (and (map? registration)

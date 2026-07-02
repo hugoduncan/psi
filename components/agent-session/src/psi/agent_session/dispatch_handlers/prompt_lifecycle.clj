@@ -101,23 +101,30 @@
         session-data
         turn-id
         #{:turn/submitted})
-       (augmentation-lifecycle/open-phase-result session-id turn-id run-id event-data))))
+       (augmentation-lifecycle/open-phase-result
+        (:extension-registry ctx)
+        session-id
+        turn-id
+        run-id
+        event-data
+        session-data))))
 
   (register-core-handler!
    :session/close-pre-turn-augmentation
-   (fn [ctx {:keys [session-id turn-id workflow-run-id] :as event-data}]
+   (fn [ctx {:keys [session-id turn-id workflow-run-id close-record] :as event-data}]
      (let [session-data (ss/get-session-data-in ctx session-id)
            run-id (or workflow-run-id
                       (:workflow-run-id session-data)
                       (:workflow-run-id (augmentation-lifecycle/turn-lifecycle session-data turn-id)))
-           close-record (augmentation-lifecycle/no-provider-close-record session-id turn-id run-id)]
+           close-record* (or close-record
+                             (augmentation-lifecycle/no-provider-close-record session-id turn-id run-id))]
        (augmentation-lifecycle/require-turn-state!
         :session/close-pre-turn-augmentation
         session-id
         session-data
         turn-id
         #{:turn/augmentation-open})
-       (augmentation-lifecycle/close-phase-result session-id turn-id run-id close-record event-data))))
+       (augmentation-lifecycle/close-phase-result session-id turn-id run-id close-record* (dissoc event-data :close-record)))))
 
   (register-core-handler! :session/prompt-prepare-request turn.handlers/prompt-prepare-request-handler)
   (register-core-handler! :session/prompt-record-response turn.handlers/prompt-record-response-handler)

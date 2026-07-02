@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -61,6 +62,215 @@
                             :session/close-pre-turn-augmentation
                             :session/prompt-prepare-request})
                   vec))))))
+
+(deftest live-turn-augmentation-invokes-provider-and-inserts-context-test
+  ;; Authorized live turn augmenters run at the effect boundary and their
+  ;; accepted operations are recorded before request preparation consumes them.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        ext-id "manifest:psi/context-manager"
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (ss/update-state-value-in!
+     ctx
+     (ss/session-data-path session-id)
+     assoc-in
+     [:available-extension-capabilities :extensions ext-id]
+     #{ext/turn-augmentation-capability})
+    (ext/register-turn-augmenter-in!
+     (:extension-registry ctx)
+     ext-id
+     {:augmenter-id "project-context"
+      :handler (fn [projection]
+                 {:turn-augmentation/status :success
+                  :turn-augmentation/operations
+                  [{:op :append-context-block
+                    :id "project-context"
+                    :title "Project context"
+                    :content (str "Working directory: "
+                                  (:turn-augmentation/effective-cwd projection))}]})})
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _pq]
+                    {:execution-result/turn-id (:prepared-request/id prepared)
+                     :execution-result/session-id sid
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "ok"}]
+                                                          :stop-reason :stop
+                                                          :timestamp (java.time.Instant/now)}
+                     :execution-result/turn-outcome :turn.outcome/stop
+                     :execution-result/tool-calls []
+                     :execution-result/stop-reason :stop})]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-live"
+                             :user-msg user-msg}
+                            {:origin :core})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-live"
+                             :user-msg user-msg}
+                            {:origin :core}))
+    (let [session-data (ss/get-session-data-in ctx session-id)
+          record (get-in session-data [:turn-augmentations "turn-live"])
+          summary (:last-prepared-request-summary session-data)]
+      (is (= :success (:status record)))
+      (is (= [{:extension-id ext-id
+               :augmenter-id "project-context"
+               :status :success
+               :operation-count 1
+               :accepted-operation-count 1
+               :rejected-operation-count 0
+               :child-session-ids []
+               :reasons []}]
+             (:providers record)))
+      (is (= "project-context" (get-in record [:operations 0 :id])))
+      (is (= :success (get-in summary [:augmentation :status])))
+      (is (= 1 (get-in summary [:augmentation :accepted-operation-count]))))))
+
+(deftest live-turn-augmentation-skips-session-unauthorized-provider-test
+  ;; Stale registrations that are not available to the parent session are skipped
+  ;; and diagnosed without invoking the handler.
+  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))
+        invoked? (atom false)
+        ext-id "manifest:psi/context-manager"
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (ext/register-turn-augmenter-in!
+     (:extension-registry ctx)
+     ext-id
+     {:augmenter-id "project-context"
+      :handler (fn [_]
+                 (reset! invoked? true)
+                 {:turn-augmentation/status :success
+                  :turn-augmentation/operations
+                  [{:op :append-context-block
+                    :id "unauthorized"
+                    :title "Unauthorized"
+                    :content "must not be accepted"}]})})
+    (let [session-id (:session-id (session/new-session-in! ctx nil {}))]
+      (ss/update-state-value-in!
+       ctx
+       (ss/session-data-path session-id)
+       assoc-in
+       [:available-extension-capabilities :extensions]
+       {})
+      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                    (fn [_ai-ctx _ctx sid prepared _pq]
+                      {:execution-result/turn-id (:prepared-request/id prepared)
+                       :execution-result/session-id sid
+                       :execution-result/assistant-message {:role "assistant"
+                                                            :content [{:type :text :text "ok"}]
+                                                            :stop-reason :stop
+                                                            :timestamp (java.time.Instant/now)}
+                       :execution-result/turn-outcome :turn.outcome/stop
+                       :execution-result/tool-calls []
+                       :execution-result/stop-reason :stop})]
+        (session/dispatch-in! ctx :session/prompt-submit
+                              {:session-id session-id
+                               :turn-id "turn-unauthorized"
+                               :user-msg user-msg}
+                              {:origin :core})
+        (session/dispatch-in! ctx :session/pre-turn-augment
+                              {:session-id session-id
+                               :turn-id "turn-unauthorized"
+                               :user-msg user-msg}
+                              {:origin :core}))
+      (let [record (get-in (ss/get-session-data-in ctx session-id)
+                           [:turn-augmentations "turn-unauthorized"])]
+        (is (false? @invoked?))
+        (is (= :failed (:status record)))
+        (is (= [{:extension-id ext-id
+                 :augmenter-id "project-context"
+                 :status :unauthorized
+                 :operation-count 0
+                 :accepted-operation-count 0
+                 :rejected-operation-count 0
+                 :child-session-ids []
+                 :reasons [:unauthorized]}]
+               (:providers record)))))))
+
+(deftest live-turn-augmentation-records-stale-replacement-diagnostics-test
+  ;; Provider results are accepted only for the registration token selected when
+  ;; the phase opened; replacing a provider during invocation marks the result stale.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        ext-id "manifest:psi/context-manager"
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (ss/update-state-value-in!
+     ctx
+     (ss/session-data-path session-id)
+     assoc-in
+     [:available-extension-capabilities :extensions ext-id]
+     #{ext/turn-augmentation-capability})
+    (ext/register-turn-augmenter-in!
+     (:extension-registry ctx)
+     ext-id
+     {:augmenter-id "project-context"
+      :handler (fn [_projection]
+                 (ext/register-turn-augmenter-in!
+                  (:extension-registry ctx)
+                  ext-id
+                  {:augmenter-id "project-context"
+                   :handler (fn [_]
+                              {:turn-augmentation/status :no-op
+                               :turn-augmentation/operations []})})
+                 {:turn-augmentation/status :success
+                  :turn-augmentation/operations
+                  [{:op :append-context-block
+                    :id "stale"
+                    :title "Stale"
+                    :content "must not be accepted"}]})})
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [_ai-ctx _ctx sid prepared _pq]
+                    {:execution-result/turn-id (:prepared-request/id prepared)
+                     :execution-result/session-id sid
+                     :execution-result/assistant-message {:role "assistant"
+                                                          :content [{:type :text :text "ok"}]
+                                                          :stop-reason :stop
+                                                          :timestamp (java.time.Instant/now)}
+                     :execution-result/turn-outcome :turn.outcome/stop
+                     :execution-result/tool-calls []
+                     :execution-result/stop-reason :stop})]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-stale"
+                             :user-msg user-msg}
+                            {:origin :core})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-stale"
+                             :user-msg user-msg}
+                            {:origin :core}))
+    (let [record (get-in (ss/get-session-data-in ctx session-id)
+                         [:turn-augmentations "turn-stale"])]
+      (is (= :failed (:status record)))
+      (is (= [] (:operations record)))
+      (is (= [{:extension-id ext-id
+               :augmenter-id "project-context"
+               :status :stale
+               :operation-count 0
+               :accepted-operation-count 0
+               :rejected-operation-count 0
+               :child-session-ids []
+               :reasons [:late-stale-result]}]
+             (:providers record))))))
 
 (deftest prompt-prepare-request-rejects-before-augmentation-closed-test
   ;; Direct prepare attempts cannot bypass the augmentation lifecycle barrier.

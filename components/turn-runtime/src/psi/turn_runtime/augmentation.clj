@@ -8,6 +8,43 @@
 
 (def preparable-statuses #{:success :no-op :partial :failed :replay-used})
 
+(def provider-statuses
+  #{:success
+    :no-op
+    :failed
+    :invalid-operation
+    :unsupported-operation
+    :unauthorized
+    :canceled
+    :stale})
+
+(def reason-order
+  [:unauthorized
+   :handler-exception
+   :provider-canceled
+   :late-stale-result
+   :invalid-envelope
+   :invalid-status
+   :invalid-operations
+   :invalid-child-session-ids
+   :invalid-diagnostic
+   :invalid-operation-shape
+   :invalid-append-context-block
+   :provenance-mismatch
+   :unsupported-operation
+   :missing-record
+   :malformed-record
+   :wrong-turn-id])
+
+(def reason-rank (zipmap reason-order (range)))
+
+(defn ordered-reasons
+  [reasons]
+  (->> reasons
+       distinct
+       (sort-by #(get reason-rank % Integer/MAX_VALUE))
+       vec))
+
 (defn non-blank-string?
   [x]
   (and (string? x) (not (str/blank? x))))
@@ -32,15 +69,7 @@
   (and (map? provider)
        (non-blank-string? (:extension-id provider))
        (non-blank-string? (:augmenter-id provider))
-       (contains? #{:success
-                    :no-op
-                    :failed
-                    :invalid-operation
-                    :unsupported-operation
-                    :unauthorized
-                    :canceled
-                    :stale}
-                  (:status provider))
+       (contains? provider-statuses (:status provider))
        (integer? (:operation-count provider))
        (not (neg? (:operation-count provider)))
        (integer? (:accepted-operation-count provider))
@@ -72,6 +101,189 @@
          (vector? providers)
          (every? provider-diagnostic? providers)
          (not (:accepting? record)))))
+
+(defn provider-source
+  [provider child-session-ids]
+  {:type :extension
+   :extension-id (:extension-id provider)
+   :augmenter-id (:augmenter-id provider)
+   :child-session-ids (vec child-session-ids)})
+
+(defn- source-matches?
+  [provider child-session-ids source]
+  (= (provider-source provider child-session-ids) source))
+
+(defn- valid-child-session-ids?
+  [child-session-ids]
+  (and (vector? child-session-ids)
+       (every? non-blank-string? child-session-ids)))
+
+(defn- valid-diagnostic?
+  [diagnostic]
+  (or (nil? diagnostic) (string? diagnostic)))
+
+(defn- operation-reasons
+  [provider child-session-ids operation]
+  (cond
+    (not (map? operation))
+    [:invalid-operation-shape]
+
+    (= :append-context-block (:op operation))
+    (cond-> []
+      (not (and (non-blank-string? (:id operation))
+                (non-blank-string? (:title operation))
+                (non-blank-string? (:content operation))))
+      (conj :invalid-append-context-block)
+
+      (and (contains? operation :source)
+           (not (source-matches? provider child-session-ids (:source operation))))
+      (conj :provenance-mismatch))
+
+    :else
+    [:unsupported-operation]))
+
+(defn- normalize-operation
+  [provider child-session-ids operation]
+  (-> operation
+      (select-keys [:op :id :title :content])
+      (assoc :source (provider-source provider child-session-ids))))
+
+(defn provider-result->accepted
+  "Validate one provider envelope and return provider diagnostics plus accepted
+   normalized operations. This is pure; handler execution and liveness checks
+   happen at the dispatch effect/runtime boundary."
+  [provider envelope]
+  (let [envelope*         (when (map? envelope) envelope)
+        status            (:turn-augmentation/status envelope*)
+        operations        (:turn-augmentation/operations envelope*)
+        child-session-ids (if (contains? envelope* :turn-augmentation/child-session-ids)
+                            (:turn-augmentation/child-session-ids envelope*)
+                            [])
+        diagnostic        (:turn-augmentation/diagnostic envelope*)
+        envelope-reasons  (cond-> []
+                            (not (map? envelope))
+                            (conj :invalid-envelope)
+
+                            (not (contains? #{:success :no-op} status))
+                            (conj :invalid-status)
+
+                            (not (vector? operations))
+                            (conj :invalid-operations)
+
+                            (not (valid-child-session-ids? child-session-ids))
+                            (conj :invalid-child-session-ids)
+
+                            (not (valid-diagnostic? diagnostic))
+                            (conj :invalid-diagnostic))
+        operations*       (if (vector? operations) operations [])
+        operation-reasons* (mapcat #(operation-reasons provider child-session-ids %) operations*)
+        status-shape-reasons (cond-> []
+                               (and (= :success status) (empty? operations*))
+                               (conj :invalid-operations)
+
+                               (and (= :no-op status) (seq operations*))
+                               (conj :invalid-operations))
+        reasons           (ordered-reasons (concat envelope-reasons operation-reasons* status-shape-reasons))
+        invalid?          (some #{:invalid-envelope
+                                  :invalid-status
+                                  :invalid-operations
+                                  :invalid-child-session-ids
+                                  :invalid-diagnostic
+                                  :invalid-operation-shape
+                                  :invalid-append-context-block
+                                  :provenance-mismatch}
+                                reasons)
+        unsupported?      (some #{:unsupported-operation} reasons)
+        accepted?         (and (empty? reasons)
+                               (= :success status)
+                               (seq operations*))
+        accepted          (if accepted?
+                            (mapv #(normalize-operation provider child-session-ids %) operations*)
+                            [])
+        provider-status   (cond
+                            invalid? :invalid-operation
+                            unsupported? :unsupported-operation
+                            (= :no-op status) :no-op
+                            accepted? :success
+                            :else :invalid-operation)]
+    {:provider (cond-> {:extension-id (:extension-id provider)
+                        :augmenter-id (:augmenter-id provider)
+                        :status provider-status
+                        :operation-count (count operations*)
+                        :accepted-operation-count (count accepted)
+                        :rejected-operation-count (- (count operations*) (count accepted))
+                        :child-session-ids (if (valid-child-session-ids? child-session-ids)
+                                             (vec child-session-ids)
+                                             [])
+                        :reasons reasons}
+                 (string? diagnostic) (assoc :diagnostic diagnostic))
+     :operations accepted}))
+
+(defn provider-failed
+  [provider reason]
+  {:provider {:extension-id (:extension-id provider)
+              :augmenter-id (:augmenter-id provider)
+              :status :failed
+              :operation-count 0
+              :accepted-operation-count 0
+              :rejected-operation-count 0
+              :child-session-ids []
+              :reasons (ordered-reasons [reason])}
+   :operations []})
+
+(defn provider-unauthorized
+  [provider]
+  {:provider {:extension-id (:extension-id provider)
+              :augmenter-id (:augmenter-id provider)
+              :status :unauthorized
+              :operation-count 0
+              :accepted-operation-count 0
+              :rejected-operation-count 0
+              :child-session-ids []
+              :reasons [:unauthorized]}
+   :operations []})
+
+(defn provider-stale
+  [provider]
+  {:provider {:extension-id (:extension-id provider)
+              :augmenter-id (:augmenter-id provider)
+              :status :stale
+              :operation-count 0
+              :accepted-operation-count 0
+              :rejected-operation-count 0
+              :child-session-ids []
+              :reasons [:late-stale-result]}
+   :operations []})
+
+(defn aggregate-status
+  [providers accepted-operation-count]
+  (cond
+    (empty? providers)
+    :no-op
+
+    (pos? accepted-operation-count)
+    (if (every? #(contains? #{:success :no-op} (:status %)) providers)
+      :success
+      :partial)
+
+    (every? #(= :no-op (:status %)) providers)
+    :no-op
+
+    :else
+    :failed))
+
+(defn terminal-record
+  [session-id turn-id workflow-run-id provider-results]
+  (let [providers  (mapv :provider provider-results)
+        operations (into [] (mapcat :operations) provider-results)]
+    {:session-id session-id
+     :turn-id turn-id
+     :workflow-run-id workflow-run-id
+     :status (aggregate-status providers (count operations))
+     :replay? false
+     :accepted-operation-count (count operations)
+     :operations operations
+     :providers providers}))
 
 (defn render-append-context-blocks
   [operations]

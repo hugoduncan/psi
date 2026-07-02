@@ -49,6 +49,10 @@
 ;;;     :context-tokens         — runtime-derived, starts nil
 ;;;     :context-window         — runtime-derived, starts nil
 ;;;
+;;;   Separately, :available-extension-capabilities is not inherited by child
+;;;   sessions; extension-scoped capability inheritance is parent-turn policy,
+;;;   not child helper-session authority.
+;;;
 ;;; prompt-state-fields (4 keys in init.clj):
 ;;;   All 4 are derived (not carried as-is from parent):
 ;;;     :base-system-prompt         — derived via derive-child-prompt-state

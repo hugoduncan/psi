@@ -198,6 +198,11 @@
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:extensions [:map-of :string extension-schema]]
+   [:available-extension-capabilities {:optional true}
+    [:map
+     [:extensions {:optional true} [:map-of :string [:set :keyword]]]]]
+   [:prompt-turns {:optional true} [:map-of :string :map]]
+   [:turn-augmentations {:optional true} [:map-of :string :map]]
    [:session-entries [:vector session-entry-schema]]
    [:startup-bootstrap {:optional true}
     [:maybe
@@ -291,6 +296,9 @@
      :prompt-templates        []
      :prompt-contribution-ids []
      :extensions              {}
+     :available-extension-capabilities {:extensions {}}
+     :prompt-turns            {}
+     :turn-augmentations      {}
      :session-entries         []
      :extension-last-prompt-source nil
      :extension-last-prompt-delivery nil
