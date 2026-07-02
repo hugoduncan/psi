@@ -33,3 +33,5 @@
 - no new inconsistency review feedback after latest ambiguity follow-up
 
 - design follow-up completion (invocation-scoped child API): latest task-scoped design-review batch identified as `ebd63069a`..`ead94f6f4` with baseline `3b809157c`; the 1 current unchecked checklist line added by that batch was resolved. Implementation should make `:create-turn-augmentation-child-session` a stable guarded API closure whose authority comes only from a runtime-held active provider invocation context, cleared after the handler returns; outside-invocation calls throw `:no-active-turn-augmentation-invocation` and create no session.
+
+- ambiguity review added 5 new design steps
