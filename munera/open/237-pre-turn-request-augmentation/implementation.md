@@ -64,3 +64,5 @@
 - architectural review added 1 new design step: live augmenter invocation must sit on the dispatch effect/runtime boundary, not in a pure handler, because handlers may perform arbitrary extension/helper-session work before recorded operations influence request preparation.
 
 - ambiguity review added 5 new design steps: concrete extension identity/capability schemas, diagnostic reason/query surfaces, and minimal context-manager scaffold behavior remain underspecified.
+
+- inconsistency review added 2 new design steps: prompt-submit ordering conflicts with history/rendering wording, and data-only augmenter rules need reconciliation with allowed helper-session mutations.
