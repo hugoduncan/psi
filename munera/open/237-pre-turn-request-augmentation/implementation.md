@@ -21,3 +21,5 @@
 - no architectural review feedback (design-review architecture turn)
 
 - ambiguity review (design-review turn) added 7 new design steps
+
+- no inconsistency review feedback (design-review turn)
