@@ -255,6 +255,18 @@
               :reasons [:late-stale-result]}
    :operations []})
 
+(defn provider-canceled
+  [provider]
+  {:provider {:extension-id (:extension-id provider)
+              :augmenter-id (:augmenter-id provider)
+              :status :canceled
+              :operation-count 0
+              :accepted-operation-count 0
+              :rejected-operation-count 0
+              :child-session-ids []
+              :reasons [:provider-canceled]}
+   :operations []})
+
 (defn aggregate-status
   [providers accepted-operation-count]
   (cond
@@ -284,6 +296,17 @@
      :accepted-operation-count (count operations)
      :operations operations
      :providers providers}))
+
+(defn canceled-record
+  [session-id turn-id workflow-run-id selected-providers]
+  {:session-id session-id
+   :turn-id turn-id
+   :workflow-run-id workflow-run-id
+   :status :canceled
+   :replay? false
+   :accepted-operation-count 0
+   :operations []
+   :providers (mapv (comp :provider provider-canceled) selected-providers)})
 
 (defn render-append-context-blocks
   [operations]

@@ -67,16 +67,18 @@
                   (open-record session-id turn-id workflow-run-id selected-providers)))))
 
 (defn close-phase-update
-  [session-id turn-id workflow-run-id close-record]
-  (fn [session-data]
-    (-> session-data
-        (assoc-in [:prompt-turns turn-id]
-                  {:session-id session-id
-                   :turn-id turn-id
-                   :workflow-run-id workflow-run-id
-                   :state :turn/augmentation-closed})
-        (assoc-in [:turn-augmentations turn-id]
-                  close-record))))
+  ([session-id turn-id workflow-run-id close-record]
+   (close-phase-update session-id turn-id workflow-run-id close-record :turn/augmentation-closed))
+  ([session-id turn-id workflow-run-id close-record turn-state]
+   (fn [session-data]
+     (-> session-data
+         (assoc-in [:prompt-turns turn-id]
+                   {:session-id session-id
+                    :turn-id turn-id
+                    :workflow-run-id workflow-run-id
+                    :state turn-state})
+         (assoc-in [:turn-augmentations turn-id]
+                   close-record)))))
 
 (defn no-provider-close-record
   [session-id turn-id workflow-run-id]
@@ -185,12 +187,24 @@
 
 (defn close-phase-result
   [session-id turn-id workflow-run-id close-record prepare-event-data]
-  {:root-state-update
-   (session/session-update
-    session-id
-    (close-phase-update session-id turn-id workflow-run-id close-record))
-   :effects [(prepare-effect (assoc prepare-event-data
-                                    :session-id session-id
-                                    :turn-id turn-id
-                                    :workflow-run-id workflow-run-id))]
-   :return-effect-result? true})
+  (let [canceled? (= :canceled (:status close-record))]
+    (cond-> {:root-state-update
+             (session/session-update
+              session-id
+              (close-phase-update session-id
+                                  turn-id
+                                  workflow-run-id
+                                  close-record
+                                  (if canceled?
+                                    :turn/canceled
+                                    :turn/augmentation-closed)))
+             :return-effect-result? true}
+      (not canceled?)
+      (assoc :effects [(prepare-effect (assoc prepare-event-data
+                                              :session-id session-id
+                                              :turn-id turn-id
+                                              :workflow-run-id workflow-run-id))])
+      canceled?
+      (assoc :return {:canceled? true
+                      :session-id session-id
+                      :turn-id turn-id}))))

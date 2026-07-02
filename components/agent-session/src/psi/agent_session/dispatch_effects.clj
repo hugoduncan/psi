@@ -316,12 +316,53 @@
            (not (contains? event-data :workflow-run-id)))
       (assoc :workflow-run-id (:workflow-run-id effect)))))
 
+(defn- turn-augmentation-close-effect?
+  [effect]
+  (= :session/close-pre-turn-augmentation (:event-type effect)))
+
+(defn- canceled-turn-augmentation-close-event-data
+  [ctx effect]
+  (let [event-data      (workflow-guarded-event-data effect)
+        session-id      (:session-id event-data)
+        turn-id         (:turn-id event-data)
+        workflow-run-id (:workflow-run-id event-data)
+        session-data    (ss/get-session-data-in ctx session-id)
+        selected        (get-in session-data [:turn-augmentations turn-id :selected-providers] [])]
+    (assoc event-data
+           :close-record (turn-augmentation/canceled-record
+                          session-id
+                          turn-id
+                          workflow-run-id
+                          selected))))
+
+(defn- dispatch-turn-augmentation-close-effect!
+  [ctx effect]
+  (dispatch/dispatch! ctx
+                      (:event-type effect)
+                      (canceled-turn-augmentation-close-event-data ctx effect)
+                      {:origin (or (:origin effect) :core)}))
+
+(defn- dispatch-workflow-guarded-effect!
+  [ctx effect]
+  (dispatch/dispatch! ctx
+                      (:event-type effect)
+                      (workflow-guarded-event-data effect)
+                      {:origin (or (:origin effect) :core)}))
+
 (defmethod execute-effect! :runtime/dispatch-event [ctx effect]
-  (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
+  (cond
+    (not (workflow-effect-stop-signal ctx effect))
+    (dispatch-workflow-guarded-effect! ctx effect)
+
+    (turn-augmentation-close-effect? effect)
+    (dispatch-turn-augmentation-close-effect! ctx effect)))
 (defmethod execute-effect! :runtime/dispatch-event-with-effect-result [ctx effect]
-  (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
+  (cond
+    (not (workflow-effect-stop-signal ctx effect))
+    (dispatch-workflow-guarded-effect! ctx effect)
+
+    (turn-augmentation-close-effect? effect)
+    (dispatch-turn-augmentation-close-effect! ctx effect)))
 
 (defn- normalize-snippet
   [text]
@@ -433,25 +474,50 @@
         (turn-augmentation/provider-failed provider :handler-exception)))
     (provider-not-current-result ctx effect provider)))
 
+(defn- turn-augmentation-close-record
+  [ctx effect]
+  (if (workflow-effect-stop-signal ctx effect)
+    (turn-augmentation/canceled-record
+     (:session-id effect)
+     (:turn-id effect)
+     (:workflow-run-id effect)
+     (:selected-providers effect))
+    (let [provider-results (loop [remaining (seq (:selected-providers effect))
+                                  results []]
+                             (if-not remaining
+                               results
+                               (if (workflow-effect-stop-signal ctx effect)
+                                 (into results (map turn-augmentation/provider-canceled) remaining)
+                                 (recur (next remaining)
+                                        (conj results
+                                              (invoke-turn-augmentation-provider
+                                               ctx
+                                               effect
+                                               (first remaining)))))))]
+      (if (workflow-effect-stop-signal ctx effect)
+        (turn-augmentation/canceled-record
+         (:session-id effect)
+         (:turn-id effect)
+         (:workflow-run-id effect)
+         (:selected-providers effect))
+        (turn-augmentation/terminal-record
+         (:session-id effect)
+         (:turn-id effect)
+         (:workflow-run-id effect)
+         provider-results)))))
+
 (defmethod execute-effect! :runtime/turn-augmentation-invoke
   [ctx effect]
-  (when-not (workflow-effect-stop-signal ctx effect)
-    (let [provider-results (mapv #(invoke-turn-augmentation-provider ctx effect %)
-                                 (:selected-providers effect))
-          close-record (turn-augmentation/terminal-record
-                        (:session-id effect)
-                        (:turn-id effect)
-                        (:workflow-run-id effect)
-                        provider-results)]
-      (dispatch/dispatch!
-       ctx
-       :session/close-pre-turn-augmentation
-       (assoc (or (:prepare-event-data effect) {})
-              :session-id (:session-id effect)
-              :turn-id (:turn-id effect)
-              :workflow-run-id (:workflow-run-id effect)
-              :close-record close-record)
-       {:origin :core}))))
+  (let [close-record (turn-augmentation-close-record ctx effect)]
+    (dispatch/dispatch!
+     ctx
+     :session/close-pre-turn-augmentation
+     (assoc (or (:prepare-event-data effect) {})
+            :session-id (:session-id effect)
+            :turn-id (:turn-id effect)
+            :workflow-run-id (:workflow-run-id effect)
+            :close-record close-record)
+     {:origin :core})))
 
 (defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)

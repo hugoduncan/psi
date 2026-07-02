@@ -6,7 +6,9 @@
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
-   [psi.turn-runtime.core]))
+   [psi.turn-runtime.core]
+   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -14,6 +16,39 @@
    (let [ctx (session/create-context (test-support/safe-context-opts opts))
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
+
+(defn- install-workflow-run!
+  [ctx run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[state* _ _] (workflow-registry/register-definition
+                               state
+                               {:definition-id "pre-turn-cancel-test"
+                                :steps [{:name "build" :type :session}]})
+                 [state* _ _] (workflow-runtime/create-run
+                               state*
+                               {:definition-id "pre-turn-cancel-test"
+                                :run-id run-id
+                                :workflow-input {:input "ship it"}})]
+             state*))))
+
+(defn- workflow-attempt-session!
+  [ctx session-id run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (-> state
+               (assoc-in (ss/session-data-path session-id)
+                         (assoc (get-in state (ss/session-data-path session-id))
+                                :workflow-owned? true
+                                :workflow-run-id run-id
+                                :workflow-step-id "build"
+                                :workflow-attempt-id "attempt-build"))
+               (assoc-in [:workflows :runs run-id :current-step-id] "build")
+               (assoc-in [:workflows :runs run-id :status] :running)
+               (assoc-in [:workflows :runs run-id :step-runs "build" :attempts]
+                         [{:attempt-id "attempt-build"
+                           :status :running
+                           :execution-session-id session-id}])))))
 
 (deftest pre-turn-augmentation-opens-closes-and-schedules-prepare-test
   ;; Pre-turn augmentation is an explicit lifecycle barrier before request preparation.
@@ -271,6 +306,79 @@
                :child-session-ids []
                :reasons [:late-stale-result]}]
              (:providers record))))))
+
+(deftest parent-cancellation-closes-open-augmentation-without-preparing-request-test
+  ;; Workflow cancellation during open augmentation records a canceled terminal
+  ;; augmentation record and skips request preparation/execution.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        run-id "run-pre-turn-cancel"
+        ext-id "manifest:psi/context-manager"
+        prepare-calls* (atom 0)
+        user-msg {:role "user"
+                  :content [{:type :text :text "hello"}]
+                  :timestamp (java.time.Instant/now)}]
+    (install-workflow-run! ctx run-id)
+    (workflow-attempt-session! ctx session-id run-id)
+    (ext/register-extension-in! (:extension-registry ctx) ext-id)
+    (ext/set-effective-permissions-in!
+     (:extension-registry ctx)
+     ext-id
+     #{ext/turn-augmentation-capability})
+    (ss/update-state-value-in!
+     ctx
+     (ss/session-data-path session-id)
+     assoc-in
+     [:available-extension-capabilities :extensions ext-id]
+     #{ext/turn-augmentation-capability})
+    (ext/register-turn-augmenter-in!
+     (:extension-registry ctx)
+     ext-id
+     {:augmenter-id "project-context"
+      :handler (fn [_]
+                 (session/dispatch-in! ctx
+                                       :psi.workflow/cancel-run
+                                       {:run-id run-id
+                                        :reason "cancel during augmentation"}
+                                       {:origin :core})
+                 {:turn-augmentation/status :success
+                  :turn-augmentation/operations
+                  [{:op :append-context-block
+                    :id "late"
+                    :title "Late"
+                    :content "must not apply"}]})})
+    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                  (fn [& _]
+                    (swap! prepare-calls* inc)
+                    {:execution-result/turn-id "turn-cancel"})]
+      (session/dispatch-in! ctx :session/prompt-submit
+                            {:session-id session-id
+                             :turn-id "turn-cancel"
+                             :workflow-run-id run-id
+                             :user-msg user-msg}
+                            {:origin :core})
+      (session/dispatch-in! ctx :session/pre-turn-augment
+                            {:session-id session-id
+                             :turn-id "turn-cancel"
+                             :workflow-run-id run-id
+                             :user-msg user-msg}
+                            {:origin :core}))
+    (let [session-data (ss/get-session-data-in ctx session-id)
+          record (get-in session-data [:turn-augmentations "turn-cancel"])]
+      (is (= :turn/canceled
+             (get-in session-data [:prompt-turns "turn-cancel" :state])))
+      (is (= :canceled (:status record)))
+      (is (= [] (:operations record)))
+      (is (= [{:extension-id ext-id
+               :augmenter-id "project-context"
+               :status :canceled
+               :operation-count 0
+               :accepted-operation-count 0
+               :rejected-operation-count 0
+               :child-session-ids []
+               :reasons [:provider-canceled]}]
+             (:providers record)))
+      (is (nil? (:last-prepared-request-summary session-data)))
+      (is (= 0 @prepare-calls*)))))
 
 (deftest prompt-prepare-request-rejects-before-augmentation-closed-test
   ;; Direct prepare attempts cannot bypass the augmentation lifecycle barrier.

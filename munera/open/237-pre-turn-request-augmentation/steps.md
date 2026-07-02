@@ -16,6 +16,6 @@
   - [x] Validate provider envelopes/operations and record invalid/unsupported diagnostics.
   - [x] Reject replaced registration-token late results as `:stale` without accepting operations.
   - [x] Diagnose session-unavailable registered providers as `:unauthorized` without invoking handlers.
-  - [ ] Add explicit parent-cancellation close/result handling for open augmentation phases.
+  - [x] Add explicit parent-cancellation close/result handling for open augmentation phases.
 - [x] Replace compatibility no-op prompt-submit record with the explicit pre-turn barrier once lifecycle scheduling is in place.
 - [ ] Add replay close-payload handling and replay missing/invalid fail-closed tests.
