@@ -423,7 +423,7 @@
 
 ## Test-review follow-ups (turn 7)
 
-- [ ] **`entity-resolution-ambiguous-dropped-test` does not exercise the
+- [x] **`entity-resolution-ambiguous-dropped-test` does not exercise the
       design behaviour it names — it is a duplicate of the empty-run no-op
       test.** design.md's Acceptance criteria and "Confidence gate" policy
       specify the ambiguous case as: the helper self-gates and *omits the
@@ -443,8 +443,14 @@
       does **not** contain the ambiguous surface. That exercises the
       never-guess drop-one-keep-another semantics the criterion actually
       requires, distinct from the empty-run path.
+      DONE: reworked `entity-resolution-ambiguous-dropped-test` to feed mixed
+      helper output — one confident mapping line for "the resolver" plus prose
+      declining the ambiguous "that thing" (no mapping line). Now asserts
+      `:success` and that the rendered `:content` contains "the resolver" but
+      **not** "that thing", exercising drop-one-keep-another distinct from the
+      empty-run path.
 
-- [ ] **No test spans the production recursion-avoidance loop end to end.**
+- [x] **No test spans the production recursion-avoidance loop end to end.**
       The recursion guarantee ("Helper sessions ... never themselves
       augmented (recursion avoidance verified)") depends on two halves in
       *different* code paths sharing `entity-resolution-helper-session-ids`:
@@ -461,8 +467,16 @@
       turn projection whose `:turn-augmentation/session-id` is that tracked id,
       asserting `:no-op` — linking the producer and consumer of the tracking
       atom in one flow.
+      DONE: added `entity-resolution-recursion-loop-end-to-end-test`. Drives
+      the real `default-run-helper` against a blocking (uninterruptible) run so
+      it `conj`s "child-1" and returns on a small injected `:wall-clock-ms`
+      while the orphan keeps it tracked; then invokes the real
+      `entity-resolution-augmentation` with a turn projection whose
+      `:turn-augmentation/session-id` is that tracked "child-1", asserting
+      `:no-op` — linking the real producer and consumer through the shared
+      atom. Releases the orphan and awaits untrack to keep the fixture clean.
 
-- [ ] **The settled-success close+untrack path of `default-run-helper` is
+- [x] **The settled-success close+untrack path of `default-run-helper` is
       unasserted — the primary cleanup path has no coverage.** The "Helper
       sessions ... cleaned up" acceptance criterion is verified only for the
       *timeout/orphan-settled* branch (`default-run-helper-timeout-branch-test`).
@@ -475,3 +489,9 @@
       call and assert, after the run returns, that the child id was closed and
       removed from `entity-resolution-helper-session-ids`, so the common-path
       cleanup is covered rather than only the exceptional timeout path.
+      DONE: extended `fake-run-api` with a `:closed` atom that records
+      `close-session` ids, added an `await-untracked` helper (settled cleanup
+      runs on the future's own thread), and added
+      `default-run-helper-settled-run-closes-and-untracks-test` — a normal
+      settled run now asserts the child was closed and removed from
+      `entity-resolution-helper-session-ids`, covering the common cleanup path.

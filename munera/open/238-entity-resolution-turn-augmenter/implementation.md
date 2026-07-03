@@ -1573,3 +1573,21 @@ Key decisions / discoveries:
   no test spans the production recursion-avoidance loop (real
   `default-run-helper` tracking → augmenter pre-filter); settled-success
   close+untrack cleanup path is unasserted (only the timeout branch is).
+
+## Test-review follow-ups (turn 7) — addressed (3 items)
+
+- addressed 3 test-review follow-up steps (test-only changes; no production
+  code touched):
+  - strengthened `entity-resolution-ambiguous-dropped-test` to feed mixed
+    helper output (confident "the resolver" line + prose declining ambiguous
+    "that thing") and assert `:success` content keeps the confident surface
+    and drops the ambiguous one — now distinct from the empty-run path;
+  - added `entity-resolution-recursion-loop-end-to-end-test` linking the real
+    `default-run-helper` producer (`conj` under a blocking run) to the real
+    augmenter pre-filter consumer via the shared
+    `entity-resolution-helper-session-ids` atom;
+  - added `default-run-helper-settled-run-closes-and-untracks-test` (with
+    `fake-run-api` now recording `close-session` ids + an `await-untracked`
+    helper) covering the common settled-run close+untrack cleanup path.
+- `bb test --focus extensions.context-manager-test`: 36 tests, 110 assertions,
+  0 failures. `clj-kondo` on the test ns: 0 errors, 0 warnings.

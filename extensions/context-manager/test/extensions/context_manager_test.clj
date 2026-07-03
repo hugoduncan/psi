@@ -496,30 +496,59 @@
       (is (= [] (:turn-augmentation/child-session-ids env))))))
 
 (deftest entity-resolution-ambiguous-dropped-test
-  (testing "ambiguous reference: model omits the line, augmenter parses nothing"
-    ;; The helper self-gates: it emits no line for the ambiguous surface.
+  (testing "ambiguous surface dropped while a confident one is kept"
+    ;; The helper self-gates: it emits a confident line for the unambiguous
+    ;; surface ("the resolver") and only prose (no mapping line) for the
+    ;; ambiguous one ("that thing"). Distinct from the empty-run path — a
+    ;; :success block is produced, but only for the confident surface, so the
+    ;; ambiguous surface never appears in the rendered content.
     (let [env (context-manager/entity-resolution-augmentation
-               {} (assoc base-tp :turn-augmentation/user-text "fix that thing")
-               (stub {:text "" :child-id "helper-9"}))]
-      (is (= :no-op (:turn-augmentation/status env)))
-      (is (not (some #(= :success %) [(:turn-augmentation/status env)]))))))
+               {} (assoc base-tp
+                         :turn-augmentation/user-text
+                         "look at the resolver and fix that thing")
+               (stub {:text (str "the resolver → components/pathom/resolver.clj "
+                                 "(exact path; high)\n"
+                                 "\"that thing\" is ambiguous — could be several "
+                                 "files, so I am not resolving it.")
+                      :child-id "helper-9"}))
+          content (-> env :turn-augmentation/operations first :content)]
+      (is (= :success (:turn-augmentation/status env)))
+      (is (re-find #"the resolver" content)
+          "confident surface is rendered in the block")
+      (is (not (re-find #"that thing" content))
+          "ambiguous surface (no mapping line parsed) is absent from the block"))))
 
 ;; --- default-run-helper: run-ok gating, prompt-selection, no worktree-path --
 
 (defn- fake-run-api
   "A minimal `api` map for exercising default-run-helper: records the
-   create-child-session params and returns the supplied run-result from
+   create-child-session params, records the close-session id (when a
+   `closed` atom is supplied), and returns the supplied run-result from
    run-agent-loop-in-session."
-  [{:keys [run-result create-calls]}]
+  [{:keys [run-result create-calls closed child-id]
+    :or   {child-id "child-1"}}]
   {:mutate-session
    (fn [_sid op params]
      (case op
        psi.extension/create-child-session
        (do (when create-calls (reset! create-calls params))
-           {:psi.agent-session/session-id "child-1"})
+           {:psi.agent-session/session-id child-id})
        psi.extension/run-agent-loop-in-session
        run-result))
-   :mutate (fn [_op _params] nil)})
+   :mutate (fn [op params]
+             (when (and closed (= op 'psi.extension/close-session))
+               (reset! closed (:session-id params)))
+             nil)})
+
+(defn- await-untracked
+  "Block (up to ~2s) until `id` is no longer tracked in the
+   entity-resolution helper-session atom. The settled run future closes +
+   untracks on its own thread, so tests must await it."
+  [id]
+  (let [deadline (+ (System/currentTimeMillis) 2000)]
+    (while (and (contains? @context-manager/entity-resolution-helper-session-ids id)
+                (< (System/currentTimeMillis) deadline))
+      (Thread/sleep 5))))
 
 (deftest default-run-helper-gates-on-run-ok-test
   (testing "a failed helper run (ok? false) surfaces no text, not the error string"
@@ -543,6 +572,27 @@
                        :system-prompt "sys"
                        :user-prompt "usr"})]
       (is (= "the resolver → x (e; c)" (:text result))))))
+
+(deftest default-run-helper-settled-run-closes-and-untracks-test
+  (testing "on a normal settled run the child is closed and untracked
+            (the common-path cleanup, not only the timeout branch)"
+    (let [closed (atom nil)
+          api (fake-run-api
+               {:closed closed
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text "the resolver → x (e; c)"}})
+          result (#'context-manager/default-run-helper
+                  api {:parent-session-id "s1"
+                       :system-prompt "sys"
+                       :user-prompt "usr"})]
+      (is (= "child-1" (:child-session-id result)))
+      ;; The future's finally closes + untracks on its own thread; await it.
+      (await-untracked "child-1")
+      (is (= "child-1" @closed)
+          "settled run closes the child session")
+      (is (not (contains? @context-manager/entity-resolution-helper-session-ids
+                          "child-1"))
+          "settled run untracks the child from the recursion-avoidance atom"))))
 
 (deftest default-run-helper-suppresses-default-prompt-and-omits-worktree-test
   (testing "create-child-session gets prompt-component-selection and no :worktree-path"
@@ -617,6 +667,52 @@
           "child untracked after orphan settles")
       (is (= "child-1" @closed)
           "child closed after orphan settles, not on the augmenter thread"))))
+
+(deftest entity-resolution-recursion-loop-end-to-end-test
+  (testing "the real default-run-helper producer and the augmenter pre-filter
+            consumer share the tracking atom: a child id tracked by a real run
+            makes the augmenter no-op for that same id"
+    ;; The two halves of the recursion guarantee live in different code paths
+    ;; sharing `entity-resolution-helper-session-ids`: default-run-helper
+    ;; `conj`s the real child id, and the augmenter pre-filter reads it. Other
+    ;; tests seed the atom manually or stub :run-helper (never touching it);
+    ;; this links producer → consumer in one flow. A blocking run keeps the
+    ;; child tracked while the augmenter checks it.
+    (let [release   (atom false)
+          run-began (promise)
+          api {:mutate-session
+               (fn [_sid op _params]
+                 (case op
+                   psi.extension/create-child-session
+                   {:psi.agent-session/session-id "child-1"}
+                   psi.extension/run-agent-loop-in-session
+                   (do (deliver run-began true)
+                       (while (not @release)
+                         (Thread/interrupted)
+                         (Thread/onSpinWait))
+                       {:psi.agent-session/agent-run-ok? true
+                        :psi.agent-session/agent-run-text ""})))
+               :mutate (fn [_op _params] nil)}]
+      ;; Drive the real producer: it tracks "child-1" before the (blocking)
+      ;; run and returns on the injected timeout while the orphan runs on.
+      (#'context-manager/default-run-helper
+       api {:parent-session-id "s1"
+            :system-prompt "sys"
+            :user-prompt "usr"
+            :wall-clock-ms 20})
+      @run-began
+      (is (contains? @context-manager/entity-resolution-helper-session-ids
+                     "child-1")
+          "real run tracked the child id")
+      ;; Now the real consumer: an augmenter turn *for that tracked child id*
+      ;; must pre-filter to :no-op — the recursion guarantee, end to end.
+      (let [env (context-manager/entity-resolution-augmentation
+                 {} (assoc base-tp :turn-augmentation/session-id "child-1"))]
+        (is (= :no-op (:turn-augmentation/status env))
+            "augmenter no-ops for a session id the real run is tracking"))
+      ;; Release the orphan and let it untrack, keeping the fixture clean.
+      (reset! release true)
+      (await-untracked "child-1"))))
 
 (deftest init-registers-entity-resolution-augmenter-test
   (testing "init registers entity-resolution with a handler"
