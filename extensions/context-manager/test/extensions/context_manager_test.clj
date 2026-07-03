@@ -1,5 +1,6 @@
 (ns extensions.context-manager-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.context-manager :as context-manager]
    [psi.extension-test-helpers.nullable-api :as nullable]))
@@ -428,7 +429,13 @@
       (is (re-find #"NEWMARKER" excerpt)
           "most-recent (tail) content is retained")
       (is (not (re-find #"OLDMARKER" excerpt))
-          "earliest (head) content is truncated away, not the tail"))))
+          "earliest (head) content is truncated away, not the tail")
+      ;; Truncation lands on a line boundary: every surviving line keeps its
+      ;; `Role:` prefix — no corrupt, role-less mid-word fragment survives as
+      ;; the first excerpt line.
+      (is (every? #(re-matches #"[A-Z][a-z]*: .*" %)
+                  (str/split-lines excerpt))
+          "every surviving excerpt line keeps a `Role:` prefix (line-boundary truncation)"))))
 
 ;; --- eligibility pre-filter no-ops ---------------------------------------
 
@@ -500,7 +507,9 @@
                :content (str "the resolver → components/pathom/resolver.clj (exact path)\n"
                              "that task → munera/open/238-x/ (git ls-files)")}]
              (:turn-augmentation/operations env))
-          "both mappings present, newline-joined, in input order"))))
+          "both mappings present, newline-joined, in input order")
+      (is (= ["helper-8"] (:turn-augmentation/child-session-ids env))
+          "helper child-session id reported as provenance"))))
 
 (deftest entity-resolution-selected-model-flows-into-run-test
   (testing "the model select-model returns is the one passed to the helper run"
@@ -518,7 +527,9 @@
                                  :text "the resolver → x (e; c)"})})]
       (is (= :success (:turn-augmentation/status env)))
       (is (= selected @captured)
-          "model returned by select-model is threaded into the helper run-opts"))))
+          "model returned by select-model is threaded into the helper run-opts")
+      (is (= ["helper-1"] (:turn-augmentation/child-session-ids env))
+          "helper child-session id reported as provenance"))))
 
 (deftest entity-resolution-no-local-model-no-op-test
   (testing "no local model yields no-op with no helper run"
@@ -581,6 +592,8 @@
                       :child-id "helper-9"}))
           content (-> env :turn-augmentation/operations first :content)]
       (is (= :success (:turn-augmentation/status env)))
+      (is (= ["helper-9"] (:turn-augmentation/child-session-ids env))
+          "helper child-session id reported as provenance")
       (is (re-find #"the resolver" content)
           "confident surface is rendered in the block")
       (is (not (re-find #"that thing" content))

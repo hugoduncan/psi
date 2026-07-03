@@ -1734,3 +1734,15 @@ Key decisions / discoveries:
   pin or guard; (2) the success-envelope `:child-session-ids` provenance
   clause is asserted on only one of the four sibling success tests
   (consistency gap).
+
+## Turn-15 test-review follow-ups addressed
+
+- addressed 2 turn-15 test-review steps: (1) `render-history-excerpt` now
+  truncates at line boundaries via `tail-lines-within` (drops whole leading
+  lines, every survivor keeps its `Role:` prefix; no mid-word/role-less
+  fragment) — pinned by an added `Role:`-prefix assertion in
+  `build-entity-resolution-prompt-tail-truncation-test`; (2) added
+  `:child-session-ids` provenance assertions to the three sibling success
+  tests (multi-mapping, model-flow, ambiguous-dropped) so the clause is
+  pinned uniformly across the success cluster. Focused suite: 36 tests,
+  136 assertions, 0 failures; lint clean.

@@ -852,7 +852,7 @@
 
 ## Test-review follow-ups (turn 15)
 
-- [ ] **`render-history-excerpt` truncates mid-line/mid-word, injecting a
+- [x] **`render-history-excerpt` truncates mid-line/mid-word, injecting a
       corrupt role-less partial fragment as the first excerpt "line" — the
       current char-slice behaviour is neither pinned nor guarded.** The
       over-long branch does `(subs text (- (count text) max-history-chars))`,
@@ -878,8 +878,16 @@
       char-slice as a benign truncation and add a test that pins the resulting
       partial-first-line shape as deliberate — so the accept/reject boundary
       of the truncation is a stated contract, not incidental `subs` behaviour.
+      DONE: chose (a) — line-boundary truncation. Added `tail-lines-within`
+      helper; `render-history-excerpt` now drops whole *leading* lines until
+      the joined tail fits `max-history-chars` (keeping the last line alone if
+      it alone exceeds the limit), so every surviving line keeps its intact
+      `Role:` prefix — no mid-word/role-less fragment. Extended
+      `build-entity-resolution-prompt-tail-truncation-test` to assert every
+      surviving excerpt line matches `Role: …`, pinning line-boundary
+      truncation against a regression to raw char-slicing.
 
-- [ ] **The success-envelope provenance clause (`:child-session-ids`) is
+- [x] **The success-envelope provenance clause (`:child-session-ids`) is
       asserted inconsistently across the sibling success tests — a regression
       dropping child-id provenance on the multi-mapping / model-flow /
       ambiguous-dropped paths would pass.** design.md's Acceptance criteria
@@ -900,3 +908,10 @@
       helper mirroring the shared `:operations []` no-op assertion) so the
       provenance clause is pinned uniformly across the success cluster, not
       just on one representative.
+      DONE: added `(= [helper-id] (:turn-augmentation/child-session-ids env))`
+      provenance assertions to `entity-resolution-multi-mapping-success-test`
+      ("helper-8"), `entity-resolution-selected-model-flows-into-run-test`
+      ("helper-1"), and `entity-resolution-ambiguous-dropped-test` ("helper-9"),
+      matching `entity-resolution-confident-mapping-success-test` so the
+      `:child-session-ids` clause is pinned uniformly across the success
+      cluster.

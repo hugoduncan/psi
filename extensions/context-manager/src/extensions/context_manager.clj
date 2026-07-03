@@ -149,20 +149,38 @@
     (when (and role text (not (slash-command-only? text)))
       (str (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
 
+(defn- tail-lines-within
+  "Keep the longest tail-suffix of `lines` whose newline-joined length is
+   `<= limit`, dropping whole leading lines. Every surviving line stays intact
+   with its `Role:` prefix — no mid-line/mid-word cut. If the last (most
+   recent) line alone exceeds `limit`, keep it alone (it is the highest-value
+   anaphora context) rather than emit nothing."
+  [lines limit]
+  (loop [kept (list (last lines))
+         remaining (butlast lines)]
+    (let [candidate (cons (last remaining) kept)]
+      (if (or (empty? remaining)
+              (> (count (str/join "\n" candidate)) limit))
+        kept
+        (recur candidate (butlast remaining))))))
+
 (defn- render-history-excerpt
   "Render a bounded, tail-truncated excerpt of the turn history for anaphora
    resolution. Consumes the 237 `:turn-augmentation/history` projection map
    `{:message-count N :tail [{:role .. :snippet ..} ...]}`; iterates `:tail`.
-   Drops slash-command lines and blank entries."
+   Drops slash-command lines and blank entries. When the excerpt exceeds
+   `max-history-chars`, truncates at a *line boundary* (drops whole leading
+   lines) so every surviving line keeps its `Role:` prefix and is never cut
+   mid-word."
   [history]
   (let [lines (->> (:tail history)
                    (keep history-line)
-                   vec)
-        text  (str/join "\n" lines)]
-    (when (seq text)
-      (if (<= (count text) max-history-chars)
-        text
-        (subs text (- (count text) max-history-chars))))))
+                   vec)]
+    (when (seq lines)
+      (let [text (str/join "\n" lines)]
+        (if (<= (count text) max-history-chars)
+          text
+          (str/join "\n" (tail-lines-within lines max-history-chars)))))))
 
 (defn build-entity-resolution-prompt
   "Compose the helper system + user prompt from the turn projection.
