@@ -1513,3 +1513,11 @@ Key decisions / discoveries:
   `parse-mapping-lines-test` cases pin the accept/reject boundary.
   `bb test --focus extensions.context-manager-test` green (33 tests, 98
   assertions, 0 failures); clj-kondo clean on both touched files.
+
+## Implementation-review (turn 5)
+
+- added 1 follow-up step: the registered `entity-resolution` handler's
+  `api`-threading through the default `select-model`/`run-helper`
+  collaborators is untested — all 8 augmenter test call sites use an empty
+  `{}` api with injected stubs, and the registration test asserts only
+  `fn?`. See steps.md.

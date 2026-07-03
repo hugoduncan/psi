@@ -334,3 +334,36 @@
       new `parse-mapping-lines-test` cases: nested-parens-in-evidence split,
       empty-canonical rejection, code-shaped false-positive rejection. Prior
       parens-in-canonical and semicolon-in-evidence cases still pass.
+
+## Implementation-review follow-ups (turn 5)
+
+- [ ] **The registered `entity-resolution` handler's `api`-threading is
+      untested — the production default-collaborator wiring has no covering
+      test.** In `register-turn-augmenter!` the handler is
+      `(fn [turn-projection] (entity-resolution-augmentation api turn-projection))`
+      (no collaborators), so at runtime it threads the real extension `api`
+      into `default-select-model` and `default-run-helper`. But every one of
+      the 8 `entity-resolution-augmentation` call sites in the test ns passes
+      an **empty** `{}` api together with **injected stub** collaborators
+      (`:select-model`/`:run-helper`), so the default branch — where the two
+      defaults are built as `#(default-select-model api %)` and
+      `#(default-run-helper api %)` — is never exercised through the
+      augmenter. `default-select-model` and `default-run-helper` are tested
+      *directly*, but not the seam that binds `api` into them via the 2-arity
+      `entity-resolution-augmentation`. Meanwhile
+      `init-registers-entity-resolution-augmenter-test` only asserts the
+      registered handler is `fn?` — unlike the sibling
+      `init-registers-turn-augmenter-test`, which *invokes* the
+      `project-context` handler and asserts a `:success` envelope. A
+      regression that dropped `api` from the closure, swapped the default
+      collaborators, or mis-ordered the
+      `(or (:select-model collaborators) #(default-select-model api %))`
+      fallback would pass all current tests. Add a test that invokes the
+      2-arity `entity-resolution-augmentation` (or the registered handler)
+      with a **real** `api` map (nullable-style, exposing
+      `:query-session`/`:mutate-session`/`:mutate`) and **no** collaborators,
+      asserting it threads through the defaults to a well-formed envelope
+      (e.g. no-local-model → `:no-op`, or a stubbed
+      `:mutate-session`/`resolve-selection` producing a `:success` block), so
+      the production default-collaborator path is covered rather than only the
+      stub-injected path.
