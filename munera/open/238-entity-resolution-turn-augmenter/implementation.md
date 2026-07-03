@@ -1260,3 +1260,21 @@ Applied to `design.md`:
   policy-level deferrals).
 - design-steps.md has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Inconsistency review (design-review turn 3, tenth pass — post ninth-slice confidence-gate resolution)
+
+- no inconsistency review feedback. The only design.md change since the
+  ninth-pass inconsistency review is the confidence-gate resolution
+  (`a75e7b61c`). Grepped all "confiden" occurrences: the reasoning-method
+  description (`surface → canonical → evidence → confidence`), the line-format
+  spec, the self-gating/no-threshold gate wording (Resolved decision 6 both
+  spots + "Confidence gate & output shape" policy bullet), the three-field
+  render (confidence dropped, not displayed), the "never guess" Constraint,
+  and the Tests-list "ambiguous reference dropped" framing all agree —
+  model-side self-gating, augmenter accepts every well-formed line, confidence
+  a required-but-unvalidated/undisplayed field.
+- No regression in the previously-verified alignments (ninth pass): the three
+  no-op enumerations (Required behaviour item 5, Acceptance criteria, Tests
+  list) and rendered-content composition are unchanged and still consistent.
+- design-steps.md has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
