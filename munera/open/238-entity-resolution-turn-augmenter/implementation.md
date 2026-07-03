@@ -77,3 +77,38 @@ Non-task-file context: this review ran as 3 turns of one shared
 design steps and their file citations were gathered without re-running
 `bb test` or touching any code — nothing in `components/` or `extensions/`
 changed during review.
+
+## Design-steps resolution (all 4 items closed)
+
+All 4 unchecked items from the architecture/ambiguity/inconsistency
+design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
+`7842383bd`) were resolved by editing `design.md` directly; no
+`SCOPE_QUESTION:` items were present. `design-steps.md` items marked `[x]`.
+
+- Added **Resolved decisions 4–6** to `design.md`:
+  4. read-only search toolset (dir-list + grep, beyond existing single-file
+     `read`) is new work this task adds, not already-shipped;
+  5. an additive tool-calling capability fact/criterion is added to
+     `psi.ai.model-selection` (new optional key only — existing `:helper` /
+     `:auto-session-name` callers unaffected); no tool-calling-capable local
+     model collapses into the existing model-absent `:no-op` fallback (no
+     new diagnostic distinguishing "no local model" from "local model, no
+     tools" — this was a deliberate simplicity choice, not an oversight);
+  6. skill delivery is verbatim embedding of `SKILL.md` content in the
+     augmenter's own constructed helper prompt (not `:skill-names`), and the
+     helper output contract is a structured per-line format
+     (`surface → canonical (evidence; confidence)`) the augmenter parses;
+     `:content` is re-rendered from parsed lines, never the raw model text.
+  Goal, Required behaviour, Constraints, and Acceptance criteria were
+  updated to reference these decisions and stay consistent with them
+  (including the "already-shipped" framing correction and the missing
+  failed/empty-helper-run test now listed under Acceptance criteria).
+- Exact model-registry fact/criterion key names (e.g.
+  `:supports-tool-calling`) and the precise structured-line regex/grammar are
+  left to plan/implementation — the design step asked to *pin down the
+  contract*, not bikeshed the literal key spelling, consistent with how
+  Resolved decision 2 already left the toolset's literal tool names at
+  "e.g." granularity.
+- Next design-review pass (if any) should treat commit range after
+  `fce0067b2`..HEAD (this follow-up) as the new prior-follow-up boundary for
+  batch-baseline purposes.

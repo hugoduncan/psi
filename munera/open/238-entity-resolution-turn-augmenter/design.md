@@ -8,21 +8,37 @@ extensions, namespaces, vars, commands, docs, vocabulary symbols) and inject
 that resolution as pre-turn context, so the parent turn sees an evidence-backed
 `surface → canonical` mapping before it acts.
 
-Reuse two already-shipped mechanisms:
+Reuse two already-shipped mechanisms, extended with small additive pieces
+this task must add (see Resolved decisions 4–6):
 
 1. the **pre-turn request augmentation** mechanism from closed task
    `237-pre-turn-request-augmentation` (the `:register-turn-augmenter` API,
    `:psi.capability/turn-augmentation`, the `:append-context-block` operation,
    and the `extensions/context-manager` scaffold);
-2. the **local-model helper-session** pattern from
+2. the **local-model helper-session mechanism** from
    `extensions/auto-session-name` (model selection with a strong `:locality
    :local` preference, `create-child-session` + `run-agent-loop-in-session`,
-   and `helper-session-ids` recursion avoidance).
+   and `helper-session-ids` recursion avoidance) — this mechanism itself is
+   already-shipped. What is **not** already-shipped, because
+   `auto-session-name`'s helper session is toolless (`:tool-ids []`,
+   single-shot title inference), is the tool-enabled evidence-gathering half
+   this task needs: a minimal read-only search toolset for the helper
+   session (Resolved decision 4) and a tool-calling capability
+   fact/criterion in `psi.ai.model-selection` so helper-model selection can
+   filter on tool-calling support (Resolved decision 5). Both are new,
+   additive work this task adds on top of the shipped mechanism, not
+   already-shipped pieces being reused verbatim.
 
 The reasoning method is the existing `entity-resolution` skill
 (`.psi/skills/entity-resolution/SKILL.md`): detect referring expressions →
 gather evidence → produce a `surface → canonical → evidence → confidence`
-mapping → include only unambiguous mappings.
+mapping → include only unambiguous mappings. The skill's method is delivered
+to the helper session by embedding it directly in the augmenter's
+constructed helper prompt (Resolved decision 6) — not via
+`create-child-session`'s `:skill-names`, which only auto-expands a skill
+when the *user's own submitted text* matches/invokes it, and the parent-turn
+user text driving this helper session is never authored to invoke
+`entity-resolution`.
 
 ## Why
 
@@ -69,19 +85,24 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
 
 1. reads the bounded turn projection (user text + history tail + effective-cwd);
 2. selects a local helper model via `model-selection` (strong `:locality
-   :local`, low latency, zero/low cost), inheriting the parent session's model
-   as context, exactly like `auto-session-name`;
+   :local`, low latency, zero/low cost, **and the tool-calling capability
+   criterion from Resolved decision 5**), inheriting the parent session's
+   model as context, like `auto-session-name` plus the added tool-calling
+   filter;
 3. runs a helper session — created **with a minimal read-only search toolset**
-   so the local model can gather filesystem/git evidence — whose prompt applies
-   the `entity-resolution` method to the user text, producing a compact
-   `surface → canonical → evidence → confidence` mapping restricted to
+   (Resolved decision 4) so the local model can gather filesystem/git
+   evidence — whose prompt embeds the `entity-resolution` method directly
+   (Resolved decision 6) and applies it to the user text, producing output
+   in the structured line format from Resolved decision 6, restricted to
    sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
    (`:id "entity-resolution"`, `:title "Resolved entities"`, `:content` = the
-   rendered mapping) when at least one confident mapping exists;
+   mapping re-rendered from the parsed confident lines, per Resolved
+   decision 6) when at least one confident mapping is successfully parsed;
 5. returns a well-formed `:no-op` envelope (no operations) when the turn is a
    tracked helper session, when there is no effective cwd, when no referring
-   expressions are detected, when no confident mapping is produced, or when the
+   expressions are detected, when no confident mapping is produced or
+   parsed, when no tool-calling-capable local model is available, or when the
    helper run fails/does not return a usable result;
 6. tracks its helper session ids and cleans them up (close on completion) as
    `auto-session-name` does, so it never augments its own helper turns.
@@ -115,6 +136,51 @@ provenance.
    the model call. Local-only + zero/low cost selection keeps it inexpensive and
    private.
 
+4. **Read-only search toolset is new work, added by this task.** Today's
+   built-in read-only toolset (`make-read-only-tools-with-cwd` in
+   `components/agent-session/src/psi/agent_session/tools.clj`) exposes only
+   a single-file `read` tool; there is no directory-list or content-grep
+   tool. This task adds a minimal read-only search toolset — file read
+   (existing) + directory list + content grep, no mutation/bash-write — for
+   the helper session to use. This toolset addition is in scope for this
+   task (not a pre-existing dependency to assume as already-shipped).
+
+5. **Model selection gains an additive tool-calling capability
+   fact/criterion, added by this task.** `psi.ai.model-selection` / the
+   model registry (`psi.ai.models` / `psi.ai.user_models`) currently exposes
+   only `:supports-text`, `:supports-images`, `:supports-reasoning`,
+   `:locality`, `:context-window`, `:max-tokens`, and cost/latency-tier
+   facts — no tool-calling fact, because `auto-session-name`'s toolless
+   helper session never needed one. This task adds an additive tool-calling
+   capability fact on model entries (e.g. `:supports-tool-calling`) and a
+   corresponding selection criterion, and the entity-resolution augmenter's
+   `resolve-selection` request sets that criterion. The addition must be
+   additive-only (new optional fact/criterion key) so existing `:helper` /
+   `:auto-session-name` role defaults and other `model-selection` callers
+   are unaffected. If `resolve-selection` yields no tool-calling-capable
+   local winner, that is treated the same as "no local model available"
+   under decision 3's model-absent fallback: the augmenter returns a
+   well-formed `:no-op` — v1 does not add a separate diagnostic
+   distinguishing "no local model" from "local model but no tool support";
+   both collapse to "no usable helper model for this turn."
+
+6. **Skill delivery and helper output contract.** The augmenter's
+   constructed helper-session prompt embeds the `entity-resolution` skill's
+   method directly (verbatim `.psi/skills/entity-resolution/SKILL.md`
+   content, included as part of the helper system/user prompt the augmenter
+   builds), not via `create-child-session`'s `:skill-names` — that option
+   auto-expands a skill only when the *user's own submitted text* matches or
+   invokes it, and the parent-turn user text driving this helper session is
+   never authored to invoke `entity-resolution`. The helper model's expected
+   output is a structured line format, one line per confident mapping:
+   `surface → canonical (evidence; confidence)`; the augmenter parses lines
+   matching this format from the helper's raw response and discards
+   everything else (preamble, commentary, malformed lines). The rendered
+   `:append-context-block` `:content` is re-rendered from the parsed
+   confident mappings, not the model's raw text echoed verbatim. Zero
+   successfully-parsed lines is treated as "no confident mapping" and yields
+   the `:no-op` in Required behaviour item 5.
+
 ### Remaining v1 policies (settled, low-risk)
 
 - **Eligibility pre-filter.** Skip tracked helper sessions and blank-cwd turns
@@ -124,9 +190,10 @@ provenance.
   enter the block; ambiguous/unevidenced references are dropped, never guessed.
   Rendered `:content` is a compact `surface → canonical` list with brief
   evidence; the raw user prompt is always preserved.
-- **Model-absent fallback.** If `resolve-selection` yields no local winner, the
-  augmenter returns a well-formed `:no-op`; it never falls back to a cloud model
-  on every turn.
+- **Model-absent fallback.** If `resolve-selection` yields no local winner
+  (including no *tool-calling-capable* local winner, per Resolved decision
+  5), the augmenter returns a well-formed `:no-op`; it never falls back to a
+  cloud model on every turn.
 
 ## Constraints
 
@@ -137,8 +204,13 @@ provenance.
   accepted operations are replayed without re-invoking the model (already
   guaranteed by 237 — do not weaken it).
 - Local-first: helper model selection must strongly prefer `:locality :local`
-  and zero/low cost, like `auto-session-name`; never silently use a cloud model
-  on every turn.
+  and zero/low cost, like `auto-session-name`, filtered on the tool-calling
+  capability criterion (Resolved decision 5); never silently use a cloud
+  model on every turn.
+- The additive tool-calling capability fact/criterion added to
+  `psi.ai.model-selection` (Resolved decision 5) must not change behaviour
+  for existing callers/roles (`:helper`, `:auto-session-name`) that don't set
+  it.
 - Recursion safety: track and no-op for the augmenter's own helper session ids.
 - Helper toolset is read-only: file read / list / grep only — no mutating,
   bash-write, or otherwise side-effecting tools on the helper session.
@@ -159,13 +231,18 @@ provenance.
   `:id "entity-resolution"`) carrying the `surface → canonical` mapping, inserted
   before the current user message.
 - The augmenter uses a helper session driven by a **local** model selected via
-  `psi.ai.model-selection` with a strong `:locality :local` preference, and the
+  `psi.ai.model-selection` with a strong `:locality :local` preference and the
+  new tool-calling capability criterion (Resolved decision 5), and the
   helper session is created with a **minimal read-only search toolset** (no
-  mutating/side-effecting tools); when no local model is available it returns a
-  well-formed `:no-op` and no cloud model is used.
+  mutating/side-effecting tools); when no tool-calling-capable local model is
+  available it returns a well-formed `:no-op` and no cloud model is used.
+- `psi.ai.model-selection`'s new tool-calling capability fact/criterion
+  (Resolved decision 5) is additive: existing `:helper` / `:auto-session-name`
+  role-default selection behaviour is unchanged when the criterion is unset.
 - The augmenter returns a well-formed `:no-op` (no operations) for: tracked
   helper sessions, blank effective-cwd, prompts with no detectable referring
-  expression, no confident mapping, and failed/empty helper runs.
+  expression, no confident mapping, no tool-calling-capable local model, and
+  failed/empty helper runs.
 - Helper sessions the augmenter creates are tracked, reported in
   `:turn-augmentation/child-session-ids`, cleaned up, and never themselves
   augmented (recursion avoidance verified).
@@ -175,7 +252,9 @@ provenance.
   local model (inherited 237 guarantee, asserted by a test).
 - Tests (Scry-first) cover: confident single mapping → success block; no
   referring expression → no-op; helper-session recursion no-op; blank cwd
-  no-op; no-local-model → no-op; ambiguous reference dropped; and replay reuse.
+  no-op; no-local-model (including no tool-calling-capable local model) →
+  no-op; ambiguous reference dropped; failed/empty helper run → no-op; and
+  replay reuse.
 - Docs updated to describe automatic entity resolution as a context-manager /
   entity-resolution augmenter capability.
 

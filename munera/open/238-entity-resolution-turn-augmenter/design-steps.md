@@ -1,6 +1,6 @@
 # Design steps — architectural fit follow-ups
 
-- [ ] `psi.ai.model-selection` / the model registry (`components/ai/src/psi/ai/model_selection.clj`,
+- [x] `psi.ai.model-selection` / the model registry (`components/ai/src/psi/ai/model_selection.clj`,
   `psi.ai.models` / `psi.ai.user_models`) exposes only `:supports-text`,
   `:supports-images`, `:supports-reasoning`, `:locality`, `:context-window`,
   `:max-tokens`, and cost/latency-tier facts — there is no tool-calling /
@@ -18,7 +18,7 @@
   otherwise ensure helper-model selection filters on tool-calling support)
   before or as part of implementing this task.
 
-- [ ] Ambiguous: the design does not specify (a) how the `entity-resolution`
+- [x] Ambiguous: the design does not specify (a) how the `entity-resolution`
   skill's method is delivered to the helper session's prompt, or (b) the
   output contract the helper model must produce and how the augmenter derives
   `:success`/`:no-op` and the rendered `:content` from it. On (a): psi's
@@ -47,7 +47,7 @@
   implementing, since both affect testability of the confident-mapping vs.
   ambiguous-dropped vs. no-referring-expression acceptance-criteria cases.
 
-- [ ] Inconsistent: the Goal section frames both reused mechanisms as
+- [x] Inconsistent: the Goal section frames both reused mechanisms as
   "already-shipped," specifically citing "the local-model helper-session
   pattern from `extensions/auto-session-name` (model selection ...,
   `create-child-session` + `run-agent-loop-in-session`, and
@@ -66,7 +66,7 @@
   is new, so a later reader/implementer doesn't under-scope the toolset work
   based on the Goal section alone.
 
-- [ ] Inconsistent: the "no-op" requirement list and the "Tests" list in
+- [x] Inconsistent: the "no-op" requirement list and the "Tests" list in
   Acceptance criteria don't match. The no-op requirement says: "The augmenter
   returns a well-formed `:no-op` (no operations) for: tracked helper
   sessions, blank effective-cwd, prompts with no detectable referring
