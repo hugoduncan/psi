@@ -286,3 +286,41 @@
       an uninterruptible blocking stub, asserting `:text` nil (→ `:no-op`),
       that the child stays tracked and unclosed while the orphan runs, and is
       closed + untracked only after the orphan settles.
+
+## Implementation-review follow-ups (turn 4)
+
+- [ ] **`parse-mapping-lines` accepts non-mapping / degenerate lines,
+      injecting misleading content into the `Resolved entities` block —
+      weakens the design's "never guess" and robust-parsing guarantees.**
+      `mapping-line-re` matches any line containing an arrow (`→`/`->`) plus a
+      trailing `(… ; …)` group, without requiring the captured surface/
+      canonical to be non-empty *or* the line to be a genuine mapping. Three
+      concrete false-positives (verified against the live regex):
+      1. **Empty canonical.** `"a →  (e; c)"` matches → `{:surface "a"
+         :canonical "" :evidence "e"}`, rendering the degenerate block line
+         `a →  (e)` with a blank canonical. The parser trims canonical to `""`
+         but never rejects the mapping, so an empty target is emitted as if
+         confident.
+      2. **Incidental code-shaped line echoed by the model.**
+         `"(fn [x] -> (foo x)) (call; note)"` matches → `{:surface "(fn [x]"
+         :canonical "(foo x)) " :evidence "call"}`. A local model that echoes
+         a code snippet or arrow-bearing prose with a trailing parenthesized
+         clause produces a bogus "resolved entity" the augmenter injects as
+         fact — a direct "never guess" violation, since nothing was actually
+         resolved.
+      3. **Nested parens in evidence.** `"the fn → foo (bar) (baz (qux);
+         high)"` mis-splits → evidence `"baz (qux"`, confidence `"qux)"` — the
+         inner `(qux)` leaks across the evidence/confidence boundary. Prior
+         turn-1 hardening handled parens-in-canonical and a single semicolon in
+         evidence, but not nested parentheses in evidence.
+      Given the design's stated emphasis on "robust parsing of unpredictable
+      local-model text" and the "never guess — only confident, evidence-backed
+      mappings" constraint, harden the parser and/or filter: reject lines whose
+      trimmed surface or canonical is empty (drop, don't emit); and either
+      tighten the grammar so an arbitrary arrow-plus-parenthesized-clause line
+      is not accepted as a mapping (e.g. constrain canonical to a
+      path/symbol/entity shape, or require the trailing group to be the final
+      balanced-paren token) or document these as accepted parse limitations
+      with covering tests. Add `parse-mapping-lines-test` cases for
+      empty-canonical rejection, the code-shaped false-positive, and the
+      nested-parens evidence split so the accept/reject boundary is pinned.

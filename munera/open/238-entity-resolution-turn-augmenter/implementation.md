@@ -1492,3 +1492,11 @@ Key decisions / discoveries:
     after the orphan settles.
 - `bb test --focus extensions.context-manager-test` green (33 tests, 95
   assertions, 0 failures); `clj-kondo` clean on both touched files.
+
+## Implementation-review (turn 4)
+
+- added 1 follow-up step: `parse-mapping-lines`/`mapping-line-re` accepts
+  degenerate and non-mapping lines (empty canonical, incidental code-shaped
+  lines with `->` + trailing `(…; …)`, nested parens in evidence),
+  producing false-positive/misleading `Resolved entities` block content
+  against the "never guess" + robust-parsing guarantees. See steps.md.
