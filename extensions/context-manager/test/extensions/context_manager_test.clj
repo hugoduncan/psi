@@ -353,6 +353,21 @@
       (testing "round-cap prompt instruction (the only representation of the bound)"
         (is (re-find #"at most 8 rounds" system-prompt)
             "system prompt states the max-helper-rounds round cap"))
+      (testing "design-required exclusions (Resolved decision 6: Method 1–5 only)"
+        ;; Step 6 'Act or ask' and the 'Output Shape' section of the skill are
+        ;; deliberately excluded — they instruct interactive clarification /
+        ;; reasoning-table framing that conflicts with the non-interactive,
+        ;; parse-only contract (and 237's exclusion of interactive pre-turn
+        ;; prompts). Pin the negative half so re-embedding the whole skill
+        ;; file is caught.
+        (is (not (re-find #"(?i)Act or ask" system-prompt))
+            "skill step 6 'Act or ask' guidance is excluded")
+        (is (not (re-find #"(?i)Output Shape" system-prompt))
+            "skill 'Output Shape' section is excluded")
+        (is (not (re-find #"(?i)ask a (focused )?clarification question" system-prompt))
+            "no instruction to ask a clarification question")
+        (is (not (re-find #"(?i)ask for the missing identifier" system-prompt))
+            "no instruction to ask for a missing identifier"))
       (is (re-find #"please look at the resolver" user-prompt))
       (is (re-find #"look at the pathom resolver" user-prompt)
           "prior-turn user :snippet line is included for anaphora")
@@ -415,6 +430,7 @@
           env (context-manager/entity-resolution-augmentation
                {} base-tp (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (nil? (:select @calls)) "model selection not attempted")
       (is (nil? (:run @calls)) "helper session never created"))))
 
@@ -425,6 +441,7 @@
                {} (assoc base-tp :turn-augmentation/effective-cwd "")
                (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (nil? (:run @calls))))))
 
 (deftest entity-resolution-slash-command-only-no-op-test
@@ -434,6 +451,7 @@
                {} (assoc base-tp :turn-augmentation/user-text "/status")
                (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (nil? (:select @calls)) "no model selected for slash-command-only turn")
       (is (nil? (:run @calls)) "helper session never created"))))
 
@@ -499,6 +517,7 @@
           env (context-manager/entity-resolution-augmentation
                {} base-tp (stub {:model nil :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (= "no local model" (:turn-augmentation/diagnostic env)))
       (is (nil? (:run @calls)) "no helper run attempted"))))
 
@@ -547,6 +566,7 @@
                (stub {:text "I could not find anything conclusive."
                       :child-id "helper-3"}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (= ["helper-3"] (:turn-augmentation/child-session-ids env))
           "helper id still reported even on empty run"))))
 
@@ -557,6 +577,7 @@
                {:select-model (fn [_] {:provider :ollama :id "q"})
                 :run-helper   (fn [_] nil)})]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (= [] (:turn-augmentation/child-session-ids env))))))
 
 (deftest entity-resolution-throwing-helper-no-op-test
@@ -567,6 +588,7 @@
     (let [env (context-manager/entity-resolution-augmentation
                {} base-tp (stub {:throw? true}))]
       (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
       (is (= [] (:turn-augmentation/child-session-ids env))
           "no child id reported when the run threw"))))
 
@@ -688,6 +710,14 @@
                 :components #{}}
                (:prompt-component-selection params))
             "helper suppresses default full system prompt, keeping only bash")
+        ;; The actual tool grant (acceptance criterion "created with access to
+        ;; the existing `bash` tool only"): `:tool-ids` is the grant mechanism
+        ;; (resolve-tool-defs tool-source (:tool-ids sd)); `:tool-names` in the
+        ;; prompt-component-selection above only controls prompt *fragments*.
+        (is (= ["bash"] (:tool-ids params))
+            "helper is granted the bash tool only via :tool-ids")
+        (is (= :off (:thinking-level params))
+            "helper runs with thinking disabled")
         (is (not (contains? params :worktree-path))
             "no silently-ignored :worktree-path passed; cwd comes from parent inheritance")))))
 

@@ -1687,3 +1687,17 @@ Key decisions / discoveries:
   captured); (2) prompt's design-required *exclusions* (skill step 6 "Act or
   ask" / "Output Shape") untested — only inclusions asserted; (3)
   entity-resolution `:no-op` envelopes' "no operations" clause unasserted.
+
+## Test-review turn-12 follow-ups addressed (test-coverage only)
+
+- addressed 3 turn-12 test-review follow-ups (all pure test additions; no
+  production change — behaviours already correct):
+  1. `:tool-ids ["bash"]` + `:thinking-level :off` now asserted in
+     `default-run-helper-suppresses-default-prompt-and-omits-worktree-test`.
+  2. exclusion assertions added to `build-entity-resolution-prompt-test`
+     (no "Act or ask", "Output Shape", clarification-question, or
+     missing-identifier guidance).
+  3. `(= [] (:turn-augmentation/operations env))` added to all seven
+     entity-resolution no-op tests.
+- `bb test --focus extensions.context-manager-test` → 38 tests, 133
+  assertions, 0 failures; clj-kondo clean on the touched test ns.

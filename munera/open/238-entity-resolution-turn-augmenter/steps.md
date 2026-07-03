@@ -733,7 +733,7 @@
 
 ## Test-review follow-ups (turn 12)
 
-- [ ] **The `bash`-tool-only grant (`:tool-ids ["bash"]`) is untested — the
+- [x] **The `bash`-tool-only grant (`:tool-ids ["bash"]`) is untested — the
       core "helper created with access to the existing `bash` tool only"
       acceptance criterion has no covering assertion.** `default-run-helper`
       passes `:tool-ids ["bash"]` to `create-child-session`, and per
@@ -754,8 +754,14 @@
       `(= ["bash"] (:tool-ids params))` — and, since `:thinking-level :off` is
       likewise passed-but-unasserted, optionally pin it too — so the actual
       tool grant that the acceptance criterion turns on is covered.
+      DONE: extended
+      `default-run-helper-suppresses-default-prompt-and-omits-worktree-test`
+      to also assert `(= ["bash"] (:tool-ids params))` (the actual tool grant,
+      distinct from `:prompt-component-selection`'s `:tool-names` prompt
+      fragments) and `(= :off (:thinking-level params))`, pinning the
+      "bash tool only" acceptance criterion / Resolved decisions 2/4/5.
 
-- [ ] **The prompt's design-required *exclusions* (skill step 6 "Act or
+- [x] **The prompt's design-required *exclusions* (skill step 6 "Act or
       ask" and the "Output Shape" section) are untested — only inclusions are
       asserted.** Resolved decision 6 and the Constraints/Out-of-scope
       sections fix that the embedded method contains *only* Method steps 1–5,
@@ -775,8 +781,16 @@
       "Act or ask", no clarification-question instruction, no "Output Shape"
       table framing), pinning the negative/exclusion half of Resolved
       decision 6.
+      DONE: added an exclusions sub-test to
+      `build-entity-resolution-prompt-test` asserting the system-prompt does
+      **not** contain "Act or ask", "Output Shape", "ask a (focused)
+      clarification question", or "ask for the missing identifier" — the four
+      skill step-6/Output-Shape markers deliberately excluded per Resolved
+      decision 6. (The output-contract's negative "Do not emit …
+      clarification questions" wording is plural and does not match the
+      singular assertion, so it is not a false positive.)
 
-- [ ] **The entity-resolution `:no-op` envelopes' "no operations" well-
+- [x] **The entity-resolution `:no-op` envelopes' "no operations" well-
       formedness clause is unasserted.** Required behaviour item 5 and the
       Acceptance criteria specify a "well-formed `:no-op` (**no operations**)"
       for the helper-session / blank-cwd / slash-command / no-referring-
@@ -794,3 +808,9 @@
       env)))` assertion to the entity-resolution no-op tests (or a shared
       well-formed-no-op helper) so the "no operations" invariant is pinned,
       not just the `:no-op` status label.
+      DONE: added `(is (= [] (:turn-augmentation/operations env)))` to all
+      seven entity-resolution no-op tests
+      (`entity-resolution-helper-session-no-op-test`, `-blank-cwd-`,
+      `-slash-command-only-`, `-no-local-model-`, `-empty-run-`, `-nil-run-`,
+      `-throwing-helper-`), pinning the "no operations" well-formedness clause
+      so a leaked stale/partial operation in a no-op envelope is caught.
