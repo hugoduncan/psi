@@ -337,7 +337,7 @@
 
 ## Implementation-review follow-ups (turn 5)
 
-- [ ] **The registered `entity-resolution` handler's `api`-threading is
+- [x] **The registered `entity-resolution` handler's `api`-threading is
       untested — the production default-collaborator wiring has no covering
       test.** In `register-turn-augmenter!` the handler is
       `(fn [turn-projection] (entity-resolution-augmentation api turn-projection))`
@@ -367,3 +367,11 @@
       `:mutate-session`/`resolve-selection` producing a `:success` block), so
       the production default-collaborator path is covered rather than only the
       stub-injected path.
+      DONE: added `entity-resolution-registered-handler-threads-real-api-test`
+      — drives the **registered** handler (built by `init` with the real
+      nullable `api` closed over, no injected collaborators) with a `base-tp`
+      turn projection under a `catalog-view`-redefed empty model pool. The real
+      `#(default-select-model api %)` closure runs through `resolve-selection`
+      (→ `:no-winner` on the empty pool → nil), so the handler reaches the
+      deterministic `no-op "no local model"` outcome — proving `api` is threaded
+      through the default-collaborator seam, not just the stub-injected path.

@@ -1521,3 +1521,18 @@ Key decisions / discoveries:
   collaborators is untested — all 8 augmenter test call sites use an empty
   `{}` api with injected stubs, and the registration test asserts only
   `fn?`. See steps.md.
+
+## Turn-5 implementation-review follow-up — resolved
+
+- addressed 1 review step (untested default-collaborator api-threading seam).
+  Added `entity-resolution-registered-handler-threads-real-api-test`: drives
+  the **registered** handler (built by `init`, real nullable `api` closed
+  over, **no** injected collaborators) with a base turn projection under a
+  `catalog-view`-redefed empty model pool. The real `#(default-select-model
+  api %)` closure runs through `resolve-selection` (empty pool → `:no-winner`
+  → nil), so the handler reaches the deterministic `no-op "no local model"`
+  outcome — covering the production `api`-into-defaults seam a regression
+  (dropped `api`, swapped defaults, mis-ordered `or` fallback) would break,
+  unlike the 8 stub-injected `{}`-api call sites. `bb test --focus
+  extensions.context-manager-test` green (34 tests, 100 assertions, 0
+  failures); clj-kondo clean on the touched test file.
