@@ -903,3 +903,10 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   actual closed toolset is read/list/grep over the worktree's files. The
   design needs to pin down whether v1 tools are git-aware/tracked-file-only
   or ordinary filesystem-scoped under `effective-cwd`.
+
+## Inconsistency review (design-review turn 3, seventh pass)
+
+- inconsistency review added 1 new design step: the References entry for
+  `.psi/skills/entity-resolution/SKILL.md` still says "resolution method and
+  output shape," contradicting Resolved decision 6's settled rule that only
+  Method steps 1–5 are embedded and the skill's Output Shape is excluded.

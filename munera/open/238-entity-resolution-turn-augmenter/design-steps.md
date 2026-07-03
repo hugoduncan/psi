@@ -370,3 +370,16 @@
   git-tracked files only or all readable files under the effective cwd, and
   align Resolved decision 2 / Required behaviour item 3 / toolset wording
   accordingly without changing the frozen read/list/grep-only scope.
+
+- [ ] Inconsistent: Resolved decision 6 explicitly says the helper prompt
+  embeds only `.psi/skills/entity-resolution/SKILL.md`'s Method section
+  (steps 1–5), excludes the skill's own "Output Shape" section, and states
+  that the augmenter's own prompt supplies the structured line output
+  contract instead. But the References section still describes
+  `.psi/skills/entity-resolution/SKILL.md` as "resolution method and output
+  shape." That reference now contradicts the settled skill-delivery/output
+  contract and can mislead implementers into reusing the skill file's
+  markdown-table/prose output shape that decision 6 deliberately excludes.
+  Update the References entry to describe only the method source (or say
+  explicitly that the skill's Output Shape is not used) so it agrees with
+  Resolved decision 6.
