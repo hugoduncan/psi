@@ -226,3 +226,49 @@
       (local pool → selected). Shipped doc claim
       ("top-ranked **local** model … never falls back to a cloud model") now
       accurate; no doc edit needed.
+
+## Implementation-review follow-ups (turn 3)
+
+- [ ] **Timeout path leaves an orphaned helper future racing session close /
+      budget.** In `default-run-helper`, on wall-clock timeout the code does
+      `(future-cancel fut)` then, in `finally`, closes the child
+      (`psi.extension/close-session`) and `disj`s it from
+      `entity-resolution-helper-session-ids`. But `run-agent-loop-in-session`
+      is a **blocking dispatch** (`core/prompt-in!` → live model call);
+      `future-cancel` only interrupts the worker thread and does **not**
+      reliably unwind a blocking model/HTTP call, so the orphaned future can
+      keep running *after* the `finally` has already closed and untracked the
+      child session. Consequences: (a) the still-running future mutates /
+      prompts a session the `finally` just closed (undefined behaviour against
+      a detached session); (b) model work / cost continues past the 120s
+      `helper-wall-clock-ms` budget the bound was supposed to enforce
+      (Resolved decision 3 / "Bounded helper agent loop" require *finite*
+      worst-case blocking, but the budget only bounds *this* augmenter's
+      blocking, not the orphaned thread's continued work); (c) the child id is
+      untracked while a turn may still run under it, narrowing the
+      recursion-avoidance guarantee. Address by making the timeout path
+      deterministic: keep the child tracked until the future actually
+      settles (or close only after the orphan is confirmed done), and/or
+      document the orphan explicitly and bound its damage (e.g. close after
+      await, or accept-and-document that `future-cancel` cannot unwind the
+      in-flight model call). The `auto-session-name` precedent does not use a
+      wall-clock `future`/`deref` bound, so there is no prior pattern to
+      inherit here — this bound is new to 238 and its teardown semantics need
+      to be pinned down rather than left to `future-cancel`'s best effort.
+
+- [ ] **The enforced finite bound (wall-clock timeout branch) is untested at
+      the `default-run-helper` level.** Slice 3 records that
+      `run-agent-loop-in-session` has no `:max-rounds` option, so the round
+      cap is only *prompt-instructed* and the *sole enforced* finite bound is
+      the 120s wall-clock budget (`future` + timed `deref`, the `::timeout`
+      branch). Yet no test exercises that branch: the "bound-exceeded → no-op"
+      assertion in slice 3 stubs the `run-helper` collaborator inside
+      `entity-resolution-augmentation` and never runs the real
+      `default-run-helper` `deref`/`::timeout`/`future-cancel`/`finally` code.
+      For the one load-bearing bound on 237's blocking critical path, add a
+      `default-run-helper` test that drives the real timeout branch (e.g. a
+      `:mutate-session run-agent-loop-in-session` that blocks past a
+      test-shrunk budget, or making `helper-wall-clock-ms` injectable so the
+      test can use a small value) and asserts `:text` is nil (→ `:no-op`) and
+      the child is closed/untracked. Without it, the only enforced bound is
+      unverified and could regress silently.

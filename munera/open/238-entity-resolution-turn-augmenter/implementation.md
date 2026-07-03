@@ -1466,3 +1466,7 @@ Key decisions / discoveries:
   selected. Shipped `doc/extensions.md` local-only claim now accurate; no doc
   change required. `bb test --focus extensions.context-manager-test` green
   (32 tests); clj-kondo clean.
+
+## Implementation-review (turn 3)
+
+- added 2 follow-up steps to steps.md.
