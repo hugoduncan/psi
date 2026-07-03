@@ -449,10 +449,17 @@
                  ;; session's worktree as its effective cwd (see
                  ;; default-run-helper); create-child-session has no
                  ;; :worktree-path parameter.
-                 result (run-helper {:parent-session-id session-id
-                                     :system-prompt system-prompt
-                                     :user-prompt user-prompt
-                                     :model model})
+                 ;; A throwing helper run (any failure that escapes
+                 ;; `default-run-helper`'s own catch) collapses to the same
+                 ;; well-formed :no-op as a failed/empty run (Required
+                 ;; behaviour item 5): the augmenter never propagates a
+                 ;; collaborator exception onto 237's blocking pre-turn path.
+                 result (try
+                          (run-helper {:parent-session-id session-id
+                                       :system-prompt system-prompt
+                                       :user-prompt user-prompt
+                                       :model model})
+                          (catch Throwable _ nil))
                  mappings (parse-mapping-lines (:text result))
                  child-ids (vec (keep :child-session-id [result]))]
              (if (seq mappings)

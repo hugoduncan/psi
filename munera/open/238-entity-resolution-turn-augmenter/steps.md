@@ -498,7 +498,7 @@
 
 ## Test-review follow-ups (turn 8)
 
-- [ ] **The `render-history-excerpt` tail-truncation branch (`max-history-chars`
+- [x] **The `render-history-excerpt` tail-truncation branch (`max-history-chars`
       = 4000) is untested — the design's "History-tail inclusion … tail-
       truncated" behaviour has no covering test.** `render-history-excerpt`
       has two branches: `(<= (count text) max-history-chars)` returns the full
@@ -515,8 +515,15 @@
       `max-history-chars`, asserting the excerpt is length-bounded (≤
       max-history-chars) and retains the *tail* (a marker in the last line is
       present; a marker in an early, truncated-away line is absent).
+      DONE: added `build-entity-resolution-prompt-tail-truncation-test` —
+      builds a `:tail` whose rendered excerpt exceeds `max-history-chars`
+      (4000) via a head OLDMARKER line + ~30 filler lines + a tail NEWMARKER
+      line; extracts the excerpt from the user-prompt and asserts it is
+      length-bounded (≤ 4000), retains NEWMARKER (tail kept), and drops
+      OLDMARKER (head truncated) — pinning the `subs`-from-tail branch against
+      a head-cut / off-by-one / no-truncation regression.
 
-- [ ] **The augmenter does not catch exceptions from `run-helper`, and the
+- [x] **The augmenter does not catch exceptions from `run-helper`, and the
       `stub` test-helper's `throw?` affordance is dead — the "helper run
       fails → :no-op" contract is unverified for the exception path.**
       Required behaviour item 5 lists "when … the helper run fails … return a
@@ -535,3 +542,12 @@
       well-formed `:no-op` rather than propagating. Pick one so the behaviour
       and its test-affordance agree — currently the affordance exists but the
       behaviour (and its test) do not.
+      DONE: chose (b) — made the augmenter defensive. `run-helper` is now
+      wrapped in `(try … (catch Throwable _ nil))` in
+      `entity-resolution-augmentation`, so a throwing helper collapses to the
+      same `nil` result / `:no-op` path as a failed/empty run (never
+      propagates onto 237's blocking pre-turn path). Activated the previously
+      dead `throw?` affordance: added
+      `entity-resolution-throwing-helper-no-op-test` (`stub {:throw? true}`),
+      asserting `:no-op` and empty `:child-session-ids` (no id reported when
+      the run threw).

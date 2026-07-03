@@ -381,6 +381,33 @@
         (is (not (re-find #"Conversation history excerpt" user-prompt))
             (str "no excerpt for history=" (pr-str history)))))))
 
+(deftest build-entity-resolution-prompt-tail-truncation-test
+  (testing "an over-long history excerpt is length-bounded and keeps the tail"
+    ;; Build a :tail long enough that the rendered excerpt exceeds
+    ;; max-history-chars (4000). An OLD-marker in the earliest line must be
+    ;; truncated away; a NEW-marker in the most-recent line must survive.
+    (let [filler (apply str (repeat 200 "padding words here "))
+          tail   (vec
+                  (concat
+                   [{:index 0 :role "user" :snippet (str "OLDMARKER " filler)}]
+                   (for [i (range 1 30)]
+                     {:index i :role "user" :snippet filler})
+                   [{:index 30 :role "user" :snippet (str filler " NEWMARKER")}]))
+          {:keys [user-prompt]}
+          (context-manager/build-entity-resolution-prompt
+           (assoc base-tp
+                  :turn-augmentation/history {:message-count (count tail)
+                                              :tail tail}))
+          excerpt (second (re-find #"(?s)Conversation history excerpt:\n\n(.*?)\n\nCurrent user request:"
+                                   user-prompt))]
+      (is (some? excerpt) "an excerpt is present")
+      (is (<= (count excerpt) 4000)
+          "excerpt is bounded by max-history-chars")
+      (is (re-find #"NEWMARKER" excerpt)
+          "most-recent (tail) content is retained")
+      (is (not (re-find #"OLDMARKER" excerpt))
+          "earliest (head) content is truncated away, not the tail"))))
+
 ;; --- eligibility pre-filter no-ops ---------------------------------------
 
 (deftest entity-resolution-helper-session-no-op-test
@@ -494,6 +521,17 @@
                 :run-helper   (fn [_] nil)})]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/child-session-ids env))))))
+
+(deftest entity-resolution-throwing-helper-no-op-test
+  (testing "a helper run that throws collapses to a well-formed :no-op"
+    ;; Required behaviour item 5: a failed helper run yields a well-formed
+    ;; :no-op. A collaborator (or future run-helper) that throws rather than
+    ;; returning nil must not propagate onto 237's blocking pre-turn path.
+    (let [env (context-manager/entity-resolution-augmentation
+               {} base-tp (stub {:throw? true}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/child-session-ids env))
+          "no child id reported when the run threw"))))
 
 (deftest entity-resolution-ambiguous-dropped-test
   (testing "ambiguous surface dropped while a confident one is kept"

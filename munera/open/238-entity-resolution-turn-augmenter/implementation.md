@@ -1598,3 +1598,12 @@ Key decisions / discoveries:
   `render-history-excerpt` tail-truncation branch; and the un-caught
   run-helper exception path vs. the dead `throw?` `stub` affordance (behaviour
   ↔ test-affordance mismatch).
+
+- Addressed 2 turn-8 test-review follow-ups. (1) tail-truncation:
+  `build-entity-resolution-prompt-tail-truncation-test` drives the `subs`
+  tail-cut branch (excerpt ≤ 4000, NEWMARKER tail kept, OLDMARKER head
+  dropped). (2) throwing helper: `entity-resolution-augmentation` now wraps
+  `run-helper` in `try/catch Throwable → nil` (defensive; collapses to
+  `:no-op`), activating the dormant `throw?` `stub` affordance via
+  `entity-resolution-throwing-helper-no-op-test`. clj-kondo clean; focused
+  suite 38 tests / 116 assertions, 0 failures.
