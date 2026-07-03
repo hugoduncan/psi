@@ -530,6 +530,58 @@
         (is (not (contains? params :worktree-path))
             "no silently-ignored :worktree-path passed; cwd comes from parent inheritance")))))
 
+(deftest default-run-helper-timeout-branch-test
+  (testing "wall-clock timeout: real deref/::timeout branch returns nil text,
+            child tracked during the run, closed+untracked after orphan settles"
+    (let [release   (atom false)
+          run-began (promise)
+          closed    (atom nil)
+          ;; run-agent-loop-in-session blocks (simulating a live, NOT reliably
+          ;; interruptible, model/HTTP call) via a busy flag `future-cancel`
+          ;; cannot unwind — until `release` is set — so the orphan outlives
+          ;; the injected budget and the mid-run assertions are deterministic.
+          api {:mutate-session
+               (fn [_sid op _params]
+                 (case op
+                   psi.extension/create-child-session
+                   {:psi.agent-session/session-id "child-1"}
+                   psi.extension/run-agent-loop-in-session
+                   (do (deliver run-began true)
+                       ;; Uninterruptible spin modelling the real, blocking,
+                       ;; not-reliably-interruptible model/HTTP call: clears
+                       ;; interrupt status so it genuinely cannot be unwound
+                       ;; until `release` is set.
+                       (while (not @release)
+                         (Thread/interrupted)
+                         (Thread/onSpinWait))
+                       {:psi.agent-session/agent-run-ok? true
+                        :psi.agent-session/agent-run-text "late → x (e; c)"})))
+               :mutate (fn [_op params] (reset! closed (:session-id params)) nil)}
+          result (#'context-manager/default-run-helper
+                  api {:parent-session-id "s1"
+                       :system-prompt "sys"
+                       :user-prompt "usr"
+                       :wall-clock-ms 20})]
+      (is (= "child-1" (:child-session-id result)))
+      (is (nil? (:text result))
+          "timeout branch surfaces no text (→ :no-op)")
+      ;; During the orphan run, before it settles, the child is still tracked
+      ;; (recursion-safe) and NOT yet closed.
+      @run-began
+      (is (contains? @context-manager/entity-resolution-helper-session-ids "child-1")
+          "child stays tracked until the orphan future settles")
+      (is (nil? @closed) "child not closed while orphan still running")
+      ;; Let the orphan settle; the detached watcher then closes + untracks.
+      (reset! release true)
+      (let [deadline (+ (System/currentTimeMillis) 2000)]
+        (while (and (contains? @context-manager/entity-resolution-helper-session-ids "child-1")
+                    (< (System/currentTimeMillis) deadline))
+          (Thread/sleep 5)))
+      (is (not (contains? @context-manager/entity-resolution-helper-session-ids "child-1"))
+          "child untracked after orphan settles")
+      (is (= "child-1" @closed)
+          "child closed after orphan settles, not on the augmenter thread"))))
+
 (deftest init-registers-entity-resolution-augmenter-test
   (testing "init registers entity-resolution with a handler"
     (let [{:keys [state]} (setup-api)

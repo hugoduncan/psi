@@ -264,8 +264,26 @@
    `:worktree-path` argument, so cwd is *not* passed here — passing it would
    be a silently-ignored dead parameter. The `cwd` from the turn projection
    is the projected effective cwd of that same parent, so inheritance yields
-   the intended bash working directory."
-  [api {:keys [parent-session-id system-prompt user-prompt model]}]
+   the intended bash working directory.
+
+   Timeout teardown (turn-3 follow-up): `run-agent-loop-in-session` is a
+   blocking dispatch driving a live model/HTTP call, so `future-cancel`
+   cannot reliably unwind it (and `future-cancel` also makes a subsequent
+   `deref` throw immediately rather than await the still-running thread, so a
+   cancel-then-deref watcher cannot observe genuine settlement). We therefore
+   make the run future *own its own teardown*: it always closes + untracks
+   the child in a `finally`, once the in-flight call actually returns/throws.
+   On wall-clock timeout the augmenter thread does NOT close/untrack (that
+   would detach a session the orphan may still be prompting, past the budget,
+   while narrowing recursion safety) — it just returns promptly with
+   `:text nil`, honouring its own blocking budget, and leaves the child
+   tracked until the future's own `finally` fires when the orphan settles.
+   `future-cancel` is not attempted: it cannot unwind the blocking call and
+   only obscures true completion.
+
+   `wall-clock-ms` (optional) overrides the default 120s budget — injectable
+   so a test can drive the real timeout branch with a small value."
+  [api {:keys [parent-session-id system-prompt user-prompt model wall-clock-ms]}]
   (let [child (try
                 ((:mutate-session api) parent-session-id 'psi.extension/create-child-session
                                        {:session-name    "entity-resolution"
@@ -291,28 +309,41 @@
         child-session-id (:psi.agent-session/session-id child)]
     (when child-session-id
       (swap! entity-resolution-helper-session-ids conj child-session-id)
-      (try
-        (let [fut  (future
-                     ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
-                                            (cond-> {:prompt user-prompt}
-                                              model (assoc :model model))))
-              run  (deref fut helper-wall-clock-ms ::timeout)]
-          (if (= ::timeout run)
-            (do (future-cancel fut)
-                {:child-session-id child-session-id :text nil})
-            ;; Gate on agent-run-ok?: a failed run returns ok? false with
-            ;; agent-run-text = "Error: ...", which must be treated as a
-            ;; failed run, not parsed for mapping lines (auto-session-name
-            ;; precedent). On failure, surface no text.
-            {:child-session-id child-session-id
-             :text (when (:psi.agent-session/agent-run-ok? run)
-                     (:psi.agent-session/agent-run-text run))}))
-        (catch Exception _
-          {:child-session-id child-session-id :text nil})
-        (finally
-          (try ((:mutate api) 'psi.extension/close-session {:session-id child-session-id})
-               (catch Exception _ nil))
-          (swap! entity-resolution-helper-session-ids disj child-session-id))))))
+      (let [budget-ms (or wall-clock-ms helper-wall-clock-ms)
+            ;; The run future owns teardown: whenever the (uninterruptible)
+            ;; blocking call actually returns or throws, it closes + untracks
+            ;; the child in `finally`. Both the settled and the timed-out
+            ;; paths rely on this single owner, so the child is never closed
+            ;; while its in-flight call is still running, and is always
+            ;; eventually closed.
+            fut (future
+                  (try
+                    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
+                                           (cond-> {:prompt user-prompt}
+                                             model (assoc :model model)))
+                    (finally
+                      (try ((:mutate api) 'psi.extension/close-session
+                                          {:session-id child-session-id})
+                           (catch Exception _ nil))
+                      (swap! entity-resolution-helper-session-ids disj child-session-id))))
+            run (try (deref fut budget-ms ::timeout)
+                     (catch Exception _ ::error))]
+        (if (= ::timeout run)
+          ;; Timeout: return promptly to honour the augmenter's blocking
+          ;; budget; leave the child tracked (recursion-safe) until the
+          ;; future's own `finally` closes/untracks it once the orphan
+          ;; settles. No `future-cancel` — it cannot unwind the blocking call.
+          {:child-session-id child-session-id :text nil}
+          ;; Settled (ok, failed, or exception): the future already
+          ;; closed/untracked in its `finally`.
+          {:child-session-id child-session-id
+           ;; Gate on agent-run-ok?: a failed run returns ok? false with
+           ;; agent-run-text = "Error: ...", which must be treated as a
+           ;; failed run, not parsed for mapping lines (auto-session-name
+           ;; precedent). On failure/exception, surface no text.
+           :text (when (and (map? run)
+                            (:psi.agent-session/agent-run-ok? run))
+                   (:psi.agent-session/agent-run-text run))})))))
 
 (defn entity-resolution-augmentation
   "Entity-resolution turn augmenter (task 238).

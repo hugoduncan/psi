@@ -229,7 +229,7 @@
 
 ## Implementation-review follow-ups (turn 3)
 
-- [ ] **Timeout path leaves an orphaned helper future racing session close /
+- [x] **Timeout path leaves an orphaned helper future racing session close /
       budget.** In `default-run-helper`, on wall-clock timeout the code does
       `(future-cancel fut)` then, in `finally`, closes the child
       (`psi.extension/close-session`) and `disj`s it from
@@ -255,8 +255,16 @@
       wall-clock `future`/`deref` bound, so there is no prior pattern to
       inherit here — this bound is new to 238 and its teardown semantics need
       to be pinned down rather than left to `future-cancel`'s best effort.
+      DONE: made the run future own its teardown — it closes + untracks the
+      child in a `finally` once the (uninterruptible) blocking call actually
+      returns/throws. Timeout path returns promptly with `:text nil`, leaves
+      the child tracked (recursion-safe) until that `finally` fires, and no
+      longer calls `future-cancel` (it can't unwind the blocking call and its
+      cancel-then-`deref` also defeats genuine-settlement detection). Settled
+      path is unchanged behaviourally (finally completes before `deref`
+      returns the value). Docstring documents the semantics.
 
-- [ ] **The enforced finite bound (wall-clock timeout branch) is untested at
+- [x] **The enforced finite bound (wall-clock timeout branch) is untested at
       the `default-run-helper` level.** Slice 3 records that
       `run-agent-loop-in-session` has no `:max-rounds` option, so the round
       cap is only *prompt-instructed* and the *sole enforced* finite bound is
@@ -272,3 +280,9 @@
       test can use a small value) and asserts `:text` is nil (→ `:no-op`) and
       the child is closed/untracked. Without it, the only enforced bound is
       unverified and could regress silently.
+      DONE: made `helper-wall-clock-ms` injectable via a `:wall-clock-ms`
+      run-opt; added `default-run-helper-timeout-branch-test`, which drives
+      the real `deref`/`::timeout` branch with a small injected budget against
+      an uninterruptible blocking stub, asserting `:text` nil (→ `:no-op`),
+      that the child stays tracked and unclosed while the orphan runs, and is
+      closed + untracked only after the orphan settles.

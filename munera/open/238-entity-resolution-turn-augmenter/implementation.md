@@ -1470,3 +1470,25 @@ Key decisions / discoveries:
 ## Implementation-review (turn 3)
 
 - added 2 follow-up steps to steps.md.
+
+## Implementation-review follow-ups resolution (turn 3, 2 items)
+
+- Addressed both turn-3 implementation-review follow-up steps:
+  - Timeout teardown race: `default-run-helper`'s run future now owns its own
+    teardown (closes + untracks the child in `finally` once the blocking call
+    truly returns/throws). The wall-clock-timeout path returns promptly with
+    `:text nil` and leaves the child tracked until that `finally` fires;
+    `future-cancel` removed (cannot unwind a blocking model/HTTP call and its
+    cancel-then-`deref` defeats genuine-settlement detection). Settled path
+    behaviour unchanged — the future's `finally` completes before `deref`
+    yields the value, so close/untrack has happened by the time the augmenter
+    reads the result.
+  - Untested enforced bound: `helper-wall-clock-ms` is now injectable via a
+    `:wall-clock-ms` run-opt (defaults to the 120s constant). New
+    `default-run-helper-timeout-branch-test` drives the real
+    `deref`/`::timeout`/`finally` path with a 20ms injected budget against an
+    uninterruptible spin stub: asserts `:text` nil (→ `:no-op`), child stays
+    tracked and unclosed during the orphan run, and is closed + untracked only
+    after the orphan settles.
+- `bb test --focus extensions.context-manager-test` green (33 tests, 95
+  assertions, 0 failures); `clj-kondo` clean on both touched files.
