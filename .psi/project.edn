@@ -3,6 +3,24 @@
  {:project-nrepl
   {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}
   :session-profiles
-  {:planning
+  {:designing
    {:model-provider "anthropic"
-    :model-id "claude-fable-5"}}}}
+    :model-id "claude-opus-4-8"}
+   :fixing-design
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :planning
+   {:model-provider "anthropic"
+    :model-id "claude-fable-5"}
+   :fixing-plan
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :implementing
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :reviewing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
+   :fixing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}}}}

@@ -356,6 +356,9 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
 
 # Guide
 
+Use fd rather than find.
+Use rg instead of rgrep.
+
 λ(worktree_path,cwd). authoritative(worktree_path) > authoritative(cwd)
 
 λα. ¬compat(backward)

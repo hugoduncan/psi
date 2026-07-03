@@ -2,6 +2,7 @@
  [{:name "review-task-implementation-core",
    :type :delegate,
    :target "review-task-implementation-core",
+   :session-profile :reviewing-implementation,
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
@@ -14,7 +15,7 @@
     {:type :source, :from {:step "review-task-implementation-core" :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task identified by {{input}} after implementation review. Independently inspect that specific task's design.md, plan.md, steps.md, implementation.md, user-facing docs, and relevant git history, and use the prior core review output as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the implementation review sequence completed cleanly\n- the key implementation, test, documentation, test-shape, or code-shape findings resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step output\n- whether the implementation is ready for task closure or knowledge extraction\n\nDo not reproduce the status lines from the review output provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS: REVIEW_COMPLETE",
+     "Produce the user-facing final result for the Munera task identified by {{input}} after implementation review. Independently inspect that specific task's design.md, plan.md, steps.md, implementation.md, user-facing docs, and relevant git history, and use the prior core review output as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the implementation review sequence completed cleanly\n- the key implementation, test, documentation, test-shape, or code-shape findings resolved in this run\n- the task artifact files updated\n- any commit ids created during the run that are evident from the provided step output\n- whether the implementation is ready for task closure or knowledge extraction\n\nDo not reproduce the status lines from the review output provided as context. End your response with exactly one status line at column 0, with a single space after the colon and nothing else on that line:\nPASS_STATUS​ REVIEW_COMPLETE",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",

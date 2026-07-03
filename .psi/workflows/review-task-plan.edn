@@ -4,12 +4,14 @@
    :target "review-task-plan-core",
    :prompt-string
    {:type :map,
-    :fields {:input {:from :workflow-input, :path [:input]}}},
+    :fields {:input {:from :workflow-input, :path [:input]}}}
+   :session-profile :plamning,
    :context [{:type :source, :from :workflow-original}]}
   {:name "check-review-task-plan-core-status",
    :type :invoke,
    :operation "workflow/constant-routing",
    :args {:route "DONE"},
+   :session-profile :fixing-plan,
    :judge
    {:type :invoke,
     :operation "workflow/pass-status-routing",

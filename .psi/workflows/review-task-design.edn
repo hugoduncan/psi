@@ -5,11 +5,13 @@
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
+   :session-profile :designing,
    :context [{:type :source, :from :workflow-original}]}
   {:name "check-review-task-design-core-status",
    :type :invoke,
    :operation "workflow/constant-routing",
    :args {:route "DONE"},
+   :session-profile :fixing-design,
    :judge
    {:type :invoke,
     :operation "workflow/pass-status-routing",
