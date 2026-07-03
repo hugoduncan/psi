@@ -66,6 +66,67 @@
                    {:candidates [local-candidate]})))
           "local winner is selected"))))
 
+(deftest helper-model-selection-request-inherits-parent-model-test
+  (testing "the parent session's model flows into the request :context
+            {:session-model {:provider :id}} (Required behaviour item 2)"
+    ;; helper-model-selection-request builds the :session-model context that
+    ;; drives resolve-selection's :same-provider-as-session weak preference /
+    ;; provider-match tie-break. A model-ctx carrying the parent session's
+    ;; provider/id must be threaded through (provider keywordized, id verbatim).
+    (let [request (#'context-manager/helper-model-selection-request
+                   {:psi.agent-session/model-provider "anthropic"
+                    :psi.agent-session/model-id "claude-x"})]
+      (is (= {:provider :anthropic :id "claude-x"}
+             (get-in request [:context :session-model]))
+          "parent provider (keywordized) and id flow into :context :session-model")))
+
+  (testing "a nil parent model yields a nil-valued session-model context"
+    (let [request (#'context-manager/helper-model-selection-request nil)]
+      (is (= {:provider nil :id nil}
+             (get-in request [:context :session-model]))
+          "absent parent model → nil provider/id (no inheritance)"))))
+
+(deftest default-select-model-inherits-parent-model-context-test
+  (testing "default-select-model queries the parent session for its model and
+            selects the matching candidate via the inherited :context"
+    ;; Drive the real default-select-model with a :query-session returning a
+    ;; concrete parent model. resolve-selection's :mode :resolve pool is
+    ;; built from all candidates, but the :same-provider-as-session weak
+    ;; preference (fed by the inherited :context) tie-breaks toward the
+    ;; parent's provider — proving the query→context wiring rather than the
+    ;; happy-path ranking. Two equally-qualifying local candidates from
+    ;; different providers; the parent-provider one must win.
+    (let [queried  (atom nil)
+          matching {:provider :ollama
+                    :id       "match"
+                    :name     "Match"
+                    :facts    {:supports-text true
+                               :latency-tier  :low
+                               :cost-tier     :zero
+                               :locality      :local}}
+          other    {:provider :llamafile
+                    :id       "other"
+                    :name     "Other"
+                    :facts    {:supports-text true
+                               :latency-tier  :low
+                               :cost-tier     :zero
+                               :locality      :local}}
+          selected (#'context-manager/default-select-model
+                    {:query-session
+                     (fn [sid keys]
+                       (reset! queried {:session-id sid :keys keys})
+                       {:psi.agent-session/model-provider "ollama"
+                        :psi.agent-session/model-id "match"})}
+                    "s1"
+                    {:candidates [other matching]})]
+      (is (= {:session-id "s1"
+              :keys [:psi.agent-session/model-provider
+                     :psi.agent-session/model-id]}
+             @queried)
+          "parent session queried for its model provider/id")
+      (is (= "match" (:id selected))
+          "the parent-provider candidate wins via the inherited :session-model context"))))
+
 (deftest default-select-model-catches-thrown-selection-test
   (testing "a throwing query-session collapses to nil rather than propagating"
     ;; default-select-model wraps its body in (catch Exception _ nil): this is

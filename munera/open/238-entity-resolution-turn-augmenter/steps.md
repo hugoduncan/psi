@@ -980,7 +980,7 @@
 
 ## Test-review follow-ups (turn 17)
 
-- [ ] **The parent-session-model context inheritance in `default-select-model`
+- [x] **The parent-session-model context inheritance in `default-select-model`
       is untested — a design-required behaviour (Required behaviour item 2 /
       plan decision 4: "inheriting the parent session's model as context, like
       `auto-session-name`") with zero coverage.** `default-select-model` calls
@@ -1004,8 +1004,19 @@
       an injected/`resolve-selection` seam, or assert on
       `helper-model-selection-request` directly), pinning the parent-model
       context inheritance distinct from the happy-path ranking assertions.
+      DONE: added two tests. `helper-model-selection-request-inherits-parent-
+      model-test` pins the request builder — a parent model-ctx flows into
+      `:context {:session-model {:provider (keywordized) :id}}` (and a nil
+      parent → nil provider/id). `default-select-model-inherits-parent-model-
+      context-test` drives the real `default-select-model` with a
+      `:query-session` returning a concrete parent model, asserts the parent
+      session is queried for `[:model-provider :model-id]`, and — via two
+      equally-qualifying local candidates from different providers — asserts
+      the parent-provider candidate wins through the inherited
+      `:same-provider-as-session` context, proving the query→context wiring
+      distinct from happy-path ranking.
 
-- [ ] **The `deref`-throws (`::error`) branch of `default-run-helper` is
+- [x] **The `deref`-throws (`::error`) branch of `default-run-helper` is
       untested — only the `::timeout` and settled branches are covered.**
       `(try (deref fut budget-ms ::timeout) (catch Exception _ ::error))`
       guards against the run future's blocking call throwing an
@@ -1021,3 +1032,10 @@
       Add a `default-run-helper` case whose `run-agent-loop-in-session` throws,
       asserting `:text` is nil (→ `:no-op`), the exception does not propagate,
       and the child is still closed/untracked by the future's `finally`.
+      DONE: added `default-run-helper-run-throws-deref-error-branch-test` — a
+      `run-agent-loop-in-session` that throws surfaces through `deref` as an
+      `Exception`, caught → `::error` → settled branch (`map? ::error` false)
+      → `:text nil` (→ `:no-op`), with no propagation (the fn returns a
+      settled `{:child-session-id ..}` result), and the future's own `finally`
+      still closes + untracks the child. Distinct from the ok?-false,
+      `::timeout`, and pre-run-gate branches.

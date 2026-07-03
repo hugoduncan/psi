@@ -1773,3 +1773,18 @@ Key decisions / discoveries:
 - added 2 steps (test-shaper): untested parent-session-model context
   inheritance in `default-select-model`, and the untested `::error`
   deref-catch branch of `default-run-helper`.
+
+## Test-review turn-17 follow-ups addressed
+
+- addressed 2 turn-17 test-review steps (both pure test additions, no
+  production-code change): (1) parent-model context inheritance —
+  `helper-model-selection-request-inherits-parent-model-test` pins the
+  request builder's `:context {:session-model {:provider :id}}`, and
+  `default-select-model-inherits-parent-model-context-test` drives the real
+  `default-select-model` with a concrete `:query-session`, asserting the
+  parent is queried for provider/id and the parent-provider candidate wins
+  via the inherited `:same-provider-as-session` context; (2)
+  `default-run-helper-run-throws-deref-error-branch-test` drives the `::error`
+  deref-catch (thrown run → nil text, no propagation, child still
+  closed/untracked by the future's `finally`). Focused + full context-manager
+  suite green (42 tests, 152 assertions); clj-kondo clean.
