@@ -1725,3 +1725,12 @@ Key decisions / discoveries:
 - addressed turn-14 review step: added `parse-mapping-lines-test` case
   pinning the confidence-required reject boundary (`;`-less trailing group →
   `[]`). Focused tests + lint pass.
+
+## Test-review turn-15 (test-shaper skill)
+
+- Independent test-shaper review — added 2 steps (turn 15): (1)
+  `render-history-excerpt`'s over-long branch truncates mid-line/mid-word,
+  injecting a corrupt role-less partial first line the turn-8 test does not
+  pin or guard; (2) the success-envelope `:child-session-ids` provenance
+  clause is asserted on only one of the four sibling success tests
+  (consistency gap).

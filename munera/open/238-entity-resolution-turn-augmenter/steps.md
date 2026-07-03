@@ -849,3 +849,54 @@
       confidence token) — `"the fn → foo/bar (exact path)"` — is rejected
       (`[]`), isolating the confidence-required reject boundary (`semi` nil →
       drop) from the pre-existing no-arrow / empty-field reject cases.
+
+## Test-review follow-ups (turn 15)
+
+- [ ] **`render-history-excerpt` truncates mid-line/mid-word, injecting a
+      corrupt role-less partial fragment as the first excerpt "line" — the
+      current char-slice behaviour is neither pinned nor guarded.** The
+      over-long branch does `(subs text (- (count text) max-history-chars))`,
+      a raw *character* slice on the newline-joined excerpt. Verified live:
+      for the exact fixture the turn-8 test builds, the excerpt's first line
+      becomes `"ng words here padding words here …"` — sliced mid-word, with
+      no leading `User:` role prefix, and the truncated-away head loses its
+      role label entirely. So in production the excerpt's leading line is a
+      syntactically corrupt, role-less fragment fed to the local model as if
+      it were conversation content (it can look like partial prose the model
+      then anaphora-resolves against, or — with adversarial history text —
+      resemble a mapping-shaped tail). The turn-8
+      `build-entity-resolution-prompt-tail-truncation-test` asserts only the
+      char-bound (`≤ 4000`), tail-marker presence, and head-marker absence; it
+      never asserts truncation lands on a line boundary or that no corrupt
+      partial line survives, so the current mid-line/mid-word cut is unpinned:
+      a regression is impossible to catch and, more importantly, the corrupt-
+      first-line behaviour is not an intended contract. Either (a) truncate at
+      a line boundary (drop whole leading lines until the joined text fits, so
+      every surviving line keeps its `Role:` prefix and is intact) and add a
+      test asserting the first excerpt line starts with a `Role:` prefix and
+      no mid-word split occurs; or (b) explicitly accept and document the
+      char-slice as a benign truncation and add a test that pins the resulting
+      partial-first-line shape as deliberate — so the accept/reject boundary
+      of the truncation is a stated contract, not incidental `subs` behaviour.
+
+- [ ] **The success-envelope provenance clause (`:child-session-ids`) is
+      asserted inconsistently across the sibling success tests — a regression
+      dropping child-id provenance on the multi-mapping / model-flow /
+      ambiguous-dropped paths would pass.** design.md's Acceptance criteria
+      require helper session ids be "reported in
+      `:turn-augmentation/child-session-ids`" on every success envelope. Only
+      `entity-resolution-confident-mapping-success-test` asserts
+      `(= ["helper-7"] (:turn-augmentation/child-session-ids env))`;
+      `entity-resolution-multi-mapping-success-test` (child-id "helper-8"),
+      `entity-resolution-selected-model-flows-into-run-test`, and
+      `entity-resolution-ambiguous-dropped-test` (child-id "helper-9") assert
+      only `:success` + `:content` and never the provenance field. This is a
+      consistency gap in the success-path test cluster (test-shaper
+      consistency/economy): the same envelope contract is checked on one
+      sibling but silently omitted on the others, so `:child-session-ids`
+      regressing to `[]` on the multi-mapping/model-flow/ambiguous paths
+      slips through. Add the `:child-session-ids` assertion to the other
+      success tests (or factor a shared success-envelope well-formedness
+      helper mirroring the shared `:operations []` no-op assertion) so the
+      provenance clause is pinned uniformly across the success cluster, not
+      just on one representative.
