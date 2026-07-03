@@ -231,7 +231,15 @@
 (defn- default-select-model
   "Select the single top-ranked local helper candidate for the parent
    session (no retry across the ranked list). Returns the candidate map or
-   nil when no local model is available."
+   nil when no local model is available.
+
+   `:locality :local` is only a strong preference in the selection request
+   (it affects ranking, not filtering), so a non-local candidate can survive
+   the required constraints and rank first when no local model is
+   configured. This augmenter is local-only by acceptance criterion (never
+   run a cloud helper on 237's per-turn blocking path), so the top-ranked
+   candidate is additionally guarded here: a non-local winner yields nil
+   (→ `:no-op`, no cloud helper run)."
   [api parent-session-id]
   (try
     (let [model-ctx (when-let [q (:query-session api)]
@@ -240,7 +248,9 @@
           result    (model-selection/resolve-selection
                      {:request (helper-model-selection-request model-ctx)})]
       (when (= :ok (:outcome result))
-        (first (get-in result [:ranking :ranked]))))
+        (let [candidate (first (get-in result [:ranking :ranked]))]
+          (when (= :local (get-in candidate [:facts :locality]))
+            candidate))))
     (catch Exception _ nil)))
 
 (defn- default-run-helper

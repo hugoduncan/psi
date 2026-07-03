@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.context-manager :as context-manager]
+   [psi.ai.model-selection :as model-selection]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
 (use-fixtures :each (fn [f]
@@ -402,6 +403,42 @@
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= "no local model" (:turn-augmentation/diagnostic env)))
       (is (nil? (:run @calls)) "no helper run attempted"))))
+
+(deftest default-select-model-rejects-cloud-winner-test
+  (testing "a cheap-tier cloud model that survives the required filter is rejected (local-only)"
+    ;; The required constraints (:supports-text, :latency-tier :low,
+    ;; :cost-tier #{:zero :low}) admit cheap cloud models; :locality :local
+    ;; is only a strong preference, so a cloud candidate can rank first when
+    ;; no local model is configured. default-select-model must still return
+    ;; nil so the augmenter runs no cloud helper on the per-turn path.
+    (let [cloud-candidate {:provider :openai
+                           :id       "cheap-cloud"
+                           :name     "Cheap Cloud"
+                           :facts    {:supports-text true
+                                      :latency-tier  :low
+                                      :cost-tier     :low
+                                      :locality      :cloud}}]
+      (with-redefs [model-selection/catalog-view
+                    (fn [] {:candidates [cloud-candidate]})]
+        (is (nil? (#'context-manager/default-select-model
+                   {:query-session (fn [_ _] {})} "s1"))
+            "cloud-only pool must yield nil (→ :no-op, no cloud helper run)")))))
+
+(deftest default-select-model-accepts-local-winner-test
+  (testing "a qualifying local model is returned as the top-ranked candidate"
+    (let [local-candidate {:provider :ollama
+                           :id       "local-q"
+                           :name     "Local Q"
+                           :facts    {:supports-text true
+                                      :latency-tier  :low
+                                      :cost-tier     :zero
+                                      :locality      :local}}]
+      (with-redefs [model-selection/catalog-view
+                    (fn [] {:candidates [local-candidate]})]
+        (is (= "local-q"
+               (:id (#'context-manager/default-select-model
+                     {:query-session (fn [_ _] {})} "s1")))
+            "local winner is selected")))))
 
 (deftest entity-resolution-empty-run-no-op-test
   (testing "helper run producing no parseable lines yields no-op"

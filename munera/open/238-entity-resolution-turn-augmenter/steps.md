@@ -180,7 +180,7 @@
 
 ## Implementation-review follow-ups (turn 2)
 
-- [ ] **Cloud model can be selected on every eligible turn — violates the
+- [x] **Cloud model can be selected on every eligible turn — violates the
       local-only acceptance criterion, constraint, and doc guarantee.**
       `default-select-model` returns `(first (get-in result [:ranking :ranked]))`
       whenever `resolve-selection` yields `:outcome :ok`, without checking the
@@ -217,3 +217,12 @@
       :locality]))` returning nil otherwise. Add a test that drives the real
       `default-select-model` with a catalog containing only a cheap-tier cloud
       candidate (no local) and asserts nil (→ `:no-op`, no cloud helper run).
+      DONE: `default-select-model` now guards the top-ranked candidate on
+      `(= :local (get-in candidate [:facts :locality]))`, returning nil for a
+      non-local winner (→ `:no-op`). Asserted by
+      `default-select-model-rejects-cloud-winner-test` (cloud-only pool → nil,
+      drives real `default-select-model`/`resolve-selection` via redefed
+      `catalog-view`) and `default-select-model-accepts-local-winner-test`
+      (local pool → selected). Shipped doc claim
+      ("top-ranked **local** model … never falls back to a cloud model") now
+      accurate; no doc edit needed.

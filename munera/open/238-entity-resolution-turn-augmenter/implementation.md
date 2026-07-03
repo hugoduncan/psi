@@ -1454,3 +1454,15 @@ Key decisions / discoveries:
   model exists (`:locality :local` is only a strong-preference, not required),
   violating the local-only acceptance criterion/constraint/doc guarantee; the
   no-local-model test stubs selection and never exercises the real path.
+
+## Implementation-review follow-ups turn 2 — resolved
+
+- addressed 1 review step (cloud-model selection gap): guarded
+  `default-select-model` on `:local` locality so a cheap-tier cloud winner
+  (which survives the required filter, since `:locality :local` is only a
+  strong preference) yields nil → `:no-op`, never a per-turn cloud helper
+  run. Two new tests drive the real `default-select-model`/`resolve-selection`
+  path via a redefed `catalog-view`: cloud-only pool → nil, local pool →
+  selected. Shipped `doc/extensions.md` local-only claim now accurate; no doc
+  change required. `bb test --focus extensions.context-manager-test` green
+  (32 tests); clj-kondo clean.
