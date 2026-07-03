@@ -1552,3 +1552,16 @@ Key decisions / discoveries:
   and each entry's `:role`+`:snippet`; rewrote the prompt-test fixture to the
   real map shape and added regressions (map-tail snippet rendered;
   nil/empty-tail/flat-vector → no excerpt). Focused tests + lint green.
+
+## Implementation-review (turn 7)
+
+- no new actionable follow-ups. Reviewed code/tests/docs and verified the
+  6 prior turns' fixes against the live codebase: `create-child-session`
+  param set (no `:worktree-path`), parent-worktree cwd inheritance
+  (`child-session-state` reads `(:worktree-path parent-sd)`),
+  `run-agent-loop-in-session` ok?/text shape and options (no `:max-rounds`),
+  `resolve-selection` `:facts :locality` candidate shape, and the live 237
+  `build-augmentation-history-projection` map shape (`:tail` of
+  `{:role :snippet}`). Focused tests green (34 tests, 104 assertions, 0
+  failures); clj-kondo clean on touched sources. Implementation is coherent,
+  design-faithful, and converged.
