@@ -199,3 +199,33 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - Reconfirmed the "no-op" vs. "Tests" list match (previously-flagged
   inconsistency, closed by `42dbf2086`) — both now enumerate the same six
   no-op conditions; no regression.
+
+## Notes for the second design-steps-resolution slice (3 unchecked items)
+
+- The 3 unchecked items (skill-embedding scope, slash-command-only
+  eligibility rule, `:content` field-composition inconsistency) are all
+  closable within frozen scope — no `SCOPE_QUESTION:` was raised across
+  architecture/ambiguity/inconsistency turns of this second pass.
+- The skill-embedding-scope item and the `:content` field-composition item
+  are coupled and should be resolved together: choosing option (b) there
+  (embed only `SKILL.md`'s Method steps + a separately-authored augmenter
+  output-format instruction) is exactly where the augmenter's own line
+  grammar and rendered-content field list (2/3/4 fields — surface, canonical,
+  evidence, confidence) get authored, so pick the embedding approach and the
+  field composition in the same design.md edit rather than independently.
+  The slash-command-only eligibility item is unrelated to these two and can
+  be resolved separately.
+- `components/turn-runtime/src/psi/turn_runtime/augmentation.clj`'s
+  `render-append-context-blocks` treats each operation's `:content` as an
+  opaque pre-rendered string (`"[title]\n" + content`, blocks joined by
+  `"\n\n"`) — core does no field-level formatting of the mapping. Whatever
+  field composition design.md settles on for `:content` is entirely the
+  augmenter's own string-building concern, not a core/rendering constraint.
+- Relevant non-task files for resolving these items: `.psi/skills/entity-resolution/SKILL.md`
+  (Method steps 1–5 vs. Output Shape/Act-or-ask sections 6+), and
+  `extensions/auto-session-name/src/extensions/auto_session_name.clj`
+  (`slash-command-text?` — a per-line context filter, not a whole-run skip;
+  don't cite it as if it already gates a full run).
+- As before: resolving a design step means editing `design.md` itself
+  (localized edits), not deferring to plan/implementation notes —
+  `design.md` must reach complete-and-unambiguous before `plan.md` can exist.
