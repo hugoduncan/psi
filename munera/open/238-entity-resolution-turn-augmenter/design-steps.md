@@ -124,3 +124,20 @@
   no-op reason/test or is expected to collapse into an existing one. Specify
   the exact slash-command-only detection rule and where it fits among the
   enumerated no-op reasons/tests.
+
+- [ ] Inconsistent: design.md states the composition of the final rendered
+  `:append-context-block` `:content` differently in three places, and these
+  were not reconciled when Resolved decision 6 was added. Acceptance
+  criteria says the block carries "the `surface → canonical` mapping" (2
+  fields: no evidence, no confidence). "Remaining v1 policies" ("Confidence
+  gate & output shape") says rendered `:content` "is a compact `surface →
+  canonical` list with brief evidence" (3 fields: adds evidence, still no
+  confidence). Resolved decision 6 defines the *parsed per-line* format as
+  `surface → canonical (evidence; confidence)` (4 fields, including
+  confidence) and says `:content` "is re-rendered from the parsed confident
+  mappings" — without stating whether the rendered output keeps all 4
+  parsed fields or drops confidence (since confidence's only stated role
+  elsewhere is as the accept/reject gate, not display). A reader cannot tell
+  from design.md alone whether the shipped `:content` shows 2, 3, or 4
+  fields per mapping. Pick one composition and align Acceptance criteria,
+  "Remaining v1 policies," and Resolved decision 6 to state it the same way.

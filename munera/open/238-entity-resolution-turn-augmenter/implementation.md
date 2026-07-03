@@ -176,3 +176,26 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   Resolved decision 6 already states zero-parsed-lines is treated as "no
   confident mapping," which subsumes the no-referring-expression case — not
   independently ambiguous, so not filed as a new item.
+
+## Inconsistency review (design-review turn 3, second pass — post-resolution)
+
+- inconsistency review added 1 new design step: design.md states the
+  rendered `:append-context-block` `:content` field composition three
+  different ways — Acceptance criteria (2 fields: surface → canonical only),
+  "Remaining v1 policies" (3 fields: adds evidence), Resolved decision 6's
+  per-line parse format (4 fields: adds confidence, with no statement of
+  whether confidence survives into the rendered `:content`). These three
+  passages were evidently not reconciled when decision 6 was added. See
+  design-steps.md.
+- Considered and ruled out as duplicates of already-filed ambiguity items
+  (not re-filed under inconsistency): (a) Resolved decision 6's verbatim
+  `SKILL.md` embedding technically *is* inconsistent with the Out-of-scope
+  "no interactive clarification prompts" bullet (the skill's own "Act or
+  ask" step instructs asking questions), but this is the same root cause
+  already captured by the turn-2 skill-embedding-scope item; (b) the
+  References section's claim that `SKILL.md` supplies "output shape" is
+  stale against decision 6's separately-authored line grammar — same root
+  cause as (a), not filed separately.
+- Reconfirmed the "no-op" vs. "Tests" list match (previously-flagged
+  inconsistency, closed by `42dbf2086`) — both now enumerate the same six
+  no-op conditions; no regression.
