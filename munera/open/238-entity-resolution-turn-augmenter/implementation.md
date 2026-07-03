@@ -589,6 +589,73 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   within frozen scope by aligning three passages, not a scope-boundary
   concern.
 
+## Notes for the fifth design-steps-resolution slice (2 unchecked items)
+
+- Both unchecked items were introduced by the same commit (`b37363b71`,
+  the fourth-slice resolution) and both live in text near/about Resolved
+  decision 6's adaptation mechanism, but they are edits to different
+  passages: the "session" item touches decision 6's capability-gap
+  sentence itself (and, if resolved by adding "session" as a real entity
+  type, the Goal section's entity-type list too); the Goal/Required-
+  behaviour-item-3 item touches those two summary passages, not decision
+  6's text. Resolve them in the same design.md edit pass anyway (not
+  necessarily the same sentence) so a single re-read confirms all three
+  passages — Goal, Required behaviour item 3, Resolved decision 6 — agree
+  after both fixes land, rather than risking a sixth pass catching drift
+  between them again.
+- Recommended order: decide the "session" question first (is it in-scope
+  or not), since its answer changes what Goal's entity-type list should
+  say, and Goal's list is exactly the text the second item also edits.
+  Settling "session" first avoids editing Goal's entity-type sentence
+  twice in the same slice.
+- For the "session" item: the two live options are (a) add "sessions" to
+  Goal's entity-type list, uses of `:turn-augmentation/session-id` as one
+  possible evidence source, and thread it through Required behaviour /
+  Acceptance criteria's entity examples too if chosen — this is an
+  *addition* of detail to an already-frozen scope's description, not a
+  scope widening, since Required behaviour item 3 already scopes the
+  helper to "the user text," so resolving what entity types it may
+  recognize is a specification clarification, not new capability; or (b)
+  drop "session" from decision 6's capability-gap sentence (reword to name
+  only the types actually in Goal's list, e.g. "path/task references") and
+  keep sessions out of scope entirely. Option (b) is the smaller, more
+  localized edit (touches only decision 6's one sentence); option (a)
+  touches at least Goal's list and probably nothing else, since
+  Required behaviour and Acceptance criteria already state entity
+  scope only via cross-reference to the Goal section, not by repeating
+  the list. Neither option requires a `SCOPE_QUESTION:` — this is
+  wording precision within the frozen scope, not a boundary call.
+- For the Goal/Required-behaviour-item-3 item: the smallest fix is
+  loosening both sentences from "names only the helper's
+  actually-available read-only tools" to something like "adapted per
+  Resolved decision 6" or a one-clause summary that acknowledges the
+  two-case split exists, without duplicating decision 6's bullet detail
+  in the Goal section (Goal is meant to stay a short overview — see
+  `AGENTS.md`'s `role(meta) ≡ {why invariants boundaries ¬how ¬syntax}`
+  framing, which this Goal section partly plays; decision 6 already owns
+  the "how" detail). Don't expand Goal into a second copy of decision 6's
+  bullet list.
+- Relevant text spans to re-check together after editing (line numbers as
+  of `4bcd1a942`, will drift on edit): Goal section ~lines 32-43,
+  Required behaviour item 3 ~lines 90-98, Resolved decision 6 ~lines
+  169-220. No other design.md section references the adaptation mechanism
+  or the entity-type list (confirmed by grep during this pass), so no
+  fourth passage needs checking.
+- As with every prior slice: resolve by editing `design.md` directly
+  (localized edits to the three spans above), not by adding a
+  plan/implementation-time workaround note — `design.md` must be
+  complete-and-unambiguous before `plan.md` can exist.
+- Batch identification for this follow-up: contiguous architecture →
+  ambiguity → inconsistency triple `54a0895c4` (architecture, no finding)
+  → `a603b77a8` (ambiguity, added the session item) → `4bcd1a942`
+  (inconsistency, added the Goal/item-3 lag item); baseline is
+  `b37363b71`, the commit that landed the fourth design-steps-resolution
+  slice (parent of the oldest commit in this triple).
+- If a future design-review pass runs again, treat the commit that lands
+  this (fifth) resolution slice as the new prior-follow-up boundary for
+  batch-baseline purposes, matching the convention used by all four prior
+  resolution slices.
+
 ## Fourth design-steps-resolution slice — resolved (batch: `c416b1a95`..`840e2100e`, baseline `d1db1d86e`)
 
 - Resolved the 1 remaining unchecked item (git-status / graph-introspection
