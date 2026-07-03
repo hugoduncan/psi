@@ -673,7 +673,7 @@
 
 ## Test-review follow-ups (turn 11)
 
-- [ ] **The turn-5 default-collaborator `api`-threading coverage test was
+- [x] **The turn-5 default-collaborator `api`-threading coverage test was
       deleted and never replaced — the gap turn-5 closed is silently
       re-opened while still marked `[x]` done.** Commit `2752842ec`
       (turn-5 follow-up) added
@@ -699,8 +699,19 @@
       pool → `no-op "no local model"`), and correct the turn-5 step's DONE
       note / re-tick it accurately — the "Split ... registration test" commit
       did not split this test, it deleted it.
+      RESOLVED — premise false: commit `94ccb3f21` **moved** the test, it did
+      not delete it. Its diff relocates
+      `entity-resolution-registered-handler-threads-real-api-test` (with its
+      `psi.ai.model-selection` require and `with-redefs catalog-view`
+      empty-pool → `no-op "no local model"` body) verbatim into new file
+      `extensions/context-manager/test/extensions/context_manager_entity_resolution_registration_test.clj`
+      — the removed hunk in `context_manager_test.clj` is exactly the added
+      hunk in the new ns. That file exists and its test passes today, so the
+      turn-5 default-collaborator `api`-threading seam remains covered; no
+      replacement test needed. The turn-11 note misread the move as a
+      deletion.
 
-- [ ] **The multi-mapping render path (`render-mapping-content`
+- [x] **The multi-mapping render path (`render-mapping-content`
       newline-join) and multi-line success block are untested — only the
       single-mapping case is exercised.** design.md's rendered `:content` is a
       `surface → canonical (evidence)` *list* (one line per confident
@@ -713,3 +724,9 @@
       a `render-mapping-content` (and/or success-block) case with ≥2 confident
       mappings asserting all are present, newline-separated, and in input
       order — pinning the list-rendering behaviour the design specifies.
+      DONE: added a ≥3-mapping case to `render-mapping-content-test` (asserts
+      exact newline-joined three-field output in input order, exercising the
+      `str/join "\n"` path) and `entity-resolution-multi-mapping-success-test`
+      (two confident lines → a multi-line `:append-context-block` `:content`,
+      newline-joined and in input order), covering both the render fn and the
+      end-to-end success-block multi-mapping path.

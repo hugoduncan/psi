@@ -1658,3 +1658,24 @@ Key decisions / discoveries:
   now inaccurate — the default-collaborator api-threading seam is uncovered
   again. Current suite is 38 tests / 119 assertions, below the "39 tests / 125
   assertions" recorded in the turn-10 note above, confirming the lost test.
+
+## Test-review turn-11 follow-ups — addressed
+
+- Item 1 (turn-5 seam allegedly deleted): premise false. `git show 94ccb3f21`
+  is a **move**, not a delete — `entity-resolution-registered-handler-threads-real-api-test`
+  was relocated verbatim (require + body) into
+  `context_manager_entity_resolution_registration_test.clj`, which exists and
+  passes (`bb test --focus
+  extensions.context-manager-entity-resolution-registration-test` → 2
+  assertions, 0 failures). The removed hunk in `context_manager_test.clj`
+  equals the added hunk in the new ns. No replacement test added; step marked
+  `[x]` with the corrected finding. (The prior implementation.md note that the
+  test was lost was itself based on the same misread of a rename as a
+  deletion.)
+- Item 2 (multi-mapping render untested): added a ≥3-mapping case to
+  `render-mapping-content-test` and a new
+  `entity-resolution-multi-mapping-success-test` (2 lines → multi-line block),
+  covering the `str/join "\n"` path and the end-to-end multi-mapping success
+  block, both asserting input order.
+- addressed 2 review steps; focused suite green
+  (`extensions.context-manager-test` 39 tests / 122 assertions, 0 failures).
