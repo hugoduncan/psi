@@ -887,3 +887,11 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   this slice as the new prior-follow-up boundary for batch-baseline
   purposes (same convention used by all five prior resolution slices).
 
+
+## Architecture review (design-review turn 1, seventh pass — post `bd70bf552`)
+
+- no architectural review feedback. Reviewed current `design.md` against
+  `AGENTS.md`, `ramora/META.md`, and `doc/architecture.md`; no new
+  architectural misfit, no `SCOPE_QUESTION:`, and no unchecked design step
+  added. `design-steps.md` remains fully checked after the prior
+  history-tail / single-attempt / git-evidence wording resolution.
