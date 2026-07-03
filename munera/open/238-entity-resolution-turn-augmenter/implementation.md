@@ -578,6 +578,47 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   already-frozen closed toolset (file read/list/grep only), not a
   scope-boundary concern.
 
+## Notes for the sixth design-steps-resolution slice (3 unchecked items)
+
+- All 3 are independent edits to different design.md spans — no forced
+  ordering, but resolving the git-evidence inconsistency (decision 2 /
+  item 3 wording) first is convenient since its edit sits right next to
+  item 3's history-tail question and may touch the same sentence region.
+- Git-evidence inconsistency: fix by rewording, not by revisiting the
+  toolset itself — the closed read/list/grep toolset (Resolved decision
+  4/6) is already frozen and correct; only decision 2's "searches the
+  worktree/git" and item 3's "gather filesystem/git evidence" phrasing are
+  wrong. Match decision 6's already-settled capability-gap language.
+- History-tail item: if resolved by including a rendered history excerpt
+  in the helper prompt, keep the excerpt-construction detail (format,
+  truncation) at plan/implementation granularity, matching how Resolved
+  decisions 4–6 already leave tool names and phrasing "e.g."/policy-level —
+  don't hardcode an excerpt algorithm into design.md. If resolved the other
+  way (current-turn-text-only is intentional), say why explicitly so a
+  future reader doesn't re-flag the anaphora gap.
+- Retry-across-candidates item: whichever way this is decided, it changes
+  what the "failed/empty helper run → no-op" acceptance-criteria test needs
+  to exercise (single failing model vs. exhausted ranked list) — if the
+  chosen policy diverges from `auto-session-name`'s retry-until-exhausted
+  behavior, say so explicitly in design.md rather than leaving the
+  divergence implicit, since Goal/References already cite that extension's
+  pattern as precedent.
+- Relevant non-task files for resolving these three items:
+  - `extensions/auto-session-name/src/extensions/auto_session_name.clj` —
+    `build-rename-prompt`/`sanitize-session-entries` (history-excerpt
+    construction precedent) and `select-helper-models`/`infer-session-title`
+    (ranked-candidate retry-loop precedent). Both cited findings were
+    verified directly against this file this session, not assumed.
+  - `.psi/skills/entity-resolution/SKILL.md` — Method step 1 is the source
+    of the anaphora/history-context requirement motivating the history-tail
+    item.
+  - `components/ai/src/psi/ai/model_selection.clj` — `resolve-selection`'s
+    `:ranking :ranked` shape is what a retry-across-candidates policy would
+    loop over, if chosen.
+- As with prior slices: resolve by editing `design.md` itself (localized
+  edits), not by deferring to plan/implementation-time notes — `design.md`
+  must stay complete-and-unambiguous before `plan.md` can exist.
+
 ## Ambiguity review (design-review turn 2, fifth pass — post `b37363b71`)
 
 - ambiguity review added 1 new design step: Resolved decision 6's new
