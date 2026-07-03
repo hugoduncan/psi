@@ -416,6 +416,32 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - No `SCOPE_QUESTION:` raised — this is a prompt-construction/adaptation
   gap closable within frozen scope, not a scope-boundary concern.
 
+## Inconsistency review (design-review turn 3, fourth pass — post `d1db1d86e`)
+
+- no inconsistency review feedback. `d1db1d86e` only touched the Goal
+  section, Required behaviour item 3, and Resolved decision 6, all now
+  consistently using "adapted"/"adapted, not embedded verbatim" language
+  with no stray "verbatim"/"directly" phrasing left describing the same
+  skill-embedding mechanism elsewhere in design.md.
+- Considered and ruled out as not a new, independently-actionable
+  inconsistency: Resolved decision 3's "worktree/git" and Required
+  behaviour item 3's "filesystem/git evidence" phrasing both still describe
+  the toolset as reaching "git" evidence despite decision 4's toolset having
+  no git-command tool — this is the same root cause already filed this
+  session as the turn-2 ambiguity item (unmappable git-status/graph-
+  introspection adaptation), not a separate inconsistency to re-file.
+- Considered and ruled out: Resolved decision 2's toolset description uses
+  "e.g. file read + directory list + content grep" (exemplary phrasing)
+  while Resolved decision 4/6 and Constraints state the toolset as closed
+  ("file read / list / grep only"). Not filed as a live contradiction:
+  decision 4 is a later, more specific refinement of decision 2 within the
+  same numbered-decisions sequence (both describe the same v1 toolset;
+  decision 4 is the authoritative closed-set restatement scoped to this
+  task's new-work addition), and every passage after decision 2 (4, 6,
+  Constraints, Acceptance criteria) agrees on the closed three-tool set —
+  no reader-facing ambiguity survives past decision 4.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
 ## Third design-steps-resolution slice — resolved (batch: `302bef5e4`..`b7bd9ebb6`, baseline `b7f717e33`)
 
 - Resolved the 1 remaining unchecked item (embedded-Method-text-names-
