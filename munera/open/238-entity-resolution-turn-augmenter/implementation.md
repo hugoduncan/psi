@@ -1133,3 +1133,18 @@ Applied to `design.md`:
   frozen, user-directed scope decision with a structural boundary via
   app-runtime effective-policy; re-raising would re-litigate frozen scope.
 - No `SCOPE_QUESTION:` raised. No new design step added this pass.
+
+## Ambiguity review (design-review turn 2, ninth pass — post eighth-slice resolution)
+
+- ambiguity review added 1 new design step: the confidence-gate mechanism is
+  underspecified — decision 6 requires a `confidence` field in the helper line
+  format and calls it "the accept/reject gate," but no confidence scale/
+  vocabulary or threshold is defined, leaving unresolved whether the augmenter
+  value-thresholds it or relies on model self-gating (augmenter accepts any
+  well-formed line). Affects the "ambiguous reference dropped" test shape. See
+  design-steps.md. Distinct from the already-resolved content-composition
+  (display-field-count) and output-contract-format items.
+- Checked and not filed (already resolved / policy-deferred by design):
+  history-tail excerpt format, bounded-helper-loop numbers, and single-attempt
+  model selection are all intentionally deferred to plan/impl at "e.g."/policy
+  granularity — not ambiguities. No `SCOPE_QUESTION:` raised.

@@ -469,3 +469,38 @@ instead of requiring any new read-only search tools:
   additions, or reword so it doesn't label the deliberate non-additions as
   "wiring this task must add"). Within frozen scope — cross-reference wording
   fix, not a scope change.
+
+## Ambiguity review (design-review turn 2, ninth pass — post eighth-slice resolution)
+
+- [ ] Ambiguous: the confidence-gate mechanism is underspecified. Resolved
+  decision 6 fixes the helper output line format as `surface → canonical
+  (evidence; confidence)` — a **required** confidence field — and states
+  "Confidence's only role is the accept/reject gate on which lines are parsed
+  as 'confident' in the first place; it is not displayed in the rendered
+  block." But design.md never defines what a confidence value looks like (a
+  categorical vocabulary like high/medium/low, a 0–1 score, a percentage,
+  free text) nor any threshold separating "confident" from "not confident."
+  This leaves two materially different mechanisms unresolved: (a) the
+  augmenter parses the confidence token's *value* and rejects lines below a
+  defined threshold (requiring a fixed scale + threshold the parse validates,
+  neither of which design.md provides), or (b) the model self-gates via the
+  "never guess: only confident, evidence-backed mappings" constraint and the
+  augmenter accepts every well-formed line, treating the confidence token as
+  a required-but-value-unconstrained field it drops at render (in which case
+  the confidence field is effectively decorative and "confidence's only role
+  is the accept/reject gate" overstates the augmenter's use of it). This is
+  not the already-resolved content-composition (2/3/4 display fields) item
+  nor the already-resolved output-contract-format item: those settled what is
+  *displayed* and that the model emits parseable lines, not *how* a parsed
+  line is judged confident enough to keep. It directly affects the shape of
+  the "ambiguous reference dropped" acceptance test (Tests list): under (a)
+  the helper emits a low-confidence line the augmenter drops (needs a defined
+  scale + threshold to assert against); under (b) the model simply omits the
+  ambiguous mapping and no augmenter-side confidence filtering is exercised.
+  Pin down whether the augmenter value-thresholds the confidence field (and
+  if so, the fixed scale/vocabulary and threshold, at least at
+  "e.g."/policy-level granularity) or relies on model self-gating with the
+  augmenter accepting any well-formed line — and align decision 6's
+  "accept/reject gate" wording and the "ambiguous reference dropped" test
+  framing accordingly. Within frozen scope (clarifying the in-scope confident
+  filter, not changing what entity types or operations are in scope).
