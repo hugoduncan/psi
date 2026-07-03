@@ -1714,3 +1714,10 @@ Key decisions / discoveries:
   (`build-prepared-request-inserts-turn-augmentation-context-test`,
   `replayed-turn-augmentation-uses-close-payload-without-live-invocation-test`),
   so the non-duplicating deferral is sound. No steps added.
+
+## Test-review turn-14 (test-shaper skill)
+
+- Independent test-shaper review — added 1 step (turn 14): the
+  confidence-required-field reject boundary (a mapping-shaped line whose
+  trailing group carries no `;`/confidence token) is silently dropped per
+  Resolved decision 6 but no test isolates that reject case.

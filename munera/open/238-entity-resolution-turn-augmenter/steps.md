@@ -814,3 +814,33 @@
       `-slash-command-only-`, `-no-local-model-`, `-empty-run-`, `-nil-run-`,
       `-throwing-helper-`), pinning the "no operations" well-formedness clause
       so a leaked stale/partial operation in a no-op envelope is caught.
+
+## Test-review follow-ups (turn 14)
+
+- [ ] **The confidence-required-field reject boundary is untested — a
+      mapping-shaped line whose trailing group carries no confidence token is
+      silently dropped, but no test isolates that reject case.** Resolved
+      decision 6 makes the confidence token a **required** field of the line
+      format ("The confidence token remains a **required** field of the line
+      format — the model must state its confidence explicitly, which
+      reinforces the self-gating discipline"). `parse-mapping-line`
+      enforces this by requiring `(str/last-index-of inner ";")` to be
+      non-nil: a mapping-shaped line whose trailing `(...)` group contains no
+      `;` (e.g. `foo → bar (just evidence)`) yields `semi` nil → the whole
+      line is dropped (verified live: `parse-mapping-lines
+      "foo → bar (just evidence)"` ⇒ `[]`). But no `parse-mapping-lines-test`
+      case isolates this: the existing "discards everything else" block feeds
+      `"Should I proceed? (question)"` (a `;`-less trailing group) but only
+      asserts the *total* parsed count is 2, conflating the no-arrow and
+      no-semicolon reject reasons — it never pins that a genuinely
+      arrow-bearing, mapping-shaped line lacking the required confidence
+      token is rejected. A regression that made the semicolon/confidence
+      split optional (accepting a line with evidence but no confidence, or
+      treating the whole inner group as evidence with an empty confidence)
+      would pass every current test while violating the "confidence remains a
+      required field" contract and re-admitting confidence-less lines the
+      self-gating discipline is meant to exclude. Add a `parse-mapping-lines-test`
+      case asserting an arrow-bearing line whose trailing group has no `;`
+      (e.g. `"the fn → foo/bar (exact path)"`) is rejected (`[]`), isolating
+      the confidence-required reject boundary distinct from the no-arrow and
+      empty-field rejects.
