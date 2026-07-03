@@ -1039,3 +1039,32 @@ Applied to `design.md`:
   multi-round bash agent loop — already captured by the ambiguity pass, not
   duplicated here.
 - No `SCOPE_QUESTION:` raised — the finding is closable within frozen scope.
+
+## Notes for the eighth design-steps-resolution slice (2 unchecked items)
+
+- The 2 unchecked items are independent (different design.md spans) and both
+  closable by localized `design.md` edits within frozen scope — no
+  `SCOPE_QUESTION:` was raised across this session's arch/ambiguity/inconsistency
+  turns. Resolve by editing `design.md` itself (design.md must be
+  complete-and-unambiguous before `plan.md` exists), not via plan/impl notes.
+- Goal additive-wiring citation (inconsistency): pure wording fix. Under the
+  bash design the real additions are the second augmenter registration +
+  helper-prompt construction (decision 6) and the existing-`bash` grant via
+  `create-child-session` :tool-ids (decision 2); decisions 4/5 are
+  non-additions. Just repoint/reword the "(see Resolved decisions 4–6)"
+  clause — don't touch decisions 4/5's own text (they're correct).
+- Helper-loop-bound (ambiguity): decide the policy at the same "policy, not
+  literal numbers" granularity as Resolved decisions 4–6 — don't hardcode a
+  round count / ms budget into design.md. Relevant existing structural facts
+  to lean on (already verified this session, no need to re-derive):
+  - each `bash` command is capped at 30s default
+    (`components/agent-session/src/psi/agent_session/tools.clj`, `execute-bash`
+    `timeout-secs (or timeout 30)`), so per-command wall-time is already bounded.
+  - `run-agent-loop-in-session`
+    (`components/agent-session/src/psi/agent_session/mutations/session.clj`)
+    runs `core/prompt-in!` to turn completion with **no** agent-loop round cap
+    surfaced — the unbounded dimension is number of rounds/commands, not
+    per-command time.
+  - if the chosen policy diverges from decision 3's "no-deadline" wording,
+    reconcile decision 3 in the same edit (it currently says "the local-model
+    call," singular, framed for the toolless single-shot precedent).
