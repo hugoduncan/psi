@@ -327,6 +327,15 @@
     (is (= [] (context-manager/parse-mapping-lines
                "(fn [x] -> (foo x)) (call; note)"))))
 
+  (testing "arrow-bearing line lacking the required confidence token (no ;) is rejected"
+    ;; Resolved decision 6: confidence is a *required* field of the line
+    ;; format. A mapping-shaped line whose trailing (...) group carries no
+    ;; `;` has no confidence token and must be dropped — isolating the
+    ;; confidence-required reject boundary from the no-arrow / empty-field
+    ;; rejects above.
+    (is (= [] (context-manager/parse-mapping-lines
+               "the fn → foo/bar (exact path)"))))
+
   (testing "zero well-formed lines yields empty vector"
     (is (= [] (context-manager/parse-mapping-lines "no lines here at all")))
     (is (= [] (context-manager/parse-mapping-lines nil)))))

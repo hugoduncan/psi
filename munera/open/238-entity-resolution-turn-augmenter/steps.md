@@ -817,7 +817,7 @@
 
 ## Test-review follow-ups (turn 14)
 
-- [ ] **The confidence-required-field reject boundary is untested — a
+- [x] **The confidence-required-field reject boundary is untested — a
       mapping-shaped line whose trailing group carries no confidence token is
       silently dropped, but no test isolates that reject case.** Resolved
       decision 6 makes the confidence token a **required** field of the line
@@ -844,3 +844,8 @@
       (e.g. `"the fn → foo/bar (exact path)"`) is rejected (`[]`), isolating
       the confidence-required reject boundary distinct from the no-arrow and
       empty-field rejects.
+      DONE: added a `parse-mapping-lines-test` case asserting an arrow-bearing,
+      mapping-shaped line whose trailing `(...)` group lacks a `;` (no
+      confidence token) — `"the fn → foo/bar (exact path)"` — is rejected
+      (`[]`), isolating the confidence-required reject boundary (`semi` nil →
+      drop) from the pre-existing no-arrow / empty-field reject cases.

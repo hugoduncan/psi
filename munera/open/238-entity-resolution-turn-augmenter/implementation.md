@@ -1721,3 +1721,7 @@ Key decisions / discoveries:
   confidence-required-field reject boundary (a mapping-shaped line whose
   trailing group carries no `;`/confidence token) is silently dropped per
   Resolved decision 6 but no test isolates that reject case.
+
+- addressed turn-14 review step: added `parse-mapping-lines-test` case
+  pinning the confidence-required reject boundary (`;`-less trailing group →
+  `[]`). Focused tests + lint pass.
