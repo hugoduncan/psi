@@ -1042,7 +1042,7 @@
 
 ## Test-review follow-ups (turn 18)
 
-- [ ] **The no-op *diagnostic* — the field that distinguishes *why* a no-op
+- [x] **The no-op *diagnostic* — the field that distinguishes *why* a no-op
       occurred — is asserted for only one of the four entity-resolution
       no-op reasons; the other three are unpinned, so a swapped/dropped/
       wrong diagnostic passes.** `entity-resolution-augmentation` emits four
@@ -1073,8 +1073,16 @@
       a `:diagnostic` key on the tracked-helper recursion no-op — so the reason
       each no-op reports is pinned uniformly, mirroring the shared
       `:operations []` assertion the turn-14 note added.
+      DONE: added the diagnostic assertion to each entity-resolution no-op
+      test — `"no effective cwd"` (`-blank-cwd-`), `"slash-command-only
+      prompt"` (`-slash-command-only-`), `"no confident mapping"` (`-empty-run-`
+      / `-nil-run-` / `-throwing-helper-`), and the *absence* of a
+      `:turn-augmentation/diagnostic` key on the tracked-helper recursion no-op
+      (`entity-resolution-helper-session-no-op-test`). The reason each no-op
+      reports is now pinned uniformly, mirroring the shared `:operations []`
+      assertion; a swapped/dropped/spurious diagnostic is caught.
 
-- [ ] **`default-run-helper`'s `:model`-forwarding branch is untested at the
+- [x] **`default-run-helper`'s `:model`-forwarding branch is untested at the
       real-fn level — the `cond->` that threads the selected model into
       `run-agent-loop-in-session`'s params never runs the model-present arm in
       any `default-run-helper` test.** `default-run-helper` builds the run
@@ -1100,3 +1108,11 @@
       selected `:model` is present in those params — pinning the model-present
       `cond->` arm at the real-fn level, distinct from the stub-boundary
       selection→run assertion.
+      DONE: extended `fake-run-api` with a `:run-calls` atom recording the
+      `run-agent-loop-in-session` params, and added
+      `default-run-helper-forwards-selected-model-test` — supplies a concrete
+      `:model`, drives the real `default-run-helper`, and asserts the selected
+      `:model` (and `:prompt`) are present in the captured run params
+      (model-present `cond->` arm); a second sub-case supplies no `:model` and
+      asserts `:model` is absent from the params (nil arm), pinning both arms
+      at the real-fn level distinct from the turn-9 stub-boundary assertion.

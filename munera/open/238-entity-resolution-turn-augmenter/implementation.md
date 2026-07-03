@@ -1795,3 +1795,11 @@ Key decisions / discoveries:
   no-op reasons (consistency/meaningful-failures gap across the no-op cluster);
   `default-run-helper`'s `:model`-forwarding `cond->` arm untested at the
   real-fn level (only the stubbed selection→run seam is covered).
+
+- addressed 2 turn-18 test-review follow-ups: pinned the no-op diagnostic
+  string uniformly across the entity-resolution no-op cluster (blank-cwd /
+  slash-command / empty-run / nil-run / throwing-helper + diagnostic-less
+  recursion no-op); added `default-run-helper-forwards-selected-model-test`
+  (via `fake-run-api` `:run-calls`) covering both the model-present and
+  nil `cond->` arms of the real fn's run-param construction. Focused suite:
+  35 tests, 140 assertions, 0 failures; test ns lints clean.

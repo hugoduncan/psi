@@ -465,6 +465,8 @@
                {} base-tp (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (not (contains? env :turn-augmentation/diagnostic))
+          "recursion pre-filter emits a diagnostic-less no-op")
       (is (nil? (:select @calls)) "model selection not attempted")
       (is (nil? (:run @calls)) "helper session never created"))))
 
@@ -476,6 +478,8 @@
                (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no effective cwd" (:turn-augmentation/diagnostic env))
+          "blank-cwd no-op names its reason")
       (is (nil? (:run @calls))))))
 
 (deftest entity-resolution-slash-command-only-no-op-test
@@ -486,6 +490,8 @@
                (stub {:text "x → y (e; c)" :calls calls}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "slash-command-only prompt" (:turn-augmentation/diagnostic env))
+          "slash-command pre-filter names its reason")
       (is (nil? (:select @calls)) "no model selected for slash-command-only turn")
       (is (nil? (:run @calls)) "helper session never created"))))
 
@@ -537,6 +543,8 @@
                       :child-id "helper-3"}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no confident mapping" (:turn-augmentation/diagnostic env))
+          "empty run names the no-confident-mapping reason")
       (is (= ["helper-3"] (:turn-augmentation/child-session-ids env))
           "helper id still reported even on empty run"))))
 
@@ -548,6 +556,8 @@
                 :run-helper   (fn [_] nil)})]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no confident mapping" (:turn-augmentation/diagnostic env))
+          "failed (nil) run names the no-confident-mapping reason")
       (is (= [] (:turn-augmentation/child-session-ids env))))))
 
 (deftest entity-resolution-throwing-helper-no-op-test
@@ -559,6 +569,8 @@
                {} base-tp (stub {:throw? true}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no confident mapping" (:turn-augmentation/diagnostic env))
+          "throwing run collapses to the no-confident-mapping reason")
       (is (= [] (:turn-augmentation/child-session-ids env))
           "no child id reported when the run threw"))))
 
@@ -591,10 +603,11 @@
 
 (defn- fake-run-api
   "A minimal `api` map for exercising default-run-helper: records the
-   create-child-session params, records the close-session id (when a
+   create-child-session params, records the run-agent-loop-in-session params
+   (when a `run-calls` atom is supplied), records the close-session id (when a
    `closed` atom is supplied), and returns the supplied run-result from
    run-agent-loop-in-session."
-  [{:keys [run-result create-calls closed child-id]
+  [{:keys [run-result create-calls run-calls closed child-id]
     :or   {child-id "child-1"}}]
   {:mutate-session
    (fn [_sid op params]
@@ -603,7 +616,8 @@
        (do (when create-calls (reset! create-calls params))
            {:psi.agent-session/session-id child-id})
        psi.extension/run-agent-loop-in-session
-       run-result))
+       (do (when run-calls (reset! run-calls params))
+           run-result)))
    :mutate (fn [op params]
              (when (and closed (= op 'psi.extension/close-session))
                (reset! closed (:session-id params)))
@@ -662,6 +676,44 @@
       (is (not (contains? @context-manager/entity-resolution-helper-session-ids
                           "child-1"))
           "settled run untracks the child from the recursion-avoidance atom"))))
+
+(deftest default-run-helper-forwards-selected-model-test
+  (testing "the selected :model is threaded into run-agent-loop-in-session's
+            params (the model-present cond-> arm) at the real-fn level"
+    ;; The turn-9 selected-model-flows test captures :model only at the
+    ;; stubbed :run-helper boundary; this drives the real default-run-helper's
+    ;; `(cond-> {:prompt ..} model (assoc :model model))` params construction
+    ;; so a dropped/mis-keyed/moved :model arm is caught in production wiring.
+    (let [run-calls (atom nil)
+          model     {:provider :ollama :id "qwen2.5-coder"}
+          api (fake-run-api
+               {:run-calls run-calls
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text ""}})
+          _result (#'context-manager/default-run-helper
+                   api {:parent-session-id "s1"
+                        :system-prompt "sys"
+                        :user-prompt "usr"
+                        :model model})]
+      (await-untracked "child-1")
+      (is (= model (:model @run-calls))
+          "selected model forwarded into run params (model-present cond-> arm)")
+      (is (= "usr" (:prompt @run-calls))
+          "user prompt is passed alongside the model")))
+
+  (testing "no :model supplied → no :model key in the run params (nil arm)"
+    (let [run-calls (atom nil)
+          api (fake-run-api
+               {:run-calls run-calls
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text ""}})]
+      (#'context-manager/default-run-helper
+       api {:parent-session-id "s1"
+            :system-prompt "sys"
+            :user-prompt "usr"})
+      (await-untracked "child-1")
+      (is (not (contains? @run-calls :model))
+          "nil model arm omits :model from the run params"))))
 
 (deftest default-run-helper-suppresses-default-prompt-and-omits-worktree-test
   (testing "create-child-session gets prompt-component-selection and no :worktree-path"
