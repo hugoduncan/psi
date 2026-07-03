@@ -553,6 +553,31 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - No `SCOPE_QUESTION:` raised — both items are prompt-construction/behavior
   specification gaps closable within frozen scope.
 
+## Inconsistency review (design-review turn 3, sixth pass — post `f92192104`)
+
+- inconsistency review added 1 new design step: Resolved decision 2
+  ("searches the worktree/git for evidence itself") and Required behaviour
+  item 3 ("gather filesystem/git evidence") both still claim git-evidence-
+  gathering capability, unedited through every resolution slice, even
+  though Resolved decision 6's settled capability-gap statement explicitly
+  tells the model it cannot check git status, run git commands, or query
+  the runtime/session graph. A fourth-pass review (post `d1db1d86e`) had
+  flagged this same "git" phrasing but deferred it as the same root cause
+  as the then-open git-status/graph-introspection adaptation ambiguity;
+  when that ambiguity was resolved (`b37363b71`, the fourth
+  design-steps-resolution slice), the resolution note explicitly recorded
+  "no other section needed a matching edit" — decision 2 and item 3's
+  git-evidence claims were never actually reconciled. See design-steps.md.
+- Used design.md, `AGENTS.md`, `ramora/META.md`, and `doc/architecture.md`
+  already loaded in this session; no re-read needed (design.md unchanged
+  since the architecture-review turn). Targeted check: grepped design.md
+  for "worktree/git"/"filesystem/git"/"gather...evidence" to confirm both
+  overclaiming phrases are still present verbatim at their original
+  locations (lines ~99, ~137-138) and were not touched by any later commit.
+- No `SCOPE_QUESTION:` raised — this is a wording reconciliation within the
+  already-frozen closed toolset (file read/list/grep only), not a
+  scope-boundary concern.
+
 ## Ambiguity review (design-review turn 2, fifth pass — post `b37363b71`)
 
 - ambiguity review added 1 new design step: Resolved decision 6's new

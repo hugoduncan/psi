@@ -279,6 +279,47 @@
   this augmenter's resolution to current-turn text only despite reading
   the history tail for some other stated or unstated reason.
 
+- [ ] Inconsistent: Resolved decision 2 says "the local model searches the
+  **worktree/git** for evidence itself, following the `entity-resolution`
+  skill method," and Required behaviour item 3 says the toolset lets "the
+  local model ... gather **filesystem/git** evidence." Both claims survive
+  unedited (design.md lines ~99, ~137-138) through every later resolution
+  slice, including the two that specifically settled the toolset's git
+  reach: Resolved decision 4/6's closed toolset is file read + directory
+  list + content grep **only** — no git-command tool exists — and Resolved
+  decision 6's capability-gap statement (landed by `b37363b71`, wording
+  confirmed unchanged by `f92192104`) explicitly tells the model it
+  "**cannot** check git status, run git commands, or query the
+  runtime/session graph, and must reason about path/task references using
+  only file contents it can read, list, or grep." A model with no git tool,
+  explicitly told it cannot run git commands, cannot "search... git" or
+  "gather git evidence" by any reading stronger than "evidence that happens
+  to live in a git-tracked worktree" — and decision 2's own wording
+  ("following the `entity-resolution` skill method," whose Method section
+  names `git ls-files`/`find`/`git grep`/git-status as the literal
+  search technique) reads as claiming exactly the git-command-based search
+  capability decision 6 says does not exist. This is not a duplicate of the
+  already-resolved "adaptation-summary lag" inconsistency (which was about
+  Goal/item-3 describing the *adaptation mechanism* — uniform reword vs.
+  two-case split — and was fixed by `f92192104`'s "adapted per Resolved
+  decision 6's two-case split" wording): that fix touched the *adaptation*
+  clause in item 3 but left the separate, earlier "gather filesystem/git
+  evidence" clause in the same sentence untouched, and never touched
+  decision 2 at all. A prior pass (fourth-pass inconsistency review, post
+  `d1db1d86e`) flagged this same "git" phrasing but deferred it as
+  "the same root cause" as the then-still-open git-status/graph-
+  introspection adaptation ambiguity; the fourth design-steps-resolution
+  slice that closed that ambiguity explicitly recorded "no other section
+  needed a matching edit," leaving decision 2's and item 3's git-evidence
+  claims unreconciled with the capability-gap disclosure it introduced.
+  Reword decision 2's "searches the worktree/git for evidence itself" and
+  item 3's "gather filesystem/git evidence" to describe only the closed
+  read/list/grep toolset's actual reach (e.g. "searches the worktree's
+  files for evidence," dropping the "git" claim, or explicitly scoping any
+  git-adjacent evidence to "git-tracked file contents visible via read/
+  list/grep," never git commands), consistent with decision 6's settled
+  capability-gap statement.
+
 - [ ] Ambiguous: Required behaviour item 2 says the augmenter "selects a
   local helper model via `model-selection`" (singular), and Acceptance
   criteria describes "a helper session driven by a **local** model selected
