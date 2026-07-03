@@ -154,6 +154,28 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
     again against current manifest).
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Ambiguity review (design-review turn 2, third pass)
+
+- ambiguity review added 1 new design step: Resolved decision 6's verbatim
+  embedding of the skill's Method steps 1–5 carries evidence-gathering
+  instructions naming `git ls-files`/`find`/`git grep`/"Psi graph
+  introspection" — commands/capabilities absent from the decision-4
+  read-only toolset (file read + directory list + content grep only, no
+  bash, no graph-query tool). Design.md doesn't say whether the embedded
+  text is left as-is or adapted to name only the actually-available tools.
+  See design-steps.md.
+- Considered and ruled out: whether "the helper's raw response" (Resolved
+  decision 6, the text the augmenter parses lines from) is well-defined once
+  the helper session is tool-using rather than single-shot. Ruled out as not
+  ambiguous: `run-agent-loop-in-session`'s result already exposes a single
+  `:psi.agent-session/agent-run-text` field
+  (`extensions/auto-session-name/src/extensions/auto_session_name.clj`,
+  `run-helper-attempt`) that `auto-session-name` already uses as "the
+  response" regardless of any tool calls in between; this pre-existing
+  mechanism unambiguously supplies "the helper's raw response" for parsing,
+  so no design-level decision is needed.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
 ## Ambiguity review (design-review turn 2, second pass — post-resolution)
 
 - ambiguity review added 2 new design steps: (1) whether Resolved decision

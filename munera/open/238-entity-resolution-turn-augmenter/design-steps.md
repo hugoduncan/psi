@@ -141,3 +141,27 @@
   from design.md alone whether the shipped `:content` shows 2, 3, or 4
   fields per mapping. Pick one composition and align Acceptance criteria,
   "Remaining v1 policies," and Resolved decision 6 to state it the same way.
+
+- [ ] Ambiguous: Resolved decision 6 embeds the `entity-resolution` skill's
+  Method section (steps 1–5) **verbatim** into the helper prompt, but those
+  verbatim steps explicitly instruct evidence-gathering via commands/capabilities
+  that the helper's toolset (Resolved decision 4) does not provide. Step 1
+  says to check "current git status"; step 3 says to "Search authoritative
+  project surfaces when not obvious: `git ls-files` / `find` for paths.
+  `git grep` for terms, vars, namespaces, workflow ids, commands, and docs.
+  Psi graph introspection for runtime/session entities when applicable."
+  The helper session's actual toolset per decision 4 is only file read +
+  directory list + content grep — no bash/git-command execution tool and no
+  EQL/psi-graph introspection tool. Design.md does not say whether (a) the
+  Method text is embedded exactly as written, leaving the model to figure
+  out on its own that it must substitute its available read/list/grep tools
+  for the named git/find/graph-introspection commands (risking failed
+  tool-call attempts against nonexistent tools, burning part of the
+  blocking, no-deadline pre-turn budget from Resolved decision 3), or (b)
+  the augmenter's prompt-construction step must adapt/annotate the embedded
+  Method text so its evidence-gathering instructions name only the tools
+  actually available to the helper session. This affects both correct
+  prompt construction and the testability of the "confident mapping via
+  gathered evidence" acceptance scenario. Pin down whether the embedded
+  Method text is used exactly as authored in `SKILL.md` or is adapted to
+  reference only the helper's actually-available read-only tool names.
