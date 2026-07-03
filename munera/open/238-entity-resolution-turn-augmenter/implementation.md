@@ -1278,3 +1278,47 @@ Applied to `design.md`:
   list) and rendered-content composition are unchanged and still consistent.
 - design-steps.md has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Notes after tenth design-review pass (no follow-ups added)
+
+- The tenth-pass design-review triple (architecture → ambiguity →
+  inconsistency, all post ninth-slice confidence-gate resolution `a75e7b61c`)
+  added **no** new design-steps and no `SCOPE_QUESTION:`. design-steps.md has
+  0 unchecked items and design.md is complete-and-unambiguous — the
+  `gate(plan.md)` precondition (AGENTS.md) is satisfied, so the next
+  task-lifecycle step is `plan.md` creation, not another resolution slice.
+- Design review has now converged: the last two full triples (ninth resolved
+  the confidence-gate item; tenth found nothing) show the design is stable. A
+  future review only needs re-running if design.md changes again.
+- Principles for the plan/implementation task (carry forward, not re-derivable
+  from design.md alone):
+  - design.md deliberately leaves several v1 knobs at "e.g."/policy
+    granularity — do NOT treat their absence as underspecification: the
+    structured-line grammar/regex, the confidence sub-token capture (must not
+    gate acceptance), the bounded-helper-loop round/wall-clock numbers, and
+    the history-tail excerpt format/truncation are all intentionally
+    plan/impl-owned.
+  - Read the two "Remaining v1 policies" bullets (history-tail inclusion,
+    single-attempt model selection) alongside Required behaviour items 2–3 —
+    those numbered items only cross-reference them.
+  - Track the helper child-session id *before* `run-agent-loop-in-session`
+    (recursion safety), mirroring `auto-session-name`'s
+    `remember-helper-session!` ordering.
+  - Additive-only: adding `psi/ai` dep to `context-manager/deps.edn` and a
+    second augmenter on the existing `turn-augmentation-capability` grant
+    needs no manifest/model-selection changes (decisions 1/5).
+- Relevant non-task files (already cited across prior slices, consolidated):
+  - `extensions/context-manager/src/extensions/context_manager.clj` — host;
+    augmenter registration + helper-prompt construction land here.
+  - `extensions/auto-session-name/src/extensions/auto_session_name.clj` —
+    precedent for helper session, `build-rename-prompt`, recursion tracking,
+    and the ranked-candidate loop this task deliberately does NOT copy.
+  - `components/ai/src/psi/ai/model_selection.clj` — `resolve-selection`.
+  - `components/agent-session/src/psi/agent_session/tools.clj` — existing
+    `bash-tool` (the only granted helper tool).
+  - `components/agent-session/src/psi/agent_session/mutations/session.clj` —
+    `run-agent-loop-in-session` (no round cap surfaced; the bound is new work).
+  - `.psi/skills/entity-resolution/SKILL.md` — Method steps 1–5 (embedded,
+    adapted); Output Shape / step 6 excluded.
+  - `munera/closed/237-pre-turn-request-augmentation/design.md` — augmentation
+    rail, envelope, replay guarantee.
