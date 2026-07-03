@@ -177,3 +177,43 @@
       DONE: hardened regex — trailing group anchored to the last `(...)`, and
       evidence splits at the last `;`; asserted by two new cases in
       `parse-mapping-lines-test` (canonical-with-parens, evidence-with-semicolon).
+
+## Implementation-review follow-ups (turn 2)
+
+- [ ] **Cloud model can be selected on every eligible turn — violates the
+      local-only acceptance criterion, constraint, and doc guarantee.**
+      `default-select-model` returns `(first (get-in result [:ranking :ranked]))`
+      whenever `resolve-selection` yields `:outcome :ok`, without checking the
+      returned candidate's `:locality`. In `helper-model-selection-request`,
+      `:locality :local` is only a **strong-preference** (affects ranking among
+      survivors), not a **required** constraint (affects filtering). The
+      required constraints are just `:supports-text`, `:latency-tier :equals
+      :low`, and `:cost-tier :one-of [:zero :low]`. Registered cloud providers
+      are `:latency-tier :low`
+      (`components/ai/src/psi/ai/models.clj` `provider-defaults`, anthropic +
+      openai), and any cheap-tier cloud model (`input-cost ≤ 1.0`,
+      `output-cost ≤ 5.0` → `:cost-tier :low` per `cost-tier`) survives the
+      required filter. So when **no local model is configured** but such a
+      cloud model is registered, `resolve-selection` returns `:ok` with the
+      **cloud** candidate as `(first ranked)`, and the augmenter runs a
+      **cloud** helper on 237's blocking pre-turn critical path of every
+      eligible turn.
+      This directly violates: design.md Acceptance criterion "when no local
+      model is available it returns a well-formed `:no-op` and no cloud model
+      is used"; Constraint "Local-first … never silently use a cloud model on
+      every turn"; and the shipped `doc/extensions.md` claim "selects a single
+      top-ranked **local** model … never falls back to a cloud model." The
+      `entity-resolution-no-local-model-no-op-test` does not catch this — it
+      stubs `:select-model` to return `nil` and never exercises the real
+      `default-select-model`/`resolve-selection` path.
+      (`auto-session-name` shares the same request shape, but its design does
+      not elevate local-only to a hard acceptance criterion on a per-turn
+      blocking path, so the same latent behaviour is out of scope for that
+      extension and in scope here.)
+      Fix: make `default-select-model` reject non-local winners — either add
+      `{:criterion :locality :equals :local}` to `:required` (so a non-local
+      pool yields `:required-constraints-unsatisfied` → nil → `:no-op`), or
+      guard the returned candidate on `(= :local (get-in candidate [:facts
+      :locality]))` returning nil otherwise. Add a test that drives the real
+      `default-select-model` with a catalog containing only a cheap-tier cloud
+      candidate (no local) and asserts nil (→ `:no-op`, no cloud helper run).

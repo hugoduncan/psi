@@ -1447,3 +1447,10 @@ Key decisions / discoveries:
   evidence-with-semicolon), `default-run-helper-gates-on-run-ok-test`,
   `default-run-helper-suppresses-default-prompt-and-omits-worktree-test`.
 - Focused suite: 30 tests, 87 assertions, 0 failures; clj-kondo clean.
+
+## Implementation-review note (turn 2)
+
+- added 1 step: `default-select-model` can return a cloud winner when no local
+  model exists (`:locality :local` is only a strong-preference, not required),
+  violating the local-only acceptance criterion/constraint/doc guarantee; the
+  no-local-model test stubs selection and never exercises the real path.
