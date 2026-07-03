@@ -166,7 +166,7 @@
   Method text is used exactly as authored in `SKILL.md` or is adapted to
   reference only the helper's actually-available read-only tool names.
 
-- [ ] Ambiguous: Resolved decision 6's adaptation policy says the
+- [x] Ambiguous: Resolved decision 6's adaptation policy says the
   augmenter's prompt-construction step "rewords those references to name
   only the helper's actually-available read-only capabilities (read a file,
   list a directory, grep file contents)" for every Method sub-step that

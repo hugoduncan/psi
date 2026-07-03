@@ -182,15 +182,31 @@ provenance.
    sub-steps whose wording names evidence-gathering commands the helper
    toolset does not expose (Resolved decision 4 is file read / directory
    list / content grep only, with no bash/git-command execution and no
-   EQL/psi-graph introspection) are **adapted, not embedded verbatim**: the
-   augmenter's prompt-construction step rewords those references to name
-   only the helper's actually-available read-only capabilities (read a
-   file, list a directory, grep file contents), so the model is never
-   instructed to reach for a tool it doesn't have. The remaining Method
-   wording that names no unavailable tool is embedded unchanged. (The exact
-   adapted phrasing is a prompt-construction detail left to
-   plan/implementation, consistent with how Resolved decisions 4–5 already
-   leave literal tool/fact names at "e.g." granularity.) In place of the
+   EQL/psi-graph introspection) are **adapted, not embedded verbatim**, and
+   the adaptation splits into two cases depending on whether a read/list/grep
+   substitute exists:
+   - Step 3's `git ls-files`/`find` (directory listing) and `git grep`
+     (content grep) have a natural substitute: those references are
+     reworded to name the substitute capability directly (list a directory,
+     grep file contents), so the model is never instructed to reach for a
+     tool it doesn't have.
+   - Step 1's "current git status" and step 3's "Psi graph introspection
+     for runtime/session entities" have **no** read/list/grep substitute.
+     These are **not** reworded to point at read/list/grep — doing so would
+     misleadingly imply those tools can answer a question they can't.
+     Instead they are replaced with an explicit statement of the capability
+     gap: the prompt tells the model it cannot check git status, run git
+     commands, or query the runtime/session graph, and must reason about
+     path/task/session references using only file contents it can read,
+     list, or grep. The model is expected to treat the missing evidence
+     source as unavailable and reason around it, not to attempt an
+     unavailable tool call.
+   The remaining Method wording that names no unavailable tool is embedded
+   unchanged. (The exact adapted phrasing — for both the substituted
+   references and the capability-gap statement — is a prompt-construction
+   detail left to plan/implementation, consistent with how Resolved
+   decisions 4–5 already leave literal tool/fact names at "e.g."
+   granularity.) In place of the
    excluded Output Shape / Act-or-ask sections, the augmenter's own prompt
    states the required output contract directly: a structured line format,
    one line per confident mapping, `surface → canonical (evidence;

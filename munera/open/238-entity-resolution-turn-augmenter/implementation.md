@@ -508,3 +508,33 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
     tool exists anywhere to point the reworded text at instead.
 - As with prior slices: resolve by editing `design.md` itself (localized
   edit to Resolved decision 6, not a plan/implementation-time workaround).
+
+## Fourth design-steps-resolution slice — resolved (batch: `c416b1a95`..`840e2100e`, baseline `d1db1d86e`)
+
+- Resolved the 1 remaining unchecked item (git-status / graph-introspection
+  unmappable adaptation) per the note above: chose option (c) — the
+  unmappable sub-references (step 1's "current git status", step 3's "Psi
+  graph introspection") are **not** reworded to point at read/list/grep;
+  instead the embedded prompt states the capability gap explicitly (model
+  told it cannot check git status, run git commands, or query the
+  runtime/session graph, and must reason using only read/list/grep-able
+  file contents). The two substitutable references (`git ls-files`/`find` →
+  directory list, `git grep` → content grep) keep the prior reword-to-
+  substitute treatment from the third slice — no change there.
+- Edited only Resolved decision 6's adaptation paragraph in `design.md`
+  (split into the two-case bullet list); no other section referenced the
+  unmappable-subset distinction, so no other passage needed a matching edit.
+- `design-steps.md`: all 9 items now checked `[x]`. No unchecked
+  design-step items remain — this is the current end state for design
+  review purposes.
+- No `SCOPE_QUESTION:` item existed in this batch; nothing deferred to the
+  user this slice.
+- Batch identification for this follow-up: the batch is the contiguous
+  architecture → ambiguity → inconsistency review triple `c416b1a95`
+  (architecture, no finding) → `e229b3a43` (ambiguity, added the resolved
+  item) → `840e2100e` (inconsistency, no finding); baseline is
+  `d1db1d86e`, the parent of the oldest commit in that triple (also the
+  commit that landed the prior/third design-steps-resolution slice).
+- If a future design-review pass runs again, treat the commit that lands
+  this slice as the new prior-follow-up boundary for batch-baseline
+  purposes (same convention used by the three prior resolution slices).
