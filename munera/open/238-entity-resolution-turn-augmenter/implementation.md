@@ -1322,3 +1322,14 @@ Applied to `design.md`:
     adapted); Output Shape / step 6 excluded.
   - `munera/closed/237-pre-turn-request-augmentation/design.md` — augmentation
     rail, envelope, replay guarantee.
+
+## Plan-review ambiguity review (plan-review turn 1)
+
+- no ambiguity review feedback. Reviewed plan.md (steps.md as read-only
+  context) against the fully-converged design.md; plan faithfully translates
+  the bash-only design. The one apparent fork (point 7's round-cap via
+  run-agent-loop-in-session option vs. prompt-instructed) is not an
+  unresolved ambiguity: the 120s wall-clock budget is the always-enforced
+  finite bound satisfying design's sole requirement, with loop-option
+  verification scheduled in slice 3. Concrete v1 knobs (8 rounds, 120s,
+  ~4000-char excerpt) correctly pin the design's policy-level deferrals.
