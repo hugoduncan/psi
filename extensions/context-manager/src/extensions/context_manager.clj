@@ -141,17 +141,21 @@
    "nothing."))
 
 (defn- history-line
+  "Render a single history tail entry (237 projection shape:
+   `{:role .. :snippet ..}`) into a `Role: text` line, or nil to drop it."
   [entry]
-  (let [role (or (:role entry) (:psi.session-entry/role entry))
-        text (some-> (or (:text entry) (:content entry)) str str/trim not-empty)]
+  (let [role (:role entry)
+        text (some-> (:snippet entry) str str/trim not-empty)]
     (when (and role text (not (slash-command-only? text)))
       (str (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
 
 (defn- render-history-excerpt
   "Render a bounded, tail-truncated excerpt of the turn history for anaphora
-   resolution. Drops slash-command lines and blank entries."
+   resolution. Consumes the 237 `:turn-augmentation/history` projection map
+   `{:message-count N :tail [{:role .. :snippet ..} ...]}`; iterates `:tail`.
+   Drops slash-command lines and blank entries."
   [history]
-  (let [lines (->> (or history [])
+  (let [lines (->> (:tail history)
                    (keep history-line)
                    vec)
         text  (str/join "\n" lines)]

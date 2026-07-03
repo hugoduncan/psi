@@ -378,7 +378,7 @@
 
 ## Implementation-review follow-ups (turn 6)
 
-- [ ] **History-tail inclusion is non-functional in production — the
+- [x] **History-tail inclusion is non-functional in production — the
       augmenter mis-reads the `:turn-augmentation/history` projection shape,
       silently disabling the design-required anaphora context.** The 237
       contract (`munera/closed/237-.../design.md` lines 221–248) and the live
@@ -410,3 +410,13 @@
       rendered. Add a regression asserting a map-shaped history with `:tail`
       snippets appears in the user-prompt and a flat-vector/`nil`/empty-tail
       history yields no excerpt.
+      DONE: `render-history-excerpt` now iterates `(:tail history)` and
+      `history-line` reads each entry's `:role` + `:snippet` (dropping
+      slash-command/blank snippets as before), matching the live 237
+      `build-augmentation-history-projection` shape
+      (`{:message-count N :tail [{:index :role :content-types :snippet}]}`).
+      `build-entity-resolution-prompt-test` fixture rewritten to the real
+      projection map; added regressions asserting (a) a map-shaped `:tail`
+      snippet renders as `User: <snippet>` in the user-prompt, and (b)
+      `nil`/empty-`:tail`/flat-vector history yields no excerpt (flat vector
+      has no `:tail` → correctly ignored).

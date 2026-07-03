@@ -347,18 +347,39 @@
           (context-manager/build-entity-resolution-prompt
            (assoc base-tp
                   :turn-augmentation/history
-                  [{:role "user" :text "look at the pathom resolver"}
-                   {:role "assistant" :text "which one?"}
-                   {:role "user" :text "/help"}]))]
+                  ;; real 237 projection shape: {:message-count :tail [{:role :snippet ...}]}
+                  {:message-count 3
+                   :tail [{:index 0 :role "user" :snippet "look at the pathom resolver"}
+                          {:index 1 :role "assistant" :snippet "which one?"}
+                          {:index 2 :role "user" :snippet "/help"}]}))]
       (is (re-find #"Identify referring expressions" system-prompt))
       (is (re-find #"evidence gathering only" system-prompt))
       (is (re-find #"surface . canonical \(evidence; confidence\)" system-prompt))
       (is (re-find #"please look at the resolver" user-prompt))
       (is (re-find #"look at the pathom resolver" user-prompt)
-          "prior-turn user line is included for anaphora")
+          "prior-turn user :snippet line is included for anaphora")
       (is (re-find #"which one\?" user-prompt))
       (is (not (re-find #"/help" user-prompt))
-          "slash-command history lines are dropped"))))
+          "slash-command history lines are dropped")))
+  (testing "map-shaped history :tail snippets appear in the user prompt"
+    (let [{:keys [user-prompt]}
+          (context-manager/build-entity-resolution-prompt
+           (assoc base-tp
+                  :turn-augmentation/history
+                  {:message-count 1
+                   :tail [{:index 0 :role "user" :snippet "the former one"}]}))]
+      (is (re-find #"User: the former one" user-prompt)
+          "map-shaped :tail snippet is rendered as a Role: text line")))
+  (testing "nil / empty-tail / flat-vector history yields no excerpt"
+    (doseq [history [nil
+                     {:message-count 0 :tail []}
+                     ;; a flat vector is NOT the real projection shape → no :tail → no excerpt
+                     [{:role "user" :text "look at the resolver"}]]]
+      (let [{:keys [user-prompt]}
+            (context-manager/build-entity-resolution-prompt
+             (assoc base-tp :turn-augmentation/history history))]
+        (is (not (re-find #"Conversation history excerpt" user-prompt))
+            (str "no excerpt for history=" (pr-str history)))))))
 
 ;; --- eligibility pre-filter no-ops ---------------------------------------
 

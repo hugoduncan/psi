@@ -1545,3 +1545,10 @@ Key decisions / discoveries:
   live `build-augmentation-history-projection`, not a flat vector of
   `{:role :text}` entries), so history-tail inclusion is dead in production and
   the prompt test masks it with a wrong-shaped fixture. See steps.md.
+
+- addressed 1 turn-6 review follow-up: fixed `render-history-excerpt`/
+  `history-line` to consume the real 237 `:turn-augmentation/history`
+  projection (`{:message-count :tail [{:role :snippet ...}]}`) — read `:tail`
+  and each entry's `:role`+`:snippet`; rewrote the prompt-test fixture to the
+  real map shape and added regressions (map-tail snippet rendered;
+  nil/empty-tail/flat-vector → no excerpt). Focused tests + lint green.
