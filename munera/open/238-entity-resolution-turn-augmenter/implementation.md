@@ -1679,3 +1679,11 @@ Key decisions / discoveries:
   block, both asserting input order.
 - addressed 2 review steps; focused suite green
   (`extensions.context-manager-test` 39 tests / 122 assertions, 0 failures).
+
+## Test review (turn 12)
+
+- added 3 test-coverage follow-up steps: (1) `:tool-ids ["bash"]` tool-grant
+  acceptance criterion unasserted (only `:prompt-component-selection`
+  captured); (2) prompt's design-required *exclusions* (skill step 6 "Act or
+  ask" / "Output Shape") untested — only inclusions asserted; (3)
+  entity-resolution `:no-op` envelopes' "no operations" clause unasserted.

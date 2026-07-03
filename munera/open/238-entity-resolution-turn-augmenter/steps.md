@@ -730,3 +730,67 @@
       (two confident lines → a multi-line `:append-context-block` `:content`,
       newline-joined and in input order), covering both the render fn and the
       end-to-end success-block multi-mapping path.
+
+## Test-review follow-ups (turn 12)
+
+- [ ] **The `bash`-tool-only grant (`:tool-ids ["bash"]`) is untested — the
+      core "helper created with access to the existing `bash` tool only"
+      acceptance criterion has no covering assertion.** `default-run-helper`
+      passes `:tool-ids ["bash"]` to `create-child-session`, and per
+      `components/agent-session/.../mutations/session.clj` `:tool-ids` is the
+      actual tool-grant mechanism (`resolve-tool-defs tool-source
+      (:tool-ids sd)`) that controls which tools the child session may
+      invoke. The only test that captures the `create-child-session` params
+      (`default-run-helper-suppresses-default-prompt-and-omits-worktree-test`)
+      asserts `:prompt-component-selection` and the *absence* of
+      `:worktree-path`, but never asserts `:tool-ids ["bash"]`. Note
+      `:prompt-component-selection`'s `:tool-names ["bash"]` only controls
+      which *tool prompt fragments* are assembled — not the tool grant — so it
+      does not cover this. A regression that dropped `:tool-ids`, granted all
+      tools, or granted none would pass every current test while violating
+      design.md's Acceptance criterion "the helper session is created with
+      access to the existing `bash` tool only" and Resolved decisions 2/4/5.
+      Extend the params-capture test (or add one) to assert
+      `(= ["bash"] (:tool-ids params))` — and, since `:thinking-level :off` is
+      likewise passed-but-unasserted, optionally pin it too — so the actual
+      tool grant that the acceptance criterion turns on is covered.
+
+- [ ] **The prompt's design-required *exclusions* (skill step 6 "Act or
+      ask" and the "Output Shape" section) are untested — only inclusions are
+      asserted.** Resolved decision 6 and the Constraints/Out-of-scope
+      sections fix that the embedded method contains *only* Method steps 1–5,
+      **deliberately excluding** step 6 ("Act or ask", which instructs asking
+      a clarification question / asking for a missing identifier) and the
+      "Output Shape" section, because both conflict with the augmenter's
+      non-interactive, parse-only contract and with 237's exclusion of
+      interactive pre-turn prompts. `build-entity-resolution-prompt-test`
+      asserts many positive inclusions (method text, safety, contract,
+      capability-gap disclosure, round cap) but never asserts these
+      exclusions. A regression that embedded the whole skill file — re-
+      introducing "Act or ask"/clarification-question guidance or the Output
+      Shape reasoning-table framing — would pass every current test yet
+      directly re-open the interactive-prompt hazard the design closes. Add
+      assertions to `build-entity-resolution-prompt-test` that the
+      system-prompt does **not** contain the excluded guidance (e.g. no
+      "Act or ask", no clarification-question instruction, no "Output Shape"
+      table framing), pinning the negative/exclusion half of Resolved
+      decision 6.
+
+- [ ] **The entity-resolution `:no-op` envelopes' "no operations" well-
+      formedness clause is unasserted.** Required behaviour item 5 and the
+      Acceptance criteria specify a "well-formed `:no-op` (**no operations**)"
+      for the helper-session / blank-cwd / slash-command / no-referring-
+      expression / no-confident-mapping / no-local-model / failed-run paths.
+      Every entity-resolution no-op test
+      (`entity-resolution-helper-session-no-op-test`, `-blank-cwd-`,
+      `-slash-command-only-`, `-no-local-model-`, `-empty-run-`, `-nil-run-`,
+      `-throwing-helper-`) asserts `:turn-augmentation/status = :no-op` (and
+      some assert `:child-session-ids`), but none asserts
+      `:turn-augmentation/operations` is empty `[]` — the very clause that
+      makes the envelope well-formed. (`project-context-augmentation-test`
+      does assert `:operations []`, but the entity-resolution no-op paths do
+      not.) A regression that leaked a stale/partial operation into a no-op
+      envelope would pass. Add an `(is (= [] (:turn-augmentation/operations
+      env)))` assertion to the entity-resolution no-op tests (or a shared
+      well-formed-no-op helper) so the "no operations" invariant is pinned,
+      not just the `:no-op` status label.
