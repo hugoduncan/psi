@@ -1767,3 +1767,9 @@ Key decisions / discoveries:
   an embedded newline/tab/multi-space snippet renders as one collapsed
   `Role:` line. Focused + full context-manager suite green (38 tests, 138
   assertions); clj-kondo clean.
+
+## Test-review note (turn 17)
+
+- added 2 steps (test-shaper): untested parent-session-model context
+  inheritance in `default-select-model`, and the untested `::error`
+  deref-catch branch of `default-run-helper`.

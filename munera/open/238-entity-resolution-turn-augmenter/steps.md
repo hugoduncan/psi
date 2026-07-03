@@ -977,3 +977,47 @@
       the exact collapsed line and that the excerpt is exactly one line (no
       role-less continuation), pinning the `\s+ → " "` collapse from the render
       side (complementing the turn-15 char-slice line-boundary invariant).
+
+## Test-review follow-ups (turn 17)
+
+- [ ] **The parent-session-model context inheritance in `default-select-model`
+      is untested — a design-required behaviour (Required behaviour item 2 /
+      plan decision 4: "inheriting the parent session's model as context, like
+      `auto-session-name`") with zero coverage.** `default-select-model` calls
+      `(:query-session api)` on the parent session-id to fetch
+      `:psi.agent-session/model-provider` / `:psi.agent-session/model-id`, and
+      `helper-model-selection-request` threads that into
+      `resolve-selection`'s `:context {:session-model {:provider .. :id ..}}`
+      (the `:same-provider-as-session` weak preference and provider-match
+      tie-break depend on it). But every `default-select-model` test stubs
+      `:query-session` to return `{}` (or omits it), so the parent model is
+      always nil and the `:context`/`query-session` path is never exercised: a
+      regression that dropped the `query-session` call, stopped reading the
+      provider/id keys, or stopped building the `:session-model` context would
+      pass all current tests while silently losing the design-required
+      model-inheritance behaviour. Add a `default-select-model` (or
+      `helper-model-selection-request`) test that supplies a `:query-session`
+      returning a concrete
+      `{:psi.agent-session/model-provider .. :psi.agent-session/model-id ..}`
+      and asserts the parent model flows into the selection request's
+      `:context {:session-model {...}}` (e.g. capture the `:request` passed to
+      an injected/`resolve-selection` seam, or assert on
+      `helper-model-selection-request` directly), pinning the parent-model
+      context inheritance distinct from the happy-path ranking assertions.
+
+- [ ] **The `deref`-throws (`::error`) branch of `default-run-helper` is
+      untested — only the `::timeout` and settled branches are covered.**
+      `(try (deref fut budget-ms ::timeout) (catch Exception _ ::error))`
+      guards against the run future's blocking call throwing an
+      *uncaught* exception that surfaces through `deref` (e.g. an
+      `ExecutionException`); on `::error` the fn falls to the settled branch
+      where `(map? ::error)` is false → `:text nil` (→ `:no-op`).
+      `default-run-helper-gates-on-run-ok-test` covers ok?-false, the timeout
+      test covers `::timeout`, and the child-creation-failure test covers the
+      pre-run gate, but no test drives a `run-agent-loop-in-session` that
+      *throws* out of the future so the `::error` deref-catch runs. A
+      regression that dropped the deref-catch (letting the exception propagate
+      onto 237's blocking pre-turn path) or mis-handled `::error` would pass.
+      Add a `default-run-helper` case whose `run-agent-loop-in-session` throws,
+      asserting `:text` is nil (→ `:no-op`), the exception does not propagate,
+      and the child is still closed/untracked by the future's `finally`.
