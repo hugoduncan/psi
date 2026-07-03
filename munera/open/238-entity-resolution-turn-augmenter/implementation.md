@@ -725,3 +725,21 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - If a future design-review pass runs again, treat the commit that lands
   this slice as the new prior-follow-up boundary for batch-baseline
   purposes (same convention used by all four prior resolution slices).
+
+## Architecture review (design-review turn 1, sixth pass — post `f92192104`)
+
+- no architectural review feedback. `f92192104` only reworded Resolved
+  decision 6's two-case-split summary and the Goal/Required-behaviour-item-3
+  cross-references to it, and dropped "session" from the capability-gap
+  sentence — no new architectural surface, dependency, capability, or
+  boundary.
+- Re-verified against current code: `extension_installs.clj` still grants
+  `context-manager` only `turn-augmentation-capability`; `model_selection.clj`
+  still has no `:supports-tool-calling` fact; `make-read-only-tools-with-cwd`
+  still returns only the single `read-tool`; `context-manager/deps.edn`
+  still lacks a `psi/ai` dep (unlike `auto-session-name/deps.edn`); confirmed
+  `doc/extension-api.md` documents UI capability keywords only, not
+  turn-augmentation permissions — not a conflicting source for Resolved
+  decision 1. All still match design.md's assumptions.
+- `design-steps.md` has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
