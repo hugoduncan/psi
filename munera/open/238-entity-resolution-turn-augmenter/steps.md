@@ -670,3 +670,46 @@
       false), and that no nil/orphan id is tracked in
       `entity-resolution-helper-session-ids`, pinning the run/track entry
       gate against a dropped nil guard.
+
+## Test-review follow-ups (turn 11)
+
+- [ ] **The turn-5 default-collaborator `api`-threading coverage test was
+      deleted and never replaced — the gap turn-5 closed is silently
+      re-opened while still marked `[x]` done.** Commit `2752842ec`
+      (turn-5 follow-up) added
+      `entity-resolution-registered-handler-threads-real-api-test`, which
+      drove the **registered** 2-arity handler (built by `init` with the real
+      `api` closed over, no injected collaborators) through the production
+      `#(default-select-model api %)` seam to a `no-op "no local model"`
+      outcome — the only test exercising the default-collaborator branch the
+      registered handler actually uses at runtime. Commit `94ccb3f21`
+      ("Split context-manager registration test") **removed** that test (and
+      the `psi.ai.model-selection` require it needed) without adding any
+      replacement. The surviving `init-registers-entity-resolution-augmenter-test`
+      only asserts `(fn? (:handler registration))` — it never invokes the
+      handler — so every `entity-resolution-augmentation` call site again
+      passes an empty `{}` api with injected stubs, and the real
+      `(or (:select-model collaborators) #(default-select-model api %))` /
+      `#(default-run-helper api %)` default-collaborator path is once more
+      uncovered (exactly the regression turn-5 identified: a dropped `api`
+      closure, swapped defaults, or mis-ordered `or` fallback would pass all
+      tests). Re-add a test that invokes the **registered** handler with a
+      **real** `api` (nullable-style) and **no** collaborators, asserting it
+      threads through the defaults to a well-formed envelope (e.g. empty model
+      pool → `no-op "no local model"`), and correct the turn-5 step's DONE
+      note / re-tick it accurately — the "Split ... registration test" commit
+      did not split this test, it deleted it.
+
+- [ ] **The multi-mapping render path (`render-mapping-content`
+      newline-join) and multi-line success block are untested — only the
+      single-mapping case is exercised.** design.md's rendered `:content` is a
+      `surface → canonical (evidence)` *list* (one line per confident
+      mapping), and `parse-mapping-lines`/`render-mapping-content` both
+      support many mappings, but `render-mapping-content-test` renders exactly
+      one mapping and `entity-resolution-confident-mapping-success-test`
+      asserts a single-line block. The `(str/join "\n" ...)` multi-mapping
+      join is never run, so a regression that dropped the join separator,
+      emitted only the first/last mapping, or reordered lines would pass. Add
+      a `render-mapping-content` (and/or success-block) case with ≥2 confident
+      mappings asserting all are present, newline-separated, and in input
+      order — pinning the list-rendering behaviour the design specifies.

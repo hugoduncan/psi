@@ -1648,3 +1648,13 @@ Key decisions / discoveries:
   (nil-child and throwing-child sub-cases) asserting nil result → no run →
   no nil/orphan tracking. `bb test --focus extensions.context-manager-test`:
   39 tests, 125 assertions, 0 failures. clj-kondo clean.
+
+## Test-review turn 11 (task-test-review)
+
+- added 2 steps.
+- non-compliance: commit `94ccb3f21` deleted the turn-5
+  `entity-resolution-registered-handler-threads-real-api-test` (closing that
+  follow-up's coverage) without replacement, so that step's `[x]`/DONE note is
+  now inaccurate — the default-collaborator api-threading seam is uncovered
+  again. Current suite is 38 tests / 119 assertions, below the "39 tests / 125
+  assertions" recorded in the turn-10 note above, confirming the lost test.
