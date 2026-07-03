@@ -1163,3 +1163,36 @@ Applied to `design.md`:
   already captured by this session's ambiguity pass; its "accept/reject gate"
   wording tension is an ambiguity, not a distinct contradiction. No
   `SCOPE_QUESTION:` raised.
+
+## Notes for the ninth design-steps-resolution slice (1 unchecked item: confidence-gate)
+
+- Only one new unchecked item this batch: the confidence-gate mechanism
+  (ambiguity turn 2). Resolve by editing `design.md` within frozen scope —
+  clarify the in-scope confident filter; do not change entity types/operations.
+- Two candidate resolutions to pick between (state the choice + rationale in
+  design.md, don't leave both):
+  (a) augmenter value-thresholds the confidence field → must fix a confidence
+      scale/vocabulary + threshold at "e.g."/policy granularity (matching
+      decisions 4–6), and the "ambiguous reference dropped" test asserts a
+      low-confidence line is dropped by the augmenter;
+  (b) model self-gates via "never guess" and the augmenter accepts any
+      well-formed line (confidence token required-but-value-unconstrained,
+      dropped at render) → then soften decision 6's "confidence's only role is
+      the accept/reject gate" so it doesn't overstate augmenter-side filtering,
+      and the "ambiguous reference dropped" test asserts the model omits the
+      mapping (no augmenter confidence filtering exercised).
+- Keep the three-field rendered composition (`surface → canonical (evidence)`,
+  confidence dropped at render) unchanged whichever way is chosen — that is
+  already settled; only the accept/reject step is in question.
+- Whichever is chosen, align: decision 6's gate wording, the "Confidence gate &
+  output shape" policy bullet, the "never guess" Constraint, and the Tests-list
+  "ambiguous reference dropped" framing — so all agree on where the drop happens
+  (model vs augmenter).
+- Relevant precedent files (no re-derivation needed): confidence/self-gating
+  language originates in `.psi/skills/entity-resolution/SKILL.md` (only Method
+  steps 1–5 embedded; Output Shape excluded per decision 6); helper output
+  parsing/render lives in the augmenter to be added under
+  `extensions/context-manager/src/extensions/context_manager.clj`.
+- No `SCOPE_QUESTION:` outstanding from this design-review batch. Architecture
+  and inconsistency turns added nothing; this batch's only follow-up is the
+  confidence-gate item.
