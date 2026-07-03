@@ -1427,3 +1427,23 @@ Key decisions / discoveries:
 - added 4 follow-up steps: helper child inherits full default system prompt
   (missing `:prompt-component-selection`), silently-ignored `:worktree-path`
   arg, unchecked `agent-run-ok?`, and mapping-line regex parens/`;` fragility.
+
+## Implementation-review follow-ups (turn 1) — resolved
+
+- addressed 4 review steps in `default-run-helper` / `parse-mapping-lines`:
+  1. **prompt-component-selection**: added `{:agents-md? false
+     :extension-prompt-contributions [] :tool-names ["bash"] :skill-names []
+     :components #{}}` to `create-child-session` so the augmenter's embedded
+     Method-only system prompt is authoritative (auto-session-name precedent).
+  2. **worktree-path dead arg**: dropped `:worktree-path` (and the now-unused
+     `:cwd` run-helper opt); child cwd comes from parent-worktree inheritance,
+     documented in the fn docstring/comment.
+  3. **agent-run-ok? gate**: `:text` is now `(when agent-run-ok? agent-run-text)`
+     — a failed run (`ok? false`, `"Error: ..."`) no longer feeds the parser.
+  4. **mapping-line-re hardening**: trailing `(evidence; confidence)` anchored
+     to the last parenthesized group; evidence splits at the last `;`. Canonical
+     may now contain `(...)` and evidence may contain `;`.
+- New tests: two `parse-mapping-lines-test` cases (canonical-with-parens,
+  evidence-with-semicolon), `default-run-helper-gates-on-run-ok-test`,
+  `default-run-helper-suppresses-default-prompt-and-omits-worktree-test`.
+- Focused suite: 30 tests, 87 assertions, 0 failures; clj-kondo clean.

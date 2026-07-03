@@ -178,7 +178,14 @@
 
 (def ^:private mapping-line-re
   ;; surface → canonical (evidence; confidence)
-  #"^\s*(.+?)\s*(?:→|->)\s*(.+?)\s*\(\s*(.+?)\s*;\s*(.+?)\s*\)\s*$")
+  ;;
+  ;; The trailing `(evidence; confidence)` group is anchored to the *last*
+  ;; parenthesized group on the line, so a `canonical` containing its own
+  ;; parentheses (e.g. `foo/bar (arity 2)`) does not leak into the evidence
+  ;; group. Within that final group, `evidence` is everything up to the
+  ;; *last* `;`, so evidence text may itself contain `;` (e.g.
+  ;; `git grep; 3 hits`) without truncating.
+  #"^\s*(.+?)\s*(?:→|->)\s*(.+)\(\s*(.+)\s*;\s*(.+?)\s*\)\s*$")
 
 (defn parse-mapping-lines
   "Parse only well-formed `surface → canonical (evidence; confidence)` lines
@@ -240,15 +247,36 @@
   "Create a bash-tool-enabled child helper session, run a bounded agent loop
    with the built prompt, and return {:child-session-id id :text raw} (text
    may be nil). The child id is tracked before the run for recursion safety
-   and the session is closed/untracked afterward. Returns nil on failure."
-  [api {:keys [parent-session-id system-prompt user-prompt cwd model]}]
+   and the session is closed/untracked afterward. Returns nil on failure.
+
+   The child's effective cwd comes from parent-worktree inheritance (the
+   parent session-id's worktree). `create-child-session` does not accept a
+   `:worktree-path` argument, so cwd is *not* passed here — passing it would
+   be a silently-ignored dead parameter. The `cwd` from the turn projection
+   is the projected effective cwd of that same parent, so inheritance yields
+   the intended bash working directory."
+  [api {:keys [parent-session-id system-prompt user-prompt model]}]
   (let [child (try
                 ((:mutate-session api) parent-session-id 'psi.extension/create-child-session
                                        {:session-name    "entity-resolution"
                                         :system-prompt   system-prompt
-                                        :worktree-path   cwd
                                         :tool-ids        ["bash"]
-                                        :thinking-level  :off})
+                                        :thinking-level  :off
+                                        ;; The augmenter's constructed
+                                        ;; `system-prompt` is authoritative
+                                        ;; (Resolved decision 6 embeds only
+                                        ;; Method steps 1–5). Suppress the
+                                        ;; default full system-prompt assembly
+                                        ;; — AGENTS.md context, skill/extension/
+                                        ;; tool prompt fragments — exactly as
+                                        ;; the auto-session-name precedent does,
+                                        ;; keeping only `bash` in `:tool-names`.
+                                        :prompt-component-selection
+                                        {:agents-md? false
+                                         :extension-prompt-contributions []
+                                         :tool-names ["bash"]
+                                         :skill-names []
+                                         :components #{}}})
                 (catch Exception _ nil))
         child-session-id (:psi.agent-session/session-id child)]
     (when child-session-id
@@ -262,8 +290,13 @@
           (if (= ::timeout run)
             (do (future-cancel fut)
                 {:child-session-id child-session-id :text nil})
+            ;; Gate on agent-run-ok?: a failed run returns ok? false with
+            ;; agent-run-text = "Error: ...", which must be treated as a
+            ;; failed run, not parsed for mapping lines (auto-session-name
+            ;; precedent). On failure, surface no text.
             {:child-session-id child-session-id
-             :text (:psi.agent-session/agent-run-text run)}))
+             :text (when (:psi.agent-session/agent-run-ok? run)
+                     (:psi.agent-session/agent-run-text run))}))
         (catch Exception _
           {:child-session-id child-session-id :text nil})
         (finally
@@ -304,10 +337,13 @@
            (no-op-envelope "no local model")
            (let [{:keys [system-prompt user-prompt]}
                  (build-entity-resolution-prompt turn-projection)
+                 ;; No :cwd — the helper child inherits the parent
+                 ;; session's worktree as its effective cwd (see
+                 ;; default-run-helper); create-child-session has no
+                 ;; :worktree-path parameter.
                  result (run-helper {:parent-session-id session-id
                                      :system-prompt system-prompt
                                      :user-prompt user-prompt
-                                     :cwd cwd
                                      :model model})
                  mappings (parse-mapping-lines (:text result))
                  child-ids (vec (keep :child-session-id [result]))]

@@ -296,6 +296,22 @@
     (is (= 1 (count (context-manager/parse-mapping-lines
                      "foo -> bar (ev; conf)")))))
 
+  (testing "canonical containing parentheses does not leak into evidence"
+    (is (= [{:surface "the fn"
+             :canonical "foo/bar (arity 2)"
+             :evidence "exact path"
+             :confidence "high"}]
+           (context-manager/parse-mapping-lines
+            "the fn → foo/bar (arity 2) (exact path; high)"))))
+
+  (testing "evidence containing a semicolon is preserved (splits at last ;)"
+    (is (= [{:surface "the term"
+             :canonical "foo"
+             :evidence "git grep; 3 hits"
+             :confidence "medium"}]
+           (context-manager/parse-mapping-lines
+            "the term → foo (git grep; 3 hits; medium)"))))
+
   (testing "zero well-formed lines yields empty vector"
     (is (= [] (context-manager/parse-mapping-lines "no lines here at all")))
     (is (= [] (context-manager/parse-mapping-lines nil)))))
@@ -414,6 +430,68 @@
                (stub {:text "" :child-id "helper-9"}))]
       (is (= :no-op (:turn-augmentation/status env)))
       (is (not (some #(= :success %) [(:turn-augmentation/status env)]))))))
+
+;; --- default-run-helper: run-ok gating, prompt-selection, no worktree-path --
+
+(defn- fake-run-api
+  "A minimal `api` map for exercising default-run-helper: records the
+   create-child-session params and returns the supplied run-result from
+   run-agent-loop-in-session."
+  [{:keys [run-result create-calls]}]
+  {:mutate-session
+   (fn [_sid op params]
+     (case op
+       psi.extension/create-child-session
+       (do (when create-calls (reset! create-calls params))
+           {:psi.agent-session/session-id "child-1"})
+       psi.extension/run-agent-loop-in-session
+       run-result))
+   :mutate (fn [_op _params] nil)})
+
+(deftest default-run-helper-gates-on-run-ok-test
+  (testing "a failed helper run (ok? false) surfaces no text, not the error string"
+    (let [api (fake-run-api
+               {:run-result {:psi.agent-session/agent-run-ok? false
+                             :psi.agent-session/agent-run-text "Error: boom"}})
+          result (#'context-manager/default-run-helper
+                  api {:parent-session-id "s1"
+                       :system-prompt "sys"
+                       :user-prompt "usr"})]
+      (is (= "child-1" (:child-session-id result)))
+      (is (nil? (:text result))
+          "failed run must not surface agent-run-text for parsing")))
+
+  (testing "a successful helper run (ok? true) surfaces the run text"
+    (let [api (fake-run-api
+               {:run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text "the resolver → x (e; c)"}})
+          result (#'context-manager/default-run-helper
+                  api {:parent-session-id "s1"
+                       :system-prompt "sys"
+                       :user-prompt "usr"})]
+      (is (= "the resolver → x (e; c)" (:text result))))))
+
+(deftest default-run-helper-suppresses-default-prompt-and-omits-worktree-test
+  (testing "create-child-session gets prompt-component-selection and no :worktree-path"
+    (let [create-calls (atom nil)
+          api (fake-run-api
+               {:create-calls create-calls
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text ""}})]
+      (#'context-manager/default-run-helper
+       api {:parent-session-id "s1"
+            :system-prompt "sys"
+            :user-prompt "usr"})
+      (let [params @create-calls]
+        (is (= {:agents-md? false
+                :extension-prompt-contributions []
+                :tool-names ["bash"]
+                :skill-names []
+                :components #{}}
+               (:prompt-component-selection params))
+            "helper suppresses default full system prompt, keeping only bash")
+        (is (not (contains? params :worktree-path))
+            "no silently-ignored :worktree-path passed; cwd comes from parent inheritance")))))
 
 (deftest init-registers-entity-resolution-augmenter-test
   (testing "init registers entity-resolution with a handler"
