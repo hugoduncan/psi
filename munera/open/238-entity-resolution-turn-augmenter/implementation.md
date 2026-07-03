@@ -259,3 +259,26 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - design-steps.md: all 7 items now checked `[x]`. No unchecked design-step
   items remain — design.md should be re-readable end-to-end for
   completeness/unambiguity before `plan.md` is created.
+
+## Architecture review (design-review turn 1, third pass — post skill/slash/content-composition resolution)
+
+- no architectural review feedback. Re-checked design.md as edited by
+  `b7f717e33` (skill-embedding scope narrowed to Method steps 1–5,
+  slash-command-only pre-filter rule pinned down, `:content` field
+  composition settled at three fields) against `AGENTS.md`, `ramora/META.md`,
+  `doc/architecture.md`, and `doc/extension-api.md` — these edits are
+  ambiguity/inconsistency clarifications, not architectural changes, and
+  introduce no new architectural surface.
+- Re-verified against current code that nothing has drifted since the
+  second-pass architecture review (`bbf888503`): `context-manager`'s
+  manifest still grants only `turn-augmentation-capability`
+  (`extension_installs.clj`); `model_selection.clj` still has no
+  `:supports-tool-calling` fact/criterion (additive addition still
+  uncomplicated); `tools.clj`'s `make-read-only-tools-with-cwd` still
+  exposes only `"read"` (dir-list/grep still genuinely new); `auto-session-name`
+  still depends on `psi/ai` directly via `:local/root` while
+  `context-manager` still doesn't — confirming the design's stated
+  dependency-addition need is accurate and consistent with existing
+  extension-dependency precedent (not an isolation violation; already
+  established practice, not new).
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
