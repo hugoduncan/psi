@@ -1148,3 +1148,18 @@ Applied to `design.md`:
   history-tail excerpt format, bounded-helper-loop numbers, and single-attempt
   model selection are all intentionally deferred to plan/impl at "e.g."/policy
   granularity — not ambiguities. No `SCOPE_QUESTION:` raised.
+
+## Inconsistency review (design-review turn 3, ninth pass — post eighth-slice resolution)
+
+- no inconsistency review feedback. Verified the three no-op enumerations
+  (Required behaviour item 5, Acceptance criteria, Tests list) are aligned
+  (all seven reasons + tests, incl. failed/empty-helper-run and the distinct
+  slash-command pre-filter test); rendered-content composition is stated
+  identically (3-field `surface → canonical (evidence)`, confidence dropped)
+  across Acceptance criteria / decision 6 / "Confidence gate & output shape";
+  model-selection (single-attempt, local, inherit context), child-session-ids
+  provenance, and bounded-loop→failed-run `:no-op` collapse are consistent.
+- Not filed (would duplicate): the confidence-gate underspecification is
+  already captured by this session's ambiguity pass; its "accept/reject gate"
+  wording tension is an ambiguity, not a distinct contradiction. No
+  `SCOPE_QUESTION:` raised.
