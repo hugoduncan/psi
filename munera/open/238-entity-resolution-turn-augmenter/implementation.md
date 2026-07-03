@@ -934,3 +934,60 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   - `extensions/context-manager/src/extensions/context_manager.clj` — host
     extension where the augmenter will construct helper prompts and select
     helper tools.
+
+
+## User requirement change — bash-only helper tool access
+
+User changed task 238's requirements: remove any need for new read-only tools
+and give the entity-resolution helper session access to the existing `bash`
+tool instead.
+
+Applied to `design.md`:
+
+- Goal now says the task deliberately does not add new read-only tools or a new
+  model-selection tool-calling fact/criterion.
+- Required behaviour now creates the helper with the existing `bash` tool only.
+- Resolved decision 2 now defines evidence gathering as local-model + `bash`.
+- Resolved decision 4 now says no directory-list/content-grep/git-aware search
+  or other new read-only tool is in scope.
+- Resolved decision 5 now says no `psi.ai.model-selection` tool/function-calling
+  fact or criterion is added.
+- Resolved decision 6 now adapts the embedded method to `bash`-based evidence
+  gathering and keeps runtime/session graph introspection as an unavailable
+  capability.
+- Constraints and acceptance criteria now assert no new read-only/search tools
+  and no new model-selection capability facts.
+- The two previously open design steps are marked resolved in `design-steps.md`:
+  the git-tracked-vs-filesystem read/list/grep corpus question is obsolete, and
+  the SKILL.md reference wording now matches the method-only delivery contract.
+
+## Architecture review (design-review turn 1, eighth pass — post bash-only requirement change)
+
+- no architectural review feedback. First architecture pass over the
+  bash-only design (user requirement change). The change reduces
+  architectural surface rather than adding it: it drops the previously
+  design-flagged new `:supports-tool-calling` model-selection fact and the
+  new read-only toolset, and instead reuses the existing `bash` tool
+  (`components/agent-session/src/psi/agent_session/tools.clj` — `bash-tool`,
+  in the built-in tool set) granted via the existing `create-child-session`
+  `:tool-ids` path (`child_session_state.clj` / `resolve-tool-defs`). No new
+  child/run API, no new tool surface.
+- Conformance verified against `AGENTS.md` (VSM), `ramora/META.md`,
+  `doc/architecture.md`: data-only extension envelope + no parent mutation +
+  replay determinism (237/S5) preserved; capability gating unchanged
+  (`turn-augmentation-capability`, no manifest change); graceful `:no-op`
+  degradation when the local model can't use bash keeps invariants intact.
+- `context-manager` will need a `psi/ai` dep added for `model-selection`;
+  consistent with `auto-session-name/deps.edn`'s existing `psi/ai` dep — an
+  established extension-dependency precedent, not an isolation violation.
+- Considered and not filed: relying on prompt constraints (behavioral) for
+  bash safety on an auto-fired per-turn helper is in mild tension with the
+  `impossible_invalid_states` structural-safety ethos, but (a) it is a
+  deliberate, user-directed, documented decision (Resolved decisions 2/4),
+  (b) the existing bash tool already routes through app-runtime
+  `effective-policy`/tool-output policy (`tools.clj` ~line 372), providing a
+  structural boundary automatically, and (c) filing it would re-litigate the
+  frozen bash-vs-restricted-tools scope. Not an architectural misfit against
+  a violated invariant.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+- design-steps.md has 0 unchecked items; no new step added this pass.
