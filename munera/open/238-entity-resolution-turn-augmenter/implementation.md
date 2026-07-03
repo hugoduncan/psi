@@ -509,6 +509,27 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - As with prior slices: resolve by editing `design.md` itself (localized
   edit to Resolved decision 6, not a plan/implementation-time workaround).
 
+## Architecture review (design-review turn 1, fifth pass — post `b37363b71`)
+
+- no architectural review feedback. `b37363b71` only reworded Resolved
+  decision 6's adaptation-policy paragraph (splitting the substitutable
+  `git ls-files`/`find`/`git grep` references from the unmappable "current
+  git status" / "Psi graph introspection" references, replacing the latter
+  with an explicit capability-gap statement instead of a misleading
+  reword) — a policy-wording refinement of an already-reviewed decision,
+  introducing no new architectural surface, dependency, capability, or
+  boundary.
+- Re-verified against current code that nothing has drifted since the
+  fourth architecture pass (`c416b1a95`): `model_selection.clj` still has
+  no `:supports-tool-calling` fact/criterion; `make-read-only-tools-with-cwd`
+  (`components/agent-session/src/psi/agent_session/tools.clj`) still
+  returns only the single `read-tool`; `extensions/context-manager/deps.edn`
+  still lacks a `psi/ai` dep (unlike `auto-session-name`'s); `extension_installs.clj`
+  still grants `context-manager` only `turn-augmentation-capability`. All
+  four still match what design.md assumes — no new gap.
+- `design-steps.md` has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
 ## Fourth design-steps-resolution slice — resolved (batch: `c416b1a95`..`840e2100e`, baseline `d1db1d86e`)
 
 - Resolved the 1 remaining unchecked item (git-status / graph-introspection
