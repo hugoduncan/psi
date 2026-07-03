@@ -112,3 +112,44 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - Next design-review pass (if any) should treat commit range after
   `fce0067b2`..HEAD (this follow-up) as the new prior-follow-up boundary for
   batch-baseline purposes.
+
+## Architecture review (design-review turn 1, second pass — post-resolution)
+
+- no architectural review feedback. Re-checked design.md (as updated by
+  `42dbf2086`, which added Resolved decisions 4–6) against `AGENTS.md`,
+  `ramora/META.md`, `doc/architecture.md`, and `doc/extension-api.md`;
+  confirmed no new architectural misfit beyond what the prior
+  architecture/ambiguity/inconsistency batch already found and design.md now
+  resolves.
+- Re-verified against current code (not just prior notes), all consistent
+  with the design:
+  - `run-agent-loop-in-session` (`components/agent-session/src/psi/agent_session/mutations/session.clj`)
+    drives the full `core/prompt-in!` lifecycle for the child session,
+    meaning the helper session goes through its own
+    `:session/pre-turn-augment` phase and would itself be eligible for the
+    `"project-context"` and `"entity-resolution"` augmenters unless tracked
+    — this is exactly what Required behaviour item 6 / Constraints
+    "Recursion safety" already require; `auto-session-name` shows the
+    correct ordering (`remember-helper-session!` before
+    `run-agent-loop-in-session`, `close-session` + `disj` after). No design
+    change needed, but implementation must track the child id *before*
+    starting the helper run, not after.
+  - `psi.ai.model-selection`'s criterion dispatch (`candidate-attribute`,
+    `compare-by-criterion`) is a `case`-based, additive per-key lookup —
+    adding a `:supports-tool-calling` fact/criterion is mechanically
+    additive, confirming Resolved decision 5's additive-only claim.
+  - `create-child-session` / `prompt_request.clj`'s `input-expansion` calls
+    `prompt-skills/invoke-skill` against the *submitted user text only* —
+    confirms Resolved decision 6's rationale (verbatim `SKILL.md` embedding
+    in the augmenter-constructed system/user prompt, not `:skill-names`) is
+    the only viable existing mechanism; `:skill-names`/skill-text-expansion
+    cannot force-include a skill independent of user text.
+  - `components/agent-session/src/psi/agent_session/tools.clj` is already
+    the core-owned built-in-tool home (read/bash/edit/write); adding
+    dir-list/grep read-only tools there (Resolved decision 4) matches the
+    existing tool-registry location and pattern, not a new surface.
+  - `extension_installs.clj` already grants `context-manager` only
+    `turn-augmentation-capability`; a second augmenter on the same
+    extension needs no manifest change (Resolved decision 1 confirmed
+    again against current manifest).
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
