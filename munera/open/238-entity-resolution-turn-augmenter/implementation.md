@@ -153,3 +153,26 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
     extension needs no manifest change (Resolved decision 1 confirmed
     again against current manifest).
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Ambiguity review (design-review turn 2, second pass — post-resolution)
+
+- ambiguity review added 2 new design steps: (1) whether Resolved decision
+  6's "verbatim `SKILL.md` content" means the whole file (whose own "Output
+  Shape"/"Act or ask" sections conflict with the augmenter's non-interactive,
+  parse-only-fixed-line-format contract) or only the Method steps, with the
+  augmenter's prompt separately stating the output contract; (2) the
+  "Remaining v1 policies" slash-command-only eligibility skip cites
+  `auto-session-name`'s guard as precedent, but that guard only filters
+  individual context lines, not whole helper runs — the exact turn-level
+  detection rule and its no-op/test placement are unspecified. See
+  design-steps.md.
+- Confirmed `:turn/augmentation-context` (used in Acceptance criteria) is a
+  real, already-shipped 237 prompt-layer id
+  (`components/turn-runtime/src/psi/turn_runtime/augmentation.clj`,
+  `psi.agent_session/prompt_request_test.clj`) — not an ambiguous/new term;
+  ruled out as a finding.
+- Considered and ruled out: whether "no referring expressions detected" vs.
+  "no confident mapping" (Required behaviour item 5) are the same code path.
+  Resolved decision 6 already states zero-parsed-lines is treated as "no
+  confident mapping," which subsumes the no-referring-expression case — not
+  independently ambiguous, so not filed as a new item.

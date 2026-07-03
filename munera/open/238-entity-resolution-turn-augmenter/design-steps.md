@@ -80,3 +80,47 @@
   mapping-confidence filtering) called out one paragraph earlier. Add a
   failed/empty-helper-run → no-op test to the Tests list, or state why it's
   not needed.
+
+- [ ] Ambiguous: "embeds the `entity-resolution` skill's method directly ...
+  (verbatim `.psi/skills/entity-resolution/SKILL.md` content, included as
+  part of the helper system/user prompt the augmenter builds)" (Resolved
+  decision 6) does not say whether the *whole file* is embedded verbatim or
+  only its "Method" steps (1–5). This matters because the skill file's own
+  "Output Shape" section prescribes a markdown table plus prose "final
+  response" framing ("Interpreting 'that workflow' as ... because..."), and
+  its "Act or ask" step (6) explicitly instructs: "If multiple candidates
+  remain plausible, ask a focused clarification question... If no candidate
+  is evidenced, say what was searched and ask for the missing identifier" —
+  both directly conflicting with the augmenter's required non-interactive,
+  parse-only-a-fixed-line-format output contract (also decision 6), and with
+  237's "no interactive pre-turn prompts" exclusion. Two different
+  interpretations of "embeds ... directly" lead to different prompt
+  construction: (a) embed the full file verbatim and rely on the model
+  reconciling the conflicting output instructions unaided (any "question" or
+  table output the model produces is silently discarded as
+  non-matching-format commentary, per decision 6's "discards everything
+  else"), or (b) embed only the reasoning-method portion and have the
+  augmenter's own prompt separately state the required output contract,
+  omitting/overriding the skill's own Output Shape and Act-or-ask framing.
+  Pin down which is intended (or state that (a) is acceptable because
+  mismatched output is already a no-op via decision 6's zero-parsed-lines
+  rule) so the helper-prompt-construction step isn't improvised.
+
+- [ ] Ambiguous: "Remaining v1 policies" says the eligibility pre-filter
+  should "skip slash-command-only prompts, mirroring `auto-session-name`'s
+  guards, before spending a helper run." `auto-session-name`'s actual guard
+  (`slash-command-text?` in `extensions/auto_session_name.clj`) only filters
+  individual conversation *lines* out of its rename-inference excerpt; it
+  does not skip its own checkpoint/helper run when the *current* turn is a
+  slash command (checkpoint firing is gated only by `checkpoint-due?`,
+  independent of message content). So "mirroring auto-session-name's guards"
+  does not name an existing whole-run-skip mechanism to copy, leaving the
+  exact detection rule for a *turn-level* slash-command-only skip
+  unspecified (e.g., is it "trimmed user text starts with `/`", matching
+  `slash-command-text?`'s definition, applied at a different granularity than
+  its current use?). This eligibility condition is also absent from Required
+  behaviour item 5's no-op enumeration, the Acceptance criteria no-op list,
+  and the Tests list, so it's unclear whether it needs its own diagnosable
+  no-op reason/test or is expected to collapse into an existing one. Specify
+  the exact slash-command-only detection rule and where it fits among the
+  enumerated no-op reasons/tests.
