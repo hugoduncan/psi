@@ -640,7 +640,7 @@
 
 ## Test-review follow-ups (turn 10)
 
-- [ ] **`default-run-helper`'s child-creation-failure branch is untested — the
+- [x] **`default-run-helper`'s child-creation-failure branch is untested — the
       run/track entry gate on the blocking pre-turn path has no coverage.**
       `default-run-helper` wraps `create-child-session` in `(try … (catch
       Exception _ nil))` and then gates the entire run on
@@ -662,3 +662,11 @@
       `:no-op`), that `run-agent-loop-in-session` is never invoked, and that
       `entity-resolution-helper-session-ids` is left untouched (no nil/orphan
       id tracked).
+      DONE: added `default-run-helper-child-creation-failure-test` with two
+      sub-cases — `create-child-session` returns a session-id-less map
+      (nil child), and `create-child-session` throws (caught → nil child).
+      Both assert the fn returns nil (→ `:no-op`), that
+      `run-agent-loop-in-session` is never invoked (a `ran?` flag stays
+      false), and that no nil/orphan id is tracked in
+      `entity-resolution-helper-session-ids`, pinning the run/track entry
+      gate against a dropped nil guard.

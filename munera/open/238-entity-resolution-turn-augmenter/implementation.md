@@ -1641,3 +1641,10 @@ Key decisions / discoveries:
 
 - Added 1 step: `default-run-helper` child-creation-failure branch (nil/throwing
   `create-child-session` → nil result / no run / no tracking) is untested.
+
+## Test-review follow-ups addressed (turn 10)
+
+- addressed 1 review step: added `default-run-helper-child-creation-failure-test`
+  (nil-child and throwing-child sub-cases) asserting nil result → no run →
+  no nil/orphan tracking. `bb test --focus extensions.context-manager-test`:
+  39 tests, 125 assertions, 0 failures. clj-kondo clean.
