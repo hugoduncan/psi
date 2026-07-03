@@ -1788,3 +1788,10 @@ Key decisions / discoveries:
   deref-catch (thrown run → nil text, no propagation, child still
   closed/untracked by the future's `finally`). Focused + full context-manager
   suite green (42 tests, 152 assertions); clj-kondo clean.
+
+## Test review (turn 18, test-shaper)
+
+- added 2 steps: no-op *diagnostic* asserted for only 1 of 4 entity-resolution
+  no-op reasons (consistency/meaningful-failures gap across the no-op cluster);
+  `default-run-helper`'s `:model`-forwarding `cond->` arm untested at the
+  real-fn level (only the stubbed selection→run seam is covered).

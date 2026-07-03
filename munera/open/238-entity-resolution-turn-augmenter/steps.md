@@ -1039,3 +1039,64 @@
       settled `{:child-session-id ..}` result), and the future's own `finally`
       still closes + untracks the child. Distinct from the ok?-false,
       `::timeout`, and pre-run-gate branches.
+
+## Test-review follow-ups (turn 18)
+
+- [ ] **The no-op *diagnostic* — the field that distinguishes *why* a no-op
+      occurred — is asserted for only one of the four entity-resolution
+      no-op reasons; the other three are unpinned, so a swapped/dropped/
+      wrong diagnostic passes.** `entity-resolution-augmentation` emits four
+      distinct `:turn-augmentation/diagnostic` strings across its no-op paths
+      (`"no effective cwd"`, `"slash-command-only prompt"`, `"no local
+      model"`, `"no confident mapping"`) plus a *diagnostic-less*
+      `(no-op-envelope)` for the tracked-helper recursion path. Only
+      `"no local model"` is asserted
+      (`entity-resolution-no-local-model-no-op-test`,
+      `entity-resolution-registered-handler-threads-real-api-test`); the
+      remaining no-op tests (`entity-resolution-blank-cwd-no-op-test`,
+      `-slash-command-only-`, `-empty-run-`, `-nil-run-`, `-throwing-helper-`,
+      `entity-resolution-helper-session-no-op-test`) assert only
+      `:turn-augmentation/status = :no-op` and `:operations []` — never the
+      diagnostic. The diagnostic is the sole observable that names the no-op
+      *reason* (meaningful-failures: a failing test should explain which
+      contract was violated), and this is exactly a consistency gap across the
+      no-op cluster (test-shaper consistent-assertion-style): the
+      status/operations clauses are checked uniformly but the reason-string is
+      checked on one representative only. A regression that returned the wrong
+      diagnostic on the slash-command path (e.g. `"no confident mapping"`),
+      dropped the `"no confident mapping"`/`"slash-command-only prompt"` string
+      entirely, or emitted a spurious diagnostic on the diagnostic-less
+      recursion path would pass every current test. Add the diagnostic
+      assertion to each entity-resolution no-op test — `"slash-command-only
+      prompt"` (slash-command), `"no confident mapping"` (empty-run / nil-run /
+      throwing-helper), `"no effective cwd"` (blank-cwd), and the *absence* of
+      a `:diagnostic` key on the tracked-helper recursion no-op — so the reason
+      each no-op reports is pinned uniformly, mirroring the shared
+      `:operations []` assertion the turn-14 note added.
+
+- [ ] **`default-run-helper`'s `:model`-forwarding branch is untested at the
+      real-fn level — the `cond->` that threads the selected model into
+      `run-agent-loop-in-session`'s params never runs the model-present arm in
+      any `default-run-helper` test.** `default-run-helper` builds the run
+      params as `(cond-> {:prompt user-prompt} model (assoc :model model))`, so
+      the selected model reaches the actual `run-agent-loop-in-session` call
+      only via that conditional `assoc`. Every `default-run-helper` test
+      (`-gates-on-run-ok-`, `-settled-run-closes-`, `-timeout-branch-`,
+      `-child-creation-failure-`, `-run-throws-deref-error-`,
+      `entity-resolution-recursion-loop-end-to-end-test`) invokes
+      `default-run-helper` **without** a `:model` run-opt, so the
+      `model`-present arm never fires and the real fn is never asserted to
+      forward `:model` into the params passed to `run-agent-loop-in-session`.
+      The turn-9 `entity-resolution-selected-model-flows-into-run-test` covers
+      the selection→run seam only through a **stubbed** `:run-helper` (it
+      captures `opts` at the augmenter boundary), not through the real
+      `default-run-helper`'s `cond->`/params construction. A regression that
+      dropped the `(assoc :model model)` arm, mis-keyed it, or moved the model
+      out of the params `run-agent-loop-in-session` receives would pass every
+      test — the production default collaborator would silently run the helper
+      under the wrong/default model. Add a `default-run-helper` case that
+      supplies a concrete `:model`, captures the params passed to
+      `run-agent-loop-in-session` (via `fake-run-api`), and asserts the
+      selected `:model` is present in those params — pinning the model-present
+      `cond->` arm at the real-fn level, distinct from the stub-boundary
+      selection→run assertion.
