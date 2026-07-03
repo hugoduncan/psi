@@ -991,3 +991,27 @@ Applied to `design.md`:
   a violated invariant.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 - design-steps.md has 0 unchecked items; no new step added this pass.
+
+## Ambiguity review (design-review turn 2, eighth pass — bash-only design)
+
+- ambiguity review added 1 new design step: the bash-only helper is now a
+  multi-round tool-using agent loop with no design-specified bound on
+  agent-loop rounds / bash commands / total wall-clock time, running on
+  Resolved decision 3's blocking no-deadline critical path of every eligible
+  turn. Decision 3's "no-deadline" was framed for a single toolless model
+  call (the `auto-session-name` `:tool-ids []` precedent); it doesn't address
+  an unbounded tool-using loop. See design-steps.md.
+- Ruled out (checked, not filed): the "helper bash runs under the effective
+  cwd" claim is unambiguous — `:turn-augmentation/effective-cwd` =
+  `(:worktree-path session-data)` (`dispatch_effects.clj:413`), and
+  `create-child-session` inherits the parent's `:worktree-path` and binds the
+  child's tools to it (`child_session_state.clj:70,172`), so the granted
+  `bash` runs in effective-cwd automatically via existing inheritance — no
+  design decision needed.
+- Ruled out (not filed): bash could technically reach `psi-tool`/nrepl to do
+  the "unavailable" runtime/session graph introspection; this is covered by
+  decision 6's capability-gap disclosure + decision 2's "bash for evidence
+  gathering only" constraint, and re-raising it would re-litigate the frozen
+  bash-safety-via-prompt-constraints scope decision.
+- No `SCOPE_QUESTION:` raised — the loop-bound item is closable within frozen
+  scope.

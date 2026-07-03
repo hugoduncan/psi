@@ -1,5 +1,16 @@
 # Design steps — architectural fit follow-ups
 
+## Current scope override — user requirement change
+
+User changed task 238's requirements after the prior design-review loop:
+remove any need for new read-only tools and grant the helper session access to
+the existing `bash` tool instead. The current authoritative design is
+`design.md` after this change: no directory-list/content-grep/read-only toolset
+is added, no git-aware search tool is added, and no model-selection
+tool-calling fact/criterion is added. Earlier checked review items remain as
+historical context for the old read/list/grep-only design and are superseded
+where they conflict with this scope override.
+
 - [x] `psi.ai.model-selection` / the model registry (`components/ai/src/psi/ai/model_selection.clj`,
   `psi.ai.models` / `psi.ai.user_models`) exposes only `:supports-text`,
   `:supports-images`, `:supports-reasoning`, `:locality`, `:context-window`,
@@ -352,7 +363,7 @@
   note that as a deliberate departure from the cited precedent rather than
   leaving it implicit.
 
-- [ ] Ambiguous: Resolved decision 2 now says the helper has no git-command
+- [x] Ambiguous: Resolved decision 2 now says the helper has no git-command
   execution, but that "searching the worktree" means
   "reading/listing/grepping **git-tracked file contents**." Required
   behaviour item 3 describes the helper toolset as read / list / grep over
@@ -371,7 +382,7 @@
   align Resolved decision 2 / Required behaviour item 3 / toolset wording
   accordingly without changing the frozen read/list/grep-only scope.
 
-- [ ] Inconsistent: Resolved decision 6 explicitly says the helper prompt
+- [x] Inconsistent: Resolved decision 6 explicitly says the helper prompt
   embeds only `.psi/skills/entity-resolution/SKILL.md`'s Method section
   (steps 1–5), excludes the skill's own "Output Shape" section, and states
   that the augmenter's own prompt supplies the structured line output
@@ -383,3 +394,52 @@
   Update the References entry to describe only the method source (or say
   explicitly that the skill's Output Shape is not used) so it agrees with
   Resolved decision 6.
+
+
+## User requirement change resolution — bash-only helper tool access
+
+Resolved by editing `design.md` to make the helper use the existing `bash` tool
+instead of requiring any new read-only search tools:
+
+- Removed the required new file-read/directory-list/content-grep helper toolset.
+- Removed the required additive tool/function-calling capability fact/criterion
+  in `psi.ai.model-selection`.
+- Reframed evidence gathering as `bash`-based shell evidence gathering under the
+  effective cwd, with prompt constraints forbidding intentional mutation,
+  dependency installation, long-running processes, or unrelated side effects.
+- Updated Required behaviour, Resolved decisions 2/4/5/6, constraints,
+  acceptance criteria, tests, and references to align with that scope.
+- The prior open git-tracked-vs-filesystem corpus question is obsolete because
+  there is no new read/list/grep corpus/toolset to specify.
+- The prior open SKILL.md reference inconsistency is closed: the References
+  entry now says the skill file supplies the method source and that its Output
+  Shape section is explicitly not used.
+
+## Ambiguity review (design-review turn 2, eighth pass — bash-only design)
+
+- [ ] Ambiguous: the bash-only change turns the helper session into a
+  multi-round, tool-using agent loop, but the design does not bound how many
+  agent-loop rounds / `bash` commands the helper may run before the augmenter
+  takes its result, nor any wall-clock ceiling for the whole helper run.
+  Resolved decision 3 ("blocking, no-deadline barrier ... keeps the
+  local-model call there") was written when the helper was conceptually a
+  single toolless model call (the `auto-session-name` precedent it cites runs
+  with `:tool-ids []`, so its `run-agent-loop-in-session` is effectively
+  single-shot). With `bash` granted, `run-agent-loop-in-session`
+  (`components/agent-session/src/psi/agent_session/mutations/session.clj`)
+  runs the full prompt lifecycle until the model stops issuing tool calls —
+  each `bash` command is capped (30s default in
+  `components/agent-session/src/psi/agent_session/tools.clj`), but the number
+  of rounds is unbounded, so worst-case blocking latency is
+  rounds × up-to-30s on the critical path of *every* eligible turn. This
+  directly affects the cost/latency posture the Why section and Resolved
+  decision 3 rely on, the "single-attempt model selection" framing (one
+  *model* attempt, but that attempt is itself an unbounded loop), and the
+  testability of the failed/empty-helper-run and confident-mapping cases.
+  Pin down whether the helper agent loop has a design-intended bound
+  (max rounds/commands and/or total wall-clock budget) or is deliberately
+  left unbounded under decision 3's "no-deadline" posture — and if bounded,
+  at what granularity (policy-level, deferring exact numbers to
+  plan/implementation, matching Resolved decisions 4–6). This is within
+  frozen scope (bounding the in-scope helper's own behavior), not a scope
+  change.
