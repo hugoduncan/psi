@@ -40,3 +40,14 @@
                    {:query-session (fn [_ _] {})} "s1"
                    {:candidates [local-candidate]})))
           "local winner is selected"))))
+
+(deftest default-select-model-catches-thrown-selection-test
+  (testing "a throwing query-session collapses to nil rather than propagating"
+    ;; default-select-model wraps its body in (catch Exception _ nil): this is
+    ;; the *only* guard against a thrown selection propagating out of
+    ;; entity-resolution-augmentation onto 237's blocking pre-turn path (the
+    ;; augmenter wraps only run-helper, not select-model, in its own
+    ;; try/catch). A throw from :query-session must yield nil (→ :no-op).
+    (is (nil? (#'context-manager/default-select-model
+               {:query-session (fn [_ _] (throw (ex-info "boom" {})))} "s1"))
+        "thrown query-session must be caught → nil (→ :no-op, not propagated)")))

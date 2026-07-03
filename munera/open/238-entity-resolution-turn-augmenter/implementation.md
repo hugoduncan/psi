@@ -1757,3 +1757,13 @@ Key decisions / discoveries:
   (`\s+ → " "`) is untested — every history fixture uses single-space
   snippets, so an embedded-newline snippet that would inject a role-less
   continuation line into the excerpt is unguarded.
+
+## Test-review turn-16 follow-ups addressed
+
+- addressed 2 turn-16 test-review steps (both pure test additions, no
+  production-code change): (1) `default-select-model-catches-thrown-selection-test`
+  drives a throwing `:query-session` and asserts nil (select-side catch guard);
+  (2) whitespace-collapse case in `build-entity-resolution-prompt-test` asserts
+  an embedded newline/tab/multi-space snippet renders as one collapsed
+  `Role:` line. Focused + full context-manager suite green (38 tests, 138
+  assertions); clj-kondo clean.

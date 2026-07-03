@@ -393,6 +393,24 @@
                    :tail [{:index 0 :role "user" :snippet "the former one"}]}))]
       (is (re-find #"User: the former one" user-prompt)
           "map-shaped :tail snippet is rendered as a Role: text line")))
+  (testing "a multi-line/multi-space snippet collapses to a single Role: line"
+    ;; history-line normalizes each snippet's internal whitespace (\s+ → " ")
+    ;; so a snippet with embedded newlines/tabs/runs renders as ONE Role: line,
+    ;; never injecting a role-less continuation line into the excerpt (the same
+    ;; corrupt-fragment class the line-boundary truncation invariant guards).
+    (let [{:keys [user-prompt]}
+          (context-manager/build-entity-resolution-prompt
+           (assoc base-tp
+                  :turn-augmentation/history
+                  {:message-count 1
+                   :tail [{:index 0 :role "user"
+                           :snippet "look at\nthe\t pathom   resolver"}]}))
+          excerpt (second (re-find #"(?s)Conversation history excerpt:\n\n(.*?)\n\nCurrent user request:"
+                                   user-prompt))]
+      (is (= "User: look at the pathom resolver" excerpt)
+          "embedded newline/tab/multi-space run collapsed to single spaces on one Role: line")
+      (is (= 1 (count (str/split-lines excerpt)))
+          "no role-less continuation line — snippet renders as exactly one line")))
   (testing "nil / empty-tail / flat-vector history yields no excerpt"
     (doseq [history [nil
                      {:message-count 0 :tail []}

@@ -918,7 +918,7 @@
 
 ## Test-review follow-ups (turn 16)
 
-- [ ] **`default-select-model`'s `catch Exception` branch — the sole guard
+- [x] **`default-select-model`'s `catch Exception` branch — the sole guard
       against a thrown model selection propagating onto 237's blocking
       pre-turn path — is untested.** `default-select-model` wraps its whole
       body in `(try … (catch Exception _ nil))`, so a throw from
@@ -942,8 +942,13 @@
       throwing real `default-select-model`) collapses to
       `no-op "no local model"` rather than throwing, pinning the select-side
       failure contract symmetrically with the run-side one.
+      DONE: added `default-select-model-catches-thrown-selection-test` — a
+      `:query-session` that throws drives the real `default-select-model`, and
+      the test asserts it returns nil (caught → `:no-op`) rather than
+      propagating, pinning the select-side failure guard symmetrically with the
+      turn-8 run-side one.
 
-- [ ] **`history-line`'s whitespace-collapse (`str/replace text #"\s+" " "`)
+- [x] **`history-line`'s whitespace-collapse (`str/replace text #"\s+" " "`)
       — which flattens a multi-line/multi-space snippet into a single intact
       excerpt line — is untested; every history fixture uses single-space
       snippets.** `render-history-excerpt`/`history-line` normalize each
@@ -965,3 +970,10 @@
       newline / tab / multi-space run, asserting the rendered excerpt line is
       a single `Role: …` line with internal whitespace collapsed to single
       spaces (no embedded newline survives, no role-less continuation line).
+      DONE: added a whitespace-collapse case to
+      `build-entity-resolution-prompt-test` — a `:snippet` with an embedded
+      newline, tab, and multi-space run (`"look at\nthe\t pathom   resolver"`)
+      renders as the single line `"User: look at the pathom resolver"`; asserts
+      the exact collapsed line and that the excerpt is exactly one line (no
+      role-less continuation), pinning the `\s+ → " "` collapse from the render
+      side (complementing the turn-15 char-slice line-boundary invariant).
