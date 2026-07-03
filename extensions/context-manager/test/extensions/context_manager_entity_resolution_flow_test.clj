@@ -1,19 +1,14 @@
 (ns extensions.context-manager-entity-resolution-flow-test
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [extensions.context-manager :as context-manager]))
+   [extensions.context-manager :as context-manager]
+   [extensions.context-manager-test-support :refer [base-tp]]))
 
 (use-fixtures :each (fn [f]
                       (reset! context-manager/initialized? nil)
                       (reset! context-manager/helper-session-ids #{})
                       (reset! context-manager/entity-resolution-helper-session-ids #{})
                       (f)))
-
-(def ^:private base-tp
-  {:turn-augmentation/session-id "s1"
-   :turn-augmentation/effective-cwd "/repo"
-   :turn-augmentation/user-text "please look at the resolver"
-   :turn-augmentation/history []})
 
 (deftest entity-resolution-selected-model-flows-into-run-test
   (testing "the model select-model returns is the one passed to the helper run"

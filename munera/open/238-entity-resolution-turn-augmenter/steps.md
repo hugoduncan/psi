@@ -1119,7 +1119,7 @@
 
 ## Test-review follow-ups (turn 19)
 
-- [ ] **The test-suite split (`866f505db`/`d7103d389`/`4db2ff0da`) left the
+- [x] **The test-suite split (`866f505db`/`d7103d389`/`4db2ff0da`) left the
       shared fixtures duplicated and — in one case — divergent across the six
       test files, violating test-shaper `consistent(fixtures ∧
       test_abstractions)` and `economical(minimal_incidental_variation)`.**
@@ -1143,8 +1143,16 @@
       two shapes are genuinely different concerns) into a shared test-support
       ns the split files require, so the fixture is defined once and the two
       `stub` contracts stop colliding.
+      DONE: created `extensions.context-manager-test-support` with a single
+      canonical `base-tp` and `stub`. The two divergent `stub` contracts
+      reconcile cleanly — the model-selection copy's only use passes
+      `:model nil` (no-local path), where the augmenter no-ops before
+      run-helper, so the canonical `stub`'s `:run-helper` return is
+      irrelevant; both `:calls`-recording semantics preserved. All four
+      files now `:refer` `base-tp`/`stub` from shared support; the three
+      duplicate `base-tp` and two colliding `stub` defns removed.
 
-- [ ] **`await-untracked` (and its inlined poll-until-untracked loop) is
+- [x] **`await-untracked` (and its inlined poll-until-untracked loop) is
       duplicated four times across the split test files — the same
       settle-await ceremony, no shared helper.** The
       `(let [deadline (+ (System/currentTimeMillis) 2000)] (while (and
@@ -1163,8 +1171,13 @@
       `await-untracked` into shared test support and call it from all four
       sites (the timeout/throws tests inline it only because the shared defn
       was not in scope after the split).
+      DONE: `await-untracked` now lives once in
+      `extensions.context-manager-test-support`. Both named defns removed
+      and all four call sites (main recursion-loop, helper-runtime settled/
+      forwards-model/timeout, helper-failure run-throws) call the shared
+      helper; the two inlined poll loops replaced with `(await-untracked id)`.
 
-- [ ] **The `default-run-helper` collaborator double is abstracted as
+- [x] **The `default-run-helper` collaborator double is abstracted as
       `fake-run-api` in `context_manager_helper_runtime_test.clj` but
       re-inlined ad hoc in the other files that drive the same seam —
       inconsistent test-double abstraction for one collaborator contract.**
@@ -1182,8 +1195,16 @@
       document why a bespoke double is warranted per case — so there is one
       consistent test-double abstraction for the `default-run-helper` seam
       rather than four subtly different inline api maps.
+      DONE: moved `fake-run-api` into shared support and extended it with the
+      injection points the bespoke maps needed — `:create-result` (nil-child
+      via `{}`), `:create-throws?`, `:run-throws?`, and `:block-until`/
+      `:run-began` (uninterruptible blocking run for timeout/recursion). All
+      `default-run-helper` seams — helper-runtime (gates/settled/forwards-
+      model/prompt-selection/timeout), helper-failure (child-creation-failure/
+      run-throws), and the main recursion-loop test — now build their api
+      through the one `fake-run-api`; the four bespoke inline api maps removed.
 
-- [ ] **The augmenter's exception-safety is asymmetric and the `select-model`
+- [x] **The augmenter's exception-safety is asymmetric and the `select-model`
       side is untested at the augmenter boundary.** turn-8 wrapped
       `run-helper` in `(try … (catch Throwable _ nil))` inside
       `entity-resolution-augmentation` so a throwing helper collapses to
@@ -1206,3 +1227,11 @@
       `default-select-model-catches-thrown-selection-test`). Pick one so the
       select-side and run-side failure contracts are consistent rather than
       silently asymmetric.
+      DONE: chose (a) — symmetric augmenter-boundary safety. Wrapped the
+      `select-model` call in `entity-resolution-augmentation` in
+      `(try … (catch Throwable _ nil))` mirroring the run-helper wrap, so a
+      thrown selection collapses to the same no-model `:no-op`. Added
+      `entity-resolution-throwing-select-model-no-op-test` (injected throwing
+      `:select-model`) asserting a well-formed `:no-op` (`"no local model"`
+      diagnostic, empty operations/child-ids, helper never runs), mirroring
+      `entity-resolution-throwing-helper-no-op-test`.

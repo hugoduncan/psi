@@ -1813,3 +1813,23 @@ Key decisions / discoveries:
   augmenter exception-safety (run-helper wrapped, select-model not) untested at
   the augmenter boundary. All are consistency/economy shaping items; behaviour
   coverage is otherwise thorough (35 tests, 140 assertions passing).
+
+## Turn-19 follow-ups addressed (test-shaper consistency + symmetric exception-safety)
+
+- addressed 4 turn-19 review steps.
+- Extracted `extensions.context-manager-test-support` (new test ns): single
+  canonical `base-tp`, `stub`, `await-untracked`, and an extended `fake-run-api`
+  (adds `:create-result`/`:create-throws?`/`:run-throws?`/`:block-until`/
+  `:run-began` injection points). All six entity-resolution test files now
+  `:refer` from it; removed 3 duplicate `base-tp`, 2 divergent same-named
+  `stub`s, 2 duplicate `await-untracked` defns + 2 inlined poll loops, and 4
+  bespoke inline `default-run-helper` api maps.
+- Made the augmenter exception-safe symmetrically: wrapped the `select-model`
+  call in `entity-resolution-augmentation` in `(try … (catch Throwable _ nil))`
+  (mirroring the turn-8 run-helper wrap). Added
+  `entity-resolution-throwing-select-model-no-op-test`. A thrown selection now
+  collapses to the no-model `:no-op` ("no local model") rather than propagating
+  onto 237's blocking pre-turn path.
+- Verified: `clj-kondo` 0 errors/warnings on src+test; all context-manager
+  test namespaces green (main 31 tests, model-selection 6, helper-runtime,
+  helper-failure, flow, rendering, registration all pass).

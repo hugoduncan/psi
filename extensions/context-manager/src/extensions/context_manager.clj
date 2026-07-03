@@ -466,7 +466,13 @@
        (no-op-envelope "slash-command-only prompt")
 
        :else
-       (let [model (select-model session-id)]
+       ;; A throwing model selection (any failure that escapes the default
+       ;; collaborator's own catch, or an injected :select-model that throws)
+       ;; collapses to the same well-formed :no-op as no-local-model, mirroring
+       ;; the run-helper try/catch below: the augmenter never propagates a
+       ;; collaborator exception onto 237's blocking pre-turn path.
+       (let [model (try (select-model session-id)
+                        (catch Throwable _ nil))]
          (if (nil? model)
            (no-op-envelope "no local model")
            (let [{:keys [system-prompt user-prompt]}

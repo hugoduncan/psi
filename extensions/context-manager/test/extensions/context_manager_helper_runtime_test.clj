@@ -1,7 +1,8 @@
 (ns extensions.context-manager-helper-runtime-test
   (:require
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [extensions.context-manager :as context-manager]))
+   [extensions.context-manager :as context-manager]
+   [extensions.context-manager-test-support :refer [await-untracked fake-run-api]]))
 
 (use-fixtures :each (fn [f]
                       (reset! context-manager/initialized? nil)
@@ -10,38 +11,6 @@
                       (f)))
 
 ;; --- default-run-helper: run-ok gating, prompt-selection, no worktree-path --
-
-(defn- fake-run-api
-  "A minimal `api` map for exercising default-run-helper: records the
-   create-child-session params, records the run-agent-loop-in-session params
-   (when a `run-calls` atom is supplied), records the close-session id (when a
-   `closed` atom is supplied), and returns the supplied run-result from
-   run-agent-loop-in-session."
-  [{:keys [run-result create-calls run-calls closed child-id]
-    :or   {child-id "child-1"}}]
-  {:mutate-session
-   (fn [_sid op params]
-     (case op
-       psi.extension/create-child-session
-       (do (when create-calls (reset! create-calls params))
-           {:psi.agent-session/session-id child-id})
-       psi.extension/run-agent-loop-in-session
-       (do (when run-calls (reset! run-calls params))
-           run-result)))
-   :mutate (fn [op params]
-             (when (and closed (= op 'psi.extension/close-session))
-               (reset! closed (:session-id params)))
-             nil)})
-
-(defn- await-untracked
-  "Block (up to ~2s) until `id` is no longer tracked in the
-   entity-resolution helper-session atom. The settled run future closes +
-   untracks on its own thread, so tests must await it."
-  [id]
-  (let [deadline (+ (System/currentTimeMillis) 2000)]
-    (while (and (contains? @context-manager/entity-resolution-helper-session-ids id)
-                (< (System/currentTimeMillis) deadline))
-      (Thread/sleep 5))))
 
 (deftest default-run-helper-gates-on-run-ok-test
   (testing "a failed helper run (ok? false) surfaces no text, not the error string"
@@ -161,27 +130,16 @@
     (let [release   (atom false)
           run-began (promise)
           closed    (atom nil)
-          ;; run-agent-loop-in-session blocks (simulating a live, NOT reliably
-          ;; interruptible, model/HTTP call) via a busy flag `future-cancel`
+          ;; The run blocks (via fake-run-api's :block-until) simulating a
+          ;; live, NOT reliably interruptible model/HTTP call `future-cancel`
           ;; cannot unwind — until `release` is set — so the orphan outlives
           ;; the injected budget and the mid-run assertions are deterministic.
-          api {:mutate-session
-               (fn [_sid op _params]
-                 (case op
-                   psi.extension/create-child-session
-                   {:psi.agent-session/session-id "child-1"}
-                   psi.extension/run-agent-loop-in-session
-                   (do (deliver run-began true)
-                       ;; Uninterruptible spin modelling the real, blocking,
-                       ;; not-reliably-interruptible model/HTTP call: clears
-                       ;; interrupt status so it genuinely cannot be unwound
-                       ;; until `release` is set.
-                       (while (not @release)
-                         (Thread/interrupted)
-                         (Thread/onSpinWait))
-                       {:psi.agent-session/agent-run-ok? true
-                        :psi.agent-session/agent-run-text "late → x (e; c)"})))
-               :mutate (fn [_op params] (reset! closed (:session-id params)) nil)}
+          api (fake-run-api
+               {:closed closed
+                :block-until release
+                :run-began run-began
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text "late → x (e; c)"}})
           result (#'context-manager/default-run-helper
                   api {:parent-session-id "s1"
                        :system-prompt "sys"
@@ -198,10 +156,7 @@
       (is (nil? @closed) "child not closed while orphan still running")
       ;; Let the orphan settle; the detached watcher then closes + untracks.
       (reset! release true)
-      (let [deadline (+ (System/currentTimeMillis) 2000)]
-        (while (and (contains? @context-manager/entity-resolution-helper-session-ids "child-1")
-                    (< (System/currentTimeMillis) deadline))
-          (Thread/sleep 5)))
+      (await-untracked "child-1")
       (is (not (contains? @context-manager/entity-resolution-helper-session-ids "child-1"))
           "child untracked after orphan settles")
       (is (= "child-1" @closed)

@@ -1,22 +1,8 @@
 (ns extensions.context-manager-model-selection-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [extensions.context-manager :as context-manager]))
-
-(def ^:private base-tp
-  {:turn-augmentation/session-id "s1"
-   :turn-augmentation/effective-cwd "/repo"
-   :turn-augmentation/user-text "please look at the resolver"
-   :turn-augmentation/history []})
-
-(defn- stub
-  [{:keys [model calls]
-    :or   {model {:provider :ollama :id "qwen"}}}]
-  {:select-model (fn [_parent]
-                   (swap! (or calls (atom nil)) (fnil update {}) :select (fnil inc 0))
-                   model)
-   :run-helper   (fn [_opts]
-                   (when calls (swap! calls (fnil update {}) :run (fnil inc 0))))})
+   [extensions.context-manager :as context-manager]
+   [extensions.context-manager-test-support :refer [base-tp stub]]))
 
 (deftest entity-resolution-no-local-model-no-op-test
   (testing "no local model yields no-op with no helper run"

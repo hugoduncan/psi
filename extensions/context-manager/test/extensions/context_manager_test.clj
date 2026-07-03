@@ -3,6 +3,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.context-manager :as context-manager]
+   [extensions.context-manager-test-support
+    :refer [await-untracked base-tp fake-run-api stub]]
    [psi.extension-test-helpers.nullable-api :as nullable]))
 
 (use-fixtures :each (fn [f]
@@ -254,26 +256,6 @@
 ;; ---------------------------------------------------------------------------
 ;; Entity-resolution augmenter (task 238)
 ;; ---------------------------------------------------------------------------
-
-(def ^:private base-tp
-  {:turn-augmentation/session-id "s1"
-   :turn-augmentation/effective-cwd "/repo"
-   :turn-augmentation/user-text "please look at the resolver"
-   :turn-augmentation/history []})
-
-(defn- stub
-  "Build a collaborators map with a fixed model and a run-helper returning
-   the supplied raw text under a fixed child-session-id. Records calls."
-  [{:keys [model text child-id throw? calls]
-    :or   {model {:provider :ollama :id "qwen"} child-id "helper-1"}}]
-  {:select-model (fn [_parent]
-                   (swap! (or calls (atom nil)) (fnil update {}) :select (fnil inc 0))
-                   model)
-   :run-helper   (fn [_opts]
-                   (when calls (swap! calls (fnil update {}) :run (fnil inc 0)))
-                   (if throw?
-                     (throw (ex-info "boom" {}))
-                     {:child-session-id child-id :text text}))})
 
 ;; --- pure: prompt / parse / render ---------------------------------------
 
@@ -574,6 +556,25 @@
       (is (= [] (:turn-augmentation/child-session-ids env))
           "no child id reported when the run threw"))))
 
+(deftest entity-resolution-throwing-select-model-no-op-test
+  (testing "a select-model that throws collapses to a well-formed :no-op"
+    ;; Symmetric with entity-resolution-throwing-helper-no-op-test: the
+    ;; augmenter wraps select-model in the same defensive try/catch as
+    ;; run-helper, so an injected :select-model collaborator that throws
+    ;; (or any future non-default select fn) collapses to a well-formed
+    ;; :no-op rather than propagating onto 237's blocking pre-turn path.
+    ;; A thrown selection follows the no-model branch → "no local model".
+    (let [env (context-manager/entity-resolution-augmentation
+               {} base-tp
+               {:select-model (fn [_parent] (throw (ex-info "boom" {})))
+                :run-helper   (fn [_opts] {:child-session-id "x" :text "a → b (e; c)"})})]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no local model" (:turn-augmentation/diagnostic env))
+          "thrown selection collapses to the no-local-model reason")
+      (is (= [] (:turn-augmentation/child-session-ids env))
+          "no child id reported when selection threw (helper never runs)"))))
+
 (deftest entity-resolution-ambiguous-dropped-test
   (testing "ambiguous surface dropped while a confident one is kept"
     ;; The helper self-gates: it emits a confident line for the unambiguous
@@ -599,15 +600,6 @@
       (is (not (re-find #"that thing" content))
           "ambiguous surface (no mapping line parsed) is absent from the block"))))
 
-(defn- await-untracked
-  "Block (up to ~2s) until `id` is no longer tracked in the
-   entity-resolution helper-session atom. The settled run future closes +
-   untracks on its own thread, so tests must await it."
-  [id]
-  (let [deadline (+ (System/currentTimeMillis) 2000)]
-    (while (and (contains? @context-manager/entity-resolution-helper-session-ids id)
-                (< (System/currentTimeMillis) deadline))
-      (Thread/sleep 5))))
 (deftest entity-resolution-recursion-loop-end-to-end-test
   (testing "the real default-run-helper producer and the augmenter pre-filter
             consumer share the tracking atom: a child id tracked by a real run
@@ -620,19 +612,11 @@
     ;; child tracked while the augmenter checks it.
     (let [release   (atom false)
           run-began (promise)
-          api {:mutate-session
-               (fn [_sid op _params]
-                 (case op
-                   psi.extension/create-child-session
-                   {:psi.agent-session/session-id "child-1"}
-                   psi.extension/run-agent-loop-in-session
-                   (do (deliver run-began true)
-                       (while (not @release)
-                         (Thread/interrupted)
-                         (Thread/onSpinWait))
-                       {:psi.agent-session/agent-run-ok? true
-                        :psi.agent-session/agent-run-text ""})))
-               :mutate (fn [_op _params] nil)}]
+          api (fake-run-api
+               {:block-until release
+                :run-began run-began
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text ""}})]
       ;; Drive the real producer: it tracks "child-1" before the (blocking)
       ;; run and returns on the injected timeout while the orphan runs on.
       (#'context-manager/default-run-helper
