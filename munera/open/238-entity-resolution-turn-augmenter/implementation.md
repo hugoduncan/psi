@@ -1217,3 +1217,26 @@ Applied to `design.md`:
 - Implementer note: there is deliberately no confidence-parse/threshold step —
   the parser only matches line *shape* and keeps all well-formed lines; the
   confidence sub-token can be captured or ignored but must not gate acceptance.
+
+## Architecture review (design-review turn 1, tenth pass — post ninth-slice confidence-gate resolution)
+
+- no architectural review feedback. Reviewed design.md as edited by the
+  ninth-slice confidence-gate resolution (`a75e7b61c`) — the only design.md
+  change since the ninth-pass architecture review — against AGENTS.md (VSM),
+  ramora/META.md, and doc/architecture.md. The confidence-gate resolution
+  (model self-gating; augmenter accepts every well-formed parsed line with no
+  value threshold; confidence a required-but-undisplayed field) is a
+  prompt/output-contract clarification only: no new architectural surface,
+  dependency, capability, boundary, or effect path. Data-only extension
+  envelope + no parent mutation + replay determinism (237/S5), capability
+  gating (`:psi.capability/turn-augmentation`), and extension isolation via
+  existing `create-child-session` `:tool-ids` + existing `bash` tool remain
+  intact.
+- Re-verified against current code, still matching design assumptions:
+  `extension_installs.clj` grants `context-manager` only
+  `turn-augmentation-capability` (decision 1 sound); `model_selection.clj`
+  still has no `:supports-tool-calling` fact (decision 5's non-addition holds);
+  `context-manager/deps.edn` still lacks a `psi/ai` dep (the design's stated
+  additive dependency, matching `auto-session-name` precedent, remains accurate).
+- design-steps.md has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
