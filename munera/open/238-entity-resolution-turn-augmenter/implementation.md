@@ -1803,3 +1803,13 @@ Key decisions / discoveries:
   (via `fake-run-api` `:run-calls`) covering both the model-present and
   nil `cond->` arms of the real fn's run-param construction. Focused suite:
   35 tests, 140 assertions, 0 failures; test ns lints clean.
+
+## Test review (turn 19, test-shaper) — ψ
+
+- added 4 steps to be addressed (turn-19 follow-ups): shared-fixture
+  duplication/divergence from the test-suite split (`base-tp` ×3, two
+  same-named divergent `stub`s), `await-untracked` ×4, ad-hoc vs `fake-run-api`
+  test-double inconsistency for the `default-run-helper` seam, and asymmetric
+  augmenter exception-safety (run-helper wrapped, select-model not) untested at
+  the augmenter boundary. All are consistency/economy shaping items; behaviour
+  coverage is otherwise thorough (35 tests, 140 assertions passing).

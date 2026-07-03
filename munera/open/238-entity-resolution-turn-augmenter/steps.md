@@ -1116,3 +1116,93 @@
       (model-present `cond->` arm); a second sub-case supplies no `:model` and
       asserts `:model` is absent from the params (nil arm), pinning both arms
       at the real-fn level distinct from the turn-9 stub-boundary assertion.
+
+## Test-review follow-ups (turn 19)
+
+- [ ] **The test-suite split (`866f505db`/`d7103d389`/`4db2ff0da`) left the
+      shared fixtures duplicated and — in one case — divergent across the six
+      test files, violating test-shaper `consistent(fixtures ∧
+      test_abstractions)` and `economical(minimal_incidental_variation)`.**
+      `base-tp` is defined **three** times, byte-identical, in
+      `context_manager_test.clj`, `context_manager_model_selection_test.clj`,
+      and `context_manager_entity_resolution_flow_test.clj` — three copies of
+      the same turn-projection fixture that must now be kept in lock-step by
+      hand (a change to the projection shape, like the turn-6 `:tail` fix,
+      would have to be applied in three places or silently drift). Worse, the
+      `stub` collaborators helper is defined **twice under the same name but
+      with different contracts**: `context_manager_test.clj`'s `stub` accepts
+      `{:model :text :child-id :throw? :calls}` and its `:run-helper` returns
+      `{:child-session-id :text}` (or throws), whereas
+      `context_manager_model_selection_test.clj`'s `stub` accepts only
+      `{:model :calls}` and its `:run-helper` returns **nil** and ignores
+      `:text`/`:child-id`. Two same-named helpers with divergent shapes across
+      sibling files is exactly the `locally_comprehensible`/consistency hazard
+      test-shaper warns against — a reader who learns one `stub` will
+      mis-read the other. Extract the shared `base-tp` (and a single
+      canonical `stub`/collaborators builder, or clearly distinct names if the
+      two shapes are genuinely different concerns) into a shared test-support
+      ns the split files require, so the fixture is defined once and the two
+      `stub` contracts stop colliding.
+
+- [ ] **`await-untracked` (and its inlined poll-until-untracked loop) is
+      duplicated four times across the split test files — the same
+      settle-await ceremony, no shared helper.** The
+      `(let [deadline (+ (System/currentTimeMillis) 2000)] (while (and
+      (contains? @…helper-session-ids id) (< … deadline)) (Thread/sleep 5)))`
+      poll appears as a named `await-untracked` defn in **both**
+      `context_manager_test.clj` and `context_manager_helper_runtime_test.clj`
+      (two copies of the identical fn), and is **inlined verbatim** a third
+      time in `context_manager_helper_runtime_test.clj`'s
+      `default-run-helper-timeout-branch-test` and a fourth in
+      `context_manager_helper_failure_test.clj`'s
+      `default-run-helper-run-throws-deref-error-branch-test`. This is
+      ceremony that should be compressed into one shared helper
+      (`helpers_that_compress(ceremony)`): four hand-maintained copies of a
+      timing-sensitive async-settle poll invite drift (e.g. one copy's 2s
+      deadline diverging) and obscure intent. Factor a single
+      `await-untracked` into shared test support and call it from all four
+      sites (the timeout/throws tests inline it only because the shared defn
+      was not in scope after the split).
+
+- [ ] **The `default-run-helper` collaborator double is abstracted as
+      `fake-run-api` in `context_manager_helper_runtime_test.clj` but
+      re-inlined ad hoc in the other files that drive the same seam —
+      inconsistent test-double abstraction for one collaborator contract.**
+      `context_manager_helper_runtime_test.clj` builds a reusable
+      `fake-run-api` (records create/run/close params, returns a
+      `:run-result`), but `context_manager_helper_failure_test.clj`
+      (child-creation-failure, run-throws) and
+      `context_manager_test.clj`'s `entity-resolution-recursion-loop-end-to-end-test`
+      hand-roll their own bespoke `{:mutate-session … :mutate …}` maps for the
+      **same** `default-run-helper` collaborator shape. The
+      child-creation-failure/throwing cases need behaviours `fake-run-api`
+      does not yet express (nil/thrown `create-child-session`, thrown
+      `run-agent-loop-in-session`), so either extend `fake-run-api` with those
+      injection points and route all `default-run-helper` tests through it, or
+      document why a bespoke double is warranted per case — so there is one
+      consistent test-double abstraction for the `default-run-helper` seam
+      rather than four subtly different inline api maps.
+
+- [ ] **The augmenter's exception-safety is asymmetric and the `select-model`
+      side is untested at the augmenter boundary.** turn-8 wrapped
+      `run-helper` in `(try … (catch Throwable _ nil))` inside
+      `entity-resolution-augmentation` so a throwing helper collapses to
+      `:no-op`, and `entity-resolution-throwing-helper-no-op-test`
+      (`stub {:throw? true}`) pins it. But `select-model` is **not** wrapped
+      by the augmenter — turn-16 instead relies on `default-select-model`'s own
+      internal `(catch Exception _ nil)`. That is a defensible design choice
+      for the production default collaborator, but it means an **injected**
+      `:select-model` collaborator that throws (or any future non-default
+      select fn) propagates uncaught out of the augmenter onto 237's blocking
+      pre-turn path — the exact hazard turn-8 closed on the run side — and no
+      test exercises a throwing `:select-model` collaborator through
+      `entity-resolution-augmentation` (the sibling `throw?`/no-op assertion
+      exists only for `run-helper`). Either (a) make the augmenter symmetric —
+      wrap the `select-model` call in the same defensive try/catch and add a
+      throwing-`:select-model` → `:no-op` test mirroring the run-helper one; or
+      (b) explicitly document that the augmenter trusts injected collaborators
+      not to throw and that only the *default* select path is guarded (by
+      `default-select-model`'s catch, already tested by
+      `default-select-model-catches-thrown-selection-test`). Pick one so the
+      select-side and run-side failure contracts are consistent rather than
+      silently asymmetric.
