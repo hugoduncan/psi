@@ -305,6 +305,44 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   established practice, not new).
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Notes for the third design-steps-resolution slice (1 unchecked item)
+
+- Only one unchecked design step remains (the embedded-Method-text-names-
+  unavailable-tools item, filed in the ambiguity pass above). Resolving it
+  is the same kind of operation as the two prior resolution slices: a
+  localized edit to `design.md` itself (Resolved decision 6, and any
+  wording in "Required behaviour" item 3 that assumes the skill text
+  applies unmodified), not a plan/implementation-time workaround —
+  `design.md` must stay complete-and-unambiguous before `plan.md` can exist.
+- Don't over-specify while resolving: decide the *policy* (embed
+  `SKILL.md`'s Method steps verbatim and accept the mismatch vs. have the
+  augmenter adapt/annotate the git/find/graph-introspection references to
+  name only the actually-available tools) without hardcoding literal tool
+  identifiers into `design.md` — Resolved decisions 4/5 already
+  deliberately left exact tool-id/fact-key spelling to plan/implementation
+  ("e.g." granularity), so this resolution should match that precedent
+  rather than introduce the first hardcoded tool-name literal.
+- If the chosen policy is "adapt the embedded text," the adaptation only
+  needs to cover the specific unavailable references actually present in
+  Method steps 1 and 3 — "current git status" (step 1) and "`git ls-files` /
+  `find`", "`git grep`", and "Psi graph introspection" (step 3). No other
+  Method sub-steps (2, 4, 5) name tools/commands, so the fix is localized,
+  not a rewrite of the whole embedded section.
+- Relevant non-task files for resolving this item:
+  - `.psi/skills/entity-resolution/SKILL.md` — Method steps 1 and 3 contain
+    the exact unavailable-tool references to reconcile.
+  - `components/agent-session/src/psi/agent_session/tools.clj` —
+    `make-read-only-tools-with-cwd` is the only existing read-only toolset;
+    confirms no dir-list/grep/bash-git tool exists anywhere in the codebase
+    today (checked afresh this slice), so there's no already-shipped tool
+    the embedded text could be pointing at instead.
+  - `extensions/auto-session-name/src/extensions/auto_session_name.clj` —
+    `build-rename-prompt` is the existing precedent for how this
+    extension family authors a constructed system/user prompt string;
+    useful shape reference if plan/implementation needs to see how prompt
+    text is assembled today (no adaptation-of-embedded-skill-text
+    precedent exists there, since that helper session is toolless).
+
 ## Inconsistency review (design-review turn 3, third pass)
 
 - no inconsistency review feedback. Checked, and found consistent (no new
