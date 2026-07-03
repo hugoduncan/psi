@@ -1196,3 +1196,24 @@ Applied to `design.md`:
 - No `SCOPE_QUESTION:` outstanding from this design-review batch. Architecture
   and inconsistency turns added nothing; this batch's only follow-up is the
   confidence-gate item.
+
+## Ninth-pass confidence-gate resolution (design-steps slice)
+
+- Resolved the ninth-pass confidence-gate item by choosing **model
+  self-gating (interpretation (b))**: the augmenter accepts every well-formed
+  parsed line and applies no confidence-value threshold/scale. Rationale: the
+  design already forbids guessing and never provided a scale/threshold; (b) is
+  the minimal-mechanism choice consistent with existing text and avoids
+  introducing unauthored confidence-scale machinery.
+- Confidence token stays a **required** field of the `surface → canonical
+  (evidence; confidence)` line format (forces the model to state confidence,
+  reinforcing self-gating) but is model-authored text — not validated, not
+  displayed. Three-field render (`surface → canonical (evidence)`) unchanged.
+- Aligned four passages to agree the drop happens model-side: decision 6's
+  gate wording (two spots), the "Confidence gate & output shape" policy
+  bullet, and the Tests-list "ambiguous reference dropped" framing (now
+  asserts no line is emitted/parsed for the ambiguous surface). The "never
+  guess" Constraint already matched and needed no edit.
+- Implementer note: there is deliberately no confidence-parse/threshold step —
+  the parser only matches line *shape* and keeps all well-formed lines; the
+  confidence sub-token can be captured or ignored but must not gate acceptance.

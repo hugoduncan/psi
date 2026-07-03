@@ -195,7 +195,19 @@ provenance.
    one line per confident mapping, `surface → canonical (evidence;
    confidence)`; the augmenter parses lines matching this format from the
    helper's raw response and discards everything else (preamble, commentary,
-   malformed lines, any clarification-question-shaped text). Skill delivery
+   malformed lines, any clarification-question-shaped text). The confidence
+   token is **model-self-gated, not augmenter-value-thresholded**: the model
+   emits a line only for a mapping it judges confident (per the "never guess —
+   only confident, evidence-backed mappings" constraint), and the augmenter
+   accepts *every* well-formed parsed line as confident without comparing the
+   token against any fixed scale/vocabulary or numeric threshold. The
+   confidence token remains a **required** field of the line format — the
+   model must state its confidence explicitly, which reinforces the
+   self-gating discipline — but its value is model-authored text the augmenter
+   neither validates nor displays. There is intentionally no
+   confidence-scale/threshold machinery in v1: the accept/reject boundary is
+   the model choosing whether to emit the line at all, not augmenter-side
+   value comparison. Skill delivery
    is not via `create-child-session`'s `:skill-names` — that option
    auto-expands a skill only when the *user's own submitted text* matches or
    invokes it, and the parent-turn user text driving this helper session is
@@ -204,9 +216,10 @@ provenance.
    The rendered `:append-context-block` `:content` is re-rendered from the
    parsed confident mappings as a compact `surface → canonical (evidence)`
    list — **three** fields per mapping, dropping confidence. Confidence's
-   only role is the accept/reject gate on which lines are parsed as
-   "confident" in the first place; it is not displayed in the rendered
-   block. Zero successfully-parsed lines is treated as "no confident
+   only role is to make the model's self-gating explicit (it emits a line
+   only for mappings it judges confident); the augmenter does not threshold
+   or display the token, and every well-formed parsed line is kept. Zero
+   successfully-parsed lines is treated as "no confident
    mapping" and yields the `:no-op` in Required behaviour item 5.
 
 ### Remaining v1 policies (settled, low-risk)
@@ -275,9 +288,13 @@ provenance.
   not the literal numbers.
 - **Confidence gate & output shape.** Only sufficiently-unambiguous mappings
   enter the block; ambiguous/unevidenced references are dropped, never
-  guessed. Rendered `:content` is a compact `surface → canonical (evidence)`
-  list — see Resolved decision 6 for the exact three-field composition and
-  why confidence is gate-only, not displayed; the raw user prompt is always
+  guessed. The gate is **model self-gating**, not an augmenter-side value
+  threshold: the model emits a line only for mappings it judges confident,
+  and the augmenter accepts every well-formed parsed line without validating
+  the confidence token against a fixed scale/threshold (see Resolved decision
+  6). Rendered `:content` is a compact `surface → canonical (evidence)` list
+  — see Resolved decision 6 for the exact three-field composition and why
+  confidence is stated-but-not-displayed; the raw user prompt is always
   preserved.
 - **Model-absent fallback.** If `resolve-selection` yields no local winner,
   the augmenter returns a well-formed `:no-op`; it never falls back to a
@@ -340,7 +357,11 @@ provenance.
   referring expression → no-op; slash-command-only prompt → no-op with no
   helper session created (pre-filter, distinct from the model-determined no
   referring expression path); helper-session recursion no-op; blank cwd
-  no-op; no-local-model → no-op; ambiguous reference dropped;
+  no-op; no-local-model → no-op; ambiguous reference dropped (the helper
+  model omits the ambiguous mapping under its self-gating constraint — the
+  augmenter exercises no confidence-value threshold, so the assertion is that
+  no line is emitted/parsed for the ambiguous surface, not that a
+  low-confidence line is filtered);
   failed/empty helper run → no-op; and replay reuse.
 - Docs updated to describe automatic entity resolution as a context-manager /
   entity-resolution augmenter capability.

@@ -472,7 +472,7 @@ instead of requiring any new read-only search tools:
 
 ## Ambiguity review (design-review turn 2, ninth pass — post eighth-slice resolution)
 
-- [ ] Ambiguous: the confidence-gate mechanism is underspecified. Resolved
+- [x] Ambiguous: the confidence-gate mechanism is underspecified. Resolved
   decision 6 fixes the helper output line format as `surface → canonical
   (evidence; confidence)` — a **required** confidence field — and states
   "Confidence's only role is the accept/reject gate on which lines are parsed
