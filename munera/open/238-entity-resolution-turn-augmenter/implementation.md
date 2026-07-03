@@ -1617,3 +1617,22 @@ Key decisions / discoveries:
   tests stubbing `catalog-view` via `with-redefs` rather than injecting a
   catalog (`λtest` nullable-over-mock standard, though `resolve-selection`
   already exposes a `:catalog` seam).
+
+## Test-review follow-ups (turn 9) — addressed
+
+- Addressed all 4 turn-9 test-review follow-ups (all test/testability items,
+  behaviour already correct):
+  1. Capability-gap disclosure now asserted in
+     `build-entity-resolution-prompt-test` ("cannot query the Psi
+     runtime/session graph" + "sessions are not a resolvable entity type").
+  2. Round-cap prompt instruction now asserted ("at most 8 rounds").
+  3. Added `entity-resolution-selected-model-flows-into-run-test` capturing
+     run-helper's `:model` run-opt to pin the selection→run seam.
+  4. Gave `default-select-model` an optional `catalog` arg threaded into
+     `resolve-selection`'s `:catalog` seam; the two `default-select-model`
+     tests now inject a nullable `{:candidates [...]}` pool instead of
+     `with-redefs`-ing `catalog-view`. The registered-handler real-api test
+     keeps `with-redefs catalog-view` (production 2-arity default path has no
+     injection point). Production 2-arity call site unchanged.
+- `bb test --focus extensions.context-manager-test`: 39 tests, 121
+  assertions, 0 failures. clj-kondo clean on src + test.

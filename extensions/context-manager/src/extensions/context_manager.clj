@@ -306,19 +306,27 @@
    configured. This augmenter is local-only by acceptance criterion (never
    run a cloud helper on 237's per-turn blocking path), so the top-ranked
    candidate is additionally guarded here: a non-local winner yields nil
-   (→ `:no-op`, no cloud helper run)."
-  [api parent-session-id]
-  (try
-    (let [model-ctx (when-let [q (:query-session api)]
-                      (q parent-session-id [:psi.agent-session/model-provider
-                                            :psi.agent-session/model-id]))
-          result    (model-selection/resolve-selection
-                     {:request (helper-model-selection-request model-ctx)})]
-      (when (= :ok (:outcome result))
-        (let [candidate (first (get-in result [:ranking :ranked]))]
-          (when (= :local (get-in candidate [:facts :locality]))
-            candidate))))
-    (catch Exception _ nil)))
+   (→ `:no-op`, no cloud helper run).
+
+   `catalog` (optional) is threaded into `resolve-selection` as its
+   injectable candidate pool (defaulting to the live `catalog-view`), so a
+   test can pass a nullable candidate pool as a parameter rather than
+   `with-redefs`-ing the model-registry infrastructure boundary."
+  ([api parent-session-id]
+   (default-select-model api parent-session-id nil))
+  ([api parent-session-id catalog]
+   (try
+     (let [model-ctx (when-let [q (:query-session api)]
+                       (q parent-session-id [:psi.agent-session/model-provider
+                                             :psi.agent-session/model-id]))
+           result    (model-selection/resolve-selection
+                      (cond-> {:request (helper-model-selection-request model-ctx)}
+                        catalog (assoc :catalog catalog)))]
+       (when (= :ok (:outcome result))
+         (let [candidate (first (get-in result [:ranking :ranked]))]
+           (when (= :local (get-in candidate [:facts :locality]))
+             candidate))))
+     (catch Exception _ nil))))
 
 (defn- default-run-helper
   "Create a bash-tool-enabled child helper session, run a bounded agent loop

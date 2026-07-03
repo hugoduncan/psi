@@ -355,6 +355,14 @@
       (is (re-find #"Identify referring expressions" system-prompt))
       (is (re-find #"evidence gathering only" system-prompt))
       (is (re-find #"surface . canonical \(evidence; confidence\)" system-prompt))
+      (testing "design-required capability-gap disclosure (Resolved decision 6)"
+        (is (re-find #"cannot query the Psi runtime/session graph" system-prompt)
+            "helper is told it cannot query the runtime/session graph")
+        (is (re-find #"sessions are not a resolvable entity type" system-prompt)
+            "sessions are explicitly not a resolvable entity type"))
+      (testing "round-cap prompt instruction (the only representation of the bound)"
+        (is (re-find #"at most 8 rounds" system-prompt)
+            "system prompt states the max-helper-rounds round cap"))
       (is (re-find #"please look at the resolver" user-prompt))
       (is (re-find #"look at the pathom resolver" user-prompt)
           "prior-turn user :snippet line is included for anaphora")
@@ -458,6 +466,24 @@
       (is (not (contains? (first (:turn-augmentation/operations env)) :source))
           "augmenter omits :source; core injects provenance"))))
 
+(deftest entity-resolution-selected-model-flows-into-run-test
+  (testing "the model select-model returns is the one passed to the helper run"
+    ;; Single-attempt selection→run wiring (Required behaviour item 3): the
+    ;; one top-ranked local candidate select-model returns must be the model
+    ;; the helper run actually runs under. Capture run-helper's :model run-opt.
+    (let [selected {:provider :ollama :id "qwen-selected"}
+          captured (atom :unset)
+          env (context-manager/entity-resolution-augmentation
+               {} base-tp
+               {:select-model (fn [_parent] selected)
+                :run-helper   (fn [opts]
+                                (reset! captured (:model opts))
+                                {:child-session-id "helper-1"
+                                 :text "the resolver → x (e; c)"})})]
+      (is (= :success (:turn-augmentation/status env)))
+      (is (= selected @captured)
+          "model returned by select-model is threaded into the helper run-opts"))))
+
 (deftest entity-resolution-no-local-model-no-op-test
   (testing "no local model yields no-op with no helper run"
     (let [calls (atom {})
@@ -481,11 +507,13 @@
                                       :latency-tier  :low
                                       :cost-tier     :low
                                       :locality      :cloud}}]
-      (with-redefs [model-selection/catalog-view
-                    (fn [] {:candidates [cloud-candidate]})]
-        (is (nil? (#'context-manager/default-select-model
-                   {:query-session (fn [_ _] {})} "s1"))
-            "cloud-only pool must yield nil (→ :no-op, no cloud helper run)")))))
+      ;; Inject the candidate pool via default-select-model's :catalog seam
+      ;; (nullable-over-mock: pass a candidate pool as a parameter rather than
+      ;; with-redefs-ing the model-registry infrastructure boundary).
+      (is (nil? (#'context-manager/default-select-model
+                 {:query-session (fn [_ _] {})} "s1"
+                 {:candidates [cloud-candidate]}))
+          "cloud-only pool must yield nil (→ :no-op, no cloud helper run)"))))
 
 (deftest default-select-model-accepts-local-winner-test
   (testing "a qualifying local model is returned as the top-ranked candidate"
@@ -496,12 +524,12 @@
                                       :latency-tier  :low
                                       :cost-tier     :zero
                                       :locality      :local}}]
-      (with-redefs [model-selection/catalog-view
-                    (fn [] {:candidates [local-candidate]})]
-        (is (= "local-q"
-               (:id (#'context-manager/default-select-model
-                     {:query-session (fn [_ _] {})} "s1")))
-            "local winner is selected")))))
+      ;; Inject the candidate pool via the :catalog seam (nullable-over-mock).
+      (is (= "local-q"
+             (:id (#'context-manager/default-select-model
+                   {:query-session (fn [_ _] {})} "s1"
+                   {:candidates [local-candidate]})))
+          "local winner is selected"))))
 
 (deftest entity-resolution-empty-run-no-op-test
   (testing "helper run producing no parseable lines yields no-op"

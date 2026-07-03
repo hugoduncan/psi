@@ -554,7 +554,7 @@
 
 ## Test-review follow-ups (turn 9)
 
-- [ ] **The design-required capability-gap disclosure in the helper system
+- [x] **The design-required capability-gap disclosure in the helper system
       prompt is untested.** Resolved decision 6 fixes a specific adaptation of
       the embedded Method: shell discovery commands stay `bash`-runnable, but
       "runtime/session graph introspection is replaced with an explicit
@@ -571,8 +571,13 @@
       system-prompt contains the capability-gap disclosure (cannot query
       runtime/session graph) and the "sessions are not a resolvable entity
       type" statement.
+      DONE: added assertions to `build-entity-resolution-prompt-test` that the
+      system-prompt contains "cannot query the Psi runtime/session graph" and
+      "sessions are not a resolvable entity type", pinning the Resolved
+      decision 6 capability-gap disclosure against a regression that drops the
+      wording or re-implies sessions are resolvable.
 
-- [ ] **The round-cap prompt instruction — the *only* signal of the design's
+- [x] **The round-cap prompt instruction — the *only* signal of the design's
       round bound — is untested.** Slice 3's finding records that
       `run-agent-loop-in-session` exposes no `:max-rounds` option, so the
       "Bounded helper agent loop" round cap is *prompt-instructed only* (the
@@ -585,8 +590,12 @@
       pass every test. Add an assertion to `build-entity-resolution-prompt-test`
       that the system-prompt states the round cap (references
       `max-helper-rounds` / "at most N rounds").
+      DONE: added an assertion to `build-entity-resolution-prompt-test` that the
+      system-prompt contains "at most 8 rounds" (the interpolated
+      `max-helper-rounds` value), pinning the sole prompt-level representation
+      of the round bound against a drop/mis-interpolation regression.
 
-- [ ] **The selected model is never asserted to flow into the helper run —
+- [x] **The selected model is never asserted to flow into the helper run —
       the single-attempt selection→run wiring is unverified.** Required
       behaviour item 3 / "Single-attempt model selection" specify that the one
       top-ranked local candidate `select-model` returns is the model the
@@ -599,8 +608,12 @@
       selection→run seam. Add an assertion (e.g. a `:run-helper` that captures
       its `:model` run-opt) that the model returned by `select-model` is the
       one passed to the helper run.
+      DONE: added `entity-resolution-selected-model-flows-into-run-test` — a
+      `:run-helper` captures its `:model` run-opt and the test asserts it
+      equals the exact map `select-model` returned, pinning the selection→run
+      wiring against a dropped/wrong `:model`.
 
-- [ ] **`default-select-model` tests stub the model-registry infra via
+- [x] **`default-select-model` tests stub the model-registry infra via
       `with-redefs` on `catalog-view` instead of injecting a catalog
       (project `λtest` nullable-over-mock standard).** `resolve-selection`
       already exposes a `:catalog` parameter (defaulting to `(catalog-view)`),
@@ -614,3 +627,13 @@
       parameter, or document why `with-redefs` is the accepted seam here.
       Low-risk; behaviour is already correct — this is a testability/standard
       alignment item.
+      DONE: added an optional `catalog` arg to `default-select-model` (3-arity)
+      that threads into `resolve-selection`'s `:catalog` seam; the 2-arity
+      production path is unchanged (defaults to live `catalog-view`). Reworked
+      `default-select-model-rejects-cloud-winner-test` /
+      `default-select-model-accepts-local-winner-test` to inject a nullable
+      `{:candidates [...]}` pool as a parameter instead of `with-redefs`-ing
+      `catalog-view`. The registered-handler test
+      (`entity-resolution-registered-handler-threads-real-api-test`) keeps
+      `with-redefs catalog-view` deliberately: it exercises the production
+      2-arity default-collaborator seam, which has no catalog injection point.
