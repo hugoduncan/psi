@@ -253,9 +253,40 @@ Purpose: automate munera + mementum working-memory follow-up after non-PSL commi
 
 ### `extensions/context-manager/src/extensions/context_manager.clj` (`extensions.context-manager`)
 
-Purpose: scaffold extension that subscribes to `session_turn_finished` events
-and logs session-id and turn-id via `(:log api)`. Idempotent init for reload
-safety. No commands, tools, operations, or prompt contributions yet.
+Purpose: subscribes to `session_turn_finished` events and logs session-id and
+turn-id via `(:log api)` (idempotent init for reload safety), and registers two
+pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
+
+- Turn augmenters (via `:register-turn-augmenter`):
+  - `project-context` — emits a minimal `Project context` block reporting the
+    effective working directory when available.
+  - `entity-resolution` — automatic pre-turn entity resolution. For each
+    eligible parent turn it runs a bounded local-model helper session (created
+    with the existing `bash` tool only) that applies the `entity-resolution`
+    skill's method (Method steps 1–5) to the user text plus a rendered
+    conversation-history excerpt, and injects any confidently-resolved
+    `surface → canonical (evidence)` mappings as a `Resolved entities` context
+    block before the current user message.
+    - Local-first: selects a single top-ranked local model (strong
+      `:locality :local`, `:latency-tier :low`, `:cost-tier #{:zero :low}`,
+      inheriting the parent session's model as context); never falls back to a
+      cloud model.
+    - `bash` is granted for read-only evidence gathering only; the helper is
+      instructed not to mutate files or cause side effects. The helper run is
+      bounded (round-cap prompt guidance plus a wall-clock budget); exceeding
+      the bound is treated as a failed run.
+    - Data-only and non-interactive: never mutates the submitted prompt or
+      parent session; omits `:source` (core injects provenance); reports helper
+      child-session ids in `:turn-augmentation/child-session-ids` and tracks
+      them to avoid augmenting its own helper turns.
+    - Returns a well-formed no-op for: tracked helper sessions, blank effective
+      cwd, slash-command-only prompts (pre-filter, before spending a helper
+      run), no confident mapping parsed, no local model available, and
+      failed/empty/timed-out helper runs. Confidence is model self-gated — the
+      model emits a line only for mappings it judges confident; the augmenter
+      accepts every well-formed parsed line and drops the confidence token from
+      the rendered block.
+- No commands, tools, or prompt contributions.
 
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)
 

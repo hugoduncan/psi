@@ -7,6 +7,7 @@
 (use-fixtures :each (fn [f]
                       (reset! context-manager/initialized? nil)
                       (reset! context-manager/helper-session-ids #{})
+                      (reset! context-manager/entity-resolution-helper-session-ids #{})
                       (f)))
 
 (defn- setup-api
@@ -69,8 +70,8 @@
       ;; Prompt contributions live in :root-state, not directly on the state map;
       ;; use :list-prompt-contributions on the API to query them.
       (is (empty? ((:list-prompt-contributions api))) "no prompt contributions registered")
-      (is (= ["project-context"] (-> @state :turn-augmenters keys sort vec))
-          "one turn augmenter is registered"))))
+      (is (= ["entity-resolution" "project-context"] (-> @state :turn-augmenters keys sort vec))
+          "both turn augmenters are registered"))))
 
 (deftest handler-handles-missing-payload-keys-test
   (testing "handler logs gracefully when :session-id or :turn-id are missing"
@@ -248,3 +249,175 @@
               ((:handler registration)
                {:turn-augmentation/session-id "s"
                 :turn-augmentation/effective-cwd "/repo"})))))))
+
+;; ---------------------------------------------------------------------------
+;; Entity-resolution augmenter (task 238)
+;; ---------------------------------------------------------------------------
+
+(def ^:private base-tp
+  {:turn-augmentation/session-id "s1"
+   :turn-augmentation/effective-cwd "/repo"
+   :turn-augmentation/user-text "please look at the resolver"
+   :turn-augmentation/history []})
+
+(defn- stub
+  "Build a collaborators map with a fixed model and a run-helper returning
+   the supplied raw text under a fixed child-session-id. Records calls."
+  [{:keys [model text child-id throw? calls]
+    :or   {model {:provider :ollama :id "qwen"} child-id "helper-1"}}]
+  {:select-model (fn [_parent]
+                   (swap! (or calls (atom nil)) (fnil update {}) :select (fnil inc 0))
+                   model)
+   :run-helper   (fn [_opts]
+                   (when calls (swap! calls (fnil update {}) :run (fnil inc 0)))
+                   (if throw?
+                     (throw (ex-info "boom" {}))
+                     {:child-session-id child-id :text text}))})
+
+;; --- pure: prompt / parse / render ---------------------------------------
+
+(deftest parse-mapping-lines-test
+  (testing "accepts well-formed lines, discards everything else"
+    (let [raw (str "Here are the mappings I found:\n"
+                   "the resolver → components/pathom/resolver.clj (exact path; high)\n"
+                   "some malformed line without arrow\n"
+                   "that task → munera/open/238-x/ (git ls-files; medium)\n"
+                   "Should I proceed? (question)\n")
+          parsed (context-manager/parse-mapping-lines raw)]
+      (is (= 2 (count parsed)))
+      (is (= {:surface "the resolver"
+              :canonical "components/pathom/resolver.clj"
+              :evidence "exact path"
+              :confidence "high"}
+             (first parsed)))
+      (is (= "that task" (:surface (second parsed))))))
+
+  (testing "supports ascii arrow"
+    (is (= 1 (count (context-manager/parse-mapping-lines
+                     "foo -> bar (ev; conf)")))))
+
+  (testing "zero well-formed lines yields empty vector"
+    (is (= [] (context-manager/parse-mapping-lines "no lines here at all")))
+    (is (= [] (context-manager/parse-mapping-lines nil)))))
+
+(deftest render-mapping-content-test
+  (testing "renders three fields, confidence dropped"
+    (is (= "the resolver → components/pathom/resolver.clj (exact path)"
+           (context-manager/render-mapping-content
+            [{:surface "the resolver"
+              :canonical "components/pathom/resolver.clj"
+              :evidence "exact path"
+              :confidence "high"}])))))
+
+(deftest build-entity-resolution-prompt-test
+  (testing "prompt embeds method, safety, contract, user text, and history"
+    (let [{:keys [system-prompt user-prompt]}
+          (context-manager/build-entity-resolution-prompt
+           (assoc base-tp
+                  :turn-augmentation/history
+                  [{:role "user" :text "look at the pathom resolver"}
+                   {:role "assistant" :text "which one?"}
+                   {:role "user" :text "/help"}]))]
+      (is (re-find #"Identify referring expressions" system-prompt))
+      (is (re-find #"evidence gathering only" system-prompt))
+      (is (re-find #"surface . canonical \(evidence; confidence\)" system-prompt))
+      (is (re-find #"please look at the resolver" user-prompt))
+      (is (re-find #"look at the pathom resolver" user-prompt)
+          "prior-turn user line is included for anaphora")
+      (is (re-find #"which one\?" user-prompt))
+      (is (not (re-find #"/help" user-prompt))
+          "slash-command history lines are dropped"))))
+
+;; --- eligibility pre-filter no-ops ---------------------------------------
+
+(deftest entity-resolution-helper-session-no-op-test
+  (testing "tracked helper session yields no-op without creating a helper"
+    (swap! context-manager/entity-resolution-helper-session-ids conj "s1")
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} base-tp (stub {:text "x → y (e; c)" :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (nil? (:select @calls)) "model selection not attempted")
+      (is (nil? (:run @calls)) "helper session never created"))))
+
+(deftest entity-resolution-blank-cwd-no-op-test
+  (testing "blank effective-cwd yields no-op without helper"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} (assoc base-tp :turn-augmentation/effective-cwd "")
+               (stub {:text "x → y (e; c)" :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (nil? (:run @calls))))))
+
+(deftest entity-resolution-slash-command-only-no-op-test
+  (testing "slash-command-only prompt is pre-filtered before any helper run"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} (assoc base-tp :turn-augmentation/user-text "/status")
+               (stub {:text "x → y (e; c)" :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (nil? (:select @calls)) "no model selected for slash-command-only turn")
+      (is (nil? (:run @calls)) "helper session never created"))))
+
+;; --- orchestration outcomes ----------------------------------------------
+
+(deftest entity-resolution-confident-mapping-success-test
+  (testing "one confident line becomes a success append-context-block"
+    (let [env (context-manager/entity-resolution-augmentation
+               {} base-tp
+               (stub {:text "the resolver → components/pathom/resolver.clj (exact path; high)"
+                      :child-id "helper-7"}))]
+      (is (= :success (:turn-augmentation/status env)))
+      (is (= [{:op :append-context-block
+               :id "entity-resolution"
+               :title "Resolved entities"
+               :content "the resolver → components/pathom/resolver.clj (exact path)"}]
+             (:turn-augmentation/operations env)))
+      (is (= ["helper-7"] (:turn-augmentation/child-session-ids env))
+          "helper child-session id reported as provenance")
+      (is (not (contains? (first (:turn-augmentation/operations env)) :source))
+          "augmenter omits :source; core injects provenance"))))
+
+(deftest entity-resolution-no-local-model-no-op-test
+  (testing "no local model yields no-op with no helper run"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} base-tp (stub {:model nil :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= "no local model" (:turn-augmentation/diagnostic env)))
+      (is (nil? (:run @calls)) "no helper run attempted"))))
+
+(deftest entity-resolution-empty-run-no-op-test
+  (testing "helper run producing no parseable lines yields no-op"
+    (let [env (context-manager/entity-resolution-augmentation
+               {} base-tp
+               (stub {:text "I could not find anything conclusive."
+                      :child-id "helper-3"}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= ["helper-3"] (:turn-augmentation/child-session-ids env))
+          "helper id still reported even on empty run"))))
+
+(deftest entity-resolution-nil-run-no-op-test
+  (testing "failed helper run (nil result) yields no-op"
+    (let [env (context-manager/entity-resolution-augmentation
+               {} base-tp
+               {:select-model (fn [_] {:provider :ollama :id "q"})
+                :run-helper   (fn [_] nil)})]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/child-session-ids env))))))
+
+(deftest entity-resolution-ambiguous-dropped-test
+  (testing "ambiguous reference: model omits the line, augmenter parses nothing"
+    ;; The helper self-gates: it emits no line for the ambiguous surface.
+    (let [env (context-manager/entity-resolution-augmentation
+               {} (assoc base-tp :turn-augmentation/user-text "fix that thing")
+               (stub {:text "" :child-id "helper-9"}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (not (some #(= :success %) [(:turn-augmentation/status env)]))))))
+
+(deftest init-registers-entity-resolution-augmenter-test
+  (testing "init registers entity-resolution with a handler"
+    (let [{:keys [state]} (setup-api)
+          registration (get-in @state [:turn-augmenters "entity-resolution"])]
+      (is (= "entity-resolution" (:augmenter-id registration)))
+      (is (fn? (:handler registration))))))

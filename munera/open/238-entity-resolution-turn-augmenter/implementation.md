@@ -1360,3 +1360,64 @@ Applied to `design.md`:
 - Implementer entry points (already consolidated in the tenth design-review
   note above; not repeated here) remain the authoritative file list — start
   from plan.md's slice order.
+
+## Implementation pass 1 (slices 1–5, extension-side complete)
+
+All code + tests landed in `extensions/context-manager` in one coherent pass;
+28 tests / 80 assertions green (`bb test --focus extensions.context-manager-test`).
+
+Key decisions / discoveries:
+
+- **`run-agent-loop-in-session` has no round-cap option** (verified in
+  `components/agent-session/src/psi/agent_session/mutations/session.clj:148`;
+  params are only `:session-id :prompt :model :api-key`). Per plan.md's stated
+  mitigation, the enforced finite bound is the **120s wall-clock budget** (a
+  `future` + `(deref fut helper-wall-clock-ms ::timeout)`; timeout ⇒ cancel ⇒
+  treated as failed/empty run ⇒ no-op). The **8-round cap is prompt-instructed**
+  only (embedded in the bash-safety prompt text). Each bash command already has
+  its own 30s cap. Constants: `max-helper-rounds` 8, `helper-wall-clock-ms`
+  120000, `max-history-chars` 4000.
+
+- **Orchestration testability without mocks.** `entity-resolution-augmentation`
+  takes an optional 3rd `collaborators` arg injecting `:select-model` (fn
+  [parent-session-id] → model|nil) and `:run-helper` (fn [run-opts] →
+  {:child-session-id :text}|nil). Tests pass deterministic fakes (real logic,
+  nullable infrastructure) — no mocking framework, per `testing-without-mocks`.
+  `init` registration wraps the real defaults (`default-select-model`,
+  `default-run-helper`) closed over `api`.
+
+- **Helper line format / parsing.** Parser regex accepts
+  `surface (→|->) canonical (evidence; confidence)` per line and keeps *every*
+  well-formed line (model self-gating — no confidence-value threshold; the
+  confidence sub-token is captured but never gates acceptance and is dropped at
+  render). Rendered `:content` is three-field `surface → canonical (evidence)`.
+
+- **Recursion safety.** Child id is added to
+  `entity-resolution-helper-session-ids` (a distinct atom from the existing
+  `helper-session-ids`) *before* `run-agent-loop-in-session`, removed after
+  close in `finally`. The augmenter no-ops for any tracked helper session id.
+
+- **Provenance / data-only.** Success envelope operation omits `:source` (core
+  injects it); the helper child id is reported in
+  `:turn-augmentation/child-session-ids`. The no-confident-mapping no-op still
+  reports the child id (a helper *did* run).
+
+- **Dispatch insertion + replay reuse NOT duplicated.** The
+  `:turn/augmentation-context` block insertion (before the current user
+  message) and replay-without-re-invocation are augmenter-id-agnostic 237-rail
+  guarantees, already fully tested in
+  `components/agent-session/.../prompt_request_test.clj`
+  (`build-prepared-request-inserts-turn-augmentation-context-test` + 237 replay
+  tests). The extension's own responsibility — producing a correctly-shaped
+  envelope operation — is asserted by
+  `entity-resolution-confident-mapping-success-test`. Re-proving the shared rail
+  inside the extension test alias would require pulling agent-session +
+  turn-runtime deps into the extension (coupling AGENTS.md's shims/adapters
+  guidance warns against). Steps for those two items are marked `[~]` with this
+  rationale rather than `[x]`.
+
+- **deps.edn**: added `psi/ai {:local/root "../../components/ai"}` (mirrors
+  `auto-session-name`), needed for `psi.ai.model-selection/resolve-selection`.
+
+- **Docs/changelog**: `doc/extensions.md` context-manager section now describes
+  both augmenters; CHANGELOG `[Unreleased] → Added` entry added.
