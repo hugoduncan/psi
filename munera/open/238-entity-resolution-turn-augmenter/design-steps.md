@@ -351,3 +351,22 @@
   top-ranked attempt with immediate `:no-op` on failure — and if the latter,
   note that as a deliberate departure from the cited precedent rather than
   leaving it implicit.
+
+- [ ] Ambiguous: Resolved decision 2 now says the helper has no git-command
+  execution, but that "searching the worktree" means
+  "reading/listing/grepping **git-tracked file contents**." Required
+  behaviour item 3 describes the helper toolset as read / list / grep over
+  "the worktree's files" with no git-command execution, and Resolved
+  decision 4 says the new toolset is file read + directory list + content
+  grep. The design does not say whether these new list/grep tools are
+  expected to be **git-aware** (filtering to tracked files via some
+  non-command git integration or precomputed tracked-file set) or ordinary
+  filesystem-scoped read-only tools constrained only by `effective-cwd`.
+  Those two interpretations change what evidence the model can see: a
+  git-aware corpus excludes untracked/generated/ignored files and requires
+  implementation machinery not otherwise described, while a filesystem
+  corpus makes "git-tracked" inaccurate and may expose files that are not
+  project source of truth. Pin down whether the v1 evidence corpus is
+  git-tracked files only or all readable files under the effective cwd, and
+  align Resolved decision 2 / Required behaviour item 3 / toolset wording
+  accordingly without changing the frozen read/list/grep-only scope.

@@ -895,3 +895,11 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   architectural misfit, no `SCOPE_QUESTION:`, and no unchecked design step
   added. `design-steps.md` remains fully checked after the prior
   history-tail / single-attempt / git-evidence wording resolution.
+
+## Ambiguity review (design-review turn 2, seventh pass)
+
+- ambiguity review added 1 new design step: Resolved decision 2 says the
+  no-git-command helper searches "git-tracked file contents," while the
+  actual closed toolset is read/list/grep over the worktree's files. The
+  design needs to pin down whether v1 tools are git-aware/tracked-file-only
+  or ordinary filesystem-scoped under `effective-cwd`.
