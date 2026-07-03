@@ -1,4 +1,8 @@
 {:version 1
  :agent-session
  {:project-nrepl
-  {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}}}
+  {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}
+  :session-profiles
+  {:planning
+   {:model-provider "anthropic"
+    :model-id "claude-fable-5"}}}}

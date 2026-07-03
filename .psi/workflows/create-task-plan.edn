@@ -1,6 +1,7 @@
 {:steps
  [{:name "create-plan",
    :type :session,
+   :session-profile :planning,
    :prompt-workflow "create-task-plan-create-plan.md"}],
  :name "create-task-plan",
  :description
