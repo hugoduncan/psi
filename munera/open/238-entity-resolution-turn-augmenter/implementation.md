@@ -1607,3 +1607,13 @@ Key decisions / discoveries:
   `:no-op`), activating the dormant `throw?` `stub` affordance via
   `entity-resolution-throwing-helper-no-op-test`. clj-kondo clean; focused
   suite 38 tests / 116 assertions, 0 failures.
+
+## Test review (turn 9)
+
+- Applied `task-test-review` skill. Added 4 steps: untested capability-gap
+  prompt disclosure (Resolved decision 6); untested round-cap prompt
+  instruction (sole representation of the round bound); unverified
+  select-model→run-helper `:model` threading; and `default-select-model`
+  tests stubbing `catalog-view` via `with-redefs` rather than injecting a
+  catalog (`λtest` nullable-over-mock standard, though `resolve-selection`
+  already exposes a `:catalog` seam).

@@ -551,3 +551,66 @@
       `entity-resolution-throwing-helper-no-op-test` (`stub {:throw? true}`),
       asserting `:no-op` and empty `:child-session-ids` (no id reported when
       the run threw).
+
+## Test-review follow-ups (turn 9)
+
+- [ ] **The design-required capability-gap disclosure in the helper system
+      prompt is untested.** Resolved decision 6 fixes a specific adaptation of
+      the embedded Method: shell discovery commands stay `bash`-runnable, but
+      "runtime/session graph introspection is replaced with an explicit
+      capability-gap disclosure" and "sessions are not a resolvable entity
+      type." `entity-resolution-method` implements this ("You cannot query the
+      Psi runtime/session graph — sessions are not a resolvable entity type
+      here …"), but `build-entity-resolution-prompt-test` asserts only method /
+      safety / contract / user-text / history — never this disclosure. A
+      regression that dropped the capability-gap wording (re-introducing the
+      skill's original unavailable-evidence-source phrasing, or implying
+      sessions are resolvable) would pass all current tests, yet it is an
+      explicit design-required prompt element. Add an assertion to
+      `build-entity-resolution-prompt-test` (or a dedicated case) that the
+      system-prompt contains the capability-gap disclosure (cannot query
+      runtime/session graph) and the "sessions are not a resolvable entity
+      type" statement.
+
+- [ ] **The round-cap prompt instruction — the *only* signal of the design's
+      round bound — is untested.** Slice 3's finding records that
+      `run-agent-loop-in-session` exposes no `:max-rounds` option, so the
+      "Bounded helper agent loop" round cap is *prompt-instructed only* (the
+      enforced finite bound is the wall-clock budget, tested by
+      `default-run-helper-timeout-branch-test`). `entity-resolution-bash-safety`
+      carries the round cap ("use at most 8 rounds of tool use"), but no test
+      asserts the built prompt contains it. Since the prompt text is the sole
+      remaining representation of the round bound, a regression dropping or
+      corrupting it (e.g. `max-helper-rounds` no longer interpolated) would
+      pass every test. Add an assertion to `build-entity-resolution-prompt-test`
+      that the system-prompt states the round cap (references
+      `max-helper-rounds` / "at most N rounds").
+
+- [ ] **The selected model is never asserted to flow into the helper run —
+      the single-attempt selection→run wiring is unverified.** Required
+      behaviour item 3 / "Single-attempt model selection" specify that the one
+      top-ranked local candidate `select-model` returns is the model the
+      helper session actually runs under. `entity-resolution-augmentation`
+      threads it as `:model model` into `run-helper`, but every stubbed
+      `:run-helper` ignores its `:opts`, and no test asserts the model returned
+      by `select-model` reaches `run-helper`'s run-opts. A regression that
+      dropped `:model` from the run-opts (or passed the wrong value) would
+      pass — the success test only checks the rendered block, not the
+      selection→run seam. Add an assertion (e.g. a `:run-helper` that captures
+      its `:model` run-opt) that the model returned by `select-model` is the
+      one passed to the helper run.
+
+- [ ] **`default-select-model` tests stub the model-registry infra via
+      `with-redefs` on `catalog-view` instead of injecting a catalog
+      (project `λtest` nullable-over-mock standard).** `resolve-selection`
+      already exposes a `:catalog` parameter (defaulting to `(catalog-view)`),
+      the intended injection seam, but `default-select-model` does not thread a
+      catalog through, so `default-select-model-rejects-cloud-winner-test` /
+      `default-select-model-accepts-local-winner-test` must `with-redefs` the
+      real `catalog-view` var — a global stub of an infrastructure boundary the
+      project's testing standard steers away from. Either make
+      `default-select-model` accept/thread an injectable catalog (or expose the
+      catalog via `api`) so the tests pass a nullable candidate pool as a
+      parameter, or document why `with-redefs` is the accepted seam here.
+      Low-risk; behaviour is already correct — this is a testability/standard
+      alignment item.
