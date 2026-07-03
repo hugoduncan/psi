@@ -195,3 +195,26 @@
   which of (a)/(b)/(c) the adaptation intends for the git-status and
   graph-introspection sub-references specifically, not just for the two
   substitutable ones.
+
+- [ ] Ambiguous: Resolved decision 6's capability-gap statement (added by
+  `b37363b71` to resolve the previous unmappable-sub-reference item) tells
+  the model it "must reason about path/task/**session** references using
+  only file contents it can read, list, or grep" — but "session" does not
+  appear anywhere else in design.md as a resolvable entity type. The Goal
+  section's explicit entity-type list is "paths, tasks, workflows, skills,
+  extensions, namespaces, vars, commands, docs, vocabulary symbols" — no
+  sessions — and Required behaviour, Constraints, and Acceptance criteria
+  never mention sessions as something this augmenter maps or emits mappings
+  for. The word appears to be carried over from the `entity-resolution`
+  skill's own step 3 wording ("Psi graph introspection for runtime/session
+  entities") without checking whether "session" belongs in this augmenter's
+  narrower, tool-constrained entity-type scope. This leaves it unclear
+  whether (a) sessions are actually an in-scope entity type this augmenter
+  should attempt to resolve via file-based evidence when a user references
+  one (in which case the Goal section's entity-type list is incomplete), or
+  (b) "session" should not appear in the capability-gap prompt text at all
+  since this augmenter never resolves session references (in which case the
+  capability-gap wording overclaims what the model is being asked to
+  attempt). Pin down whether sessions are in or out of this augmenter's
+  entity-type scope and align the Goal section's entity-type list and
+  Resolved decision 6's capability-gap wording to agree.

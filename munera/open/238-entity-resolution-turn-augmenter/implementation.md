@@ -530,6 +530,37 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - `design-steps.md` has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Ambiguity review (design-review turn 2, fifth pass — post `b37363b71`)
+
+- ambiguity review added 1 new design step: Resolved decision 6's new
+  capability-gap statement (landed by `b37363b71`) tells the model to
+  "reason about path/task/**session** references" using file-based
+  evidence, but "session" appears nowhere else in design.md as a
+  resolvable entity type — the Goal section's entity-type list omits it
+  entirely. The word was carried over from the `entity-resolution` skill's
+  own step 3 wording ("runtime/session entities") without checking it
+  against this augmenter's narrower, tool-constrained scope. See
+  design-steps.md.
+- Targeted re-read only: reused the design.md, `AGENTS.md`, `ramora/META.md`,
+  and `doc/architecture.md` content already loaded in this session's
+  architecture-review turn; the only design.md text change since the prior
+  (fourth-pass) ambiguity review is the `b37363b71` diff to Resolved
+  decision 6, so review effort focused there rather than re-reading the
+  whole file end-to-end.
+- Confirmed by grep that "session" (as a candidate entity-reference type,
+  not "helper session"/"child session"/"session-id" plumbing) occurs
+  exactly once in design.md, at the new capability-gap sentence — this is
+  a genuinely new ambiguity introduced by the latest resolution commit, not
+  a pre-existing one missed by prior passes.
+- Considered and ruled out: the capability-gap statement's exact
+  insertion point (one consolidated statement vs. duplicated at each of
+  step 1's and step 3's original locations) — design.md explicitly defers
+  "exact adapted phrasing ... to plan/implementation," matching the same
+  "policy, not literal phrasing" granularity already established for
+  Resolved decisions 4–5; not re-flagged as ambiguous.
+- No `SCOPE_QUESTION:` raised — this is a wording/entity-list-alignment
+  gap closable within frozen scope, not a scope-boundary concern.
+
 ## Fourth design-steps-resolution slice — resolved (batch: `c416b1a95`..`840e2100e`, baseline `d1db1d86e`)
 
 - Resolved the 1 remaining unchecked item (git-status / graph-introspection
