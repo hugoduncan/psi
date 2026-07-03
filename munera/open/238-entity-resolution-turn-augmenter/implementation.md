@@ -24,3 +24,15 @@ Context loaded for later ambiguity/inconsistency turns in this session:
 - `extensions/context-manager/deps.edn` does not depend on `psi/ai` yet
   (unlike `extensions/auto-session-name/deps.edn`, which does); implementation
   will need to add that dependency to call `psi.ai.model-selection`.
+
+## Ambiguity review (design-review turn 2)
+
+- ambiguity review added 1 new design step: the design leaves both the
+  skill-to-helper-prompt delivery mechanism and the helper model's expected
+  output contract unspecified. See design-steps.md.
+- `psi.prompt-assets.skills/invoke-skill` (used via `prompt_request.clj` and
+  `create-child-session`'s `:skill-names`) expands skills based on
+  matching/explicit invocation in the *user's own submitted text*, not
+  model-judged relevance mid-conversation — confirms `:skill-names` alone
+  cannot be assumed to deterministically apply `entity-resolution`'s method
+  to a helper session driven by arbitrary parent-turn user text.
