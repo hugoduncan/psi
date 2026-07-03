@@ -1636,3 +1636,8 @@ Key decisions / discoveries:
      injection point). Production 2-arity call site unchanged.
 - `bb test --focus extensions.context-manager-test`: 39 tests, 121
   assertions, 0 failures. clj-kondo clean on src + test.
+
+## Test-review (turn 10)
+
+- Added 1 step: `default-run-helper` child-creation-failure branch (nil/throwing
+  `create-child-session` → nil result / no run / no tracking) is untested.

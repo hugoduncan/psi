@@ -637,3 +637,28 @@
       (`entity-resolution-registered-handler-threads-real-api-test`) keeps
       `with-redefs catalog-view` deliberately: it exercises the production
       2-arity default-collaborator seam, which has no catalog injection point.
+
+## Test-review follow-ups (turn 10)
+
+- [ ] **`default-run-helper`'s child-creation-failure branch is untested — the
+      run/track entry gate on the blocking pre-turn path has no coverage.**
+      `default-run-helper` wraps `create-child-session` in `(try … (catch
+      Exception _ nil))` and then gates the entire run on
+      `(when child-session-id …)`: when child creation returns nil (or throws
+      → caught → nil), `child-session-id` is nil, so the fn returns nil (→
+      `:no-op`) *without* running `run-agent-loop-in-session`, without
+      `conj`-ing anything into `entity-resolution-helper-session-ids`, and
+      without leaving an orphaned/leaked session. This is a distinct
+      production failure mode (session-limit reached, dispatch/create error)
+      and the *entry* gate for the whole helper run — Required behaviour item
+      5's "the helper run fails" and the recursion/cleanup invariants both
+      depend on it — yet every existing `default-run-helper` test supplies a
+      valid child id from `create-child-session`, so the nil-child branch is
+      never exercised. A regression that dropped the nil guard (calling
+      `run-agent-loop-in-session` with a nil session id, or tracking a nil id
+      in the recursion atom) would pass all current tests. Add a
+      `default-run-helper` test whose `create-child-session` returns nil (and a
+      second sub-case where it throws), asserting the fn returns nil (→
+      `:no-op`), that `run-agent-loop-in-session` is never invoked, and that
+      `entity-resolution-helper-session-ids` is left untouched (no nil/orphan
+      id tracked).
