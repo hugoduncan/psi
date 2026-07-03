@@ -375,3 +375,38 @@
       (→ `:no-winner` on the empty pool → nil), so the handler reaches the
       deterministic `no-op "no local model"` outcome — proving `api` is threaded
       through the default-collaborator seam, not just the stub-injected path.
+
+## Implementation-review follow-ups (turn 6)
+
+- [ ] **History-tail inclusion is non-functional in production — the
+      augmenter mis-reads the `:turn-augmentation/history` projection shape,
+      silently disabling the design-required anaphora context.** The 237
+      contract (`munera/closed/237-.../design.md` lines 221–248) and the live
+      producer
+      (`components/agent-session/src/psi/agent_session/dispatch_effects.clj`
+      `build-augmentation-history-projection`) both fix
+      `:turn-augmentation/history` as a **map**
+      `{:message-count N :tail [{:index .. :role .. :content-types ..
+      :snippet ..} ...]}` (tail = last 8 prior messages, each with a
+      `:snippet`, no `:text`/`:content` keys). But `render-history-excerpt`
+      iterates `(or history [])` **directly** (treating the map as a seq of
+      entries — it degrades to iterating MapEntry pairs) and `history-line`
+      reads `(:text entry)`/`(:content entry)`, neither of which exists on a
+      tail entry (the real key is `:snippet`). Consequences: (a) in
+      production the history excerpt is *always empty*, so
+      `build-entity-resolution-prompt` never includes prior-turn context and
+      the "History-tail inclusion" v1 policy's anaphora resolution ("it",
+      "this", "that", "the former/latter") — which design.md declares
+      *required* because anaphora is only resolvable against prior turns — is
+      dead; (b) the defect is masked because `build-entity-resolution-prompt-test`
+      passes a hand-built **flat vector** `[{:role "user" :text "..."}]` that
+      matches neither the real projection map nor its entry keys, so the test
+      is green against a fixture the runtime never produces. Fix
+      `render-history-excerpt`/`history-line` to consume the real projection:
+      read `(:tail history)` and each entry's `:role` + `:snippet` (dropping
+      slash-command and blank snippets as today), and update the prompt test
+      fixture to the actual `{:message-count :tail [...]}` shape (or a shared
+      237 projection helper) so the test proves real-shape history is
+      rendered. Add a regression asserting a map-shaped history with `:tail`
+      snippets appears in the user-prompt and a flat-vector/`nil`/empty-tail
+      history yields no excerpt.

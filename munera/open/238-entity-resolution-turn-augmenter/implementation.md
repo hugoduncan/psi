@@ -1536,3 +1536,12 @@ Key decisions / discoveries:
   unlike the 8 stub-injected `{}`-api call sites. `bb test --focus
   extensions.context-manager-test` green (34 tests, 100 assertions, 0
   failures); clj-kondo clean on the touched test file.
+
+## Implementation-review (turn 6)
+
+- added 1 follow-up step: `render-history-excerpt`/`history-line` mis-read the
+  `:turn-augmentation/history` projection (real shape is a map
+  `{:message-count :tail [{:role :snippet ...}]}` per the 237 contract and the
+  live `build-augmentation-history-projection`, not a flat vector of
+  `{:role :text}` entries), so history-tail inclusion is dead in production and
+  the prompt test masks it with a wrong-shaped fixture. See steps.md.
