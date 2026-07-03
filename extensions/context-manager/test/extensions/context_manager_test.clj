@@ -529,16 +529,6 @@
       (is (= ["helper-8"] (:turn-augmentation/child-session-ids env))
           "helper child-session id reported as provenance"))))
 
-(deftest entity-resolution-no-local-model-no-op-test
-  (testing "no local model yields no-op with no helper run"
-    (let [calls (atom {})
-          env (context-manager/entity-resolution-augmentation
-               {} base-tp (stub {:model nil :calls calls}))]
-      (is (= :no-op (:turn-augmentation/status env)))
-      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
-      (is (= "no local model" (:turn-augmentation/diagnostic env)))
-      (is (nil? (:run @calls)) "no helper run attempted"))))
-
 (deftest entity-resolution-empty-run-no-op-test
   (testing "helper run producing no parseable lines yields no-op"
     (let [env (context-manager/entity-resolution-augmentation

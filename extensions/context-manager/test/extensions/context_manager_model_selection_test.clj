@@ -3,6 +3,31 @@
    [clojure.test :refer [deftest is testing]]
    [extensions.context-manager :as context-manager]))
 
+(def ^:private base-tp
+  {:turn-augmentation/session-id "s1"
+   :turn-augmentation/effective-cwd "/repo"
+   :turn-augmentation/user-text "please look at the resolver"
+   :turn-augmentation/history []})
+
+(defn- stub
+  [{:keys [model calls]
+    :or   {model {:provider :ollama :id "qwen"}}}]
+  {:select-model (fn [_parent]
+                   (swap! (or calls (atom nil)) (fnil update {}) :select (fnil inc 0))
+                   model)
+   :run-helper   (fn [_opts]
+                   (when calls (swap! calls (fnil update {}) :run (fnil inc 0))))})
+
+(deftest entity-resolution-no-local-model-no-op-test
+  (testing "no local model yields no-op with no helper run"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} base-tp (stub {:model nil :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= [] (:turn-augmentation/operations env)) "well-formed no-op: no operations")
+      (is (= "no local model" (:turn-augmentation/diagnostic env)))
+      (is (nil? (:run @calls)) "no helper run attempted"))))
+
 (deftest default-select-model-rejects-cloud-winner-test
   (testing "a cheap-tier cloud model that survives the required filter is rejected (local-only)"
     ;; The required constraints (:supports-text, :latency-tier :low,
