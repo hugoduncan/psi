@@ -530,6 +530,29 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - `design-steps.md` has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Ambiguity review (design-review turn 2, sixth pass — post `f92192104`)
+
+- ambiguity review added 2 new design steps: (1) whether the history-tail
+  read by Required behaviour item 1 is ever incorporated into the
+  constructed helper prompt (item 3 only says the prompt "applies [the
+  method] to the user text," no mention of history), despite the embedded
+  skill method's own step 1 needing conversation history to resolve
+  anaphora; (2) whether helper-model selection retries across
+  `resolve-selection`'s full ranked candidate list on failure (matching
+  `auto-session-name`'s actual `select-helper-models`/loop behavior, the
+  precedent this design cites) or attempts only the top-ranked candidate
+  before `:no-op`. See design-steps.md.
+- Used design.md, `AGENTS.md`, `ramora/META.md`, and `doc/architecture.md`
+  already loaded in this session; no re-read needed since design.md is
+  unchanged since the architecture-review turn. Targeted re-read: opened
+  `extensions/auto-session-name/src/extensions/auto_session_name.clj` to
+  check the exact precedent behavior for both findings above (history-excerpt
+  construction via `build-rename-prompt`/`sanitize-session-entries`, and the
+  ranked-candidate retry loop in `select-helper-models`/`infer-session-title`)
+  — confirmed via code, not assumption.
+- No `SCOPE_QUESTION:` raised — both items are prompt-construction/behavior
+  specification gaps closable within frozen scope.
+
 ## Ambiguity review (design-review turn 2, fifth pass — post `b37363b71`)
 
 - ambiguity review added 1 new design step: Resolved decision 6's new

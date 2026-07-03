@@ -248,3 +248,65 @@
   two-case split (or explicitly note the summary is intentionally
   simplified and defer full detail to decision 6), so the three passages
   agree on what "adapted" means.
+
+- [ ] Ambiguous: Required behaviour item 1 says the augmenter "reads the
+  bounded turn projection (user text + history tail + effective-cwd)," and
+  the Context section confirms `:turn-augmentation/history` (a bounded
+  tail) is part of the 237 input contract the augmenter receives. But
+  Required behaviour item 3 — the step that actually builds the helper
+  session's prompt — says only that the prompt "embeds the
+  `entity-resolution` method ... and applies it to **the user text**,"
+  with no mention of the history tail being included in what the helper
+  model sees. Grepping design.md for "history" turns up only these two
+  passages; no other passage says whether the read history tail is ever
+  incorporated into the constructed helper prompt content, or is read but
+  unused. This is not a cosmetic gap: the embedded `entity-resolution`
+  skill method's own step 1 ("Collect local context") lists "Current user
+  turn and immediately relevant conversation history" as context to
+  collect, and the skill's stated referring-expression types explicitly
+  include anaphora ("it", "this", "that", "those", "the former/latter")
+  that are frequently only resolvable by looking at prior turns — the
+  Goal section's own opening sentence describes resolving "ambiguous/
+  underspecified references," which for pronouns/deixis structurally
+  requires prior-turn context. If the helper prompt the augmenter
+  constructs carries only the bare current-turn user text with no history
+  excerpt, the helper model has no way to resolve anaphoric references at
+  all, undercutting a class of reference the design otherwise claims to
+  handle. Pin down whether the constructed helper prompt includes a
+  rendered history-tail excerpt (and if so, in what form — similar to
+  `auto-session-name`'s `build-rename-prompt`/`sanitize-session-entries`
+  conversation-excerpt pattern) or whether the design intentionally scopes
+  this augmenter's resolution to current-turn text only despite reading
+  the history tail for some other stated or unstated reason.
+
+- [ ] Ambiguous: Required behaviour item 2 says the augmenter "selects a
+  local helper model via `model-selection`" (singular), and Acceptance
+  criteria describes "a helper session driven by a **local** model selected
+  via `psi.ai.model-selection`" — both read as selecting one candidate.
+  Design.md is silent on what happens if that single selected model's
+  helper run fails or returns an unusable result while `resolve-selection`
+  had *other* tool-calling-capable local candidates ranked below it. The
+  design explicitly frames the local-model helper-session mechanism it
+  reuses as `auto-session-name`'s pattern (Goal section, References), and
+  that mechanism's actual behavior (`select-helper-models` /
+  `infer-session-title` in
+  `extensions/auto-session-name/src/extensions/auto_session_name.clj`) is
+  not "pick the top-ranked candidate and stop" — it takes the *entire*
+  ranked candidate list from `resolve-selection` and loops through it,
+  retrying the next-ranked model whenever an attempt fails or returns an
+  invalid result, only giving up once every ranked candidate has been
+  tried. Required behaviour item 5 and Acceptance criteria both list
+  "failed/empty helper runs" as an unconditional `:no-op` trigger without
+  saying whether that means "the single attempted model failed" or "every
+  ranked tool-calling-capable local candidate was tried and failed." This
+  changes both the shipped no-op rate under transient single-model failures
+  and the shape of the "failed/empty helper run → no-op" test (one
+  synthetic failing model vs. an exhausted ranked list of failing models),
+  and interacts with Resolved decision 3's "blocking, no-deadline" latency
+  posture (retrying across multiple local models on the critical path costs
+  more latency than one attempt). Pin down whether this augmenter retries
+  across `resolve-selection`'s ranked candidate list like
+  `auto-session-name` does, or deliberately simplifies to a single
+  top-ranked attempt with immediate `:no-op` on failure — and if the latter,
+  note that as a deliberate departure from the cited precedent rather than
+  leaving it implicit.
