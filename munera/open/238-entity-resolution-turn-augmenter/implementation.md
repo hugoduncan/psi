@@ -378,6 +378,25 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
     re-raised here.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Architecture review (design-review turn 1, fourth pass — post `d1db1d86e`)
+
+- no architectural review feedback. `d1db1d86e` (the third
+  design-steps-resolution slice) only reworded Goal/Required behaviour
+  item 3/Resolved decision 6 from "embeds ... verbatim/directly" to "embeds
+  ... adapted" — a wording clarification of an already-reviewed decision,
+  introducing no new architectural surface, dependency, capability, or
+  boundary.
+- Re-verified against current code that nothing has drifted since the third
+  architecture pass (`302bef5e4`): `model_selection.clj` still has no
+  `:supports-tool-calling` fact/criterion; `make-read-only-tools-with-cwd`
+  (`components/agent-session/src/psi/agent_session/tools.clj`) still returns
+  only the single `read-tool`; `extensions/context-manager/deps.edn` still
+  lacks a `psi/ai` dep (unlike `auto-session-name`'s); `extension_installs.clj`
+  still grants `context-manager` only `turn-augmentation-capability`. All
+  four still match what design.md assumes — no new gap.
+- design-steps.md has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
 ## Third design-steps-resolution slice — resolved (batch: `302bef5e4`..`b7bd9ebb6`, baseline `b7f717e33`)
 
 - Resolved the 1 remaining unchecked item (embedded-Method-text-names-
