@@ -1701,3 +1701,16 @@ Key decisions / discoveries:
      entity-resolution no-op tests.
 - `bb test --focus extensions.context-manager-test` → 38 tests, 133
   assertions, 0 failures; clj-kondo clean on the touched test ns.
+
+## Test-review turn-13 (task-test-review skill)
+
+- Independent test review (task-test-review skill): well-formedness, design-
+  behaviour coverage, and nullable-not-mocked infra deps. Ran full extension
+  test suite (39 tests, 141 assertions, 0 failures) and exercised
+  `parse-mapping-lines` edge cases directly. No new actionable issues — every
+  design acceptance criterion has a covering test; the two `[~]` slice-4
+  items (dispatch-level insertion, replay reuse) are augmenter-id-agnostic
+  237 guarantees verified by existing component tests
+  (`build-prepared-request-inserts-turn-augmentation-context-test`,
+  `replayed-turn-augmentation-uses-close-payload-without-live-invocation-test`),
+  so the non-duplicating deferral is sound. No steps added.
