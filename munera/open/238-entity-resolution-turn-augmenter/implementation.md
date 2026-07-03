@@ -1240,3 +1240,23 @@ Applied to `design.md`:
   additive dependency, matching `auto-session-name` precedent, remains accurate).
 - design-steps.md has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Ambiguity review (design-review turn 2, tenth pass — post ninth-slice confidence-gate resolution)
+
+- no ambiguity review feedback. The only design.md change since the ninth-pass
+  ambiguity review is the ninth-slice confidence-gate resolution (`a75e7b61c`),
+  which *removed* the confidence-gate ambiguity by choosing model self-gating
+  (augmenter accepts every well-formed parsed line; confidence is a
+  required-but-unvalidated, undisplayed field). That resolution is internally
+  unambiguous and aligned across decision 6, the "Confidence gate & output
+  shape" policy bullet, and the Tests-list "ambiguous reference dropped"
+  framing.
+- Considered and ruled out (not filed): the exact "well-formed line"
+  grammar/regex and whether a line missing the confidence token is malformed —
+  deliberately deferred to plan/implementation at the same "e.g."/policy
+  granularity as Resolved decisions 4–6, not a design-level ambiguity. Same
+  for history-tail excerpt format, bounded-helper-loop numbers, and
+  single-attempt selection (all previously classified as intentional
+  policy-level deferrals).
+- design-steps.md has 0 unchecked items; no new step added this pass.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
