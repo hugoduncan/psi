@@ -465,3 +465,46 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - If a future design-review pass runs again, treat the commit that lands
   this slice as the new prior-follow-up boundary for batch-baseline
   purposes (same convention used by the two prior resolution slices).
+
+## Notes for the fourth design-steps-resolution slice (1 unchecked item)
+
+- The 1 unchecked item (git-status / graph-introspection unmappable
+  adaptation) is closable within frozen scope by picking one of its own
+  (a)/(b)/(c) options and editing Resolved decision 6 (and, if the chosen
+  option changes what step 1/3 evidence sources this augmenter can rely on,
+  Required behaviour item 3's "gather filesystem/git evidence" phrasing,
+  which currently overclaims git reach the same way decision 6 does) — no
+  `SCOPE_QUESTION:` was raised, so don't treat this as a scope call.
+- Recommended framing while resolving: option (a) (drop the unmappable
+  sub-instruction) keeps the embedded Method text honest about what the
+  toolset can actually do; option (c) (reword as an explicit capability gap
+  the model should reason around, e.g. "you cannot check git status or run
+  git commands; rely only on file contents you can read/list/grep") is the
+  other viable choice and is arguably more useful than silent deletion,
+  since it tells the model *why* an expected evidence source is missing
+  rather than leaving a silent hole. Option (b) (reword to point at
+  read/list/grep anyway) was already identified as producing misleading
+  instructions and is the weakest choice — avoid it unless there's a reason
+  the other two don't work.
+  - Whichever option is chosen, keep it stated at the same "policy, not
+    literal phrasing" granularity as the rest of Resolved decision 6 (which
+    already defers exact adapted wording to plan/implementation) — don't
+    hardcode the actual prompt sentence into design.md.
+- This item does not affect Resolved decisions 4 or 5, the toolset
+  membership (still exactly file read / directory list / content grep, per
+  Constraints' closed "only" list), or any Acceptance-criteria/Tests-list
+  enumeration — it is purely about how Method steps 1 and 3's two
+  unmappable sub-clauses are handled inside the embedded/adapted prompt
+  text.
+- Relevant non-task files for resolving this item:
+  - `.psi/skills/entity-resolution/SKILL.md` — Method step 1's "current git
+    status" bullet and step 3's "Psi graph introspection for runtime/session
+    entities" bullet are the exact two sub-clauses in question; steps 2, 4,
+    5 and step 3's `git ls-files`/`find`/`git grep` bullets are unaffected
+    (already resolved as adaptable via directory-list/content-grep
+    substitutes in the third design-steps-resolution slice).
+  - `components/agent-session/src/psi/agent_session/tools.clj` —
+    confirms (still, as of this slice) no git-status/git-command/graph-query
+    tool exists anywhere to point the reworded text at instead.
+- As with prior slices: resolve by editing `design.md` itself (localized
+  edit to Resolved decision 6, not a plan/implementation-time workaround).
