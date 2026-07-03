@@ -832,3 +832,58 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   decision 1. All still match design.md's assumptions.
 - `design-steps.md` has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Sixth design-steps-resolution slice — resolved (batch: `317f1c7de`..`91f3f4ea5`, baseline `f92192104`)
+
+- Batch identification for this follow-up: the batch is the contiguous
+  architecture → ambiguity → inconsistency review triple `317f1c7de`
+  (architecture, no finding) → `94d5a93b8` (ambiguity, added 2 items:
+  history-tail inclusion, single-attempt vs. retry-across-candidates
+  selection) → `91f3f4ea5` (inconsistency, added 1 item: decision
+  2/item 3 git-evidence overclaim); baseline is `f92192104`, the parent of
+  the oldest commit in that triple (also the commit that landed the fifth
+  design-steps-resolution slice). `git diff f92192104..HEAD --
+  design-steps.md` showed exactly these 3 added, still-unchecked checklist
+  lines — no stale/pre-batch items and no `SCOPE_QUESTION:` items in the
+  candidate set.
+- Resolved all 3 items by editing `design.md` directly:
+  - Git-evidence inconsistency: reworded Resolved decision 2 ("searches
+    the worktree/git for evidence itself" → "searches the worktree's
+    files for evidence itself" + an explicit "no git-command execution"
+    clause) and Required behaviour item 3 ("gather filesystem/git
+    evidence" → "gather evidence from the worktree's files (read / list /
+    grep only — no git-command execution)"), both now consistent with
+    Resolved decision 6's capability-gap disclosure.
+  - History-tail inclusion: chose "include it" — Required behaviour item 3
+    now says the helper prompt applies the method to the user text *plus*
+    a rendered history-tail excerpt; added a new "Remaining v1 policies"
+    bullet ("History-tail inclusion") stating the rationale (anaphora
+    resolution needs prior-turn context) and deferring excerpt format/
+    truncation to plan/implementation, at the same granularity as
+    Resolved decisions 4–6. Chose inclusion over "current-turn-only" because
+    the Goal section's "ambiguous/underspecified references" claim and the
+    embedded skill method's own anaphora guidance structurally require
+    prior-turn context to be actionable.
+  - Retry-across-candidates: chose "single top-ranked attempt, no retry"
+    (deliberate departure from `auto-session-name`'s retry-until-exhausted
+    precedent) — added a new "Remaining v1 policies" bullet
+    ("Single-attempt model selection") and a cross-reference in Required
+    behaviour item 2, explicitly framed as v1 simplicity consistent with
+    Resolved decision 5's existing precedent of trading away
+    `auto-session-name` feature parity (the collapsed no-local-model
+    diagnostic). Noted the "failed/empty helper run → no-op" test exercises
+    the single attempted candidate, not an exhausted ranked list.
+- `design-steps.md`: all 14 items now checked `[x]`. No unchecked
+  design-step items remain.
+- No `SCOPE_QUESTION:` item existed in this batch; nothing deferred to the
+  user this slice.
+- Implementation-relevant detail not otherwise in design.md: the two new
+  "Remaining v1 policies" bullets (history-tail inclusion, single-attempt
+  selection) are the only places design.md states these two behaviours —
+  plan/implementation should read them alongside Required behaviour items
+  2 and 3, not just the numbered items, since the numbered items only
+  cross-reference them.
+- If a future design-review pass runs again, treat the commit that lands
+  this slice as the new prior-follow-up boundary for batch-baseline
+  purposes (same convention used by all five prior resolution slices).
+

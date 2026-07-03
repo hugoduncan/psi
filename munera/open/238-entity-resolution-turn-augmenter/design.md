@@ -94,15 +94,20 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
    :local`, low latency, zero/low cost, **and the tool-calling capability
    criterion from Resolved decision 5**), inheriting the parent session's
    model as context, like `auto-session-name` plus the added tool-calling
-   filter;
+   filter — but attempting only the single top-ranked candidate, not
+   retrying across `resolve-selection`'s ranked list (see "Remaining v1
+   policies" → "Single-attempt model selection");
 3. runs a helper session — created **with a minimal read-only search toolset**
-   (Resolved decision 4) so the local model can gather filesystem/git
-   evidence — whose prompt embeds the `entity-resolution` method, adapted
-   per Resolved decision 6's two-case split (available-tool substitution
-   for substitutable references; explicit capability-gap disclosure for the
-   two unmappable ones), and applies it to the user text, producing output
-   in the structured line format from Resolved decision 6, restricted to
-   sufficiently-unambiguous entries;
+   (Resolved decision 4) so the local model can gather evidence from the
+   worktree's files (read / list / grep only — no git-command execution,
+   per Resolved decision 6's capability-gap disclosure) — whose prompt
+   embeds the `entity-resolution` method, adapted per Resolved decision 6's
+   two-case split (available-tool substitution for substitutable
+   references; explicit capability-gap disclosure for the two unmappable
+   ones), and applies it to the user text plus a rendered history-tail
+   excerpt (see "Remaining v1 policies" → "History-tail inclusion"),
+   producing output in the structured line format from Resolved decision 6,
+   restricted to sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
    (`:id "entity-resolution"`, `:title "Resolved entities"`, `:content` = the
    mapping re-rendered from the parsed confident lines, per Resolved
@@ -135,9 +140,13 @@ provenance.
 2. **Evidence — local model + tools.** The helper session is created **with a
    minimal read-only search toolset** (e.g. file read + directory list +
    content grep, no mutation/bash-write) and the local model searches the
-   worktree/git for evidence itself, following the `entity-resolution` skill
-   method. No deterministic pre-gathered corpus is required in v1; the tool
-   surface must be read-only and side-effect-free.
+   worktree's files for evidence itself, following the `entity-resolution`
+   skill method. The toolset has no git-command execution, so "searching
+   the worktree" means reading/listing/grepping git-tracked file contents,
+   never running `git` (Resolved decision 6's capability-gap disclosure
+   tells the model explicitly it cannot run git commands). No deterministic
+   pre-gathered corpus is required in v1; the tool surface must be
+   read-only and side-effect-free.
 
 3. **Latency — accept the local model on the critical path.** 237 makes pre-turn
    augmentation a blocking, no-deadline barrier and this task keeps the
@@ -255,6 +264,36 @@ provenance.
   model-determined "no referring expression" outcome), it gets its own
   entry in the Tests list asserting the helper session is never created for
   such prompts.
+- **History-tail inclusion.** The helper prompt (Required behaviour item 3)
+  applies the `entity-resolution` method to the current-turn user text
+  *plus* a rendered excerpt of the read history tail
+  (`:turn-augmentation/history`, Required behaviour item 1) — not
+  current-turn text alone. This is required for the embedded method's
+  anaphora-resolution guidance ("it", "this", "that", "those", "the
+  former/latter") to be actionable, since anaphora is only resolvable
+  against prior-turn context, and the Goal section's "ambiguous/
+  underspecified references" claim structurally includes such references.
+  Excerpt construction (format, truncation) is a prompt-construction detail
+  left to plan/implementation, mirroring `auto-session-name`'s
+  `build-rename-prompt`/`sanitize-session-entries` conversation-excerpt
+  precedent, at the same "e.g."/policy-level granularity already used by
+  Resolved decisions 4–6.
+- **Single-attempt model selection.** The augmenter selects and attempts
+  only the single top-ranked tool-calling-capable local candidate returned
+  by `resolve-selection` (Required behaviour item 2); it does not retry the
+  next-ranked candidate if that attempt fails or returns an unusable
+  result — a failed/empty helper run from the one attempted candidate goes
+  straight to `:no-op` (Required behaviour item 5 / Acceptance criteria).
+  This deliberately departs from `auto-session-name`'s
+  `select-helper-models`/`infer-session-title` behaviour, which retries
+  across its entire ranked candidate list until one succeeds or all are
+  exhausted; this task instead bounds the blocking, no-deadline critical
+  path (Resolved decision 3) to at most one local-model attempt per turn,
+  consistent with Resolved decision 5's precedent of trading away
+  `auto-session-name` feature parity for v1 simplicity (the collapsed
+  "no local model" vs. "local model, no tool support" diagnostic). The
+  "failed/empty helper run → no-op" test (Tests list) exercises this single
+  attempted candidate failing, not an exhausted ranked list.
 - **Confidence gate & output shape.** Only sufficiently-unambiguous mappings
   enter the block; ambiguous/unevidenced references are dropped, never
   guessed. Rendered `:content` is a compact `surface → canonical (evidence)`

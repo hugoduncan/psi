@@ -249,7 +249,7 @@
   simplified and defer full detail to decision 6), so the three passages
   agree on what "adapted" means.
 
-- [ ] Ambiguous: Required behaviour item 1 says the augmenter "reads the
+- [x] Ambiguous: Required behaviour item 1 says the augmenter "reads the
   bounded turn projection (user text + history tail + effective-cwd)," and
   the Context section confirms `:turn-augmentation/history` (a bounded
   tail) is part of the 237 input contract the augmenter receives. But
@@ -279,7 +279,7 @@
   this augmenter's resolution to current-turn text only despite reading
   the history tail for some other stated or unstated reason.
 
-- [ ] Inconsistent: Resolved decision 2 says "the local model searches the
+- [x] Inconsistent: Resolved decision 2 says "the local model searches the
   **worktree/git** for evidence itself, following the `entity-resolution`
   skill method," and Required behaviour item 3 says the toolset lets "the
   local model ... gather **filesystem/git** evidence." Both claims survive
@@ -320,7 +320,7 @@
   list/grep," never git commands), consistent with decision 6's settled
   capability-gap statement.
 
-- [ ] Ambiguous: Required behaviour item 2 says the augmenter "selects a
+- [x] Ambiguous: Required behaviour item 2 says the augmenter "selects a
   local helper model via `model-selection`" (singular), and Acceptance
   criteria describes "a helper session driven by a **local** model selected
   via `psi.ai.model-selection`" — both read as selecting one candidate.
