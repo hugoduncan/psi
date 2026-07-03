@@ -63,15 +63,17 @@ mapping → include only unambiguous mappings.
 
 ## Required behaviour
 
-A turn augmenter (host extension: `context-manager`; new augmenter id, e.g.
-`"entity-resolution"`) that, for an eligible parent turn:
+A second turn augmenter registered by the existing `extensions/context-manager`
+extension (new `:augmenter-id "entity-resolution"`, alongside the current
+`"project-context"` augmenter) that, for an eligible parent turn:
 
 1. reads the bounded turn projection (user text + history tail + effective-cwd);
 2. selects a local helper model via `model-selection` (strong `:locality
    :local`, low latency, zero/low cost), inheriting the parent session's model
    as context, exactly like `auto-session-name`;
-3. runs a helper session whose prompt applies the `entity-resolution` method to
-   the user text against project evidence, producing a compact
+3. runs a helper session — created **with a minimal read-only search toolset**
+   so the local model can gather filesystem/git evidence — whose prompt applies
+   the `entity-resolution` method to the user text, producing a compact
    `surface → canonical → evidence → confidence` mapping restricted to
    sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
@@ -89,50 +91,42 @@ request or parent session, must omit `:source` (core injects provenance), and
 its helper-session ids go in `:turn-augmentation/child-session-ids` as
 provenance.
 
-## Open design questions (resolve before plan.md)
+## Resolved decisions
 
-1. **Host: extend `context-manager` vs. new extension.** Adding a second
-   augmenter to `context-manager` reuses its capability grant and helper-id
-   tracking, but mixes two concerns (project-context vs. entity-resolution) in
-   one file. Decide: second augmenter in `context-manager`, or a dedicated
-   `extensions/entity-resolution` extension declaring
-   `:psi.capability/turn-augmentation`. (Leaning: dedicated extension for clean
-   separation and independent helper-id tracking; confirm.)
+1. **Host — inside `context-manager` (for now).** The entity-resolution
+   augmenter is registered as a second `:augmenter-id "entity-resolution"` by
+   the existing `extensions/context-manager` extension, reusing its
+   `:psi.capability/turn-augmentation` grant. It maintains its own helper-session
+   id tracking (distinct from any `project-context` helper tracking) so
+   recursion avoidance is per-augmenter-correct. A dedicated extension may be
+   split out later; not in this task.
 
-2. **Evidence gathering for a tool-less/bounded local model.** The skill relies
-   on filesystem/git/graph evidence, but the augmenter input is bounded and the
-   local helper is weak. Options:
-   - (a) augmenter deterministically pre-gathers a small candidate corpus
-     (e.g. `munera/plan.md`, `munera/open/*` ids, workflow ids, skill names,
-     `git ls-files` head, recent history tail) and passes it to a **tool-less**
-     local helper that only maps surfaces to supplied candidates;
-   - (b) give the helper a minimal read/grep/ls toolset and let it search;
-   - (c) hybrid: pre-gather candidate lists + allow one read tool.
-   Decide the v1 evidence strategy and its bounds. (Leaning: (a) — deterministic
-   corpus + tool-less local model — keeps it cheap, private, and testable, and
-   avoids arming a weak local model with side-effecting tools.)
+2. **Evidence — local model + tools.** The helper session is created **with a
+   minimal read-only search toolset** (e.g. file read + directory list +
+   content grep, no mutation/bash-write) and the local model searches the
+   worktree/git for evidence itself, following the `entity-resolution` skill
+   method. No deterministic pre-gathered corpus is required in v1; the tool
+   surface must be read-only and side-effect-free.
 
-3. **Eligibility.** Which turns run resolution? At minimum skip tracked helper
-   sessions and blank-cwd turns (per 237 scaffold). Also consider skipping
-   slash-command-only prompts and turns with no detectable referring
-   expressions (cheap pre-filter before spending a model call), mirroring
-   `auto-session-name`'s slash-command and eligibility guards.
+3. **Latency — accept the local model on the critical path.** 237 makes pre-turn
+   augmentation a blocking, no-deadline barrier and this task keeps the
+   local-model call there. No heuristic-only / model-deferred fallback path is
+   built in v1; cheap eligibility pre-filters (below) reduce, but do not replace,
+   the model call. Local-only + zero/low cost selection keeps it inexpensive and
+   private.
 
-4. **Confidence gate & output shape.** Define the rendered `:content` format
-   (compact table vs. lines) and the minimum confidence for inclusion. The skill
-   says "act only when sufficiently unambiguous"; here that means only confident
-   mappings enter the context block, and everything else is dropped (never
-   guessed) — the parent still sees the raw prompt.
+### Remaining v1 policies (settled, low-risk)
 
-5. **Model-absent fallback.** If no local model is configured/available,
-   `resolve-selection` yields no winner. V1 should `:no-op` (never fall back to a
-   cloud model on every turn) — confirm this policy.
-
-6. **Latency on the critical path.** 237 makes pre-turn augmentation a
-   blocking, no-deadline barrier. A local model call on every turn adds
-   critical-path latency. Confirm acceptability and whether the pre-filter in (3)
-   plus local-only selection is sufficient, or whether a cheap heuristic-only
-   (no model) path is preferable for v1 with the model path deferred.
+- **Eligibility pre-filter.** Skip tracked helper sessions and blank-cwd turns
+  (per 237 scaffold), and skip slash-command-only prompts, mirroring
+  `auto-session-name`'s guards, before spending a helper run.
+- **Confidence gate & output shape.** Only sufficiently-unambiguous mappings
+  enter the block; ambiguous/unevidenced references are dropped, never guessed.
+  Rendered `:content` is a compact `surface → canonical` list with brief
+  evidence; the raw user prompt is always preserved.
+- **Model-absent fallback.** If `resolve-selection` yields no local winner, the
+  augmenter returns a well-formed `:no-op`; it never falls back to a cloud model
+  on every turn.
 
 ## Constraints
 
@@ -145,7 +139,9 @@ provenance.
 - Local-first: helper model selection must strongly prefer `:locality :local`
   and zero/low cost, like `auto-session-name`; never silently use a cloud model
   on every turn.
-- Recursion safety: track and no-op for helper session ids.
+- Recursion safety: track and no-op for the augmenter's own helper session ids.
+- Helper toolset is read-only: file read / list / grep only — no mutating,
+  bash-write, or otherwise side-effecting tools on the helper session.
 - Never guess: only confident, evidence-backed mappings are injected; ambiguity
   is dropped, not collapsed.
 - Follow project change_chain: meta/spec/tests/code/doc coherence; malli for
@@ -163,9 +159,10 @@ provenance.
   `:id "entity-resolution"`) carrying the `surface → canonical` mapping, inserted
   before the current user message.
 - The augmenter uses a helper session driven by a **local** model selected via
-  `psi.ai.model-selection` with a strong `:locality :local` preference; when no
-  local model is available it returns a well-formed `:no-op` and no cloud model
-  is used.
+  `psi.ai.model-selection` with a strong `:locality :local` preference, and the
+  helper session is created with a **minimal read-only search toolset** (no
+  mutating/side-effecting tools); when no local model is available it returns a
+  well-formed `:no-op` and no cloud model is used.
 - The augmenter returns a well-formed `:no-op` (no operations) for: tracked
   helper sessions, blank effective-cwd, prompts with no detectable referring
   expression, no confident mapping, and failed/empty helper runs.
