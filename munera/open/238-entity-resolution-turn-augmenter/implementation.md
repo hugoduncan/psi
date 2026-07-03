@@ -1068,3 +1068,48 @@ Applied to `design.md`:
   - if the chosen policy diverges from decision 3's "no-deadline" wording,
     reconcile decision 3 in the same edit (it currently says "the local-model
     call," singular, framed for the toolless single-shot precedent).
+
+## Eighth design-steps-resolution slice — resolved (baseline `c070dd961`)
+
+- Batch identification: the immediately preceding whole `design-review` batch is
+  the eighth-pass triple `2284b1849` (architecture, no finding) → `81361a548`
+  (ambiguity, added helper-loop-bound item) → `5613076a4` (inconsistency, added
+  Goal additive-wiring citation item). Baseline = `c070dd961`, parent of the
+  oldest review commit in that segment. `git diff c070dd961..HEAD --
+  design-steps.md` showed exactly these 2 added, still-unchecked lines — no
+  stale/pre-batch items, no `SCOPE_QUESTION:` items in the candidate set.
+- Note: design.md carried an uncommitted working-tree bash-only edit at
+  follow-up start (the user requirement change); both resolutions were applied
+  on top of that working tree, so this slice's commit lands the bash-only
+  design.md change together with these two follow-up edits.
+- Resolved both items by editing `design.md` directly, within frozen scope:
+  - Goal additive-wiring citation (inconsistency): repointed the "additive
+    wiring this task must add" clause from "(see Resolved decisions 4–6)" to
+    decisions 2 (bash grant) and 6 (augmenter registration + helper prompt),
+    and added an explicit note that decisions 4/5 are deliberate non-additions.
+    Decisions 4/5's own text was not touched.
+  - Bounded helper agent loop (ambiguity): chose "bounded, exceeding →
+    `:no-op`". Reworded Resolved decision 3 so "no-deadline" means the
+    augmenter adds no wall-clock deadline of its own, not that the helper loop
+    is unbounded; added a new "Remaining v1 policies" bullet ("Bounded helper
+    agent loop") stating a finite bound exists (round cap and/or wall-clock
+    budget) and that hitting it collapses into the existing failed-helper-run
+    `:no-op` (Required behaviour item 5); cross-referenced it from Required
+    behaviour item 3. Exact bound numbers deferred to plan/implementation at
+    the same "e.g."/policy granularity as decisions 4–6.
+- The bound-exceeded outcome deliberately collapses into Required behaviour
+  item 5 / Acceptance-criteria's existing "failed/empty helper run → no-op"
+  enumeration rather than adding a new no-op reason — no new test case or
+  enumeration entry is required; the existing failed/empty-helper-run test
+  covers it.
+- `design-steps.md`: both eighth-pass items now `[x]`; 0 unchecked items remain.
+- No `SCOPE_QUESTION:` item existed in this batch; nothing deferred to the user.
+- Structural facts to lean on for plan/impl bound sizing (verified in prior
+  slices): each `bash` command is capped at 30s default
+  (`components/agent-session/src/psi/agent_session/tools.clj`, `execute-bash`);
+  `run-agent-loop-in-session`
+  (`components/agent-session/src/psi/agent_session/mutations/session.clj`) has
+  no agent-loop round cap surfaced today — the round count is the dimension the
+  new bound must cap.
+- If a future design-review pass runs again, treat the commit that lands this
+  slice as the new prior-follow-up boundary for batch-baseline purposes.

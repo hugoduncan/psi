@@ -8,8 +8,12 @@ extensions, namespaces, vars, commands, docs, vocabulary symbols) and inject
 that resolution as pre-turn context, so the parent turn sees an evidence-backed
 `surface → canonical` mapping before it acts.
 
-Reuse two already-shipped mechanisms, extended with small additive pieces
-this task must add (see Resolved decisions 4–6):
+Reuse two already-shipped mechanisms, extended with small additive wiring
+this task must add — the second augmenter registration plus helper-prompt
+construction (Resolved decision 6) and the existing-`bash`-tool grant via
+`create-child-session` (Resolved decision 2). (Resolved decisions 4 and 5 are
+deliberate non-additions — no new read-only tools, no new model-selection
+tool-calling fact — not wiring this task adds.)
 
 1. the **pre-turn request augmentation** mechanism from closed task
    `237-pre-turn-request-augmentation` (the `:register-turn-augmenter` API,
@@ -18,16 +22,12 @@ this task must add (see Resolved decisions 4–6):
 2. the **local-model helper-session mechanism** from
    `extensions/auto-session-name` (model selection with a strong `:locality
    :local` preference, `create-child-session` + `run-agent-loop-in-session`,
-   and `helper-session-ids` recursion avoidance) — this mechanism itself is
-   already-shipped. What is **not** already-shipped, because
-   `auto-session-name`'s helper session is toolless (`:tool-ids []`,
-   single-shot title inference), is the tool-enabled evidence-gathering half
-   this task needs: a minimal read-only search toolset for the helper
-   session (Resolved decision 4) and a tool-calling capability
-   fact/criterion in `psi.ai.model-selection` so helper-model selection can
-   filter on tool-calling support (Resolved decision 5). Both are new,
-   additive work this task adds on top of the shipped mechanism, not
-   already-shipped pieces being reused verbatim.
+   and `helper-session-ids` recursion avoidance) — unlike
+   `auto-session-name`'s toolless single-shot title helper, this task creates
+   a tool-enabled helper by granting the existing `bash` tool (Resolved
+   decisions 2, 4, and 5). It deliberately does **not** add new read-only
+   tools, and it does **not** add a new model-selection tool-calling
+   fact/criterion.
 
 The reasoning method is the existing `entity-resolution` skill
 (`.psi/skills/entity-resolution/SKILL.md`): detect referring expressions →
@@ -35,13 +35,8 @@ gather evidence → produce a `surface → canonical → evidence → confidence
 mapping → include only unambiguous mappings. The skill's Method section
 (steps 1–5 only, not its Output Shape / Act-or-ask sections) is delivered
 to the helper session by embedding it in the augmenter's constructed helper
-prompt, adapted per Resolved decision 6's two-case split — sub-steps naming
-a git/find reference with an available-tool substitute (directory listing,
-content grep) are reworded to name that tool directly, while the two
-sub-steps with no available-tool substitute (git status, graph
-introspection) are replaced with an explicit capability-gap disclosure —
-rather than embedding the skill's original git/find/graph-introspection
-references verbatim (Resolved decision 6) — not via `create-child-session`'s
+prompt, with evidence-gathering wording adapted to the helper's actual
+`bash` capability (Resolved decision 6) — not via `create-child-session`'s
 `:skill-names`, which only auto-expands a skill when the *user's own
 submitted text* matches/invokes it, and the parent-turn user text driving
 this helper session is never authored to invoke `entity-resolution`.
@@ -91,23 +86,22 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
 
 1. reads the bounded turn projection (user text + history tail + effective-cwd);
 2. selects a local helper model via `model-selection` (strong `:locality
-   :local`, low latency, zero/low cost, **and the tool-calling capability
-   criterion from Resolved decision 5**), inheriting the parent session's
-   model as context, like `auto-session-name` plus the added tool-calling
-   filter — but attempting only the single top-ranked candidate, not
-   retrying across `resolve-selection`'s ranked list (see "Remaining v1
-   policies" → "Single-attempt model selection");
-3. runs a helper session — created **with a minimal read-only search toolset**
-   (Resolved decision 4) so the local model can gather evidence from the
-   worktree's files (read / list / grep only — no git-command execution,
-   per Resolved decision 6's capability-gap disclosure) — whose prompt
-   embeds the `entity-resolution` method, adapted per Resolved decision 6's
-   two-case split (available-tool substitution for substitutable
-   references; explicit capability-gap disclosure for the two unmappable
-   ones), and applies it to the user text plus a rendered history-tail
-   excerpt (see "Remaining v1 policies" → "History-tail inclusion"),
-   producing output in the structured line format from Resolved decision 6,
-   restricted to sufficiently-unambiguous entries;
+   :local`, low latency, zero/low cost), inheriting the parent session's
+   model as context, like `auto-session-name` — but attempting only the
+   single top-ranked candidate, not retrying across `resolve-selection`'s
+   ranked list (see "Remaining v1 policies" → "Single-attempt model
+   selection");
+3. runs a helper session — created with access to the existing `bash` tool
+   only (Resolved decisions 2, 4, and 5) so the local model can gather
+   evidence from the worktree using ordinary shell commands under the
+   effective cwd, running as a bounded multi-round agent loop (see
+   "Remaining v1 policies" → "Bounded helper agent loop") — whose prompt
+   embeds the `entity-resolution` method,
+   adapted per Resolved decision 6 to permit `bash`-based evidence gathering,
+   and applies it to the user text plus a rendered history-tail excerpt (see
+   "Remaining v1 policies" → "History-tail inclusion"), producing output in
+   the structured line format from Resolved decision 6, restricted to
+   sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
    (`:id "entity-resolution"`, `:title "Resolved entities"`, `:content` = the
    mapping re-rendered from the parsed confident lines, per Resolved
@@ -116,9 +110,8 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
    tracked helper session, when there is no effective cwd, when the prompt
    is slash-command-only (pre-filter, see "Remaining v1 policies") or when
    no referring expressions are otherwise detected, when no confident
-   mapping is produced or parsed, when no tool-calling-capable local model
-   is available, or when the helper run fails/does not return a usable
-   result;
+   mapping is produced or parsed, when no local model is available, or when
+   the helper run fails/does not return a usable result;
 6. tracks its helper session ids and cleans them up (close on completion) as
    `auto-session-name` does, so it never augments its own helper turns.
 
@@ -137,51 +130,43 @@ provenance.
    recursion avoidance is per-augmenter-correct. A dedicated extension may be
    split out later; not in this task.
 
-2. **Evidence — local model + tools.** The helper session is created **with a
-   minimal read-only search toolset** (e.g. file read + directory list +
-   content grep, no mutation/bash-write) and the local model searches the
-   worktree's files for evidence itself, following the `entity-resolution`
-   skill method. The toolset has no git-command execution, so "searching
-   the worktree" means reading/listing/grepping git-tracked file contents,
-   never running `git` (Resolved decision 6's capability-gap disclosure
-   tells the model explicitly it cannot run git commands). No deterministic
-   pre-gathered corpus is required in v1; the tool surface must be
-   read-only and side-effect-free.
+2. **Evidence — local model + `bash`.** The helper session is created with
+   access to the existing `bash` tool and the local model gathers evidence
+   itself by running ordinary shell commands from the effective cwd, following
+   the `entity-resolution` skill method. No deterministic pre-gathered corpus
+   and no new read/list/grep toolset are required in v1. The helper prompt
+   must instruct the model to avoid mutating commands and to use `bash` only
+   for evidence gathering.
 
 3. **Latency — accept the local model on the critical path.** 237 makes pre-turn
    augmentation a blocking, no-deadline barrier and this task keeps the
-   local-model call there. No heuristic-only / model-deferred fallback path is
+   local helper run there. No heuristic-only / model-deferred fallback path is
    built in v1; cheap eligibility pre-filters (below) reduce, but do not replace,
-   the model call. Local-only + zero/low cost selection keeps it inexpensive and
-   private.
+   the helper run. Local-only + zero/low cost selection keeps it inexpensive and
+   private. Because granting `bash` (Resolved decision 2) makes the helper a
+   multi-round tool-using agent loop rather than a single toolless model call,
+   "no-deadline" here means the augmenter imposes no wall-clock deadline of its
+   own on the barrier — it does **not** mean the helper loop itself is
+   unbounded. The helper agent loop is bounded (see "Remaining v1 policies" →
+   "Bounded helper agent loop"), so worst-case blocking latency per eligible
+   turn stays finite.
 
-4. **Read-only search toolset is new work, added by this task.** Today's
-   built-in read-only toolset (`make-read-only-tools-with-cwd` in
-   `components/agent-session/src/psi/agent_session/tools.clj`) exposes only
-   a single-file `read` tool; there is no directory-list or content-grep
-   tool. This task adds a minimal read-only search toolset — file read
-   (existing) + directory list + content grep, no mutation/bash-write — for
-   the helper session to use. This toolset addition is in scope for this
-   task (not a pre-existing dependency to assume as already-shipped).
+4. **No new read-only tools.** This task does not add directory-list,
+   content-grep, git-aware search, or any other new read-only tools. The
+   helper session uses the existing `bash` tool as its evidence-gathering
+   interface. Any command safety is handled by prompt constraints and by
+   the fact that the helper is a child session created specifically for this
+   bounded pre-turn resolution job; there is no new special-purpose
+   filesystem tool surface in scope.
 
-5. **Model selection gains an additive tool-calling capability
-   fact/criterion, added by this task.** `psi.ai.model-selection` / the
-   model registry (`psi.ai.models` / `psi.ai.user_models`) currently exposes
-   only `:supports-text`, `:supports-images`, `:supports-reasoning`,
-   `:locality`, `:context-window`, `:max-tokens`, and cost/latency-tier
-   facts — no tool-calling fact, because `auto-session-name`'s toolless
-   helper session never needed one. This task adds an additive tool-calling
-   capability fact on model entries (e.g. `:supports-tool-calling`) and a
-   corresponding selection criterion, and the entity-resolution augmenter's
-   `resolve-selection` request sets that criterion. The addition must be
-   additive-only (new optional fact/criterion key) so existing `:helper` /
-   `:auto-session-name` role defaults and other `model-selection` callers
-   are unaffected. If `resolve-selection` yields no tool-calling-capable
-   local winner, that is treated the same as "no local model available"
-   under decision 3's model-absent fallback: the augmenter returns a
-   well-formed `:no-op` — v1 does not add a separate diagnostic
-   distinguishing "no local model" from "local model but no tool support";
-   both collapse to "no usable helper model for this turn."
+5. **No new model-selection tool-calling fact/criterion.** This task does
+   not change `psi.ai.model-selection`, `psi.ai.models`, or
+   `psi.ai.user_models` to add a tool/function-calling capability fact. The
+   augmenter selects a local helper model using the existing locality,
+   latency, and cost criteria. If the selected local model cannot use the
+   granted `bash` tool well enough to produce parseable confident mappings,
+   that is treated as an ordinary failed/empty helper run and yields the
+   existing well-formed `:no-op` fallback.
 
 6. **Skill delivery and helper output contract.** The augmenter's
    constructed helper-session prompt embeds only the `entity-resolution`
@@ -192,40 +177,19 @@ provenance.
    asking a clarification question or asking for a missing identifier) are
    **not** embedded: both conflict with this augmenter's non-interactive,
    parse-only-a-fixed-line-format contract and with 237's exclusion of
-   interactive pre-turn prompts. Within the embedded Method steps, the
-   sub-steps whose wording names evidence-gathering commands the helper
-   toolset does not expose (Resolved decision 4 is file read / directory
-   list / content grep only, with no bash/git-command execution and no
-   EQL/psi-graph introspection) are **adapted, not embedded verbatim**, and
-   the adaptation splits into two cases depending on whether a read/list/grep
-   substitute exists:
-   - Step 3's `git ls-files`/`find` (directory listing) and `git grep`
-     (content grep) have a natural substitute: those references are
-     reworded to name the substitute capability directly (list a directory,
-     grep file contents), so the model is never instructed to reach for a
-     tool it doesn't have.
-   - Step 1's "current git status" and step 3's "Psi graph introspection
-     for runtime/session entities" have **no** read/list/grep substitute.
-     These are **not** reworded to point at read/list/grep — doing so would
-     misleadingly imply those tools can answer a question they can't.
-     Instead they are replaced with an explicit statement of the capability
-     gap: the prompt tells the model it cannot check git status, run git
-     commands, or query the runtime/session graph, and must reason about
-     path/task references (the two in-scope entity types, per the Goal
-     section's entity-type list, whose evidence those unavailable sources
-     would otherwise supply) using only file contents it can read, list, or
-     grep. Sessions are not a resolvable entity type for this augmenter —
-     the "runtime/session graph" phrase names the skill's original
-     unavailable evidence source, not an in-scope output entity type — so
-     no session-related mapping is ever produced. The model is expected to
-     treat the missing evidence source as unavailable and reason around it,
-     not to attempt an unavailable tool call.
-   The remaining Method wording that names no unavailable tool is embedded
-   unchanged. (The exact adapted phrasing — for both the substituted
-   references and the capability-gap statement — is a prompt-construction
-   detail left to plan/implementation, consistent with how Resolved
-   decisions 4–5 already leave literal tool/fact names at "e.g."
-   granularity.) In place of the
+   interactive pre-turn prompts. Within the embedded Method steps, evidence
+   gathering is adapted to the helper's actual `bash` access: references to
+   shell-oriented discovery such as `git status`, `git ls-files`, `find`, and
+   `git grep` may remain available as commands the helper can run from the
+   effective cwd, while unavailable runtime/session graph introspection is
+   replaced with an explicit capability-gap disclosure. Sessions are not a
+   resolvable entity type for this augmenter — the "runtime/session graph"
+   phrase names the skill's original unavailable evidence source, not an
+   in-scope output entity type — so no session-related mapping is ever
+   produced. The prompt must also instruct the helper that `bash` is for
+   evidence gathering only and that it must not mutate files, install
+   dependencies, start long-running processes, or perform unrelated side
+   effects. In place of the
    excluded Output Shape / Act-or-ask sections, the augmenter's own prompt
    states the required output contract directly: a structured line format,
    one line per confident mapping, `surface → canonical (evidence;
@@ -279,8 +243,8 @@ provenance.
   precedent, at the same "e.g."/policy-level granularity already used by
   Resolved decisions 4–6.
 - **Single-attempt model selection.** The augmenter selects and attempts
-  only the single top-ranked tool-calling-capable local candidate returned
-  by `resolve-selection` (Required behaviour item 2); it does not retry the
+  only the single top-ranked local candidate returned by `resolve-selection`
+  (Required behaviour item 2); it does not retry the
   next-ranked candidate if that attempt fails or returns an unusable
   result — a failed/empty helper run from the one attempted candidate goes
   straight to `:no-op` (Required behaviour item 5 / Acceptance criteria).
@@ -290,19 +254,33 @@ provenance.
   exhausted; this task instead bounds the blocking, no-deadline critical
   path (Resolved decision 3) to at most one local-model attempt per turn,
   consistent with Resolved decision 5's precedent of trading away
-  `auto-session-name` feature parity for v1 simplicity (the collapsed
-  "no local model" vs. "local model, no tool support" diagnostic). The
+  `auto-session-name` feature parity for v1 simplicity. The
   "failed/empty helper run → no-op" test (Tests list) exercises this single
   attempted candidate failing, not an exhausted ranked list.
+- **Bounded helper agent loop.** Granting the existing `bash` tool (Resolved
+  decision 2) makes the helper session a multi-round tool-using agent loop:
+  `run-agent-loop-in-session` runs the prompt lifecycle until the model stops
+  issuing tool calls, and each `bash` command is already capped at the existing
+  per-command timeout, but the *number* of agent-loop rounds / commands is not
+  otherwise bounded. Since this loop sits on Resolved decision 3's blocking,
+  per-eligible-turn critical path, the augmenter bounds the helper run so
+  worst-case latency is finite: it caps the helper agent loop with an upper
+  bound on rounds (and, if needed, a total wall-clock budget for the whole
+  helper run), and treats hitting that bound as an unusable/failed helper run
+  that collapses into the `:no-op` of Required behaviour item 5 (same path as
+  any other failed/empty helper run). The exact bound (round count and/or
+  wall-clock budget) is a policy-level decision left to plan/implementation at
+  the same "e.g."/policy granularity as Resolved decisions 4–6 — design.md
+  fixes only that a finite bound exists and that exceeding it yields `:no-op`,
+  not the literal numbers.
 - **Confidence gate & output shape.** Only sufficiently-unambiguous mappings
   enter the block; ambiguous/unevidenced references are dropped, never
   guessed. Rendered `:content` is a compact `surface → canonical (evidence)`
   list — see Resolved decision 6 for the exact three-field composition and
   why confidence is gate-only, not displayed; the raw user prompt is always
   preserved.
-- **Model-absent fallback.** If `resolve-selection` yields no local winner
-  (including no *tool-calling-capable* local winner, per Resolved decision
-  5), the augmenter returns a well-formed `:no-op`; it never falls back to a
+- **Model-absent fallback.** If `resolve-selection` yields no local winner,
+  the augmenter returns a well-formed `:no-op`; it never falls back to a
   cloud model on every turn.
 
 ## Constraints
@@ -314,16 +292,13 @@ provenance.
   accepted operations are replayed without re-invoking the model (already
   guaranteed by 237 — do not weaken it).
 - Local-first: helper model selection must strongly prefer `:locality :local`
-  and zero/low cost, like `auto-session-name`, filtered on the tool-calling
-  capability criterion (Resolved decision 5); never silently use a cloud
+  and zero/low cost, like `auto-session-name`; never silently use a cloud
   model on every turn.
-- The additive tool-calling capability fact/criterion added to
-  `psi.ai.model-selection` (Resolved decision 5) must not change behaviour
-  for existing callers/roles (`:helper`, `:auto-session-name`) that don't set
-  it.
+- No new read-only/search tools and no new model-selection capability facts are
+  in scope for this task; the helper's tool grant is the existing `bash` tool.
 - Recursion safety: track and no-op for the augmenter's own helper session ids.
-- Helper toolset is read-only: file read / list / grep only — no mutating,
-  bash-write, or otherwise side-effecting tools on the helper session.
+- Helper prompt constrains `bash` use to evidence gathering and forbids
+  intentional mutation or unrelated side effects.
 - Never guess: only confident, evidence-backed mappings are injected; ambiguity
   is dropped, not collapsed.
 - Follow project change_chain: meta/spec/tests/code/doc coherence; malli for
@@ -342,19 +317,18 @@ provenance.
   mapping (Resolved decision 6's three-field rendered composition), inserted
   before the current user message.
 - The augmenter uses a helper session driven by a **local** model selected via
-  `psi.ai.model-selection` with a strong `:locality :local` preference and the
-  new tool-calling capability criterion (Resolved decision 5), and the
-  helper session is created with a **minimal read-only search toolset** (no
-  mutating/side-effecting tools); when no tool-calling-capable local model is
-  available it returns a well-formed `:no-op` and no cloud model is used.
-- `psi.ai.model-selection`'s new tool-calling capability fact/criterion
-  (Resolved decision 5) is additive: existing `:helper` / `:auto-session-name`
-  role-default selection behaviour is unchanged when the criterion is unset.
+  `psi.ai.model-selection` with a strong `:locality :local` preference, and
+  the helper session is created with access to the existing `bash` tool only;
+  when no local model is available it returns a well-formed `:no-op` and no
+  cloud model is used.
+- No new directory-list/content-grep/read-only toolset is introduced, and no
+  new `psi.ai.model-selection` tool/function-calling capability fact or
+  criterion is introduced.
 - The augmenter returns a well-formed `:no-op` (no operations) for: tracked
   helper sessions, blank effective-cwd, slash-command-only prompts
   (pre-filter, before spending a helper run), prompts with no detectable
-  referring expression, no confident mapping, no tool-calling-capable local
-  model, and failed/empty helper runs.
+  referring expression, no confident mapping, no local model, and
+  failed/empty helper runs.
 - Helper sessions the augmenter creates are tracked, reported in
   `:turn-augmentation/child-session-ids`, cleaned up, and never themselves
   augmented (recursion avoidance verified).
@@ -366,9 +340,8 @@ provenance.
   referring expression → no-op; slash-command-only prompt → no-op with no
   helper session created (pre-filter, distinct from the model-determined no
   referring expression path); helper-session recursion no-op; blank cwd
-  no-op; no-local-model (including no tool-calling-capable local model) →
-  no-op; ambiguous reference dropped; failed/empty helper run → no-op; and
-  replay reuse.
+  no-op; no-local-model → no-op; ambiguous reference dropped;
+  failed/empty helper run → no-op; and replay reuse.
 - Docs updated to describe automatic entity resolution as a context-manager /
   entity-resolution augmenter capability.
 
@@ -394,4 +367,5 @@ provenance.
   local-model helper-session pattern and recursion avoidance.
 - `components/ai/src/psi/ai/model_selection.clj` — `resolve-selection` request
   shape (locality/latency/cost criteria).
-- `.psi/skills/entity-resolution/SKILL.md` — resolution method and output shape.
+- `.psi/skills/entity-resolution/SKILL.md` — resolution method source; its
+  Output Shape section is explicitly not used by this augmenter.

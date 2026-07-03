@@ -417,7 +417,7 @@ instead of requiring any new read-only search tools:
 
 ## Ambiguity review (design-review turn 2, eighth pass — bash-only design)
 
-- [ ] Ambiguous: the bash-only change turns the helper session into a
+- [x] Ambiguous: the bash-only change turns the helper session into a
   multi-round, tool-using agent loop, but the design does not bound how many
   agent-loop rounds / `bash` commands the helper may run before the augmenter
   takes its result, nor any wall-clock ceiling for the whole helper run.
@@ -446,7 +446,7 @@ instead of requiring any new read-only search tools:
 
 ## Inconsistency review (design-review turn 3, eighth pass — bash-only design)
 
-- [ ] Inconsistent: the Goal section contradicts itself about what Resolved
+- [x] Inconsistent: the Goal section contradicts itself about what Resolved
   decisions 4 and 5 are. The opening (design.md ~lines 11–12) says the task
   reuses two shipped mechanisms "extended with small additive wiring this
   task must add (**see Resolved decisions 4–6**)," citing decisions 4–6 as
