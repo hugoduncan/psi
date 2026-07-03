@@ -561,6 +561,34 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - No `SCOPE_QUESTION:` raised — this is a wording/entity-list-alignment
   gap closable within frozen scope, not a scope-boundary concern.
 
+## Inconsistency review (design-review turn 3, fifth pass — post `b37363b71`)
+
+- inconsistency review added 1 new design step: `b37363b71` amended
+  Resolved decision 6's adaptation policy alone (split into substitutable
+  vs. unmappable reference cases), but the Goal section and Required
+  behaviour item 3 — both written earlier by `d1db1d86e` to summarize the
+  policy as a uniform "name only the helper's actually-available read-only
+  tools" reword — were not updated. Two of decision 6's four flagged
+  references (git status, graph introspection) are now explicitly *not*
+  handled by that reword rule; they get a distinct capability-gap
+  disclosure instead. See design-steps.md.
+- Targeted re-read: diffed `b37363b71` against `d1db1d86e` (already
+  inspected in this session's architecture-review turn) and grepped
+  design.md for "adapted"/"reworded"/"verbatim"/"capability gap" to find
+  every passage describing the adaptation mechanism, rather than
+  re-reading the whole file — confirmed only decision 6's paragraph
+  changed in the latest commit; Goal and Required behaviour item 3's
+  adaptation-summary sentences are unchanged since `d1db1d86e` and now lag
+  decision 6's more detailed two-case split.
+- Considered and ruled out as already filed (not re-filed here): the
+  "session" entity-type mention in decision 6's new capability-gap text —
+  filed as an ambiguity item in this session's turn 2, not re-raised under
+  inconsistency since its root cause (unreconciled wording from the same
+  edit) is the same finding already tracked there.
+- No `SCOPE_QUESTION:` raised — this is a summary-wording drift closable
+  within frozen scope by aligning three passages, not a scope-boundary
+  concern.
+
 ## Fourth design-steps-resolution slice — resolved (batch: `c416b1a95`..`840e2100e`, baseline `d1db1d86e`)
 
 - Resolved the 1 remaining unchecked item (git-status / graph-introspection

@@ -218,3 +218,33 @@
   attempt). Pin down whether sessions are in or out of this augmenter's
   entity-type scope and align the Goal section's entity-type list and
   Resolved decision 6's capability-gap wording to agree.
+
+- [ ] Inconsistent: the Goal section and Required behaviour item 3 both
+  describe the Method-text adaptation as uniformly "naming only the
+  helper's actually-available read-only tools" in place of the skill's
+  original git/graph-introspection references — Goal: "adapted so
+  evidence-gathering wording names only the helper's actually-available
+  read-only tools rather than the skill's original git/find/graph-
+  introspection references"; Required behaviour item 3: "embeds the
+  `entity-resolution` method, adapted to name only that toolset." Both
+  passages were written by `d1db1d86e` when Resolved decision 6's
+  adaptation policy was a single uniform reword-to-available-tool-name
+  rule, and neither was updated when `b37363b71` later split that policy
+  into two cases: the two *substitutable* references (`git ls-files`/`find`,
+  `git grep`) are reworded to name the available tool directly, matching
+  Goal/item 3's description, but the two *unmappable* references ("current
+  git status," "Psi graph introspection") are explicitly **not** reworded
+  to name an available tool — decision 6 says doing so "would misleadingly
+  imply those tools can answer a question they can't," and instead
+  substitutes a qualitatively different capability-gap disclosure
+  ("the prompt tells the model it cannot check git status ... or query the
+  runtime/session graph, and must reason ... using only file contents").
+  A reader who reads only the Goal section or Required behaviour item 3
+  (without cross-checking decision 6's amended detail) would form the
+  inaccurate model that every original tool reference is 1:1 substituted
+  with an available-tool name, missing that two of the four references
+  instead get an explicit "you cannot do this" disclosure. Update Goal and
+  Required behaviour item 3's summary wording to reflect decision 6's
+  two-case split (or explicitly note the summary is intentionally
+  simplified and defer full detail to decision 6), so the three passages
+  agree on what "adapted" means.
