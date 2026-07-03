@@ -32,7 +32,8 @@ this task must add (see Resolved decisions 4–6):
 The reasoning method is the existing `entity-resolution` skill
 (`.psi/skills/entity-resolution/SKILL.md`): detect referring expressions →
 gather evidence → produce a `surface → canonical → evidence → confidence`
-mapping → include only unambiguous mappings. The skill's method is delivered
+mapping → include only unambiguous mappings. The skill's Method section
+(steps 1–5 only, not its Output Shape / Act-or-ask sections) is delivered
 to the helper session by embedding it directly in the augmenter's
 constructed helper prompt (Resolved decision 6) — not via
 `create-child-session`'s `:skill-names`, which only auto-expands a skill
@@ -100,10 +101,12 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
    mapping re-rendered from the parsed confident lines, per Resolved
    decision 6) when at least one confident mapping is successfully parsed;
 5. returns a well-formed `:no-op` envelope (no operations) when the turn is a
-   tracked helper session, when there is no effective cwd, when no referring
-   expressions are detected, when no confident mapping is produced or
-   parsed, when no tool-calling-capable local model is available, or when the
-   helper run fails/does not return a usable result;
+   tracked helper session, when there is no effective cwd, when the prompt
+   is slash-command-only (pre-filter, see "Remaining v1 policies") or when
+   no referring expressions are otherwise detected, when no confident
+   mapping is produced or parsed, when no tool-calling-capable local model
+   is available, or when the helper run fails/does not return a usable
+   result;
 6. tracks its helper session ids and cleans them up (close on completion) as
    `auto-session-name` does, so it never augments its own helper turns.
 
@@ -165,31 +168,58 @@ provenance.
    both collapse to "no usable helper model for this turn."
 
 6. **Skill delivery and helper output contract.** The augmenter's
-   constructed helper-session prompt embeds the `entity-resolution` skill's
-   method directly (verbatim `.psi/skills/entity-resolution/SKILL.md`
-   content, included as part of the helper system/user prompt the augmenter
-   builds), not via `create-child-session`'s `:skill-names` — that option
+   constructed helper-session prompt embeds only the `entity-resolution`
+   skill's **Method section (steps 1–5)** verbatim from
+   `.psi/skills/entity-resolution/SKILL.md` — not the whole file. The
+   skill's "Output Shape" section (internal reasoning table plus prose
+   "final response" framing) and step 6 ("Act or ask," which instructs
+   asking a clarification question or asking for a missing identifier) are
+   **not** embedded: both conflict with this augmenter's non-interactive,
+   parse-only-a-fixed-line-format contract and with 237's exclusion of
+   interactive pre-turn prompts. In their place, the augmenter's own prompt
+   states the required output contract directly: a structured line format,
+   one line per confident mapping, `surface → canonical (evidence;
+   confidence)`; the augmenter parses lines matching this format from the
+   helper's raw response and discards everything else (preamble, commentary,
+   malformed lines, any clarification-question-shaped text). Skill delivery
+   is not via `create-child-session`'s `:skill-names` — that option
    auto-expands a skill only when the *user's own submitted text* matches or
    invokes it, and the parent-turn user text driving this helper session is
-   never authored to invoke `entity-resolution`. The helper model's expected
-   output is a structured line format, one line per confident mapping:
-   `surface → canonical (evidence; confidence)`; the augmenter parses lines
-   matching this format from the helper's raw response and discards
-   everything else (preamble, commentary, malformed lines). The rendered
-   `:append-context-block` `:content` is re-rendered from the parsed
-   confident mappings, not the model's raw text echoed verbatim. Zero
-   successfully-parsed lines is treated as "no confident mapping" and yields
-   the `:no-op` in Required behaviour item 5.
+   never authored to invoke `entity-resolution`.
+
+   The rendered `:append-context-block` `:content` is re-rendered from the
+   parsed confident mappings as a compact `surface → canonical (evidence)`
+   list — **three** fields per mapping, dropping confidence. Confidence's
+   only role is the accept/reject gate on which lines are parsed as
+   "confident" in the first place; it is not displayed in the rendered
+   block. Zero successfully-parsed lines is treated as "no confident
+   mapping" and yields the `:no-op` in Required behaviour item 5.
 
 ### Remaining v1 policies (settled, low-risk)
 
 - **Eligibility pre-filter.** Skip tracked helper sessions and blank-cwd turns
-  (per 237 scaffold), and skip slash-command-only prompts, mirroring
-  `auto-session-name`'s guards, before spending a helper run.
+  (per 237 scaffold), and skip slash-command-only prompts before spending a
+  helper run. "Slash-command-only" uses the same predicate as
+  `auto-session-name`'s `slash-command-text?` (trimmed text is non-empty and
+  starts with `/`), applied to the *whole turn's*
+  `:turn-augmentation/user-text` rather than to individual conversation
+  lines (which is how `auto-session-name` uses it — to filter lines out of
+  its rename-inference excerpt, not to skip its own run). This is a
+  turn-level reuse of an existing line-level predicate, not an existing
+  whole-run-skip mechanism. A slash-command-only turn is treated as having
+  no detectable referring expression, so it collapses into the "no
+  referring expression" `:no-op` reason in Required behaviour item 5 and
+  Acceptance criteria — but because it is a distinct pre-filter code path
+  (skipped *before* selecting a model or spending a helper run, unlike the
+  model-determined "no referring expression" outcome), it gets its own
+  entry in the Tests list asserting the helper session is never created for
+  such prompts.
 - **Confidence gate & output shape.** Only sufficiently-unambiguous mappings
-  enter the block; ambiguous/unevidenced references are dropped, never guessed.
-  Rendered `:content` is a compact `surface → canonical` list with brief
-  evidence; the raw user prompt is always preserved.
+  enter the block; ambiguous/unevidenced references are dropped, never
+  guessed. Rendered `:content` is a compact `surface → canonical (evidence)`
+  list — see Resolved decision 6 for the exact three-field composition and
+  why confidence is gate-only, not displayed; the raw user prompt is always
+  preserved.
 - **Model-absent fallback.** If `resolve-selection` yields no local winner
   (including no *tool-calling-capable* local winner, per Resolved decision
   5), the augmenter returns a well-formed `:no-op`; it never falls back to a
@@ -228,7 +258,8 @@ provenance.
 - For a parent turn whose user text contains a referring expression that maps to
   exactly one strongly-evidenced project entity, the prepared request contains a
   `:turn/augmentation-context` block (via `:append-context-block`
-  `:id "entity-resolution"`) carrying the `surface → canonical` mapping, inserted
+  `:id "entity-resolution"`) carrying the `surface → canonical (evidence)`
+  mapping (Resolved decision 6's three-field rendered composition), inserted
   before the current user message.
 - The augmenter uses a helper session driven by a **local** model selected via
   `psi.ai.model-selection` with a strong `:locality :local` preference and the
@@ -240,9 +271,10 @@ provenance.
   (Resolved decision 5) is additive: existing `:helper` / `:auto-session-name`
   role-default selection behaviour is unchanged when the criterion is unset.
 - The augmenter returns a well-formed `:no-op` (no operations) for: tracked
-  helper sessions, blank effective-cwd, prompts with no detectable referring
-  expression, no confident mapping, no tool-calling-capable local model, and
-  failed/empty helper runs.
+  helper sessions, blank effective-cwd, slash-command-only prompts
+  (pre-filter, before spending a helper run), prompts with no detectable
+  referring expression, no confident mapping, no tool-calling-capable local
+  model, and failed/empty helper runs.
 - Helper sessions the augmenter creates are tracked, reported in
   `:turn-augmentation/child-session-ids`, cleaned up, and never themselves
   augmented (recursion avoidance verified).
@@ -251,7 +283,9 @@ provenance.
 - Replaying the turn reuses the recorded operation and does not re-invoke the
   local model (inherited 237 guarantee, asserted by a test).
 - Tests (Scry-first) cover: confident single mapping → success block; no
-  referring expression → no-op; helper-session recursion no-op; blank cwd
+  referring expression → no-op; slash-command-only prompt → no-op with no
+  helper session created (pre-filter, distinct from the model-determined no
+  referring expression path); helper-session recursion no-op; blank cwd
   no-op; no-local-model (including no tool-calling-capable local model) →
   no-op; ambiguous reference dropped; failed/empty helper run → no-op; and
   replay reuse.

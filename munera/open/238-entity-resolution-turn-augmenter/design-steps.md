@@ -81,7 +81,7 @@
   failed/empty-helper-run → no-op test to the Tests list, or state why it's
   not needed.
 
-- [ ] Ambiguous: "embeds the `entity-resolution` skill's method directly ...
+- [x] Ambiguous: "embeds the `entity-resolution` skill's method directly ...
   (verbatim `.psi/skills/entity-resolution/SKILL.md` content, included as
   part of the helper system/user prompt the augmenter builds)" (Resolved
   decision 6) does not say whether the *whole file* is embedded verbatim or
@@ -106,7 +106,7 @@
   mismatched output is already a no-op via decision 6's zero-parsed-lines
   rule) so the helper-prompt-construction step isn't improvised.
 
-- [ ] Ambiguous: "Remaining v1 policies" says the eligibility pre-filter
+- [x] Ambiguous: "Remaining v1 policies" says the eligibility pre-filter
   should "skip slash-command-only prompts, mirroring `auto-session-name`'s
   guards, before spending a helper run." `auto-session-name`'s actual guard
   (`slash-command-text?` in `extensions/auto_session_name.clj`) only filters
@@ -125,7 +125,7 @@
   the exact slash-command-only detection rule and where it fits among the
   enumerated no-op reasons/tests.
 
-- [ ] Inconsistent: design.md states the composition of the final rendered
+- [x] Inconsistent: design.md states the composition of the final rendered
   `:append-context-block` `:content` differently in three places, and these
   were not reconciled when Resolved decision 6 was added. Acceptance
   criteria says the block carries "the `surface → canonical` mapping" (2

@@ -229,3 +229,33 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - As before: resolving a design step means editing `design.md` itself
   (localized edits), not deferring to plan/implementation notes —
   `design.md` must reach complete-and-unambiguous before `plan.md` can exist.
+
+## Second design-steps-resolution slice — resolved (batch: `bbf888503`..`9860b98cb`, baseline `42dbf2086`)
+
+- Resolved all 3 items flagged in the note above, per the coupling called
+  out there:
+  - Skill-embedding scope (Resolved decision 6): only `SKILL.md`'s Method
+    section (steps 1–5) is embedded verbatim; "Output Shape" and step 6
+    ("Act or ask") are explicitly excluded because they conflict with the
+    non-interactive parse-only contract. The augmenter's own prompt states
+    the output line grammar directly instead.
+  - `:content` field composition (Resolved decision 6, "Remaining v1
+    policies," Acceptance criteria — all three now aligned): rendered
+    `:content` is `surface → canonical (evidence)`, three fields,
+    **confidence dropped** (it's gate-only, decides which lines parse as
+    "confident," never displayed). The parsed *per-line* format from the
+    helper's raw output stays four-field (`surface → canonical (evidence;
+    confidence)`) — only the *re-rendered* `:content` is three-field.
+  - Slash-command-only eligibility: defined as the same predicate as
+    `auto-session-name`'s `slash-command-text?` (trimmed text non-empty and
+    starts with `/`), applied to the whole turn's
+    `:turn-augmentation/user-text` (turn-level), not per conversation line
+    (auto-session-name's line-level use). It's a pre-filter checked before
+    model selection/helper-run spend; outcome collapses into the existing
+    "no referring expression" `:no-op` reason, but gets its own Tests-list
+    entry since it's a distinct (pre-model) code path.
+- No `SCOPE_QUESTION:` items existed in this batch; nothing deferred to the
+  user this slice.
+- design-steps.md: all 7 items now checked `[x]`. No unchecked design-step
+  items remain — design.md should be re-readable end-to-end for
+  completeness/unambiguity before `plan.md` is created.
