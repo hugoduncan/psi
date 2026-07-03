@@ -142,7 +142,7 @@
   fields per mapping. Pick one composition and align Acceptance criteria,
   "Remaining v1 policies," and Resolved decision 6 to state it the same way.
 
-- [ ] Ambiguous: Resolved decision 6 embeds the `entity-resolution` skill's
+- [x] Ambiguous: Resolved decision 6 embeds the `entity-resolution` skill's
   Method section (steps 1–5) **verbatim** into the helper prompt, but those
   verbatim steps explicitly instruct evidence-gathering via commands/capabilities
   that the helper's toolset (Resolved decision 4) does not provide. Step 1

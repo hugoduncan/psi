@@ -377,3 +377,27 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
     duplicate of the already-resolved skill-embedding-scope item; not
     re-raised here.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Third design-steps-resolution slice — resolved (batch: `302bef5e4`..`b7bd9ebb6`, baseline `b7f717e33`)
+
+- Resolved the 1 remaining unchecked item (embedded-Method-text-names-
+  unavailable-tools) per the note above: chose policy (b) — the augmenter's
+  prompt-construction step adapts/rewords only the specific Method
+  sub-steps (1 and 3) that name unavailable commands (`git status`,
+  `git ls-files`/`find`, `git grep`, "Psi graph introspection") so they
+  instead name the helper's actually-available read-only capabilities
+  (read a file, list a directory, grep file contents). Method sub-steps 2,
+  4, 5 (no unavailable-tool references) are embedded unchanged. Exact
+  adapted phrasing is left to plan/implementation, matching the existing
+  "e.g." granularity precedent in Resolved decisions 4–5.
+- Edited Resolved decision 6, the Goal section's skill-delivery paragraph,
+  and Required behaviour item 3 to say "embeds ... adapted" instead of
+  "embeds ... verbatim/directly" — these three passages previously implied
+  unmodified embedding, which is now explicitly false.
+- design-steps.md: all 8 items now checked `[x]`. No unchecked design-step
+  items remain.
+- No `SCOPE_QUESTION:` item existed in this batch; nothing deferred to the
+  user this slice.
+- If a future design-review pass runs again, treat the commit that lands
+  this slice as the new prior-follow-up boundary for batch-baseline
+  purposes (same convention used by the two prior resolution slices).

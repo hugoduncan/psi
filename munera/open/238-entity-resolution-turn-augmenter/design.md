@@ -34,8 +34,10 @@ The reasoning method is the existing `entity-resolution` skill
 gather evidence → produce a `surface → canonical → evidence → confidence`
 mapping → include only unambiguous mappings. The skill's Method section
 (steps 1–5 only, not its Output Shape / Act-or-ask sections) is delivered
-to the helper session by embedding it directly in the augmenter's
-constructed helper prompt (Resolved decision 6) — not via
+to the helper session by embedding it in the augmenter's constructed helper
+prompt, adapted so evidence-gathering wording names only the helper's
+actually-available read-only tools rather than the skill's original
+git/find/graph-introspection references (Resolved decision 6) — not via
 `create-child-session`'s `:skill-names`, which only auto-expands a skill
 when the *user's own submitted text* matches/invokes it, and the parent-turn
 user text driving this helper session is never authored to invoke
@@ -92,10 +94,10 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
    filter;
 3. runs a helper session — created **with a minimal read-only search toolset**
    (Resolved decision 4) so the local model can gather filesystem/git
-   evidence — whose prompt embeds the `entity-resolution` method directly
-   (Resolved decision 6) and applies it to the user text, producing output
-   in the structured line format from Resolved decision 6, restricted to
-   sufficiently-unambiguous entries;
+   evidence — whose prompt embeds the `entity-resolution` method, adapted to
+   name only that toolset (Resolved decision 6), and applies it to the user
+   text, producing output in the structured line format from Resolved
+   decision 6, restricted to sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
    (`:id "entity-resolution"`, `:title "Resolved entities"`, `:content` = the
    mapping re-rendered from the parsed confident lines, per Resolved
@@ -169,14 +171,27 @@ provenance.
 
 6. **Skill delivery and helper output contract.** The augmenter's
    constructed helper-session prompt embeds only the `entity-resolution`
-   skill's **Method section (steps 1–5)** verbatim from
+   skill's **Method section (steps 1–5)** from
    `.psi/skills/entity-resolution/SKILL.md` — not the whole file. The
    skill's "Output Shape" section (internal reasoning table plus prose
    "final response" framing) and step 6 ("Act or ask," which instructs
    asking a clarification question or asking for a missing identifier) are
    **not** embedded: both conflict with this augmenter's non-interactive,
    parse-only-a-fixed-line-format contract and with 237's exclusion of
-   interactive pre-turn prompts. In their place, the augmenter's own prompt
+   interactive pre-turn prompts. Within the embedded Method steps, the
+   sub-steps whose wording names evidence-gathering commands the helper
+   toolset does not expose (Resolved decision 4 is file read / directory
+   list / content grep only, with no bash/git-command execution and no
+   EQL/psi-graph introspection) are **adapted, not embedded verbatim**: the
+   augmenter's prompt-construction step rewords those references to name
+   only the helper's actually-available read-only capabilities (read a
+   file, list a directory, grep file contents), so the model is never
+   instructed to reach for a tool it doesn't have. The remaining Method
+   wording that names no unavailable tool is embedded unchanged. (The exact
+   adapted phrasing is a prompt-construction detail left to
+   plan/implementation, consistent with how Resolved decisions 4–5 already
+   leave literal tool/fact names at "e.g." granularity.) In place of the
+   excluded Output Shape / Act-or-ask sections, the augmenter's own prompt
    states the required output contract directly: a structured line format,
    one line per confident mapping, `surface → canonical (evidence;
    confidence)`; the augmenter parses lines matching this format from the
