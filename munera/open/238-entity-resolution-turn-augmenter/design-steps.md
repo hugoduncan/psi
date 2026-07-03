@@ -165,3 +165,33 @@
   gathered evidence" acceptance scenario. Pin down whether the embedded
   Method text is used exactly as authored in `SKILL.md` or is adapted to
   reference only the helper's actually-available read-only tool names.
+
+- [ ] Ambiguous: Resolved decision 6's adaptation policy says the
+  augmenter's prompt-construction step "rewords those references to name
+  only the helper's actually-available read-only capabilities (read a file,
+  list a directory, grep file contents)" for every Method sub-step that
+  names a tool the helper toolset lacks. That rewording works cleanly for
+  two of the four flagged references — `git ls-files`/`find` (step 3) has a
+  natural directory-list substitute, and `git grep` (step 3) has a natural
+  content-grep substitute — but not for the other two: step 1's "current
+  git status" and step 3's "Psi graph introspection for runtime/session
+  entities" name capabilities with **no** read/list/grep equivalent at all
+  (working-tree change state and runtime/session-graph queries are not
+  obtainable by reading a file, listing a directory, or grepping content,
+  no matter how the instruction is worded). Design.md doesn't say what
+  "adapted" means for this unmappable subset: (a) drop that specific
+  sub-instruction from the embedded text entirely (since no available tool
+  can fulfill it), (b) reword it anyway to point at read/list/grep even
+  though doing so cannot actually satisfy the original instruction's intent
+  (e.g., telling the model to "list the directory" in place of "check git
+  status" doesn't tell it anything about uncommitted changes), or (c) leave
+  it worded as a capability gap the model should treat as unavailable
+  evidence and reason around. This matters because step 1's git-status
+  reference is explicitly tied to "path or task references," which are
+  squarely within this augmenter's in-scope entity types (per the Goal
+  section's "paths, tasks, ..." list) — so the gap isn't hypothetical, it's
+  a real evidence source the Method text currently implies is available
+  when it structurally is not, given decision 4's frozen toolset. Pin down
+  which of (a)/(b)/(c) the adaptation intends for the git-status and
+  graph-introspection sub-references specifically, not just for the two
+  substitutable ones.

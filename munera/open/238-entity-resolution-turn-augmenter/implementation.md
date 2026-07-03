@@ -397,6 +397,25 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - design-steps.md has 0 unchecked items; no new step added this pass.
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
 
+## Ambiguity review (design-review turn 2, fourth pass — post `d1db1d86e`)
+
+- ambiguity review added 1 new design step: Resolved decision 6's adaptation
+  policy ("reword to name only actually-available read-only capabilities")
+  only has a natural substitute for 2 of the 4 flagged unavailable-tool
+  references (`git ls-files`/`find` → directory list; `git grep` → content
+  grep). The other 2 — step 1's "current git status" and step 3's "Psi
+  graph introspection for runtime/session entities" — have no read/list/grep
+  equivalent at all, and design.md doesn't say what "adapted" means for
+  those (drop the sub-instruction vs. reword misleadingly vs. flag as an
+  unavailable-evidence gap). See design-steps.md.
+- git-status is not a hypothetical edge case: Method step 1 ties it to
+  "path or task references," which are explicitly in this augmenter's scope
+  (Goal section's entity-type list includes "paths" and "tasks"), so this is
+  a real evidence-source gap under the frozen read/list/grep-only toolset
+  (Resolved decision 4), not a corner the augmenter can avoid hitting.
+- No `SCOPE_QUESTION:` raised — this is a prompt-construction/adaptation
+  gap closable within frozen scope, not a scope-boundary concern.
+
 ## Third design-steps-resolution slice — resolved (batch: `302bef5e4`..`b7bd9ebb6`, baseline `b7f717e33`)
 
 - Resolved the 1 remaining unchecked item (embedded-Method-text-names-
