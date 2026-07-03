@@ -910,3 +910,27 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   `.psi/skills/entity-resolution/SKILL.md` still says "resolution method and
   output shape," contradicting Resolved decision 6's settled rule that only
   Method steps 1–5 are embedded and the skill's Output Shape is excluded.
+
+## Notes for the seventh design-steps-resolution slice (2 unchecked items)
+
+- Resolve both items by localized edits to `design.md`; neither requires a
+  scope change or `SCOPE_QUESTION:`. Keep the closed helper capability set
+  intact: read / list / grep only, no git-command execution, no bash, no graph
+  introspection.
+- Evidence-corpus ambiguity: choose and state one corpus rule. Either make the
+  new tools explicitly git-aware/tracked-file-only, or drop "git-tracked" and
+  specify ordinary filesystem-scoped read/list/grep under `effective-cwd`.
+  Do not leave design.md implying both.
+- Skill reference inconsistency: the References entry should not say
+  `SKILL.md` provides the output shape unless it also says that output shape is
+  deliberately not used. Resolved decision 6 is authoritative: Method steps
+  1–5 only; augmenter-authored structured line contract supplies output.
+- Relevant non-task files:
+  - `components/agent-session/src/psi/agent_session/tools.clj` — existing
+    built-in read tool and likely home/pattern for new read-only list/grep
+    tools.
+  - `.psi/skills/entity-resolution/SKILL.md` — Method vs Output Shape / Act-or-ask
+    split that the design references.
+  - `extensions/context-manager/src/extensions/context_manager.clj` — host
+    extension where the augmenter will construct helper prompts and select
+    helper tools.
