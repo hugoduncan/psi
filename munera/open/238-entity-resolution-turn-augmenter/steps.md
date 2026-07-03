@@ -915,3 +915,53 @@
       matching `entity-resolution-confident-mapping-success-test` so the
       `:child-session-ids` clause is pinned uniformly across the success
       cluster.
+
+## Test-review follow-ups (turn 16)
+
+- [ ] **`default-select-model`'s `catch Exception` branch — the sole guard
+      against a thrown model selection propagating onto 237's blocking
+      pre-turn path — is untested.** `default-select-model` wraps its whole
+      body in `(try … (catch Exception _ nil))`, so a throw from
+      `(:query-session api)` or from `model-selection/resolve-selection`
+      collapses to `nil` (→ `no-op "no local model"`). This catch is
+      load-bearing: unlike `run-helper`, the augmenter does **not** wrap
+      `select-model` in its own try/catch (turn 8 added `(try … (catch
+      Throwable _ nil))` around `run-helper` only), so `default-select-model`'s
+      internal catch is the *only* thing stopping a thrown selection from
+      propagating out of `entity-resolution-augmentation` onto the blocking
+      critical path. Yet every existing `default-select-model` test drives the
+      happy `:ok` path (`-rejects-cloud-winner`, `-accepts-local-winner`) or,
+      via the registered-handler test, the `:no-winner` empty-pool path — none
+      exercises a *throwing* `query-session`/catalog. A regression that
+      dropped the catch (or narrowed it) would pass all current tests while
+      re-opening the exact "thrown-collaborator-must-not-propagate" hazard
+      turn 8 closed for `run-helper`. Add a `default-select-model` test whose
+      `:query-session` (or injected `:catalog`) throws, asserting the fn
+      returns nil (→ `:no-op`, not a propagated exception); optionally also
+      assert the augmenter-level path (`entity-resolution-augmentation` with a
+      throwing real `default-select-model`) collapses to
+      `no-op "no local model"` rather than throwing, pinning the select-side
+      failure contract symmetrically with the run-side one.
+
+- [ ] **`history-line`'s whitespace-collapse (`str/replace text #"\s+" " "`)
+      — which flattens a multi-line/multi-space snippet into a single intact
+      excerpt line — is untested; every history fixture uses single-space
+      snippets.** `render-history-excerpt`/`history-line` normalize each
+      tail snippet's internal whitespace to single spaces so a multi-line
+      snippet renders as *one* `Role: …` line, not several lines (only the
+      first of which would carry the `Role:` prefix). This matters because the
+      turn-15 line-boundary-truncation invariant ("every surviving excerpt
+      line keeps a `Role:` prefix") and the anaphora excerpt's readability
+      both depend on one-snippet-one-line: a snippet containing an embedded
+      `\n` that was *not* collapsed would inject a role-less continuation line
+      into the excerpt (the same class of corrupt-fragment defect turn 15
+      fixed for char-slicing, but from the render side). All existing fixtures
+      (`build-entity-resolution-prompt-test`, `-tail-truncation-test`) use
+      single-space snippets, so the `\s+ → " "` collapse never runs against
+      embedded newlines/tabs/runs. A regression dropping the collapse (or
+      replacing only literal spaces) would pass every test yet re-admit
+      multi-line excerpt lines. Add a `build-entity-resolution-prompt` /
+      `render-history-excerpt` case with a `:snippet` containing an embedded
+      newline / tab / multi-space run, asserting the rendered excerpt line is
+      a single `Role: …` line with internal whitespace collapsed to single
+      spaces (no embedded newline survives, no role-less continuation line).

@@ -1746,3 +1746,14 @@ Key decisions / discoveries:
   tests (multi-mapping, model-flow, ambiguous-dropped) so the clause is
   pinned uniformly across the success cluster. Focused suite: 36 tests,
   136 assertions, 0 failures; lint clean.
+
+## Test-review turn-16 (test-shaper skill)
+
+- Independent test-shaper review — added 2 steps (turn 16): (1)
+  `default-select-model`'s `catch Exception` branch is untested — it is the
+  sole guard against a thrown selection propagating onto 237's blocking
+  pre-turn path (the augmenter wraps only `run-helper`, not `select-model`,
+  in its own try/catch); (2) `history-line`'s whitespace-collapse
+  (`\s+ → " "`) is untested — every history fixture uses single-space
+  snippets, so an embedded-newline snippet that would inject a role-less
+  continuation line into the excerpt is unguarded.
