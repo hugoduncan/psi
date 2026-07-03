@@ -313,6 +313,21 @@
            (context-manager/parse-mapping-lines
             "the term → foo (git grep; 3 hits; medium)"))))
 
+  (testing "nested parens in evidence split at last ;, not leaking across boundary"
+    (is (= [{:surface "the fn"
+             :canonical "foo (bar)"
+             :evidence "baz (qux)"
+             :confidence "high"}]
+           (context-manager/parse-mapping-lines
+            "the fn → foo (bar) (baz (qux); high)"))))
+
+  (testing "empty canonical is rejected, not emitted as a confident mapping"
+    (is (= [] (context-manager/parse-mapping-lines "a →  (e; c)"))))
+
+  (testing "incidental code-shaped line with unbalanced parens is rejected"
+    (is (= [] (context-manager/parse-mapping-lines
+               "(fn [x] -> (foo x)) (call; note)"))))
+
   (testing "zero well-formed lines yields empty vector"
     (is (= [] (context-manager/parse-mapping-lines "no lines here at all")))
     (is (= [] (context-manager/parse-mapping-lines nil)))))

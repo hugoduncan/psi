@@ -1500,3 +1500,16 @@ Key decisions / discoveries:
   lines with `->` + trailing `(…; …)`, nested parens in evidence),
   producing false-positive/misleading `Resolved entities` block content
   against the "never guess" + robust-parsing guarantees. See steps.md.
+
+## Turn-4 implementation-review follow-up — resolved
+
+- addressed 1 review step (parser hardening / false-positive rejection).
+  Replaced the greedy single `mapping-line-re` with a structural parser:
+  `balanced-trailing-group` (right-to-left balanced-paren scan) + last-`;`
+  evidence split + non-empty-field gate + `balanced-parens?` on
+  surface/canonical. Rejects empty-canonical, incidental code-shaped lines,
+  and correctly isolates nested parens in evidence; preserves the turn-1
+  parens-in-canonical and semicolon-in-evidence cases. 3 new
+  `parse-mapping-lines-test` cases pin the accept/reject boundary.
+  `bb test --focus extensions.context-manager-test` green (33 tests, 98
+  assertions, 0 failures); clj-kondo clean on both touched files.

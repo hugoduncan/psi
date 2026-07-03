@@ -176,31 +176,94 @@
 
 ;; --- parsing & rendering (pure) -------------------------------------------
 
-(def ^:private mapping-line-re
-  ;; surface → canonical (evidence; confidence)
-  ;;
-  ;; The trailing `(evidence; confidence)` group is anchored to the *last*
-  ;; parenthesized group on the line, so a `canonical` containing its own
-  ;; parentheses (e.g. `foo/bar (arity 2)`) does not leak into the evidence
-  ;; group. Within that final group, `evidence` is everything up to the
-  ;; *last* `;`, so evidence text may itself contain `;` (e.g.
-  ;; `git grep; 3 hits`) without truncating.
-  #"^\s*(.+?)\s*(?:→|->)\s*(.+)\(\s*(.+)\s*;\s*(.+?)\s*\)\s*$")
+(def ^:private arrow-re
+  ;; `surface → canonical` arrow (unicode or ascii), splitting on the first
+  ;; arrow so an evidence/confidence clause containing `->` cannot re-split.
+  #"(?:→|->)")
+
+(defn- balanced-parens?
+  "True when every `(` in `s` has a matching `)` and vice versa, never
+   dipping below zero depth. A genuine entity reference (path, symbol, task
+   id) is paren-balanced; incidental echoed code (e.g. `(foo x))`) is not,
+   so this rejects code-shaped false-positive mappings without guessing."
+  [s]
+  (loop [i 0 depth 0]
+    (cond
+      (= i (count s)) (zero? depth)
+      :else
+      (let [c (.charAt ^String s i)
+            depth (cond (= c \() (inc depth) (= c \)) (dec depth) :else depth)]
+        (if (neg? depth) false (recur (inc i) depth))))))
+
+(defn- balanced-trailing-group
+  "If `s` ends with a balanced parenthesized group `(...)`, return
+   `[prefix inner]` where `prefix` is `s` with that final group and any
+   trailing whitespace removed and `inner` is the group's contents (parens
+   stripped). Returns nil if `s` does not end in a balanced final group.
+
+   Scans right-to-left counting paren depth so nested parens inside the
+   group (e.g. `(baz (qux); high)`) stay wholly inside `inner` and do not
+   leak across the evidence boundary, and a trailing group is only accepted
+   when it is genuinely balanced (rejecting code-shaped lines like
+   `(foo x))`)."
+  [s]
+  (let [s (str/trimr s)]
+    (when (str/ends-with? s ")")
+      (loop [i (dec (count s)) depth 0]
+        (cond
+          (neg? i) nil
+          :else
+          (let [c (.charAt ^String s i)
+                depth (cond (= c \)) (inc depth)
+                            (= c \() (dec depth)
+                            :else depth)]
+            (cond
+              (zero? depth) [(str/trimr (subs s 0 i))
+                             (subs s (inc i) (dec (count s)))]
+              (neg? depth)  nil
+              :else         (recur (dec i) depth))))))))
+
+(defn- parse-mapping-line
+  "Parse a single line into a confident mapping map, or nil.
+
+   A line is a mapping only when it (a) contains an arrow, (b) ends in a
+   balanced `(evidence; confidence)` group whose inner text contains a `;`,
+   and (c) yields a non-empty trimmed surface *and* canonical. Evidence is
+   everything up to the *last* `;` (so evidence may contain `;`), and both
+   evidence and confidence must be non-empty, and both surface and canonical
+   must have balanced parentheses. Degenerate lines (empty
+   surface/canonical/evidence/confidence, no balanced trailing group, or an
+   incidental code-shaped arrow-plus-clause line whose surface/canonical has
+   unbalanced parens) are rejected so no guessed/bogus entity is emitted."
+  [line]
+  (when-let [[prefix inner] (balanced-trailing-group line)]
+    (let [semi (str/last-index-of inner ";")]
+      (when semi
+        (let [evidence   (str/trim (subs inner 0 semi))
+              confidence (str/trim (subs inner (inc semi)))
+              parts      (str/split prefix arrow-re 2)]
+          (when (= 2 (count parts))
+            (let [surface   (str/trim (first parts))
+                  canonical (str/trim (second parts))]
+              (when (and (seq surface) (seq canonical)
+                         (seq evidence) (seq confidence)
+                         (balanced-parens? surface)
+                         (balanced-parens? canonical))
+                {:surface    surface
+                 :canonical  canonical
+                 :evidence   evidence
+                 :confidence confidence}))))))))
 
 (defn parse-mapping-lines
   "Parse only well-formed `surface → canonical (evidence; confidence)` lines
    from raw helper text. Every well-formed line is kept (model self-gating —
-   no confidence-value threshold). All other text is discarded. Returns a
-   vector of {:surface .. :canonical .. :evidence .. :confidence ..}."
+   no confidence-value threshold). All other text — preamble, malformed
+   lines, degenerate/empty mappings, and incidental code-shaped lines — is
+   discarded. Returns a vector of
+   {:surface .. :canonical .. :evidence .. :confidence ..}."
   [raw]
   (->> (str/split-lines (or raw ""))
-       (keep (fn [line]
-               (when-let [[_ surface canonical evidence confidence]
-                          (re-matches mapping-line-re line)]
-                 {:surface    (str/trim surface)
-                  :canonical  (str/trim canonical)
-                  :evidence   (str/trim evidence)
-                  :confidence (str/trim confidence)})))
+       (keep parse-mapping-line)
        vec))
 
 (defn render-mapping-content

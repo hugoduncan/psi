@@ -289,7 +289,7 @@
 
 ## Implementation-review follow-ups (turn 4)
 
-- [ ] **`parse-mapping-lines` accepts non-mapping / degenerate lines,
+- [x] **`parse-mapping-lines` accepts non-mapping / degenerate lines,
       injecting misleading content into the `Resolved entities` block —
       weakens the design's "never guess" and robust-parsing guarantees.**
       `mapping-line-re` matches any line containing an arrow (`→`/`->`) plus a
@@ -324,3 +324,13 @@
       with covering tests. Add `parse-mapping-lines-test` cases for
       empty-canonical rejection, the code-shaped false-positive, and the
       nested-parens evidence split so the accept/reject boundary is pinned.
+      DONE: replaced the single greedy `mapping-line-re` with a structural
+      parser — `balanced-trailing-group` scans right-to-left to take the
+      *balanced* final `(...)` (nested evidence parens stay inside `inner`,
+      code-shaped unbalanced tails are rejected), evidence splits at the last
+      `;`, and a mapping is emitted only when surface/canonical/evidence/
+      confidence are all non-empty *and* `balanced-parens?` holds for surface
+      and canonical (rejects echoed code like `(foo x))`). Asserted by three
+      new `parse-mapping-lines-test` cases: nested-parens-in-evidence split,
+      empty-canonical rejection, code-shaped false-positive rejection. Prior
+      parens-in-canonical and semicolon-in-evidence cases still pass.
