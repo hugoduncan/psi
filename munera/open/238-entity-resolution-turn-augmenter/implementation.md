@@ -1344,3 +1344,19 @@ Applied to `design.md`:
   duplicated. Plan's pinned v1 numbers (8 rounds / 120s / ~4000-char excerpt)
   and confidence-token-required parse shape are consistent with design's
   policy-level deferrals and model-self-gating resolution, not contradictions.
+
+## Notes after plan-review batch (no follow-ups added)
+
+- The plan-review batch (ambiguity + inconsistency turns) added **no**
+  design-steps and no `SCOPE_QUESTION:`. plan.md/steps.md are complete and
+  internally consistent with the converged design.md — the next
+  task-lifecycle step is implementation (slice 1), not a plan-resolution
+  slice.
+- Principle if a future plan-review pass runs: plan.md deliberately pins v1
+  knobs design.md left at "e.g."/policy granularity (8 rounds, 120s
+  wall-clock, ~4000-char history excerpt, confidence-token-required parse
+  shape). Do NOT re-flag these as under/over-specification — they are the
+  plan-level policy values design.md explicitly deferred to plan/impl.
+- Implementer entry points (already consolidated in the tenth design-review
+  note above; not repeated here) remain the authoritative file list — start
+  from plan.md's slice order.
