@@ -35,13 +35,16 @@ gather evidence → produce a `surface → canonical → evidence → confidence
 mapping → include only unambiguous mappings. The skill's Method section
 (steps 1–5 only, not its Output Shape / Act-or-ask sections) is delivered
 to the helper session by embedding it in the augmenter's constructed helper
-prompt, adapted so evidence-gathering wording names only the helper's
-actually-available read-only tools rather than the skill's original
-git/find/graph-introspection references (Resolved decision 6) — not via
-`create-child-session`'s `:skill-names`, which only auto-expands a skill
-when the *user's own submitted text* matches/invokes it, and the parent-turn
-user text driving this helper session is never authored to invoke
-`entity-resolution`.
+prompt, adapted per Resolved decision 6's two-case split — sub-steps naming
+a git/find reference with an available-tool substitute (directory listing,
+content grep) are reworded to name that tool directly, while the two
+sub-steps with no available-tool substitute (git status, graph
+introspection) are replaced with an explicit capability-gap disclosure —
+rather than embedding the skill's original git/find/graph-introspection
+references verbatim (Resolved decision 6) — not via `create-child-session`'s
+`:skill-names`, which only auto-expands a skill when the *user's own
+submitted text* matches/invokes it, and the parent-turn user text driving
+this helper session is never authored to invoke `entity-resolution`.
 
 ## Why
 
@@ -94,10 +97,12 @@ extension (new `:augmenter-id "entity-resolution"`, alongside the current
    filter;
 3. runs a helper session — created **with a minimal read-only search toolset**
    (Resolved decision 4) so the local model can gather filesystem/git
-   evidence — whose prompt embeds the `entity-resolution` method, adapted to
-   name only that toolset (Resolved decision 6), and applies it to the user
-   text, producing output in the structured line format from Resolved
-   decision 6, restricted to sufficiently-unambiguous entries;
+   evidence — whose prompt embeds the `entity-resolution` method, adapted
+   per Resolved decision 6's two-case split (available-tool substitution
+   for substitutable references; explicit capability-gap disclosure for the
+   two unmappable ones), and applies it to the user text, producing output
+   in the structured line format from Resolved decision 6, restricted to
+   sufficiently-unambiguous entries;
 4. returns a `:success` envelope with one `:append-context-block`
    (`:id "entity-resolution"`, `:title "Resolved entities"`, `:content` = the
    mapping re-rendered from the parsed confident lines, per Resolved
@@ -197,10 +202,15 @@ provenance.
      Instead they are replaced with an explicit statement of the capability
      gap: the prompt tells the model it cannot check git status, run git
      commands, or query the runtime/session graph, and must reason about
-     path/task/session references using only file contents it can read,
-     list, or grep. The model is expected to treat the missing evidence
-     source as unavailable and reason around it, not to attempt an
-     unavailable tool call.
+     path/task references (the two in-scope entity types, per the Goal
+     section's entity-type list, whose evidence those unavailable sources
+     would otherwise supply) using only file contents it can read, list, or
+     grep. Sessions are not a resolvable entity type for this augmenter —
+     the "runtime/session graph" phrase names the skill's original
+     unavailable evidence source, not an in-scope output entity type — so
+     no session-related mapping is ever produced. The model is expected to
+     treat the missing evidence source as unavailable and reason around it,
+     not to attempt an unavailable tool call.
    The remaining Method wording that names no unavailable tool is embedded
    unchanged. (The exact adapted phrasing — for both the substituted
    references and the capability-gap statement — is a prompt-construction

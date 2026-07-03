@@ -685,3 +685,43 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
 - If a future design-review pass runs again, treat the commit that lands
   this slice as the new prior-follow-up boundary for batch-baseline
   purposes (same convention used by the three prior resolution slices).
+
+## Fifth design-steps-resolution slice — resolved (batch: `54a0895c4`..`4bcd1a942`, baseline `b37363b71`)
+
+- Resolved both remaining unchecked items from the note above:
+  - "Session" item: chose option (b) — dropped "session" from Resolved
+    decision 6's capability-gap sentence (now "reason about path/task
+    references," the two in-scope entity types the unavailable git-status/
+    graph-introspection evidence would otherwise have served). Added one
+    clarifying sentence stating sessions are not a resolvable entity type
+    for this augmenter, and that "runtime/session graph" in the same
+    sentence names the skill's original unavailable evidence source, not an
+    in-scope output entity — so a future reader doesn't re-flag the phrase.
+    Goal's entity-type list was **not** touched (already correct; option
+    (b) doesn't require it).
+  - Goal/Required-behaviour-item-3 lag item: reworded both summary
+    sentences from the uniform "names only the helper's actually-available
+    read-only tools" to reference "Resolved decision 6's two-case split"
+    (one clause each), without duplicating decision 6's bullet detail —
+    Goal and item 3 now point at decision 6 as the single source of the
+    adaptation mechanism's detail instead of carrying their own
+    (now-inaccurate) paraphrase.
+- Confirmed by grep (`grep -n session design.md`) that every remaining
+  "session" occurrence is helper/child-session plumbing
+  (`helper-session`, `session-id`, `auto-session-name`, etc.) or the
+  skill's-original-wording reference inside decision 6's own clarifying
+  sentence — no other passage claims sessions as a resolvable entity type.
+- `design-steps.md`: all 11 items now checked `[x]`. No unchecked
+  design-step items remain — this is the current end state for design
+  review purposes.
+- No `SCOPE_QUESTION:` item existed in this batch; nothing deferred to the
+  user this slice.
+- Batch identification for this follow-up: the batch is the contiguous
+  architecture → ambiguity → inconsistency review triple `54a0895c4`
+  (architecture, no finding) → `a603b77a8` (ambiguity, added the session
+  item) → `4bcd1a942` (inconsistency, added the Goal/item-3 lag item);
+  baseline is `b37363b71`, the parent of the oldest commit in that triple
+  (also the commit that landed the fourth design-steps-resolution slice).
+- If a future design-review pass runs again, treat the commit that lands
+  this slice as the new prior-follow-up boundary for batch-baseline
+  purposes (same convention used by all four prior resolution slices).

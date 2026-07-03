@@ -196,7 +196,7 @@
   graph-introspection sub-references specifically, not just for the two
   substitutable ones.
 
-- [ ] Ambiguous: Resolved decision 6's capability-gap statement (added by
+- [x] Ambiguous: Resolved decision 6's capability-gap statement (added by
   `b37363b71` to resolve the previous unmappable-sub-reference item) tells
   the model it "must reason about path/task/**session** references using
   only file contents it can read, list, or grep" — but "session" does not
@@ -219,7 +219,7 @@
   entity-type scope and align the Goal section's entity-type list and
   Resolved decision 6's capability-gap wording to agree.
 
-- [ ] Inconsistent: the Goal section and Required behaviour item 3 both
+- [x] Inconsistent: the Goal section and Required behaviour item 3 both
   describe the Method-text adaptation as uniformly "naming only the
   helper's actually-available read-only tools" in place of the skill's
   original git/graph-introspection references — Goal: "adapted so
