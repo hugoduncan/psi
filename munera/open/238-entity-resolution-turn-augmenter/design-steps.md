@@ -443,3 +443,29 @@ instead of requiring any new read-only search tools:
   plan/implementation, matching Resolved decisions 4–6). This is within
   frozen scope (bounding the in-scope helper's own behavior), not a scope
   change.
+
+## Inconsistency review (design-review turn 3, eighth pass — bash-only design)
+
+- [ ] Inconsistent: the Goal section contradicts itself about what Resolved
+  decisions 4 and 5 are. The opening (design.md ~lines 11–12) says the task
+  reuses two shipped mechanisms "extended with small additive wiring this
+  task must add (**see Resolved decisions 4–6**)," citing decisions 4–6 as
+  the additions the task makes. But after the bash-only change, decision 4 is
+  "No new read-only tools" and decision 5 is "No new model-selection
+  tool-calling fact/criterion" — both explicit *non-additions* — and the same
+  Goal paragraph (~lines 24–26) states the task "deliberately does **not**
+  add new read-only tools, and it does **not** add a new model-selection
+  tool-calling fact/criterion." So decisions 4 and 5 are simultaneously
+  cited as additive wiring the task must add and as deliberate non-additions.
+  This is stale cross-reference wording carried over from the old
+  read/list/grep design (where decision 4 = a new toolset and decision 5 = a
+  new capability fact genuinely were additions); the bash edit flipped 4 and
+  5 to non-additions without updating the "(see Resolved decisions 4–6)"
+  additive-wiring citation. Under the bash design the actual additive wiring
+  is the second augmenter registration + helper-prompt construction
+  (decision 6) + the existing-`bash`-tool grant via `create-child-session`
+  (decision 2), not decisions 4/5. Reconcile the Goal's additive-wiring
+  cross-reference (e.g. point it at the decisions that describe actual
+  additions, or reword so it doesn't label the deliberate non-additions as
+  "wiring this task must add"). Within frozen scope — cross-reference wording
+  fix, not a scope change.

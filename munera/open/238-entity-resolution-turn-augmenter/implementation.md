@@ -1015,3 +1015,27 @@ Applied to `design.md`:
   bash-safety-via-prompt-constraints scope decision.
 - No `SCOPE_QUESTION:` raised — the loop-bound item is closable within frozen
   scope.
+
+## Inconsistency review (design-review turn 3, eighth pass — bash-only design)
+
+- inconsistency review added 1 new design step: Goal's "additive wiring this
+  task must add (see Resolved decisions 4–6)" citation is stale — decisions 4
+  ("No new read-only tools") and 5 ("No new model-selection fact") are now
+  non-additions, contradicting the same paragraph's "deliberately does not
+  add" wording. Leftover from the pre-bash read-only design. See
+  design-steps.md.
+- Checked and found consistent (not filed): no stale "cannot check git
+  status"/"worktree/git"/"git-tracked"/"filesystem/git" phrasing survives the
+  bash edit (grepped design.md); decision 6's capability gap now covers only
+  runtime/session graph introspection, git commands correctly framed as
+  available via bash; References SKILL.md entry correctly says Output Shape
+  not used; acceptance-criteria/tests list correctly say "bash tool only" and
+  "no new directory-list/content-grep/read-only toolset"; the old
+  "tool-enabled evidence-gathering half is new work" inconsistency is
+  resolved by bash (bash + create-child-session :tool-ids is genuinely
+  already-shipped).
+- Not re-filed (same root cause as ambiguity turn's loop-bound item):
+  Resolved decision 3's "the local-model call" singular framing vs. the
+  multi-round bash agent loop — already captured by the ambiguity pass, not
+  duplicated here.
+- No `SCOPE_QUESTION:` raised — the finding is closable within frozen scope.
