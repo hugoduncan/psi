@@ -1565,3 +1565,11 @@ Key decisions / discoveries:
   `{:role :snippet}`). Focused tests green (34 tests, 104 assertions, 0
   failures); clj-kondo clean on touched sources. Implementation is coherent,
   design-faithful, and converged.
+
+## Test-review (turn 7)
+
+- added 3 steps to be addressed (test-quality gaps): ambiguous-dropped test
+  is a duplicate of the empty-run test (does not exercise drop-one-keep-another);
+  no test spans the production recursion-avoidance loop (real
+  `default-run-helper` tracking → augmenter pre-filter); settled-success
+  close+untrack cleanup path is unasserted (only the timeout branch is).

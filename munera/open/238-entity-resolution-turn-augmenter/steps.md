@@ -420,3 +420,58 @@
       snippet renders as `User: <snippet>` in the user-prompt, and (b)
       `nil`/empty-`:tail`/flat-vector history yields no excerpt (flat vector
       has no `:tail` → correctly ignored).
+
+## Test-review follow-ups (turn 7)
+
+- [ ] **`entity-resolution-ambiguous-dropped-test` does not exercise the
+      design behaviour it names — it is a duplicate of the empty-run no-op
+      test.** design.md's Acceptance criteria and "Confidence gate" policy
+      specify the ambiguous case as: the helper self-gates and *omits the
+      ambiguous surface's line while still emitting confident ones*, and "the
+      assertion is that no line is emitted/parsed for the ambiguous surface,
+      not that a low-confidence line is filtered." The current test stubs the
+      helper with `:text ""` (fully empty output), which is behaviourally
+      identical to `entity-resolution-empty-run-no-op-test` — it proves only
+      "empty text ⇒ no-op," not "an ambiguous surface is dropped *while a
+      confident one is kept*." Its second assertion
+      `(is (not (some #(= :success %) [(:turn-augmentation/status env)])))` is
+      trivially true given the first `:no-op` assertion and adds no signal.
+      Strengthen the test to feed a *mixed* helper output — one confident
+      mapping line for an unambiguous surface plus prose/commentary about an
+      ambiguous surface that emits no mapping line — and assert the resulting
+      `:success` block's rendered content contains the confident surface and
+      does **not** contain the ambiguous surface. That exercises the
+      never-guess drop-one-keep-another semantics the criterion actually
+      requires, distinct from the empty-run path.
+
+- [ ] **No test spans the production recursion-avoidance loop end to end.**
+      The recursion guarantee ("Helper sessions ... never themselves
+      augmented (recursion avoidance verified)") depends on two halves in
+      *different* code paths sharing `entity-resolution-helper-session-ids`:
+      `default-run-helper` `conj`s the real child id into the atom, and the
+      augmenter pre-filter reads that same atom to no-op. Both halves are
+      tested only in isolation and against *different* ids:
+      `entity-resolution-helper-session-no-op-test` seeds the atom **manually**
+      (`swap! ... conj "s1"`) rather than via a real run, and the
+      success/orchestration tests stub `:run-helper` so it never touches the
+      atom. A regression that made `default-run-helper` track the wrong id (or
+      stop tracking), while leaving the manually-seeded pre-filter test green,
+      would not be caught. Add a test that drives the real `default-run-helper`
+      to track a child id, then invokes `entity-resolution-augmentation` with a
+      turn projection whose `:turn-augmentation/session-id` is that tracked id,
+      asserting `:no-op` — linking the producer and consumer of the tracking
+      atom in one flow.
+
+- [ ] **The settled-success close+untrack path of `default-run-helper` is
+      unasserted — the primary cleanup path has no coverage.** The "Helper
+      sessions ... cleaned up" acceptance criterion is verified only for the
+      *timeout/orphan-settled* branch (`default-run-helper-timeout-branch-test`).
+      On the normal settled run (`default-run-helper-gates-on-run-ok-test`) the
+      future's `finally` closes the child (`:mutate` →
+      `psi.extension/close-session`) and `disj`s it from the tracking atom, but
+      neither `gates-on-run-ok` sub-case asserts the child was closed or
+      untracked — `fake-run-api`'s `:mutate` is a no-op that records nothing.
+      Extend the settled-run test (or add one) to record the `close-session`
+      call and assert, after the run returns, that the child id was closed and
+      removed from `entity-resolution-helper-session-ids`, so the common-path
+      cleanup is covered rather than only the exceptional timeout path.
