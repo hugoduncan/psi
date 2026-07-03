@@ -46,3 +46,34 @@ Context loaded for later ambiguity/inconsistency turns in this session:
   in Acceptance criteria omits a test for "failed/empty helper runs → no-op"
   even though that no-op condition is explicitly required one paragraph
   above it. See design-steps.md.
+
+## Notes for the design-steps-resolution slice
+
+Principles to hold while closing out design-steps.md:
+
+- Resolving a design step means editing `design.md` itself (localized edits
+  to the relevant section, per `AGENTS.md`'s "localized change, ¬broad
+  restructure(spec)"), not just noting an implementation-time workaround —
+  `design.md` must reach complete-and-unambiguous before `plan.md` can exist
+  (`AGENTS.md` `gate(plan.md)`).
+- None of the 4 items require a scope change — no `SCOPE_QUESTION` was
+  raised in any of the three review turns, so every item can be closed by
+  clarifying/deciding within the existing frozen scope, not by widening or
+  narrowing it.
+- The model-selection step touches a shared, non-extension component
+  (`components/ai`) also used by the existing `:helper` and
+  `:auto-session-name` role-defaults in `model_selection.clj` and by
+  `auto-session-name` itself — whatever tool-calling fact/criterion gets
+  added must be additive (new optional fact/criterion key) so existing
+  callers/roles are unaffected.
+- The two prompt/output-contract items (ambiguity step, and the related half
+  of the "already-shipped" inconsistency step) are coupled: deciding how the
+  skill's method reaches the helper prompt also determines what "already
+  shipped" should honestly claim in the Goal section — resolve them together
+  rather than independently.
+
+Non-task-file context: this review ran as 3 turns of one shared
+`design-review` session (architecture → ambiguity → inconsistency); all 4
+design steps and their file citations were gathered without re-running
+`bb test` or touching any code — nothing in `components/` or `extensions/`
+changed during review.
