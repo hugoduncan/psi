@@ -495,3 +495,43 @@
       `default-run-helper-settled-run-closes-and-untracks-test` — a normal
       settled run now asserts the child was closed and removed from
       `entity-resolution-helper-session-ids`, covering the common cleanup path.
+
+## Test-review follow-ups (turn 8)
+
+- [ ] **The `render-history-excerpt` tail-truncation branch (`max-history-chars`
+      = 4000) is untested — the design's "History-tail inclusion … tail-
+      truncated" behaviour has no covering test.** `render-history-excerpt`
+      has two branches: `(<= (count text) max-history-chars)` returns the full
+      excerpt, else `(subs text (- (count text) max-history-chars))` keeps the
+      *tail* (most-recent chars). `build-entity-resolution-prompt-test` only
+      exercises short histories (the `<=` branch), so the `subs` tail-cut is
+      never run. A regression that truncated from the head (`(subs text 0
+      max-history-chars)`, dropping the most-recent/most-relevant anaphora
+      context), off-by-one'd the bound, or dropped truncation entirely would
+      pass all current tests. The design's "History-tail inclusion" v1 policy
+      names truncation as a required behaviour (`auto-session-name`
+      sanitize/truncate precedent). Add a `build-entity-resolution-prompt` /
+      `render-history-excerpt` case with a history whose rendered lines exceed
+      `max-history-chars`, asserting the excerpt is length-bounded (≤
+      max-history-chars) and retains the *tail* (a marker in the last line is
+      present; a marker in an early, truncated-away line is absent).
+
+- [ ] **The augmenter does not catch exceptions from `run-helper`, and the
+      `stub` test-helper's `throw?` affordance is dead — the "helper run
+      fails → :no-op" contract is unverified for the exception path.**
+      Required behaviour item 5 lists "when … the helper run fails … return a
+      well-formed `:no-op`". `default-run-helper` catches its own internal
+      failures and returns nil (covered), but `entity-resolution-augmentation`
+      wraps neither `select-model` nor `run-helper` in try/catch, so an
+      injected-collaborator exception (or any future run-helper that throws
+      rather than returns nil) propagates uncaught out of the augmenter — a
+      thrown-from-a-collaborator failure is NOT the well-formed `:no-op` the
+      contract promises. The `stub` helper already defines a `throw?` branch
+      for exactly this scenario, but no test sets it, so it is dead test-helper
+      code. Either (a) remove the dead `throw?` branch from `stub`, or (b)
+      decide the augmenter should be defensive against a throwing helper: wrap
+      the helper run so an exception collapses to `:no-op`, and add a test
+      (using `stub {:throw? true}`) asserting a throwing helper yields a
+      well-formed `:no-op` rather than propagating. Pick one so the behaviour
+      and its test-affordance agree — currently the affordance exists but the
+      behaviour (and its test) do not.

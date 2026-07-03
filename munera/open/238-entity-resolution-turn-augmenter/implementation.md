@@ -1591,3 +1591,10 @@ Key decisions / discoveries:
     helper) covering the common settled-run close+untrack cleanup path.
 - `bb test --focus extensions.context-manager-test`: 36 tests, 110 assertions,
   0 failures. `clj-kondo` on the test ns: 0 errors, 0 warnings.
+
+## Test review (turn 8)
+
+- Applied `task-test-review` skill. Added 2 steps: untested
+  `render-history-excerpt` tail-truncation branch; and the un-caught
+  run-helper exception path vs. the dead `throw?` `stub` affordance (behaviour
+  ↔ test-affordance mismatch).
