@@ -1421,3 +1421,9 @@ Key decisions / discoveries:
 
 - **Docs/changelog**: `doc/extensions.md` context-manager section now describes
   both augmenters; CHANGELOG `[Unreleased] → Added` entry added.
+
+## Implementation review (turn 1)
+
+- added 4 follow-up steps: helper child inherits full default system prompt
+  (missing `:prompt-component-selection`), silently-ignored `:worktree-path`
+  arg, unchecked `agent-run-ok?`, and mapping-line regex parens/`;` fragility.
