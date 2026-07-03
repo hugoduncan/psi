@@ -1113,3 +1113,23 @@ Applied to `design.md`:
   new bound must cap.
 - If a future design-review pass runs again, treat the commit that lands this
   slice as the new prior-follow-up boundary for batch-baseline purposes.
+
+## Architecture review (design-review turn 1, ninth pass — post eighth-slice resolution)
+
+- no architectural review feedback. Re-checked the fully-resolved bash-only
+  design.md (0 unchecked design-steps items) against AGENTS.md (VSM),
+  ramora/META.md, and doc/architecture.md. Core invariants preserved: data-only
+  extension envelope + no parent mutation + replay determinism (237/S5),
+  unchanged capability gating (`:psi.capability/turn-augmentation`), extension
+  isolation via existing `create-child-session` `:tool-ids` + existing `bash`
+  tool (no new child/run API, no new tool surface), and `psi/ai` dep matching
+  `auto-session-name` precedent.
+- The two eighth-slice resolution edits introduce no new architectural surface:
+  the bounded-helper-loop bullet collapses bound-exhaustion into the existing
+  failed-run `:no-op` (finite blocking latency, no new invariant/effect path);
+  the Goal additive-wiring citation repoint is documentation wording only.
+- Considered and not re-filed: bash-safety-via-prompt-constraints tension with
+  `impossible_invalid_states` — already classified in the eighth pass as a
+  frozen, user-directed scope decision with a structural boundary via
+  app-runtime effective-policy; re-raising would re-litigate frozen scope.
+- No `SCOPE_QUESTION:` raised. No new design step added this pass.
