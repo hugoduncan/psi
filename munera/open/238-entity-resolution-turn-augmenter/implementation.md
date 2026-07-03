@@ -36,3 +36,13 @@ Context loaded for later ambiguity/inconsistency turns in this session:
   model-judged relevance mid-conversation — confirms `:skill-names` alone
   cannot be assumed to deterministically apply `entity-resolution`'s method
   to a helper session driven by arbitrary parent-turn user text.
+
+## Inconsistency review (design-review turn 3)
+
+- inconsistency review added 2 new design steps: (1) Goal's "already-shipped"
+  framing of the auto-session-name pattern overclaims — that pattern's
+  helper session is toolless, but this design needs a tool-enabled
+  evidence-gathering helper session, which is new work; (2) the Tests list
+  in Acceptance criteria omits a test for "failed/empty helper runs → no-op"
+  even though that no-op condition is explicitly required one paragraph
+  above it. See design-steps.md.

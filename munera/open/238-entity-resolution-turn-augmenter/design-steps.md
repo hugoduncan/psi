@@ -46,3 +46,37 @@
   mechanism and the expected helper-model output contract before/while
   implementing, since both affect testability of the confident-mapping vs.
   ambiguous-dropped vs. no-referring-expression acceptance-criteria cases.
+
+- [ ] Inconsistent: the Goal section frames both reused mechanisms as
+  "already-shipped," specifically citing "the local-model helper-session
+  pattern from `extensions/auto-session-name` (model selection ...,
+  `create-child-session` + `run-agent-loop-in-session`, and
+  `helper-session-ids` recursion avoidance)." But the pattern this task
+  actually needs — a helper session that calls a read-only search toolset to
+  gather evidence — is not what's shipped: `auto-session-name`'s helper
+  session runs with `:tool-ids []` (no tools at all; a toolless single-shot
+  title-inference completion). The "minimal read-only search toolset (file
+  read + directory list + content grep)" required by Required behaviour
+  item 3 / Resolved decision 2 / Constraints is new work — today only a
+  single-file `read` tool exists without `bash`
+  (`make-read-only-tools-with-cwd` in
+  `components/agent-session/src/psi/agent_session/tools.clj`), with no
+  directory-list or grep tool. Reconcile the Goal's "already-shipped" framing
+  with the fact that the tool-enabled evidence-gathering half of the pattern
+  is new, so a later reader/implementer doesn't under-scope the toolset work
+  based on the Goal section alone.
+
+- [ ] Inconsistent: the "no-op" requirement list and the "Tests" list in
+  Acceptance criteria don't match. The no-op requirement says: "The augmenter
+  returns a well-formed `:no-op` (no operations) for: tracked helper
+  sessions, blank effective-cwd, prompts with no detectable referring
+  expression, no confident mapping, and **failed/empty helper runs**." The verbatim
+  "Tests (Scry-first) cover" list immediately below enumerates: confident
+  single mapping → success block; no referring expression → no-op;
+  helper-session recursion no-op; blank cwd no-op; no-local-model → no-op;
+  ambiguous reference dropped; and replay reuse — with **no test for
+  failed/empty helper runs → no-op**, even though that scenario is a
+  distinct code path (helper-session-run failure/empty result handling, not
+  mapping-confidence filtering) called out one paragraph earlier. Add a
+  failed/empty-helper-run → no-op test to the Tests list, or state why it's
+  not needed.
