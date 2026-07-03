@@ -304,3 +304,38 @@ design-review batch (commits `ac659bce7`..`1ef1a8d50`, baseline
   extension-dependency precedent (not an isolation violation; already
   established practice, not new).
 - No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
+
+## Inconsistency review (design-review turn 3, third pass)
+
+- no inconsistency review feedback. Checked, and found consistent (no new
+  finding):
+  - The no-op enumeration in Required behaviour item 5, "Remaining v1
+    policies," Acceptance criteria, and the Tests list all still agree
+    (six reasons, slash-command-only listed as a distinct pre-filter path
+    that collapses into the "no referring expression" outcome only for
+    labeling purposes, per the deliberate "otherwise" wording in Required
+    behaviour item 5) — no drift since the `42dbf2086`/`b7f717e33` fixes.
+  - `:content` field composition (3 fields, confidence dropped) still reads
+    the same way in Resolved decision 6, "Remaining v1 policies," and
+    Acceptance criteria.
+  - Cross-checked design.md's cited 237 input-contract field names
+    (`:turn-augmentation/user-text`, `:turn-augmentation/user-message`,
+    `:turn-augmentation/effective-cwd`, `:turn-augmentation/session`,
+    `:turn-augmentation/history`, `:turn-augmentation/session-id`,
+    `:turn-augmentation/turn-id`, `:turn-augmentation/workflow-run-id`)
+    against `dispatch_effects.clj`'s `turn-projection` construction (~line
+    408) — exact match, no stale/renamed field.
+  - Cross-checked design.md's claim that 237 "explicitly excludes
+    interactive pre-turn prompts" against
+    `munera/closed/237-pre-turn-request-augmentation/design.md`'s own Out
+    of scope list ("Interactive user prompts during pre-turn
+    augmentation.") — accurate, not fabricated.
+  - Cross-checked `:turn-augmentation/child-session-ids` provenance and
+    `:turn/augmentation-context` message id against
+    `psi.turn-runtime.augmentation` — both real, matching keys.
+  - The already-known References-section staleness ("resolution method and
+    output shape" overclaiming that `SKILL.md`'s Output Shape section is
+    used) was previously identified and intentionally left unfiled as a
+    duplicate of the already-resolved skill-embedding-scope item; not
+    re-raised here.
+- No `SCOPE_QUESTION:` raised — no scope-boundary concern found.
