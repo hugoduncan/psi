@@ -181,7 +181,7 @@
 
 ## Follow-up (implementation review, round 3)
 
-- [ ] `known-helper-session-names` (`extensions/context_manager.clj`) is a
+- [x] `known-helper-session-names` (`extensions/context_manager.clj`) is a
       fixed literal set `#{"entity-resolution" "friction-analysis"}`, but the
       runtime's actual workflow-step child sessions are named dynamically as
       `(str "workflow " step-id " attempt")` (confirmed:
@@ -202,7 +202,7 @@
       `str/starts-with? "workflow "` check, or a shared regex) in addition
       to the fixed literal set, and add a test using a realistic
       `"workflow builder attempt"`-style session-name.
-- [ ] `friction-history-turn-count` (4) is documented as "Number of
+- [x] `friction-history-turn-count` (4) is documented as "Number of
       most-recent turns fed to the friction helper" and design.md's AC1
       requires analysis of "the last 4 turns", but `default-fetch-history`
       builds its `:tail` from `:psi.agent-session/message-history` — one

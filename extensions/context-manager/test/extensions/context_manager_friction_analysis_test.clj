@@ -96,6 +96,14 @@
                                                             :session-name "entity-resolution"})}))]
       (is (= :no-op (:status result))))))
 
+(deftest other-known-workflow-step-session-excluded-test
+  (testing "a workflow-runtime step-attempt child session is excluded by naming convention"
+    (let [result (context-manager/friction-analysis
+                  {} {:session-id "s3"}
+                  (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                            :session-name "workflow builder attempt"})}))]
+      (is (= :no-op (:status result))))))
+
 (deftest cap-applied-test
   (testing "3 detected issues yield only 2 created tasks (per-run cap)"
     (let [three-issues (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"

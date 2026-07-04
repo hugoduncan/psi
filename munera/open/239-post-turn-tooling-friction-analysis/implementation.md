@@ -712,3 +712,39 @@
   aren't actually excluded per AC5; and `friction-history-turn-count`
   bounds raw messages, not conversational turns, undercounting AC1's
   "last 4 turns" for tool-heavy turns.
+
+## Follow-up execution (post-review pass, round 3)
+
+- addressed 2 review steps:
+  - Added `friction/workflow-step-session?` (`friction.clj`) matching the
+    workflow runtime's dynamic `"workflow <step-id> attempt"` child-session
+    naming convention (`str/starts-with?`/`str/ends-with?`), and wired it
+    into `known-helper-session?` alongside the existing fixed-literal
+    check. Added `other-known-workflow-step-session-excluded-test`
+    (`context_manager_friction_analysis_test.clj`) using a realistic
+    `"workflow builder attempt"` session-name. Updated `doc/extensions.md`
+    to name workflow-step-attempt sessions as an excluded example.
+  - Added `friction/group-into-turns`/`friction/last-n-turns` (pure,
+    grouping raw messages on `:role :user` boundaries) and switched
+    `default-fetch-history` to bound its query result to
+    `friction-history-turn-count` *turns* via `last-n-turns` before
+    rendering, instead of `take-last`-ing raw messages via
+    `render-history-excerpt`'s `turn-count` arg (now called with `nil`,
+    since the message list is already turn-bounded). Updated
+    `friction-history-turn-count`'s docstring to state it counts turns, not
+    messages. Added `group-into-turns-test`/`last-n-turns-test`
+    (`context_manager_friction_collaborators_test.clj`) and a
+    `default-fetch-history` tool-heavy-turn test demonstrating a
+    multi-message turn is no longer undercounted.
+  - Kept `extensions/context_manager.clj` at the 800-line file-length
+    ratchet (moved the workflow-step-name predicate into `friction.clj`
+    and trimmed docstrings) rather than raising the ratchet.
+  - Verification: `clojure -M:test --focus extensions` → 342 tests, 1336
+    assertions, 0 failures (up from 339/1325). `clj-kondo --lint` clean on
+    all changed src/test files. `clj-paren-repair` clean. Full `bb test`:
+    same pre-existing unrelated failure set as before (57 files under
+    `.scry-results`, none in `extensions.context-manager*`).
+- steps.md: both round-3 follow-up items checked off; no items remain
+  unchecked in that section.
+
+- addressed 2 review steps

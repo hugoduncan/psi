@@ -541,15 +541,15 @@
   2)
 
 (defn- known-helper-session?
-  "True when `session-id` is one of this analyzer's own tracked helper
-   sessions, the entity-resolution augmenter's tracked helper sessions, or
-   (via `session-info`, a `{:worktree-root .. :session-name ..}` map or
-   nil) identifiable by name as another known helper/infra session."
+  "True when `session-id` is a tracked helper session (own, or entity-
+   resolution's) or `session-info` names another known helper/infra
+   session (fixed literal or `friction/workflow-step-session?` dynamic)."
   [session-id session-info]
   (boolean
    (or (contains? @friction-helper-session-ids session-id)
        (contains? @entity-resolution-helper-session-ids session-id)
-       (contains? known-helper-session-names (:session-name session-info)))))
+       (contains? known-helper-session-names (:session-name session-info))
+       (friction/workflow-step-session? (:session-name session-info)))))
 
 (defn- default-friction-run-helper
   "Run the friction-detection+dedup helper as a bounded, no-tools child
@@ -569,15 +569,16 @@
 
 (defn- default-fetch-history
   "Real `:fetch-history` collaborator: query the session's raw message
-   history via EQL and render a bounded, tail-truncated excerpt of the last
-   `friction/friction-history-turn-count` turns (design.md: 'Analysis
-   input')."
+   history via EQL, bound to the last `friction/friction-history-turn-
+   count` turns (`friction/last-n-turns`; design.md AC1), and render a
+   bounded, char-capped excerpt."
   [api session-id]
   (let [messages (:psi.agent-session/message-history
                   ((:query-session api) session-id [:psi.agent-session/message-history]))
+        recent   (friction/last-n-turns messages friction/friction-history-turn-count)
         tail     (mapv (fn [m] {:role (:role m) :snippet (friction/message-snippet m)})
-                       messages)]
-    (render-history-excerpt {:tail tail} friction/friction-history-turn-count max-history-chars)))
+                       recent)]
+    (render-history-excerpt {:tail tail} nil max-history-chars)))
 
 (defn- default-session-info
   "Real `:session-info` collaborator: the analyzed session's own effective

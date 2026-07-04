@@ -13,8 +13,10 @@
 ;; ---------------------------------------------------------------------------
 
 (def friction-history-turn-count
-  "Number of most-recent turns fed to the friction helper (design.md:
-   'Analysis input'). Public: also used by the ns's real `:fetch-history`
+  "Number of most-recent *conversational turns* (grouped via
+   [[last-n-turns]] on `:role :user` boundaries — not raw messages) fed to
+   the friction helper (design.md AC1: 'Analysis input', 'the last 4
+   turns'). Public: also used by the ns's real `:fetch-history`
    collaborator (slice 4) to bound the raw message-history query."
   4)
 
@@ -316,6 +318,52 @@
        (filter #(= :text (:type %)))
        (map :text)
        (str/join " ")))
+
+(defn group-into-turns
+  "Group a flat seq of raw agent-core messages (`{:role .. :content ..}`)
+   into per-turn groups, where a new turn begins at each `:role :user`
+   message. Any messages preceding the first `:user` message (unusual, but
+   possible) form their own leading group. Returns a vector of message
+   vectors, in original order — used by [[last-n-turns]] to bound the
+   friction helper's input to a number of *conversational turns* rather
+   than a number of raw messages (a single turn can span several raw
+   messages: one user message plus any number of assistant/tool-call/
+   tool-result messages before the next user message)."
+  [messages]
+  (reduce
+   (fn [turns message]
+     (if (or (empty? turns) (= :user (:role message)))
+       (conj turns [message])
+       (conj (pop turns) (conj (peek turns) message))))
+   []
+   messages))
+
+(defn workflow-step-session?
+  "True when `session-name` matches the workflow runtime's dynamic
+   step-attempt child-session naming convention `\"workflow <step-id>
+   attempt\"` (`statechart_runtime.clj`'s `create-step-attempt-session!`),
+   e.g. \"workflow builder attempt\". Used by `known-helper-session?` to
+   exclude 'other workflow helper sessions' (design.md, AC5) — these names
+   are never in the fixed `known-helper-session-names` literal set, since
+   they're parameterized on `step-id`."
+  [session-name]
+  (boolean
+   (and session-name
+        (str/starts-with? session-name "workflow ")
+        (str/ends-with? session-name " attempt"))))
+
+(defn last-n-turns
+  "The raw messages belonging to the last `n` turns of `messages` (see
+   [[group-into-turns]]), flattened back into a single ordered seq — bounds
+   `default-fetch-history`'s query result to `friction-history-turn-count`
+   *turns* (design.md AC1: 'the last 4 turns'), not the last N raw
+   messages (a prior gap: `take-last` on the raw tail undercounted turns
+   whenever a turn contained more than one message, e.g. any tool-heavy
+   turn). `n` nil or non-positive returns all `messages` unchanged."
+  [messages n]
+  (if (and n (pos? n))
+    (->> (group-into-turns messages) (take-last n) (apply concat) vec)
+    (vec messages)))
 
 (defn session-info-of
   "Build the `:session-info` collaborator's `{:worktree-root ..
