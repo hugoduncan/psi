@@ -1,6 +1,7 @@
 {:deps
  {psi/auto-session-name {}
   psi/commit-checks     {}
+  psi/context-manager   {}
   psi/edit-clj          {}
   psi/github            {}
   psi/logprobs          {}
