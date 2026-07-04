@@ -703,3 +703,12 @@
     under `.scry-results`, none in `extensions.context-manager*`).
 - steps.md: both round-2 follow-up items checked off; no items remain
   unchecked in that section.
+
+## Implementation review, round 3 (task-implementation-review skill)
+
+- Added 2 follow-up steps to steps.md: `known-helper-session-names`'s fixed
+  literal set doesn't match real workflow-step child session names
+  (`"workflow <step-id> attempt"`), so "other workflow helper sessions"
+  aren't actually excluded per AC5; and `friction-history-turn-count`
+  bounds raw messages, not conversational turns, undercounting AC1's
+  "last 4 turns" for tool-heavy turns.

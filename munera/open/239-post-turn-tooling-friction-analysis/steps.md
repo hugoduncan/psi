@@ -178,3 +178,46 @@
       `#'context-manager/...` unit tests
       (`context_manager_model_selection_test.clj`,
       `context_manager_helper_runtime_test.clj`).
+
+## Follow-up (implementation review, round 3)
+
+- [ ] `known-helper-session-names` (`extensions/context_manager.clj`) is a
+      fixed literal set `#{"entity-resolution" "friction-analysis"}`, but the
+      runtime's actual workflow-step child sessions are named dynamically as
+      `(str "workflow " step-id " attempt")` (confirmed:
+      `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj:179`,
+      e.g. `"workflow builder attempt"`, `"workflow reviewer attempt"`). None
+      of these match the fixed literal set, so `known-helper-session?`'s
+      name-based backstop does not actually exclude "other workflow helper
+      sessions" as design.md's Scope-of-sessions decision and AC5 require
+      (design.md explicitly gives "other workflow helper sessions" as an
+      example of what must be excluded; AC7's test list requires "other
+      known helper/infra session excluded" coverage) — the friction analyzer
+      will run on essentially every delegate/workflow-step child session
+      (builder, reviewer, planner, sub-agent, etc.), the opposite of the
+      intended exclusion. The existing
+      `other-known-helper-session-excluded-test` only exercises the literal
+      `"entity-resolution"` name, so it doesn't catch this gap. Match the
+      `"workflow "`/`" attempt"` naming convention (e.g. a
+      `str/starts-with? "workflow "` check, or a shared regex) in addition
+      to the fixed literal set, and add a test using a realistic
+      `"workflow builder attempt"`-style session-name.
+- [ ] `friction-history-turn-count` (4) is documented as "Number of
+      most-recent turns fed to the friction helper" and design.md's AC1
+      requires analysis of "the last 4 turns", but `default-fetch-history`
+      builds its `:tail` from `:psi.agent-session/message-history` — one
+      entry per *raw* agent-core message (user/assistant/tool-call/
+      tool-result), not one per conversational turn (compare
+      `build-augmentation-history-projection` in
+      `components/agent-session/src/psi/agent_session/dispatch_effects.clj`,
+      which the entity-resolution augmenter's equivalent `:tail` input also
+      uses — same one-entry-per-raw-message granularity). `render-history-
+      excerpt`'s `turn-count` arg then does `take-last 4` on that
+      per-message tail, i.e. the friction helper actually sees the last 4
+      raw messages, not the last 4 conversational turns — for any
+      tool-heavy turn (several tool calls/results before a final reply) this
+      can be far less context than 4 real turns, undermining AC1's intent.
+      Either group raw messages into turn boundaries before taking the last
+      4, or rename/redocument `friction-history-turn-count` to reflect that
+      it bounds messages, not turns, and re-confirm the resulting window
+      still satisfies AC1's intent.
