@@ -243,3 +243,29 @@
   Constraints defines rather than restating it, matching the resolution
   already accepted in round 1 (inconsistency turn 3) for the Goal-wording
   fix; no other Decisions/Constraints/AC/Open-questions mismatch found.
+
+## Round 4 outcome (all three review turns — no design-steps added)
+
+- design-steps.md has zero unchecked items after round 4: architectural,
+  ambiguity, and inconsistency turns all found design.md unchanged and
+  fully consistent since the round-3 follow-up commits. There is no
+  design-steps follow-up task to perform for this round — design.md needs
+  no further edits before planning/implementation proceeds.
+- If a future review round does add new unchecked items, follow the same
+  pattern used for rounds 1–3 (see the "Design-follow-up completion"
+  entries above): resolve each by editing design.md directly (these have
+  all been wording/decision clarifications, not code changes), then check
+  the item off in design-steps.md, confirming the batch's baseline commit
+  via `git diff <parent-of-oldest-adding-commit>..HEAD -- design-steps.md`
+  before starting.
+- Remaining explicitly-deferred (not ambiguous) planning-stage decisions to
+  carry forward, already stated in design.md itself: (1) ctx-keyed-managed-
+  service vs. extension-local `defonce` atom for the recursion-guard state
+  (`ramora/META.md` process-scoped-managed-service principle applies), and
+  (2) exact duplicate-matching mechanism (model-judged vs. slug similarity).
+  Neither needs a design-steps entry — both are already framed in
+  design.md's Decisions/Open-questions as planning's job, not design's.
+- No new non-task files were read this round beyond what's already listed
+  in earlier "Notes for addressing ... design-steps" sections
+  (`ramora/META.md`, `AGENTS.md`, `doc/architecture.md`,
+  `extensions/context-manager/src/extensions/context_manager.clj`).
