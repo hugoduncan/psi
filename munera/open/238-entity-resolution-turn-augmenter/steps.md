@@ -1371,7 +1371,7 @@
 
 ## Test-review follow-ups (turn 23 — test-shaper)
 
-- [ ] **`parse-mapping-lines` has no test for list-marker-prefixed mapping
+- [x] **`parse-mapping-lines` has no test for list-marker-prefixed mapping
       lines — the single most common markdown-model output shape — and the
       current behaviour silently leaks the marker into the injected `:surface`
       field, an untested and arguably-wrong contract on the parser's central
@@ -1400,3 +1400,11 @@
       change rather than a silent one. Prefer (a): the surface field is
       re-rendered verbatim into the parent-visible block, and a leaked list
       marker misrepresents the resolved referring expression.
+      DONE: chose (a) — added `strip-list-marker` (via `list-marker-re`,
+      matching a leading `-`/`*`/`+`/`N.`/`N)` marker plus following
+      whitespace), applied to the arrow-split prefix in `parse-mapping-line`
+      so `:surface` is the bare referring expression, not the list marker.
+      Added a `parse-mapping-lines-test` case asserting `- `, `* `, `N. `,
+      and `N) ` marker-prefixed lines all yield the bare `:surface`
+      ("the resolver"), pinning marker stripping so a leaked list marker in
+      the parent-visible block is caught.

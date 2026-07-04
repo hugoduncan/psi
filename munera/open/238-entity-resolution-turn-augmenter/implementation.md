@@ -1911,3 +1911,13 @@ Key decisions / discoveries:
   `:surface`, so the injected block renders a mis-attributed referring
   expression. The surface-field contract on the parser's primary real-world
   input is unguarded — decide strip-vs-keep and pin it.
+
+## Turn-23 test-review follow-up addressed
+
+- addressed 1 test-review follow-up (turn 23): chose option (a) — strip a
+  leading list marker (`-`/`*`/`+`/`N.`/`N)`) from mapping lines in
+  `parse-mapping-line` (`strip-list-marker`/`list-marker-re`) before the
+  arrow split so `:surface` is the bare referring expression, not list
+  formatting leaked into the parent-visible block. Pinned by a new
+  `parse-mapping-lines-test` case. Focused suite green (33 tests, 143
+  assertions, 0 failures); clj-kondo clean.

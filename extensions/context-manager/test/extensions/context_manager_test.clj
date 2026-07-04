@@ -319,6 +319,31 @@
     (is (= [] (context-manager/parse-mapping-lines
                "the fn → foo/bar (exact path)"))))
 
+  (testing "leading list marker is stripped from surface (markdown-list model output)"
+    ;; A local model told to "emit one line per confident mapping" routinely
+    ;; emits a markdown list. The marker is list formatting, not part of the
+    ;; referring expression, so it must not leak into :surface (which is
+    ;; re-rendered verbatim into the parent-visible block).
+    (is (= [{:surface "the resolver"
+             :canonical "foo/bar.clj"
+             :evidence "exact path"
+             :confidence "high"}]
+           (context-manager/parse-mapping-lines
+            "- the resolver → foo/bar.clj (exact path; high)"))
+        "unordered `- ` marker stripped")
+    (is (= "the resolver"
+           (:surface (first (context-manager/parse-mapping-lines
+                             "1. the resolver → foo (exact; high)"))))
+        "ordered `N. ` marker stripped")
+    (is (= "the resolver"
+           (:surface (first (context-manager/parse-mapping-lines
+                             "2) the resolver → foo (exact; high)"))))
+        "ordered `N) ` marker stripped")
+    (is (= "the resolver"
+           (:surface (first (context-manager/parse-mapping-lines
+                             "* the resolver → foo (exact; high)"))))
+        "unordered `* ` marker stripped"))
+
   (testing "zero well-formed lines yields empty vector"
     (is (= [] (context-manager/parse-mapping-lines "no lines here at all")))
     (is (= [] (context-manager/parse-mapping-lines nil)))))

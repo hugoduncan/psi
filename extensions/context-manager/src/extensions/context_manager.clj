@@ -245,15 +245,32 @@
               (neg? depth)  nil
               :else         (recur (dec i) depth))))))))
 
+(def ^:private list-marker-re
+  ;; Leading markdown/ordered list marker (`- `, `* `, `+ `, `1. `, `2) `)
+  ;; plus following whitespace. A local model told to "emit one line per
+  ;; confident mapping" routinely emits a markdown list; the marker is list
+  ;; formatting, not part of the referring expression, so it is stripped
+  ;; before the arrow split to keep `:surface` the bare reference.
+  #"^\s*(?:[-*+]|\d+[.)])\s+")
+
+(defn- strip-list-marker
+  "Strip a leading ordered/unordered list marker (and following whitespace)
+   from `s` so the captured surface is the bare referring expression, not a
+   list marker the parent-visible block would otherwise show verbatim."
+  [s]
+  (str/replace-first s list-marker-re ""))
+
 (defn- parse-mapping-line
   "Parse a single line into a confident mapping map, or nil.
 
    A line is a mapping only when it (a) contains an arrow, (b) ends in a
    balanced `(evidence; confidence)` group whose inner text contains a `;`,
-   and (c) yields a non-empty trimmed surface *and* canonical. Evidence is
-   everything up to the *last* `;` (so evidence may contain `;`), and both
-   evidence and confidence must be non-empty, and both surface and canonical
-   must have balanced parentheses. Degenerate lines (empty
+   and (c) yields a non-empty trimmed surface *and* canonical. A leading list
+   marker (`- `, `* `, `+ `, `N. `, `N) `) is stripped first so `:surface` is
+   the bare reference, not the list formatting. Evidence is everything up to
+   the *last* `;` (so evidence may contain `;`), and both evidence and
+   confidence must be non-empty, and both surface and canonical must have
+   balanced parentheses. Degenerate lines (empty
    surface/canonical/evidence/confidence, no balanced trailing group, or an
    incidental code-shaped arrow-plus-clause line whose surface/canonical has
    unbalanced parens) are rejected so no guessed/bogus entity is emitted."
@@ -263,7 +280,7 @@
       (when semi
         (let [evidence   (str/trim (subs inner 0 semi))
               confidence (str/trim (subs inner (inc semi)))
-              parts      (str/split prefix arrow-re 2)]
+              parts      (str/split (strip-list-marker prefix) arrow-re 2)]
           (when (= 2 (count parts))
             (let [surface   (str/trim (first parts))
                   canonical (str/trim (second parts))]
