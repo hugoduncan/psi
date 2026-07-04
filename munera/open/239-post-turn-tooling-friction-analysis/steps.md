@@ -5,6 +5,58 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 7)
+
+- [ ] `friction/group-into-turns` (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      splits turns via `(= :user (:role message))` — a keyword comparison —
+      but real agent-core messages persist `:role` as the *string*
+      `"user"`/`"assistant"`, not a keyword: confirmed at
+      `components/ai/src/psi/ai/providers/anthropic.clj:631`,
+      `components/ai/src/psi/ai/providers/openai/chat_completions.clj:114`
+      and `:491`, `components/agent-session/src/psi/agent_session/turn/handlers.clj:24`,
+      `components/agent-session/src/psi/agent_session/dispatch_effects.clj:93`,
+      and `components/agent-session/src/psi/agent_session/turn.clj:92` (all
+      construct `{:role "user"/"assistant" ...}`), and by the existing
+      237/238 history-projection test fixture's own comment "real 237
+      projection shape" using `:role "user"` string values
+      (`context_manager_test.clj:361-365`). No normalization step converts
+      role to a keyword before `default-fetch-history`'s EQL query result
+      reaches `group-into-turns`. Reproduced directly: 40 real-shaped
+      messages (20 turns, `:role "user"`/`"assistant"` strings) group into
+      **1** turn via `group-into-turns`, versus 20 groups for the same data
+      shaped with keyword roles. In production this means every message
+      after the first is merged into one giant "turn", so
+      `last-n-turns`/`friction-history-turn-count` (4) bounds nothing beyond
+      `bounded-message-tail`'s 200-raw-message cap — contradicting AC1's
+      "last 4 turns" intent and silently undoing the round-3 follow-up's
+      stated fix. The friction-collaborators test suite doesn't catch this
+      because its message fixtures use keyword `:role :user`/`:assistant`
+      (invented shape), not the real string-role shape. Fix the boundary
+      check to match the real value (e.g. `(= "user" (name (:role
+      message)))`), and update `group-into-turns`/`last-n-turns`/
+      `default-fetch-history`'s test fixtures to use string roles so the
+      test suite actually exercises the production shape.
+- [ ] `friction/message-snippet` only extracts `{:type :text :text ..}`
+      content blocks, silently dropping `{:type :error ...}` blocks — the
+      exact representation used throughout the codebase for provider/tool
+      failures and timeouts (`components/ai/src/psi/ai/providers/anthropic/error.clj:132`,
+      `components/ai/src/psi/ai/providers/openai/transport.clj:168`,
+      `components/turn-runtime/src/psi/turn_runtime/core.clj:172,249,291`,
+      `components/agent-session/src/psi/agent_session/turn.clj:93`,
+      `components/agent-session/src/psi/agent_session/turn/handlers.clj:126`,
+      `components/agent-session/src/psi/agent_session/dispatch_effects.clj:94`,
+      `components/workflow_runtime/src/psi/workflow_runtime/turn_execution_contract.clj:160`).
+      Since design.md's own "Issue definition" names "tool errors/retries"
+      as a primary friction example, the analyzer's history excerpt
+      currently hides exactly the signal it's meant to detect. Extend
+      `message-snippet` to also surface `:type :error` block text (its
+      `:text` key), or delegate to the more complete
+      `psi.agent-session.message-text/content-error-parts` /
+      `content-display-text` (already used by the pre-turn 237 projection
+      this analyzer's history rendering is otherwise modelled on) —
+      weighing that against the deliberate classpath-isolation choice noted
+      in slice 4's implementation.md entry.
+
 ## Follow-up (implementation review, round 6)
 
 - [x] `friction-analysis`'s per-session in-flight guard

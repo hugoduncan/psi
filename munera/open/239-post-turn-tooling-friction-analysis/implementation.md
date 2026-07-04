@@ -864,3 +864,14 @@
     `.scry-results`, none in `extensions.context-manager*`).
 - steps.md: both round-4 follow-up items checked off; no items remain
   unchecked in that section.
+
+## Implementation review, round 7 (task-implementation-review skill)
+
+- Added 2 follow-up steps to steps.md: `group-into-turns`'s turn-boundary
+  check compares `:role` against the keyword `:user`, but real agent-core
+  messages persist `:role` as the string `"user"`/`"assistant"` — confirmed
+  by direct repro (20 real turns collapse into 1 group) — silently undoing
+  the round-3 fix's "last 4 turns" intent in production even though its own
+  tests (which use keyword-role fixtures) pass; and `message-snippet` drops
+  `:type :error` content blocks, hiding the "tool errors" friction signal
+  design.md itself names as a primary example.
