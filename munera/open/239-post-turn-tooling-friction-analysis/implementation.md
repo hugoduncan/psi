@@ -1,4 +1,10 @@
-- architectural review (design-review turn 1) added 1 new design step: the
+- steps.md: both round-4 follow-up items checked off; no items remain
+  unchecked in that section.
+
+## Implementation review, round 5 (task-implementation-review skill)
+
+- Added 1 follow-up step to steps.md: `doc/extensions.md` was not updated
+  for the round-4 follow-up's per-session in-flight guard.- architectural review (design-review turn 1) added 1 new design step: the
   planned recursion-guard atom copies the extension-local `helper-session-ids`
   pattern rather than the ctx-keyed managed-service model documented in
   `ramora/META.md`. Reviewed against AGENTS.md, ramora/META.md, and

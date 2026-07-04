@@ -1,4 +1,24 @@
-# Steps — 239 post-turn tooling-friction analysis
+      race is only guarded against for id-collision (the `next-free-task-id`
+      retry loop), not for two concurrent runs on the same session both
+      passing their own dedup check for the same underlying issue. Consider
+      a per-session in-flight guard (e.g. skip/coalesce a new run for
+      `session-id` while a previous run for that same `session-id` is still
+      in flight).
+
+## Follow-up (implementation review, round 5)
+
+- [ ] `doc/extensions.md`'s context-manager friction-analyzer section
+      (updated through the round-3 follow-up — see commit `b24ea45df`,
+      which added the "workflow-runtime step-attempt child sessions"
+      exclusion wording) was not updated for the round-4 follow-up (commit
+      `e9be80a20`), which added the per-session in-flight guard
+      (`friction-in-flight-session-ids`): a second `session_turn_finished`
+      analysis for the same session is now skipped/no-op'd while a prior
+      run for that session is still in flight. This is user-observable
+      behaviour (fewer/no duplicate tasks from closely-spaced turns on the
+      same session) not described anywhere in `doc/extensions.md`. Add a
+      short bullet describing the in-flight-run guard, alongside the
+      existing scope/cap/dedup bullets.# Steps — 239 post-turn tooling-friction analysis
 
 ## Slice 1 — pure core
 
