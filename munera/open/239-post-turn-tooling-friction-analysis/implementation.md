@@ -85,3 +85,33 @@
   `extensions/context-manager/src/extensions/context_manager.clj` (existing
   `helper-session-ids`/`entity-resolution-helper-session-ids` atoms and
   `session_turn_finished` subscription this design extends).
+
+## Notes for addressing round-2 design-steps (3 open items)
+
+- Baseline: all 3 open items were added in this round-2 batch (ambiguity
+  turn-2 x2, inconsistency turn-3 x1); none pre-date it, so all 3 are
+  in-scope to resolve together.
+- All 3 remain design.md wording/decision edits, not code changes — same
+  resolution pattern as round 1 (edit design.md, then check off in
+  design-steps.md).
+- The two ambiguity items (recently-closed window; whether dedup runs inside
+  the same helper-session call as detection or a separate one) are coupled:
+  resolving "one helper session, two phases (detect + dedup-match)" vs.
+  "two helper sessions" affects how a recently-closed lookback would be
+  implemented/tested, so decide the helper-session-shape question first, then
+  state the recently-closed window in terms of that shape (e.g. "closed
+  within the current recursion-guard/analysis-session lifetime" vs. an
+  absolute time bound) — don't fix the window wording before the shape
+  decision or it may need re-wording afterward.
+- The inconsistency item (AC5/AC7 not reflecting the broadened
+  Scope-of-sessions exclusion) is independent of the two ambiguity items —
+  it's a pure sync-up of Acceptance criteria wording to already-decided
+  Decisions text; resolve by adding the "other extensions'/runtime's known
+  helper/infra sessions" phrase to AC5 and to the AC7 test list, mirroring
+  the Decisions section's existing phrasing rather than inventing new
+  wording.
+- Keep edits minimal/localized (same `AGENTS.md` guidance as round 1) — don't
+  use these steps as a reason to restate or reorganize the whole Decisions/
+  Acceptance criteria sections.
+- No new non-task files needed beyond those already listed above for round 1;
+  these 3 items are resolvable from design.md content alone.
