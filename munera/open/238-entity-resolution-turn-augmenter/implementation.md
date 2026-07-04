@@ -1951,3 +1951,11 @@ Key decisions / discoveries:
   bullet to describe the pre-turn turn augmenters (project-context +
   entity-resolution / `Resolved entities` block) and link to doc/extensions.md;
   README now consistent with doc/extensions.md + CHANGELOG. Docs-only change.
+
+## Docs review (turn 27 — review-task-docs)
+
+- added 0 steps. README, doc/extensions.md, and CHANGELOG [Unreleased] verified
+  accurate/complete/consistent against the shipped implementation (block
+  titles/ids, local-only single-attempt selection, bash-only grant, wall-clock
+  bound vs prompt-only round cap, no-op reasons). Prior turn-25/26 README fix
+  closed the only real gap; no new actionable docs issues.
