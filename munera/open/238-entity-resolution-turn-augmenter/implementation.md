@@ -1861,3 +1861,9 @@ Key decisions / discoveries:
   a — the documented intended behaviour); scoped the turn-15 `<= 4000`
   assertion to the multi-line case. Length-bound contract is now one coherent
   tested pair. Focused tests + clj-kondo clean.
+
+## Test-review note (turn 21)
+
+- Added 1 step: slash-command-only pre-filter has only a positive case and no
+  mid-string-`/` negative-boundary test, so a mis-anchored predicate
+  regression that disables the augmenter for path-like prompts would pass.

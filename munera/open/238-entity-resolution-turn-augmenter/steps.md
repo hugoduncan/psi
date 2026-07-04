@@ -1288,3 +1288,33 @@
       wording) so the length-bound contract is now one coherent, tested pair:
       multi-line ⇒ bounded (drop leading lines); single-over-limit ⇒
       kept-whole exception.
+
+## Test-review follow-ups (turn 21)
+
+- [ ] **The slash-command-only pre-filter has only one positive case
+      (`"/status"`) and no negative-boundary test, leaving the augmenter's
+      central purpose — resolving path-like references — unguarded against a
+      mis-anchored predicate.** `entity-resolution-slash-command-only-no-op-test`
+      pins that `"/status"` (a leading-slash whole-turn text) pre-filters to
+      `:no-op` with no model selected and no helper created. But the
+      *discriminating* case is the opposite: a normal prompt that merely
+      *contains* a `/` mid-string — e.g. `"look at src/foo"` or
+      `"fix components/pathom/resolver.clj"`, exactly the path-like references
+      this augmenter exists to resolve — must **not** be pre-filtered; it must
+      proceed to model selection / helper run. `slash-command-only?` is
+      correctly anchored today (`str/starts-with? trimmed "/"`), but a
+      regression to a naive `(str/includes? text "/")` (or a mis-anchored
+      match) would silently route every path-bearing prompt into the
+      slash-command `:no-op`, disabling the augmenter for its primary input
+      class, and **no current test would catch it** — the only slash test uses
+      a text that is *also* rejected by `includes?`, so it cannot distinguish
+      the two predicates. Add a negative-boundary case (a mid-string-`/` user
+      text through `entity-resolution-augmentation`) asserting the pre-filter
+      does **not** fire: the turn reaches model selection / helper run
+      (e.g. `:select`/`:run` recorded via the `stub` `:calls` atom, or a
+      `:success`/`no confident mapping` diagnostic rather than
+      `"slash-command-only prompt"`). Optionally also pin the leading-whitespace
+      positive case (`"  /help"`) so both halves of the anchored predicate's
+      contract — leading `/` after trim ⇒ skip; internal `/` ⇒ do not skip —
+      are a single coherent, tested statement rather than one positive example
+      that both candidate predicates satisfy.
