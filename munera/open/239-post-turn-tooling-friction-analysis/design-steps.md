@@ -31,6 +31,26 @@
       session other than this analyzer's own helpers) or is intended to
       exclude other known helper/infra session categories too.
 
+# Design steps — ambiguity review (design-review round 2, turn 2)
+
+- [ ] Dedup says "Recently-closed duplicates also suppress creation (avoid
+      reopening churn)" but does not define "recently" (no time window, no
+      count of closed tasks to scan, no reference commit range). Clarify
+      what "recently-closed" means (e.g. all closed tasks, a bounded lookback
+      window, or N most-recently-closed) so the dedup mechanism has an
+      unambiguous scope to check against.
+
+- [ ] It's unclear whether the dedup/duplicate-matching step ("the helper
+      model can be given the list of existing task ids + titles and asked to
+      match") runs inside the same bounded helper-session invocation that
+      performs friction detection, or as a second, separate helper-session
+      call. This affects how "Helper sessions must be bounded (rounds,
+      wall-clock, output size)" and the recursion-guard's own-helper-session
+      tracking apply — a second helper call would itself need guarding/
+      accounting for, which the design does not currently address. Clarify
+      whether dedup matching is one phase of a single helper session or a
+      distinct helper session.
+
 # Design steps — inconsistency review (design-review session, turn 3)
 
 - [x] The Goal states the analyzer should "automatically create a Munera task

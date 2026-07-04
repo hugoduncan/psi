@@ -47,6 +47,13 @@
   review feedback. Re-checked against AGENTS.md, ramora/META.md, and
   doc/architecture.md after the round-1 follow-up edits (ctx-guard decision,
   cap=2, session scope, Goal wording); no new architectural misfit found.
+- ambiguity review (design-review round 2, turn 2) added 2 new design steps:
+  (1) "recently-closed" duplicate-suppression window is undefined (no time
+  bound / count / lookback rule); (2) whether dedup/duplicate-matching runs
+  as part of the same bounded helper-session call as friction detection, or
+  as a separate helper-session invocation, is unstated — this matters
+  because a second helper call would need its own bounding/recursion-guard
+  accounting, which the design doesn't currently mention.
 
 ## Notes for addressing accumulated design-steps
 
