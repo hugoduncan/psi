@@ -152,3 +152,10 @@
   and file-based `munera/open/NNN-slug/design.md` task creation stays outside
   `:state*`/dispatch (git-tracked project artifact, not canonical root
   state), so no dispatch-boundary violation.
+
+- ambiguity review (design-review round 3, turn 2) added 1 new design step:
+  "the session's effective worktree" (Task location) is undefined for
+  delegated/workflow sessions, which may run in a different checkout than
+  their parent/originating session — the design doesn't say whether task
+  creation targets the analyzed session's own worktree or one resolved by
+  walking up to an originating/top-level session.

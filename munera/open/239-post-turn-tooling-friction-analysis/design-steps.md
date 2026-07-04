@@ -75,3 +75,16 @@
       behaviour (e.g. "create a Munera task for newly identified issues, up
       to a per-run cap") so the top-level statement of intent doesn't overstate
       what the capped mechanism (AC6) actually delivers.
+
+# Design steps — ambiguity review (design-review round 3, turn 2)
+
+- [ ] "Task location: the session's effective worktree" is undefined. The
+      Decisions section scopes analysis to "every session (top-level,
+      delegated, workflow, helper)", but delegated/workflow sessions can run
+      in a different checkout than their parent/originating session. It's
+      unclear whether "effective worktree" means the analyzed session's own
+      worktree (even if it is a delegated/workflow child), or the worktree
+      resolved by walking up to some originating/top-level session. Clarify
+      what "effective worktree" resolves to when the analyzed session is a
+      delegated or workflow session, so task creation has one unambiguous
+      target directory.
