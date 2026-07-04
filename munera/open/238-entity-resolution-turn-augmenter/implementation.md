@@ -1959,3 +1959,14 @@ Key decisions / discoveries:
   titles/ids, local-only single-attempt selection, bash-only grant, wall-clock
   bound vs prompt-only round cap, no-op reasons). Prior turn-25/26 README fix
   closed the only real gap; no new actionable docs issues.
+
+## Code review (turn 28 — code-shaper)
+
+- added 0 steps. No new non-compliance. Reviewed src/tests/docs under the
+  code-shaper lens (simplicity/consistency/robustness); `bb test` green, lint
+  clean, docs coherent. Only sub-threshold observations, all pre-justified or
+  low-value: private `blank?` shadows `str/blank?` (237 scaffold, not this
+  task); `slash-command-only?` duplicates auto-session-name's predicate
+  (design-justified turn-level reuse, avoids cross-extension coupling); no
+  shared `success-envelope` helper (two augmenters' success content differs).
+  None actionable.
