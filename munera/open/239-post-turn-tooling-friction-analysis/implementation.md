@@ -667,3 +667,10 @@
     --lint` clean on all changed src/test files. `clj-paren-repair` clean.
     Full `bb test`: same pre-existing unrelated failure set as before
     (57 files under `.scry-results`, none in `extensions.context-manager*`).
+
+## Implementation review, round 2 (task-implementation-review skill)
+
+- Added 2 follow-up steps to steps.md: unsanitized model-supplied `slug`
+  reaches filesystem-path construction unvalidated (confirmed via direct
+  repro), and missing direct unit tests for the real `default-fetch-history`/
+  `default-session-info` collaborators.

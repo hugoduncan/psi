@@ -138,3 +138,43 @@
       helper — the friction helper's timeout/teardown branch currently has
       no dedicated test exercising the real `deref`/`::timeout` path with an
       injected small `:wall-clock-ms`.
+
+## Follow-up (implementation review, round 2)
+
+- [ ] Sanitize/validate the model-supplied `slug` before it is used to build
+      a filesystem path. `parse-friction-block`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      accepts any non-blank text between `ISSUE:` and `|` as `:slug` with no
+      format check, and `create-friction-task!`/`allocate-task-id` splice it
+      directly into `munera/open/NNN-slug` via `io/file`. A local-model
+      output containing `/` or `..` in the slug (e.g. `ISSUE:
+      ../../../../tmp/pwned | Evil`) is parsed through unchanged (confirmed
+      by direct repro: `parse-friction-output` returns
+      `:slug "../../../../../tmp/pwned"` verbatim) and passed straight to
+      `(io/file root "munera" "open" id)`, i.e. path-traversal-shaped
+      segments from untrusted model output reach filesystem-path
+      construction with no validation — munera's own convention (`slug ∈
+      kebab_case`, AGENTS.md) is not enforced here. Reject/drop ISSUE
+      blocks whose slug isn't a plain kebab-case token (e.g.
+      `#"^[a-z0-9]+(-[a-z0-9]+)*$"`) in `parse-friction-block`, consistent
+      with the existing fail-safe "malformed block dropped" pattern, rather
+      than relying only on `create-friction-task!`'s own I/O layer.
+- [ ] Add direct unit tests for the real (non-injected) `:fetch-history`/
+      `:session-info` collaborators added in slice 4 —
+      `default-fetch-history`, `default-session-info`,
+      `friction/message-snippet`, and `friction/session-info-of`
+      (`extensions/context_manager.clj` /
+      `extensions/context_manager/friction.clj`) currently have no test
+      exercising them against realistic EQL query-session result shapes
+      (raw agent-core message maps with `:role`/`:content`,
+      `:psi.agent-session/worktree-path`/`:psi.agent-session/session-name`
+      result maps). The existing wiring test
+      (`context_manager_friction_wiring_test.clj`) only reaches the
+      "no worktree" no-op path via the nullable API's default empty
+      query-session result, so it never actually calls these functions with
+      data. This breaks the pattern already established for
+      entity-resolution's equivalent real collaborators
+      (`default-select-model`, `default-run-helper`), which do have direct
+      `#'context-manager/...` unit tests
+      (`context_manager_model_selection_test.clj`,
+      `context_manager_helper_runtime_test.clj`).
