@@ -5,6 +5,36 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 6)
+
+- [ ] `friction-analysis`'s per-session in-flight guard
+      (`extensions/context_manager.clj`) has a check-then-act race: it does
+      a plain `(contains? @friction-in-flight-session-ids session-id)` read
+      followed by a separate `(swap! friction-in-flight-session-ids conj
+      session-id)`, with no atomicity between the two. Two genuinely
+      concurrent `friction-analysis` calls for the *same* `session-id`
+      (e.g. two turns finishing close enough together that both threads
+      reach the `contains?` check before either has run its `swap!`) can
+      both observe `false` and both proceed to run analysis in parallel —
+      reproduced directly with a minimal harness mirroring this exact
+      check-then-swap shape (20 concurrent callers against a fresh atom,
+      each with a small delay between the read and the `swap!`: all 20
+      report `:claimed`, none `:already-in-flight`). This defeats the very
+      race the round-4 in-flight guard was added to prevent (two concurrent
+      runs on the same session both passing their own dedup snapshot and
+      creating duplicate tasks for the same issue) — it only narrows the
+      window rather than closing it, and the existing
+      `concurrent-run-same-session-guarded-test` doesn't catch this because
+      it serializes the two calls (waits for the first to reach its
+      blocking `:run-helper` deliver before invoking the second), so the
+      first call's `swap!` has already completed by the time the second's
+      `contains?` check runs. Replace the check-then-swap with a single
+      atomic claim, e.g. a `compare-and-set!`/`swap!`-returns-prior-state
+      loop that reports whether `session-id` was already present in the
+      *same* atomic operation that adds it, and add a test that starts two
+      calls truly concurrently (no ordering handshake) to exercise the
+      narrow-window case.
+
 ## Follow-up (implementation review, round 5)
 
 - [x] `doc/extensions.md`'s context-manager friction-analyzer section

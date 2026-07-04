@@ -1,5 +1,13 @@
 - steps.md: both round-4 follow-up items checked off; no items remain
   unchecked in that section.
+
+## Implementation review, round 6 (task-implementation-review skill)
+
+- Added 1 follow-up step to steps.md: the round-4 in-flight guard
+  (`friction-in-flight-session-ids`) has a check-then-swap race
+  (`contains?` read, then separate `swap!`), reproduced with a minimal
+  harness — it narrows but doesn't close the concurrent-duplicate-task
+  race it was added to prevent.
 - Round-5 follow-up: added a "Per-session in-flight guard" bullet to
   `doc/extensions.md`'s context-manager friction-analyzer section,
   describing `friction-in-flight-session-ids` (round-4 follow-up,
