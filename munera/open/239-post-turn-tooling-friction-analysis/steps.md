@@ -141,7 +141,7 @@
 
 ## Follow-up (implementation review, round 2)
 
-- [ ] Sanitize/validate the model-supplied `slug` before it is used to build
+- [x] Sanitize/validate the model-supplied `slug` before it is used to build
       a filesystem path. `parse-friction-block`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       accepts any non-blank text between `ISSUE:` and `|` as `:slug` with no
@@ -159,7 +159,7 @@
       `#"^[a-z0-9]+(-[a-z0-9]+)*$"`) in `parse-friction-block`, consistent
       with the existing fail-safe "malformed block dropped" pattern, rather
       than relying only on `create-friction-task!`'s own I/O layer.
-- [ ] Add direct unit tests for the real (non-injected) `:fetch-history`/
+- [x] Add direct unit tests for the real (non-injected) `:fetch-history`/
       `:session-info` collaborators added in slice 4 —
       `default-fetch-history`, `default-session-info`,
       `friction/message-snippet`, and `friction/session-info-of`

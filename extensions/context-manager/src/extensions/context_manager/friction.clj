@@ -88,18 +88,27 @@
   (when (str/starts-with? line prefix)
     (str/trim (subs line (count prefix)))))
 
+(def ^:private friction-slug-re
+  "Plain kebab-case token, matching munera's `slug ∈ kebab_case` convention
+   (AGENTS.md). Enforced here — not just at `create-friction-task!`'s I/O
+   layer — so path-traversal-shaped model output (e.g. `../../tmp/pwned`)
+   never reaches filesystem-path construction at all."
+  #"^[a-z0-9]+(-[a-z0-9]+)*$")
+
 (defn- parse-friction-block
   "Parse a single ISSUE-headed block of lines (header + following
    FRICTION/EVIDENCE/SUGGESTION lines) into
    `{:slug :title :friction :evidence :suggestion}`, or nil when any
-   required field is missing (malformed block dropped, fail-safe)."
+   required field is missing or `slug` isn't a plain kebab-case token
+   (malformed block dropped, fail-safe)."
   [lines]
   (when-let [[_ slug title] (re-matches friction-issue-header-re (first lines))]
     (let [rest-lines (rest lines)
           friction   (some #(friction-field "FRICTION:" %) rest-lines)
           evidence   (some #(friction-field "EVIDENCE:" %) rest-lines)
           suggestion (some #(friction-field "SUGGESTION:" %) rest-lines)]
-      (when (and (seq slug) (seq title) (seq friction) (seq evidence) (seq suggestion))
+      (when (and (re-matches friction-slug-re (or slug ""))
+                 (seq title) (seq friction) (seq evidence) (seq suggestion))
         {:slug slug :title title :friction friction
          :evidence evidence :suggestion suggestion}))))
 

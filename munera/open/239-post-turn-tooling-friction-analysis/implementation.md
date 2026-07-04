@@ -674,3 +674,32 @@
   reaches filesystem-path construction unvalidated (confirmed via direct
   repro), and missing direct unit tests for the real `default-fetch-history`/
   `default-session-info` collaborators.
+
+## Follow-up execution (post-review pass, round 2)
+
+- addressed 2 review steps:
+  - `parse-friction-block` (`friction.clj`) now requires `slug` to match a
+    plain kebab-case token (`#"^[a-z0-9]+(-[a-z0-9]+)*$"`) before accepting
+    an ISSUE block; a slug containing `/`, `..`, uppercase, or underscores
+    is dropped as malformed (same fail-safe pattern as the existing
+    missing-field checks), so path-traversal-shaped model output never
+    reaches `create-friction-task!`'s `io/file` construction. Added
+    `parse-friction-output-slug-sanitization-test`
+    (`context_manager_friction_parsing_test.clj`) covering
+    path-traversal/slash/non-kebab-case rejection and the plain-kebab-case
+    accept case.
+  - Added `context_manager_friction_collaborators_test.clj`: direct unit
+    tests for `default-fetch-history`/`default-session-info`
+    (`#'context-manager/...`) and `friction/message-snippet`/
+    `friction/session-info-of`, driven against realistic EQL query-session
+    result shapes (raw `{:role :content [{:type :text :text ..}]}` message
+    maps; `:psi.agent-session/worktree-path`/`:psi.agent-session/
+    session-name` result maps) — mirrors the existing
+    `default-select-model`/`default-run-helper` direct-test pattern.
+  - Verification: `clojure -M:test --focus extensions` → 339 tests, 1325
+    assertions, 0 failures (up from 334/1307). `clj-kondo --lint` clean on
+    all context-manager src/test files. `clj-paren-repair` clean. Full
+    `bb test`: same pre-existing unrelated failure set as before (58 files
+    under `.scry-results`, none in `extensions.context-manager*`).
+- steps.md: both round-2 follow-up items checked off; no items remain
+  unchecked in that section.

@@ -59,6 +59,44 @@
            (context-manager/parse-friction-output
             "Here is my analysis of the conversation:\nNothing notable.")))))
 
+(deftest parse-friction-output-slug-sanitization-test
+  (testing "a slug containing path-traversal segments is dropped"
+    (is (= {:issues [] :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: ../../../../tmp/pwned | Evil\n"
+                 "FRICTION: something\n"
+                 "EVIDENCE: turn 1\n"
+                 "SUGGESTION: do nothing\n")))))
+
+  (testing "a slug containing a path separator is dropped"
+    (is (= {:issues [] :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: foo/bar | Slash slug\n"
+                 "FRICTION: something\n"
+                 "EVIDENCE: turn 1\n"
+                 "SUGGESTION: do nothing\n")))))
+
+  (testing "a slug with uppercase or underscores is dropped (not kebab-case)"
+    (is (= {:issues [] :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: Not_Kebab | Bad casing\n"
+                 "FRICTION: something\n"
+                 "EVIDENCE: turn 1\n"
+                 "SUGGESTION: do nothing\n")))))
+
+  (testing "a plain kebab-case slug still parses"
+    (is (= {:issues [{:slug "valid-slug-123"
+                      :title "Fine"
+                      :friction "something"
+                      :evidence "turn 1"
+                      :suggestion "do nothing"}]
+            :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: valid-slug-123 | Fine\n"
+                 "FRICTION: something\n"
+                 "EVIDENCE: turn 1\n"
+                 "SUGGESTION: do nothing\n"))))))
+
 (deftest parse-friction-output-mixed-test
   (testing "an issue and a duplicate line both parse from the same output"
     (is (= {:issues [{:slug "missing-dep"
