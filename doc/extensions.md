@@ -312,6 +312,11 @@ pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
   - Every failure path (no local model available, missing worktree, helper
     failure/timeout, malformed or empty helper output) logs a diagnostic and
     no-ops — no task is created and the turn is never disrupted.
+  - Per-session in-flight guard: a second `session_turn_finished` analysis
+    for the same session is skipped/no-op'd (with a diagnostic) while a
+    prior analysis run for that same session is still in flight, avoiding
+    duplicate-task races that the dedup pass alone can't catch (dedup only
+    checks tasks that existed before the run started).
 - No commands, tools, or prompt contributions besides the augmenters above.
 
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)

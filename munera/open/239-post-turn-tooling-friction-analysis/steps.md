@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 5)
 
-- [ ] `doc/extensions.md`'s context-manager friction-analyzer section
+- [x] `doc/extensions.md`'s context-manager friction-analyzer section
       (updated through the round-3 follow-up — see commit `b24ea45df`,
       which added the "workflow-runtime step-attempt child sessions"
       exclusion wording) was not updated for the round-4 follow-up (commit

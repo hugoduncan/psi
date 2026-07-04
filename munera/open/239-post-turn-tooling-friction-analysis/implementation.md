@@ -1,5 +1,12 @@
 - steps.md: both round-4 follow-up items checked off; no items remain
   unchecked in that section.
+- Round-5 follow-up: added a "Per-session in-flight guard" bullet to
+  `doc/extensions.md`'s context-manager friction-analyzer section,
+  describing `friction-in-flight-session-ids` (round-4 follow-up,
+  `friction-analysis`'s skip/no-op behaviour for a second in-flight run on
+  the same session), alongside the existing scope/cap/dedup bullets.
+  Checked off the round-5 steps.md item.
+- addressed 1 review step
 
 ## Implementation review, round 5 (task-implementation-review skill)
 
