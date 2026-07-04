@@ -139,3 +139,16 @@
 - N=20 is a planning-stage placeholder chosen for concreteness (not derived
   from a stated constraint) — future review/planning may revise this count
   if it proves wrong in practice.
+
+- architectural review (design-review round 3, turn 1) — no new architectural
+  review feedback. Re-checked against AGENTS.md, ramora/META.md, and
+  doc/architecture.md; the current design.md (round-2 follow-up state:
+  ctx-guard-vs-atom deferred as deliberate planning decision, cap=2 fixed,
+  helper/infra session scope broadened, dedup as single-helper-session second
+  phase, N=20 fixed recently-closed count) remains architecturally consistent
+  — confirmed the existing `entity-resolution-helper-session-ids` atom
+  pattern in `extensions/context-manager.clj` this design extends already
+  performs the same kind of session-id exclusion check the design describes,
+  and file-based `munera/open/NNN-slug/design.md` task creation stays outside
+  `:state*`/dispatch (git-tracked project artifact, not canonical root
+  state), so no dispatch-boundary violation.
