@@ -227,3 +227,10 @@
   (ctx-guard deferred as deliberate decision, cap=2, effective worktree
   defined, dedup single-helper-session phase, N=20 closed bound, open-tasks
   unbounded rationale) and remains architecturally consistent — no new gap.
+
+- ambiguity review (design-review round 4, turn 2) — no new ambiguity
+  feedback. Reused design.md/context from turn 1 (unchanged since round-3
+  follow-up); remaining deferred items (exact dedup-matching mechanism,
+  ctx-keyed-vs-atom recursion-guard choice) are already explicitly marked as
+  planning-stage decisions in design.md's Open questions / Decisions, not
+  unresolved ambiguity — no new unclear wording found.
