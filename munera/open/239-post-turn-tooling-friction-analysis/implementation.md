@@ -220,3 +220,10 @@
      breaks. This chose the "no bound needed in v1" resolution rather than a
      symmetric fixed-count bound, since open-task volume is expected to
      differ in growth pattern from the closed-task history.
+
+- architectural review (design-review round 4, turn 1) — no new architectural
+  review feedback. Re-checked against AGENTS.md, ramora/META.md, and
+  doc/architecture.md; design.md is unchanged since the round-3 follow-up
+  (ctx-guard deferred as deliberate decision, cap=2, effective worktree
+  defined, dedup single-helper-session phase, N=20 closed bound, open-tasks
+  unbounded rationale) and remains architecturally consistent — no new gap.
