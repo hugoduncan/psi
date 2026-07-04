@@ -30,3 +30,15 @@
       sessions. Clarify whether "every session" is meant literally (any
       session other than this analyzer's own helpers) or is intended to
       exclude other known helper/infra session categories too.
+
+# Design steps — inconsistency review (design-review session, turn 3)
+
+- [ ] The Goal states the analyzer should "automatically create a Munera task
+      for each newly identified issue," implying one task per issue with no
+      upper bound. The Constraints section directly contradicts this: "at
+      most a small fixed number of tasks created per turn analysis (suggest:
+      1–2) even if more issues are detected; remaining issues will recur and
+      be caught later." Reword the Goal to reflect the capped/best-effort
+      behaviour (e.g. "create a Munera task for newly identified issues, up
+      to a per-run cap") so the top-level statement of intent doesn't overstate
+      what the capped mechanism (AC6) actually delivers.

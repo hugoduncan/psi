@@ -12,3 +12,11 @@
   recursion-guard scope ("except the extension's own helper sessions") leaves
   open whether other extensions'/runtime infra helper sessions (e.g.
   entity-resolution helpers) should also be excluded as analysis inputs.
+- inconsistency review (design-review turn 3) added 1 new design step: the
+  Goal's "create a task for each newly identified issue" contradicts the
+  Constraints' per-run cap of 1–2 tasks (AC6). Verified against
+  extensions/context-manager source that the design's factual claims (existing
+  `session_turn_finished` subscription, `psi.ai.model-selection` helper
+  machinery, munera design.md-only task-creation convention, NNN allocation
+  rule) all match the current codebase/AGENTS.md — no discrepancies found
+  there.
