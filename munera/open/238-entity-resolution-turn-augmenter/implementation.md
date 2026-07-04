@@ -1833,3 +1833,14 @@ Key decisions / discoveries:
 - Verified: `clj-kondo` 0 errors/warnings on src+test; all context-manager
   test namespaces green (main 31 tests, model-selection 6, helper-runtime,
   helper-failure, flow, rendering, registration all pass).
+
+## Implementation review (turn 20)
+
+- reviewed against task-implementation-review skill; no new steps added.
+- Code matches design (237-rail reuse, auto-session-name precedent, data-only
+  extension, local-only guard); tests pass (all context-manager namespaces
+  green); lint clean; docs (`doc/extensions.md`) + CHANGELOG coherent. Verified
+  `mutate-session` first-arg→`:session-id` maps `parent-session-id` onto
+  `create-child-session`'s parent param correctly, and the embedded method
+  faithfully drops skill step 6 / Output Shape / runtime-graph line per
+  Resolved decision 6. All 19 prior review turns resolved; DONE notes match code.
