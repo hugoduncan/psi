@@ -179,8 +179,10 @@ Built-in extensions that ship with this repo (activated via
   workflow, workflow-step, nested workflow, and helper sessions are excluded.
 - **commit-checks** — run project-local checks after a local commit and feed
   failures back into the session.
-- **context-manager** — scaffold extension that subscribes to
-  `session_turn_finished` events and logs session/turn identifiers.
+- **context-manager** — registers pre-turn turn augmenters:
+  `project-context` and automatic `entity-resolution` (a bash-only local-model
+  helper that injects a `Resolved entities` block). See
+  [`doc/extensions.md`](doc/extensions.md).
 - **dev-http** — dev-time localhost HTTP side channel (`/dev-http`,
   `dev-present`) for presenting markdown/tables/Vega/Mermaid/files/hiccup and
   choice prompts in a browser, with choices flowing back as user input. See

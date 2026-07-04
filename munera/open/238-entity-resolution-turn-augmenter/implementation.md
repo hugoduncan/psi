@@ -1944,3 +1944,10 @@ Key decisions / discoveries:
   shipped implementation, though doc/extensions.md and CHANGELOG are accurate
   and complete. Non-compliance with the design's "docs updated to describe …
   augmenter capability" criterion at the README surface.
+
+## Docs-review follow-up execution (turn 26)
+
+- addressed 1 docs-review step (turn 25): updated README.md `context-manager`
+  bullet to describe the pre-turn turn augmenters (project-context +
+  entity-resolution / `Resolved entities` block) and link to doc/extensions.md;
+  README now consistent with doc/extensions.md + CHANGELOG. Docs-only change.

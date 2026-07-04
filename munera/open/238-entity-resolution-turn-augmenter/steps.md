@@ -1411,7 +1411,7 @@
 
 ## Docs-review follow-ups (turn 25 — review-task-docs)
 
-- [ ] **README.md's `context-manager` description is stale and inconsistent
+- [x] **README.md's `context-manager` description is stale and inconsistent
       with the shipped implementation — it never mentions turn augmentation.**
       `README.md` (extensions list) still describes `context-manager` as a
       "scaffold extension that subscribes to `session_turn_finished` events and
@@ -1433,3 +1433,9 @@
       omission originated in task 237's project-context work or here, the
       entity-resolution feature this task ships makes the stale README a
       user-facing doc gap to close under this task's docs criterion.)
+      DONE: rewrote the README `context-manager` bullet — it now states the
+      extension registers pre-turn turn augmenters (`project-context` and
+      automatic `entity-resolution`, a bash-only local-model helper injecting a
+      `Resolved entities` block) and links to `doc/extensions.md`, matching the
+      shipped implementation and the surrounding terse one-line summaries.
+      README is now consistent with `doc/extensions.md` + `CHANGELOG.md`.
