@@ -234,3 +234,12 @@
   ctx-keyed-vs-atom recursion-guard choice) are already explicitly marked as
   planning-stage decisions in design.md's Open questions / Decisions, not
   unresolved ambiguity — no new unclear wording found.
+
+- inconsistency review (design-review round 4, turn 3) — no new
+  inconsistency feedback. Reused design.md/context from turns 1–2 (unchanged
+  since round-3 follow-up). Checked AC6's generic "capped per analysis run"
+  wording against Constraints' concrete "at most 2" figure — not treated as
+  a new inconsistency, since AC6/AC7 intentionally refer to whatever value
+  Constraints defines rather than restating it, matching the resolution
+  already accepted in round 1 (inconsistency turn 3) for the Goal-wording
+  fix; no other Decisions/Constraints/AC/Open-questions mismatch found.
