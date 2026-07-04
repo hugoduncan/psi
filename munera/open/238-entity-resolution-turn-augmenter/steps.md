@@ -1291,7 +1291,7 @@
 
 ## Test-review follow-ups (turn 21)
 
-- [ ] **The slash-command-only pre-filter has only one positive case
+- [x] **The slash-command-only pre-filter has only one positive case
       (`"/status"`) and no negative-boundary test, leaving the augmenter's
       central purpose — resolving path-like references — unguarded against a
       mis-anchored predicate.** `entity-resolution-slash-command-only-no-op-test`
@@ -1318,3 +1318,14 @@
       contract — leading `/` after trim ⇒ skip; internal `/` ⇒ do not skip —
       are a single coherent, tested statement rather than one positive example
       that both candidate predicates satisfy.
+      DONE: added `entity-resolution-slash-command-only-negative-boundary-test`
+      with both halves of the anchored predicate's contract. Negative boundary:
+      a mid-string-`/` path-like prompt (`"fix components/pathom/resolver.clj"`)
+      through `entity-resolution-augmentation` records `:select`=1 and `:run`=1
+      via the `stub` `:calls` atom and is not diagnosed `"slash-command-only
+      prompt"` — pinning that the augmenter's primary input class is NOT
+      pre-filtered (a naive `includes?` predicate would fail this). Positive
+      boundary: leading-whitespace `"  /help"` still pre-filters after trim
+      (`:no-op`, `"slash-command-only prompt"`, no select/run), so
+      leading-`/`-after-trim ⇒ skip and internal-`/` ⇒ do-not-skip are one
+      coherent tested pair.

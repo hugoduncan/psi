@@ -510,6 +510,32 @@
       (is (nil? (:select @calls)) "no model selected for slash-command-only turn")
       (is (nil? (:run @calls)) "helper session never created"))))
 
+(deftest entity-resolution-slash-command-only-negative-boundary-test
+  (testing "a prompt containing a mid-string `/` (a path-like reference) is
+            NOT pre-filtered — the anchored predicate must let the augmenter's
+            primary input class through to model selection / helper run"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} (assoc base-tp :turn-augmentation/user-text "fix components/pathom/resolver.clj")
+               (stub {:text "" :calls calls}))]
+      ;; mid-string `/` must not fire the slash pre-filter: the turn proceeds
+      ;; to model selection and a helper run (a naive `includes?` predicate
+      ;; would route every path-bearing prompt into the slash-command no-op).
+      (is (= 1 (:select @calls)) "path-like prompt reaches model selection")
+      (is (= 1 (:run @calls)) "path-like prompt reaches the helper run")
+      (is (not= "slash-command-only prompt" (:turn-augmentation/diagnostic env))
+          "path-like prompt is not diagnosed as slash-command-only")))
+  (testing "leading whitespace before a slash still pre-filters (trim then anchor)"
+    (let [calls (atom {})
+          env (context-manager/entity-resolution-augmentation
+               {} (assoc base-tp :turn-augmentation/user-text "  /help")
+               (stub {:text "x → y (e; c)" :calls calls}))]
+      (is (= :no-op (:turn-augmentation/status env)))
+      (is (= "slash-command-only prompt" (:turn-augmentation/diagnostic env))
+          "leading-whitespace slash-command pre-filters after trim")
+      (is (nil? (:select @calls)) "no model selected for leading-whitespace slash turn")
+      (is (nil? (:run @calls)) "helper session never created"))))
+
 ;; --- orchestration outcomes ----------------------------------------------
 
 (deftest entity-resolution-confident-mapping-success-test

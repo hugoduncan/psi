@@ -1867,3 +1867,12 @@ Key decisions / discoveries:
 - Added 1 step: slash-command-only pre-filter has only a positive case and no
   mid-string-`/` negative-boundary test, so a mis-anchored predicate
   regression that disables the augmenter for path-like prompts would pass.
+
+## Test-review turn-21 follow-up
+
+- Addressed 1 review step (turn-21): added
+  `entity-resolution-slash-command-only-negative-boundary-test` — a
+  mid-string-`/` path-like prompt reaches select+run (not the slash no-op),
+  plus a leading-whitespace `"  /help"` positive case, pinning the anchored
+  predicate's two-sided contract against a naive `includes?` regression.
+  Focused tests + clj-kondo clean.
