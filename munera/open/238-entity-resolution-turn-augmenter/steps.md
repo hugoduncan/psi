@@ -1238,7 +1238,7 @@
 
 ## Test-review follow-ups (turn 20)
 
-- [ ] **`tail-lines-within`'s single-line-over-limit branch — the one place
+- [x] **`tail-lines-within`'s single-line-over-limit branch — the one place
       the excerpt is *deliberately* allowed to exceed `max-history-chars` —
       is untested, and it violates the length-bound invariant the turn-15
       test pins for the multi-line case.** `tail-lines-within` starts
@@ -1274,3 +1274,17 @@
       a single coherent, tested statement rather than two silently-conflicting
       ones (one asserted for multi-line, the opposite documented-but-untested
       for single-line).
+      DONE: chose (a) — the single-line-over-limit-kept-whole behaviour is the
+      intended, already-documented contract (`tail-lines-within` docstring:
+      "keep it alone … the highest-value anaphora context"), and bounding it
+      (b) would re-introduce the mid-word/role-less fragment turn-15 fixed.
+      Added `build-entity-resolution-prompt-single-line-over-limit-test`: a
+      one-entry `:tail` whose rendered `User: …` line exceeds
+      `max-history-chars` (4000), asserting the excerpt is kept whole
+      (> 4000, deliberate exception), equals the one intact
+      whitespace-collapsed `Role:` line, is exactly one line (no mid-word
+      split / role-less fragment), and keeps its `User:` prefix. Scoped the
+      turn-15 `<= 4000` assertion to the multi-line case (comment + message
+      wording) so the length-bound contract is now one coherent, tested pair:
+      multi-line ⇒ bounded (drop leading lines); single-over-limit ⇒
+      kept-whole exception.

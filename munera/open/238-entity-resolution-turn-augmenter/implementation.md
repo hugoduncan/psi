@@ -1852,3 +1852,12 @@ Key decisions / discoveries:
   invariant (a >4000-char single snippet yields a >4000-char excerpt). The
   documented deliberate-exception behaviour has no covering test, so the
   length-bound contract is two silently-conflicting statements.
+
+## Test-review turn-20 follow-up
+
+- Addressed 1 review step (turn-20): added
+  `build-entity-resolution-prompt-single-line-over-limit-test` pinning the
+  `tail-lines-within` single-line-over-limit kept-whole exception (option
+  a — the documented intended behaviour); scoped the turn-15 `<= 4000`
+  assertion to the multi-line case. Length-bound contract is now one coherent
+  tested pair. Focused tests + clj-kondo clean.

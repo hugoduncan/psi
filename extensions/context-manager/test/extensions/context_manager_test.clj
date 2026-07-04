@@ -424,8 +424,11 @@
           excerpt (second (re-find #"(?s)Conversation history excerpt:\n\n(.*?)\n\nCurrent user request:"
                                    user-prompt))]
       (is (some? excerpt) "an excerpt is present")
+      ;; Multi-line case only: with ≥2 lines the char-bound holds because whole
+      ;; leading lines are dropped. The single-line-over-limit exception is
+      ;; pinned separately by the next test.
       (is (<= (count excerpt) 4000)
-          "excerpt is bounded by max-history-chars")
+          "multi-line excerpt is bounded by max-history-chars")
       (is (re-find #"NEWMARKER" excerpt)
           "most-recent (tail) content is retained")
       (is (not (re-find #"OLDMARKER" excerpt))
@@ -436,6 +439,36 @@
       (is (every? #(re-matches #"[A-Z][a-z]*: .*" %)
                   (str/split-lines excerpt))
           "every surviving excerpt line keeps a `Role:` prefix (line-boundary truncation)"))))
+
+(deftest build-entity-resolution-prompt-single-line-over-limit-test
+  (testing "a single most-recent snippet whose rendered line alone exceeds
+            max-history-chars is kept whole — a deliberate, documented
+            exception to the char-bound (highest-value anaphora line preserved
+            intact over the bound rather than mid-cut or emitted empty)"
+    ;; One tail entry whose rendered `User: …` line exceeds max-history-chars
+    ;; (4000). tail-lines-within seeds kept with (last lines) and only prepends
+    ;; while <= limit, so the single over-limit line is returned intact.
+    (let [snippet (apply str (repeat 300 "resolver words here "))
+          _ (assert (> (count snippet) 4000))
+          tail [{:index 0 :role "user" :snippet snippet}]
+          {:keys [user-prompt]}
+          (context-manager/build-entity-resolution-prompt
+           (assoc base-tp
+                  :turn-augmentation/history {:message-count 1
+                                              :tail tail}))
+          excerpt (second (re-find #"(?s)Conversation history excerpt:\n\n(.*?)\n\nCurrent user request:"
+                                   user-prompt))]
+      (is (some? excerpt) "an excerpt is present (not emitted empty)")
+      ;; Deliberate exception to the multi-line <= 4000 bound: the single
+      ;; over-limit line is kept whole rather than mid-cut or dropped.
+      (is (> (count excerpt) 4000)
+          "the single over-limit line is kept whole, exceeding max-history-chars")
+      (is (= (str "User: " (str/replace snippet #"\s+$" "")) excerpt)
+          "excerpt equals the one intact, whitespace-collapsed `Role:` line")
+      (is (= 1 (count (str/split-lines excerpt)))
+          "excerpt is exactly one line — no mid-word split, no role-less fragment")
+      (is (str/starts-with? excerpt "User: ")
+          "the retained line keeps its `Role:` prefix intact"))))
 
 ;; --- eligibility pre-filter no-ops ---------------------------------------
 
