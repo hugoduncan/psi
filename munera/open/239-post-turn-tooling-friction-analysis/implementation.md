@@ -289,3 +289,25 @@
   session-exclusion guard in both correctly maps onto design.md's
   own-helper-vs-other-known-helper/infra distinction. No new design-steps
   added.
+
+## Plan-review batch (turns 1–2): no design-steps follow-up needed
+
+- This batch (ambiguity turn 1, inconsistency turn 2) added zero unchecked
+  items to design-steps.md — plan.md/steps.md remain fully consistent with
+  design.md as-is. There is no follow-up task to perform before
+  implementation proceeds; skip the usual "resolve → check off" cycle for
+  this batch.
+- If a later plan-review round (or the plan review itself is re-run after a
+  plan.md/steps.md edit) does add unchecked items, the prior
+  design-review resolution pattern applies analogously but targets
+  plan.md/steps.md instead of design.md: edit the plan/steps artifact that
+  the item concerns, then check the item off in design-steps.md, confirming
+  the batch's baseline commit via
+  `git diff <parent-of-oldest-adding-commit>..HEAD -- design-steps.md`
+  first (same convention used for all prior design-review batches above).
+- No new non-task files were needed for this plan-review batch beyond what
+  was already read for the design-review rounds (listed in earlier "Notes
+  for addressing ... design-steps" sections); `extensions/context-manager/
+  src/extensions/context_manager.clj` was re-consulted (not re-read in full)
+  only to confirm `default-run-helper`'s hardcoded `:tool-ids ["bash"]`
+  doesn't conflict with plan's "bash-tool-less" helper variant.
