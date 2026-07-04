@@ -486,3 +486,87 @@
   equivalent direct run (`clojure -M:test --focus extensions`): 332 tests,
   1297 assertions, 0 failures (up from 322/1275 after slice 2).
   `clj-kondo --lint` clean on all context-manager src + test files.
+
+## Slice 4 implementation (wiring & real collaborators)
+
+- EQL attributes confirmed against `psi.agent-session.resolvers.session`:
+  `:psi.agent-session/message-history` (raw agent-core messages, via
+  `query-session`) for history; `:psi.agent-session/worktree-path` for
+  effective worktree (task location); `:psi.agent-session/session-name`
+  for the known-helper-session-name backstop. No dedicated "helper-flag"
+  attribute exists — the design's accepted fallback (atom membership +
+  session-name matching, already built in slice 3's
+  `known-helper-session?`) is what's actually wired; no new fallback logic
+  needed for slice 4.
+- `default-fetch-history` queries `:psi.agent-session/message-history` and
+  converts each raw message to `{:role :snippet}` via a new
+  `friction/message-snippet` (joins `:content` entries where
+  `:type :text`) — a deliberately minimal, dependency-free extraction (does
+  *not* pull in `psi.agent-session.message-text`, which is not on this
+  extension's classpath), then reuses the existing
+  `render-history-excerpt` with `friction/friction-history-turn-count`
+  (now public, was private) and the existing `max-history-chars` cap —
+  exactly per plan.md decision 6 ("adapting", not duplicating).
+- `default-session-info` queries `:psi.agent-session/worktree-path` +
+  `:psi.agent-session/session-name` and shapes them via a new
+  `friction/session-info-of` into the `{:worktree-root .. :session-name
+  ..}` collaborator contract `friction-analysis` already expected from
+  slice 3.
+- `:list-tasks`/`:create-task!` default collaborators are now thin inline
+  fns built from the existing slice-2 `open-tasks`/`recent-closed-tasks`/
+  `create-friction-task!` re-exports — no new wrapper `defn`s were kept
+  (removed after being added, to stay under the file-length ratchet; see
+  below).
+- `:select-model`/`:run-helper` real defaults were already implemented in
+  slice 3 (`default-select-model`, `default-friction-run-helper`) — slice 4
+  only had to wire them as `friction-analysis`'s actual defaults, which
+  slice 3 already did.
+- Fire-and-forget wiring: `init`'s `session_turn_finished` handler now
+  spawns `(future (try (friction-analysis api payload) (catch Throwable
+  ...)))` after its existing synchronous `on-turn-finished` log call. The
+  future body has its own outer `catch Throwable` as a second line of
+  defence beyond `friction-analysis`'s own internal outer catch — belt and
+  braces so no exception shape can ever reach the turn/dispatch path.
+  Handler still always returns `nil` (unchanged contract).
+- Manifest/permissions: confirmed no change needed. `.psi/extensions.edn`'s
+  `psi/context-manager {}` entry declares no `:allowed-events` restriction,
+  and neither did the pre-existing entity-resolution augmenter (which
+  already uses the same `create-child-session`/`run-agent-loop-in-session`/
+  `close-session` mutation ops) — task 239 adds no new manifest surface.
+- File-length ratchet: adding slice 4's real collaborators pushed
+  `context_manager.clj` to 815 lines (ratchet: 800). Resolved by moving the
+  two purely-mechanical extraction helpers (`message-snippet`,
+  `session-info-of`) into the `friction` ns (where the rest of task 239's
+  pure/support code already lives) and inlining the two trivial
+  `:list-tasks`/`:create-task!` default-collaborator wrappers directly at
+  their one call site instead of as separate `defn-`s — no behaviour
+  change, `context_manager.clj` back to 797 lines.
+- Pre-existing handler tests (`context_manager_test.clj`) started failing
+  once the fire-and-forget future was wired in: they asserted
+  `(last (:log-lines @state))` immediately after a synchronous handler
+  call, which raced against the new concurrent friction-analysis future's
+  own async diagnostic log line (using the same nullable-api `state`).
+  Fixed by changing those assertions from exact-last-line equality to
+  `(some #{expected-line} (:log-lines @state))` membership checks — this
+  preserves each test's actual intent (verify the synchronous
+  on-turn-finished log format) without being racy against the new
+  concurrent logging. This is the general pattern any *future* extension
+  of `session_turn_finished`'s synchronous logging should also follow if
+  it adds another async side effect sharing the same log sink.
+- New integration-style test:
+  `extensions/context-manager/test/extensions/context_manager_friction_wiring_test.clj`
+  — injects a 200ms-sleeping `:query-fn` into a real `create-nullable-extension-api`,
+  confirms the `session_turn_finished` handler returns in well under the
+  sleep duration (non-blocking proof), then polls (up to ~2s) for the
+  friction-analysis future's own async diagnostic log line to appear
+  (proof the analysis actually ran on its own thread). Uses the nullable
+  API's real (undoctored) `:query-session` default behaviour (returns
+  effectively-empty maps for unqueried attributes) rather than injected
+  collaborators, since this test is specifically about the *wiring*
+  (real collaborators + fire-and-forget), not `friction-analysis`'s
+  internal logic (already fully covered by slice 3's collaborator-injected
+  tests).
+- `bb test`-equivalent direct run (`clojure -M:test --focus extensions`):
+  333 tests, 1300 assertions, 0 failures (up from 332/1297 after slice 3).
+  `clj-kondo --lint` clean on all context-manager src + test files.
+  `clj-paren-repair` clean.

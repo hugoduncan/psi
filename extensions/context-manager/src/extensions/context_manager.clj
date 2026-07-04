@@ -565,6 +565,28 @@
                             (:psi.agent-session/agent-run-ok? run))
                    (:psi.agent-session/agent-run-text run))})))))
 
+(defn- default-fetch-history
+  "Real `:fetch-history` collaborator: query the session's raw message
+   history via EQL and render a bounded, tail-truncated excerpt of the last
+   `friction/friction-history-turn-count` turns (design.md: 'Analysis
+   input')."
+  [api session-id]
+  (let [messages (:psi.agent-session/message-history
+                  ((:query-session api) session-id [:psi.agent-session/message-history]))
+        tail     (mapv (fn [m] {:role (:role m) :snippet (friction/message-snippet m)})
+                       messages)]
+    (render-history-excerpt {:tail tail} friction/friction-history-turn-count max-history-chars)))
+
+(defn- default-session-info
+  "Real `:session-info` collaborator: the analyzed session's own effective
+   worktree (design.md: 'Task location' — never walks up to an originating
+   session) and session name (for the known-helper-session-name backstop)."
+  [api session-id]
+  (friction/session-info-of
+   ((:query-session api) session-id
+                         [:psi.agent-session/worktree-path
+                          :psi.agent-session/session-name])))
+
 (defn friction-analysis
   "Post-turn tooling-friction analysis orchestration (task 239).
 
@@ -591,10 +613,14 @@
                               #(default-select-model api %))
            run-helper     (or (:run-helper collaborators)
                               #(default-friction-run-helper api %))
-           fetch-history  (or (:fetch-history collaborators) (constantly nil))
-           session-info   (or (:session-info collaborators) (constantly nil))
-           list-tasks     (or (:list-tasks collaborators) (constantly nil))
-           create-task!   (or (:create-task! collaborators) (constantly nil))
+           fetch-history  (or (:fetch-history collaborators)
+                              #(default-fetch-history api %))
+           session-info   (or (:session-info collaborators)
+                              #(default-session-info api %))
+           list-tasks     (or (:list-tasks collaborators)
+                              (fn [root] {:open (open-tasks root)
+                                          :recent-closed (recent-closed-tasks root)}))
+           create-task!   (or (:create-task! collaborators) create-friction-task!)
            info           (try (session-info session-id) (catch Throwable _ nil))]
        (cond
          (known-helper-session? session-id info)
@@ -747,6 +773,21 @@
                  (fn [payload]
                    (when (:log api)
                      (on-turn-finished (:log api) payload))
+                   ;; Fire-and-forget (task 239): the friction analysis runs
+                   ;; on its own thread and never blocks/delays the turn
+                   ;; pipeline; `friction-analysis` itself never throws
+                   ;; (belt-and-braces outer catch), but the future body adds
+                   ;; its own catch-all as a last line of defence so a future
+                   ;; exception can never surface anywhere the turn path
+                   ;; would observe it.
+                   (future
+                     (try
+                       (friction-analysis api payload)
+                       (catch Throwable e
+                         (try (when (:log api)
+                                ((:log api) (str "context-manager: friction-analysis: "
+                                                 "uncaught error: " (.getMessage e))))
+                              (catch Exception _ nil)))))
                    nil))
       true)
     (if (and (map? api) (:on api))

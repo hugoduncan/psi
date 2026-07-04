@@ -29,29 +29,33 @@
 
 (deftest turn-finished-handler-fires-and-logs-test
   (testing "handler fires on synthetic session_turn_finished event and logs session-id and turn-id"
+    ;; (task 239) the handler also spawns a fire-and-forget friction-analysis
+    ;; future that logs its own async diagnostic line via the same api/log;
+    ;; assertions below check *membership* rather than the exact last log
+    ;; line so they are not racy against that concurrent future.
     (let [{:keys [state]} (setup-api)
           handler (first (get-in @state [:handlers "session_turn_finished"]))]
       (testing "nominal case"
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil as per design requirement")
-        (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=s1 turn-id=t1" line)
-              "log output must match exact project standard prefix and format")))
+        (is (some #{"context-manager: session_turn_finished session-id=s1 turn-id=t1"}
+                  (:log-lines @state))
+            "log output must match exact project standard prefix and format"))
       (testing "payload is an empty map"
         (is (nil? (handler {}))
             "handler returns nil")
-        (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))))
+        (is (some #{"context-manager: session_turn_finished session-id=nil turn-id=nil"}
+                  (:log-lines @state))))
       (testing "payload is nil"
         (is (nil? (handler nil))
             "handler must return nil and not throw when payload is nil")
-        (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line))))
+        (is (some #{"context-manager: session_turn_finished session-id=nil turn-id=nil"}
+                  (:log-lines @state))))
       (testing "payload is not a map"
         (is (nil? (handler "not-a-map"))
             "handler must return nil and not throw when payload is not a map")
-        (let [line (last (:log-lines @state))]
-          (is (= "context-manager: session_turn_finished session-id=nil turn-id=nil" line)))))))
+        (is (some #{"context-manager: session_turn_finished session-id=nil turn-id=nil"}
+                  (:log-lines @state)))))))
 
 (deftest init-reload-safety-test
   (testing "calling init twice does not register duplicate handlers"
@@ -83,13 +87,13 @@
       (testing "missing only :turn-id"
         (is (nil? (handler {:session-id "s2"}))
             "handler returns nil")
-        (is (= "context-manager: session_turn_finished session-id=s2 turn-id=nil"
-               (last (:log-lines @state)))))
+        (is (some #{"context-manager: session_turn_finished session-id=s2 turn-id=nil"}
+                  (:log-lines @state))))
       (testing "missing only :session-id"
         (is (nil? (handler {:turn-id "t2"}))
             "handler returns nil")
-        (is (= "context-manager: session_turn_finished session-id=nil turn-id=t2"
-               (last (:log-lines @state))))))))
+        (is (some #{"context-manager: session_turn_finished session-id=nil turn-id=t2"}
+                  (:log-lines @state)))))))
 
 (deftest init-robustness-test
   (testing "init handles non-standard api gracefully"
@@ -194,8 +198,8 @@
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
             "handler must return nil and not throw")
-        (is (= "context-manager: handler error: first call fails"
-               (last (:log-lines @state)))
+        (is (some #{"context-manager: handler error: first call fails"}
+                  (:log-lines @state))
             "error message with exact prefix and exception message is logged")))))
 
 (deftest handler-log-fn-returns-non-nil-test

@@ -64,28 +64,32 @@
 
 ## Slice 4 — wiring & real collaborators
 
-- [ ] Confirm EQL attributes for post-turn history (last 4 turns), session
+- [x] Confirm EQL attributes for post-turn history (last 4 turns), session
       effective worktree, and helper-session identification against the
       resolver graph; note findings (and any fallback used) in
       implementation.md.
-- [ ] Implement real collaborators: `:fetch-history` (EQL, last 4 turns →
+- [x] Implement real collaborators: `:fetch-history` (EQL, last 4 turns →
       excerpt input), `:session-info` (worktree + helper-session detection),
       `:list-tasks` (slice-2 fns against the session worktree),
       `:create-task!` (slice-2 fn), `:select-model`
       (reuse `default-select-model`), `:run-helper` (bounded no-tools helper
       child session tracked in `friction-helper-session-ids`, 120s budget,
       future-owns-teardown pattern as in `default-run-helper`).
-- [ ] Wire fire-and-forget: extend the existing `session_turn_finished`
+- [x] Wire fire-and-forget: extend the existing `session_turn_finished`
       handler in `init` to spawn a `future` calling `friction-analysis`
       with real collaborators; catch-all + `(:log api)` inside the future;
       handler return value unchanged.
-- [ ] Align extension manifest/permissions (subscriptions, mutations used:
+- [x] Align extension manifest/permissions (subscriptions, mutations used:
       create-child-session, run-agent-loop-in-session, close-session; EQL
-      reads) per extension-development skill.
-- [ ] Integration-style test: fire `session_turn_finished` through the test
+      reads) per extension-development skill. (No manifest/permission
+      changes needed — `.psi/extensions.edn` declares no
+      `:allowed-events`/permission restriction for `psi/context-manager`,
+      matching the pre-existing entity-resolution augmenter's use of the
+      same mutation ops with no extra manifest entries.)
+- [x] Integration-style test: fire `session_turn_finished` through the test
       support state → handler returns promptly (non-blocking) and analysis
       runs (deterministic via injected collaborators or latch).
-- [ ] Run tests + lint; commit slice 4.
+- [x] Run tests + lint; commit slice 4.
 
 ## Slice 5 — docs & verification
 

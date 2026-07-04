@@ -12,9 +12,10 @@
 ;; Post-turn tooling-friction analyzer (task 239)
 ;; ---------------------------------------------------------------------------
 
-(def ^:private friction-history-turn-count
+(def friction-history-turn-count
   "Number of most-recent turns fed to the friction helper (design.md:
-   'Analysis input')."
+   'Analysis input'). Public: also used by the ns's real `:fetch-history`
+   collaborator (slice 4) to bound the raw message-history query."
   4)
 
 ;; friction-task-cap (2) and friction-recent-closed-limit (20) — design.md's
@@ -292,3 +293,24 @@
           (take n)
           (mapv (fn [id] {:id id :title (task-title (io/file closed-dir id) id)}))))))
 
+;; ---------------------------------------------------------------------------
+;; Real collaborator support (task 239, slice 4)
+;; ---------------------------------------------------------------------------
+
+(defn message-snippet
+  "Extract joined text content from a raw agent-core message's `:content`
+   vector — the `:fetch-history` collaborator's own minimal extraction
+   (does not depend on `psi.agent-session.message-text`, which is not on
+   this extension's classpath)."
+  [message]
+  (->> (:content message)
+       (filter #(= :text (:type %)))
+       (map :text)
+       (str/join " ")))
+
+(defn session-info-of
+  "Build the `:session-info` collaborator's `{:worktree-root ..
+   :session-name ..}` map from an EQL query-session result."
+  [eql-result]
+  {:worktree-root (:psi.agent-session/worktree-path eql-result)
+   :session-name  (:psi.agent-session/session-name eql-result)})
