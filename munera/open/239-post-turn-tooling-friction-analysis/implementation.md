@@ -164,3 +164,38 @@
   step: the Dedup decision bounds the closed-tasks list to N=20 for
   output-size reasons but leaves the open-tasks list (checked in the same
   dedup call) unbounded, undermining its own stated boundedness rationale.
+
+## Notes for addressing round-3 design-steps (2 open items)
+
+- Both open items (effective-worktree ambiguity, open-tasks-list bound
+  inconsistency) were added in this round-3 batch; neither pre-dates it —
+  both are in-scope to resolve together.
+- Same resolution pattern as rounds 1–2: these are design.md wording/decision
+  edits, not code changes — edit design.md, then check off in
+  design-steps.md.
+- Keep edits minimal/localized (`AGENTS.md`'s
+  `λreq. λspec. localized_change(...) ∧ ¬broad_restructure(spec)`) — resolve
+  each in its own Decisions-section sentence rather than restating adjacent
+  prose.
+- The two items are independent: "effective worktree" resolution (which
+  worktree delegated/workflow sessions target) doesn't bear on the
+  open-tasks-list bounding question, and vice versa — no shared decision
+  blocks either.
+- For "effective worktree": resolving it need only state the resolution rule
+  (e.g. "the analyzed session's own worktree, not resolved through parent
+  sessions" or the reverse) — no new mechanism needs designing, since
+  worktree resolution presumably already exists for delegated/workflow
+  sessions elsewhere in the runtime (check `app-runtime`/`agent-session`
+  worktree resolvers before assuming this needs new design surface).
+- For the open-tasks bound: the simplest resolution consistent with the
+  existing N=20 closed-list precedent is stating an analogous fixed count
+  for open tasks (or explicitly noting open-task count is expected to stay
+  small and doesn't need bounding in v1) — avoid inventing a different
+  bounding mechanism (e.g. time-window) than the one already chosen for
+  closed tasks, to keep the two dedup-list bounding rules symmetric.
+- Relevant non-task files already consulted for this round (no need to
+  re-read in full): `doc/architecture.md` (adapter/app-runtime ownership,
+  no worktree-resolution detail found there), `ramora/META.md`
+  (managed-service principle, unrelated to these two items),
+  `extensions/context-manager/src/extensions/context_manager.clj`
+  (existing helper-session-id atoms, session_turn_finished subscription).
