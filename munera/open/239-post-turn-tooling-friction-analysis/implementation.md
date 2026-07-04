@@ -624,3 +624,13 @@
   extensions.md is not Clojure source and is not kondo-lintable — confirmed
   its lint errors are markdown-parsed-as-edn noise, not real). `clj-paren-
   repair` clean.
+
+## Implementation review (task-implementation-review skill)
+
+- Added 3 follow-up steps to steps.md: a reproducible flaky-test cross-namespace
+  atom-pollution bug (`context_manager_model_selection_test.clj` missing
+  `use-fixtures` reset, sharing session-id `"s1"` with friction/entity-resolution
+  tests — confirmed via 1-in-6 unseeded `clojure -M:test --focus extensions`
+  failures), duplicated bounded-helper-session logic between
+  `default-run-helper`/`default-friction-run-helper`, and a missing real
+  wall-clock-timeout test for `default-friction-run-helper`.

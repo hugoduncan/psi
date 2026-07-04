@@ -101,3 +101,40 @@
 - [x] Verify all acceptance criteria 1–7 against design.md; note verification
       in implementation.md.
 - [x] Full `bb test`; `clj-kondo --lint` on changed files; commit slice 5.
+
+## Follow-up (implementation review)
+
+- [ ] Fix flaky cross-namespace test pollution: `entity-resolution-helper-session-ids`
+      and `friction-helper-session-ids` are `defonce` atoms shared across the
+      whole test JVM, and several test files (e.g. every friction-analysis
+      test, `context_manager_test_support/base-tp`) use the same hardcoded
+      `session-id "s1"`. `context_manager_model_selection_test.clj` has no
+      `use-fixtures` resetting either atom, so a prior test in a different
+      namespace that leaves `"s1"` tracked (e.g. via
+      `entity-resolution-helper-session-excluded-test` or
+      `own-helper-session-excluded-test`) causes
+      `entity-resolution-no-local-model-no-op-test` to spuriously return a
+      no-op with `:turn-augmentation/diagnostic nil` instead of
+      `"no local model"`. Reproduced directly: `clojure -M:test --focus
+      extensions` failed this way in 1 of 6 unseeded runs. Add a
+      `use-fixtures :each` reset of both atoms to
+      `context_manager_model_selection_test.clj` (and audit other
+      no-fixture context-manager test files for the same gap), or use
+      distinct session-ids per test file to avoid the shared-state
+      collision.
+- [ ] Reduce duplication between `default-run-helper` (entity-resolution,
+      task 238) and `default-friction-run-helper` (task 239): the two
+      functions are near-identical (~40–130 lines each) copies of the same
+      bounded-child-session / future-owns-teardown / wall-clock-timeout
+      mechanism, differing only in session-name, `:tool-ids`/`:tool-names`,
+      and which tracking atom is swapped. Consider extracting a shared
+      parameterized helper (session-name, tool-ids, tracking atom as
+      parameters) to avoid the two copies drifting out of sync on future
+      changes to the timeout/teardown logic.
+- [ ] Add a real wall-clock-timeout unit test for
+      `default-friction-run-helper`, mirroring
+      `default-run-helper-timeout-branch-test`
+      (`context_manager_helper_runtime_test.clj`) for the entity-resolution
+      helper — the friction helper's timeout/teardown branch currently has
+      no dedicated test exercising the real `deref`/`::timeout` path with an
+      injected small `:wall-clock-ms`.
