@@ -20,3 +20,28 @@
   machinery, munera design.md-only task-creation convention, NNN allocation
   rule) all match the current codebase/AGENTS.md — no discrepancies found
   there.
+
+## Notes for addressing accumulated design-steps
+
+- All 4 design-steps are design.md edits (wording/decision clarifications),
+  not code changes — resolve them by editing design.md itself, then re-check
+  coherence with plan.md/steps.md only if those files already exist and
+  reference the changed wording.
+- Keep edits minimal/localized per `AGENTS.md`'s
+  `λreq. λspec. localized_change(...) ∧ ¬broad_restructure(spec)` — don't use
+  these steps as an excuse to rewrite unrelated Decisions/Constraints prose.
+- Recursion-guard steps (arch step 1, ambiguity step 2) are related: deciding
+  the ctx-keyed-vs-atom question may also inform (but should not expand into
+  deciding) which other sessions count as "helper/infra" for exclusion
+  purposes — keep these as two separate, narrow edits.
+- The cap-value ambiguity (ambiguity step 1) and the Goal-wording
+  inconsistency (inconsistency step 1) both trace back to the same
+  Constraints sentence ("suggest: 1–2"); fixing the cap to one concrete
+  number in Constraints and then aligning the Goal sentence's wording to it
+  resolves both in one coordinated edit rather than two independent ones.
+- Relevant non-task files for context (already consulted, no need to re-read
+  in full): `ramora/META.md` (managed-service-vs-extension-atom principle),
+  `AGENTS.md` (task-creation/design.md-only convention, NNN allocation rule),
+  `extensions/context-manager/src/extensions/context_manager.clj` (existing
+  `helper-session-ids`/`entity-resolution-helper-session-ids` atoms and
+  `session_turn_finished` subscription this design extends).
