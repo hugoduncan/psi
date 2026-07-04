@@ -311,3 +311,51 @@
   src/extensions/context_manager.clj` was re-consulted (not re-read in full)
   only to confirm `default-run-helper`'s hardcoded `:tool-ids ["bash"]`
   doesn't conflict with plan's "bash-tool-less" helper variant.
+
+## Slice 1 implementation (pure core)
+
+- `render-history-excerpt` generalized to 3-arity
+  `([history] [history turn-count char-cap])`; 1-arg call preserves prior
+  entity-resolution behaviour exactly (`nil` turn-count = no tail
+  truncation, `max-history-chars` cap). Friction analyzer will call the
+  2-extra-arg form with `friction-history-turn-count` (4) and
+  `max-history-chars` — no separate char-cap constant introduced for
+  friction; reusing the existing one per plan step 6 ("adapting" not
+  duplicating).
+- Added under a new "Post-turn tooling-friction analyzer (task 239)"
+  section, mirroring the entity-resolution section's pure-core/
+  parsing/rendering/orchestration layout: `friction-history-turn-count`
+  (4), `render-task-list`, `build-friction-prompt`,
+  `parse-friction-output`, `cap-issues`, `render-friction-design-md`.
+  `cap-issues` takes its cap as a parameter (no module-level cap
+  constant needed yet); the design.md-decided cap value (2) and the
+  closed-task dedup-list bound (N=20) will be introduced as constants in
+  slices 2/3 where they're first referenced (avoids an unused-private-var
+  lint warning for constants with no caller yet).
+- `parse-friction-output` block-scanning: an `ISSUE:` line starts a block
+  that greedily consumes following lines until the next `ISSUE:` or
+  `DUPLICATE:` line (or end of input); this lets `FRICTION/EVIDENCE/
+  SUGGESTION:` lines appear in any order within a block (matched via
+  `some` + prefix-strip) and tolerates blank lines between fields.
+  `parse-friction-block` requires all four of
+  slug/title/friction/evidence/suggestion non-blank or the whole block is
+  dropped (fail-safe, no partial-issue task).
+- `DUPLICATE: <slug> ~ <existing-id>` lines are collected independently of
+  ISSUE blocks (order-preserving relative position not required by
+  callers — orchestration in slice 3 will just log each duplicate).
+- `cap-issues` is a pure, order-preserving `take`/`drop` split — no
+  ranking/scoring, matching plan step 8 ("take first 2 parsed issues").
+- `render-friction-design-md` produces design.md content only (no
+  plan.md/steps.md — that's slice 2's `create-friction-task!` job); the
+  auto-generated marker text explicitly names "the context-manager
+  post-turn tooling-friction analyzer (task 239)" per design's Constraints
+  requirement.
+- New test ns:
+  `extensions/context-manager/test/extensions/context_manager_friction_parsing_test.clj`
+  (mirrors `context_manager_rendering_test.clj` naming style). Full
+  `bb test --focus extensions` run: 317 tests, 1256 assertions, 0
+  failures (confirms `render-history-excerpt` generalization didn't
+  regress existing entity-resolution rendering tests). `clj-kondo` clean
+  except two expected "unused private var" warnings for
+  `friction-task-cap`/`friction-recent-closed-limit`, which slice 2/3
+  will consume.

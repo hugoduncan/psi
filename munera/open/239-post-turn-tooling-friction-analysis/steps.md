@@ -2,27 +2,27 @@
 
 ## Slice 1 — pure core
 
-- [ ] Generalize `render-history-excerpt` in
+- [x] Generalize `render-history-excerpt` in
       `extensions/context-manager/src/extensions/context_manager.clj` to
       accept turn-count and char-cap parameters (default preserving current
       entity-resolution behaviour); verify existing rendering tests still pass.
-- [ ] Add `build-friction-prompt`: takes {history-excerpt, open-tasks,
+- [x] Add `build-friction-prompt`: takes {history-excerpt, open-tasks,
       recent-closed-tasks} → {system-prompt, user-prompt} embedding detection
       criteria (tooling/dependency friction only; excludes project bugs,
       features, user mistakes), the dedup task list, the strict output
       contract (ISSUE/FRICTION/EVIDENCE/SUGGESTION blocks, DUPLICATE lines,
       NONE), and the per-run expectation of at-most-a-few issues.
-- [ ] Add `parse-friction-output`: text → {:issues [{:slug :title :friction
+- [x] Add `parse-friction-output`: text → {:issues [{:slug :title :friction
       :evidence :suggestion}] :duplicates [{:slug :existing-id}]}; malformed
       blocks dropped; nil/blank/NONE → empty; unit tests for nominal, NONE,
       malformed, mixed issue+duplicate output.
-- [ ] Add `render-friction-design-md`: issue map + evidence context → design.md
+- [x] Add `render-friction-design-md`: issue map + evidence context → design.md
       content with auto-generated marker naming the analyzer, friction,
       evidence (turn references), suggested change; unit test asserts all four
       required elements present.
-- [ ] Add cap logic: `cap-issues` takes issues + cap (2) → {:selected :dropped};
+- [x] Add cap logic: `cap-issues` takes issues + cap (2) → {:selected :dropped};
       unit test 0/1/2/3-issue cases.
-- [ ] Run `bb test --focus extensions.context-manager` (or matching test ns),
+- [x] Run `bb test --focus extensions.context-manager` (or matching test ns),
       lint, `clj-paren-repair`; commit slice 1.
 
 ## Slice 2 — task-file creation
