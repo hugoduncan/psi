@@ -415,3 +415,74 @@
   (statecharts working-memory/turn-data errors) — unrelated to
   context-manager/friction code, not introduced by this slice (confirmed by
   file/namespace scope; these failures are outside `extensions/`).
+
+## Slice 3 implementation (orchestration)
+
+- Recursion-guard state decision (plan.md decision 1, confirmed at
+  implementation): extension-local `defonce friction-helper-session-ids`
+  atom, not a ctx-keyed managed service. Rationale recorded in-code: the
+  extension API map exposes no ctx to key a managed service on, and both
+  pre-existing guards (`helper-session-ids`,
+  `entity-resolution-helper-session-ids`) already use the atom pattern.
+  Migrating all three atoms to a ctx-keyed managed service (per
+  `ramora/META.md`'s process-scoped-managed-service model) is recorded here
+  as a candidate follow-up task, not done in this task.
+- `friction-analysis` orchestration added directly in
+  `extensions/context_manager.clj` (not the `friction` ns) — it needs
+  `default-select-model`, `helper-wall-clock-ms`, `blank?`,
+  `entity-resolution-helper-session-ids`, and the friction pure-core
+  re-exports, all already local to this ns; placed immediately after
+  `default-run-helper` (before `entity-resolution-augmentation`) so its
+  `default-select-model` reference resolves at compile time.
+- `known-helper-session?` combines three signals: membership in
+  `friction-helper-session-ids` (own helpers), membership in
+  `entity-resolution-helper-session-ids` (task-238 helpers), and
+  `known-helper-session-names` (`#{"entity-resolution" "friction-analysis"}`)
+  matched against the injected `:session-info` collaborator's
+  `:session-name` — the name-based check is the "known helper/infra
+  session" backstop design.md's Scope-of-sessions decision calls for
+  (e.g. would also catch an entity-resolution helper session this
+  extension's own atom didn't happen to have tracked, such as after a
+  process restart).
+- `default-friction-run-helper` mirrors `default-run-helper`'s
+  future-owns-teardown timeout handling exactly, but requests a **no-tools**
+  child session (`:tool-ids []`, empty `:tool-names`) per plan.md decision 9
+  — the friction helper only reasons over the prompt-embedded excerpt +
+  task list, no bash needed.
+- `friction-analysis`'s collaborator seam:
+  `:select-model`/`:run-helper`/`:fetch-history`/`:session-info`/
+  `:list-tasks`/`:create-task!`, matching plan.md decision 10 exactly. Every
+  collaborator call (including `session-info`, called before the
+  known-helper-session guard) is wrapped in its own `try/catch Throwable`,
+  and the whole orchestration body is additionally wrapped in an outer
+  `try/catch Throwable` that logs and returns `{:status :no-op :diagnostic
+  "error"}` — belt-and-braces so no combination of throwing collaborators
+  can escape to the (not-yet-wired) fire-and-forget caller.
+- Return shape (new, not in design.md/plan.md verbatim — chosen for
+  testability): `{:status :no-op :diagnostic ..}` for every guard/failure
+  exit, or `{:status :success :created-task-ids [..] :duplicate-diagnostics
+  [{:slug :existing-id} ..] :dropped-count n}` on completion (including the
+  zero-issues case, which is `:success` with an empty `:created-task-ids`,
+  not `:no-op` — a clean "nothing to report" run is not a failure path).
+  The event-subscription wiring (slice 4) will discard this value; it
+  exists purely so tests can assert on outcomes without a real model/
+  sessions.
+- Per-run cap (`friction-task-cap` = 2, a new private constant in this
+  slice) is applied via the existing `friction/cap-issues`; dropped count is
+  logged as a diagnostic string, not returned as data beyond
+  `:dropped-count`.
+- Gotcha for future slices: manually inserting a large multi-`try`/`cond`/
+  `let` form via a single text edit is easy to get paren-count wrong on
+  (this slice needed one extra `)`, caught via a small ad-hoc Python
+  paren-balance script since `clj-paren-repair` silently *mis-repaired* an
+  unbalanced two-namespace-move edit into different-but-still-broken code
+  earlier in this slice, rather than surfacing the imbalance — verify new
+  large orchestration-shaped edits by loading the ns under `clojure -M:test
+  --focus <ns>` directly, not just by trusting a clean `clj-paren-repair`
+  run).
+- New test file:
+  `extensions/context-manager/test/extensions/context_manager_friction_analysis_test.clj`,
+  covering all AC7 cases plus the all-collaborators-throw case. `bb test`-
+  equivalent direct run (`clojure -M:test --focus extensions`): 332 tests,
+  1297 assertions, 0 failures (up from 322/1275 after slice 2).
+  `clj-kondo --lint` clean on all context-manager src + test files.

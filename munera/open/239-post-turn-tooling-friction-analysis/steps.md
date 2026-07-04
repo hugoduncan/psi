@@ -43,10 +43,10 @@
 
 ## Slice 3 — orchestration
 
-- [ ] Add `friction-helper-session-ids` defonce atom; record in
+- [x] Add `friction-helper-session-ids` defonce atom; record in
       implementation.md the deliberate atom-vs-ctx decision and the ctx-keyed
       managed-service migration as a follow-up candidate.
-- [ ] Add `friction-analysis` `(api payload collaborators)` orchestration:
+- [x] Add `friction-analysis` `(api payload collaborators)` orchestration:
       guard (payload session-id ∈ friction-helper-session-ids ∨
       entity-resolution-helper-session-ids ∨ known-helper session info) →
       no-op; fetch history/worktree via collaborators; select local model;
@@ -54,13 +54,13 @@
       DUPLICATE lines; cap at 2 with dropped-issues diagnostic; create tasks
       via `:create-task!`; every failure path (no model, no worktree, helper
       failure/timeout, parse-empty) → no task + diagnostic log + no throw.
-- [ ] Tests (injected collaborators, no real model/sessions) covering AC7:
+- [x] Tests (injected collaborators, no real model/sessions) covering AC7:
       issue → task created; duplicate → skipped + diagnostic; helper failure
       → no-op; missing local model → no-op; missing worktree → no-op; own
       helper session excluded; entity-resolution helper session excluded;
       other known helper/infra session excluded; 3 issues → 2 tasks (cap).
-- [ ] Test: `friction-analysis` never throws when every collaborator throws.
-- [ ] Run tests + lint; commit slice 3.
+- [x] Test: `friction-analysis` never throws when every collaborator throws.
+- [x] Run tests + lint; commit slice 3.
 
 ## Slice 4 — wiring & real collaborators
 

@@ -483,6 +483,173 @@
                             (:psi.agent-session/agent-run-ok? run))
                    (:psi.agent-session/agent-run-text run))})))))
 
+;; ---------------------------------------------------------------------------
+;; Post-turn tooling-friction analyzer (task 239) — orchestration
+;; ---------------------------------------------------------------------------
+
+(defonce friction-helper-session-ids
+  ;; Deliberate planning-stage choice (plan.md decision 1): extension-local
+  ;; `defonce` atom, not a ctx-keyed managed service (`ramora/META.md`'s
+  ;; process-scoped-managed-service model) — the extension API map exposes
+  ;; no ctx to key such a service on, and both pre-existing guards
+  ;; (`helper-session-ids`, `entity-resolution-helper-session-ids`) already
+  ;; use this same pattern. Migrating all three to a ctx-keyed managed
+  ;; service is a coherent separate follow-up task, not something to do
+  ;; piecemeal here.
+  (atom #{}))
+
+(def ^:private known-helper-session-names
+  "Session names of other extensions'/runtime's known helper/infra
+   sessions (design.md: 'Scope of sessions') — excluded as non-
+   representative friction-analysis inputs, in addition to this
+   analyzer's own tracked helper sessions and the entity-resolution
+   augmenter's tracked helper sessions."
+  #{"entity-resolution" "friction-analysis"})
+
+(def ^:private friction-task-cap
+  "Maximum number of tasks created per friction-analysis run (design.md:
+   Constraints, 'at most 2 tasks created per turn analysis')."
+  2)
+
+(defn- known-helper-session?
+  "True when `session-id` is one of this analyzer's own tracked helper
+   sessions, the entity-resolution augmenter's tracked helper sessions, or
+   (via `session-info`, a `{:worktree-root .. :session-name ..}` map or
+   nil) identifiable by name as another known helper/infra session."
+  [session-id session-info]
+  (boolean
+   (or (contains? @friction-helper-session-ids session-id)
+       (contains? @entity-resolution-helper-session-ids session-id)
+       (contains? known-helper-session-names (:session-name session-info)))))
+
+(defn- default-friction-run-helper
+  "Run the friction-detection+dedup helper as a bounded, no-tools child
+   session (design.md/plan.md: no bash needed — the helper only reasons
+   over the excerpt + task list in its prompt). Tracks the child session id
+   in `friction-helper-session-ids` for the recursion guard. Mirrors
+   `default-run-helper`'s future-owns-teardown timeout handling."
+  [api {:keys [parent-session-id system-prompt user-prompt model wall-clock-ms]}]
+  (let [child (try
+                ((:mutate-session api) parent-session-id 'psi.extension/create-child-session
+                                       {:session-name    "friction-analysis"
+                                        :system-prompt   system-prompt
+                                        :tool-ids        []
+                                        :thinking-level  :off
+                                        :prompt-component-selection
+                                        {:agents-md? false
+                                         :extension-prompt-contributions []
+                                         :tool-names []
+                                         :skill-names []
+                                         :components #{}}})
+                (catch Exception _ nil))
+        child-session-id (:psi.agent-session/session-id child)]
+    (when child-session-id
+      (swap! friction-helper-session-ids conj child-session-id)
+      (let [budget-ms (or wall-clock-ms helper-wall-clock-ms)
+            fut (future
+                  (try
+                    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
+                                           (cond-> {:prompt user-prompt}
+                                             model (assoc :model model)))
+                    (finally
+                      (try ((:mutate api) 'psi.extension/close-session
+                                          {:session-id child-session-id})
+                           (catch Exception _ nil))
+                      (swap! friction-helper-session-ids disj child-session-id))))
+            run (try (deref fut budget-ms ::timeout)
+                     (catch Exception _ ::error))]
+        (if (= ::timeout run)
+          {:child-session-id child-session-id :text nil}
+          {:child-session-id child-session-id
+           :text (when (and (map? run)
+                            (:psi.agent-session/agent-run-ok? run))
+                   (:psi.agent-session/agent-run-text run))})))))
+
+(defn friction-analysis
+  "Post-turn tooling-friction analysis orchestration (task 239).
+
+   `collaborators` (optional) injects `:select-model` (fn [session-id] →
+   model-or-nil), `:run-helper` (fn [run-opts] → {:child-session-id :text}
+   or nil), `:fetch-history` (fn [session-id] → history-excerpt string or
+   nil), `:session-info` (fn [session-id] → {:worktree-root .. :session-name
+   ..} or nil), `:list-tasks` (fn [worktree-root] → {:open [..] :recent-closed
+   [..]}), and `:create-task!` (fn [worktree-root issue] → task-id or nil).
+   Every collaborator call is guarded so no exception escapes to the
+   fire-and-forget caller (AC4: helper failure/missing model/missing
+   worktree never disrupts the turn).
+
+   Returns a result map for testability: `{:status :no-op :diagnostic ..}`,
+   or on completion `{:status :success :created-task-ids [..]
+   :duplicate-diagnostics [..] :dropped-count n}`. The event-subscription
+   wiring (slice 4) discards this return value — it exists for tests."
+  ([api payload] (friction-analysis api payload nil))
+  ([api payload collaborators]
+   (try
+     (let [session-id     (:session-id payload)
+           log            (or (:log api) (fn [_]))
+           select-model   (or (:select-model collaborators)
+                              #(default-select-model api %))
+           run-helper     (or (:run-helper collaborators)
+                              #(default-friction-run-helper api %))
+           fetch-history  (or (:fetch-history collaborators) (constantly nil))
+           session-info   (or (:session-info collaborators) (constantly nil))
+           list-tasks     (or (:list-tasks collaborators) (constantly nil))
+           create-task!   (or (:create-task! collaborators) (constantly nil))
+           info           (try (session-info session-id) (catch Throwable _ nil))]
+       (cond
+         (known-helper-session? session-id info)
+         {:status :no-op :diagnostic "known helper/infra session excluded"}
+
+         (blank? (:worktree-root info))
+         (do (log "context-manager: friction-analysis: no worktree, skipping")
+             {:status :no-op :diagnostic "no worktree"})
+
+         :else
+         (let [model (try (select-model session-id) (catch Throwable _ nil))]
+           (if (nil? model)
+             (do (log "context-manager: friction-analysis: no local model, skipping")
+                 {:status :no-op :diagnostic "no local model"})
+             (let [worktree-root (:worktree-root info)
+                   history-excerpt (try (fetch-history session-id) (catch Throwable _ nil))
+                   {:keys [open recent-closed]} (try (list-tasks worktree-root)
+                                                     (catch Throwable _ nil))
+                   {:keys [system-prompt user-prompt]}
+                   (build-friction-prompt {:history-excerpt history-excerpt
+                                           :open-tasks open
+                                           :recent-closed-tasks recent-closed})
+                   result (try
+                            (run-helper {:parent-session-id session-id
+                                         :system-prompt system-prompt
+                                         :user-prompt user-prompt
+                                         :model model})
+                            (catch Throwable _ nil))
+                   {:keys [issues duplicates]} (parse-friction-output (:text result))]
+               (doseq [{:keys [slug existing-id]} duplicates]
+                 (log (str "context-manager: friction-analysis: duplicate " slug
+                           " ~ " existing-id ", skipped")))
+               (if (empty? issues)
+                 {:status :success :created-task-ids [] :duplicate-diagnostics duplicates
+                  :dropped-count 0}
+                 (let [{:keys [selected dropped]} (cap-issues issues friction-task-cap)
+                       created (->> selected
+                                    (keep (fn [issue]
+                                            (try (create-task! worktree-root issue)
+                                                 (catch Throwable _ nil))))
+                                    vec)]
+                   (when (seq dropped)
+                     (log (str "context-manager: friction-analysis: "
+                               (count dropped) " issue(s) dropped by per-run cap")))
+                   {:status :success
+                    :created-task-ids created
+                    :duplicate-diagnostics duplicates
+                    :dropped-count (count dropped)})))))))
+     (catch Throwable e
+       (try (when (:log api)
+              ((:log api) (str "context-manager: friction-analysis: error: "
+                               (.getMessage e))))
+            (catch Exception _ nil))
+       {:status :no-op :diagnostic "error"}))))
+
 (defn entity-resolution-augmentation
   "Entity-resolution turn augmenter (task 238).
 
