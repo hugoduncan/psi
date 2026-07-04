@@ -100,7 +100,41 @@
       behaviour (fewer/no duplicate tasks from closely-spaced turns on the
       same session) not described anywhere in `doc/extensions.md`. Add a
       short bullet describing the in-flight-run guard, alongside the
-      existing scope/cap/dedup bullets.# Steps — 239 post-turn tooling-friction analysis
+      existing scope/cap/dedup bullets.## Follow-up (task-test-review skill)
+
+- [ ] `default-friction-run-helper` (`extensions/context_manager.clj`)
+      requests a no-tools child session (`:tool-ids []`, `:tool-names []`,
+      plan.md decision 9 — "the friction helper only reasons over the
+      prompt-embedded excerpt + task list, no bash needed") but no test
+      asserts this reaches the real `create-child-session` call. The
+      equivalent entity-resolution helper has exactly this coverage
+      (`context_manager_helper_runtime_test.clj`'s "create-child-session
+      gets prompt-component-selection and no :worktree-path" test, which
+      asserts `(= ["bash"] (:tool-ids params))` via `fake-run-api`'s
+      `:create-calls` capture); no friction test file
+      (`context_manager_friction_helper_runtime_test.clj` or elsewhere)
+      makes the analogous assertion for the friction helper. A future
+      refactor of `bounded-helper-session-run` that drops or defaults the
+      `:tool-ids`/`:tool-names` pass-through could silently grant the
+      friction helper bash/tool access with no test catching it. Add a
+      direct test (mirroring the entity-resolution one, via `fake-run-api`'s
+      `:create-calls`) asserting `default-friction-run-helper` passes
+      `:tool-ids []`/`:tool-names []` to `create-child-session`.
+- [ ] `create-friction-task-test`'s "retry exhaustion → nil, no task
+      created" `testing` block
+      (`context_manager_friction_task_files_test.clj`) doesn't test
+      retry exhaustion at all: its body asserts `(is (some?
+      (context-manager/create-friction-task! root issue 5)))` — i.e. that
+      a task *is* created, the opposite of the label. The in-code comment
+      correctly explains the actual exhaustion path can't be driven via
+      `create-friction-task!` (only via `next-free-task-id` directly, which
+      `next-free-task-id-test` already covers) — but the misleading
+      `testing` string/assertion pair should be renamed to reflect what it
+      actually verifies (e.g. "max-retries param threads through to a
+      successful call on the happy path" or similar), so a reader doesn't
+      believe exhaustion is covered here when it isn't.
+
+# Steps — 239 post-turn tooling-friction analysis
 
 ## Slice 1 — pure core
 

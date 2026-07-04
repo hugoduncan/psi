@@ -917,3 +917,9 @@
     `workflow-child-session-context-test`, is agent-session's, unrelated).
 - steps.md: both round-7 follow-up items checked off; no items remain
   unchecked in that section.
+
+## Test review (task-test-review skill)
+
+- added 2 steps to steps.md: missing test coverage for the friction
+  helper's no-tools child-session grant, and a misleadingly-labeled
+  retry-exhaustion test that actually asserts success.
