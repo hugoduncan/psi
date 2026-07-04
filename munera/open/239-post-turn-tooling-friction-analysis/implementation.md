@@ -54,6 +54,12 @@
   as a separate helper-session invocation, is unstated — this matters
   because a second helper call would need its own bounding/recursion-guard
   accounting, which the design doesn't currently mention.
+- inconsistency review (design-review round 2, turn 3) added 1 new design
+  step: the Decisions section's "Scope of sessions" exclusion was broadened
+  (round 1 follow-up) to cover other extensions'/runtime's helper/infra
+  sessions too, but AC5 and the AC7 test-coverage list still only name the
+  analyzer's own-helper-session exclusion/recursion guard — the acceptance
+  criteria text lags behind the widened Decisions scope.
 
 ## Notes for addressing accumulated design-steps
 

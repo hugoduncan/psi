@@ -51,6 +51,19 @@
       whether dedup matching is one phase of a single helper session or a
       distinct helper session.
 
+# Design steps — inconsistency review (design-review round 2, turn 3)
+
+- [ ] The "Scope of sessions" decision excludes both "the extension's own
+      helper sessions" *and* "other extensions'/runtime's known helper/infra
+      sessions (e.g. entity-resolution helper sessions, other workflow helper
+      sessions)" as non-representative analysis inputs. However, acceptance
+      criterion 5 ("The analyzer never runs on its own helper sessions.") and
+      the AC7 test list ("recursion guard") only name the own-helper-session
+      exclusion — neither mentions excluding other extensions'/runtime's
+      helper/infra sessions. Update AC5 (and/or AC7's test coverage list) to
+      reflect the full exclusion scope stated in Decisions, so acceptance
+      criteria don't understate what the design commits to.
+
 # Design steps — inconsistency review (design-review session, turn 3)
 
 - [x] The Goal states the analyzer should "automatically create a Munera task
