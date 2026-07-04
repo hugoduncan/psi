@@ -393,11 +393,21 @@
              candidate))))
      (catch Exception _ nil))))
 
-(defn- default-run-helper
-  "Create a bash-tool-enabled child helper session, run a bounded agent loop
-   with the built prompt, and return {:child-session-id id :text raw} (text
-   may be nil). The child id is tracked before the run for recursion safety
-   and the session is closed/untracked afterward. Returns nil on failure.
+(defn- bounded-helper-session-run
+  "Shared bounded-child-helper-session mechanism underlying both
+   `default-run-helper` (entity-resolution, task 238) and
+   `default-friction-run-helper` (task 239): create a child helper session,
+   run a bounded agent loop with the built prompt, and return
+   `{:child-session-id id :text raw}` (text may be nil). The child id is
+   tracked (in the caller-supplied `tracking-atom`) before the run for
+   recursion safety and is closed/untracked afterward. Returns nil on
+   failure.
+
+   `session-config` supplies the two axes the two callers differ on:
+   `:session-name` (child session-name), `:tool-ids`/`:tool-names` (tool
+   grant + prompt-component tool-name list — `[]` for the friction helper,
+   which needs no tools), and `:tracking-atom` (the recursion-guard atom to
+   swap the child id into/out of).
 
    The child's effective cwd comes from parent-worktree inheritance (the
    parent session-id's worktree). `create-child-session` does not accept a
@@ -423,12 +433,13 @@
 
    `wall-clock-ms` (optional) overrides the default 120s budget — injectable
    so a test can drive the real timeout branch with a small value."
-  [api {:keys [parent-session-id system-prompt user-prompt model wall-clock-ms]}]
+  [api {:keys [parent-session-id system-prompt user-prompt model wall-clock-ms]}
+   {:keys [session-name tool-ids tool-names tracking-atom]}]
   (let [child (try
                 ((:mutate-session api) parent-session-id 'psi.extension/create-child-session
-                                       {:session-name    "entity-resolution"
+                                       {:session-name    session-name
                                         :system-prompt   system-prompt
-                                        :tool-ids        ["bash"]
+                                        :tool-ids        tool-ids
                                         :thinking-level  :off
                                         ;; The augmenter's constructed
                                         ;; `system-prompt` is authoritative
@@ -438,17 +449,18 @@
                                         ;; — AGENTS.md context, skill/extension/
                                         ;; tool prompt fragments — exactly as
                                         ;; the auto-session-name precedent does,
-                                        ;; keeping only `bash` in `:tool-names`.
+                                        ;; keeping only `tool-names` in the
+                                        ;; prompt-component-selection.
                                         :prompt-component-selection
                                         {:agents-md? false
                                          :extension-prompt-contributions []
-                                         :tool-names ["bash"]
+                                         :tool-names tool-names
                                          :skill-names []
                                          :components #{}}})
                 (catch Exception _ nil))
         child-session-id (:psi.agent-session/session-id child)]
     (when child-session-id
-      (swap! entity-resolution-helper-session-ids conj child-session-id)
+      (swap! tracking-atom conj child-session-id)
       (let [budget-ms (or wall-clock-ms helper-wall-clock-ms)
             ;; The run future owns teardown: whenever the (uninterruptible)
             ;; blocking call actually returns or throws, it closes + untracks
@@ -465,7 +477,7 @@
                       (try ((:mutate api) 'psi.extension/close-session
                                           {:session-id child-session-id})
                            (catch Exception _ nil))
-                      (swap! entity-resolution-helper-session-ids disj child-session-id))))
+                      (swap! tracking-atom disj child-session-id))))
             run (try (deref fut budget-ms ::timeout)
                      (catch Exception _ ::error))]
         (if (= ::timeout run)
@@ -484,6 +496,21 @@
            :text (when (and (map? run)
                             (:psi.agent-session/agent-run-ok? run))
                    (:psi.agent-session/agent-run-text run))})))))
+
+(defn- default-run-helper
+  "Create a bash-tool-enabled child helper session, run a bounded agent loop
+   with the built prompt, and return {:child-session-id id :text raw} (text
+   may be nil). Thin `entity-resolution`-specific wrapper (session-name
+   \"entity-resolution\", `bash`-tool grant, `entity-resolution-helper-
+   session-ids` tracking) over the shared `bounded-helper-session-run`
+   mechanism. See its docstring for the full timeout/teardown behaviour."
+  [api opts]
+  (bounded-helper-session-run
+   api opts
+   {:session-name   "entity-resolution"
+    :tool-ids       ["bash"]
+    :tool-names     ["bash"]
+    :tracking-atom  entity-resolution-helper-session-ids}))
 
 ;; ---------------------------------------------------------------------------
 ;; Post-turn tooling-friction analyzer (task 239) — orchestration
@@ -527,45 +554,18 @@
 (defn- default-friction-run-helper
   "Run the friction-detection+dedup helper as a bounded, no-tools child
    session (design.md/plan.md: no bash needed — the helper only reasons
-   over the excerpt + task list in its prompt). Tracks the child session id
-   in `friction-helper-session-ids` for the recursion guard. Mirrors
-   `default-run-helper`'s future-owns-teardown timeout handling."
-  [api {:keys [parent-session-id system-prompt user-prompt model wall-clock-ms]}]
-  (let [child (try
-                ((:mutate-session api) parent-session-id 'psi.extension/create-child-session
-                                       {:session-name    "friction-analysis"
-                                        :system-prompt   system-prompt
-                                        :tool-ids        []
-                                        :thinking-level  :off
-                                        :prompt-component-selection
-                                        {:agents-md? false
-                                         :extension-prompt-contributions []
-                                         :tool-names []
-                                         :skill-names []
-                                         :components #{}}})
-                (catch Exception _ nil))
-        child-session-id (:psi.agent-session/session-id child)]
-    (when child-session-id
-      (swap! friction-helper-session-ids conj child-session-id)
-      (let [budget-ms (or wall-clock-ms helper-wall-clock-ms)
-            fut (future
-                  (try
-                    ((:mutate-session api) child-session-id 'psi.extension/run-agent-loop-in-session
-                                           (cond-> {:prompt user-prompt}
-                                             model (assoc :model model)))
-                    (finally
-                      (try ((:mutate api) 'psi.extension/close-session
-                                          {:session-id child-session-id})
-                           (catch Exception _ nil))
-                      (swap! friction-helper-session-ids disj child-session-id))))
-            run (try (deref fut budget-ms ::timeout)
-                     (catch Exception _ ::error))]
-        (if (= ::timeout run)
-          {:child-session-id child-session-id :text nil}
-          {:child-session-id child-session-id
-           :text (when (and (map? run)
-                            (:psi.agent-session/agent-run-ok? run))
-                   (:psi.agent-session/agent-run-text run))})))))
+   over the excerpt + task list in its prompt). Thin `friction-analysis`-
+   specific wrapper (session-name \"friction-analysis\", no tool grant,
+   `friction-helper-session-ids` tracking) over the shared
+   `bounded-helper-session-run` mechanism. See its docstring for the full
+   timeout/teardown behaviour (mirrored here, not duplicated)."
+  [api opts]
+  (bounded-helper-session-run
+   api opts
+   {:session-name   "friction-analysis"
+    :tool-ids       []
+    :tool-names     []
+    :tracking-atom  friction-helper-session-ids}))
 
 (defn- default-fetch-history
   "Real `:fetch-history` collaborator: query the session's raw message

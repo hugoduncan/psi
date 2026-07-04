@@ -104,7 +104,7 @@
 
 ## Follow-up (implementation review)
 
-- [ ] Fix flaky cross-namespace test pollution: `entity-resolution-helper-session-ids`
+- [x] Fix flaky cross-namespace test pollution: `entity-resolution-helper-session-ids`
       and `friction-helper-session-ids` are `defonce` atoms shared across the
       whole test JVM, and several test files (e.g. every friction-analysis
       test, `context_manager_test_support/base-tp`) use the same hardcoded
@@ -122,7 +122,7 @@
       no-fixture context-manager test files for the same gap), or use
       distinct session-ids per test file to avoid the shared-state
       collision.
-- [ ] Reduce duplication between `default-run-helper` (entity-resolution,
+- [x] Reduce duplication between `default-run-helper` (entity-resolution,
       task 238) and `default-friction-run-helper` (task 239): the two
       functions are near-identical (~40–130 lines each) copies of the same
       bounded-child-session / future-owns-teardown / wall-clock-timeout
@@ -131,7 +131,7 @@
       parameterized helper (session-name, tool-ids, tracking atom as
       parameters) to avoid the two copies drifting out of sync on future
       changes to the timeout/teardown logic.
-- [ ] Add a real wall-clock-timeout unit test for
+- [x] Add a real wall-clock-timeout unit test for
       `default-friction-run-helper`, mirroring
       `default-run-helper-timeout-branch-test`
       (`context_manager_helper_runtime_test.clj`) for the entity-resolution

@@ -634,3 +634,36 @@
   failures), duplicated bounded-helper-session logic between
   `default-run-helper`/`default-friction-run-helper`, and a missing real
   wall-clock-timeout test for `default-friction-run-helper`.
+
+## Follow-up execution (post-review pass)
+
+- addressed 3 review steps:
+  - Added `use-fixtures :each` to `context_manager_model_selection_test.clj`
+    resetting both `entity-resolution-helper-session-ids` and
+    `friction-helper-session-ids` (the actual gap; the only shared-atom-
+    touching test file with no fixture — `friction_parsing_test.clj`,
+    `friction_task_files_test.clj`, and `rendering_test.clj` were audited
+    and confirmed to never reference session-ids or either atom, so no
+    fixture gap there).
+  - Extracted the shared bounded-child-helper-session mechanism (create
+    child → track → bounded run via future-owns-teardown → deref-or-
+    timeout → close/untrack) out of `default-run-helper` and
+    `default-friction-run-helper` into one private `bounded-helper-
+    session-run` fn parameterized on `:session-name`, `:tool-ids`/
+    `:tool-names`, and `:tracking-atom`; both original fns are now thin
+    wrappers supplying their own config. No behaviour change (verified by
+    the full existing `default-run-helper`/`default-friction-run-helper`
+    test suites, unchanged, all still passing).
+  - Added `default-friction-run-helper-timeout-branch-test`
+    (`context_manager_friction_helper_runtime_test.clj`, new file),
+    mirroring `default-run-helper-timeout-branch-test`: drives the real
+    `deref`/`::timeout` branch with an injected small `:wall-clock-ms`,
+    asserting the child stays tracked in `friction-helper-session-ids`
+    (not the unrelated entity-resolution atom) mid-run, is not closed
+    until the orphan settles, and is closed+untracked afterward.
+  - Verification: `clojure -M:test --focus extensions` → 334 tests, 1307
+    assertions, 0 failures (up from 333/1300), stable across 7 repeated
+    unseeded runs (the flaky-test repro no longer reproduces). `clj-kondo
+    --lint` clean on all changed src/test files. `clj-paren-repair` clean.
+    Full `bb test`: same pre-existing unrelated failure set as before
+    (57 files under `.scry-results`, none in `extensions.context-manager*`).

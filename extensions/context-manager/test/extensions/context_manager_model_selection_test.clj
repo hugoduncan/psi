@@ -1,8 +1,19 @@
 (ns extensions.context-manager-model-selection-test
   (:require
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [extensions.context-manager :as context-manager]
    [extensions.context-manager-test-support :refer [base-tp stub]]))
+
+;; Guards against cross-namespace pollution of the shared `defonce`
+;; helper-session-id atoms: several test namespaces reuse the hardcoded
+;; session-id "s1" (this file's `base-tp` included), so a prior test that
+;; leaves "s1" tracked in either atom would otherwise make
+;; `entity-resolution-no-local-model-no-op-test` spuriously observe "s1" as
+;; a known-helper session (nil diagnostic instead of "no local model").
+(use-fixtures :each (fn [f]
+                      (reset! context-manager/entity-resolution-helper-session-ids #{})
+                      (reset! context-manager/friction-helper-session-ids #{})
+                      (f)))
 
 (deftest entity-resolution-no-local-model-no-op-test
   (testing "no local model yields no-op with no helper run"
