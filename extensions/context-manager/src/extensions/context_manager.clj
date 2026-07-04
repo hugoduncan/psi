@@ -11,6 +11,7 @@
    (evidence)` mappings as a pre-turn context block."
   (:require
    [clojure.string :as str]
+   [extensions.context-manager.friction :as friction]
    [psi.ai.model-selection :as model-selection]))
 
 (defn- on-turn-finished
@@ -327,148 +328,19 @@
 ;; ---------------------------------------------------------------------------
 ;; Post-turn tooling-friction analyzer (task 239)
 ;; ---------------------------------------------------------------------------
+;; Pure prompt/parsing/rendering core and task-file creation/listing live in
+;; `extensions.context-manager.friction` (kept out of this ns to stay within
+;; the file-length ratchet); re-exported here as the ns's public surface.
 
-(def ^:private friction-history-turn-count
-  "Number of most-recent turns fed to the friction helper (design.md:
-   'Analysis input')."
-  4)
-
-;; friction-task-cap (2) and friction-recent-closed-limit (20) — design.md's
-;; decided cap and closed-task dedup-list bound — are introduced in slices
-;; 2/3 (task-listing, orchestration) where they are first referenced, to
-;; avoid an unused-private-var lint warning here.
-
-(defn- render-task-list
-  "Render `[{:id .. :title ..} ...]` as `NNN-slug: title` lines, one per
-   task, for embedding in the dedup section of the helper prompt. Empty
-   input renders as `(none)`."
-  [tasks]
-  (if (seq tasks)
-    (str/join "\n" (map (fn [{:keys [id title]}] (str id ": " title)) tasks))
-    "(none)"))
-
-(def ^:private friction-detection-instructions
-  (str
-   "You are looking for developer-experience-for-the-agent friction in the "
-   "conversation excerpt below: awkward tool contracts, missing tools, "
-   "missing/outdated dependencies, slow or noisy feedback loops, or "
-   "discoverability gaps in tooling — friction that could be *fixed by a "
-   "change to tooling or dependencies*.\n\n"
-   "Exclude: project bugs, feature requests, and user mistakes. Only surface "
-   "issues an agent working on this project would want fixed in its own "
-   "working environment."))
-
-(def ^:private friction-output-contract
-  (str
-   "Output contract (strict — one block per issue):\n\n"
-   "ISSUE: <slug> | <title>\n"
-   "FRICTION: <what friction was observed>\n"
-   "EVIDENCE: <which turns / what happened>\n"
-   "SUGGESTION: <suggested tooling/dependency change>\n\n"
-   "Before emitting an ISSUE block, check it against the existing open and "
-   "recently-closed tasks listed below. If it matches an existing task, "
-   "instead emit a single line:\n\n"
-   "DUPLICATE: <slug> ~ <existing-task-id>\n\n"
-   "and emit no ISSUE block for it. If nothing qualifies, output exactly:\n\n"
-   "NONE\n\n"
-   "Emit only these block/line forms — no preamble, commentary, headings, or "
-   "clarification questions. Expect at most a few genuine issues per run."))
-
-(defn build-friction-prompt
-  "Compose the friction-analysis helper's system + user prompt from
-   `{:history-excerpt :open-tasks :recent-closed-tasks}`, where
-   `:open-tasks`/`:recent-closed-tasks` are `[{:id .. :title ..} ...]`.
-   Returns `{:system-prompt .. :user-prompt ..}`."
-  [{:keys [history-excerpt open-tasks recent-closed-tasks]}]
-  {:system-prompt (str/join "\n\n" [friction-detection-instructions
-                                    friction-output-contract])
-   :user-prompt   (str/join "\n\n"
-                            [(str "Conversation history excerpt (last "
-                                  friction-history-turn-count " turns):\n\n"
-                                  (or history-excerpt "(none)"))
-                             (str "Open tasks:\n\n" (render-task-list open-tasks))
-                             (str "Recently-closed tasks:\n\n"
-                                  (render-task-list recent-closed-tasks))])})
-
-;; --- parsing (pure) --------------------------------------------------------
-
-(def ^:private friction-issue-header-re
-  #"^ISSUE:\s*(.+?)\s*\|\s*(.+)$")
-
-(def ^:private friction-duplicate-re
-  #"^DUPLICATE:\s*(.+?)\s*~\s*(.+)$")
-
-(defn- friction-field
-  [prefix line]
-  (when (str/starts-with? line prefix)
-    (str/trim (subs line (count prefix)))))
-
-(defn- parse-friction-block
-  "Parse a single ISSUE-headed block of lines (header + following
-   FRICTION/EVIDENCE/SUGGESTION lines) into
-   `{:slug :title :friction :evidence :suggestion}`, or nil when any
-   required field is missing (malformed block dropped, fail-safe)."
-  [lines]
-  (when-let [[_ slug title] (re-matches friction-issue-header-re (first lines))]
-    (let [rest-lines (rest lines)
-          friction   (some #(friction-field "FRICTION:" %) rest-lines)
-          evidence   (some #(friction-field "EVIDENCE:" %) rest-lines)
-          suggestion (some #(friction-field "SUGGESTION:" %) rest-lines)]
-      (when (and (seq slug) (seq title) (seq friction) (seq evidence) (seq suggestion))
-        {:slug slug :title title :friction friction
-         :evidence evidence :suggestion suggestion}))))
-
-(defn parse-friction-output
-  "Parse the friction helper's raw text output into
-   `{:issues [{:slug :title :friction :evidence :suggestion}] :duplicates
-   [{:slug :existing-id}]}`. Malformed ISSUE blocks are dropped
-   (fail-safe: no task rather than a garbage task); `nil`/blank/`NONE`
-   input yields empty vectors for both."
-  [raw]
-  (let [lines (str/split-lines (or raw ""))]
-    (loop [lines lines issues [] duplicates []]
-      (if (empty? lines)
-        {:issues issues :duplicates duplicates}
-        (let [line (first lines)]
-          (cond
-            (re-matches friction-issue-header-re line)
-            (let [block (cons line (take-while #(not (or (re-matches friction-issue-header-re %)
-                                                         (re-matches friction-duplicate-re %)))
-                                               (rest lines)))
-                  parsed (parse-friction-block block)]
-              (recur (drop (count block) lines)
-                     (cond-> issues parsed (conj parsed))
-                     duplicates))
-
-            (re-matches friction-duplicate-re line)
-            (let [[_ slug existing-id] (re-matches friction-duplicate-re line)]
-              (recur (rest lines) issues (conj duplicates {:slug slug :existing-id existing-id})))
-
-            :else
-            (recur (rest lines) issues duplicates)))))))
-
-(defn cap-issues
-  "Split `issues` into the first `cap` (`:selected`) and the remainder
-   (`:dropped`), preserving order."
-  [issues cap]
-  {:selected (vec (take cap issues))
-   :dropped  (vec (drop cap issues))})
-
-;; --- rendering (pure) -------------------------------------------------------
-
-(defn render-friction-design-md
-  "Render a generated task's `design.md` content for a friction `issue`
-   map `{:slug :title :friction :evidence :suggestion}`. Includes an
-   auto-generated marker naming this analyzer, the observed friction,
-   evidence, and the suggested tooling/dependency change."
-  [{:keys [title friction evidence suggestion]}]
-  (str "# " title "\n\n"
-       "> Auto-generated by the context-manager post-turn "
-       "tooling-friction analyzer (task 239). No human review has "
-       "occurred yet — verify before acting.\n\n"
-       "## Friction\n\n" friction "\n\n"
-       "## Evidence\n\n" evidence "\n\n"
-       "## Suggested change\n\n" suggestion "\n"))
+(def build-friction-prompt friction/build-friction-prompt)
+(def parse-friction-output friction/parse-friction-output)
+(def cap-issues friction/cap-issues)
+(def render-friction-design-md friction/render-friction-design-md)
+(def allocate-task-id friction/allocate-task-id)
+(def next-free-task-id friction/next-free-task-id)
+(def create-friction-task! friction/create-friction-task!)
+(def open-tasks friction/open-tasks)
+(def recent-closed-tasks friction/recent-closed-tasks)
 
 ;; --- orchestration --------------------------------------------------------
 

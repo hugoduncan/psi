@@ -27,19 +27,19 @@
 
 ## Slice 2 — task-file creation
 
-- [ ] Add `allocate-task-id`: scan `munera/open/` and `munera/closed/` under a
+- [x] Add `allocate-task-id`: scan `munera/open/` and `munera/closed/` under a
       given root → max NNN + 1, zero-padded ≥3; unit test with temp dirs
       (empty, open-only, closed-max, non-numeric noise dirs preserved/ignored).
-- [ ] Add `create-friction-task!`: worktree-root + issue → writes
+- [x] Add `create-friction-task!`: worktree-root + issue → writes
       `munera/open/NNN-slug/design.md` only; on pre-existing directory,
       re-allocate NNN (bounded retries, e.g. 5) then give up returning nil;
       returns created task id or nil; unit tests: creation, collision
       re-allocation, retry exhaustion, design.md-only (no plan.md/steps.md).
-- [ ] Add closed-task listing: `recent-closed-tasks` root → last 20 closed task
+- [x] Add closed-task listing: `recent-closed-tasks` root → last 20 closed task
       ids+titles by git commit order of moves into `munera/closed/`, falling
       back to name/mtime order when git fails; `open-tasks` → all open task
       ids+titles; unit tests with temp git repo and non-git dir fallback.
-- [ ] Run tests + lint; commit slice 2.
+- [x] Run tests + lint; commit slice 2.
 
 ## Slice 3 — orchestration
 

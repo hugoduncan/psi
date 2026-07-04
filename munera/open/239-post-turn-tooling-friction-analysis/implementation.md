@@ -359,3 +359,59 @@
   except two expected "unused private var" warnings for
   `friction-task-cap`/`friction-recent-closed-limit`, which slice 2/3
   will consume.
+
+## Slice 2 implementation (task-file creation)
+
+- Extracted the entire post-turn friction analyzer pure-core/task-file
+  section out of `extensions/context_manager.clj` into a new
+  `extensions.context-manager.friction` namespace
+  (`extensions/context-manager/src/extensions/context_manager/friction.clj`).
+  Reason: adding slice 2 pushed `context_manager.clj` to 843 lines, over the
+  bb.edn `file-length-legacy-max-lines` default ratchet (800); rather than
+  adding a legacy-ratchet exception, split into a second namespace (more code
+  is still coming in slices 3/4, so this avoids re-hitting the ratchet
+  repeatedly). `context_manager.clj` re-exports the friction ns's public fns
+  as plain `def` aliases (`build-friction-prompt`, `parse-friction-output`,
+  `cap-issues`, `render-friction-design-md`, `allocate-task-id`,
+  `next-free-task-id`, `create-friction-task!`, `open-tasks`,
+  `recent-closed-tasks`) so existing/slice-1 tests and callers keep using
+  `context-manager/...` unchanged. Slice 3's orchestration fn can call either
+  the re-exported aliases or `friction/...` directly — no preference yet.
+- `allocate-task-id` scans `munera/open/` ∪ `munera/closed/` directory names
+  matching `^(\d+)-.+$`, taking `max + 1`, zero-padded to 3 digits (`"001"`
+  when nothing exists).
+- `create-friction-task!`'s retry-on-collision logic is NOT reachable via
+  pre-existing directories alone: `allocate-task-id` always scans the full
+  directory listing first, so any directories a test pre-creates are already
+  reflected in the computed starting NNN (there's no way to make the initial
+  scan "miss" existing dirs). The retry loop only matters for a genuine
+  concurrent-writer race (another process creates `NNN-slug` after our scan
+  but before our `mkdirs`). To keep this testable without real concurrency,
+  the collision/retry/exhaustion algorithm is factored into a pure
+  `next-free-task-id [start-n slug taken? max-retries]` (fake `taken?`
+  predicate, no filesystem) — `create-friction-task!` calls it with a real
+  `.exists`-backed `taken?`. `next-free-task-id` is re-exported too, and is
+  the thing slice 2's "retry exhaustion" test actually exercises directly;
+  the `create-friction-task!`-level test for that scenario only asserts the
+  happy path still works (documented in a test comment — see
+  `context_manager_friction_task_files_test.clj`).
+- `recent-closed-tasks` git-ordering: `git log --format=%H --name-only
+  --diff-filter=A -- munera/closed/`, most-recent commit first (git's
+  default `log` order), taking the first `munera/closed/<id>/...` path
+  component per commit, `distinct` (keeps first/most-recent occurrence).
+  Falls back to `sort` descending by directory name when git exits non-zero
+  or the parsed id list is empty (covers both "not a git repo" and "no
+  closed tasks yet" cases uniformly).
+- `task-title` (shared by `open-tasks`/`recent-closed-tasks`) reads the
+  first `# ` heading line of a task's `design.md` for its title, falling
+  back to the task id itself when `design.md` is missing or has no heading.
+- New test file:
+  `extensions/context-manager/test/extensions/context_manager_friction_task_files_test.clj`.
+  `bb test --focus extensions`: 322 tests, 1275 assertions, 0 failures
+  (up from 317/1256 after slice 1). `clj-kondo` clean on both source files
+  and the new test file. `clj-paren-repair` clean (no reformatting needed).
+- Full-repo `bb test` still shows pre-existing, unrelated failures in
+  `psi.turn-runtime.accumulator-test`/`psi.turn-runtime.core-test`
+  (statecharts working-memory/turn-data errors) — unrelated to
+  context-manager/friction code, not introduced by this slice (confirmed by
+  file/namespace scope; these failures are outside `extensions/`).
