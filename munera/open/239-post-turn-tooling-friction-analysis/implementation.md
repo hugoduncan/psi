@@ -570,3 +570,57 @@
   333 tests, 1300 assertions, 0 failures (up from 332/1297 after slice 3).
   `clj-kondo --lint` clean on all context-manager src + test files.
   `clj-paren-repair` clean.
+
+## Slice 5 implementation (docs & verification)
+
+- Extension namespace docstring (`context_manager.clj`) trimmed to a short
+  summary of all three registered behaviours (project-context,
+  entity-resolution, friction analyzer) plus a pointer to
+  `doc/extensions.md` for full behaviour details — kept short deliberately:
+  a full-detail docstring (matching the entity-resolution paragraph's level
+  of detail) pushed `context_manager.clj` over the `file-length-legacy-max-
+  lines` ratchet (800; file was 816 with the first, fuller docstring draft,
+  then 805, then 799 after trimming both the friction and entity-resolution
+  summary paragraphs). Full behavioural detail (trigger, scope/exclusions,
+  cap=2, dedup mechanism, N=20 closed-task bound, generated-task format,
+  failure paths) lives in `doc/extensions.md`'s context-manager section
+  instead, mirroring the existing entity-resolution sub-bullet style.
+- `doc/extensions.md` and `CHANGELOG.md [Unreleased] → Added` both updated
+  with user-visible-behaviour descriptions of the friction analyzer,
+  matching design.md's Decisions/Constraints/AC wording (scope/exclusions,
+  single bounded no-tools helper session doing detection+dedup as one call,
+  cap=2, N=20 closed-task dedup bound, design.md-only auto-generated task
+  format, no-op failure paths).
+- Acceptance criteria 1–7 verified against design.md and the slice 1–4
+  implementation:
+  1. AC1 (async, non-blocking) — covered by slice 4's
+     `context_manager_friction_wiring_test.clj` (handler returns well under
+     a 200ms-sleeping `:query-fn`'s duration).
+  2. AC2 (task created with friction/evidence/suggestion/marker) — covered
+     by slice 1's `render-friction-design-md` test and slice 3's
+     `friction-analysis` issue→task-created test.
+  3. AC3 (duplicate → no task + diagnostic) — covered by slice 3's
+     duplicate-skip test.
+  4. AC4 (failure paths → no-op, no disruption) — covered by slice 3's
+     no-model/no-worktree/helper-failure tests and the all-collaborators-
+     throw test.
+  5. AC5 (never runs on own or other known helper/infra sessions) — covered
+     by slice 3's own-helper-session and entity-resolution-helper-session
+     exclusion tests, backed by `known-helper-session?`'s three-signal
+     check (own atom, entity-resolution atom, session-name backstop).
+  6. AC6 (capped per run) — covered by slice 3's 3-issues→2-tasks cap test
+     (`friction-task-cap` = 2).
+  7. AC7 (test coverage list) — all named cases (issue→created,
+     duplicate→skipped, failure paths, both recursion-guard cases, cap)
+     confirmed present across the slice 1–4 test files.
+  All seven criteria are satisfied by existing slice 1–4 code/tests; slice
+  5 added no new test file, only docs.
+- Full `bb test` (whole repo): 2439 passed / 19 failed / 38 errored,
+  all in pre-existing unrelated namespaces (streaming/retry/turn-runtime/
+  review-workflow tests, same failure set noted after slice 2) — confirmed
+  none are in `extensions.context-manager*`. `bb test --focus extensions`:
+  333 tests, 1300 assertions, 0 failures (unchanged from slice 4).
+  `clj-kondo --lint` clean on all context-manager src + test files (doc/
+  extensions.md is not Clojure source and is not kondo-lintable — confirmed
+  its lint errors are markdown-parsed-as-edn noise, not real). `clj-paren-
+  repair` clean.

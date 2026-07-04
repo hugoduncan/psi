@@ -286,7 +286,32 @@ pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
       model emits a line only for mappings it judges confident; the augmenter
       accepts every well-formed parsed line and drops the confidence token from
       the rendered block.
-- No commands, tools, or prompt contributions.
+- Post-turn tooling-friction analyzer (task 239) — from the same
+  `session_turn_finished` handler, after logging session-id/turn-id it spawns
+  a fire-and-forget `future` that analyzes the last 4 turns for friction
+  fixable by tooling/dependency changes (not project bugs or feature work),
+  and automatically opens Munera tasks for newly identified issues.
+  - Scope: every session (top-level, delegated, workflow, helper) except this
+    analyzer's own helper sessions and other known helper/infra sessions
+    (e.g. entity-resolution helper sessions) — a recursion guard.
+  - Fire-and-forget: runs on its own thread outside the turn/dispatch
+    critical path; the handler always returns promptly regardless of
+    analysis outcome.
+  - Single bounded, no-tools local-model helper session (selected the same
+    local-first way as `entity-resolution`) performs both friction detection
+    and duplicate matching (against all open tasks and the 20
+    most-recently-closed tasks) as two phases of the same call.
+  - Non-duplicate issues are capped at 2 created tasks per analysis run
+    (remaining issues recur and are caught on a later turn); each created
+    task is `munera/open/NNN-slug/design.md` only (per munera's
+    design.md-only creation convention), written to the analyzed session's
+    own worktree, and clearly marked as auto-generated with the observed
+    friction, evidence (turn references), and suggested tooling/dependency
+    change.
+  - Every failure path (no local model available, missing worktree, helper
+    failure/timeout, malformed or empty helper output) logs a diagnostic and
+    no-ops — no task is created and the turn is never disrupted.
+- No commands, tools, or prompt contributions besides the augmenters above.
 
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)
 

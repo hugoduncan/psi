@@ -93,11 +93,11 @@
 
 ## Slice 5 — docs & verification
 
-- [ ] Update extension namespace docstring and any context-manager docs in
+- [x] Update extension namespace docstring and any context-manager docs in
       `doc/` describing the friction analyzer (trigger, scope, exclusions,
       cap, dedup, generated-task format).
-- [ ] Add CHANGELOG `[Unreleased]` → Added entry (user-visible behaviour:
+- [x] Add CHANGELOG `[Unreleased]` → Added entry (user-visible behaviour:
       automatic post-turn tooling-friction task creation).
-- [ ] Verify all acceptance criteria 1–7 against design.md; note verification
+- [x] Verify all acceptance criteria 1–7 against design.md; note verification
       in implementation.md.
-- [ ] Full `bb test`; `clj-kondo --lint` on changed files; commit slice 5.
+- [x] Full `bb test`; `clj-kondo --lint` on changed files; commit slice 5.

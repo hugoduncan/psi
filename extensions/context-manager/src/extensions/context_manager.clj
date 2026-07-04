@@ -1,14 +1,16 @@
 (ns extensions.context-manager
   "Context manager extension scaffold.
 
-   Subscribes to `session_turn_finished` events and registers a minimal
-   pre-turn project-context augmenter when the runtime exposes that API.
-
-   Also registers a second, model-backed `entity-resolution` pre-turn
-   augmenter (task 238): it runs a bounded, bash-tool-enabled local-model
-   helper session that applies the `entity-resolution` skill's method to the
-   parent turn, and injects any confidently-resolved `surface → canonical
-   (evidence)` mappings as a pre-turn context block."
+   Subscribes to `session_turn_finished` events; registers a minimal
+   pre-turn `project-context` augmenter, and a model-backed
+   `entity-resolution` pre-turn augmenter (task 238, bash-tool helper
+   session, resolves surfaces to canonical entities). Also runs a
+   fire-and-forget post-turn tooling-friction analyzer (task 239, see
+   `friction-analysis` and `extensions.context-manager.friction`) that
+   analyzes recent turns via a bounded no-tools local-model helper session
+   for tooling/dependency friction and opens capped, deduped
+   `munera/open/NNN-slug/design.md` tasks. See `doc/extensions.md` for full
+   behaviour details."
   (:require
    [clojure.string :as str]
    [extensions.context-manager.friction :as friction]
