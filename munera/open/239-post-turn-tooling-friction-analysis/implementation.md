@@ -115,3 +115,27 @@
   Acceptance criteria sections.
 - No new non-task files needed beyond those already listed above for round 1;
   these 3 items are resolvable from design.md content alone.
+
+## Design-follow-up completion (design-review batch: round 2, turns 2–3)
+
+- Segment: commits `1ae167bca` (ambiguity round 2, turn 2) and `3661627c9`
+  (inconsistency round 2, turn 3). Baseline: `1ae167bca^` (parent of the
+  oldest of the two), confirmed via
+  `git diff 1ae167bca^..HEAD -- design-steps.md` showing all 3 items as pure
+  additions.
+- All 3 unchecked items were in-scope and resolved by editing design.md,
+  then checked off in design-steps.md:
+  1. Helper-session shape: Dedup decision now states dedup-matching is a
+     second phase of the *same* bounded helper session as friction
+     detection (not a separate call), so no second recursion-guard/bounding
+     accounting is needed.
+  2. Recently-closed window: defined (given the shape decision above) as a
+     fixed count — the N=20 most-recently-closed tasks by closure order,
+     not a time window — chosen so the list stays boundable within the
+     single session's existing output-size limit.
+  3. AC5/AC7 sync: both now name exclusion of other known helper/infra
+     sessions (entity-resolution, other workflow helpers), matching the
+     already-broadened Decisions "Scope of sessions" text.
+- N=20 is a planning-stage placeholder chosen for concreteness (not derived
+  from a stated constraint) — future review/planning may revise this count
+  if it proves wrong in practice.

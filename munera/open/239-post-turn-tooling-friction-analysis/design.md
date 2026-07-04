@@ -56,9 +56,16 @@ agent's working environment.
 - **Task location:** the session's effective worktree.
 - **Dedup:** before creating, check existing open **and closed** tasks for
   the same issue (slug/content similarity — the helper model can be given
-  the list of existing task ids + titles and asked to match). Duplicate →
-  skip, log diagnostic. Recently-closed duplicates also suppress creation
-  (avoid reopening churn).
+  the list of existing task ids + titles and asked to match). Dedup matching
+  is a second phase of the *same* bounded helper session that performs
+  friction detection (not a separate helper-session call) — this keeps the
+  recursion-guard/own-helper-session tracking and bounding rules (rounds,
+  wall-clock, output size) single-scoped, with no second call to account
+  for. Duplicate → skip, log diagnostic. "Recently-closed" (also suppressed,
+  to avoid reopening churn) means the N most-recently-closed tasks (N=20)
+  by closure order, not a time window — a fixed count keeps the list passed
+  to the helper model boundable within the single session's output-size
+  limit.
 - **Configurability:** always-on for now. No config flag in v1.
 
 ## Constraints
@@ -93,10 +100,13 @@ agent's working environment.
    diagnostic is logged.
 4. Helper failure, missing local model, or missing worktree → no task, no
    turn disruption, diagnostic logged.
-5. The analyzer never runs on its own helper sessions.
+5. The analyzer never runs on its own helper sessions, nor on other known
+   helper/infra sessions (e.g. entity-resolution helper sessions, other
+   workflow helper sessions).
 6. Task creation is capped per analysis run.
 7. Tests cover: issue → task created; duplicate → skipped; failure paths →
-   no-op; recursion guard; per-run cap.
+   no-op; recursion guard (own-helper and other known helper/infra
+   sessions); per-run cap.
 
 ## Open questions
 

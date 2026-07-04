@@ -33,14 +33,14 @@
 
 # Design steps — ambiguity review (design-review round 2, turn 2)
 
-- [ ] Dedup says "Recently-closed duplicates also suppress creation (avoid
+- [x] Dedup says "Recently-closed duplicates also suppress creation (avoid
       reopening churn)" but does not define "recently" (no time window, no
       count of closed tasks to scan, no reference commit range). Clarify
       what "recently-closed" means (e.g. all closed tasks, a bounded lookback
       window, or N most-recently-closed) so the dedup mechanism has an
       unambiguous scope to check against.
 
-- [ ] It's unclear whether the dedup/duplicate-matching step ("the helper
+- [x] It's unclear whether the dedup/duplicate-matching step ("the helper
       model can be given the list of existing task ids + titles and asked to
       match") runs inside the same bounded helper-session invocation that
       performs friction detection, or as a second, separate helper-session
@@ -53,7 +53,7 @@
 
 # Design steps — inconsistency review (design-review round 2, turn 3)
 
-- [ ] The "Scope of sessions" decision excludes both "the extension's own
+- [x] The "Scope of sessions" decision excludes both "the extension's own
       helper sessions" *and* "other extensions'/runtime's known helper/infra
       sessions (e.g. entity-resolution helper sessions, other workflow helper
       sessions)" as non-representative analysis inputs. However, acceptance
