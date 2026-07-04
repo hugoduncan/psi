@@ -1235,3 +1235,42 @@
       `:select-model`) asserting a well-formed `:no-op` (`"no local model"`
       diagnostic, empty operations/child-ids, helper never runs), mirroring
       `entity-resolution-throwing-helper-no-op-test`.
+
+## Test-review follow-ups (turn 20)
+
+- [ ] **`tail-lines-within`'s single-line-over-limit branch — the one place
+      the excerpt is *deliberately* allowed to exceed `max-history-chars` —
+      is untested, and it violates the length-bound invariant the turn-15
+      test pins for the multi-line case.** `tail-lines-within` starts
+      `kept = (list (last lines))` and only prepends earlier lines while the
+      joined length stays `<= limit`; per its own docstring, "If the last
+      (most recent) line alone exceeds `limit`, keep it alone … rather than
+      emit nothing." So when a single most-recent snippet's rendered
+      `Role: …` line exceeds `max-history-chars` (4000),
+      `render-history-excerpt` returns that whole over-limit line and the
+      excerpt is emitted *unbounded* (verified live: a 5000-char snippet →
+      5006-char excerpt, `> 4000`). This is a distinct, documented behaviour
+      (preserve the highest-value anaphora line over the char-bound) but it
+      directly contradicts the turn-15
+      `build-entity-resolution-prompt-tail-truncation-test`'s `(<= (count
+      excerpt) 4000)` assertion, which only ever runs the *multi-line*
+      drop-leading-lines path (its filler lines are ~3806 chars each, all
+      individually under 4000). No test drives a single snippet whose
+      rendered line exceeds the limit, so this accept-boundary is entirely
+      unpinned: a regression that mid-cut the long single line (re-introducing
+      the corrupt role-less fragment turn-15 fixed), emitted nothing, or
+      changed the retained content would pass every current test, and the
+      "excerpt is bounded" guarantee is silently false for this input class.
+      Add a `render-history-excerpt` / `build-entity-resolution-prompt` case
+      with a `:tail` of exactly one entry whose `:snippet` renders longer than
+      `max-history-chars`, asserting the documented behaviour explicitly —
+      either (a) if the over-limit-single-line-kept-whole behaviour is
+      intended, assert the excerpt equals that one intact `Role: …` line
+      (pinning it as a deliberate, documented exception to the char-bound and
+      reconciling it with the turn-15 `<= 4000` assertion, e.g. by scoping
+      that assertion to the multi-line case), or (b) if the char-bound must
+      hold universally, change the behaviour to bound the single line too and
+      assert `<= max-history-chars`. Pick one so the length-bound contract is
+      a single coherent, tested statement rather than two silently-conflicting
+      ones (one asserted for multi-line, the opposite documented-but-untested
+      for single-line).

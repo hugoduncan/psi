@@ -1844,3 +1844,11 @@ Key decisions / discoveries:
   `create-child-session`'s parent param correctly, and the embedded method
   faithfully drops skill step 6 / Output Shape / runtime-graph line per
   Resolved decision 6. All 19 prior review turns resolved; DONE notes match code.
+
+## Test review (turn 20)
+
+- Added 1 step: `tail-lines-within`'s single-line-over-limit branch is
+  untested and violates the turn-15 `<= max-history-chars` excerpt-bound
+  invariant (a >4000-char single snippet yields a >4000-char excerpt). The
+  documented deliberate-exception behaviour has no covering test, so the
+  length-bound contract is two silently-conflicting statements.
