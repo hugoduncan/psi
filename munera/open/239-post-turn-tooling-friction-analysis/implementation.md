@@ -1,6 +1,47 @@
 - steps.md: both round-4 follow-up items checked off; no items remain
   unchecked in that section.
 
+## Follow-up execution (post-review pass, round 6)
+
+- Fixed the round-6 check-then-act race in `friction-analysis`
+  (`extensions/context_manager.clj`): the previous body did a plain
+  `(contains? @friction-in-flight-session-ids session-id)` read followed by
+  a separate `(swap! friction-in-flight-session-ids conj session-id)`, with
+  no atomicity between the two. Replaced with a single atomic
+  `(swap-vals! friction-in-flight-session-ids conj session-id)` — the
+  returned `[prior new]` pair lets the caller see whether `session-id` was
+  already present in the *same* atomic operation that adds it, closing the
+  window rather than narrowing it. No other behaviour change (the
+  `finally`-based release on completion is unchanged).
+- Added `truly-concurrent-runs-same-session-atomic-claim-test`
+  (`context_manager_friction_analysis_test.clj`): starts two calls for the
+  same `session-id` with a `CountDownLatch`+shared-promise handshake (no
+  ordering between them — neither waits for the other to reach a blocking
+  point), with a small `Thread/sleep` inside the injected `:run-helper` to
+  widen the claim-to-completion window, repeated 20 times with the
+  in-flight atom reset between iterations; asserts exactly one run reaches
+  `:success` and exactly one is turned away with `:no-op` every iteration.
+  This is the same shape the review's minimal harness reproduced the bug
+  with (20 concurrent callers, small delay between read and swap, all 20
+  previously reporting `:claimed`); against the atomic `swap-vals!` fix all
+  20 iterations correctly show exactly one claimant. Left the existing
+  `concurrent-run-same-session-guarded-test` (ordered handshake) in place —
+  it still validates the guard's user-facing skip/diagnostic behaviour;
+  the new test targets the atomicity property specifically.
+- Verification: `clojure -M:test --focus
+  extensions.context-manager-friction-analysis-test` → 14 tests, 129
+  assertions, 0 failures, stable across 5 repeated runs.
+  `clojure -M:test --focus extensions` → 347 tests, 1450 assertions, 0
+  failures. `clj-kondo --lint` clean on both changed files.
+  `clj-paren-repair` clean. No doc/CHANGELOG changes needed — this is an
+  internal atomicity fix to not-yet-released behaviour already described in
+  `doc/extensions.md`'s in-flight-guard bullet and the `[Unreleased]`
+  CHANGELOG entry; no new user-observable behaviour.
+- steps.md: the round-6 follow-up item checked off; no items remain
+  unchecked in that section.
+
+- addressed 1 review step
+
 ## Implementation review, round 6 (task-implementation-review skill)
 
 - Added 1 follow-up step to steps.md: the round-4 in-flight guard

@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 6)
 
-- [ ] `friction-analysis`'s per-session in-flight guard
+- [x] `friction-analysis`'s per-session in-flight guard
       (`extensions/context_manager.clj`) has a check-then-act race: it does
       a plain `(contains? @friction-in-flight-session-ids session-id)` read
       followed by a separate `(swap! friction-in-flight-session-ids conj

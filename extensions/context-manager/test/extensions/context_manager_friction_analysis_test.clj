@@ -147,6 +147,44 @@
       (is (= :success (:status (deref fut 2000 :timeout)))
           "the first run still completes normally once unblocked"))))
 
+(deftest truly-concurrent-runs-same-session-atomic-claim-test
+  (testing "round-6 review follow-up: two calls for the same session-id
+            started with no ordering handshake (no wait for the first to
+            reach a blocking point) can never both claim the in-flight
+            slot — the claim is a single atomic swap-vals!, not a
+            separate contains? read + swap! conj"
+    (dotimes [_ 20]
+      (reset! context-manager/friction-in-flight-session-ids #{})
+      (let [start   (promise)
+            results (atom [])
+            latch   (java.util.concurrent.CountDownLatch. 2)
+            run     (fn []
+                      (.countDown latch)
+                      (deref start 2000 ::timeout)
+                      (let [result (context-manager/friction-analysis
+                                    {} {:session-id "s1"}
+                                    (collaborators
+                                     {:run-helper (fn [_opts]
+                                                    ;; widen the window between
+                                                    ;; the claim and completion
+                                                    (Thread/sleep 5)
+                                                    {:child-session-id "h1" :text issue-output})}))]
+                        (swap! results conj result)))
+            fut1    (future (run))
+            fut2    (future (run))]
+        (.await latch)
+        (deliver start true)
+        (let [r1 (deref fut1 2000 ::timeout)
+              r2 (deref fut2 2000 ::timeout)]
+          (is (not= ::timeout r1))
+          (is (not= ::timeout r2)))
+        (let [statuses (mapv :status @results)]
+          (is (= 2 (count statuses)))
+          (is (= 1 (count (filter #(= :success %) statuses)))
+              (str "exactly one run should proceed to completion, got " statuses))
+          (is (= 1 (count (filter #(= :no-op %) statuses)))
+              (str "exactly one run should be turned away as already in-flight, got " statuses)))))))
+
 (deftest sequential-runs-same-session-not-blocked-test
   (testing "the in-flight guard doesn't leak across runs: a session can be
             analyzed again once its prior run has finished"

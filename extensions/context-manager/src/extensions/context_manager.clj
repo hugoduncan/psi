@@ -658,18 +658,22 @@
    in-flight from a prior run, rather than letting both runs
    independently detect + create a task for the same issue (a race dedup
    alone can't catch, since dedup only checks tasks that existed before
-   the run started)."
+   the run started). The claim itself uses `swap-vals!` so the
+   \"was it already present?\" check and the \"add it\" mutation happen
+   in a single atomic operation (round-6 review follow-up) — a plain
+   `contains?` read followed by a separate `swap!` conj is a
+   check-then-act race that lets two truly-concurrent calls for the same
+   `session-id` both observe an empty set and both proceed."
   ([api payload] (friction-analysis api payload nil))
   ([api payload collaborators]
-   (let [session-id (:session-id payload)]
-     (if (contains? @friction-in-flight-session-ids session-id)
+   (let [session-id (:session-id payload)
+         [prior _]  (swap-vals! friction-in-flight-session-ids conj session-id)]
+     (if (contains? prior session-id)
        {:status :no-op :diagnostic "analysis already in flight for this session"}
-       (do
-         (swap! friction-in-flight-session-ids conj session-id)
-         (try
-           (friction-analysis* api session-id collaborators)
-           (finally
-             (swap! friction-in-flight-session-ids disj session-id))))))))
+       (try
+         (friction-analysis* api session-id collaborators)
+         (finally
+           (swap! friction-in-flight-session-ids disj session-id)))))))
 
 (defn entity-resolution-augmentation
   "Entity-resolution turn augmenter (task 238).
