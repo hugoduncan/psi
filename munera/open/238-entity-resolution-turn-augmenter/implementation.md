@@ -1888,3 +1888,11 @@ Key decisions / discoveries:
   `with-redefs catalog-view` (registration test) and the `[~]`-deferred
   insertion-point/replay coverage are pre-existing documented, justified
   boundary decisions, not new gaps.
+
+## Test review (turn 22 — test-shaper)
+
+- Added 1 step: history-excerpt tests pin only the `User:` role label; the
+  `Assistant:` (non-`user`) arm of `history-line` is unguarded — a
+  role-agnostic `[A-Z][a-z]*: .*` line-shape check plus `User:`-only equality
+  would pass a role-collapsing/dropping/mis-casing regression on the
+  augmenter's anaphora material.

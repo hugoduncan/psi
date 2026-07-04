@@ -1329,3 +1329,33 @@
       (`:no-op`, `"slash-command-only prompt"`, no select/run), so
       leading-`/`-after-trim ⇒ skip and internal-`/` ⇒ do-not-skip are one
       coherent tested pair.
+
+## Test-review follow-ups (turn 22)
+
+- [ ] **The `Assistant:` role-label rendering of history lines is never
+      pinned — only `User:` is asserted, so `history-line`'s
+      `(str/capitalize (name role))` is unguarded for every non-`user` role
+      (the other half of every real conversation).** Across the history-excerpt
+      tests, the assistant-role entry's *snippet content* is asserted present
+      (`build-entity-resolution-prompt-test`: `#"which one\?"`), but its
+      rendered `Assistant:` prefix is never asserted. Every prefix assertion
+      is either `User:`-specific (`#"User: the former one"`, the single-line
+      excerpt equality/`starts-with? "User: "`) or a role-agnostic
+      `#"[A-Z][a-z]*: .*"` line-shape check that matches `User:`, `Assistant:`,
+      or any other capitalized label indiscriminately. Consequently a
+      regression that (a) hard-coded every line to `User:`, (b) dropped
+      assistant-role lines entirely, or (c) mangled/mis-cased the assistant
+      label would pass the whole suite — the assistant-role branch of
+      `history-line` has no distinguishing, behaviour-focused test. This is
+      the augmenter's *anaphora* material (the assistant's prior turn is
+      exactly the context "it"/"that"/"the former" resolves against), so its
+      correct role attribution is a real behavioural contract, not incidental
+      formatting. Add an assertion (extend `build-entity-resolution-prompt-test`
+      or add a focused case) that an `assistant`-role `:tail` entry renders as
+      a line literally prefixed `Assistant: <snippet>` in the excerpt —
+      pinning the non-`user` arm of `history-line` so a role-collapsing /
+      role-dropping / mis-casing regression fails. Optionally assert both
+      `User:` and `Assistant:` lines coexist in the rendered excerpt in
+      projection order, so role attribution across a mixed conversation is one
+      coherent tested statement rather than a `User:`-only example plus a
+      role-blind line-shape check.
