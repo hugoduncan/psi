@@ -1936,3 +1936,11 @@ Key decisions / discoveries:
   deliberate resolved decision (e.g. the flow-test's `:success`/provenance
   assertions are the turn-15 uniform-success-cluster decision, not incidental
   redundancy). Focused suite green (33 tests, 143 assertions, 0 failures).
+
+## Docs review (turn 25 — review-task-docs)
+
+- Added 1 step: README.md's `context-manager` description is stale (logging
+  scaffold only, no turn-augmentation mention) and inconsistent with the
+  shipped implementation, though doc/extensions.md and CHANGELOG are accurate
+  and complete. Non-compliance with the design's "docs updated to describe …
+  augmenter capability" criterion at the README surface.

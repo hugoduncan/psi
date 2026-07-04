@@ -1408,3 +1408,28 @@
       and `N) ` marker-prefixed lines all yield the bare `:surface`
       ("the resolver"), pinning marker stripping so a leaked list marker in
       the parent-visible block is caught.
+
+## Docs-review follow-ups (turn 25 — review-task-docs)
+
+- [ ] **README.md's `context-manager` description is stale and inconsistent
+      with the shipped implementation — it never mentions turn augmentation.**
+      `README.md` (extensions list) still describes `context-manager` as a
+      "scaffold extension that subscribes to `session_turn_finished` events and
+      logs session/turn identifiers", with zero mention of the two registered
+      turn augmenters (`grep -n augment README.md` → no matches). But the
+      extension now registers `project-context` and this task's `entity-resolution`
+      augmenter, and the `Resolved entities` pre-turn context block is a
+      user-visible behaviour (already in `CHANGELOG.md [Unreleased] Added` and
+      fully documented in `doc/extensions.md`). The design acceptance criterion
+      "Docs updated to describe automatic entity resolution as a context-manager
+      / entity-resolution augmenter capability" is met in `doc/extensions.md` and
+      `CHANGELOG.md`, but `README.md` is now factually inconsistent with the
+      implementation (review-task-docs checklist item 5, consistency; item 1,
+      new behaviours reflected in README). Update the README `context-manager`
+      bullet to note it registers pre-turn turn augmenters (project-context +
+      automatic entity-resolution injecting a `Resolved entities` block),
+      linking to `doc/extensions.md` for detail — keeping it terse to match the
+      surrounding one-line extension summaries. (Whether the augmentation
+      omission originated in task 237's project-context work or here, the
+      entity-resolution feature this task ships makes the stale README a
+      user-facing doc gap to close under this task's docs criterion.)
