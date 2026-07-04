@@ -1921,3 +1921,18 @@ Key decisions / discoveries:
   formatting leaked into the parent-visible block. Pinned by a new
   `parse-mapping-lines-test` case. Focused suite green (33 tests, 143
   assertions, 0 failures); clj-kondo clean.
+
+## Test review (turn 24 — test-shaper)
+
+- No steps added. Reviewed the full entity-resolution test suite against
+  test-shaper (simple ∧ consistent ∧ robust ∧ economical). Suite is already
+  well-shaped from 23 prior review turns: shared canonical fixtures/doubles
+  (`context-manager-test-support`), promise-gated deterministic async cleanup
+  (`fake-run-api` `:block-until`/`:run-began` + bounded `await-untracked`),
+  uniform no-op diagnostic + success `:child-session-ids` provenance
+  assertions, symmetric select/run exception-safety, and boundary coverage
+  (list markers, single-line-over-limit, slash negative boundary, role
+  labels). Every candidate finding was already addressed or contradicts a
+  deliberate resolved decision (e.g. the flow-test's `:success`/provenance
+  assertions are the turn-15 uniform-success-cluster decision, not incidental
+  redundancy). Focused suite green (33 tests, 143 assertions, 0 failures).
