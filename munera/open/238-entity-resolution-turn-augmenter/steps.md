@@ -1332,7 +1332,7 @@
 
 ## Test-review follow-ups (turn 22)
 
-- [ ] **The `Assistant:` role-label rendering of history lines is never
+- [x] **The `Assistant:` role-label rendering of history lines is never
       pinned — only `User:` is asserted, so `history-line`'s
       `(str/capitalize (name role))` is unguarded for every non-`user` role
       (the other half of every real conversation).** Across the history-excerpt
@@ -1359,3 +1359,12 @@
       projection order, so role attribution across a mixed conversation is one
       coherent tested statement rather than a `User:`-only example plus a
       role-blind line-shape check.
+      DONE: extended `build-entity-resolution-prompt-test`'s existing mixed
+      `:tail` (user/assistant/slash) with an `Assistant:`-prefix testing block —
+      asserts the assistant-role snippet renders as `Assistant: which one?`
+      (pinning the non-`user` arm of `history-line`'s
+      `(str/capitalize (name role))` against a role-collapsing/dropping/
+      mis-casing regression) and that the `User:` and `Assistant:` lines coexist
+      in projection order in the rendered excerpt, so mixed-conversation role
+      attribution is one coherent tested statement rather than a `User:`-only
+      example plus a role-blind line-shape check.

@@ -1896,3 +1896,9 @@ Key decisions / discoveries:
   role-agnostic `[A-Z][a-z]*: .*` line-shape check plus `User:`-only equality
   would pass a role-collapsing/dropping/mis-casing regression on the
   augmenter's anaphora material.
+
+- Addressed 1 turn-22 review step: pinned `Assistant:` role-label rendering in
+  `build-entity-resolution-prompt-test` (assistant-role snippet →
+  `Assistant: which one?`, plus User/Assistant projection-order coexistence).
+  No src change — `history-line` already renders `(str/capitalize (name role))`
+  correctly; the gap was purely test coverage of the non-`user` arm.

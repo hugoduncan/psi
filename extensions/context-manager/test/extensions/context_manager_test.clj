@@ -364,6 +364,19 @@
       (is (re-find #"look at the pathom resolver" user-prompt)
           "prior-turn user :snippet line is included for anaphora")
       (is (re-find #"which one\?" user-prompt))
+      (testing "assistant-role lines render with an `Assistant:` prefix (anaphora attribution)"
+        ;; The assistant's prior turn is exactly what "it"/"that"/"the former"
+        ;; resolves against, so its role attribution is a behavioural contract,
+        ;; not incidental formatting. Pin the non-`user` arm of history-line so
+        ;; a role-collapsing (everything → User:), role-dropping, or mis-casing
+        ;; regression fails.
+        (is (re-find #"Assistant: which one\?" user-prompt)
+            "assistant-role :snippet renders as `Assistant: <snippet>`")
+        (let [excerpt (second (re-find #"(?s)Conversation history excerpt:\n\n(.*?)\n\nCurrent user request:"
+                                       user-prompt))]
+          (is (< (.indexOf ^String excerpt "User: look at the pathom resolver")
+                 (.indexOf ^String excerpt "Assistant: which one?"))
+              "User and Assistant lines coexist in projection order")))
       (is (not (re-find #"/help" user-prompt))
           "slash-command history lines are dropped")))
   (testing "map-shaped history :tail snippets appear in the user prompt"
