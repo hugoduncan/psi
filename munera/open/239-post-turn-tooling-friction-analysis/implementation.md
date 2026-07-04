@@ -278,3 +278,14 @@
   from literal reuse (e.g. "bash-tool-less" helper vs. `default-run-helper`'s
   hardcoded `:tool-ids ["bash"]`) are self-consistent adaptations of the
   existing pattern, not unstated ambiguity — no new design-steps added.
+
+- inconsistency review (plan-review session, turn 2) — no inconsistency
+  review feedback. Cross-checked plan.md ↔ steps.md ↔ design.md using
+  context already loaded from turn 1 (no new re-reads needed): slice
+  titles/order, collaborator names (`:select-model`/`:run-helper`/
+  `:fetch-history`/`:list-tasks`/`:create-task!`/`:session-info`), the
+  `friction-helper-session-ids` atom name, cap=2, and the 120s wall-clock
+  budget all match consistently across plan.md and steps.md, and the
+  session-exclusion guard in both correctly maps onto design.md's
+  own-helper-vs-other-known-helper/infra distinction. No new design-steps
+  added.
