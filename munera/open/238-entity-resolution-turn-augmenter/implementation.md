@@ -1902,3 +1902,12 @@ Key decisions / discoveries:
   `Assistant: which one?`, plus User/Assistant projection-order coexistence).
   No src change — `history-line` already renders `(str/capitalize (name role))`
   correctly; the gap was purely test coverage of the non-`user` arm.
+
+## Test review (turn 23 — test-shaper)
+
+- Added 1 step: `parse-mapping-lines` has no coverage for list-marker-prefixed
+  lines (the most common markdown-model output shape); verified at the REPL
+  that `- surface → …` / `1. surface → …` parse but leak the marker into
+  `:surface`, so the injected block renders a mis-attributed referring
+  expression. The surface-field contract on the parser's primary real-world
+  input is unguarded — decide strip-vs-keep and pin it.

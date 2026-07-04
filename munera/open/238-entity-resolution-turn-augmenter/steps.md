@@ -1368,3 +1368,35 @@
       in projection order in the rendered excerpt, so mixed-conversation role
       attribution is one coherent tested statement rather than a `User:`-only
       example plus a role-blind line-shape check.
+
+## Test-review follow-ups (turn 23 — test-shaper)
+
+- [ ] **`parse-mapping-lines` has no test for list-marker-prefixed mapping
+      lines — the single most common markdown-model output shape — and the
+      current behaviour silently leaks the marker into the injected `:surface`
+      field, an untested and arguably-wrong contract on the parser's central
+      input.** Every `parse-mapping-lines` case (`parse-mapping-lines-test`)
+      feeds a bare `surface → canonical (evidence; confidence)` line. But a
+      local model instructed to "emit one line per confident mapping" routinely
+      emits a *markdown list*: `- the resolver → foo/bar.clj (exact path; high)`
+      or `1. the resolver → foo (exact; high)`. Verified at the REPL: such lines
+      **do** parse, but the leading `- ` / `1. ` marker is captured verbatim as
+      part of `:surface` (`{:surface "- the resolver" ...}`,
+      `{:surface "1. the resolver" ...}`), so the rendered
+      `:append-context-block` content becomes `- the resolver → …` /
+      `1. the resolver → …` — the list marker surfaces (mis-attributed as part
+      of the referring expression) in the pre-turn context the parent model
+      reads. No test pins whether this is intended (marker kept) or a defect
+      (marker should be stripped so the surface is the bare referring
+      expression). This is the parser's primary real-world input class and its
+      surface-field contract is unguarded. Decide the intended contract and pin
+      it: either (a) strip a leading ordered/unordered list marker
+      (`-`, `*`, `+`, `N.`, `N)`) plus following whitespace before splitting on
+      the arrow, and add a test asserting `- the resolver → …` and
+      `1. the resolver → …` both yield `:surface "the resolver"` (marker
+      stripped, so the injected block shows the bare reference); or (b) if the
+      marker is deliberately kept, add a test that documents and pins that
+      choice so a future strip-normalization is a visible, tested behaviour
+      change rather than a silent one. Prefer (a): the surface field is
+      re-rendered verbatim into the parent-visible block, and a leaked list
+      marker misrepresents the resolved referring expression.
