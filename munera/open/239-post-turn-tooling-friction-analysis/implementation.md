@@ -159,3 +159,8 @@
   their parent/originating session — the design doesn't say whether task
   creation targets the analyzed session's own worktree or one resolved by
   walking up to an originating/top-level session.
+
+- inconsistency review (design-review round 3, turn 3) added 1 new design
+  step: the Dedup decision bounds the closed-tasks list to N=20 for
+  output-size reasons but leaves the open-tasks list (checked in the same
+  dedup call) unbounded, undermining its own stated boundedness rationale.

@@ -88,3 +88,18 @@
       what "effective worktree" resolves to when the analyzed session is a
       delegated or workflow session, so task creation has one unambiguous
       target directory.
+
+# Design steps — inconsistency review (design-review round 3, turn 3)
+
+- [ ] The Dedup decision bounds the *closed*-tasks dedup list to a fixed
+      count ("N=20 most-recently-closed tasks... a fixed count keeps the
+      list passed to the helper model boundable within the single session's
+      output-size limit"), but states no analogous bound for the *open*-tasks
+      side of the same dedup check ("check existing open **and closed**
+      tasks... the helper model can be given the list of existing task ids +
+      titles"). As open tasks accumulate over the project's life, the
+      open-tasks list is unbounded, undermining the stated boundedness
+      rationale that motivated capping the closed list. Clarify whether the
+      open-tasks list also needs a bound (and if so, what it is), or state
+      why it doesn't need one (e.g. open task count is expected to stay
+      small in practice).
