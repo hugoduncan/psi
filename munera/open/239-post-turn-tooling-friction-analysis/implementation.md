@@ -43,6 +43,11 @@
 - Cap value chosen as **2** (upper end of the prior suggested range) —
   future review/planning should treat this as final unless re-opened.
 
+- architectural review (design-review round 2, turn 1) — no new architectural
+  review feedback. Re-checked against AGENTS.md, ramora/META.md, and
+  doc/architecture.md after the round-1 follow-up edits (ctx-guard decision,
+  cap=2, session scope, Goal wording); no new architectural misfit found.
+
 ## Notes for addressing accumulated design-steps
 
 - All 4 design-steps are design.md edits (wording/decision clarifications),
