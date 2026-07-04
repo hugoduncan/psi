@@ -748,3 +748,12 @@
   unchecked in that section.
 
 - addressed 2 review steps
+
+## Implementation review, round 4 (task-implementation-review skill)
+
+- Added 2 follow-up steps to steps.md: `default-fetch-history` rescans the
+  entire unbounded session message history every turn (O(n) per turn, O(n²)
+  over a session's life) instead of a bounded tail; and no per-session
+  in-flight guard exists, so two overlapping runs on the same session can
+  both pass their own dedup check and create duplicate tasks for the same
+  issue.

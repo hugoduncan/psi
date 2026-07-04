@@ -221,3 +221,38 @@
       4, or rename/redocument `friction-history-turn-count` to reflect that
       it bounds messages, not turns, and re-confirm the resulting window
       still satisfies AC1's intent.
+
+## Follow-up (implementation review, round 4)
+
+- [ ] `default-fetch-history` (`extensions/context_manager.clj`) queries the
+      session's *entire* unbounded `:psi.agent-session/message-history` via
+      EQL (`agent-core-messages` returns the full in-memory `:messages`
+      vector, unbounded) and then runs `friction/group-into-turns` +
+      `friction/last-n-turns` — both O(total-messages) — over the whole
+      thing every single completed turn, merely to keep the last 4 turns.
+      This is unlike the existing bounded pre-turn `:turn-augmentation/
+      history` projection the entity-resolution augmenter uses
+      (`build-augmentation-history-projection`,
+      `components/agent-session/src/psi/agent_session/dispatch_effects.clj`,
+      already `take-last 8` at the source). For a long-running/autonomous
+      session (many turns, e.g. a multi-hour workflow session), this
+      re-scans the growing full history on every turn — O(n) work per turn,
+      O(n²) cumulative over the session's lifetime — where only a small
+      constant-bounded tail is ever used. Bound the EQL query or the
+      grouping/slicing to a small tail (mirroring the existing `take-last 8`
+      pattern) instead of scanning the full message vector each turn.
+- [ ] `friction-analysis` has no per-session serialization/coalescing guard:
+      if two turns of the *same* session complete close enough together
+      that a still-in-flight `future` (bounded by the 120s helper wall-clock
+      budget) hasn't finished when the next turn's analysis starts, both
+      runs independently snapshot `:list-tasks` (open/recent-closed) before
+      either has created a task, so both can independently detect the same
+      issue and both create a task for it — a duplicate neither run's own
+      dedup pass can see, since dedup only checks against tasks that existed
+      *before* that run started. AC3 requires duplicates be skipped; this
+      race is only guarded against for id-collision (the `next-free-task-id`
+      retry loop), not for two concurrent runs on the same session both
+      passing their own dedup check for the same underlying issue. Consider
+      a per-session in-flight guard (e.g. skip/coalesce a new run for
+      `session-id` while a previous run for that same `session-id` is still
+      in flight).
