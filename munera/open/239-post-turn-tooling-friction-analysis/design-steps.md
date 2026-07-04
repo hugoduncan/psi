@@ -1,6 +1,6 @@
 # Design steps — architectural review (design-review session, turn 1)
 
-- [ ] Reconsider the "Home" decision's reuse of a bare `defonce` recursion-guard
+- [x] Reconsider the "Home" decision's reuse of a bare `defonce` recursion-guard
       atom (explicitly modeled on `helper-session-ids`) for tracking this
       analyzer's own helper sessions. `ramora/META.md` states: "psi runtime
       owns process-scoped managed services on ctx for long-lived subprocesses
@@ -16,13 +16,13 @@
 
 # Design steps — ambiguity review (design-review session, turn 2)
 
-- [ ] Acceptance criterion 6 says "Task creation is capped per analysis run,"
+- [x] Acceptance criterion 6 says "Task creation is capped per analysis run,"
       but the Constraints section only offers a range as a suggestion
       ("suggest: 1–2"), not a decided value. Resolve to a single stated cap
       (or explicitly state the cap is a planning-stage decision) so the
       acceptance criterion has one unambiguous number to test against.
 
-- [ ] The recursion-guard decision excludes only "the extension's own helper
+- [x] The recursion-guard decision excludes only "the extension's own helper
       sessions." It's unclear whether other extensions' or the runtime's own
       non-substantive helper/infra sessions (e.g. entity-resolution helper
       sessions, other workflow helper sessions) are in-scope inputs for
@@ -33,7 +33,7 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
-- [ ] The Goal states the analyzer should "automatically create a Munera task
+- [x] The Goal states the analyzer should "automatically create a Munera task
       for each newly identified issue," implying one task per issue with no
       upper bound. The Constraints section directly contradicts this: "at
       most a small fixed number of tasks created per turn analysis (suggest:

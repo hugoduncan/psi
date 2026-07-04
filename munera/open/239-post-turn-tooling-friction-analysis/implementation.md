@@ -21,6 +21,28 @@
   rule) all match the current codebase/AGENTS.md — no discrepancies found
   there.
 
+## Design-follow-up completion (design-review batch: turns 1–3)
+
+- Baseline for this follow-up: `545956c44^` (parent of the oldest of the 3
+  design-steps-adding commits `545956c44`/`abe5d7066`/`99f29e624`, confirmed
+  via `git diff 545956c44^..HEAD -- design-steps.md` showing all 4 items as
+  additions with no prior follow-up commit existing).
+- All 4 unchecked items were in-scope (added by the batch, still unchecked)
+  and were resolved by editing design.md, then checked off in
+  design-steps.md:
+  1. Recursion-guard state: added an explicit "Recursion-guard state"
+     decision requiring planning to choose ctx-keyed-managed-service vs.
+     extension-local atom, rather than defaulting silently.
+  2. Cap ambiguity: Constraints now states the cap as a decided single
+     number (2), removing the "suggest: 1–2" range language.
+  3. Helper/infra session scope: Scope-of-sessions decision now explicitly
+     excludes other extensions'/runtime's known helper/infra sessions (e.g.
+     entity-resolution helpers), not just this analyzer's own helpers.
+  4. Goal wording: reworded to "create a Munera task for newly identified
+     issues, up to a per-run cap" to match the AC6/Constraints cap.
+- Cap value chosen as **2** (upper end of the prior suggested range) —
+  future review/planning should treat this as final unless re-opened.
+
 ## Notes for addressing accumulated design-steps
 
 - All 4 design-steps are design.md edits (wording/decision clarifications),

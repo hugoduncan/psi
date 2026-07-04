@@ -5,8 +5,8 @@
 After every completed turn, in every session, run an asynchronous
 (fire-and-forget) local-model analysis of the recent conversation to detect
 friction the LLM experienced that could be reduced by changes to **tooling or
-dependencies** — and automatically create a Munera task for each newly
-identified issue in the session's worktree.
+dependencies** — and automatically create a Munera task for newly identified
+issues, up to a per-run cap, in the session's worktree.
 
 This is explicitly *not* about project bugs or feature work. The target is
 developer-experience-for-the-agent: making it easier for the LLM to work on
@@ -25,8 +25,17 @@ agent's working environment.
 
 - **Scope of sessions:** every session (top-level, delegated, workflow,
   helper) — no exclusions for v1, except the extension's own helper sessions
-  (guard against recursion, same pattern as existing
-  `helper-session-ids` atoms).
+  (guard against recursion) and other extensions'/runtime's known
+  helper/infra sessions (e.g. entity-resolution helper sessions, other
+  workflow helper sessions) — these are also excluded as non-representative
+  analysis inputs, not just this analyzer's own helpers.
+- **Recursion-guard state:** planning must explicitly choose between a
+  ctx-keyed managed service (aligned with `ramora/META.md`'s
+  process-scoped-managed-service model) and a bare extension-local
+  `defonce` atom (the existing `helper-session-ids` pattern) for tracking
+  this analyzer's own helper sessions — this design does not mandate either,
+  but requires the choice to be a deliberate planning-stage decision rather
+  than a default copy-paste of the existing atom pattern.
 - **Trigger:** post-turn, fire-and-forget async. Must never block or delay
   the turn pipeline; failures are logged and swallowed.
 - **Home:** part of the existing `extensions/context-manager` extension,
@@ -65,9 +74,8 @@ agent's working environment.
 - Concurrent NNN allocation may collide across sessions/branches; follow
   munera convention (rename, never merge). Creation should tolerate a
   pre-existing directory by re-allocating.
-- Volume control: at most a small fixed number of tasks created per turn
-  analysis (suggest: 1–2) even if more issues are detected; remaining issues
-  will recur and be caught later.
+- Volume control: at most 2 tasks created per turn analysis, even if more
+  issues are detected; remaining issues will recur and be caught later.
 - Respect extension boundary: implementation lives in
   `extensions/context-manager`, uses declared subscriptions/permissions;
   align manifest, capabilities, docs, tests (extension-development skill).
