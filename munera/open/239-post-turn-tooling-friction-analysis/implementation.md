@@ -269,3 +269,12 @@
   in earlier "Notes for addressing ... design-steps" sections
   (`ramora/META.md`, `AGENTS.md`, `doc/architecture.md`,
   `extensions/context-manager/src/extensions/context_manager.clj`).
+
+- ambiguity review (plan-review session, turn 1) — no ambiguity review
+  feedback. Read plan.md/steps.md (steps.md treated read-only) against
+  design.md and current `extensions/context_manager.clj` (existing
+  `entity-resolution-helper-session-ids`, `default-run-helper`,
+  `default-select-model`, `render-history-excerpt`); plan's stated deviations
+  from literal reuse (e.g. "bash-tool-less" helper vs. `default-run-helper`'s
+  hardcoded `:tool-ids ["bash"]`) are self-consistent adaptations of the
+  existing pattern, not unstated ambiguity — no new design-steps added.
