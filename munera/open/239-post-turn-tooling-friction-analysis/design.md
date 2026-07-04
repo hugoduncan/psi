@@ -53,7 +53,11 @@ agent's working environment.
   `munera/open/NNN-slug/design.md` only (per task-creation convention:
   design.md only, no plan.md/steps.md). NNN allocated per munera protocol
   (max over open/ ∪ closed/ + 1).
-- **Task location:** the session's effective worktree.
+- **Task location:** the session's effective worktree, meaning the analyzed
+  session's own worktree (the checkout it is actually running in), even
+  when that session is a delegated or workflow child running in a
+  different checkout than its parent/originating session — v1 does not
+  walk up to an originating/top-level session's worktree.
 - **Dedup:** before creating, check existing open **and closed** tasks for
   the same issue (slug/content similarity — the helper model can be given
   the list of existing task ids + titles and asked to match). Dedup matching
@@ -65,7 +69,10 @@ agent's working environment.
   to avoid reopening churn) means the N most-recently-closed tasks (N=20)
   by closure order, not a time window — a fixed count keeps the list passed
   to the helper model boundable within the single session's output-size
-  limit.
+  limit. The open-tasks side of the dedup list is unbounded in v1 (all
+  open tasks are passed) — open task count is expected to stay small
+  enough in practice to fit the helper session's output-size limit; if
+  open-task volume grows to threaten this, a bound should be added then.
 - **Configurability:** always-on for now. No config flag in v1.
 
 ## Constraints

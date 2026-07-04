@@ -78,7 +78,7 @@
 
 # Design steps — ambiguity review (design-review round 3, turn 2)
 
-- [ ] "Task location: the session's effective worktree" is undefined. The
+- [x] "Task location: the session's effective worktree" is undefined. The
       Decisions section scopes analysis to "every session (top-level,
       delegated, workflow, helper)", but delegated/workflow sessions can run
       in a different checkout than their parent/originating session. It's
@@ -91,7 +91,7 @@
 
 # Design steps — inconsistency review (design-review round 3, turn 3)
 
-- [ ] The Dedup decision bounds the *closed*-tasks dedup list to a fixed
+- [x] The Dedup decision bounds the *closed*-tasks dedup list to a fixed
       count ("N=20 most-recently-closed tasks... a fixed count keeps the
       list passed to the helper model boundable within the single session's
       output-size limit"), but states no analogous bound for the *open*-tasks

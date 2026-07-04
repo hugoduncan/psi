@@ -199,3 +199,24 @@
   (managed-service principle, unrelated to these two items),
   `extensions/context-manager/src/extensions/context_manager.clj`
   (existing helper-session-id atoms, session_turn_finished subscription).
+
+## Design-follow-up completion (design-review batch: round 3, turns 2–3)
+
+- Segment: commits `85b96ce61` (ambiguity round 3, turn 2) and `63ec1df55`
+  (inconsistency round 3, turn 3). Baseline: `85b96ce61^` (parent of the
+  oldest of the two), confirmed via
+  `git diff 85b96ce61^..HEAD -- design-steps.md` showing both items as pure
+  additions with no intervening follow-up commit.
+- Both unchecked items were in-scope and resolved by editing design.md, then
+  checked off in design-steps.md:
+  1. Effective worktree: "Task location" decision now states it means the
+     analyzed session's own worktree (the checkout it is actually running
+     in), even for delegated/workflow sessions — v1 does not walk up to an
+     originating/top-level session's worktree.
+  2. Open-tasks dedup bound: Dedup decision now states the open-tasks side
+     of the list is unbounded in v1 (all open tasks passed), on the
+     assumption open-task count stays small enough for the helper session's
+     output-size limit; revisit with a bound later if that assumption
+     breaks. This chose the "no bound needed in v1" resolution rather than a
+     symmetric fixed-count bound, since open-task volume is expected to
+     differ in growth pattern from the closed-task history.
