@@ -875,3 +875,35 @@
   tests (which use keyword-role fixtures) pass; and `message-snippet` drops
   `:type :error` content blocks, hiding the "tool errors" friction signal
   design.md itself names as a primary example.
+
+## Follow-up execution (post-review pass, round 7)
+
+- addressed 2 review steps:
+  - `friction/group-into-turns`'s turn-boundary check now goes through a
+    new `friction/user-turn-boundary?` predicate comparing `(name (:role
+    message))` against `"user"` (via `some->`, nil-safe), so it matches the
+    real string-role shape (`"user"`/`"assistant"`) as well as a `:user`
+    keyword. Updated `context_manager_friction_collaborators_test.clj`'s
+    `group-into-turns`/`last-n-turns`/`default-fetch-history` fixtures from
+    keyword to string roles (matching the real 237/agent-core shape used
+    elsewhere in the test suite), added a direct round-7 repro test (40
+    string-role messages → 20 turns, not 1), and kept one dedicated test
+    confirming the legacy `:user` keyword shape still works for backward
+    compatibility.
+  - `friction/message-snippet` now also extracts `{:type :error :text ..}`
+    blocks alongside `{:type :text :text ..}` (both share a `:text` key),
+    without adding a dependency on `psi.agent-session.message-text` — kept
+    the deliberate slice-4 classpath-isolation choice (`psi.agent-session`
+    is a test-only dep of `context-manager`'s `deps.edn`, not a `src` dep)
+    since a plain type filter is sufficient; added
+    `message-snippet-test` cases for a text+error mix and an error-only
+    message.
+  - Verification: `clojure -M:test --focus extensions` (via `bb test
+    --focus extensions`) → 347 tests, 1454 assertions, 0 failures (up from
+    346/1350). `clj-kondo --lint` clean on both changed files.
+    `clj-paren-repair` clean. Full `bb test`: same pre-existing unrelated
+    failure set as before (58 `.scry-results` files, none under
+    `extensions.context-manager*`; the one context-manager-adjacent name,
+    `workflow-child-session-context-test`, is agent-session's, unrelated).
+- steps.md: both round-7 follow-up items checked off; no items remain
+  unchecked in that section.

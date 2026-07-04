@@ -312,27 +312,44 @@
   "Extract joined text content from a raw agent-core message's `:content`
    vector — the `:fetch-history` collaborator's own minimal extraction
    (does not depend on `psi.agent-session.message-text`, which is not on
-   this extension's classpath)."
+   this extension's classpath). Includes both `{:type :text :text ..}`
+   and `{:type :error :text ..}` blocks — the latter is the representation
+   used throughout the codebase for provider/tool failures and timeouts
+   (e.g. `psi.ai.providers.anthropic.error`, `psi.turn-runtime.core`,
+   `psi.agent-session.turn`); design.md names 'tool errors/retries' as a
+   primary friction example, so dropping error blocks would hide exactly
+   the signal this excerpt is meant to surface."
   [message]
   (->> (:content message)
-       (filter #(= :text (:type %)))
+       (filter #(contains? #{:text :error} (:type %)))
        (map :text)
        (str/join " ")))
 
+(defn- user-turn-boundary?
+  "True when `message`'s `:role` is the *user* role. Real agent-core
+   messages persist `:role` as the string `\"user\"`/`\"assistant\"` (see
+   e.g. `psi.ai.providers.anthropic`, `psi.agent-session.turn`), not a
+   keyword — `name` normalizes either representation so this matches both
+   the production string shape and (for backwards test-fixture
+   compatibility) a `:user` keyword."
+  [message]
+  (= "user" (some-> (:role message) name)))
+
 (defn group-into-turns
   "Group a flat seq of raw agent-core messages (`{:role .. :content ..}`)
-   into per-turn groups, where a new turn begins at each `:role :user`
-   message. Any messages preceding the first `:user` message (unusual, but
-   possible) form their own leading group. Returns a vector of message
-   vectors, in original order — used by [[last-n-turns]] to bound the
-   friction helper's input to a number of *conversational turns* rather
-   than a number of raw messages (a single turn can span several raw
-   messages: one user message plus any number of assistant/tool-call/
-   tool-result messages before the next user message)."
+   into per-turn groups, where a new turn begins at each user-role message
+   (see [[user-turn-boundary?]]). Any messages preceding the first
+   user-role message (unusual, but possible) form their own leading group.
+   Returns a vector of message vectors, in original order — used by
+   [[last-n-turns]] to bound the friction helper's input to a number of
+   *conversational turns* rather than a number of raw messages (a single
+   turn can span several raw messages: one user message plus any number of
+   assistant/tool-call/tool-result messages before the next user
+   message)."
   [messages]
   (reduce
    (fn [turns message]
-     (if (or (empty? turns) (= :user (:role message)))
+     (if (or (empty? turns) (user-turn-boundary? message))
        (conj turns [message])
        (conj (pop turns) (conj (peek turns) message))))
    []

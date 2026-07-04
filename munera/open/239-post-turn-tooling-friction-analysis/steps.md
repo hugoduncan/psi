@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 7)
 
-- [ ] `friction/group-into-turns` (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+- [x] `friction/group-into-turns` (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       splits turns via `(= :user (:role message))` — a keyword comparison —
       but real agent-core messages persist `:role` as the *string*
       `"user"`/`"assistant"`, not a keyword: confirmed at
@@ -36,7 +36,7 @@
       message)))`), and update `group-into-turns`/`last-n-turns`/
       `default-fetch-history`'s test fixtures to use string roles so the
       test suite actually exercises the production shape.
-- [ ] `friction/message-snippet` only extracts `{:type :text :text ..}`
+- [x] `friction/message-snippet` only extracts `{:type :text :text ..}`
       content blocks, silently dropping `{:type :error ...}` blocks — the
       exact representation used throughout the codebase for provider/tool
       failures and timeouts (`components/ai/src/psi/ai/providers/anthropic/error.clj:132`,

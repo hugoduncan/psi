@@ -5,7 +5,11 @@
    supporting fns in `extensions.context-manager.friction`
    (`message-snippet`, `session-info-of`, `group-into-turns`,
    `last-n-turns`) — driven against realistic EQL query-session result
-   shapes (task 239, implementation review rounds 2 and 3)."
+   shapes (task 239, implementation review rounds 2, 3, and 7). Message
+   fixtures use the real agent-core `:role` string shape (`\"user\"`/
+   `\"assistant\"`/`\"tool\"`), not keywords (round-7 follow-up: keyword
+   fixtures previously masked a keyword-vs-string boundary-check bug in
+   `group-into-turns`)."
   (:require
    [clojure.test :refer [deftest is testing]]
    [extensions.context-manager :as context-manager]
@@ -15,36 +19,64 @@
   (testing "joins :text entries from a raw agent-core message's :content"
     (is (= "hello world"
            (friction/message-snippet
-            {:role :user
+            {:role "user"
              :content [{:type :text :text "hello"}
                        {:type :text :text "world"}]}))))
 
   (testing "ignores non-:text content entries"
     (is (= "hello"
            (friction/message-snippet
-            {:role :assistant
+            {:role "assistant"
              :content [{:type :text :text "hello"}
                        {:type :tool-use :id "t1" :name "bash" :input {}}]}))))
 
   (testing "no :content or no :text entries yields empty string"
-    (is (= "" (friction/message-snippet {:role :user})))
-    (is (= "" (friction/message-snippet {:role :user :content []})))))
+    (is (= "" (friction/message-snippet {:role "user"})))
+    (is (= "" (friction/message-snippet {:role "user" :content []}))))
+
+  (testing "includes :type :error blocks (round-7 follow-up: tool errors/
+            timeouts must not be hidden from the friction excerpt)"
+    (is (= "hello timed out"
+           (friction/message-snippet
+            {:role "assistant"
+             :content [{:type :text :text "hello"}
+                       {:type :error :text "timed out"}]}))))
+
+  (testing "an :error-only message still yields its error text"
+    (is (= "connection refused"
+           (friction/message-snippet
+            {:role "assistant"
+             :content [{:type :error :text "connection refused"}]})))))
 
 (deftest group-into-turns-test
   (testing "groups messages into per-turn vectors starting at each :user message"
-    (is (= [[{:role :user :n 1}]
-            [{:role :user :n 2} {:role :assistant :n 3} {:role :tool :n 4}]]
+    (is (= [[{:role "user" :n 1}]
+            [{:role "user" :n 2} {:role "assistant" :n 3} {:role "tool" :n 4}]]
            (friction/group-into-turns
-            [{:role :user :n 1}
-             {:role :user :n 2} {:role :assistant :n 3} {:role :tool :n 4}]))))
+            [{:role "user" :n 1}
+             {:role "user" :n 2} {:role "assistant" :n 3} {:role "tool" :n 4}]))))
 
   (testing "messages preceding the first :user message form their own leading group"
-    (is (= [[{:role :assistant :n 1}] [{:role :user :n 2}]]
+    (is (= [[{:role "assistant" :n 1}] [{:role "user" :n 2}]]
            (friction/group-into-turns
-            [{:role :assistant :n 1} {:role :user :n 2}]))))
+            [{:role "assistant" :n 1} {:role "user" :n 2}]))))
 
   (testing "empty input yields no turns"
-    (is (= [] (friction/group-into-turns [])))))
+    (is (= [] (friction/group-into-turns []))))
+
+  (testing "a :user keyword role (legacy fixture shape) still starts a new turn"
+    (is (= [[{:role :user :n 1}] [{:role :user :n 2} {:role :assistant :n 3}]]
+           (friction/group-into-turns
+            [{:role :user :n 1} {:role :user :n 2} {:role :assistant :n 3}]))))
+
+  (testing "round-7 direct repro: real string-role messages group into one
+            turn per user message, not one giant turn"
+    (let [messages (vec (mapcat (fn [n]
+                                  [{:role "user" :n n}
+                                   {:role "assistant" :n n}])
+                                (range 20)))]
+      (is (= 20 (count (friction/group-into-turns messages)))
+          "40 real-shaped messages (20 turns) group into 20 turns, not 1"))))
 
 (deftest bounded-message-tail-test
   (testing "returns messages unchanged when at or under cap"
@@ -66,10 +98,10 @@
 
 (deftest last-n-turns-test
   (testing "bounds a multi-message tool-heavy turn as a single turn, not several messages"
-    (let [messages [{:role :user :n 1} {:role :assistant :n 2}
-                    {:role :user :n 3} {:role :assistant :n 4} {:role :tool :n 5}
-                    {:role :tool :n 6} {:role :assistant :n 7}
-                    {:role :user :n 8} {:role :assistant :n 9}]]
+    (let [messages [{:role "user" :n 1} {:role "assistant" :n 2}
+                    {:role "user" :n 3} {:role "assistant" :n 4} {:role "tool" :n 5}
+                    {:role "tool" :n 6} {:role "assistant" :n 7}
+                    {:role "user" :n 8} {:role "assistant" :n 9}]]
       ;; turn A (excluded) = n1..n2, turn B (tool-heavy) = n3..n7 (5
       ;; messages), turn C = n8..n9 (2 messages). Last 2 turns = turn B +
       ;; turn C = the last 7 of the 9 messages here, even though a naive
@@ -77,12 +109,12 @@
       (is (= (subvec messages 2) (friction/last-n-turns messages 2)))))
 
   (testing "n nil or non-positive returns all messages unchanged"
-    (let [messages [{:role :user :n 1} {:role :assistant :n 2}]]
+    (let [messages [{:role "user" :n 1} {:role "assistant" :n 2}]]
       (is (= messages (friction/last-n-turns messages nil)))
       (is (= messages (friction/last-n-turns messages 0)))))
 
   (testing "n at or beyond the turn count returns all messages"
-    (let [messages [{:role :user :n 1} {:role :assistant :n 2}]]
+    (let [messages [{:role "user" :n 1} {:role "assistant" :n 2}]]
       (is (= messages (friction/last-n-turns messages 5))))))
 
 (deftest session-info-of-test
@@ -98,8 +130,8 @@
 
 (deftest default-fetch-history-test
   (testing "renders a bounded excerpt from realistic raw agent-core messages"
-    (let [messages [{:role :user :content [{:type :text :text "do X"}]}
-                    {:role :assistant :content [{:type :text :text "did X via bash workaround"}]}]
+    (let [messages [{:role "user" :content [{:type :text :text "do X"}]}
+                    {:role "assistant" :content [{:type :text :text "did X via bash workaround"}]}]
           queried (atom nil)
           api {:query-session (fn [session-id q]
                                 (reset! queried {:session-id session-id :query q})
@@ -111,10 +143,10 @@
       (is (= "User: do X\nAssistant: did X via bash workaround" excerpt))))
 
   (testing "only the last friction-history-turn-count entries are considered"
-    (let [excluded [{:role :user :content [{:type :text :text "excluded turn 1"}]}
-                    {:role :assistant :content [{:type :text :text "excluded turn 2"}]}]
+    (let [excluded [{:role "user" :content [{:type :text :text "excluded turn 1"}]}
+                    {:role "assistant" :content [{:type :text :text "excluded turn 2"}]}]
           included (vec (for [n (range friction/friction-history-turn-count)]
-                          {:role :user :content [{:type :text :text (str "included turn " n)}]}))
+                          {:role "user" :content [{:type :text :text (str "included turn " n)}]}))
           messages (vec (concat excluded included))
           api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
           excerpt (#'context-manager/default-fetch-history api "s1")]
@@ -137,14 +169,14 @@
     ;; and miss part of the tool-heavy turn. Turn-grouping keeps exactly
     ;; the last `friction-history-turn-count` (4) turns regardless of how
     ;; many raw messages each spans.
-    (let [excluded [{:role :user :content [{:type :text :text "excluded turn"}]}
-                    {:role :assistant :content [{:type :text :text "excluded reply"}]}]
-          tool-heavy-turn [{:role :user :content [{:type :text :text "turn A"}]}
-                           {:role :assistant :content [{:type :text :text "turn A step 1"}]}
-                           {:role :tool :content [{:type :text :text "turn A tool result"}]}
-                           {:role :assistant :content [{:type :text :text "turn A final"}]}]
+    (let [excluded [{:role "user" :content [{:type :text :text "excluded turn"}]}
+                    {:role "assistant" :content [{:type :text :text "excluded reply"}]}]
+          tool-heavy-turn [{:role "user" :content [{:type :text :text "turn A"}]}
+                           {:role "assistant" :content [{:type :text :text "turn A step 1"}]}
+                           {:role "tool" :content [{:type :text :text "turn A tool result"}]}
+                           {:role "assistant" :content [{:type :text :text "turn A final"}]}]
           other-turns (vec (for [n (range (dec friction/friction-history-turn-count))]
-                             {:role :user :content [{:type :text :text (str "turn " n)}]}))
+                             {:role "user" :content [{:type :text :text (str "turn " n)}]}))
           messages (vec (concat excluded tool-heavy-turn other-turns))
           api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
           excerpt (#'context-manager/default-fetch-history api "s1")]
@@ -163,9 +195,9 @@
             session, without losing the last friction-history-turn-count
             turns)"
     (let [many-old-turns (vec (for [n (range 500)]
-                                {:role :user :content [{:type :text :text (str "old turn " n)}]}))
+                                {:role "user" :content [{:type :text :text (str "old turn " n)}]}))
           recent-turns (vec (for [n (range friction/friction-history-turn-count)]
-                              {:role :user :content [{:type :text :text (str "recent turn " n)}]}))
+                              {:role "user" :content [{:type :text :text (str "recent turn " n)}]}))
           messages (vec (concat many-old-turns recent-turns))
           api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
           excerpt (#'context-manager/default-fetch-history api "s1")]
