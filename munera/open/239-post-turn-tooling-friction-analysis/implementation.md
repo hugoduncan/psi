@@ -1,4 +1,14 @@
-- steps.md: both round-4 follow-up items checked off; no items remain
+- steps.md: both round-7 follow-up items checked off; no items remain
+  unchecked in that section.
+
+## Implementation review, round 8 (task-implementation-review skill)
+
+- No new actionable issues found. Re-read design.md/plan.md/steps.md/
+  design-steps.md, all of `friction.clj` and `context_manager.clj`'s
+  friction-related code, `doc/extensions.md`/`CHANGELOG.md` friction
+  sections, and `.psi/extensions.edn`; ran `bb test --focus extensions`
+  (347 tests, 1454 assertions, 0 failures) and `clj-kondo --lint` (clean).
+  No steps added to steps.md.- steps.md: both round-4 follow-up items checked off; no items remain
   unchecked in that section.
 
 ## Follow-up execution (post-review pass, round 6)
