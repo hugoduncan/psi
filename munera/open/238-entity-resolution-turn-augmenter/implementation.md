@@ -1876,3 +1876,15 @@ Key decisions / discoveries:
   plus a leading-whitespace `"  /help"` positive case, pinning the anchored
   predicate's two-sided contract against a naive `includes?` regression.
   Focused tests + clj-kondo clean.
+
+## Test review (turn 22)
+
+- Reviewed against task-test-review skill (well-formed / spec-behaviour
+  coverage / infra-dep nullable-not-mocked). No steps added: every design
+  behaviour and acceptance criterion maps to a covering test; the non-`:ok`
+  select branch is hit by the empty-catalog registration test; infra deps use
+  the nullable extension api + `fake-run-api` doubles + injectable
+  `:select-model`/`:run-helper`/`:catalog` seams. The sole remaining
+  `with-redefs catalog-view` (registration test) and the `[~]`-deferred
+  insertion-point/replay coverage are pre-existing documented, justified
+  boundary decisions, not new gaps.
