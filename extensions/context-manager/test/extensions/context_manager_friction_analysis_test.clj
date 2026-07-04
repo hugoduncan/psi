@@ -6,6 +6,7 @@
 (use-fixtures :each (fn [f]
                       (reset! context-manager/friction-helper-session-ids #{})
                       (reset! context-manager/entity-resolution-helper-session-ids #{})
+                      (reset! context-manager/friction-in-flight-session-ids #{})
                       (f)))
 
 (def ^:private issue-output
@@ -121,6 +122,38 @@
       (is (= 2 (count (:created-task-ids result))))
       (is (= ["a" "b"] @created))
       (is (= 1 (:dropped-count result))))))
+
+(deftest concurrent-run-same-session-guarded-test
+  (testing "round-4 review follow-up: a second run for a session already
+            in-flight is skipped (not raced), so two overlapping runs on
+            the same session can't both independently detect + create a
+            task for the same issue"
+    (let [entered (promise)
+          release (promise)
+          in-flight-collaborators
+          (collaborators
+           {:run-helper (fn [_opts]
+                          (deliver entered true)
+                          (deref release 2000 ::timeout)
+                          {:child-session-id "h1" :text issue-output})})
+          fut (future (context-manager/friction-analysis
+                       {} {:session-id "s1"} in-flight-collaborators))]
+      (is (= true (deref entered 2000 :timeout))
+          "first run reached its (blocking) helper run")
+      (let [second (context-manager/friction-analysis {} {:session-id "s1"} (collaborators {}))]
+        (is (= :no-op (:status second)))
+        (is (= "analysis already in flight for this session" (:diagnostic second))))
+      (deliver release true)
+      (is (= :success (:status (deref fut 2000 :timeout)))
+          "the first run still completes normally once unblocked"))))
+
+(deftest sequential-runs-same-session-not-blocked-test
+  (testing "the in-flight guard doesn't leak across runs: a session can be
+            analyzed again once its prior run has finished"
+    (let [first-result (context-manager/friction-analysis {} {:session-id "s1"} (collaborators {}))
+          second-result (context-manager/friction-analysis {} {:session-id "s1"} (collaborators {}))]
+      (is (= :success (:status first-result)))
+      (is (= :success (:status second-result))))))
 
 (deftest all-collaborators-throw-never-throws-test
   (testing "friction-analysis never throws, even when every collaborator throws"

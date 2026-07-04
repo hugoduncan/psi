@@ -46,6 +46,24 @@
   (testing "empty input yields no turns"
     (is (= [] (friction/group-into-turns [])))))
 
+(deftest bounded-message-tail-test
+  (testing "returns messages unchanged when at or under cap"
+    (let [messages (vec (for [n (range 5)] {:n n}))]
+      (is (= messages (friction/bounded-message-tail messages 5)))
+      (is (= messages (friction/bounded-message-tail messages 10)))))
+
+  (testing "keeps only the last cap messages when over cap"
+    (let [messages (vec (for [n (range 10)] {:n n}))]
+      (is (= (subvec messages 7) (friction/bounded-message-tail messages 3)))))
+
+  (testing "cap nil or non-positive returns messages unchanged"
+    (let [messages (vec (for [n (range 5)] {:n n}))]
+      (is (= messages (friction/bounded-message-tail messages nil)))
+      (is (= messages (friction/bounded-message-tail messages 0)))))
+
+  (testing "coerces non-vector input to a vector"
+    (is (= [1 2 3] (friction/bounded-message-tail '(1 2 3) 10)))))
+
 (deftest last-n-turns-test
   (testing "bounds a multi-message tool-heavy turn as a single turn, not several messages"
     (let [messages [{:role :user :n 1} {:role :assistant :n 2}
@@ -137,6 +155,25 @@
       (is (every? #(re-find (re-pattern (str "turn " %)) excerpt)
                   (range (dec friction/friction-history-turn-count)))
           "every subsequent single-message turn is present"))))
+
+(deftest default-fetch-history-bounds-a-long-session-history-test
+  (testing "a session history far larger than the raw-message cap still
+            renders correctly (round-4 review follow-up: bounding avoids
+            O(total-messages) turn-grouping work every turn on a long
+            session, without losing the last friction-history-turn-count
+            turns)"
+    (let [many-old-turns (vec (for [n (range 500)]
+                                {:role :user :content [{:type :text :text (str "old turn " n)}]}))
+          recent-turns (vec (for [n (range friction/friction-history-turn-count)]
+                              {:role :user :content [{:type :text :text (str "recent turn " n)}]}))
+          messages (vec (concat many-old-turns recent-turns))
+          api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
+          excerpt (#'context-manager/default-fetch-history api "s1")]
+      (is (not (re-find #"old turn" excerpt))
+          "messages beyond the raw-message cap and the turn window are excluded")
+      (is (every? #(re-find (re-pattern (str "recent turn " %)) excerpt)
+                  (range friction/friction-history-turn-count))
+          "every recent turn within the tail-count window is present"))))
 
 (deftest default-session-info-test
   (testing "queries and shapes worktree-path/session-name via EQL"

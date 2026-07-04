@@ -757,3 +757,48 @@
   in-flight guard exists, so two overlapping runs on the same session can
   both pass their own dedup check and create duplicate tasks for the same
   issue.
+
+## Follow-up execution (post-review pass, round 4)
+
+- addressed 2 review steps:
+  - Added `friction/bounded-message-tail` (pure, `subvec`-based, O(1)) and a
+    new `friction/friction-history-raw-message-cap` (200) constant;
+    `default-fetch-history` now bounds the raw EQL-queried message vector to
+    this tail *before* `friction/group-into-turns`/`friction/last-n-turns`,
+    so per-turn grouping work is O(bounded-tail) instead of
+    O(total-session-messages) — mirrors `build-augmentation-history-
+    projection`'s pre-turn `take-last 8` precedent. Added
+    `bounded-message-tail-test` (pure fn, at/under/over-cap and nil/
+    non-positive-cap cases) and
+    `default-fetch-history-bounds-a-long-session-history-test` (500 old
+    turns + 4 recent turns still renders exactly the last 4)
+    (`context_manager_friction_collaborators_test.clj`).
+  - Added a `friction-in-flight-session-ids` defonce atom (alongside the
+    existing `friction-helper-session-ids`/`entity-resolution-helper-
+    session-ids` guards) and wrapped `friction-analysis`'s body in a
+    swap-in/`try`/`finally`-swap-out claim on `session-id`; a new run for a
+    session already claimed returns `{:status :no-op :diagnostic "analysis
+    already in flight for this session"}` immediately instead of racing the
+    in-flight run's own dedup snapshot. Extracted the previously-inline
+    cond/orchestration body into `friction/run-analysis` (a fully
+    collaborator-parameterized pure-orchestration fn in
+    `extensions.context-manager.friction`) to keep `context_manager.clj`
+    under the file-length ratchet (800) after the new guard code; no
+    behaviour change to the orchestration logic itself, only relocation +
+    explicit collaborator-map parameterization instead of closing over ns
+    privates. Added `concurrent-run-same-session-guarded-test` (blocks a
+    first run inside its injected `:run-helper`, confirms a second run for
+    the same session-id is skipped while the first is still in flight, then
+    confirms the first still completes normally once unblocked) and
+    `sequential-runs-same-session-not-blocked-test` (guard doesn't leak
+    across separate, non-overlapping runs)
+    (`context_manager_friction_analysis_test.clj`); both atoms reset in that
+    file's `use-fixtures`.
+  - Verification: `clojure -M:test --focus extensions` → 346 tests, 1350
+    assertions, 0 failures (up from 342/1336), stable across 5 repeated runs
+    of the friction-analysis test namespace. `clj-kondo --lint` clean on all
+    changed src/test files. `clj-paren-repair` clean. Full `bb test`: same
+    pre-existing unrelated failure set as before (57 files under
+    `.scry-results`, none in `extensions.context-manager*`).
+- steps.md: both round-4 follow-up items checked off; no items remain
+  unchecked in that section.

@@ -527,6 +527,20 @@
   ;; piecemeal here.
   (atom #{}))
 
+(defonce friction-in-flight-session-ids
+  ;; Round-4 implementation-review follow-up: without a per-session
+  ;; in-flight guard, two turns of the *same* session finishing close
+  ;; enough together that a still-in-flight run (bounded by the 120s
+  ;; helper wall-clock budget) hasn't finished when the next turn's
+  ;; analysis starts could both independently snapshot `:list-tasks`
+  ;; before either has created a task, so both could independently detect
+  ;; + create a task for the same issue — a duplicate neither run's own
+  ;; dedup pass can see (dedup only checks tasks that existed *before*
+  ;; that run started). Tracking in-flight session-ids here lets a new
+  ;; run for a session already in-flight skip/coalesce instead of racing
+  ;; it.
+  (atom #{}))
+
 (def ^:private known-helper-session-names
   "Session names of other extensions'/runtime's known helper/infra
    sessions (design.md: 'Scope of sessions') — excluded as non-
@@ -569,13 +583,18 @@
 
 (defn- default-fetch-history
   "Real `:fetch-history` collaborator: query the session's raw message
-   history via EQL, bound to the last `friction/friction-history-turn-
-   count` turns (`friction/last-n-turns`; design.md AC1), and render a
-   bounded, char-capped excerpt."
+   history via EQL, bound to a small raw-message tail
+   (`friction/bounded-message-tail`; round-4 review follow-up — avoids
+   O(total-messages) turn-grouping work every turn on a long session's
+   ever-growing history), then to the last `friction/friction-history-
+   turn-count` turns within that tail (`friction/last-n-turns`; design.md
+   AC1), and renders a bounded, char-capped excerpt."
   [api session-id]
   (let [messages (:psi.agent-session/message-history
                   ((:query-session api) session-id [:psi.agent-session/message-history]))
-        recent   (friction/last-n-turns messages friction/friction-history-turn-count)
+        bounded  (friction/bounded-message-tail
+                  messages friction/friction-history-raw-message-cap)
+        recent   (friction/last-n-turns bounded friction/friction-history-turn-count)
         tail     (mapv (fn [m] {:role (:role m) :snippet (friction/message-snippet m)})
                        recent)]
     (render-history-excerpt {:tail tail} nil max-history-chars)))
@@ -589,6 +608,32 @@
    ((:query-session api) session-id
                          [:psi.agent-session/worktree-path
                           :psi.agent-session/session-name])))
+
+(defn- friction-analysis*
+  "Guarded body of [[friction-analysis]] — runs once the caller has
+   already claimed `session-id` in `friction-in-flight-session-ids`.
+   Resolves default collaborators (needs this ns's other private
+   helpers) then delegates the actual cond/orchestration logic to
+   `friction/run-analysis`, which lives outside this ns's file-length
+   ratchet."
+  [api session-id collaborators]
+  (friction/run-analysis
+   {:session-id session-id
+    :log (or (:log api) (fn [_]))
+    :known-helper-session? #(known-helper-session? session-id %)
+    :select-model (or (:select-model collaborators)
+                      #(default-select-model api %))
+    :run-helper (or (:run-helper collaborators)
+                    #(default-friction-run-helper api %))
+    :fetch-history (or (:fetch-history collaborators)
+                       #(default-fetch-history api %))
+    :session-info (or (:session-info collaborators)
+                      #(default-session-info api %))
+    :list-tasks (or (:list-tasks collaborators)
+                    (fn [root] {:open (open-tasks root)
+                                :recent-closed (recent-closed-tasks root)}))
+    :create-task! (or (:create-task! collaborators) create-friction-task!)
+    :task-cap friction-task-cap}))
 
 (defn friction-analysis
   "Post-turn tooling-friction analysis orchestration (task 239).
@@ -606,78 +651,25 @@
    Returns a result map for testability: `{:status :no-op :diagnostic ..}`,
    or on completion `{:status :success :created-task-ids [..]
    :duplicate-diagnostics [..] :dropped-count n}`. The event-subscription
-   wiring (slice 4) discards this return value — it exists for tests."
+   wiring (slice 4) discards this return value — it exists for tests.
+
+   A per-session in-flight guard (`friction-in-flight-session-ids`;
+   round-4 review follow-up) skips a new run for a `session-id` still
+   in-flight from a prior run, rather than letting both runs
+   independently detect + create a task for the same issue (a race dedup
+   alone can't catch, since dedup only checks tasks that existed before
+   the run started)."
   ([api payload] (friction-analysis api payload nil))
   ([api payload collaborators]
-   (try
-     (let [session-id     (:session-id payload)
-           log            (or (:log api) (fn [_]))
-           select-model   (or (:select-model collaborators)
-                              #(default-select-model api %))
-           run-helper     (or (:run-helper collaborators)
-                              #(default-friction-run-helper api %))
-           fetch-history  (or (:fetch-history collaborators)
-                              #(default-fetch-history api %))
-           session-info   (or (:session-info collaborators)
-                              #(default-session-info api %))
-           list-tasks     (or (:list-tasks collaborators)
-                              (fn [root] {:open (open-tasks root)
-                                          :recent-closed (recent-closed-tasks root)}))
-           create-task!   (or (:create-task! collaborators) create-friction-task!)
-           info           (try (session-info session-id) (catch Throwable _ nil))]
-       (cond
-         (known-helper-session? session-id info)
-         {:status :no-op :diagnostic "known helper/infra session excluded"}
-
-         (blank? (:worktree-root info))
-         (do (log "context-manager: friction-analysis: no worktree, skipping")
-             {:status :no-op :diagnostic "no worktree"})
-
-         :else
-         (let [model (try (select-model session-id) (catch Throwable _ nil))]
-           (if (nil? model)
-             (do (log "context-manager: friction-analysis: no local model, skipping")
-                 {:status :no-op :diagnostic "no local model"})
-             (let [worktree-root (:worktree-root info)
-                   history-excerpt (try (fetch-history session-id) (catch Throwable _ nil))
-                   {:keys [open recent-closed]} (try (list-tasks worktree-root)
-                                                     (catch Throwable _ nil))
-                   {:keys [system-prompt user-prompt]}
-                   (build-friction-prompt {:history-excerpt history-excerpt
-                                           :open-tasks open
-                                           :recent-closed-tasks recent-closed})
-                   result (try
-                            (run-helper {:parent-session-id session-id
-                                         :system-prompt system-prompt
-                                         :user-prompt user-prompt
-                                         :model model})
-                            (catch Throwable _ nil))
-                   {:keys [issues duplicates]} (parse-friction-output (:text result))]
-               (doseq [{:keys [slug existing-id]} duplicates]
-                 (log (str "context-manager: friction-analysis: duplicate " slug
-                           " ~ " existing-id ", skipped")))
-               (if (empty? issues)
-                 {:status :success :created-task-ids [] :duplicate-diagnostics duplicates
-                  :dropped-count 0}
-                 (let [{:keys [selected dropped]} (cap-issues issues friction-task-cap)
-                       created (->> selected
-                                    (keep (fn [issue]
-                                            (try (create-task! worktree-root issue)
-                                                 (catch Throwable _ nil))))
-                                    vec)]
-                   (when (seq dropped)
-                     (log (str "context-manager: friction-analysis: "
-                               (count dropped) " issue(s) dropped by per-run cap")))
-                   {:status :success
-                    :created-task-ids created
-                    :duplicate-diagnostics duplicates
-                    :dropped-count (count dropped)})))))))
-     (catch Throwable e
-       (try (when (:log api)
-              ((:log api) (str "context-manager: friction-analysis: error: "
-                               (.getMessage e))))
-            (catch Exception _ nil))
-       {:status :no-op :diagnostic "error"}))))
+   (let [session-id (:session-id payload)]
+     (if (contains? @friction-in-flight-session-ids session-id)
+       {:status :no-op :diagnostic "analysis already in flight for this session"}
+       (do
+         (swap! friction-in-flight-session-ids conj session-id)
+         (try
+           (friction-analysis* api session-id collaborators)
+           (finally
+             (swap! friction-in-flight-session-ids disj session-id))))))))
 
 (defn entity-resolution-augmentation
   "Entity-resolution turn augmenter (task 238).

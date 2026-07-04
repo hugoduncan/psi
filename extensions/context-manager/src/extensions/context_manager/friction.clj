@@ -371,3 +371,115 @@
   [eql-result]
   {:worktree-root (:psi.agent-session/worktree-path eql-result)
    :session-name  (:psi.agent-session/session-name eql-result)})
+
+;; ---------------------------------------------------------------------------
+;; Orchestration core (task 239, slice 3), decoupled from
+;; `extensions.context-manager`'s default-collaborator wiring
+;; ---------------------------------------------------------------------------
+
+(defn run-analysis
+  "Core friction-analysis cond/orchestration logic, fully decoupled from
+   `extensions.context-manager`'s default-collaborator resolution (kept
+   there — it needs that ns's other private helpers) so this can live
+   outside its file-length ratchet. `opts` is a fully-resolved
+   collaborator map:
+
+   `:session-id`, `:log` (fn [msg] → _), `:known-helper-session?`
+   (fn [session-info] → bool), `:select-model` (fn [session-id] →
+   model-or-nil), `:run-helper` (fn [run-opts] → {:child-session-id :text}
+   or nil), `:fetch-history` (fn [session-id] → excerpt-or-nil),
+   `:session-info` (fn [session-id] → {:worktree-root .. :session-name ..}
+   or nil), `:list-tasks` (fn [worktree-root] → {:open [..]
+   :recent-closed [..]}), `:create-task!` (fn [worktree-root issue] →
+   task-id-or-nil), `:task-cap` (int).
+
+   Every collaborator call is guarded so no exception escapes (design.md
+   AC4: helper failure/missing model/missing worktree never disrupts the
+   turn). Returns `{:status :no-op :diagnostic ..}` or on completion
+   `{:status :success :created-task-ids [..] :duplicate-diagnostics [..]
+   :dropped-count n}`."
+  [{:keys [session-id log known-helper-session? select-model run-helper
+           fetch-history session-info list-tasks create-task! task-cap]}]
+  (try
+    (let [info (try (session-info session-id) (catch Throwable _ nil))]
+      (cond
+        (known-helper-session? info)
+        {:status :no-op :diagnostic "known helper/infra session excluded"}
+
+        (str/blank? (:worktree-root info))
+        (do (log "context-manager: friction-analysis: no worktree, skipping")
+            {:status :no-op :diagnostic "no worktree"})
+
+        :else
+        (let [model (try (select-model session-id) (catch Throwable _ nil))]
+          (if (nil? model)
+            (do (log "context-manager: friction-analysis: no local model, skipping")
+                {:status :no-op :diagnostic "no local model"})
+            (let [worktree-root (:worktree-root info)
+                  history-excerpt (try (fetch-history session-id) (catch Throwable _ nil))
+                  {:keys [open recent-closed]} (try (list-tasks worktree-root)
+                                                    (catch Throwable _ nil))
+                  {:keys [system-prompt user-prompt]}
+                  (build-friction-prompt {:history-excerpt history-excerpt
+                                          :open-tasks open
+                                          :recent-closed-tasks recent-closed})
+                  result (try
+                           (run-helper {:parent-session-id session-id
+                                        :system-prompt system-prompt
+                                        :user-prompt user-prompt
+                                        :model model})
+                           (catch Throwable _ nil))
+                  {:keys [issues duplicates]} (parse-friction-output (:text result))]
+              (doseq [{:keys [slug existing-id]} duplicates]
+                (log (str "context-manager: friction-analysis: duplicate " slug
+                          " ~ " existing-id ", skipped")))
+              (if (empty? issues)
+                {:status :success :created-task-ids [] :duplicate-diagnostics duplicates
+                 :dropped-count 0}
+                (let [{:keys [selected dropped]} (cap-issues issues task-cap)
+                      created (->> selected
+                                   (keep (fn [issue]
+                                           (try (create-task! worktree-root issue)
+                                                (catch Throwable _ nil))))
+                                   vec)]
+                  (when (seq dropped)
+                    (log (str "context-manager: friction-analysis: "
+                              (count dropped) " issue(s) dropped by per-run cap")))
+                  {:status :success
+                   :created-task-ids created
+                   :duplicate-diagnostics duplicates
+                   :dropped-count (count dropped)})))))))
+    (catch Throwable e
+      (try (log (str "context-manager: friction-analysis: error: " (.getMessage e)))
+           (catch Exception _ nil))
+      {:status :no-op :diagnostic "error"})))
+
+(def friction-history-raw-message-cap
+  "Upper bound on the number of most-recent raw messages considered before
+   grouping into turns (round-4 implementation-review follow-up):
+   `default-fetch-history` previously ran [[group-into-turns]]/
+   [[last-n-turns]] — both O(total-messages) — over a session's *entire*
+   unbounded message history every single completed turn, merely to keep
+   the last `friction-history-turn-count` turns; for a long-running
+   session that's O(n) work per turn, O(n²) cumulative over the session's
+   life. Generously large relative to `friction-history-turn-count` (4) so
+   ordinary turns are never truncated before grouping — only a
+   pathological single turn spanning more raw messages than this cap could
+   lose leading messages (a size, not a correctness, trade-off; mirrors
+   `build-augmentation-history-projection`'s bounded pre-turn `take-last 8`
+   precedent in `psi.agent-session.dispatch-effects`)."
+  200)
+
+(defn bounded-message-tail
+  "The last `cap` raw messages of `messages` (or all of them, if there are
+   fewer), as a vector. Uses `subvec` (O(1) on a vector) so bounding the
+   tail doesn't itself require scanning the full input — used by
+   `default-fetch-history` to keep per-turn grouping work bounded to a
+   small constant tail instead of the whole session history. `cap` nil or
+   non-positive returns `messages` unchanged."
+  [messages cap]
+  (let [messages (if (vector? messages) messages (vec messages))
+        total    (count messages)]
+    (if (and cap (pos? cap) (> total cap))
+      (subvec messages (- total cap))
+      messages)))

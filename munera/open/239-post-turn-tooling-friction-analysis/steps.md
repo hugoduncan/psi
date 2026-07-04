@@ -224,7 +224,7 @@
 
 ## Follow-up (implementation review, round 4)
 
-- [ ] `default-fetch-history` (`extensions/context_manager.clj`) queries the
+- [x] `default-fetch-history` (`extensions/context_manager.clj`) queries the
       session's *entire* unbounded `:psi.agent-session/message-history` via
       EQL (`agent-core-messages` returns the full in-memory `:messages`
       vector, unbounded) and then runs `friction/group-into-turns` +
@@ -241,7 +241,7 @@
       constant-bounded tail is ever used. Bound the EQL query or the
       grouping/slicing to a small tail (mirroring the existing `take-last 8`
       pattern) instead of scanning the full message vector each turn.
-- [ ] `friction-analysis` has no per-session serialization/coalescing guard:
+- [x] `friction-analysis` has no per-session serialization/coalescing guard:
       if two turns of the *same* session complete close enough together
       that a still-in-flight `future` (bounded by the 120s helper wall-clock
       budget) hasn't finished when the next turn's analysis starts, both
