@@ -934,3 +934,27 @@
   messages (a distinct role/shape from round-7's assistant `:type :error`
   blocks), so the excerpt can't mark a failed tool result as an error —
   the primary friction signal design.md names.
+
+## Round-9 follow-up (independent execution)
+
+- addressed 2 round-9 review steps:
+  - added `"auto-session-name"` to `known-helper-session-names`
+    (`extensions/context_manager.clj`) closing the AC5 exclusion gap for
+    the auto-session-name extension's helper child sessions; documented the
+    literal-set drift risk + round-9 audit (only auto-session-name, besides
+    the two augmenters, creates a fixed-name turn-completing helper session)
+    in the def docstring. Added
+    `other-known-auto-session-name-session-excluded-test`
+    (mirrors `other-known-workflow-step-session-excluded-test`).
+  - surfaced the out-of-band `:is-error` tool-result signal: threaded
+    `:is-error` from raw messages through `default-fetch-history`'s tail
+    entries and prefixed an `[error]` marker in `history-line`
+    (`extensions/context_manager.clj`) so a failed `"toolResult"` message is
+    distinguishable from a successful one in the helper excerpt. Added two
+    `default-fetch-history-test` cases (`:is-error true` → `[error]` prefix;
+    successful tool result → no marker). Also updated
+    `doc/extensions.md`'s exclusion list to name `"auto-session-name"`.
+  - lint clean; friction-analysis (15 tests), collaborators (8 tests), and
+    context-manager (33 tests) suites all pass.
+- older unchecked items (task-test-review skill section, commit `9bf3b9142`)
+  predate round 9 — left for their owning workflow/human decision.

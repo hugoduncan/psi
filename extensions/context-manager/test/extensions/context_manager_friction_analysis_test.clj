@@ -105,6 +105,14 @@
                                                             :session-name "workflow builder attempt"})}))]
       (is (= :no-op (:status result))))))
 
+(deftest other-known-auto-session-name-session-excluded-test
+  (testing "the auto-session-name extension's helper child session is excluded by name"
+    (let [result (context-manager/friction-analysis
+                  {} {:session-id "s4"}
+                  (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                            :session-name "auto-session-name"})}))]
+      (is (= :no-op (:status result))))))
+
 (deftest cap-applied-test
   (testing "3 detected issues yield only 2 created tasks (per-run cap)"
     (let [three-issues (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"

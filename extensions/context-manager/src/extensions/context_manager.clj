@@ -145,12 +145,21 @@
 
 (defn- history-line
   "Render a single history tail entry (237 projection shape:
-   `{:role .. :snippet ..}`) into a `Role: text` line, or nil to drop it."
+   `{:role .. :snippet ..}`) into a `Role: text` line, or nil to drop it.
+
+   When the entry carries `:is-error true` (persisted tool-result
+   failures set `:role \"toolResult\"` + `:is-error true` out-of-band from
+   the content blocks — see `default-fetch-history` /
+   `friction/message-snippet`), the line is prefixed with an `[error]`
+   marker so the friction helper can distinguish a failed tool result from
+   a successful one (design.md names 'tool errors/retries' as a primary
+   friction target; round-9 follow-up)."
   [entry]
   (let [role (:role entry)
         text (some-> (:snippet entry) str str/trim not-empty)]
     (when (and role text (not (slash-command-only? text)))
-      (str (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
+      (str (when (:is-error entry) "[error] ")
+           (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
 
 (defn- tail-lines-within
   "Keep the longest tail-suffix of `lines` whose newline-joined length is
@@ -546,8 +555,29 @@
    sessions (design.md: 'Scope of sessions') — excluded as non-
    representative friction-analysis inputs, in addition to this
    analyzer's own tracked helper sessions and the entity-resolution
-   augmenter's tracked helper sessions."
-  #{"entity-resolution" "friction-analysis"})
+   augmenter's tracked helper sessions.
+
+   These are fixed helper session-names created by other extensions'
+   `create-child-session` calls (their session-ids are NOT tracked in
+   this analyzer's own `friction-helper-session-ids` nor in
+   `entity-resolution-helper-session-ids`, so the session-name set is the
+   only backstop that can exclude them):
+   - `\"entity-resolution\"`, `\"friction-analysis\"` — the two
+     context-manager augmenters' own helper session-names.
+   - `\"auto-session-name\"` — the auto-session-name extension's helper
+     child session (`extensions/auto_session_name.clj`
+     `create-helper-child-session`), which runs a real agent loop and
+     fires `session_turn_finished`.
+
+   NOTE (drift risk, round-9 follow-up): this is a literal set that must
+   be kept in sync by hand with the fixed helper session-names created
+   across extensions. Audited at round 9: only auto-session-name (besides
+   the two augmenters) creates a fixed-name helper child session that
+   completes turns; `logprobs`/`metrics` do not. A future extension that
+   adds a fixed-name helper session must add its name here (or the
+   analyzer should move to a shared source-of-truth of known
+   helper-session names)."
+  #{"entity-resolution" "friction-analysis" "auto-session-name"})
 
 (def ^:private friction-task-cap
   "Maximum number of tasks created per friction-analysis run (design.md:
@@ -595,7 +625,9 @@
         bounded  (friction/bounded-message-tail
                   messages friction/friction-history-raw-message-cap)
         recent   (friction/last-n-turns bounded friction/friction-history-turn-count)
-        tail     (mapv (fn [m] {:role (:role m) :snippet (friction/message-snippet m)})
+        tail     (mapv (fn [m] {:role     (:role m)
+                                :snippet  (friction/message-snippet m)
+                                :is-error (:is-error m)})
                        recent)]
     (render-history-excerpt {:tail tail} nil max-history-chars)))
 

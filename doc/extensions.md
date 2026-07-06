@@ -293,8 +293,10 @@ pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
   and automatically opens Munera tasks for newly identified issues.
   - Scope: every session (top-level, delegated, workflow, helper) except this
     analyzer's own helper sessions and other known helper/infra sessions
-    (e.g. entity-resolution helper sessions, and workflow-runtime step-attempt
-    child sessions named `"workflow <step-id> attempt"`) — a recursion guard.
+    (e.g. entity-resolution helper sessions, the auto-session-name
+    extension's `"auto-session-name"` helper sessions, and workflow-runtime
+    step-attempt child sessions named `"workflow <step-id> attempt"`) — a
+    recursion guard.
   - Fire-and-forget: runs on its own thread outside the turn/dispatch
     critical path; the handler always returns promptly regardless of
     analysis outcome.

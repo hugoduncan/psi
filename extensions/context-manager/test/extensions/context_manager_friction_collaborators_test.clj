@@ -186,7 +186,29 @@
           "every message of the tool-heavy turn is present, not truncated")
       (is (every? #(re-find (re-pattern (str "turn " %)) excerpt)
                   (range (dec friction/friction-history-turn-count)))
-          "every subsequent single-message turn is present"))))
+          "every subsequent single-message turn is present")))
+
+  (testing "a failed tool-result message (:role \"toolResult\" :is-error true)
+            is marked with an [error] prefix (round-9 follow-up: the
+            out-of-band :is-error flag is the tool-error signal the friction
+            detector keys on)"
+    (let [messages [{:role "user" :content [{:type :text :text "run the tests"}]}
+                    {:role "toolResult" :is-error true
+                     :content [{:type :text :text "bash: command not found"}]}]
+          api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
+          excerpt (#'context-manager/default-fetch-history api "s1")]
+      (is (re-find #"\[error\] Toolresult: bash: command not found" excerpt)
+          "the failed tool result line is prefixed with [error]")))
+
+  (testing "a successful tool-result message (no :is-error) has no error marker"
+    (let [messages [{:role "user" :content [{:type :text :text "run the tests"}]}
+                    {:role "toolResult"
+                     :content [{:type :text :text "all tests passed"}]}]
+          api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
+          excerpt (#'context-manager/default-fetch-history api "s1")]
+      (is (not (re-find #"\[error\]" excerpt))
+          "a successful tool result is not marked as an error")
+      (is (re-find #"Toolresult: all tests passed" excerpt)))))
 
 (deftest default-fetch-history-bounds-a-long-session-history-test
   (testing "a session history far larger than the raw-message cap still

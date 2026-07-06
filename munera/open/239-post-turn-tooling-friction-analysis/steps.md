@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 9)
 
-- [ ] `known-helper-session-names` (`extensions/context_manager.clj`) is
+- [x] `known-helper-session-names` (`extensions/context_manager.clj`) is
       `#{"entity-resolution" "friction-analysis"}` and `known-helper-session?`
       additionally excludes `friction/workflow-step-session?` names, but it
       does NOT exclude the `auto-session-name` extension's helper child
@@ -36,7 +36,7 @@
       literal set that drifts). Add a test using a realistic
       `"auto-session-name"` session-name asserting the analyzer no-ops
       (mirroring `other-known-workflow-step-session-excluded-test`).
-- [ ] `friction/message-snippet`
+- [x] `friction/message-snippet`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       renders a `"toolResult"` message's `:content` text but silently drops
       its `:is-error` flag. Persisted tool-result messages carry
