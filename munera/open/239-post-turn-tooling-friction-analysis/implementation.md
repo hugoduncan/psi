@@ -958,3 +958,10 @@
     context-manager (33 tests) suites all pass.
 - older unchecked items (task-test-review skill section, commit `9bf3b9142`)
   predate round 9 — left for their owning workflow/human decision.
+
+## Implementation review, round 10 (task-implementation-review skill)
+
+- added 1 step to steps.md: `context_manager.clj` is 828 lines, over the
+  800-line `file-length-legacy-max-lines` ratchet with no exception entry —
+  the round-9 additions pushed it over and `bb commit-check:file-lengths`
+  now fails on it (tests pass, kondo clean otherwise).

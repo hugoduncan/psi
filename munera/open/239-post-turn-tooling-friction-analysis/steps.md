@@ -5,6 +5,30 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 10)
+
+- [ ] `extensions/context-manager/src/extensions/context_manager.clj` is now
+      **828 lines**, over the default 800-line `file-length-legacy-max-lines`
+      ratchet (`bb.edn`) — confirmed by `bb commit-check:file-lengths`, which
+      reports it as the only violation:
+      `context_manager.clj (828 lines, 800 limit)`. The round-9 follow-up
+      (`"auto-session-name"` exclusion + `:is-error`/`[error]`-marker
+      threading through `default-fetch-history`/`history-line`) added code
+      without keeping the file under the ratchet, even though every prior
+      round (see implementation.md's slice-2/4/5 and round-3 notes) treated
+      staying under 800 as an explicit constraint and repeatedly moved code
+      into `friction.clj` or trimmed docstrings to hold it. There is no
+      legacy-max-lines exception entry for this file (only
+      `auto_session_name_test.clj`, `dev_http_test.clj`,
+      `mcp_tasks_run_test.clj`, `mcp_tasks_run.clj` have entries), so this
+      will fail the `commit-check:file-lengths` gate. Bring the file back
+      under 800 by the same technique used before — move the round-9
+      additions' mechanical/pure helpers (e.g. the `:is-error` snippet-
+      shaping / `[error]` prefix logic) into `extensions.context-manager.
+      friction` where the rest of task 239's pure/support code already
+      lives, or otherwise relocate/trim — rather than adding a ratchet
+      exception for this file.
+
 ## Follow-up (implementation review, round 9)
 
 - [x] `known-helper-session-names` (`extensions/context_manager.clj`) is
