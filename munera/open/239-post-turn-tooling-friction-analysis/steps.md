@@ -5,6 +5,61 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 9)
+
+- [ ] `known-helper-session-names` (`extensions/context_manager.clj`) is
+      `#{"entity-resolution" "friction-analysis"}` and `known-helper-session?`
+      additionally excludes `friction/workflow-step-session?` names, but it
+      does NOT exclude the `auto-session-name` extension's helper child
+      sessions, which are created with `:session-name "auto-session-name"`
+      (`extensions/auto-session-name/src/extensions/auto_session_name.clj:254`,
+      `create-helper-child-session`) and run a real agent loop
+      (`run-agent-loop-in-session`, `run-helper-attempt` at
+      `:266`/`:278`) — so they complete a turn and fire
+      `session_turn_finished` (auto-session-name subscribes to it, `:338`),
+      triggering the friction analyzer on a helper/infra session that just
+      auto-renamed another session. This is exactly the "other known
+      helper/infra sessions … other workflow helper sessions" case
+      design.md's Scope-of-sessions decision and AC5 require to be excluded
+      as non-representative analysis inputs — the same class of gap the
+      round-3 follow-up closed for `"workflow <step-id> attempt"` sessions,
+      but for a different fixed helper name that was missed. Unlike the
+      entity-resolution helper, the auto-session-name helper's session-id is
+      NOT tracked in either `friction-helper-session-ids` or
+      `entity-resolution-helper-session-ids` (those atoms only hold *this*
+      analyzer's and task-238's own children), so the only backstop that
+      could catch it is the session-name set — which omits it. Add
+      `"auto-session-name"` to `known-helper-session-names` (and, more
+      robustly, audit the other extensions that create helper child
+      sessions — `logprobs`/`metrics` do not, but future ones might — for a
+      shared source-of-truth of known helper-session names rather than a
+      literal set that drifts). Add a test using a realistic
+      `"auto-session-name"` session-name asserting the analyzer no-ops
+      (mirroring `other-known-workflow-step-session-excluded-test`).
+- [ ] `friction/message-snippet`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      renders a `"toolResult"` message's `:content` text but silently drops
+      its `:is-error` flag. Persisted tool-result messages carry
+      `:role "toolResult"` + `:is-error true` on failure (confirmed:
+      `components/agent-session/src/psi/agent_session/dispatch_effects.clj:245`,
+      `prompt_request.clj:37`, `turn.clj:270`, `session_close.clj:47`;
+      `compaction.clj:511` confirms `:role "toolResult"` is the persisted
+      shape), and design.md's Issue-definition names "tool errors/retries"
+      as a *primary* friction target. The round-7 follow-up surfaced
+      assistant-message `{:type :error}` content blocks, but tool-*result*
+      failures are a distinct message shape (a whole different role +
+      out-of-band `:is-error` flag) that round-7 did not cover: while the
+      failing tool-result's *text* is included in the excerpt (its
+      `{:type :text}` block is), nothing in the rendered `Role: text` line
+      marks it as an error, so the helper can't distinguish a successful
+      tool result from a failed one. Consider having `message-snippet` (or
+      the `default-fetch-history` `{:role :snippet}` shaping) surface the
+      `:is-error true` status — e.g. prefix the snippet with an error marker
+      when `(:is-error message)`, or fold it into the rendered role label —
+      so the friction detector sees the tool-error signal it's meant to key
+      on, and add a `message-snippet`/`default-fetch-history` test over a
+      realistic `{:role "toolResult" :is-error true :content [...]}` message.
+
 ## Follow-up (implementation review, round 7)
 
 - [x] `friction/group-into-turns` (`extensions/context-manager/src/extensions/context_manager/friction.clj`)

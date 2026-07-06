@@ -923,3 +923,14 @@
 - added 2 steps to steps.md: missing test coverage for the friction
   helper's no-tools child-session grant, and a misleadingly-labeled
   retry-exhaustion test that actually asserts success.
+
+## Implementation review, round 9 (task-implementation-review skill)
+
+- added 2 steps to steps.md: `known-helper-session-names` omits the
+  `auto-session-name` extension's `"auto-session-name"` helper child
+  sessions (which run an agent loop and fire `session_turn_finished`), an
+  uncaught AC5 exclusion gap of the same class as the round-3 workflow-step
+  fix; and `message-snippet` drops the `:is-error` flag of `"toolResult"`
+  messages (a distinct role/shape from round-7's assistant `:type :error`
+  blocks), so the excerpt can't mark a failed tool result as an error —
+  the primary friction signal design.md names.
