@@ -270,6 +270,26 @@
       (is (= 0.6 (:cache-read-cost model)))
       (is (= 0.0 (:cache-write-cost model))))))
 
+(deftest codex-catalog-transport-matches-shared-constants-test
+  ;; Drift guard: the codex catalog entries author their transport as data
+  ;; literals, while structured-output owns the single "how a model becomes
+  ;; codex" transport definition (openai-codex-api / openai-codex-base-url,
+  ;; composed by the OAuth override via with-openai-codex-transport). Nothing
+  ;; else forces the inline catalog literals to equal those constants, so a
+  ;; change to either could drift silently. Assert every codex catalog entry's
+  ;; transport equals the shared constants so drift is caught.
+  (testing "every :openai-codex-responses catalog entry's :api/:base-url equal the shared constants"
+    (let [codex-entries (filter (fn [[_ model]]
+                                  (= structured-output/openai-codex-api (:api model)))
+                                built-in/all-models)]
+      (is (seq codex-entries)
+          "expected at least one codex catalog entry")
+      (doseq [[model-key model] codex-entries]
+        (is (= structured-output/openai-codex-api (:api model))
+            (str model-key " :api must equal structured-output/openai-codex-api"))
+        (is (= structured-output/openai-codex-base-url (:base-url model))
+            (str model-key " :base-url must equal structured-output/openai-codex-base-url"))))))
+
 ;; ── Init with user models ────────────────────────────────────────────────────
 
 (deftest init-user-models-test

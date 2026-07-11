@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups (round 3)
 
-- [ ] Reconcile the codex transport literals in the catalog with the shared
+- [x] Reconcile the codex transport literals in the catalog with the shared
       `structured-output` constants that now own them (`models.clj` — the 9
       `:openai-codex-responses` entries; the 8 that restate
       `:base-url "https://chatgpt.com/backend-api"`, e.g. `:gpt-5.4`

@@ -281,3 +281,22 @@
   out; the shared owner it created makes reconciliation (or a drift-guard test)
   reachable. Broadens beyond gpt-5.6 to sibling codex entries — noted as a scope
   caveat on the step. No behaviour or coverage change requested.
+
+## Code-shaper follow-ups addressed (round 3)
+
+- addressed 1 review step (test-only, no production change). Chose the
+  drift-guard invariant over rewriting the catalog data literals:
+  Option 1 (reference `structured-output/openai-codex-api` /
+  `openai-codex-base-url` inline in every `:openai-codex-responses`
+  entry) would rewrite the authored data-literal form of 8 pre-existing
+  sibling codex entries (gpt-5-codex, gpt-5.1/5.2/5.3/5.4-codex, etc.),
+  exceeding task-240's "add a catalog entry + set membership" scope and
+  the round-2 note's explicit catalog-literal scope-out. Instead added
+  `codex-catalog-transport-matches-shared-constants-test`
+  (`model_registry_test.clj`): iterates `built-in/all-models`, selects
+  every entry whose `:api` equals `structured-output/openai-codex-api`,
+  and asserts its `:api`/`:base-url` equal the shared constants — so the
+  catalog stays authored as data yet drift from the runtime override's
+  shared owner is now caught (`robust → enforceable(invariants)`). Guard
+  covers present and future codex entries. `bb test --focus
+  psi.ai.model-registry-test` → 16/16 (186 assertions); clj-kondo clean.
