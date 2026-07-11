@@ -48,6 +48,32 @@
             {:role "assistant"
              :content [{:type :error :text "connection refused"}]})))))
 
+(deftest history-line-test
+  ;; Round-9 follow-up: `history-line` gates the *entire* rendered line —
+  ;; `[error]` prefix included — on a non-blank, non-slash snippet. Pin the
+  ;; boundary that the round-9 `[error]` marker rides on a real snippet, and
+  ;; that a text-less tool failure contributes nothing to the excerpt (so the
+  ;; error marker never emits a content-free `[error] Role: ` line, and
+  ;; conversely never silently loses a real failure's text). The intended
+  ;; behaviour is the current one: the marker surfaces only when the failure
+  ;; also carries renderable text — an error signal with no text to hang on is
+  ;; dropped whole, not surfaced as a bare marker.
+  (testing "an :is-error entry with a real snippet renders the [error]-prefixed line"
+    (is (= "[error] Toolresult: boom"
+           (friction/history-line {:role "toolResult" :is-error true :snippet "boom"}))))
+
+  (testing "an :is-error entry with a blank/nil/whitespace snippet is dropped whole"
+    (is (nil? (friction/history-line {:role "toolResult" :is-error true :snippet ""})))
+    (is (nil? (friction/history-line {:role "toolResult" :is-error true :snippet nil})))
+    (is (nil? (friction/history-line {:role "toolResult" :is-error true :snippet "   "}))))
+
+  (testing "an :is-error entry whose snippet is a slash-command is dropped whole"
+    (is (nil? (friction/history-line {:role "toolResult" :is-error true :snippet "/help"}))))
+
+  (testing "a non-error entry with a real snippet renders without the [error] prefix"
+    (is (= "Assistant: hello"
+           (friction/history-line {:role "assistant" :snippet "hello"})))))
+
 (deftest group-into-turns-test
   (testing "groups messages into per-turn vectors starting at each :user message"
     (is (= [[{:role "user" :n 1}]

@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 9)
 
-- [ ] `friction/history-line`'s **`:is-error`-flagged-but-blank/dropped
+- [x] `friction/history-line`'s **`:is-error`-flagged-but-blank/dropped
       arm** is untested: no test pins that an error-flagged entry whose
       snippet is blank/absent (or a slash-command) is dropped **whole** —
       losing the `[error]` tool-error signal round-9 added it to carry.
@@ -57,7 +57,7 @@
       should still surface an error signal (a plausible reading of the
       round-9 intent), that is an implementation change, not just a test —
       flag it, decide, then pin the chosen behaviour.
-- [ ] `render-history-excerpt`'s **`turn-count`-truncation arm is dead code**
+- [x] `render-history-excerpt`'s **`turn-count`-truncation arm is dead code**
       and, being unreachable, is untested — worth removing rather than
       test-covering (economy: don't pin an unreachable branch). The 3-arity
       `render-history-excerpt`

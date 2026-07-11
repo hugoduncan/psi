@@ -1376,3 +1376,22 @@
   case) all fall back to the directory id, distinct from the file-missing
   branch. Pins `task-title`'s `(or (some->> … not-empty) id)` fallback.
   Lint clean; focused test suite green (5 tests, 29 assertions).
+
+## Round 9 test-shaper follow-ups (addressed 2 review steps)
+
+- `history-line` `:is-error`-blank/dropped arm: kept current behaviour (the
+  `[error]` marker rides on a real snippet; a text-less failure is dropped
+  whole) — the plausible "surface all errors" reading would inject a
+  content-free `[error] Role: ` line, so the current gating is the right
+  contract. Pinned it directly with a new `history-line-test`
+  (`context_manager_friction_collaborators_test.clj`): `:is-error true` +
+  real snippet → `[error]`-prefixed line; blank/nil/whitespace/slash snippet
+  → nil (dropped); non-error snippet → no prefix.
+- `render-history-excerpt` dead `turn-count` arm removed: both production
+  callers passed `turn-count` nil (entity-resolution 1-arity default;
+  friction bounds turns upstream via `friction/last-n-turns`). Collapsed the
+  3-arity to `[history char-cap]`, dropped the `take-last turn-count` branch,
+  corrected the stale docstring, re-pointed the `default-fetch-history`
+  caller. Existing entity-resolution + friction excerpt tests cover the
+  remaining behaviour. Lint clean; friction-collaborators (9 tests, 45
+  assertions), context-manager-test (33/143), rendering (1/2) all green.

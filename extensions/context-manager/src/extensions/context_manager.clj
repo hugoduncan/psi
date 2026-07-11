@@ -143,17 +143,14 @@
    (drops whole leading lines) so every surviving line keeps its `Role:`
    prefix and is never cut mid-word.
 
-   `turn-count` (optional, default nil = all tail entries) additionally caps
-   how many of the most-recent `:tail` entries are considered, before the
-   char-cap truncation is applied — used by the friction analyzer to bound
-   input to the last N turns."
-  ([history] (render-history-excerpt history nil max-history-chars))
-  ([history turn-count char-cap]
-   (let [tail  (:tail history)
-         tail  (if (and turn-count (pos? turn-count))
-                 (vec (take-last turn-count tail))
-                 tail)
-         lines (->> tail
+   Turn-bounding is *not* done here: the friction analyzer bounds its input
+   to the last N *conversational turns* upstream via `friction/last-n-turns`
+   (which groups raw messages into turns — a per-`:tail`-entry `take-last`
+   here would undercount turns), and the entity-resolution path renders the
+   whole 237 projection tail."
+  ([history] (render-history-excerpt history max-history-chars))
+  ([history char-cap]
+   (let [lines (->> (:tail history)
                     (keep friction/history-line)
                     vec)]
      (when (seq lines)
@@ -587,7 +584,7 @@
                                 :snippet  (friction/message-snippet m)
                                 :is-error (:is-error m)})
                        recent)]
-    (render-history-excerpt {:tail tail} nil max-history-chars)))
+    (render-history-excerpt {:tail tail} max-history-chars)))
 
 (defn- default-session-info
   "Real `:session-info` collaborator: the analyzed session's own effective
