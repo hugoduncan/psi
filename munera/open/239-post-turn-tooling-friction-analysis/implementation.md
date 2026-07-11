@@ -1,3 +1,18 @@
+## Test-shaper review (round 9)
+
+- added 2 steps. (1) `friction/history-line`'s `:is-error`-flagged-but-
+  blank/dropped arm is untested — the `[error]` marker rides only on a
+  non-blank, non-slash snippet, so a text-less failed toolResult
+  contributes no tool-error signal; boundary verified directly via nREPL
+  and `history-line` has no direct unit test at all. (2)
+  `render-history-excerpt`'s `turn-count`-truncation arm is dead code (both
+  callers pass `nil` after the round-3/7 `last-n-turns` fix) with a stale
+  docstring — flagged for removal rather than pinning an unreachable branch.
+- No non-compliance observed: one long-standing round-1 `Follow-up
+  (task-test-review skill)` item (the mislabeled "retry exhaustion → nil"
+  `testing` block) remains unchecked — pre-existing, owned by the
+  task-test-review workflow, not this review's concern.
+
 ## Test-shaper follow-up (round 7, addressed)
 
 - addressed 2 review steps.

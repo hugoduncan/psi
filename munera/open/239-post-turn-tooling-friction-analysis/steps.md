@@ -5,6 +5,85 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 9)
+
+- [ ] `friction/history-line`'s **`:is-error`-flagged-but-blank/dropped
+      arm** is untested: no test pins that an error-flagged entry whose
+      snippet is blank/absent (or a slash-command) is dropped **whole** —
+      losing the `[error]` tool-error signal round-9 added it to carry.
+      `history-line`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      gates the entire rendered line — `[error]` prefix included — on
+      `(when (and role text (not (slash-command-only? text))) …)`, where
+      `text` is `(some-> (:snippet entry) str str/trim not-empty)`. So the
+      `[error]` marker is emitted **only** when the entry also has a
+      non-blank, non-slash snippet. Verified directly against the current
+      code (nREPL): `(history-line {:role "toolResult" :is-error true
+      :snippet ""})`, `… :snippet nil`, and `… :snippet "/help"` all return
+      `nil` (the whole entry, error marker and all, is dropped), while `…
+      :snippet "boom"` returns `"[error] Toolresult: boom"`. This is
+      load-bearing: `message-snippet` renders **only** `{:type :text}` /
+      `{:type :error}` content blocks, so a persisted failed tool result
+      (`:role "toolResult" :is-error true`) whose content is non-textual
+      (structured/tool blocks only, or an empty result) yields a blank
+      snippet → the `[error]` line is dropped → the friction excerpt carries
+      **no** tool-error signal for that failure, exactly the signal round-9
+      added the marker to surface (design.md names 'tool errors/retries' as
+      a *primary* friction target). The current coverage
+      (`default-fetch-history-test`,
+      `context_manager_friction_collaborators_test.clj`) pins only the two
+      *text-present* poles — a failed toolResult **with** text →
+      `[error] Toolresult: …`, and a successful toolResult **with** text →
+      no marker — plus `message-snippet-test`'s "no :content → empty string";
+      nothing joins the two facts (blank snippet **and** `:is-error true`)
+      to pin what the analyzer does when the error signal has no text to
+      hang on. And `history-line` itself has **no** direct unit test at all
+      — it is exercised only transitively (entity-resolution prompt +
+      friction fetch-history), neither of which drives an error-flagged
+      blank/slash entry. A regression here could silently flip in either
+      direction and pass every current test: (a) dropping the `:is-error`
+      prefix logic entirely still passes the text-present poles if the text
+      still renders; (b) conversely, a "surface all errors" change that made
+      a blank error entry render as a bare `"[error] Toolresult: "`
+      (role-only, no text) would inject a content-free line into the excerpt
+      that no test forbids. Add a direct `friction/history-line` test
+      pinning the boundary: `:is-error true` with a blank/`nil`/whitespace
+      snippet → `nil` (dropped), with a slash-command snippet → `nil`, and
+      (as the positive pole, mirroring the existing collaborator test at the
+      unit layer) with real text → the `[error]`-prefixed line — so the
+      "error marker rides on a real snippet, and a text-less failure
+      contributes nothing" contract is enforced at the fn that owns it. If
+      the *intended* behaviour is instead that a text-less tool failure
+      should still surface an error signal (a plausible reading of the
+      round-9 intent), that is an implementation change, not just a test —
+      flag it, decide, then pin the chosen behaviour.
+- [ ] `render-history-excerpt`'s **`turn-count`-truncation arm is dead code**
+      and, being unreachable, is untested — worth removing rather than
+      test-covering (economy: don't pin an unreachable branch). The 3-arity
+      `render-history-excerpt`
+      (`extensions/context-manager/src/extensions/context_manager.clj`)
+      still contains `(if (and turn-count (pos? turn-count)) (vec (take-last
+      turn-count tail)) tail)`, documented as "used by the friction analyzer
+      to bound input to the last N turns". But **neither** production caller
+      passes a positive `turn-count`: the entity-resolution path calls the
+      1-arity default (`turn-count` nil), and `default-fetch-history` — after
+      the round-3/round-7 fix that moved turn-bounding into
+      `friction/last-n-turns` (which groups raw messages into *conversational*
+      turns, the whole point of that fix) — calls `(render-history-excerpt
+      {:tail tail} nil max-history-chars)`, i.e. `turn-count` **nil**. So the
+      `take-last turn-count` branch is never exercised in production and its
+      docstring rationale is stale (the friction analyzer deliberately does
+      **not** use this arm — using it would re-introduce the raw-message
+      undercount round-7 fixed). Leaving live-looking-but-dead branching
+      invites a future edit to wire it back in and silently re-break the
+      turn-vs-message contract. Remove the `turn-count` parameter/branch (and
+      correct the stale docstring), collapsing `render-history-excerpt` to
+      the `[history char-cap]` shape its two real callers actually use — then
+      the remaining behaviour is fully covered by the existing
+      entity-resolution + friction excerpt tests. (If a caller for the arm is
+      genuinely anticipated, keep it but add a `render-history-excerpt` test
+      driving a positive `turn-count` so the branch isn't dead-and-untested.)
+
 ## Follow-up (test-shaper skill, round 8)
 
 - [x] `friction/task-title`'s **design.md-present-but-no-`# `-heading
