@@ -23,12 +23,21 @@
 ;; time-independent; oauth-backed? only requires a non-expired credential.
 (def ^:private far-future-expiry 99999999999999)
 
+;; Single openai-ctx builder parameterized on the credential map, so the only
+;; thing that varies between the oauth and api-key branches is the credential
+;; type — the behavioural distinction the routing test exists to prove.
+(defn- openai-ctx [credential]
+  {:oauth-ctx (oauth/create-null-context {:credentials {:openai credential}})})
+
 (defn- oauth-openai-ctx []
-  {:oauth-ctx (oauth/create-null-context
-               {:credentials {:openai {:type    :oauth
-                                       :access  "tok"
-                                       :refresh "ref"
-                                       :expires far-future-expiry}}})})
+  (openai-ctx {:type    :oauth
+               :access  "tok"
+               :refresh "ref"
+               :expires far-future-expiry}))
+
+(defn- api-key-openai-ctx []
+  (openai-ctx {:type :api-key
+               :key  "sk-1"}))
 
 (defn- write-temp-models! [config]
   (let [tmp (java.io.File/createTempFile "psi-test-models" ".edn")]
@@ -123,9 +132,7 @@
     ;; oauth) leaves oauth-backed? false, so the codex override is guarded off
     ;; and gpt-5.6 must fall back to its catalog :openai-completions transport
     ;; despite being in openai-oauth-codex-model-ids.
-    (let [api-key-ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :api-key
-                                                                                     :key "sk-1"}}})}
-          model (registry/resolve-runtime-model api-key-ctx :openai "gpt-5.6")]
+    (let [model (registry/resolve-runtime-model (api-key-openai-ctx) :openai "gpt-5.6")]
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model))))))
 

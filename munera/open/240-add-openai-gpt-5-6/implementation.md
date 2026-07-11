@@ -182,3 +182,12 @@
   `create-null-context` literal inline, inconsistent with the round-1 extracted
   `oauth-openai-ctx` helper for the sibling oauth branch. Coverage complete;
   fixture-consistency shaping only, no production change.
+
+## Test-shaper follow-ups (round 3) — applied
+
+- addressed 1 review step: generalized the ctx fixtures into a single
+  `openai-ctx` builder parameterized on the credential map; `oauth-openai-ctx`
+  and new `api-key-openai-ctx` both delegate to it. Removed the raw inline
+  `create-null-context` literal from the api-key branch so oauth and api-key
+  fixtures share one construction style and only the credential type varies.
+  Focused test 169 assertions pass, lint clean.

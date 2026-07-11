@@ -81,7 +81,7 @@
 
 ## Test-shaper follow-ups (round 3)
 
-- [ ] Make the api-key ctx fixture consistent with the extracted oauth helper in
+- [x] Make the api-key ctx fixture consistent with the extracted oauth helper in
       `resolve-runtime-model-openai-oauth-routing-test`
       (`model_registry_test.clj` ~118–128). The oauth branches build their ctx via
       the `oauth-openai-ctx` helper (extracted in round 1 to kill the duplicated
