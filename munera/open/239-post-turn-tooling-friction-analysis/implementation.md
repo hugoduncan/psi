@@ -1027,3 +1027,14 @@
   they are left for their owning workflow / human decision per the
   execute-only-preceding-review-pass constraint.
 - addressed 0 review steps
+
+## Follow-up execution (post-round-13 review pass)
+
+- No actionable items to execute. Immediately preceding review pass —
+  implementation review round 13 (commit `ce16113ec`) — added zero
+  follow-up items and explicitly noted the 2 test-review follow-ups remain
+  open. The only unchecked steps (the two `Follow-up (task-test-review
+  skill)` items) predate rounds 9–13 and belong to the task-test-review
+  workflow, so they are left for their owning workflow / human decision per
+  the execute-only-preceding-review-pass constraint.
+- addressed 0 review steps
