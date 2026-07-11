@@ -216,3 +216,13 @@
   messages on `doseq` blocks vs. none on fixed single-model blocks) is
   justified by the dynamic-vs-static `testing` label and not actionable. 15/15
   tests, 169 assertions pass.
+
+## Docs review (review-task-docs)
+
+- no new steps: CHANGELOG `[Unreleased]/Added` gpt-5.6 entry verified accurate
+  and consistent with sibling model-add entries; all claims (capabilities, 1M
+  context, `:openai-completions`/`api.openai.com/v1`, chat-completions native
+  JSON Schema, codex OAuth routing to `chatgpt.com/backend-api` with streaming
+  `text.format` JSON Schema, `/model openai gpt-5.6` syntax) match code. No
+  stale refs; doc/ + ramora/ example blocks use single illustrative ids (not
+  enumerations), so no gpt-5.6 addition required there.
