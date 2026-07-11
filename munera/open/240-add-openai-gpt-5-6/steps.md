@@ -1,5 +1,33 @@
 # Steps
 
+## Code-shaper follow-ups
+
+- [ ] Resolve the dual-lookup shape inconsistency in `openai-oauth-runtime-model`
+      (`model_registry.clj` ~192–199). The base entry is looked up as
+      `(or (find-model :openai model-id) (get built-in/all-models (keyword
+      model-id)))`. The two branches yield **different data shapes**: `find-model`
+      returns the catalog-normalized entry (structured-output materialized via
+      `built-in-catalog` → `structured-output/normalize-model`), while the raw
+      `(get built-in/all-models (keyword model-id))` fallback returns the
+      un-normalized built-in map. For every id in `openai-oauth-codex-model-ids`
+      the catalog entry always exists, so the fallback branch is currently dead;
+      if it were ever reached (id present in `all-models` but absent from the
+      merged catalog) the override would emit a differently-shaped, un-normalized
+      model map. Prefer a single lookup source (`find-model` only), or if a
+      built-in fallback is genuinely needed, normalize it the same way the catalog
+      does so both branches produce one shape (code-shaper:
+      `consistent(data_shapes)`, `robust`, `single_responsibility`).
+- [ ] Remove the `(keyword model-id)` catalog-keying assumption from
+      `openai-oauth-runtime-model` (`model_registry.clj` ~197). The fallback
+      reconstructs the built-in map key by `(keyword model-id)`, duplicating the
+      indexing convention that `built-in-catalog`/`find-model` already own and
+      coupling the OAuth override to the raw map's keying scheme. This is the same
+      leak the design's single-source-of-truth intent argues against. Dropping the
+      raw-map fallback (previous step) removes this coupling; if a fallback must
+      remain, route it through the catalog-indexing path rather than
+      re-deriving the key here (code-shaper: `locally_comprehensible`,
+      `orthogonal`, `single_responsibility`).
+
 - [x] Add `:gpt-5.6` catalog entry to `built-in/all-models` in
       `components/ai/src/psi/ai/models.clj` (mirrors gpt-5.5 shape/transport).
 - [x] Add `:gpt-5.6` to `openai-chat-completions-native-model-keys`.

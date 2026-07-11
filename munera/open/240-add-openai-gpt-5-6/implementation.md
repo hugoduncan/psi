@@ -226,3 +226,11 @@
   `text.format` JSON Schema, `/model openai gpt-5.6` syntax) match code. No
   stale refs; doc/ + ramora/ example blocks use single illustrative ids (not
   enumerations), so no gpt-5.6 addition required there.
+
+## Code-shaper review
+
+- added 2 code-shaper steps on `openai-oauth-runtime-model` production code
+  (dual-lookup data-shape inconsistency between `find-model` and raw
+  `built-in/all-models` fallback; `(keyword model-id)` catalog-keying leak).
+  Prior review rounds were test-focused; these are the first findings on the
+  override's own lookup shape. No coverage or behaviour change requested.
