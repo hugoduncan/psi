@@ -174,3 +174,11 @@
   capability assertions (already covered by `built-in-structured-output-capabilities-test`
   and `providers/openai_structured_output_test`). Focused test 169 assertions pass,
   lint clean.
+
+## Test-shaper review (round 3)
+
+- added 1 step: api-key ctx fixture in
+  `resolve-runtime-model-openai-oauth-routing-test` reintroduces the raw
+  `create-null-context` literal inline, inconsistent with the round-1 extracted
+  `oauth-openai-ctx` helper for the sibling oauth branch. Coverage complete;
+  fixture-consistency shaping only, no production change.

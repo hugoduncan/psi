@@ -79,6 +79,24 @@
       cases are covered only at the provider-auth unit level, not at the
       `resolve-runtime-model` seam gpt-5.6 actually routes through.
 
+## Test-shaper follow-ups (round 3)
+
+- [ ] Make the api-key ctx fixture consistent with the extracted oauth helper in
+      `resolve-runtime-model-openai-oauth-routing-test`
+      (`model_registry_test.clj` ~118–128). The oauth branches build their ctx via
+      the `oauth-openai-ctx` helper (extracted in round 1 to kill the duplicated
+      oauth-ctx literal), but the "ctx present but not oauth-backed" branch
+      reintroduces the raw `{:oauth-ctx (oauth/create-null-context {:credentials
+      {:openai {:type :api-key :key "sk-1"}}})}` literal inline. Within a single
+      test, the fixture-construction style is now inconsistent (helper vs. raw
+      literal) and the incidental `create-null-context` ceremony reappears.
+      Extract a sibling helper (e.g. `api-key-openai-ctx`) or generalize a single
+      `openai-ctx` builder parameterized on the credential map, so the only thing
+      varying between the oauth and api-key branches is the credential type — the
+      actual behavioural distinction the test exists to prove (test-shaper:
+      `consistent(fixtures)`, `minimal_incidental_setup`,
+      `helpers_that_compress(ceremony)`, `behavior_focused`).
+
 ## Test-shaper follow-ups (round 2)
 
 - [x] Split the concern-mixing in the codex-routing `doseq`
