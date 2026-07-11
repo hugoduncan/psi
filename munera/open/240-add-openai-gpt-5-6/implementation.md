@@ -19,3 +19,16 @@
   design's false "second set" premise. It must not widen scope or change the
   frozen scope boundary; keep the single-source-of-truth / data-shaped-extension
   intent intact.
+
+## Design-follow-up (inconsistency step resolved)
+
+- Verified against `components/ai/src/psi/ai/models.clj`: exactly one native-key
+  set contains `:gpt-5.5` — `openai-chat-completions-native-model-keys`
+  (~610–623). The adjacent set (~625–635) is
+  `anthropic-json-schema-native-model-keys` (Anthropic-only). The design's
+  "second nearby set" premise was false.
+- Corrected design.md Context bullet and open question #4 to reference the
+  single native-key set and drop the "second key set" premise. No scope change.
+- For plan/implementation: the only membership decision for `:gpt-5.6` is
+  whether to add it to `openai-chat-completions-native-model-keys`; there is no
+  second OpenAI set to consider.

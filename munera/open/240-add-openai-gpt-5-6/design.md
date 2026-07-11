@@ -20,12 +20,12 @@ Model definitions live in the `ai` component:
   entry declares `:id :name :provider :api :base-url :supports-reasoning
   :supports-images :supports-text :context-window :max-tokens
   :input-cost :output-cost :cache-read-cost :cache-write-cost`.
-  - There is a curated set (`openai-chat-completions-native-model-keys`)
-    that lists which keys use OpenAI chat-completions native behaviour;
-    `:gpt-5.5` is a member.
-  - There is a second nearby set (lines ~612–623) that also lists model
-    keys `:gpt-5.5` belongs to — confirm which set(s) a new entry must
-    join.
+  - There is a single curated set (`openai-chat-completions-native-model-keys`,
+    models.clj ~610–623) that lists which keys use OpenAI chat-completions
+    native behaviour; `:gpt-5.5` is a member. This is the only native-key set
+    containing `:gpt-5.5`. (The adjacent set at ~625–635 is
+    `anthropic-json-schema-native-model-keys`, which is Anthropic-only and does
+    not contain OpenAI keys.)
 - `components/ai/src/psi/ai/model_registry.clj` — `openai-oauth-runtime-model`
   special-cases `gpt-5.5` to use the ChatGPT/Codex backend
   (`:openai-codex-responses`, `https://chatgpt.com/backend-api`) under
@@ -47,7 +47,8 @@ Model definitions live in the `ai` component:
 3. **API / transport** — standard `:openai-completions` against
    `https://api.openai.com/v1`, same as gpt-5.5?
 4. **Native-capability set membership** — should `:gpt-5.6` join
-   `openai-chat-completions-native-model-keys` and the second key set?
+   `openai-chat-completions-native-model-keys` (the single native-key set
+   containing `:gpt-5.5`)?
 5. **OAuth backend** — does GPT-5.6 need the ChatGPT/Codex OAuth
    transport override in `openai-oauth-runtime-model` (mirroring
    gpt-5.5), or only the standard API-key transport?
