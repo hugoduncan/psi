@@ -9,6 +9,8 @@
   (`openai-chat-completions-native-model-keys`, models.clj 610–623). The adjacent
   set (625–635) is Anthropic-only.
 
+- plan-review ambiguity review: no ambiguity review feedback — no plan.md/steps.md exist yet (design-stage); plan-level ambiguities N/A and design open questions #1–6 already captured.
+
 ## For the design-step task
 
 - Relevant files: `components/ai/src/psi/ai/models.clj` (catalog + native-key
