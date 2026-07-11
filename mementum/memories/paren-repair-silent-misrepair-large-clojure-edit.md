@@ -1,0 +1,3 @@
+❌ `clj-paren-repair` can silently *mis-repair* a large unbalanced structural Clojure edit (e.g. inserting a multi-`try`/`cond`/`let` orchestration form, or a two-namespace-move) into different-but-still-broken code, returning a clean exit rather than surfacing the imbalance. A clean paren-repair run is NOT proof the edit is correct.
+
+Rule: verify large structural Clojure edits by loading the namespace directly — `clojure -M:test --focus <ns>` (or an nREPL require) — not by trusting paren-repair alone. For a quick delimiter sanity check on a big insert, an ad-hoc paren-balance count catches what paren-repair silently "fixed". Complements workflow-edn-text-edit-verification (that covers in-string EDN `:text` edits; this covers structural Clojure form inserts). (task 239)
