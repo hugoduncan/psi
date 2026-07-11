@@ -1460,3 +1460,12 @@
   future's outer catch logs `"uncaught error: boom"`), pinning the
   belt-and-braces last-line-of-defence arm the existing wiring test never
   reaches. Full context-manager friction suites green.
+
+## Review note (task-test-review skill)
+
+- added 0 steps — friction test suite covers every design AC (AC1–AC7) with
+  injectable plain-fn / nullable-api infra deps (no mocks/stubs); no new
+  actionable test gap survived scrutiny. The one open unchecked step (the
+  misleading `"retry exhaustion → nil"` block in
+  `context_manager_friction_task_files_test.clj` whose assertion in fact
+  checks the happy path) is still valid and left in place, not re-added.
