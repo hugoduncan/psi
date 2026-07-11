@@ -1498,3 +1498,17 @@
 - addressed 1 review-task-docs follow-up: extended README.md's context-manager
   extension bullet with a summarize-and-link clause noting the post-turn
   tooling-friction analyzer (matching the entity-resolution clause style).
+
+## Review note (code-shaper skill)
+
+- added 0 steps — code-shaper pass over `friction.clj`, `context_manager.clj`
+  (friction wiring/orchestration), and the friction test suite finds
+  simplicity/consistency/robustness met: single-responsibility pure core,
+  consistent naming/arg-order/data-shapes/idioms (friction wrapper mirrors
+  the entity-resolution wrapper), guarded collaborator calls, fail-safe
+  parsing, and path-traversal slug validation. No new actionable issue
+  survived scrutiny. The one open unchecked step remains valid and is left
+  in place (not re-added): the `"retry exhaustion → nil, no task created"`
+  block in `context_manager_friction_task_files_test.clj` asserts
+  `(some? ...)` (a task *is* created), a label/assertion mismatch already
+  flagged by prior test-shaper/task-test-review passes.
