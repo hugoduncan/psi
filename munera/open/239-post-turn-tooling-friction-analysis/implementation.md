@@ -1469,3 +1469,18 @@
   misleading `"retry exhaustion → nil"` block in
   `context_manager_friction_task_files_test.clj` whose assertion in fact
   checks the happy path) is still valid and left in place, not re-added.
+
+## Review note (test-shaper skill, round 11)
+
+- added 0 steps — independent test-shaper pass over the friction suite
+  (parsing/collaborators/analysis/task-files/helper-runtime/wiring/
+  default-wiring) confirms clarity/signal/robustness are met: state-based
+  assertions, real infra via nullable api / plain-fn injection (no mocks),
+  distinct diagnostics pinned, boundary/negative cases covered. No new
+  actionable gap survived scrutiny. The one open unchecked step remains
+  valid and is left in place (not re-added): the `"retry exhaustion → nil,
+  no task created"` block in `context_manager_friction_task_files_test.clj`
+  is a meaningful-failure/label mismatch — its body asserts `(some? ...)`
+  (a task *is* created), so the label misleads a reader into believing
+  exhaustion is covered there when it is only covered in
+  `next-free-task-id-test`.
