@@ -71,3 +71,12 @@
 - For plan/implementation: the only membership decision for `:gpt-5.6` is
   whether to add it to `openai-chat-completions-native-model-keys`; there is no
   second OpenAI set to consider.
+
+## Implementation review (task-implementation-review)
+
+- Added 2 test-quality steps: bogus negative-control (gpt-5.4 catalog transport
+  already codex, so the "preserve catalog transport" assertion proves nothing),
+  and missing symmetric no-oauth assertion for gpt-5.6.
+- Code/catalog/OAuth-set changes and structured-output tests otherwise match
+  design + architecture; no changelog entry required (consistent with prior
+  synthetic-fixture gpt-5.4/gpt-5.5 additions, which also added none).
