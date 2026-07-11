@@ -146,3 +146,10 @@
   non-member), and use only the real `oauth/create-null-context` nullable
   (no mocks/stubs; state assertions, not interaction assertions). Prior
   test-review gap already closed.
+
+## Test-shaper review
+
+- added 3 test-shaper steps (duplicated oauth-ctx setup, wall-clock expiry in
+  fixture, gpt-5.5/gpt-5.6 codex-routing case duplication). Coverage is complete;
+  these are clarity/economy/determinism shaping only, no coverage or production
+  change.

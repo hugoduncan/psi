@@ -78,3 +78,34 @@
       not *non-oauth-credential* fallback for a member; the `oauth-backed?`-false
       cases are covered only at the provider-auth unit level, not at the
       `resolve-runtime-model` seam gpt-5.6 actually routes through.
+
+## Test-shaper follow-ups
+
+- [ ] Compress duplicated OAuth-context setup in
+      `resolve-runtime-model-openai-oauth-routing-test`
+      (`model_registry_test.clj` ~91–94, ~105–108, ~122–125): the
+      `{:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+      :access "tok" :refresh "ref" :expires ...}}})}` literal is copy-pasted
+      verbatim across three `testing` blocks. Extract a single helper (e.g.
+      `oauth-ctx` / `(oauth-openai-ctx)`) so the arrange step is
+      minimal-incidental-setup and the behavioural difference between blocks
+      (model-id + expected transport) is the only thing that varies. Compresses
+      ceremony without hiding intent (test-shaper: `minimal_incidental_setup`,
+      `consistent(fixtures)`, `helpers_that_compress(ceremony)`).
+- [ ] Remove wall-clock time from the OAuth fixture
+      (`model_registry_test.clj` ~94/108/125): `:expires (+
+      (System/currentTimeMillis) 60000)` derives expiry from real time in setup,
+      which is uncontrolled time in tests. Use a fixed/large constant expiry (or
+      a clearly-labelled far-future literal) so the fixture is deterministic and
+      time-independent (test-shaper: `deterministic → control(time)`). Verify
+      `oauth-backed?` only requires a non-expired credential, not a specific
+      value.
+- [ ] Reduce case-duplication between the two codex-routing `testing` blocks for
+      `gpt-5.5` and `gpt-5.6` (`model_registry_test.clj` ~89–115): they assert
+      the identical transport/capability contract and differ only by model-id
+      and expected `:id`. Consider a small data-driven form (`doseq` over
+      `["gpt-5.5" "gpt-5.6"]`) or a shared assertion helper so the shared
+      contract is stated once and each id is a representative case, not a full
+      copy (test-shaper: `economical`, `representative_cases_over_case_explosion`,
+      `one_test_per_distinct_behavior`). Keep failure messages id-specific so
+      `meaningful_failures` is preserved.
