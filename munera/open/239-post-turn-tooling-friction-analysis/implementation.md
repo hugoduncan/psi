@@ -1,5 +1,16 @@
-- steps.md: both round-7 follow-up items checked off; no items remain
-  unchecked in that section.
+## Implementation review, round 13 (task-implementation-review skill)
+
+- No new actionable issues. Verified round-11 file-length fix complete
+  (friction call sites qualified, ns loads, lint clean, file 786 lines,
+  `bb commit-check:file-lengths` passes), `clojure -M:test --focus
+  extensions` green (348 tests, 1458 assertions, 0 failures).
+- Non-compliance: the two `task-test-review` follow-up items in steps.md
+  (no-tools `:tool-ids []`/`:tool-names []` assertion; mislabeled
+  "retry exhaustion → nil" `testing` block) remain unchecked and
+  unaddressed — confirmed still valid against current code. No steps added
+  (they already exist; not duplicated). The shared
+  `bounded-helper-session-run` extraction (later rounds) strengthens the
+  first item's rationale.
 
 ## Implementation review, round 8 (task-implementation-review skill)
 
