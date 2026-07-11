@@ -241,6 +241,27 @@
       (is (= 0.3 (:cache-read-cost model)))
       (is (= 3.75 (:cache-write-cost model))))))
 
+(deftest gpt-5-6-catalog-entry-test
+  (registry/init! {})
+
+  (testing "gpt-5.6 catalog entry carries the agreed metadata, capability, and pricing values"
+    (let [model (registry/find-model :openai "gpt-5.6")]
+      (is (some? model))
+      (is (= "gpt-5.6" (:id model)))
+      (is (= "GPT-5.6" (:name model)))
+      (is (= :openai (:provider model)))
+      (is (= :openai-completions (:api model)))
+      (is (= "https://api.openai.com/v1" (:base-url model)))
+      (is (= true (:supports-reasoning model)))
+      (is (= true (:supports-images model)))
+      (is (= true (:supports-text model)))
+      (is (= 1000000 (:context-window model)))
+      (is (= 128000 (:max-tokens model)))
+      (is (= 6.0 (:input-cost model)))
+      (is (= 35.0 (:output-cost model)))
+      (is (= 0.6 (:cache-read-cost model)))
+      (is (= 0.0 (:cache-write-cost model))))))
+
 ;; ── Init with user models ────────────────────────────────────────────────────
 
 (deftest init-user-models-test

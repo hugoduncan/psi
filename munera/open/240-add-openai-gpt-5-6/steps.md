@@ -36,7 +36,7 @@
 
 ## Implementation-review follow-ups (round 2)
 
-- [ ] Add a dedicated `gpt-5.6` catalog-entry field-value test (mirror the
+- [x] Add a dedicated `gpt-5.6` catalog-entry field-value test (mirror the
       existing `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`
       pattern in `model_registry_test.clj` ~203–242). The AC "`:gpt-5.6` present
       in `built-in/all-models` with complete, sourced field values" and
@@ -49,7 +49,7 @@
       and structured-output capability. Silent drift in the decided pricing/
       context values would pass unnoticed despite the sibling test pattern
       existing in the same file for exactly this purpose.
-- [ ] Reconcile the changelog decision. implementation.md claims "no changelog
+- [x] Reconcile the changelog decision. implementation.md claims "no changelog
       entry required (consistent with prior synthetic-fixture gpt-5.4/gpt-5.5
       additions, which also added none)", but CHANGELOG.md contradicts this: it
       has entries for a catalog addition ("Claude Opus 4.8 ... is now available

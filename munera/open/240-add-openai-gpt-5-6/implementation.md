@@ -78,8 +78,11 @@
   already codex, so the "preserve catalog transport" assertion proves nothing),
   and missing symmetric no-oauth assertion for gpt-5.6.
 - Code/catalog/OAuth-set changes and structured-output tests otherwise match
-  design + architecture; no changelog entry required (consistent with prior
-  synthetic-fixture gpt-5.4/gpt-5.5 additions, which also added none).
+  design + architecture. (Note: the original "no changelog entry required"
+  justification was wrong and is superseded below — see round-2 follow-ups; a new
+  selectable, OAuth-routed model is user_visible(δ) under the AGENTS.md changelog
+  policy, and CHANGELOG.md already has sibling entries for catalog adds and the
+  gpt-5.5 OAuth/Codex routing mechanism.)
 
 ## Implementation-review follow-ups addressed
 
@@ -99,3 +102,15 @@
   pricing/context values (sibling `*-catalog-entry-test` pattern unused); the
   "no changelog needed" justification is contradicted by CHANGELOG.md precedent
   (Opus 4.8 catalog add + gpt-5.5 OAuth routing both have entries).
+
+## Implementation-review follow-ups addressed (round 2)
+
+- addressed 2 review steps:
+  - added `gpt-5-6-catalog-entry-test` pinning the decided gpt-5.6 field
+    values (id/name/provider/api/base-url, three capability flags true,
+    context-window 1000000, max-tokens 128000, pricing 6.0/35.0/0.6/0.0),
+    mirroring `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`.
+  - reconciled the changelog: added an `[Unreleased] / Added` CHANGELOG.md
+    entry for gpt-5.6 (catalog availability + OAuth/Codex routing) and
+    corrected the superseded "no changelog entry required" note above.
+  - `bb test --focus psi.ai.model-registry-test` → 15/15 pass; clj-kondo clean.
