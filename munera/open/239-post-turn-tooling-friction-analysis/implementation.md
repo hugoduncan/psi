@@ -989,3 +989,19 @@
   namespaces pass), `bb commit-check:file-lengths` reports no violation
   (file at 786 lines, under the 800 ratchet). Resolves round-11 and, in the
   same edit, round-10.
+
+## Implementation review, round 12 (task-implementation-review skill)
+
+- No new actionable issues found. Verified rounds 9–11 fixes in live code
+  (auto-session-name/workflow exclusions, toolResult `[error]` marker
+  threading through `default-fetch-history`/`history-line`, slug
+  sanitization, bounded history tail, atomic in-flight claim, file-length
+  fix at 786 lines). `clojure -M:test --focus extensions` → 348 tests,
+  1458 assertions, 0 failures; `clj-kondo --lint` clean;
+  `bb commit-check:file-lengths` clean.
+- Non-compliance note: the two `Follow-up (task-test-review skill)` items
+  in steps.md (no-tools `:tool-ids []` grant assertion for
+  `default-friction-run-helper`; mislabeled "retry exhaustion" testing
+  block in `context_manager_friction_task_files_test.clj`) remain
+  unchecked and unaddressed — still valid, not new. No steps added (would
+  duplicate existing unchecked items).
