@@ -1,5 +1,43 @@
 # Steps
 
+## Code-shaper follow-ups (round 6)
+
+- [ ] Reference the shared codex `:api` constant from the catalog capability
+      dispatch, or record why the literal is irreducible
+      (`models.clj` `built-in-structured-output-capability` ~660, the
+      `(case (:api model) … :openai-codex-responses …)` branch; constant
+      `structured-output/openai-codex-api` ~28). Rounds 3–5 established
+      `structured_output.clj` as the single owner of the "how a model becomes
+      codex" rule (`openai-codex-api` / `openai-codex-base-url` /
+      `with-openai-codex-transport`) and reconciled the *catalog data entries'*
+      `:api`/`:base-url` and *capability* against it via
+      `codex-catalog-transport-matches-shared-constants-test`. But the routing
+      that *derives* the codex capability — the `case` in
+      `built-in-structured-output-capability` — dispatches on the bare literal
+      `:openai-codex-responses`, a third inline copy of
+      `structured-output/openai-codex-api`'s value that does not reference the
+      constant. So the codex `:api` value is now defined in the constant and
+      restated in two mechanisms (catalog data entries, guarded; and this `case`
+      dispatch, unguarded): if `openai-codex-api` were retargeted to a different
+      keyword, the catalog entries would fail the drift-guard *and* this `case`
+      would silently stop matching (capability annotation would drop to `nil`),
+      an independent silent-drift surface the round-3/4/5 guard does not cover
+      because it selects by the already-present codex `:api`/`:base-url` and so
+      cannot detect a `case` that stopped firing. Note the hard constraint:
+      Clojure `case` requires compile-time-literal test constants, so
+      `structured-output/openai-codex-api` cannot be used directly as a `case`
+      key — reconciling this needs either `(condp = (:api model) …)` /
+      `cond` (referencing the constant, at the cost of `case`'s constant-time
+      dispatch and touching all provider branches), or an explicit note that the
+      `case` literal is deliberately duplicated and why. Prefer whichever keeps
+      one source for the codex `:api` value without silently broadening the
+      catalog task; if left as a literal, document the irreducibility so a future
+      reader does not mistake it for missed reconciliation (code-shaper:
+      `single_responsibility`, `orthogonal`, `robust → enforceable(invariants)`,
+      `locally_comprehensible`). Scope caveat: touches shared catalog machinery
+      beyond gpt-5.6 (same broadened blast radius rounds 3–5 flagged); confirm
+      acceptable or split into a dedicated catalog task before applying.
+
 ## Code-shaper follow-ups (round 5)
 
 - [x] Extend the codex drift-guard to the *capability* axis, or make

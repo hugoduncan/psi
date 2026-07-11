@@ -330,6 +330,15 @@
   fails on it. `bb test --focus psi.ai.model-registry-test` → 16/16 (186
   assertions); clj-kondo clean.
 
+## Code-shaper review (round 6)
+
+- added 1 step: the catalog capability dispatch `case` (`built-in-structured-output-capability`)
+  dispatches on the bare literal `:openai-codex-responses`, a third unguarded copy
+  of `structured-output/openai-codex-api`'s value; the round-3/4/5 drift-guard
+  cannot catch a `case` that stopped firing since it selects by already-present
+  codex transport fields. Noted the `case` compile-time-literal constraint. No
+  behaviour or coverage change requested.
+
 ## Code-shaper follow-ups addressed (round 5)
 
 - addressed 1 review step (test-only, no production change). Chose option (a) —
