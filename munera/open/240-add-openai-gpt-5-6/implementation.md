@@ -191,3 +191,11 @@
   `create-null-context` literal from the api-key branch so oauth and api-key
   fixtures share one construction style and only the credential type varies.
   Focused test 169 assertions pass, lint clean.
+
+## Test-shaper review (round 4)
+
+- added 1 step: the no-oauth member-pair blocks (gpt-5.5/gpt-5.6) in
+  `resolve-runtime-model-openai-oauth-routing-test` remain verbatim copies while
+  the sibling codex-routing pair was collapsed into a `doseq` — the same
+  case-explosion, left inconsistent within one test. Coverage complete;
+  economy/consistency shaping only, no production change.

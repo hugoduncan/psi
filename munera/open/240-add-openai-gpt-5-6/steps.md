@@ -79,6 +79,27 @@
       cases are covered only at the provider-auth unit level, not at the
       `resolve-runtime-model` seam gpt-5.6 actually routes through.
 
+## Test-shaper follow-ups (round 4)
+
+- [ ] Collapse the duplicated no-oauth member-pair blocks in
+      `resolve-runtime-model-openai-oauth-routing-test`
+      (`model_registry_test.clj` ~95–105). The two `testing` blocks "openai
+      gpt-5.5 remains chat-completions without oauth context" and "openai gpt-5.6
+      remains chat-completions without oauth context" are verbatim copies
+      differing only by model-id (`nil` ctx → `:openai-completions` /
+      `https://api.openai.com/v1`) — the identical `case_explosion` that the
+      adjacent codex-routing pair was already collapsed into a `doseq` over
+      `["gpt-5.5" "gpt-5.6"]` to fix (round-2 follow-up). Leaving the no-oauth
+      pair as full copies makes the *same test* internally inconsistent: one
+      member-pair contract is data-driven, the sibling member-pair contract is
+      duplicated. Data-drive the no-oauth pair the same way (`doseq` over the
+      same id list, id-specific failure messages) so the shared contract is
+      stated once and each id is a representative case, and the two member-pair
+      contracts in this test use one consistent shape (test-shaper: `economical`,
+      `representative_cases_over_case_explosion`, `consistent(structure)`,
+      `one_test_per_distinct_behavior`; keep `meaningful_failures` via
+      id-specific messages).
+
 ## Test-shaper follow-ups (round 3)
 
 - [x] Make the api-key ctx fixture consistent with the extracted oauth helper in
