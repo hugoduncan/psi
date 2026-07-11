@@ -1,5 +1,40 @@
 # Steps
 
+## Code-shaper follow-ups (round 3)
+
+- [ ] Reconcile the codex transport literals in the catalog with the shared
+      `structured-output` constants that now own them (`models.clj` — the 9
+      `:openai-codex-responses` entries; the 8 that restate
+      `:base-url "https://chatgpt.com/backend-api"`, e.g. `:gpt-5.4`
+      ~546–551, `:gpt-5.1-codex` ~402, `:gpt-5.2-codex` ~482, `:gpt-5.3-codex`
+      ~514). Task 240's round-2 code-shaper fix introduced a single owner for
+      the "how a model becomes codex" rule — `openai-codex-api` /
+      `openai-codex-base-url` constants and `with-openai-codex-transport` in
+      `structured_output.clj` — and made `openai-oauth-runtime-model` compose it
+      instead of restating the literals. But the codex catalog entries still
+      restate the same `:api :openai-codex-responses` and
+      `:base-url "https://chatgpt.com/backend-api"` string literals inline, so the
+      codex transport identity is now defined in two places by two mechanisms
+      (shared constants vs. inline catalog literals) that can drift silently: a
+      change to `openai-codex-base-url` would not propagate to the catalog
+      entries, and nothing enforces that the catalog's inline literals equal the
+      constants the override composes. This is the same duplication the round-2
+      item fixed on the override side, left in place on the catalog side
+      (round-2 note scoped catalog literals out explicitly, but the shared owner
+      it created makes reconciliation now reachable). Prefer having the codex
+      catalog entries reference the shared constants (`:api
+      structured-output/openai-codex-api`, `:base-url
+      structured-output/openai-codex-base-url`) — or an equivalent
+      catalog-authoring construct — so the codex transport strings have a single
+      source and the catalog cannot drift from the runtime override. If the
+      data-literal catalog form is intentionally kept, add a test/invariant that
+      asserts every `:openai-codex-responses` entry's `:api`/`:base-url` equal the
+      shared constants so drift is at least caught. Task-240 scope caveat: this
+      touches pre-existing sibling codex entries, not just gpt-5.6, so confirm the
+      broadened blast radius is acceptable (or split into a dedicated catalog
+      task) before applying (code-shaper: `consistent(idioms)`,
+      `single_responsibility`, `orthogonal`, `robust → enforceable(invariants)`).
+
 ## Code-shaper follow-ups (round 2)
 
 - [x] Remove the duplicated codex-transport shaping in `openai-oauth-runtime-model`

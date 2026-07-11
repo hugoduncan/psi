@@ -268,3 +268,16 @@
   as-authored (out of this item's scope: the item targets the override's
   imperative re-derivation). Tests: model-registry 15/15, core 9/9,
   openai-structured-output + models pass; clj-kondo clean.
+
+## Code-shaper review (round 3)
+
+- added 1 code-shaper step: the codex transport literals
+  (`:api :openai-codex-responses` in 9 entries, `:base-url
+  "https://chatgpt.com/backend-api"` in 8) are still restated inline in the
+  catalog while task-240's round-2 fix made `structured-output` the single owner
+  (`openai-codex-api`/`openai-codex-base-url`/`with-openai-codex-transport`) that
+  the OAuth override composes — so the codex transport identity now lives in two
+  mechanisms that can drift silently. Round-2 explicitly scoped catalog literals
+  out; the shared owner it created makes reconciliation (or a drift-guard test)
+  reachable. Broadens beyond gpt-5.6 to sibling codex entries — noted as a scope
+  caveat on the step. No behaviour or coverage change requested.
