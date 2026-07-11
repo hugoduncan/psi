@@ -5,6 +5,56 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill)
+
+- [ ] The **`create-task!` failure/nil-return path on the success branch**
+      is untested. `friction/run-analysis`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      creates tasks via
+      `(->> selected (keep (fn [issue] (try (create-task! worktree-root issue) (catch Throwable _ nil)))) vec)`
+      — so an issue whose `create-task!` **returns `nil`** (a real path:
+      `create-friction-task!`/`next-free-task-id` return `nil` on collision
+      retry exhaustion — see `next-free-task-id-test`) or **throws** is
+      silently dropped from `:created-task-ids`, while any sibling issues
+      still succeed. No `friction-analysis`/`run-analysis` test exercises
+      this partial-creation behavior: `issue-creates-task-test`,
+      `cap-applied-test`, and `duplicate-skipped-test` all use a
+      `create-task!` that always returns a non-nil id, and the only
+      throwing-`create-task!` test (`all-collaborators-throw-never-throws-
+      test`) makes *every* collaborator throw so the analysis short-circuits
+      at `session-info` to `:no-op` — it never reaches the success branch
+      with a selectively-failing `create-task!`. A regression that (e.g.)
+      let a `create-task!` exception escape the `keep`, or that recorded a
+      `nil` id into `:created-task-ids`, would pass every current test. Add
+      a `friction-analysis`/`run-analysis` test: two detected issues where
+      `create-task!` returns a real id for one and `nil` (and, separately,
+      throws) for the other → `:status :success`, `:created-task-ids`
+      contains only the successful id (no `nil`, no throw). This is the same
+      "collaborator degrades mid-success-path, analysis still completes"
+      contract the empty-`list-tasks` and dedup-diagnostic cases embody,
+      applied to the create step.
+- [ ] The **`list-tasks` throwing/nil-return degradation on the success
+      branch** is untested. `friction/run-analysis` wraps the dedup-list
+      fetch in `(try (list-tasks worktree-root) (catch Throwable _ nil))`
+      and then destructures `{:keys [open recent-closed]}` from the result
+      — so a `list-tasks` that **throws** or **returns `nil`** yields
+      `open`/`recent-closed` = `nil`, and analysis proceeds to
+      `build-friction-prompt` with empty dedup lists (detection still runs,
+      just without dedup context) rather than aborting. No
+      `friction-analysis` test drives a throwing or `nil`-returning
+      `list-tasks` on the success path: `collaborators`'s default
+      `list-tasks` always returns `{:open [] :recent-closed []}`, and the
+      all-throwing test short-circuits at `session-info` before
+      `list-tasks` is reached. A regression that let a `list-tasks`
+      exception escape the try, or that aborted when the dedup list was
+      unavailable, would pass every current test — silently converting a
+      degraded-dedup case into a lost-analysis case. Add a
+      `friction-analysis`/`run-analysis` test asserting a throwing (and,
+      separately, `nil`-returning) `list-tasks` still reaches `run-helper`
+      and creates the detected task (`:status :success`, task created),
+      pinning the "dedup unavailable → detect without dedup, don't abort"
+      contract.
+
 ## Follow-up (implementation review, round 14)
 
 - [x] `friction/run-analysis`

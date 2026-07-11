@@ -1127,3 +1127,11 @@
   items (friction helper `:tool-ids []` grant assertion; mislabeled "retry
   exhaustion" testing block) remain unchecked/unaddressed — still valid,
   not re-added.
+
+## Test review (test-shaper skill)
+
+- added 2 steps to steps.md: untested `create-task!` failure/nil-return
+  partial-creation path and untested `list-tasks` throwing/nil-return
+  dedup-degradation path in `friction/run-analysis` (both success-branch
+  collaborator-degradation contracts the all-throwing test misses by
+  short-circuiting at `session-info`).
