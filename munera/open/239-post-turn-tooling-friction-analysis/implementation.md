@@ -1,3 +1,18 @@
+## Test-shaper review (round 6)
+
+- added 1 step: the analyzer's own literal helper session-name
+  `"friction-analysis"` exclusion arm of `known-helper-session-names` is
+  untested — every sibling set member (`"entity-resolution"`,
+  `"auto-session-name"`, the `workflow-step-session?` dynamic arm) has a
+  dedicated exclusion test, but no test drives an incoming session named
+  `"friction-analysis"` (the only occurrence of that string in the analysis
+  suite asserts the *outgoing* create-child-session param). Gap verified
+  real against the current code before filing.
+- Non-compliance: one long-standing round-1 `Follow-up (task-test-review
+  skill)` item remains unchecked (the mislabeled "retry exhaustion → nil"
+  `testing` block whose body asserts a task *is* created) — pre-existing,
+  owned by the task-test-review workflow, not duplicated here.
+
 ## Test-shaper follow-up (round 5, addressed)
 
 - addressed 2 review steps.

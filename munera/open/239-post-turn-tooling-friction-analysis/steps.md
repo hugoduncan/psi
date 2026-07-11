@@ -5,6 +5,50 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 6)
+
+- [ ] The analyzer's **own literal helper session-name `"friction-analysis"`
+      exclusion arm** is untested. `known-helper-session-names`
+      (`extensions/context-manager/src/extensions/context_manager.clj`) is the
+      three-element literal set `#{"entity-resolution" "friction-analysis"
+      "auto-session-name"}`, and `known-helper-session?` excludes a session
+      when its `:session-name` is a member (a name-based backstop distinct
+      from the session-id membership in `friction-helper-session-ids`). Every
+      *sibling* member is pinned by a dedicated exclusion test driving that
+      exact name — `entity-resolution-helper-session-excluded-test`/
+      `other-known-helper-session-excluded-test` for `"entity-resolution"`,
+      `other-known-auto-session-name-session-excluded-test` for
+      `"auto-session-name"`, and the `workflow-step-session?` dynamic arm by
+      `other-known-workflow-step-session-excluded-test`
+      (`context_manager_friction_analysis_test.clj`) — plus each is
+      diagnostic-pinned in `exclusion-no-op-branch-diagnostic-pinned-test`.
+      But **no test drives a session whose `:session-info` `:session-name` is
+      literally `"friction-analysis"`** through `friction-analysis`; the only
+      occurrence of that string in the analysis test suite asserts the
+      *outgoing* `create-child-session` param
+      (`default-friction-run-helper-settled-run-test`,
+      `context_manager_friction_helper_runtime_test.clj`), not the incoming
+      exclusion. This is the analyzer's *own* helper name and arguably the
+      most important recursion-guard backstop: the `friction-helper-session-
+      ids` `defonce` atom is empty after any process restart/reload
+      (`context_manager_friction_wiring_test.clj`'s fixture resets it every
+      test to prove this), so a lingering `friction-analysis`-named helper
+      session that finishes a turn after a reload — its id no longer tracked
+      — is caught *only* by this name-set arm. A regression dropping
+      `"friction-analysis"` from `known-helper-session-names` (e.g. a refactor
+      assuming id-tracking alone suffices) would re-enable the analyzer to run
+      on its own helper sessions — the exact recursion design.md's
+      Scope-of-sessions decision and AC5 forbid — yet pass every current
+      exclusion test, since none drives this specific member. This is the same
+      "each distinct value in the fixed set is pinned" contract
+      `other-known-auto-session-name-session-excluded-test` already embodies
+      for `"auto-session-name"`, absent for the analyzer's own name. Add a
+      `friction-analysis` exclusion test (and, ideally, a
+      `:diagnostic "known helper/infra session excluded"` assertion mirroring
+      `exclusion-no-op-branch-diagnostic-pinned-test`) driving
+      `:session-info` → `{:session-name "friction-analysis"}` and asserting
+      `:no-op`.
+
 ## Follow-up (test-shaper skill, round 5)
 
 - [x] The **negative boundary of the known-helper exclusion** is untested:
