@@ -1,5 +1,45 @@
 # Steps
 
+## Code-shaper follow-ups (round 5)
+
+- [ ] Extend the codex drift-guard to the *capability* axis, or make
+      `with-openai-codex-transport` the single owner the guard fully covers
+      (`codex-catalog-transport-matches-shared-constants-test`,
+      `model_registry_test.clj` ~273–295; `structured_output.clj` ~83–95;
+      `models.clj` `built-in-structured-output-capability` ~660). The single
+      owner `with-openai-codex-transport` shapes *three* things —
+      `:api` (= `openai-codex-api`), `:base-url` (= `openai-codex-base-url`),
+      **and** the codex native structured-output capability (via
+      `with-openai-codex-native-capability` → `openai-codex-native-capability`).
+      The round-3/4 drift guard closes drift on only two of the three: it asserts
+      `:api`/`:base-url` equal the shared constants but never asserts the codex
+      capability. Yet the codex capability is still attached by a *second*,
+      independent mechanism — the catalog's `built-in-structured-output-capability`
+      `case` on `:openai-codex-responses` → `openai-codex-native-capability`
+      (models.clj ~660) — exactly the two-mechanism split (declarative catalog
+      `case` vs. override's `with-openai-codex-transport`) that round-2/3 set out
+      to eliminate for transport, left open on the capability axis. Nothing forces
+      the catalog `case`'s attached capability and the override's composed
+      capability to stay the same value: if `openai-codex-native-capability`
+      changed, or the catalog `case` branch was edited to attach a different
+      capability, the OAuth-override path and the catalog path would silently
+      diverge in structured-output behaviour with no test flagging it (the
+      existing `built-in-structured-output-capabilities-test` gpt-5.4 case is a
+      single spot-check of the value, not a per-entry invariant tying the two
+      mechanisms to one constant). Either (a) extend
+      `codex-catalog-transport-matches-shared-constants-test` to also assert every
+      selected codex entry's effective structured-output capability equals
+      `openai-codex-native-capability`, so all three facets of the codex rule are
+      drift-guarded together, or (b) collapse the catalog `case`'s codex-capability
+      branch so it too composes `with-openai-codex-transport` / a single codex
+      shaper rather than re-referencing the capability constant independently —
+      giving the "how a model becomes codex" rule one owner across all three
+      facets (code-shaper: `robust → enforceable(invariants)`,
+      `single_responsibility`, `orthogonal`, `consistent(idioms)`; test-shaper:
+      `meaningful_failures`). Scope caveat: touches shared codex machinery beyond
+      gpt-5.6 (same broadened blast radius the round-3 item flagged); confirm
+      acceptable or split into a dedicated catalog task before applying.
+
 ## Code-shaper follow-ups (round 4)
 
 - [x] Fix the tautological `:api` assertion in

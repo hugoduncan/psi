@@ -307,6 +307,14 @@
   covers present and future codex entries. `bb test --focus
   psi.ai.model-registry-test` → 16/16 (186 assertions); clj-kondo clean.
 
+## Code-shaper review (round 5)
+
+- added 1 step: the codex drift-guard covers only 2 of the 3 facets its single
+  owner (`with-openai-codex-transport`) shapes — `:api`/`:base-url` are guarded,
+  but the codex structured-output capability (attached independently by the
+  catalog's `built-in-structured-output-capability` `case`) is not, so that facet
+  can drift silently between the override and catalog paths.
+
 ## Code-shaper follow-ups addressed (round 4)
 
 - addressed 1 review step (test-only, no production change). Fixed the
