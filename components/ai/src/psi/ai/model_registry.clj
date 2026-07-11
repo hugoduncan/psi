@@ -174,20 +174,25 @@
   [provider-kw model-id]
   (get (ensure-catalog) [provider-kw model-id]))
 
+(def ^:private openai-oauth-codex-model-ids
+  "OpenAI model ids that use the ChatGPT/Codex backend under OpenAI OAuth so
+   the same user-visible model id works with ChatGPT credentials, matching
+   Codex-style account capabilities."
+  #{"gpt-5.5" "gpt-5.6"})
+
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
    or nil when the canonical catalog entry should remain unchanged.
 
    Current policy:
-   - `gpt-5.5` uses the ChatGPT/Codex backend under OpenAI OAuth so the same
-     user-visible model id works with ChatGPT credentials, matching Codex-style
-     account capabilities.
+   - models in `openai-oauth-codex-model-ids` use the ChatGPT/Codex backend
+     under OpenAI OAuth.
    - all other models keep their catalog-defined transport."
   [provider-kw model-id]
   (when (and (= :openai provider-kw)
-             (= "gpt-5.5" model-id))
-    (-> (or (find-model :openai "gpt-5.5")
-            (get built-in/all-models :gpt-5.5))
+             (contains? openai-oauth-codex-model-ids model-id))
+    (-> (or (find-model :openai model-id)
+            (get built-in/all-models (keyword model-id)))
         (assoc :api :openai-codex-responses
                :base-url "https://chatgpt.com/backend-api")
         structured-output/with-openai-codex-native-capability)))

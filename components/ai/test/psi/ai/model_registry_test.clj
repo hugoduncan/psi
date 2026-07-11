@@ -59,6 +59,7 @@
       (is (contains? built-in/all-models :fable-5))
       (is (contains? built-in/all-models :sonnet-5))
       (is (some? (registry/find-model :openai "gpt-5.5")))
+      (is (some? (registry/find-model :openai "gpt-5.6")))
       (is (some? (registry/find-model :openai "gpt-5.4-mini")))))
 
   (testing "no auth for built-in providers"
@@ -95,6 +96,20 @@
       (is (= :openai/responses-text-format-json-schema
              (get-in model [:capabilities :structured-output :native-mechanism])))))
 
+  (testing "openai gpt-5.6 resolves to codex transport when oauth credential is present"
+    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
+                                                                             :access "tok"
+                                                                             :refresh "ref"
+                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
+          model (registry/resolve-runtime-model ctx :openai "gpt-5.6")]
+      (is (= :openai-codex-responses (:api model)))
+      (is (= "https://chatgpt.com/backend-api" (:base-url model)))
+      (is (= "gpt-5.6" (:id model)))
+      (is (= [:provider-native :prompted-json]
+             (get-in model [:capabilities :structured-output :strategies])))
+      (is (= :openai/responses-text-format-json-schema
+             (get-in model [:capabilities :structured-output :native-mechanism])))))
+
   (testing "other openai models preserve catalog transport under oauth"
     (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
                                                                              :access "tok"
@@ -109,6 +124,14 @@
 
   (testing "modern OpenAI chat-completions models declare native JSON Schema support"
     (let [capability (-> (registry/find-model :openai "gpt-5.5")
+                         structured-output/effective-capability)]
+      (is (= true (:supported? capability)))
+      (is (= :openai/chat-completions-json-schema-response-format
+             (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "gpt-5.6 declares native JSON Schema support (chat-completions transport)"
+    (let [capability (-> (registry/find-model :openai "gpt-5.6")
                          structured-output/effective-capability)]
       (is (= true (:supported? capability)))
       (is (= :openai/chat-completions-json-schema-response-format

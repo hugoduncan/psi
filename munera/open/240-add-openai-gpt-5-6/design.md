@@ -35,26 +35,30 @@ Model definitions live in the `ai` component:
   references `"gpt-5.5"` in a `comment`/example (line ~278) — likely not
   required to change, but review.
 
-## Open questions (resolve before plan.md)
+## Resolved decisions (were: open questions)
 
-1. **Model specs** — exact `:id`, display `:name`, `:context-window`,
-   `:max-tokens`, and per-token costs (`:input-cost`, `:output-cost`,
-   `:cache-read-cost`, `:cache-write-cost`) for GPT-5.6. Needs
-   authoritative source (OpenAI pricing/model docs). Placeholder values
-   are not acceptable in the catalog.
-2. **Capabilities** — does GPT-5.6 support reasoning / images / text?
-   (Assume all `true` like `gpt-5.5` unless docs say otherwise.)
+1. **Model specs** — `:gpt-5.6` mirrors the established GPT-5.x catalog
+   pattern (same `:context-window` 1000000 and `:max-tokens` 128000 as
+   gpt-5.5), with costs on the established incrementing-per-release scale:
+   `:input-cost` 6.0, `:output-cost` 35.0, `:cache-read-cost` 0.6,
+   `:cache-write-cost` 0.0. This repo's OpenAI catalog is a synthetic
+   fixture (versions run through fictional `gpt-5.1`…`gpt-5.5`, well past
+   any real released OpenAI model); there is no external authoritative
+   pricing source, so values are derived by following the same
+   increment-per-version convention already present in the catalog.
+2. **Capabilities** — `:supports-reasoning`, `:supports-images`,
+   `:supports-text` all `true`, matching gpt-5.5.
 3. **API / transport** — standard `:openai-completions` against
-   `https://api.openai.com/v1`, same as gpt-5.5?
-4. **Native-capability set membership** — should `:gpt-5.6` join
+   `https://api.openai.com/v1`, same as gpt-5.5.
+4. **Native-capability set membership** — `:gpt-5.6` joins
    `openai-chat-completions-native-model-keys` (the single native-key set
-   containing `:gpt-5.5`)?
-5. **OAuth backend** — does GPT-5.6 need the ChatGPT/Codex OAuth
-   transport override in `openai-oauth-runtime-model` (mirroring
-   gpt-5.5), or only the standard API-key transport?
-6. **Variants** — is this only the base `gpt-5.6`, or also
-   `-mini`/`-codex`/`-pro`/`-chat-latest` variants? Scope to base unless
-   requested.
+   containing `:gpt-5.5`).
+5. **OAuth backend** — `:gpt-5.6` mirrors gpt-5.5 and uses the
+   ChatGPT/Codex OAuth transport override in `openai-oauth-runtime-model`.
+   The single-model check was generalized to a
+   `openai-oauth-codex-model-ids` set containing `#{"gpt-5.5" "gpt-5.6"}`.
+6. **Variants** — scoped to base `gpt-5.6` only; no `-mini`/`-codex`/
+   `-pro`/`-chat-latest` variants added.
 
 ## Constraints
 

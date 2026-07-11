@@ -589,6 +589,22 @@
     :input-cost 5.0
     :output-cost 30.0
     :cache-read-cost 0.5
+    :cache-write-cost 0.0}
+
+   :gpt-5.6
+   {:id "gpt-5.6"
+    :name "GPT-5.6"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 6.0
+    :output-cost 35.0
+    :cache-read-cost 0.6
     :cache-write-cost 0.0}})
 
 (def ^:private provider-defaults
@@ -620,7 +636,8 @@
     :gpt-5.2-chat-latest
     :gpt-5.2-pro
     :gpt-5.4-mini
-    :gpt-5.5})
+    :gpt-5.5
+    :gpt-5.6})
 
 (def ^:private anthropic-json-schema-native-model-keys
   #{:sonnet-4.5

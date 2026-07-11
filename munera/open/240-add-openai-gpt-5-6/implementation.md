@@ -23,6 +23,42 @@
   frozen scope boundary; keep the single-source-of-truth / data-shaped-extension
   intent intact.
 
+## Implementation slice (gpt-5.6 catalog entry)
+
+- Added `:gpt-5.6` to `built-in/all-models` in models.clj, mirroring
+  gpt-5.5's shape/transport (`:openai-completions`,
+  `https://api.openai.com/v1`, context-window 1000000, max-tokens 128000,
+  all capability flags `true`).
+- Pricing (`:input-cost` 6.0, `:output-cost` 35.0, `:cache-read-cost` 0.6,
+  `:cache-write-cost` 0.0) is synthetic — derived from the catalog's own
+  established increment-per-version convention since this catalog is a
+  fixture beyond real OpenAI releases and has no external pricing source
+  to cite. Recorded as a resolved decision in design.md rather than left
+  as a placeholder.
+- Added `:gpt-5.6` to `openai-chat-completions-native-model-keys`.
+- Generalized `openai-oauth-runtime-model` (model_registry.clj): replaced
+  the single `(= "gpt-5.5" model-id)` check with an
+  `openai-oauth-codex-model-ids` set `#{"gpt-5.5" "gpt-5.6"}`, and
+  parameterized the catalog lookup/override on `model-id` instead of the
+  hardcoded `"gpt-5.5"`/`:gpt-5.5` literals. Behaviour for gpt-5.5 is
+  unchanged; gpt-5.6 now gets the same ChatGPT/Codex OAuth transport
+  override.
+- Tests added to `model_registry_test.clj`: catalog presence for
+  `"gpt-5.6"`, OAuth-routing test (mirrors the existing gpt-5.5 pair),
+  and a structured-output capability test (chat-completions native JSON
+  Schema, mirrors the gpt-5.5 capability test).
+- Verified: `bb test --focus psi.ai.model-registry-test` (14/14 pass),
+  `bb test --focus psi.ai.core-test` (9/9 pass), `clj-kondo --lint
+  components/ai/src` clean.
+- `session_profiles.clj`'s `"gpt-5.5"` comment/example (line ~278,
+  mentioned in design.md Context) was left unchanged — it's an example
+  reference, not a functional model listing, and design.md scoped it as
+  "likely not required to change."
+- Design's six open questions were resolved directly in design.md
+  ("Resolved decisions") rather than staying open, since answering them
+  was the prerequisite for any plan.md; plan.md/steps.md created in this
+  same slice, already reflecting the completed implementation.
+
 ## Design-follow-up (inconsistency step resolved)
 
 - Verified against `components/ai/src/psi/ai/models.clj`: exactly one native-key
