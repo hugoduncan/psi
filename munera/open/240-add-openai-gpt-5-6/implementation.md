@@ -114,3 +114,9 @@
     entry for gpt-5.6 (catalog availability + OAuth/Codex routing) and
     corrected the superseded "no changelog entry required" note above.
   - `bb test --focus psi.ai.model-registry-test` → 15/15 pass; clj-kondo clean.
+
+## Implementation review (round 3)
+
+- no new steps — code/catalog/OAuth-set, tests (15/15), CHANGELOG `[Unreleased]`
+  entry, and docs all verified consistent with design/plan/architecture; prior
+  two rounds' follow-ups confirmed addressed.
