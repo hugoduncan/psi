@@ -4,7 +4,6 @@
 
 Not yet started:
 
-- `munera/open/239-post-turn-tooling-friction-analysis/` — context-manager: async post-turn local-model analysis of last 4 turns to detect tooling/dependency friction for the agent; dedup against existing tasks, auto-create design.md-only munera tasks in session worktree. Design-only.
 - `munera/open/202-document-at-bounds-in-scheduler-doc/` — (from master) document the resolved-millisecond-delay absolute `:at` bounds in `doc/scheduler.md`. NNN collides with closed `202-reusable-review-follow-up-step` (left as-is per convention).
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
