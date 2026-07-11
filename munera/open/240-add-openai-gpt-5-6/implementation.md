@@ -8,3 +8,14 @@
   (open question #4) does not exist; `:gpt-5.5` is in exactly one set
   (`openai-chat-completions-native-model-keys`, models.clj 610–623). The adjacent
   set (625–635) is Anthropic-only.
+
+## For the design-step task
+
+- Relevant files: `components/ai/src/psi/ai/models.clj` (catalog + native-key
+  set at 610–623; entries added via `openai-models`), and
+  `components/ai/src/psi/ai/model_registry.clj` (`openai-oauth-runtime-model`,
+  177–212 — the sole OAuth transport override, currently `gpt-5.5`-only).
+- Principle: this design-step is a documentation correction only — fixing the
+  design's false "second set" premise. It must not widen scope or change the
+  frozen scope boundary; keep the single-source-of-truth / data-shaped-extension
+  intent intact.
