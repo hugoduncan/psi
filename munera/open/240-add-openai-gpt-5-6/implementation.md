@@ -357,3 +357,20 @@
   the codex constant and a *different* capability value fails the assertion.
   `bb test --focus psi.ai.model-registry-test` → 16/16 (194 assertions, up from
   186); clj-kondo clean.
+
+## Code-shaper follow-ups addressed (round 6)
+
+- addressed 1 review step. Chose to document the irreducibility rather than
+  broaden scope (option a — `condp`/`cond` — would touch all three provider
+  branches and abandon `case`'s constant-time dispatch, exceeding the
+  round-3/4/5 "guard data, don't broaden into shared codex machinery"
+  precedent). Clojure `case` requires compile-time-literal keys, so the
+  `:openai-codex-responses` branch in `built-in-structured-output-capability`
+  cannot reference `structured-output/openai-codex-api` directly. Added an
+  inline note at that branch stating the literal is a deliberate, reconciled
+  restatement (not a missed reference) and pointing at the drift-guard, and
+  added an assertion to `codex-catalog-transport-matches-shared-constants-test`
+  pinning `openai-codex-api` to that literal so a retarget of the constant fails
+  there and directs a reader to the `case`. `bb test --focus
+  psi.ai.model-registry-test` → 16/16 (195 assertions, up from 194); clj-kondo
+  clean.

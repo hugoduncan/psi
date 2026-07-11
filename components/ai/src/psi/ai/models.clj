@@ -658,6 +658,15 @@
       structured-output/anthropic-json-schema-output-native-capability
       structured-output/anthropic-forced-tool-native-capability)
 
+    ;; The test key here is the literal value of
+    ;; `structured-output/openai-codex-api`, deliberately restated rather than
+    ;; referenced: Clojure `case` requires compile-time-literal test constants,
+    ;; so the shared constant cannot be used as a `case` key. This is the single
+    ;; irreducible re-statement of that value; it is reconciled with the constant
+    ;; (not a missed reference) by `codex-catalog-transport-matches-shared-constants-test`,
+    ;; which asserts every codex catalog entry's effective structured-output
+    ;; capability equals `openai-codex-native-capability` — so a divergence
+    ;; between this branch and the shared codex owner is drift-guarded.
     :openai-codex-responses
     structured-output/openai-codex-native-capability
 

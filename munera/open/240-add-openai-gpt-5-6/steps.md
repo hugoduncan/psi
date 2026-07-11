@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups (round 6)
 
-- [ ] Reference the shared codex `:api` constant from the catalog capability
+- [x] Reference the shared codex `:api` constant from the catalog capability
       dispatch, or record why the literal is irreducible
       (`models.clj` `built-in-structured-output-capability` ~660, the
       `(case (:api model) … :openai-codex-responses …)` branch; constant

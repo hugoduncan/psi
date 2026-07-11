@@ -294,6 +294,16 @@
   ;; facets together so the "how a model becomes codex" rule is drift-checked as
   ;; one invariant. The capability is only attached during catalog normalization,
   ;; so assert it on the normalized entry (via find-model), not the raw map.
+  ;; `built-in-structured-output-capability`'s `case` dispatches on the bare
+  ;; literal `:openai-codex-responses` — an irreducible restatement of
+  ;; `openai-codex-api`'s value (Clojure `case` cannot take a non-literal key).
+  ;; Pin that literal to the constant so a retarget of `openai-codex-api` fails
+  ;; here (pointing a reader to the `case`) rather than silently leaving the
+  ;; capability branch matching the old value.
+  (testing "the codex :api constant equals the literal the capability case dispatches on"
+    (is (= :openai-codex-responses structured-output/openai-codex-api)
+        (str "structured-output/openai-codex-api must equal the literal the"
+             " built-in-structured-output-capability case dispatches on")))
   (testing "every codex-transport catalog entry's :api, :base-url, and native capability equal the shared constants"
     (let [codex? (fn [model]
                    (or (= structured-output/openai-codex-api (:api model))
