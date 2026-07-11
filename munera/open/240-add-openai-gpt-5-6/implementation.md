@@ -199,3 +199,8 @@
   the sibling codex-routing pair was collapsed into a `doseq` — the same
   case-explosion, left inconsistent within one test. Coverage complete;
   economy/consistency shaping only, no production change.
+
+- addressed 1 test-shaper round-4 review step: collapsed the no-oauth
+  member-pair blocks into a `doseq` over `["gpt-5.5" "gpt-5.6"]` with
+  id-specific failure messages, matching the codex-routing pair's shape;
+  tests pass, lint clean.

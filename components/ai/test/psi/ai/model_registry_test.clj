@@ -97,15 +97,14 @@
 (deftest resolve-runtime-model-openai-oauth-routing-test
   (registry/init! {})
 
-  (testing "openai gpt-5.5 remains chat-completions without oauth context"
-    (let [model (registry/resolve-runtime-model nil :openai "gpt-5.5")]
-      (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model)))))
-
-  (testing "openai gpt-5.6 remains chat-completions without oauth context"
-    (let [model (registry/resolve-runtime-model nil :openai "gpt-5.6")]
-      (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model)))))
+  ;; Codex-set members share one no-oauth contract: with no ctx the override is
+  ;; skipped and each member retains its catalog chat-completions transport.
+  ;; State it once and vary only the id (mirrors the codex-transport pair below).
+  (doseq [id ["gpt-5.5" "gpt-5.6"]]
+    (testing (str "openai " id " remains chat-completions without oauth context")
+      (let [model (registry/resolve-runtime-model nil :openai id)]
+        (is (= :openai-completions (:api model)) (str id " api"))
+        (is (= "https://api.openai.com/v1" (:base-url model)) (str id " base-url")))))
 
   ;; Codex-set members share one transport-override contract under oauth; each
   ;; id is a representative case, so state it once and vary only the id. This

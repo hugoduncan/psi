@@ -81,7 +81,7 @@
 
 ## Test-shaper follow-ups (round 4)
 
-- [ ] Collapse the duplicated no-oauth member-pair blocks in
+- [x] Collapse the duplicated no-oauth member-pair blocks in
       `resolve-runtime-model-openai-oauth-routing-test`
       (`model_registry_test.clj` ~95–105). The two `testing` blocks "openai
       gpt-5.5 remains chat-completions without oauth context" and "openai gpt-5.6
