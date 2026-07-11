@@ -48,8 +48,25 @@
       (is (.exists (io/file root "munera" "open" id "design.md")))
       (is (not (.exists (io/file root "munera" "open" id "plan.md"))))
       (is (not (.exists (io/file root "munera" "open" id "steps.md"))))
-      (is (str/includes? (slurp (io/file root "munera" "open" id "design.md"))
-                         "Missing linter"))))
+      ;; AC2 end-to-end: the *written* design.md must contain the
+      ;; auto-generated marker plus friction/evidence/suggestion content,
+      ;; not only the title (task 239 task-test-review round-2 follow-up) —
+      ;; proves the whole rendered document reached the created file.
+      (let [content (slurp (io/file root "munera" "open" id "design.md"))]
+        (is (str/includes? content "# Missing linter")
+            "title rendered as heading in the written file")
+        (is (str/includes? content "Auto-generated")
+            "auto-generated marker in the written file")
+        (is (str/includes? content "context-manager")
+            "marker names the context-manager analyzer in the written file")
+        (is (str/includes? content "task 239")
+            "marker names the owning task in the written file")
+        (is (str/includes? content "no linter installed")
+            "friction content in the written file")
+        (is (str/includes? content "turn 1")
+            "evidence content in the written file")
+        (is (str/includes? content "add linter dependency")
+            "suggested change in the written file"))))
 
   (testing "pre-existing directory collision → re-allocates NNN"
     (let [root  (temp-worktree)

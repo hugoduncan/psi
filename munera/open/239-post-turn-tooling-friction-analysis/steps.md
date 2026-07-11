@@ -280,7 +280,7 @@
 
 ## Follow-up (task-test-review skill, round 2)
 
-- [ ] `default-friction-run-helper`
+- [x] `default-friction-run-helper`
       (`extensions/context_manager.clj`) is a thin wrapper over the shared
       `bounded-helper-session-run`, but its friction-specific configuration
       on the **happy path** is untested. The entity-resolution wrapper has
@@ -307,7 +307,7 @@
       `default-run-helper-settled-run-closes-and-untracks-test`) asserting
       returned text, `:session-name "friction-analysis"` in `:create-calls`,
       selected-model threading, and child close+untrack on success.
-- [ ] The **auto-generated marker naming the analyzer** (design.md AC2:
+- [x] The **auto-generated marker naming the analyzer** (design.md AC2:
       the generated `design.md` must contain "an auto-generated marker",
       the analyzer's own attribution) is only weakly asserted, and never
       asserted in the *written file*. `render-friction-design-md-test`

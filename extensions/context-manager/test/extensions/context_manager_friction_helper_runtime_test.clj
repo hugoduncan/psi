@@ -19,6 +19,56 @@
                 (< (System/currentTimeMillis) deadline))
       (Thread/sleep 5))))
 
+(deftest default-friction-run-helper-settled-run-test
+  (testing "on a normal settled run the friction wrapper (a) returns the run
+            text, (b) passes :session-name \"friction-analysis\" (and the
+            no-tools :tool-ids []/:tool-names [] grant) to
+            create-child-session, (c) threads the selected model into
+            run-agent-loop-in-session, and (d) closes + untracks the child in
+            `friction-helper-session-ids` on success.
+
+            Mirrors `default-run-helper-settled-run-closes-and-untracks-test`
+            + `default-run-helper-forwards-selected-model-test`
+            (`context_manager_helper_runtime_test.clj`) for the
+            entity-resolution wrapper — the two wrappers differ only by
+            session-name / tool-grant / tracking atom, so without this a
+            mis-wired friction session-name or normal-completion teardown
+            would pass every existing friction helper-runtime test
+            (task 239 task-test-review round-2 follow-up)."
+    (let [create-calls (atom nil)
+          run-calls    (atom nil)
+          closed       (atom nil)
+          model        {:provider :ollama :id "qwen2.5-coder"}
+          api (fake-run-api
+               {:create-calls create-calls
+                :run-calls run-calls
+                :closed closed
+                :run-result {:psi.agent-session/agent-run-ok? true
+                             :psi.agent-session/agent-run-text "ISSUE: x | X\n"}})
+          result (#'context-manager/default-friction-run-helper
+                  api {:parent-session-id "s1"
+                       :system-prompt "sys"
+                       :user-prompt "usr"
+                       :model model})]
+      (is (= "child-1" (:child-session-id result)))
+      (is (= "ISSUE: x | X\n" (:text result))
+          "settled successful run surfaces the run text")
+      (is (= "friction-analysis" (:session-name @create-calls))
+          "friction wrapper passes :session-name \"friction-analysis\"")
+      (is (= [] (:tool-ids @create-calls))
+          "friction helper is granted no tools (:tool-ids [])")
+      (is (= [] (get-in @create-calls [:prompt-component-selection :tool-names]))
+          "no tool-name prompt fragments granted (:tool-names [])")
+      (is (= model (:model @run-calls))
+          "selected model threaded into run params")
+      ;; The future's finally closes + untracks on its own thread; await it.
+      (await-friction-untracked "child-1")
+      (is (= "child-1" @closed)
+          "settled run closes the child session")
+      (is (not (contains? @context-manager/friction-helper-session-ids
+                          "child-1"))
+          "settled run untracks the child from the recursion-avoidance atom"))))
+
 (deftest default-friction-run-helper-timeout-branch-test
   (testing "wall-clock timeout: real deref/::timeout branch returns nil text,
             child tracked in `friction-helper-session-ids` during the run,

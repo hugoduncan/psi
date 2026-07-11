@@ -121,6 +121,19 @@
                     :evidence "turns 2-3"
                     :suggestion "surface retry count in tool output"})]
       (is (str/includes? content "Auto-generated"))
+      ;; AC2: the marker must actually identify *this* analyzer, not merely
+      ;; contain the word "Auto-generated" (task 239 task-test-review round-2
+      ;; follow-up) — a regression dropping "context-manager"/"task 239"/
+      ;; "analyzer" would otherwise pass.
+      (is (str/includes? content "context-manager")
+          "marker names the context-manager analyzer")
+      (is (str/includes? content "task 239")
+          "marker names the owning task")
+      (is (str/includes? content "analyzer")
+          "marker names it as the tooling-friction analyzer")
+      ;; :title is rendered as the H1 heading.
+      (is (str/includes? content "# bash tool retries silently")
+          "title becomes the H1 heading")
       (is (str/includes? content "bash calls retried 3x with no diagnostic"))
       (is (str/includes? content "turns 2-3"))
       (is (str/includes? content "surface retry count in tool output")))))

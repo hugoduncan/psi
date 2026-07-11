@@ -1,3 +1,27 @@
+## Task-test-review round-2 follow-up (addressed)
+
+- Addressed 2 task-test-review round-2 follow-up steps (the immediately
+  preceding review pass, commit `05cbecc76`):
+  - Added `default-friction-run-helper-settled-run-test`
+    (`context_manager_friction_helper_runtime_test.clj`) asserting the
+    settled-run path: returned text, `:session-name "friction-analysis"`
+    + no-tools `:tool-ids []`/`:tool-names []` in `:create-calls`,
+    selected-model threading into run params, and child close+untrack in
+    `friction-helper-session-ids` on success.
+  - Strengthened `render-friction-design-md-test`
+    (`context_manager_friction_parsing_test.clj`) to assert the marker
+    identifies the context-manager/task-239 analyzer and that `:title`
+    renders as the H1 heading; strengthened `create-friction-task-test`
+    (`context_manager_friction_task_files_test.clj`) to assert the
+    *written* design.md contains the auto-generated marker (with
+    context-manager/task-239 attribution) plus friction/evidence/
+    suggestion content, not just the title.
+- The two `Follow-up (task-test-review skill)` (round-1) items remain
+  unchecked by design: they predate this preceding review pass and are
+  left for their owning workflow / human decision.
+- `bb test --focus` (3 friction test namespaces): 15 tests, 71
+  assertions, 0 failures; clj-kondo clean on the 3 changed test files.
+
 ## Implementation review, round 15 (task-implementation-review skill)
 
 - No new actionable issues. Verified round-14 empty-history guard in
