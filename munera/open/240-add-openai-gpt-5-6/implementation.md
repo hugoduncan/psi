@@ -282,6 +282,12 @@
   reachable. Broadens beyond gpt-5.6 to sibling codex entries — noted as a scope
   caveat on the step. No behaviour or coverage change requested.
 
+## Code-shaper review (round 4)
+
+- added 1 step: the round-3 drift-guard test's `:api` assertion is tautological
+  (filters codex entries by `:api == openai-codex-api`, then asserts the same),
+  so it can never catch `:api` drift; only `:base-url` is actually guarded.
+
 ## Code-shaper follow-ups addressed (round 3)
 
 - addressed 1 review step (test-only, no production change). Chose the

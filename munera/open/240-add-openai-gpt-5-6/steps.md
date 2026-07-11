@@ -1,5 +1,29 @@
 # Steps
 
+## Code-shaper follow-ups (round 4)
+
+- [ ] Fix the tautological `:api` assertion in
+      `codex-catalog-transport-matches-shared-constants-test`
+      (`model_registry_test.clj` ~273–295). The drift-guard test filters codex
+      entries with the predicate `(= structured-output/openai-codex-api (:api
+      model))`, then asserts `(= structured-output/openai-codex-api (:api model))`
+      on each surviving entry. Every entry that passes the filter satisfies that
+      assertion *by construction* — the `:api` check is provably always-true and
+      can never catch drift, so the test's stated "`:api`/`:base-url` equal the
+      shared constants" invariant is only half-enforced (only `:base-url` carries
+      signal). The intent (round-3: "asserts its `:api`/`:base-url` equal the
+      shared constants") is undermined: a codex entry whose `:api` diverged from
+      the constant would simply be excluded by the filter and silently skipped
+      rather than flagged. Select the drift-guard population by a codex identity
+      *independent of* `:api` — e.g. iterate all entries and select those whose
+      `:base-url` equals `openai-codex-base-url` (then assert `:api` equals
+      `openai-codex-api`), or select by a stable catalog key/marker — so the
+      `:api` assertion tests a real invariant instead of the filter predicate.
+      Guard against the empty-population masking risk either way (the current
+      `(seq codex-entries)` check must key off whichever independent selector is
+      used) (code-shaper: `robust → enforceable(invariants)`,
+      `single_responsibility`, `orthogonal`; test-shaper: `meaningful_failures`).
+
 ## Code-shaper follow-ups (round 3)
 
 - [x] Reconcile the codex transport literals in the catalog with the shared
