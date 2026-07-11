@@ -1222,3 +1222,20 @@
 - older unchecked items (top-of-file per-session in-flight-guard note;
   `create-friction-task-test` rename in task-test-review) predate this
   review pass and are left for their owning workflow / human.
+
+## Address test-shaper round-4 follow-up
+
+- addressed 1 test-shaper round-4 review step in
+  `context_manager_friction_parsing_test.clj`:
+  - `parse-friction-output-multi-block-test`: two well-formed ISSUE
+    blocks → ordered two-element `:issues` (pins block accumulation).
+  - `parse-friction-output-malformed-then-valid-recovery-test`: a
+    malformed leading ISSUE block (missing SUGGESTION) followed by a
+    valid one → only the valid issue (pins the drop-then-recover boundary
+    that a single-block test cannot reach).
+- `clojure -M:test --focus extensions.context-manager-friction-parsing-test`:
+  10 tests, 33 assertions, 0 failures; clj-kondo clean.
+- older unchecked items (top-of-file per-session in-flight-guard note;
+  `create-friction-task-test` mislabeled-"retry exhaustion" rename in
+  task-test-review) predate this review pass and are left for their
+  owning workflow / human.

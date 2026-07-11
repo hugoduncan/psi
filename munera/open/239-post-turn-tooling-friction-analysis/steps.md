@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 4)
 
-- [ ] `parse-friction-output`'s **multi-block splitting and
+- [x] `parse-friction-output`'s **multi-block splitting and
       malformed-then-valid recovery** — the core structural behaviour of
       its `take-while`/`drop` block loop
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)

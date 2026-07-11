@@ -112,6 +112,60 @@
                  "SUGGESTION: add linter to deps.edn\n"
                  "DUPLICATE: slow-test-loop ~ 012-slow-tests\n"))))))
 
+(deftest parse-friction-output-multi-block-test
+  (testing "two well-formed ISSUE blocks parse into an ordered two-element :issues"
+    ;; Exercises `parse-friction-output`'s own block boundaries — the
+    ;; header + `(take-while (not ISSUE|DUPLICATE))` split then
+    ;; `(drop (count block) …)` to resume at the next header — so multiple
+    ;; issues must accumulate in order. Only multi-issue coverage that
+    ;; existed was at the orchestration layer (`cap-applied-test`).
+    (is (= {:issues [{:slug "first-issue"
+                      :title "First friction"
+                      :friction "first thing broke"
+                      :evidence "turn 1"
+                      :suggestion "fix first thing"}
+                     {:slug "second-issue"
+                      :title "Second friction"
+                      :friction "second thing broke"
+                      :evidence "turn 2"
+                      :suggestion "fix second thing"}]
+            :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: first-issue | First friction\n"
+                 "FRICTION: first thing broke\n"
+                 "EVIDENCE: turn 1\n"
+                 "SUGGESTION: fix first thing\n"
+                 "\n"
+                 "ISSUE: second-issue | Second friction\n"
+                 "FRICTION: second thing broke\n"
+                 "EVIDENCE: turn 2\n"
+                 "SUGGESTION: fix second thing\n"))))))
+
+(deftest parse-friction-output-malformed-then-valid-recovery-test
+  (testing "a malformed ISSUE block followed by a valid one yields only the valid issue"
+    ;; A bad first block (missing its SUGGESTION line) must be dropped
+    ;; without swallowing the following complete block — the parser drops
+    ;; the malformed header + its take-while span, then resumes at the next
+    ;; ISSUE header and recovers the valid block. A regression that let a
+    ;; malformed leading block consume the following valid one (or that
+    ;; stopped after the first parsed block) would silently drop real
+    ;; detected issues yet pass every single-block parse test.
+    (is (= {:issues [{:slug "good-one"
+                      :title "Good friction"
+                      :friction "real friction here"
+                      :evidence "turn 3"
+                      :suggestion "fix the real thing"}]
+            :duplicates []}
+           (context-manager/parse-friction-output
+            (str "ISSUE: bad-one | Malformed friction\n"
+                 "FRICTION: incomplete block missing suggestion\n"
+                 "EVIDENCE: turn 2\n"
+                 "\n"
+                 "ISSUE: good-one | Good friction\n"
+                 "FRICTION: real friction here\n"
+                 "EVIDENCE: turn 3\n"
+                 "SUGGESTION: fix the real thing\n"))))))
+
 (deftest render-friction-design-md-test
   (testing "includes auto-generated marker, friction, evidence, and suggestion"
     (let [content (context-manager/render-friction-design-md
