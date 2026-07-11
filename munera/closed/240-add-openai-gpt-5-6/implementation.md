@@ -385,3 +385,9 @@
   referencing the shared constants; `with-openai-codex-native-capability` now
   single-caller) are already captured as deliberately scope-caveated
   shared-codex-machinery items in rounds 2–6; not re-raised to avoid duplication.
+
+## Close
+
+Closed: completed. All lifecycle gates (design/plan/implement/review/knowledge)
+passed; `:gpt-5.6` shipped in the catalog with OAuth/Codex routing and full test
+coverage. Moved open/ → closed/ per Munera state-transition convention.
