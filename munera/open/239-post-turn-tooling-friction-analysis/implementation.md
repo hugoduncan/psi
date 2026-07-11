@@ -1,3 +1,18 @@
+## Implementation review, round 15 (task-implementation-review skill)
+
+- No new actionable issues. Verified round-14 empty-history guard in
+  `friction/run-analysis` (`str/blank? history-excerpt` no-op mirroring
+  the `:worktree-root` guard); `render-history-excerpt` returns `nil` on
+  an empty tail, so the guard covers both `nil` and `""`. `clojure -M:test
+  --focus extensions` green (349 tests, 1470 assertions, 0 failures);
+  working tree clean; file lengths under the 800-line ratchet (786/556).
+- Non-compliance: the two `Follow-up (task-test-review skill)` items in
+  steps.md remain unchecked (no-tools `:tool-ids []`/`:tool-names []`
+  grant assertion; mislabeled "retry exhaustion → nil" testing block) —
+  confirmed still valid against current code, not new, owned by the
+  task-test-review workflow (not this implementation review). No steps
+  added (no new issues; existing items not duplicated).
+
 ## Implementation review, round 14 (task-implementation-review skill)
 
 - added 1 step to steps.md: `run-analysis` runs the bounded local-model
