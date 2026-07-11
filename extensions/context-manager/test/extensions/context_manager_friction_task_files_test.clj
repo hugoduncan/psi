@@ -143,6 +143,58 @@
       (is (= [{:id "002-b" :title "002-b"} {:id "001-a" :title "001-a"}]
              (context-manager/recent-closed-tasks root)))))
 
+  (testing "git-listed-but-absent-from-disk id is dropped (git-vs-disk reconciliation)"
+    ;; `closed-ids-by-git-order` derives closure order from
+    ;; `git log --diff-filter=A -- munera/closed/`, whose A-records are
+    ;; append-only history: an id committed into `munera/closed/` and later
+    ;; deleted off disk still appears in that log. `recent-closed-ids-git-
+    ;; filtered` guards against this with `(filter all-ids ids)` where
+    ;; `all-ids` is the set of directory names *currently* on disk — a
+    ;; stale git-derived id must never reach the dedup list (a phantom
+    ;; task the helper would wrongly dedup against, defeating AC2/AC3).
+    (let [root (temp-worktree)]
+      (git! root "init" "-q")
+      (git! root "config" "user.email" "test@example.com")
+      (git! root "config" "user.name" "Test")
+      (mkdirs! (str root "/munera/closed/001-first"))
+      (spit (io/file root "munera" "closed" "001-first" "design.md") "# First\n")
+      (git! root "add" "-A")
+      (git! root "commit" "-q" "-m" "close first")
+      (mkdirs! (str root "/munera/closed/002-second"))
+      (spit (io/file root "munera" "closed" "002-second" "design.md") "# Second\n")
+      (git! root "add" "-A")
+      (git! root "commit" "-q" "-m" "close second")
+      ;; Remove the first task from disk; it remains an A-record in git log.
+      (let [_ (doseq [f (reverse (file-seq (io/file root "munera" "closed" "001-first")))]
+                (.delete f))
+            result (context-manager/recent-closed-tasks root)]
+        (is (= [{:id "002-second" :title "Second"}] result)
+            "only the surviving on-disk task is returned")
+        (is (not-any? #(= "001-first" (:id %)) result)
+            "the git-listed-but-deleted id is never emitted"))))
+
+  (testing "git-success-but-empty (uncommitted closed dirs) falls back to name-descending"
+    ;; `closed-ids-by-git-order` returns nil via its `(when (seq ids) ids)`
+    ;; tail whenever `git log` succeeds (exit 0) but yields no A-records for
+    ;; `munera/closed/` — a real scenario: closed dirs present on disk in a
+    ;; valid git repo whose moves were never committed. `recent-closed-tasks`
+    ;; then falls back to name-descending via
+    ;; `(or git-ids (sort ... all-ids))`. This is the git-success-empty →
+    ;; fallback branch, distinct from the non-git → git-failure → fallback
+    ;; branch the non-git test covers.
+    (let [root (temp-worktree)]
+      (git! root "init" "-q")
+      (git! root "config" "user.email" "test@example.com")
+      (git! root "config" "user.name" "Test")
+      (spit (io/file root "readme.md") "init")
+      (git! root "add" "-A")
+      (git! root "commit" "-q" "-m" "init")
+      ;; Closed dirs on disk but never committed → git log yields no A-records.
+      (mkdirs! (str root "/munera/closed/001-a") (str root "/munera/closed/002-b"))
+      (is (= [{:id "002-b" :title "002-b"} {:id "001-a" :title "001-a"}]
+             (context-manager/recent-closed-tasks root))
+          "name-descending fallback fires even inside a valid git repo")))
+
   (testing "N bounds the returned list"
     (let [root (temp-worktree)]
       (mkdirs! (str root "/munera/closed/001-a")

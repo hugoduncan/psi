@@ -1,3 +1,24 @@
+## Test-shaper follow-up (round 7, addressed)
+
+- addressed 2 review steps.
+- (1) git-listed-but-absent-from-disk filtering: added
+  `recent-closed-tasks-test` "git-listed-but-absent-from-disk id is dropped"
+  block (`context_manager_friction_task_files_test.clj`) — commits two
+  closed tasks, deletes one off disk (it stays an A-record in git log),
+  asserts only the surviving task is returned and the deleted id never
+  appears — pinning the `(filter all-ids ids)` git-vs-disk reconciliation
+  in `recent-closed-ids-git-filtered`.
+- (2) git-success-but-empty fallback: added
+  "git-success-but-empty (uncommitted closed dirs) falls back to name-
+  descending" block — git-init'd repo with an initial commit and on-disk-
+  but-uncommitted closed dirs (git log exit 0, no A-records → `closed-ids-
+  by-git-order` nil via `(when (seq ids) ids)`), asserts name-descending
+  fallback fires — distinct from the non-git → git-failure fallback the
+  existing non-git test covers.
+- focused tests: `bb test --focus
+  extensions.context-manager-friction-task-files-test` → 5 tests, 28
+  assertions, 0 failures. clj-kondo clean.
+
 ## Test-shaper review (round 6)
 
 - added 1 step: the analyzer's own literal helper session-name

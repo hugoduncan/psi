@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 7)
 
-- [ ] `recent-closed-tasks`'s **git-listed-but-absent-from-disk filtering**
+- [x] `recent-closed-tasks`'s **git-listed-but-absent-from-disk filtering**
       is untested. `closed-ids-by-git-order`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       derives closure order from `git log --diff-filter=A -- munera/closed/`,
@@ -33,7 +33,7 @@
       a `recent-closed-tasks` test: commit two closed tasks in git, `rm -rf`
       one from disk, assert the result contains only the surviving task and
       never the deleted id — pinning the git-history-vs-disk reconciliation.
-- [ ] `recent-closed-tasks`'s **git-repo-but-no-`munera/closed/`-history
+- [x] `recent-closed-tasks`'s **git-repo-but-no-`munera/closed/`-history
       fallback branch** is untested. `closed-ids-by-git-order` returns `nil`
       via its `(when (seq ids) ids)` tail whenever the `git log` succeeds
       (exit 0) but yields **no** `A`-records for `munera/closed/` — a real
