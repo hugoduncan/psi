@@ -1082,3 +1082,13 @@
   Focused suite green (16 tests). The two `Follow-up (task-test-review
   skill)` items remain unchecked — they predate round 14 and belong to
   their owning workflow / human decision.
+
+## Test review, round 2 (task-test-review skill)
+
+- added 2 steps to steps.md (Follow-up (task-test-review skill, round 2)):
+  friction helper-runtime happy-path/session-name coverage gap;
+  auto-generated-marker (AC2) assertion gap in render + created-file tests.
+- Non-compliance note: the two prior `Follow-up (task-test-review skill)`
+  items (friction helper `:tool-ids []` grant assertion; mislabeled "retry
+  exhaustion" testing block) remain unchecked/unaddressed — still valid,
+  not re-added.
