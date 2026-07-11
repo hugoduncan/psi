@@ -60,3 +60,21 @@
       an `[Unreleased] / Added` entry for gpt-5.6 (catalog availability + OAuth/
       Codex routing) or correct the implementation.md justification to cite an
       accurate reason for omission.
+
+## Test-review follow-ups
+
+- [ ] Add a `resolve-runtime-model` test for a codex-set member (`gpt-5.6`)
+      under a **ctx that is present but not OAuth-backed** (e.g. an api-key
+      `create-null-context`, mirroring `core_test.clj`'s `api-key-ctx` /
+      `empty-ctx` in `oauth-backed-test`). The current
+      `resolve-runtime-model-openai-oauth-routing-test`
+      (`model_registry_test.clj` 77–128) exercises only two branches for
+      gpt-5.6: `nil` ctx (skips the `(and ctx (= :openai ...))` guard entirely,
+      `model_registry.clj` ~216) and a ctx with a live OAuth credential. The
+      `oauth-backed?`-false-with-ctx-present branch — where the override is
+      guarded off and gpt-5.6 must fall back to catalog `:openai-completions`
+      despite being in `openai-oauth-codex-model-ids` — is untested here. The
+      existing `gpt-5.4-mini` negative control proves *non-membership* fallback,
+      not *non-oauth-credential* fallback for a member; the `oauth-backed?`-false
+      cases are covered only at the provider-auth unit level, not at the
+      `resolve-runtime-model` seam gpt-5.6 actually routes through.

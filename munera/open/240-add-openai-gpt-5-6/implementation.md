@@ -120,3 +120,9 @@
 - no new steps — code/catalog/OAuth-set, tests (15/15), CHANGELOG `[Unreleased]`
   entry, and docs all verified consistent with design/plan/architecture; prior
   two rounds' follow-ups confirmed addressed.
+
+## Test review (task-test-review)
+
+- added 1 test step: `resolve-runtime-model` lacks a codex-member
+  (gpt-5.6) case for ctx-present-but-not-oauth-backed; only nil-ctx and
+  live-oauth branches are covered at this seam.
