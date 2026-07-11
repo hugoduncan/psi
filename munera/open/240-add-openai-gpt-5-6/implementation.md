@@ -10,6 +10,7 @@
   set (625–635) is Anthropic-only.
 
 - plan-review ambiguity review: no ambiguity review feedback — no plan.md/steps.md exist yet (design-stage); plan-level ambiguities N/A and design open questions #1–6 already captured.
+- plan-review inconsistency review: no inconsistency review feedback — no plan.md/steps.md exist yet; design/design-steps/implementation mutually consistent (prior native-key-set inconsistency already resolved).
 
 ## For the design-step task
 
