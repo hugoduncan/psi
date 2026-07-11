@@ -77,6 +77,23 @@
       (is (= :no-op (:status result)))
       (is (= "no worktree" (:diagnostic result))))))
 
+(deftest blank-history-no-op-test
+  (testing "empty/blank history -> no-op, no run-helper, no task"
+    (doseq [empty-history [nil "" "   "]]
+      (let [ran-helper (atom false)
+            created    (atom false)
+            result (context-manager/friction-analysis
+                    {} {:session-id "s1"}
+                    (collaborators
+                     {:fetch-history (fn [_sid] empty-history)
+                      :run-helper    (fn [_opts] (reset! ran-helper true)
+                                       {:child-session-id "h1" :text issue-output})
+                      :create-task!  (fn [_root _issue] (reset! created true) "042-x")}))]
+        (is (= :no-op (:status result)))
+        (is (= "no history" (:diagnostic result)))
+        (is (false? @ran-helper))
+        (is (false? @created))))))
+
 (deftest own-helper-session-excluded-test
   (testing "the analyzer's own tracked helper session is excluded"
     (swap! context-manager/friction-helper-session-ids conj "s1")

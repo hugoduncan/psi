@@ -475,12 +475,19 @@
             {:status :no-op :diagnostic "no worktree"})
 
         :else
-        (let [model (try (select-model session-id) (catch Throwable _ nil))]
-          (if (nil? model)
+        (let [model (try (select-model session-id) (catch Throwable _ nil))
+              history-excerpt (try (fetch-history session-id) (catch Throwable _ nil))]
+          (cond
+            (nil? model)
             (do (log "context-manager: friction-analysis: no local model, skipping")
                 {:status :no-op :diagnostic "no local model"})
+
+            (str/blank? history-excerpt)
+            (do (log "context-manager: friction-analysis: no history, skipping")
+                {:status :no-op :diagnostic "no history"})
+
+            :else
             (let [worktree-root (:worktree-root info)
-                  history-excerpt (try (fetch-history session-id) (catch Throwable _ nil))
                   {:keys [open recent-closed]} (try (list-tasks worktree-root)
                                                     (catch Throwable _ nil))
                   {:keys [system-prompt user-prompt]}

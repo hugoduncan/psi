@@ -313,7 +313,10 @@ pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
     change.
   - Every failure path (no local model available, missing worktree, helper
     failure/timeout, malformed or empty helper output) logs a diagnostic and
-    no-ops — no task is created and the turn is never disrupted.
+    no-ops — no task is created and the turn is never disrupted. A turn with
+    an empty/blank recent-history excerpt (e.g. a freshly created session's
+    first turn) is also short-circuited before the helper session runs — no
+    local-model work is spent analyzing an empty conversation.
   - Per-session in-flight guard: a second `session_turn_finished` analysis
     for the same session is skipped/no-op'd (with a diagnostic) while a
     prior analysis run for that same session is still in flight, avoiding

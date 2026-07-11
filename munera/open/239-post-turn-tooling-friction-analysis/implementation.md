@@ -1049,3 +1049,21 @@
   workflow, so they are left for their owning workflow / human decision per
   the execute-only-preceding-review-pass constraint.
 - addressed 0 review steps
+
+## Round-14 follow-up (empty-history short-circuit)
+
+- addressed 1 review step (round 14). Added a `str/blank?` short-circuit on
+  the fetched `history-excerpt` in `friction/run-analysis`
+  (`extensions/context_manager/friction.clj`): the `:else` branch now derefs
+  `select-model` and `fetch-history`, then a `cond` returns
+  `{:status :no-op :diagnostic "no history"}` (with a diagnostic log) before
+  `run-helper` is reached — mirroring the existing no-worktree/no-model
+  no-op branches. Prevents a wasted bounded local-model helper session (and
+  the spurious-task hallucination risk) on any turn with empty/blank
+  analyzable history (e.g. a session's first turn). Added
+  `blank-history-no-op-test` (nil/""/"   " cases) asserting no-op + "no
+  history" diagnostic + no `run-helper`/`create-task!` call. Updated the
+  `doc/extensions.md` no-op bullet for the new user-observable skip.
+  Focused suite green (16 tests). The two `Follow-up (task-test-review
+  skill)` items remain unchecked — they predate round 14 and belong to
+  their owning workflow / human decision.

@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 14)
 
-- [ ] `friction/run-analysis`
+- [x] `friction/run-analysis`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       does **not short-circuit when the history excerpt is empty/blank**: it
       calls `fetch-history`, and whether that returns `nil`, `""`, or a
