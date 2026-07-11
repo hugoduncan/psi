@@ -246,7 +246,7 @@
       short bullet describing the in-flight-run guard, alongside the
       existing scope/cap/dedup bullets.## Follow-up (task-test-review skill)
 
-- [ ] `default-friction-run-helper` (`extensions/context_manager.clj`)
+- [x] `default-friction-run-helper` (`extensions/context_manager.clj`)
       requests a no-tools child session (`:tool-ids []`, `:tool-names []`,
       plan.md decision 9 — "the friction helper only reasons over the
       prompt-embedded excerpt + task list, no bash needed") but no test

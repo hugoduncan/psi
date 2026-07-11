@@ -1,3 +1,14 @@
+## Task-test-review (round 3)
+
+- Checked off round-1 item 1 (no-tools `:tool-ids []`/`:tool-names []`
+  grant to `create-child-session`): now covered by
+  `default-friction-run-helper-settled-run-test` (added in the round-2
+  follow-up commit `1a46891b8`). Round-1 item 2 (mislabeled "retry
+  exhaustion → nil, no task created" `testing` block) remains valid and
+  unchecked. No new steps added — test net is well-formed (no mocks/stubs,
+  injectable/nullable collaborators, state/output assertions) and covers
+  design behaviour.
+
 ## Task-test-review round-2 follow-up (addressed)
 
 - Addressed 2 task-test-review round-2 follow-up steps (the immediately
