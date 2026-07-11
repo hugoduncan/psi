@@ -374,3 +374,14 @@
   there and directs a reader to the `case`. `bb test --focus
   psi.ai.model-registry-test` → 16/16 (195 assertions, up from 194); clj-kondo
   clean.
+
+## Code-shaper review (round 7)
+
+- no new steps — code (single `find-model` lookup composing the shared
+  `with-openai-codex-transport` owner), tests (16/16, 195 assertions,
+  data-driven fixtures, all three codex facets drift-guarded, field values
+  pinned), CHANGELOG `[Unreleased]/Added`, and lint verified simple, consistent,
+  and robust. Residual observations (catalog `:api`/`:base-url` literals not
+  referencing the shared constants; `with-openai-codex-native-capability` now
+  single-caller) are already captured as deliberately scope-caveated
+  shared-codex-machinery items in rounds 2–6; not re-raised to avoid duplication.
