@@ -187,12 +187,14 @@
    Current policy:
    - models in `openai-oauth-codex-model-ids` use the ChatGPT/Codex backend
      under OpenAI OAuth.
-   - all other models keep their catalog-defined transport."
+   - all other models keep their catalog-defined transport.
+
+   The base entry is read from the merged catalog (`find-model`) so the
+   override shapes a single, catalog-normalized model shape."
   [provider-kw model-id]
   (when (and (= :openai provider-kw)
              (contains? openai-oauth-codex-model-ids model-id))
-    (-> (or (find-model :openai model-id)
-            (get built-in/all-models (keyword model-id)))
+    (-> (find-model :openai model-id)
         (assoc :api :openai-codex-responses
                :base-url "https://chatgpt.com/backend-api")
         structured-output/with-openai-codex-native-capability)))

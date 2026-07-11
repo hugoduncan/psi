@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups
 
-- [ ] Resolve the dual-lookup shape inconsistency in `openai-oauth-runtime-model`
+- [x] Resolve the dual-lookup shape inconsistency in `openai-oauth-runtime-model`
       (`model_registry.clj` ~192–199). The base entry is looked up as
       `(or (find-model :openai model-id) (get built-in/all-models (keyword
       model-id)))`. The two branches yield **different data shapes**: `find-model`
@@ -17,7 +17,7 @@
       built-in fallback is genuinely needed, normalize it the same way the catalog
       does so both branches produce one shape (code-shaper:
       `consistent(data_shapes)`, `robust`, `single_responsibility`).
-- [ ] Remove the `(keyword model-id)` catalog-keying assumption from
+- [x] Remove the `(keyword model-id)` catalog-keying assumption from
       `openai-oauth-runtime-model` (`model_registry.clj` ~197). The fallback
       reconstructs the built-in map key by `(keyword model-id)`, duplicating the
       indexing convention that `built-in-catalog`/`find-model` already own and

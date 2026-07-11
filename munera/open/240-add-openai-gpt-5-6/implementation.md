@@ -234,3 +234,16 @@
   `built-in/all-models` fallback; `(keyword model-id)` catalog-keying leak).
   Prior review rounds were test-focused; these are the first findings on the
   override's own lookup shape. No coverage or behaviour change requested.
+
+## Code-shaper follow-ups addressed
+
+- addressed 2 code-shaper review steps (single production-code change, no
+  behaviour change): dropped the dead `(or ... (get built-in/all-models
+  (keyword model-id)))` raw-map fallback in `openai-oauth-runtime-model`,
+  keeping only `find-model` so the override always shapes one
+  catalog-normalized model shape. Every id in `openai-oauth-codex-model-ids`
+  (`gpt-5.5`/`gpt-5.6`) has a catalog entry (models.clj 578/594), so the
+  fallback was unreachable; removing it also removes the `(keyword model-id)`
+  catalog-keying leak. Docstring updated to state the single lookup source.
+  `bb test --focus psi.ai.model-registry-test` → 15/15 (169 assertions),
+  `bb test --focus psi.ai.core-test` → 9/9 pass; clj-kondo clean.
