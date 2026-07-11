@@ -1494,3 +1494,7 @@
   `doc/extensions.md` friction section and CHANGELOG entry were verified
   accurate against the implementation (cap=2, 20-closed dedup, exclusion
   names) — only the README is out of sync.
+
+- addressed 1 review-task-docs follow-up: extended README.md's context-manager
+  extension bullet with a summarize-and-link clause noting the post-turn
+  tooling-friction analyzer (matching the entity-resolution clause style).

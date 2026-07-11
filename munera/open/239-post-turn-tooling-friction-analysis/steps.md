@@ -1,6 +1,6 @@
 ## Follow-up (review-task-docs skill)
 
-- [ ] `README.md`'s **context-manager extension bullet is stale/incomplete**:
+- [x] `README.md`'s **context-manager extension bullet is stale/incomplete**:
       it now describes only the *pre-turn* augmenters — "registers pre-turn
       turn augmenters: `project-context` and automatic `entity-resolution`
       (a bash-only local-model helper that injects a `Resolved entities`

@@ -181,7 +181,10 @@ Built-in extensions that ship with this repo (activated via
   failures back into the session.
 - **context-manager** — registers pre-turn turn augmenters:
   `project-context` and automatic `entity-resolution` (a bash-only local-model
-  helper that injects a `Resolved entities` block). See
+  helper that injects a `Resolved entities` block); also runs a post-turn
+  tooling-friction analyzer (fire-and-forget: auto-creates capped, deduped
+  `munera/open/NNN-slug/design.md` tooling/dependency-friction tasks in the
+  analyzed session's worktree, excluding known helper/infra sessions). See
   [`doc/extensions.md`](doc/extensions.md).
 - **dev-http** — dev-time localhost HTTP side channel (`/dev-http`,
   `dev-present`) for presenting markdown/tables/Vega/Mermaid/files/hiccup and
