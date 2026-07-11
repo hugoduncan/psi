@@ -1,3 +1,14 @@
+## Implementation review, round 14 (task-implementation-review skill)
+
+- added 1 step to steps.md: `run-analysis` runs the bounded local-model
+  helper even on an empty/blank history excerpt (no `str/blank?` guard
+  before `run-helper`), wasting a helper session and risking a
+  hallucinated task on empty-history turns.
+- Non-compliance: the two `Follow-up (task-test-review skill)` items in
+  steps.md remain unchecked (no-tools `:tool-ids []` grant assertion;
+  mislabeled "retry exhaustion" testing block) — confirmed still valid,
+  not new, owned by the task-test-review workflow.
+
 ## Implementation review, round 13 (task-implementation-review skill)
 
 - No new actionable issues. Verified round-11 file-length fix complete

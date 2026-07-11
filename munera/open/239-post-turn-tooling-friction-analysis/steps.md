@@ -5,6 +5,45 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 14)
+
+- [ ] `friction/run-analysis`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      does **not short-circuit when the history excerpt is empty/blank**: it
+      calls `fetch-history`, and whether that returns `nil`, `""`, or a
+      blank string, `build-friction-prompt` simply renders the excerpt slot
+      as `"(none)"` and the orchestration proceeds straight to the bounded
+      `run-helper` local-model session anyway (there is no `str/blank?`
+      guard on `history-excerpt` between fetch and `run-helper`, unlike the
+      `:worktree-root` blank-guard immediately above it). Confirmed against
+      the code path: `default-fetch-history` builds its tail from the
+      EQL-queried message history and renders via `render-history-excerpt`,
+      which returns an **empty string** for an empty/absent `:tail`
+      (`extensions/context_manager.clj` — no lines → `str/join` of nothing);
+      that empty string flows through `fetch-history` → `build-friction-
+      prompt`'s `(or history-excerpt "(none)")` → the helper prompt. So for
+      any turn whose analyzable recent history is empty — e.g. a freshly
+      created session's first `session_turn_finished`, or any session where
+      the history query yields nothing usable — the analyzer still spins up
+      a bounded (120s wall-clock budget) no-tools local-model child helper
+      session to reason over a `(none)` excerpt every turn. This is wasted
+      helper-session work (a real local-model run per empty-history turn)
+      and a spurious-task risk (a small model asked to find friction in an
+      empty conversation may hallucinate an ISSUE block, which — if its slug
+      passes the kebab-case check and it isn't a dedup match — becomes an
+      auto-created task). An empty/blank history is not a *failure* path
+      (design.md AC4 covers helper failure / missing model / missing
+      worktree, all of which already no-op here) but it is the same class of
+      "nothing meaningful to analyze → don't run the model" case those
+      guards embody. Add a `str/blank?`/empty-`:tail` short-circuit on the
+      fetched history excerpt in `run-analysis` (mirroring the existing
+      `(str/blank? (:worktree-root info))` no-op branch) that returns
+      `{:status :no-op :diagnostic "no history"}` (with a diagnostic log)
+      before `run-helper` is called, and add a `run-analysis`/
+      `friction-analysis` test asserting an empty/blank `:fetch-history`
+      result yields a no-op with no `run-helper` call and no `create-task!`
+      call (mirroring the existing no-worktree/no-model no-op tests).
+
 ## Follow-up (implementation review, round 11)
 
 - [x] The **uncommitted working-tree change** that begins the round-10
