@@ -15,7 +15,7 @@
 
 ## Implementation-review follow-ups
 
-- [ ] Fix bogus negative-control in `resolve-runtime-model-openai-oauth-routing-test`
+- [x] Fix bogus negative-control in `resolve-runtime-model-openai-oauth-routing-test`
       ("other openai models preserve catalog transport under oauth",
       `model_registry_test.clj` ~113–121): it uses `"gpt-5.4"`, whose *catalog*
       entry already has `:api :openai-codex-responses` /
@@ -27,7 +27,7 @@
       genuine negative control whose catalog transport is `:openai-completions`
       (e.g. `gpt-5.4-mini` or `gpt-5`) and assert it stays `:openai-completions`
       under oauth ctx.
-- [ ] Add the missing symmetric "no oauth context" assertion for `gpt-5.6`
+- [x] Add the missing symmetric "no oauth context" assertion for `gpt-5.6`
       (mirroring the existing `gpt-5.5` "remains chat-completions without oauth
       context" case, `model_registry_test.clj` ~80–84): assert
       `(resolve-runtime-model nil :openai "gpt-5.6")` yields `:openai-completions`

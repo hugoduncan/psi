@@ -80,3 +80,15 @@
 - Code/catalog/OAuth-set changes and structured-output tests otherwise match
   design + architecture; no changelog entry required (consistent with prior
   synthetic-fixture gpt-5.4/gpt-5.5 additions, which also added none).
+
+## Implementation-review follow-ups addressed
+
+- addressed 2 review steps (test-quality only, no production code change):
+  - replaced bogus negative-control (`gpt-5.4`, catalog transport already
+    `:openai-codex-responses`) with a genuine one (`gpt-5.4-mini`, catalog
+    `:openai-completions`, ∉ `openai-oauth-codex-model-ids`); asserts it stays
+    `:openai-completions` under oauth ctx.
+  - added symmetric no-oauth assertion for `gpt-5.6`
+    (`resolve-runtime-model nil :openai "gpt-5.6"` → `:openai-completions` /
+    `https://api.openai.com/v1`), mirroring the gpt-5.5 case.
+  - `bb test --focus psi.ai.model-registry-test` → 14/14 pass; clj-kondo clean.
