@@ -166,3 +166,11 @@
   structured-output-capability concerns in one block (capability half redundant
   with `openai_structured_output_test.clj` + gpt-5.4 codex capability test).
   Coverage complete; concern-splitting only, no production change.
+
+## Test-shaper follow-ups (round 2) — applied
+
+- addressed 1 review step: reduced codex-routing `doseq` to the transport-override
+  contract only (`:api`/`:base-url`/`:id`); dropped the redundant structured-output
+  capability assertions (already covered by `built-in-structured-output-capabilities-test`
+  and `providers/openai_structured_output_test`). Focused test 169 assertions pass,
+  lint clean.

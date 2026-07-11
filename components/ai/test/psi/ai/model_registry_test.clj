@@ -98,20 +98,17 @@
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model)))))
 
-  ;; Codex-set members share one transport/capability contract under oauth;
-  ;; each id is a representative case, so state it once and vary only the id.
+  ;; Codex-set members share one transport-override contract under oauth; each
+  ;; id is a representative case, so state it once and vary only the id. This
+  ;; seam owns transport routing only — the codex structured-output capability
+  ;; is covered by built-in-structured-output-capabilities-test and
+  ;; providers/openai_structured_output_test, so it is not re-asserted here.
   (doseq [id ["gpt-5.5" "gpt-5.6"]]
     (testing (str "openai " id " resolves to codex transport when oauth credential is present")
       (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai id)]
         (is (= :openai-codex-responses (:api model)) (str id " api"))
         (is (= "https://chatgpt.com/backend-api" (:base-url model)) (str id " base-url"))
-        (is (= id (:id model)))
-        (is (= [:provider-native :prompted-json]
-               (get-in model [:capabilities :structured-output :strategies]))
-            (str id " strategies"))
-        (is (= :openai/responses-text-format-json-schema
-               (get-in model [:capabilities :structured-output :native-mechanism]))
-            (str id " native-mechanism")))))
+        (is (= id (:id model))))))
 
   (testing "non-member chat-completions model stays chat-completions under oauth"
     ;; Genuine negative control: gpt-5.4-mini's catalog transport is

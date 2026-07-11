@@ -81,7 +81,7 @@
 
 ## Test-shaper follow-ups (round 2)
 
-- [ ] Split the concern-mixing in the codex-routing `doseq`
+- [x] Split the concern-mixing in the codex-routing `doseq`
       (`model_registry_test.clj` ~99–116). The single `testing` block asserts two
       distinct contracts at once: the OAuth **transport override** (`:api`
       `:openai-codex-responses` / `:base-url "https://chatgpt.com/backend-api"`)
