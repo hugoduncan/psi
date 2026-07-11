@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 10)
 
-- [ ] `friction/message-snippet`'s **content-block `:type` filter is
+- [x] `friction/message-snippet`'s **content-block `:type` filter is
       keyword-only and its test fixtures mask a keyword-vs-string boundary
       bug** — the same class of gap round-7 caught for `:role`, one layer
       down at the content-block `:type`. `message-snippet`

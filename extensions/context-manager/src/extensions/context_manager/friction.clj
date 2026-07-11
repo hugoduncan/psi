@@ -365,10 +365,19 @@
    (e.g. `psi.ai.providers.anthropic.error`, `psi.turn-runtime.core`,
    `psi.agent-session.turn`); design.md names 'tool errors/retries' as a
    primary friction example, so dropping error blocks would hide exactly
-   the signal this excerpt is meant to surface."
+   the signal this excerpt is meant to surface.
+
+   A content block's `:type` is normalized via `name` before the
+   membership test: persisted agent-core content carries `:type` as
+   *either* a keyword or the string `\"text\"`/`\"error\"` (provider-raw
+   content emits string types, e.g. `psi.ai.providers.anthropic`), and
+   the canonical `psi.agent-session.message-text/content-text-parts`
+   helper this rendering is modelled on normalizes both — so matching only
+   the keyword shape would silently drop string-`:type` blocks (mirrors
+   [[user-turn-boundary?]]'s string/keyword `:role` normalization)."
   [message]
   (->> (:content message)
-       (filter #(contains? #{:text :error} (:type %)))
+       (filter #(contains? #{"text" "error"} (some-> (:type %) name)))
        (map :text)
        (str/join " ")))
 

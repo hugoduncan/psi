@@ -46,7 +46,35 @@
     (is (= "connection refused"
            (friction/message-snippet
             {:role "assistant"
-             :content [{:type :error :text "connection refused"}]})))))
+             :content [{:type :error :text "connection refused"}]}))))
+
+  ;; Round-10 follow-up: persisted agent-core content carries `:type` as
+  ;; *either* a keyword or the string `"text"`/`"error"` (provider-raw
+  ;; content emits string types; the canonical
+  ;; `psi.agent-session.message-text/content-text-parts` this rendering is
+  ;; modelled on normalizes both). The keyword-only fixtures above masked a
+  ;; string-`:type` boundary bug that silently dropped string-typed blocks —
+  ;; and for an `"error"` block, exactly the tool-error signal round-9's
+  ;; `[error]` marker exists to surface. Pin both string-`:type` shapes.
+  (testing "surfaces string-:type \"text\" content blocks (not just keyword :type)"
+    (is (= "hi there"
+           (friction/message-snippet
+            {:role "assistant"
+             :content [{:type "text" :text "hi"}
+                       {:type "text" :text "there"}]}))))
+
+  (testing "surfaces a string-:type \"error\" content block (tool-error signal)"
+    (is (= "boom"
+           (friction/message-snippet
+            {:role "toolResult"
+             :content [{:type "error" :text "boom"}]}))))
+
+  (testing "mixed keyword- and string-:type blocks are both surfaced"
+    (is (= "kw str"
+           (friction/message-snippet
+            {:role "assistant"
+             :content [{:type :text :text "kw"}
+                       {:type "text" :text "str"}]})))))
 
 (deftest history-line-test
   ;; Round-9 follow-up: `history-line` gates the *entire* rendered line —
@@ -234,7 +262,22 @@
           excerpt (#'context-manager/default-fetch-history api "s1")]
       (is (not (re-find #"\[error\]" excerpt))
           "a successful tool result is not marked as an error")
-      (is (re-find #"Toolresult: all tests passed" excerpt)))))
+      (is (re-find #"Toolresult: all tests passed" excerpt))))
+
+  (testing "string-:type content blocks (the provider-raw persisted shape)
+            reach the excerpt through the full pipeline (round-10 follow-up):
+            a string-:type \"text\" block's text renders, and a failed tool
+            result with a string-:type \"error\" block still carries both its
+            text and the [error] marker"
+    (let [messages [{:role "user" :content [{:type "text" :text "run the tests"}]}
+                    {:role "toolResult" :is-error true
+                     :content [{:type "error" :text "bash: command not found"}]}]
+          api {:query-session (fn [_ _] {:psi.agent-session/message-history messages})}
+          excerpt (#'context-manager/default-fetch-history api "s1")]
+      (is (re-find #"run the tests" excerpt)
+          "the string-:type \"text\" block's text reaches the excerpt")
+      (is (re-find #"\[error\] Toolresult: bash: command not found" excerpt)
+          "the string-:type \"error\" block carries its text and the [error] marker"))))
 
 (deftest default-fetch-history-bounds-a-long-session-history-test
   (testing "a session history far larger than the raw-message cap still

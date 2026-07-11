@@ -1407,3 +1407,15 @@
   caller. Existing entity-resolution + friction excerpt tests cover the
   remaining behaviour. Lint clean; friction-collaborators (9 tests, 45
   assertions), context-manager-test (33/143), rendering (1/2) all green.
+
+- test-shaper round 10: fixed `message-snippet`'s keyword-only content-block
+  `:type` filter — now normalizes `:type` via `name` and tests string
+  membership (`#{"text" "error"}`), so string-`:type` blocks (the provider-raw
+  persisted shape) are no longer silently dropped. Mirrors
+  `user-turn-boundary?`'s string/keyword `:role` normalization. Added
+  `message-snippet-test` cases (string `"text"`, string `"error"`, mixed
+  keyword+string) and a `default-fetch-history-test` case driving string-`:type`
+  `"text"`/`"error"` blocks through the full pipeline, asserting the text and
+  the round-9 `[error]` marker reach the excerpt. Addressed 1 review step.
+  Friction suites all green (collaborators 9/50, plus parsing/analysis/
+  task-files/helper-runtime/wiring).
