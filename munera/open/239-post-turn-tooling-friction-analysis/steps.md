@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 8)
 
-- [ ] `friction/task-title`'s **design.md-present-but-no-`# `-heading
+- [x] `friction/task-title`'s **design.md-present-but-no-`# `-heading
       fallback branch** is untested. `task-title`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       resolves a task's title through three distinct branches:

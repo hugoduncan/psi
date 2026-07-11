@@ -114,6 +114,31 @@
     (let [root (temp-worktree)]
       (mkdirs! (str root "/munera/open/003-no-design"))
       (is (= [{:id "003-no-design" :title "003-no-design"}]
+             (context-manager/open-tasks root)))))
+
+  (testing "falls back to id when design.md exists but has no usable # heading"
+    ;; Branch 3, distinct from the file-missing fallback (branch 2): the
+    ;; design.md is present but yields no `# ` title, so the inner some->>
+    ;; is nil (or the not-empty guard drops a whitespace heading) and the
+    ;; outer (or .. id) falls back to the directory id. Reachable because
+    ;; open-tasks scans every task dir, including human-authored/malformed
+    ;; ones — a headingless title must not emit an empty/nil dedup-list line.
+    (let [root (temp-worktree)]
+      ;; body-only (no # heading at all)
+      (mkdirs! (str root "/munera/open/004-body-only"))
+      (spit (io/file root "munera" "open" "004-body-only" "design.md")
+            "no heading here\n\njust body")
+      ;; sub-heading only (## does not satisfy the `# ` starts-with)
+      (mkdirs! (str root "/munera/open/005-sub-heading"))
+      (spit (io/file root "munera" "open" "005-sub-heading" "design.md")
+            "## Only a sub-heading\n\nbody")
+      ;; blank-after-`# ` heading (the not-empty guard must reject "")
+      (mkdirs! (str root "/munera/open/006-blank-heading"))
+      (spit (io/file root "munera" "open" "006-blank-heading" "design.md")
+            "# \n\nbody")
+      (is (= [{:id "004-body-only" :title "004-body-only"}
+              {:id "005-sub-heading" :title "005-sub-heading"}
+              {:id "006-blank-heading" :title "006-blank-heading"}]
              (context-manager/open-tasks root))))))
 
 (defn- git! [root & args]

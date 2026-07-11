@@ -1352,3 +1352,12 @@
   `(or … id)` fallback). Load-bearing: `open-tasks`/`recent-closed-tasks`
   scan all task dirs (incl. human/malformed ones) and the title feeds the
   dedup list (AC3).
+
+## Follow-up execution (test-shaper round 8)
+
+- addressed 1 review step: added `open-tasks-test` branch-3 case
+  (design.md present but no usable `# ` heading) — body-only, `## `
+  sub-heading, and blank-`# ` heading (the `not-empty` guard's reject
+  case) all fall back to the directory id, distinct from the file-missing
+  branch. Pins `task-title`'s `(or (some->> … not-empty) id)` fallback.
+  Lint clean; focused test suite green (5 tests, 29 assertions).
