@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups (round 4)
 
-- [ ] Fix the tautological `:api` assertion in
+- [x] Fix the tautological `:api` assertion in
       `codex-catalog-transport-matches-shared-constants-test`
       (`model_registry_test.clj` ~273–295). The drift-guard test filters codex
       entries with the predicate `(= structured-output/openai-codex-api (:api

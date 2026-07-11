@@ -306,3 +306,18 @@
   shared owner is now caught (`robust → enforceable(invariants)`). Guard
   covers present and future codex entries. `bb test --focus
   psi.ai.model-registry-test` → 16/16 (186 assertions); clj-kondo clean.
+
+## Code-shaper follow-ups addressed (round 4)
+
+- addressed 1 review step (test-only, no production change). Fixed the
+  tautological `:api` assertion in
+  `codex-catalog-transport-matches-shared-constants-test`: the drift-guard now
+  selects its population by a codex identity independent of *both* transport
+  fields — an entry is codex iff `(or (= codex-api :api) (= codex-base-url
+  :base-url))` — so neither the `:api` nor the `:base-url` assertion is
+  tautological against its own selector. A codex entry whose `:api` diverged
+  from the constant is still selected (via the `:base-url` disjunct) and then
+  flagged, instead of being filtered out and silently skipped. REPL-verified: a
+  drifted-`:api`/codex-`:base-url` entry is selected and the `:api` assertion
+  fails on it. `bb test --focus psi.ai.model-registry-test` → 16/16 (186
+  assertions); clj-kondo clean.

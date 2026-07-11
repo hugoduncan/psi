@@ -276,14 +276,21 @@
   ;; codex" transport definition (openai-codex-api / openai-codex-base-url,
   ;; composed by the OAuth override via with-openai-codex-transport). Nothing
   ;; else forces the inline catalog literals to equal those constants, so a
-  ;; change to either could drift silently. Assert every codex catalog entry's
-  ;; transport equals the shared constants so drift is caught.
-  (testing "every :openai-codex-responses catalog entry's :api/:base-url equal the shared constants"
-    (let [codex-entries (filter (fn [[_ model]]
-                                  (= structured-output/openai-codex-api (:api model)))
-                                built-in/all-models)]
+  ;; change to either could drift silently.
+  ;;
+  ;; Select the drift-guard population by a codex identity *independent of both*
+  ;; transport fields — an entry carries codex transport iff either the codex
+  ;; :api OR the codex :base-url is present — so neither assertion becomes
+  ;; tautological against its own selector. An entry that set only one codex
+  ;; field (the exact drift this guard exists to catch) is still selected and
+  ;; then flagged, rather than filtered out and silently skipped.
+  (testing "every codex-transport catalog entry's :api AND :base-url equal the shared constants"
+    (let [codex? (fn [model]
+                   (or (= structured-output/openai-codex-api (:api model))
+                       (= structured-output/openai-codex-base-url (:base-url model))))
+          codex-entries (filter (fn [[_ model]] (codex? model)) built-in/all-models)]
       (is (seq codex-entries)
-          "expected at least one codex catalog entry")
+          "expected at least one codex-transport catalog entry")
       (doseq [[model-key model] codex-entries]
         (is (= structured-output/openai-codex-api (:api model))
             (str model-key " :api must equal structured-output/openai-codex-api"))
