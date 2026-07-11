@@ -204,3 +204,15 @@
   member-pair blocks into a `doseq` over `["gpt-5.5" "gpt-5.6"]` with
   id-specific failure messages, matching the codex-routing pair's shape;
   tests pass, lint clean.
+
+## Test-shaper review (round 5)
+
+- no new steps: `model_registry_test.clj` is simple, consistent, robust, and
+  economical after four prior shaping rounds — data-driven member pairs,
+  shared `openai-ctx` fixture, deterministic fixed expiry, real
+  `create-null-context` nullable (no mocks), state assertions, redundant
+  capability half removed from the routing seam, and catalog field-values
+  pinned once. The remaining assertion-message asymmetry (per-iteration
+  messages on `doseq` blocks vs. none on fixed single-model blocks) is
+  justified by the dynamic-vs-static `testing` label and not actionable. 15/15
+  tests, 169 assertions pass.
