@@ -137,3 +137,12 @@
   branch gap at the resolve-runtime-model seam.
 - `bb test --focus psi.ai.model-registry-test` → 15/15 pass (173 assertions);
   clj-kondo clean.
+
+## Test review (task-test-review, round 2)
+
+- no new steps: tests are well-formed, cover every acceptance criterion
+  (catalog presence + pinned field values, native-capability set membership,
+  all four resolve-runtime-model branches — nil/oauth/api-key-non-oauth/
+  non-member), and use only the real `oauth/create-null-context` nullable
+  (no mocks/stubs; state assertions, not interaction assertions). Prior
+  test-review gap already closed.
