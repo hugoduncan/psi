@@ -247,3 +247,10 @@
   catalog-keying leak. Docstring updated to state the single lookup source.
   `bb test --focus psi.ai.model-registry-test` → 15/15 (169 assertions),
   `bb test --focus psi.ai.core-test` → 9/9 pass; clj-kondo clean.
+
+## Code-shaper review (round 2)
+
+- added 1 code-shaper step: `openai-oauth-runtime-model` re-derives the codex
+  transport triple (`:api`/`:base-url`/codex capability) imperatively, duplicating
+  the declarative shape the codex catalog entries + `built-in-structured-output-capability`
+  already own; the two definitions drift independently. No behaviour or coverage change.

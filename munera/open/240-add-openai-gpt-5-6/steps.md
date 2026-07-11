@@ -1,5 +1,28 @@
 # Steps
 
+## Code-shaper follow-ups (round 2)
+
+- [ ] Remove the duplicated codex-transport shaping in `openai-oauth-runtime-model`
+      (`model_registry.clj` ~195–200). The override re-derives the ChatGPT/Codex
+      transport triple imperatively — `(assoc :api :openai-codex-responses :base-url
+      "https://chatgpt.com/backend-api")` plus
+      `structured-output/with-openai-codex-native-capability` — but this exact triple
+      is *already* the declarative shape a codex catalog entry produces: every
+      `:openai-codex-responses` entry in `models.clj` carries the same `:api` +
+      `:base-url` literals (e.g. `:gpt-5.4`, models.clj 546–551), and
+      `built-in-structured-output-capability`'s `:openai-codex-responses` branch
+      (models.clj ~660) auto-attaches the *same* `openai-codex-native-capability`
+      that `with-openai-codex-native-capability` sets. So the codex transport/
+      capability shape is now defined in two places via two different mechanisms
+      (declarative catalog annotation vs. imperative override `assoc`), which drift
+      independently: a change to the codex base-url or codex capability in the
+      catalog path would silently not apply to OAuth-overridden models. Prefer
+      shaping the codex transport once — e.g. derive the override target from the
+      canonical codex catalog entry / a shared codex-transport constructor — so the
+      "how a model becomes codex" rule has a single owner and the override composes
+      it rather than re-stating its literals (code-shaper: `consistent(idioms)`,
+      `orthogonal`, `single_responsibility`, `robust` → `enforceable(invariants)`).
+
 ## Code-shaper follow-ups
 
 - [x] Resolve the dual-lookup shape inconsistency in `openai-oauth-runtime-model`
