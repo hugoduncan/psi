@@ -5,6 +5,44 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 4)
+
+- [ ] `parse-friction-output`'s **multi-block splitting and
+      malformed-then-valid recovery** — the core structural behaviour of
+      its `take-while`/`drop` block loop
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      — is untested at the `parse-friction-output` layer. Every case in
+      `context_manager_friction_parsing_test.clj` drives a **single** ISSUE
+      block (`parse-friction-output-nominal-test`, `-slug-sanitization-test`,
+      `-malformed-test`) or a single issue + a single DUPLICATE line
+      (`parse-friction-output-mixed-test`); none drives (a) **two or more
+      well-formed ISSUE blocks** parsing into multiple `:issues`, nor (b) a
+      **malformed ISSUE block immediately followed by a valid ISSUE block**,
+      where the parser must drop the first and *recover* the second. Both
+      behaviours are real and load-bearing: `parse-friction-output` splits
+      each block by taking the header plus `(take-while (not (or ISSUE
+      DUPLICATE)))`, then `(drop (count block) …)` to resume at the next
+      header — so a bad first block must not swallow the following good one,
+      and multiple issues must accumulate. Verified directly against the
+      current code: the malformed-then-valid input (an ISSUE missing its
+      SUGGESTION line, followed by a complete ISSUE block) yields exactly
+      the *second* issue (`{:issues [{:slug "good-one" …}] :duplicates []}`),
+      and two blank-line-separated complete blocks yield both issues in
+      order. The only multi-block coverage that exists is at the
+      *orchestration* layer (`cap-applied-test`/`two-issue-output` through
+      `friction-analysis`), which proves cap selection over already-parsed
+      issues, not the parser's own block boundaries — and no test anywhere
+      exercises the malformed-then-valid recovery path. A regression that
+      (e.g.) let a malformed leading block consume the following valid one,
+      or that stopped after the first parsed block, would silently drop real
+      detected issues yet pass every current `parse-friction-output` test.
+      Add two direct `parse-friction-output` tests (mirroring the existing
+      single-block cases): one asserting two well-formed ISSUE blocks parse
+      into an ordered two-element `:issues`, and one asserting a malformed
+      ISSUE block followed by a valid one yields only the valid issue — the
+      parse-layer analog of the multi-issue path `cap-applied-test` only
+      reaches end-to-end.
+
 ## Follow-up (test-shaper skill, round 3)
 
 - [x] The **in-flight-claim release on a no-op / throwing first run** is

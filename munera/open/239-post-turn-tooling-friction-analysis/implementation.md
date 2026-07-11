@@ -1,3 +1,16 @@
+## Test-shaper review (round 4)
+
+- added 1 step: `parse-friction-output` lacks direct-layer coverage of its
+  multi-block splitting and malformed-then-valid recovery (only single-block
+  and issue+duplicate cases exist; multi-issue is only reached end-to-end via
+  `cap-applied-test`). Recovery/multi-block behaviour verified real against
+  the current code before filing.
+- Non-compliance: the two long-standing `Follow-up (task-test-review skill)`
+  (round-1) items in steps.md remain unchecked (no-tools `:tool-ids []`
+  grant assertion; mislabeled "retry exhaustion → nil" `testing` block) —
+  confirmed still valid, pre-existing, owned by the task-test-review
+  workflow, not duplicated here.
+
 ## Task-test-review (round 3)
 
 - Checked off round-1 item 1 (no-tools `:tool-ids []`/`:tool-names []`
