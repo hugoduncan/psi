@@ -1145,3 +1145,15 @@
   run-helper still reached, task still created) to
   `context_manager_friction_analysis_test.clj`. Both green; 18 tests,
   152 assertions, 0 failures; lint clean.
+
+## Test review (test-shaper skill, round 2)
+
+- added 2 steps to steps.md: unasserted per-run-cap dropped-issues
+  diagnostic log in `run-analysis` (`cap-applied-test` asserts only the
+  return shape with no `:log` api); missing orchestration-level mixed
+  issue+duplicate helper-output test (coexistence pinned only at the pure
+  parse layer by `parse-friction-output-mixed-test`).
+- Non-compliance note: the two `Follow-up (task-test-review skill)` items
+  (friction helper `:tool-ids []` grant assertion; mislabeled "retry
+  exhaustion" testing block) remain unchecked/unaddressed — still valid,
+  not re-added.

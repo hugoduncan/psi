@@ -641,3 +641,48 @@
       a per-session in-flight guard (e.g. skip/coalesce a new run for
       `session-id` while a previous run for that same `session-id` is still
       in flight).
+
+## Follow-up (test-shaper skill, round 2)
+
+- [ ] The **per-run-cap dropped-issues diagnostic log** is unasserted.
+      `friction/run-analysis`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      does `(when (seq dropped) (log (str "context-manager: friction-analysis: "
+      (count dropped) " issue(s) dropped by per-run cap")))` — a distinct
+      observable behavior (plan.md decision 8: "log a diagnostic for the
+      remainder") separate from the `:dropped-count` return value.
+      `cap-applied-test`
+      (`context_manager_friction_analysis_test.clj`) asserts only the return
+      shape (`(= 1 (:dropped-count result))` + 2 created ids) and passes a
+      `{}` api with **no `:log`** collaborator, so the dropped-cap log line
+      is never exercised — a regression that dropped, mis-worded, or
+      inverted the `(when (seq dropped) …)` guard would pass every current
+      test. This is the exact same "diagnostic log fired for a suppressed
+      case" contract `duplicate-skipped-test` already pins for the dedup
+      path (`(is (some #(re-find #"duplicate" %) @logged))`), applied to the
+      cap path. Add to `cap-applied-test` (or a sibling) a `{:log #(swap!
+      logged conj %)}` api and assert a log line matches
+      `#"dropped by per-run cap"` when issues exceed the cap, and — for the
+      complementary negative — assert **no** such line fires when
+      `issues ≤ cap` (mirroring `cap-issues-test`'s `:dropped []` cases at
+      the orchestration level).
+- [ ] No `friction-analysis`/`run-analysis` test drives a **mixed
+      issue+duplicate helper output** (some new ISSUE blocks → task created,
+      some DUPLICATE lines → diagnostic) in a single run — the realistic
+      model-output shape. `issue-creates-task-test` uses issue-only output;
+      `duplicate-skipped-test` uses duplicate-only output
+      (`"DUPLICATE: slow-tests ~ 001-slow-tests\n"`). `run-analysis` emits
+      **both** `:created-task-ids` (from `selected`) and
+      `:duplicate-diagnostics`/dedup log lines (from `duplicates`) in the
+      same pass, but a regression where the presence of a created issue
+      suppressed duplicate-diagnostic emission (or where a duplicate line
+      suppressed task creation) would pass every current orchestration test,
+      since no test asserts the two coexist. `parse-friction-output-mixed-
+      test` (`context_manager_friction_parsing_test.clj`) pins this coexistence
+      only at the *pure parse* layer, not end-to-end through `run-analysis`.
+      Add a `friction-analysis` test driving a `run-helper` output containing
+      one well-formed ISSUE block plus one `DUPLICATE:` line, asserting
+      `:status :success`, `:created-task-ids` = the one created id,
+      `:duplicate-diagnostics` = the one duplicate entry, and a dedup log
+      line fired — the orchestration-level analog of
+      `parse-friction-output-mixed-test`.
