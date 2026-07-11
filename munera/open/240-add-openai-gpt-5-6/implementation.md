@@ -126,3 +126,14 @@
 - added 1 test step: `resolve-runtime-model` lacks a codex-member
   (gpt-5.6) case for ctx-present-but-not-oauth-backed; only nil-ctx and
   live-oauth branches are covered at this seam.
+
+## Test-review follow-ups addressed
+
+- addressed 1 test step: added `resolve-runtime-model` case for codex-member
+  `gpt-5.6` under an api-key (ctx-present-but-not-oauth-backed) context in
+  `resolve-runtime-model-openai-oauth-routing-test`; asserts fallback to
+  catalog `:openai-completions` / `https://api.openai.com/v1` despite membership
+  in `openai-oauth-codex-model-ids`. Closes the `oauth-backed?`-false-with-ctx
+  branch gap at the resolve-runtime-model seam.
+- `bb test --focus psi.ai.model-registry-test` → 15/15 pass (173 assertions);
+  clj-kondo clean.

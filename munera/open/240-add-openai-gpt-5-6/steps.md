@@ -63,7 +63,7 @@
 
 ## Test-review follow-ups
 
-- [ ] Add a `resolve-runtime-model` test for a codex-set member (`gpt-5.6`)
+- [x] Add a `resolve-runtime-model` test for a codex-set member (`gpt-5.6`)
       under a **ctx that is present but not OAuth-backed** (e.g. an api-key
       `create-null-context`, mirroring `core_test.clj`'s `api-key-ctx` /
       `empty-ctx` in `oauth-backed-test`). The current

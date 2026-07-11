@@ -125,6 +125,17 @@
                                                                              :expires (+ (System/currentTimeMillis) 60000)}}})}
           model (registry/resolve-runtime-model ctx :openai "gpt-5.4-mini")]
       (is (= :openai-completions (:api model)))
+      (is (= "https://api.openai.com/v1" (:base-url model)))))
+
+  (testing "codex-member gpt-5.6 falls back to chat-completions when ctx is present but not oauth-backed"
+    ;; ctx-present-but-not-oauth-backed branch: an api-key credential (not
+    ;; oauth) leaves oauth-backed? false, so the codex override is guarded off
+    ;; and gpt-5.6 must fall back to its catalog :openai-completions transport
+    ;; despite being in openai-oauth-codex-model-ids.
+    (let [api-key-ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :api-key
+                                                                                     :key "sk-1"}}})}
+          model (registry/resolve-runtime-model api-key-ctx :openai "gpt-5.6")]
+      (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model))))))
 
 (deftest built-in-structured-output-capabilities-test
