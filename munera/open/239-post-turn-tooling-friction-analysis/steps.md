@@ -1,3 +1,33 @@
+## Follow-up (review-task-docs skill)
+
+- [ ] `README.md`'s **context-manager extension bullet is stale/incomplete**:
+      it now describes only the *pre-turn* augmenters — "registers pre-turn
+      turn augmenters: `project-context` and automatic `entity-resolution`
+      (a bash-only local-model helper that injects a `Resolved entities`
+      block)" (README.md ~line 182) — and does **not** mention the
+      **post-turn tooling-friction analyzer** this task (239) added. That new
+      behaviour is user-visible and is already documented in both
+      `doc/extensions.md` (the detailed "Post-turn tooling-friction analyzer
+      (task 239)" section) and `CHANGELOG.md` `[Unreleased] → Added`, so the
+      README — the primary top-level user documentation, which the skill's
+      checklist item 1 requires reflect all new/changed behaviours — is the
+      one user-facing doc surface left out of sync. A reader scanning the
+      README's extension list would not learn context-manager now
+      auto-opens Munera friction tasks after every turn. Extend the
+      context-manager bullet with a short clause noting the post-turn
+      friction analyzer (fire-and-forget; auto-creates capped, deduped
+      `munera/open/NNN-slug/design.md` tooling/dependency-friction tasks in
+      the analyzed session's worktree; excludes known helper/infra
+      sessions), keeping it a summary and pointing to
+      `doc/extensions.md` for detail — matching how the `entity-resolution`
+      clause already summarizes-and-links. (Accuracy of the existing
+      `doc/extensions.md` friction section and the CHANGELOG entry was
+      verified against the implementation — cap=2, 20 most-recently-closed
+      dedup, and the `entity-resolution`/`friction-analysis`/
+      `auto-session-name`/`"workflow <step-id> attempt"` exclusion names all
+      match `context_manager.clj` — so no correction is needed there; only
+      the README omission.)
+
       race is only guarded against for id-collision (the `next-free-task-id`
       retry loop), not for two concurrent runs on the same session both
       passing their own dedup check for the same underlying issue. Consider

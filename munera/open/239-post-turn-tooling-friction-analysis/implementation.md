@@ -1484,3 +1484,13 @@
   (a task *is* created), so the label misleads a reader into believing
   exhaustion is covered there when it is only covered in
   `next-free-task-id-test`.
+
+## Review note (review-task-docs skill)
+
+- added 1 step — `README.md`'s context-manager extension bullet lists only
+  the pre-turn augmenters (`project-context`/`entity-resolution`) and omits
+  the task-239 post-turn tooling-friction analyzer, though that user-visible
+  behaviour is already in `doc/extensions.md` and `CHANGELOG.md`. The
+  `doc/extensions.md` friction section and CHANGELOG entry were verified
+  accurate against the implementation (cap=2, 20-closed dedup, exclusion
+  names) — only the README is out of sync.
