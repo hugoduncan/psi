@@ -1,3 +1,15 @@
+## Test-shaper review (round 10)
+
+- added 1 step: `friction/message-snippet`'s content-block `:type` filter is
+  keyword-only, and its keyword-`:type` fixtures mask a keyword-vs-string
+  boundary bug — the same class of gap round-7 caught for `:role`, one layer
+  down. Verified directly via nREPL: string `:type "text"`/`"error"` blocks
+  yield an empty snippet (dropping the message, and the tool-error signal),
+  while the canonical `content-text-parts` handles both shapes. Likely an
+  implementation fix, then a string-`:type` test.
+- No non-compliance observed (same pre-existing unchecked round-1
+  task-test-review item noted below still stands, not this review's scope).
+
 ## Test-shaper review (round 9)
 
 - added 2 steps. (1) `friction/history-line`'s `:is-error`-flagged-but-

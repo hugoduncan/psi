@@ -5,6 +5,61 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 10)
+
+- [ ] `friction/message-snippet`'s **content-block `:type` filter is
+      keyword-only and its test fixtures mask a keyword-vs-string boundary
+      bug** — the same class of gap round-7 caught for `:role`, one layer
+      down at the content-block `:type`. `message-snippet`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      selects renderable blocks with `(filter #(contains? #{:text :error}
+      (:type %)))` — a **keyword-only** membership test — so a content block
+      whose `:type` is the *string* `"text"`/`"error"` is silently dropped
+      and contributes no snippet text. But persisted agent-core message
+      content carries `:type` as **either** a keyword or a string: the
+      canonical codebase helper `psi.agent-session.message-text/
+      content-text-parts` (the fn `content-display-text` /
+      `build-augmentation-history-projection` use — the *same* pre-turn
+      history projection the friction analyzer's rendering is otherwise
+      modelled on, `components/agent-session/src/psi/agent_session/
+      dispatch_effects.clj:387`) deliberately normalizes both via its
+      `->kw` (`(keyword? x) x / (string? x) (keyword x)`), and provider-raw
+      content emits string types (`components/ai/src/psi/ai/providers/
+      anthropic.clj:616`, `(= "text" (:type block))`). So the string-`:type`
+      shape is a real, first-class persisted shape the analyzer will
+      encounter — and on it `message-snippet` yields an **empty** snippet,
+      dropping the message entirely from the excerpt (a text-less line is
+      then dropped by `history-line`). For an `:type "error"` tool failure,
+      this silently loses exactly the tool-error signal round-7/round-9
+      threaded the `[error]` marker to surface (design.md names 'tool
+      errors/retries' as a *primary* friction target). Verified directly
+      against the current code (nREPL): `(message-snippet {:role "a"
+      :content [{:type :text :text "hi"}]})` → `"hi"`, but `(message-snippet
+      {:role "a" :content [{:type "text" :text "hi"}]})` → `""` and
+      `(… {:type "error" :text "boom"})` → `""`; the canonical
+      `content-text-parts` returns `"hi"` for **both** the keyword and
+      string shapes, confirming the codebase treats both as valid and only
+      `message-snippet` diverges. The test suite doesn't catch this because
+      **every** `message-snippet`/`default-fetch-history` fixture
+      (`context_manager_friction_collaborators_test.clj`) uses keyword
+      `:type :text`/`:type :error` blocks — the invented shape, exactly as
+      round-7's keyword `:role` fixtures masked the `group-into-turns`
+      boundary bug — so no test drives the string-`:type` shape through
+      `message-snippet` and a regression either way passes silently. This is
+      likely an **implementation** fix (normalize `:type` to a keyword
+      before the membership test — e.g. `(contains? #{:text :error}
+      (some-> (:type %) name keyword))` — or delegate to `content-text-parts`/
+      `content-error-parts`, weighed against slice-4's deliberate
+      classpath-isolation choice noted in implementation.md), not just a
+      test: decide the intended behaviour (surface string-`:type` blocks —
+      the canonical-helper-consistent reading), fix it, then add a
+      `message-snippet` test (and, ideally, a `default-fetch-history` test)
+      driving realistic **string**-`:type` `"text"` and `"error"` content
+      blocks and asserting their text (and, for the error case, its
+      round-9 `[error]` marker through `history-line`) reaches the excerpt —
+      pinning the keyword-vs-string content-block boundary the current
+      keyword-only fixtures leave open.
+
 ## Follow-up (test-shaper skill, round 9)
 
 - [x] `friction/history-line`'s **`:is-error`-flagged-but-blank/dropped
