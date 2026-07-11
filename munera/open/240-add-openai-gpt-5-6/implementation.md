@@ -159,3 +159,10 @@
   wall-clock `:expires` with fixed `far-future-expiry` constant (deterministic),
   and collapsed gpt-5.5/gpt-5.6 codex-routing blocks into a data-driven `doseq`
   with id-specific failure messages. Focused test 173 assertions pass, lint clean.
+
+## Test-shaper review (round 2)
+
+- added 1 test-shaper step: codex-routing `doseq` mixes transport-override and
+  structured-output-capability concerns in one block (capability half redundant
+  with `openai_structured_output_test.clj` + gpt-5.4 codex capability test).
+  Coverage complete; concern-splitting only, no production change.

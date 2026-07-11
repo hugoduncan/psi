@@ -79,6 +79,27 @@
       cases are covered only at the provider-auth unit level, not at the
       `resolve-runtime-model` seam gpt-5.6 actually routes through.
 
+## Test-shaper follow-ups (round 2)
+
+- [ ] Split the concern-mixing in the codex-routing `doseq`
+      (`model_registry_test.clj` ~99–116). The single `testing` block asserts two
+      distinct contracts at once: the OAuth **transport override** (`:api`
+      `:openai-codex-responses` / `:base-url "https://chatgpt.com/backend-api"`)
+      and the **structured-output capability** shaping (`:strategies`
+      `[:provider-native :prompted-json]`, `:native-mechanism`
+      `:openai/responses-text-format-json-schema`). This violates
+      `single_concern` and weakens `meaningful_failures` (a capability-shaping
+      regression fails under a test named for transport routing). The capability
+      half is also redundant: the codex structured-output contract is already
+      covered in `openai_structured_output_test.clj` (~160/256/304) and, for a
+      codex catalog model, in `built-in-structured-output-capabilities-test`'s
+      "OpenAI Codex Responses models" block (`gpt-5.4`). Reduce this `doseq` to
+      the transport-override contract only (the behaviour that this seam owns and
+      that the OAuth override actually changes), so the routing test states one
+      concern and capability regressions surface under the capability tests
+      (test-shaper: `single_concern`, `behavior_focused`, `meaningful_failures`,
+      `economical`).
+
 ## Test-shaper follow-ups
 
 - [x] Compress duplicated OAuth-context setup in
