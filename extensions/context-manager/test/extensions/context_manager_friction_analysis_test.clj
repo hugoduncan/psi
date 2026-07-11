@@ -181,6 +181,27 @@
                                                             :session-name "auto-session-name"})}))]
       (is (= :no-op (:status result))))))
 
+(deftest own-helper-session-name-excluded-test
+  (testing "test-shaper round-6 follow-up: a session whose `:session-name`
+            is literally `\"friction-analysis\"` — the analyzer's *own*
+            helper name in `known-helper-session-names` — is excluded by
+            the name-set arm (distinct from the session-id membership in
+            `friction-helper-session-ids`, which is empty after any
+            process restart/reload). This name-based backstop is the only
+            guard catching a lingering `friction-analysis`-named helper
+            session whose id is no longer tracked; a regression dropping
+            `\"friction-analysis\"` from the name set would re-enable the
+            recursion design.md's Scope-of-sessions decision and AC5
+            forbid. Mirrors the per-value contract
+            `other-known-auto-session-name-session-excluded-test` embodies
+            for `\"auto-session-name\"`."
+    (let [result (context-manager/friction-analysis
+                  {} {:session-id "s6"}
+                  (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                            :session-name "friction-analysis"})}))]
+      (is (= :no-op (:status result)))
+      (is (= "known helper/infra session excluded" (:diagnostic result))))))
+
 (def ^:private two-issue-output
   (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
        "ISSUE: b | B\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n"))
@@ -388,6 +409,13 @@
                     {} {:session-id "s2"}
                     (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
                                                               :session-name "entity-resolution"})}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))
+    (testing "own helper session by literal name (\"friction-analysis\")"
+      (let [result (context-manager/friction-analysis
+                    {} {:session-id "s6"}
+                    (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                              :session-name "friction-analysis"})}))]
         (is (= :no-op (:status result)))
         (is (= "known helper/infra session excluded" (:diagnostic result)))))
     (testing "workflow step-attempt child session (workflow-step-session? path)"

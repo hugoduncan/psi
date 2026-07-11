@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 6)
 
-- [ ] The analyzer's **own literal helper session-name `"friction-analysis"`
+- [x] The analyzer's **own literal helper session-name `"friction-analysis"`
       exclusion arm** is untested. `known-helper-session-names`
       (`extensions/context-manager/src/extensions/context_manager.clj`) is the
       three-element literal set `#{"entity-resolution" "friction-analysis"

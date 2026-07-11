@@ -1295,3 +1295,21 @@
   `create-friction-task-test` mislabeled-"retry exhaustion" rename in
   task-test-review) predate this review pass and are left for their
   owning workflow / human.
+
+- addressed 1 test-shaper round-6 review step in
+  `context_manager_friction_analysis_test.clj`:
+  - `own-helper-session-name-excluded-test`: drives `:session-info` →
+    `{:session-name "friction-analysis"}` (the analyzer's own helper name
+    in `known-helper-session-names`, distinct from the id-tracked
+    `friction-helper-session-ids` arm) → `:no-op` + `:diagnostic "known
+    helper/infra session excluded"`, pinning the name-set backstop that is
+    the only guard after a reload empties the id atom.
+  - extended `exclusion-no-op-branch-diagnostic-pinned-test` with a
+    literal-`"friction-analysis"`-name arm, completing the per-member
+    diagnostic-pinned contract alongside the sibling names.
+- `bb test --focus extensions.context-manager-friction-analysis-test`:
+  23 tests, 187 assertions, 0 failures; clj-kondo clean.
+- older unchecked items (top-of-file per-session in-flight-guard note;
+  `create-friction-task-test` mislabeled-"retry exhaustion" rename in
+  task-test-review) predate this review pass and are left for their
+  owning workflow / human.
