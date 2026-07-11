@@ -92,3 +92,10 @@
     (`resolve-runtime-model nil :openai "gpt-5.6"` → `:openai-completions` /
     `https://api.openai.com/v1`), mirroring the gpt-5.5 case.
   - `bb test --focus psi.ai.model-registry-test` → 14/14 pass; clj-kondo clean.
+
+## Implementation review (round 2)
+
+- added 2 steps: no field-value test pins the design-decided gpt-5.6
+  pricing/context values (sibling `*-catalog-entry-test` pattern unused); the
+  "no changelog needed" justification is contradicted by CHANGELOG.md precedent
+  (Opus 4.8 catalog add + gpt-5.5 OAuth routing both have entries).

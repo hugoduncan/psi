@@ -33,3 +33,30 @@
       `(resolve-runtime-model nil :openai "gpt-5.6")` yields `:openai-completions`
       / `https://api.openai.com/v1`. This closes the "selectable via the same path
       as gpt-5.5" AC and proves gpt-5.6 differs from an already-codex catalog entry.
+
+## Implementation-review follow-ups (round 2)
+
+- [ ] Add a dedicated `gpt-5.6` catalog-entry field-value test (mirror the
+      existing `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`
+      pattern in `model_registry_test.clj` ~203–242). The AC "`:gpt-5.6` present
+      in `built-in/all-models` with complete, sourced field values" and
+      design.md Resolved-decision #1 elevate the specific pricing/context/max
+      values (`:input-cost` 6.0, `:output-cost` 35.0, `:cache-read-cost` 0.6,
+      `:cache-write-cost` 0.0, `:context-window` 1000000, `:max-tokens` 128000,
+      `:api :openai-completions`, `:base-url "https://api.openai.com/v1"`, all
+      three capability flags `true`) to resolved decisions, but no test pins any
+      of them — the current gpt-5.6 tests assert only presence, OAuth routing,
+      and structured-output capability. Silent drift in the decided pricing/
+      context values would pass unnoticed despite the sibling test pattern
+      existing in the same file for exactly this purpose.
+- [ ] Reconcile the changelog decision. implementation.md claims "no changelog
+      entry required (consistent with prior synthetic-fixture gpt-5.4/gpt-5.5
+      additions, which also added none)", but CHANGELOG.md contradicts this: it
+      has entries for a catalog addition ("Claude Opus 4.8 ... is now available
+      in the Anthropic model catalog") and for the exact OAuth-routing mechanism
+      gpt-5.6 now joins ("OpenAI OAuth-backed `gpt-5.5` sessions now route
+      through the ChatGPT/Codex transport"). A new user-visible, selectable
+      model is `user_visible(δ)` under the AGENTS.md changelog policy. Either add
+      an `[Unreleased] / Added` entry for gpt-5.6 (catalog availability + OAuth/
+      Codex routing) or correct the implementation.md justification to cite an
+      accurate reason for omission.
