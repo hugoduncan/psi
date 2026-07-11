@@ -1343,3 +1343,12 @@
   from the non-git git-failure fallback the existing test covers). Both
   verified directly against the current code; both are load-bearing for the
   dedup-list correctness (a phantom/empty closed-task list defeats AC2/AC3).
+
+## Review note (test-shaper skill, round 8)
+
+- added 1 step: `friction/task-title`'s design.md-present-but-no-`# `-heading
+  fallback branch is untested — `open-tasks-test` covers only heading-present
+  and file-missing, not file-present-headingless (the `not-empty` + outer
+  `(or … id)` fallback). Load-bearing: `open-tasks`/`recent-closed-tasks`
+  scan all task dirs (incl. human/malformed ones) and the title feeds the
+  dedup list (AC3).

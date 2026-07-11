@@ -5,6 +5,43 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 8)
+
+- [ ] `friction/task-title`'s **design.md-present-but-no-`# `-heading
+      fallback branch** is untested. `task-title`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      resolves a task's title through three distinct branches:
+      (1) design.md exists **and** has a `# ` heading →
+      `(some->> … (some #(when (str/starts-with? % "# ") …)) str/trim
+      not-empty)`; (2) design.md **missing** → outer `(or … id)` returns the
+      directory id; and (3) design.md **exists but has no `# ` heading** (or
+      only a blank/`#`-only heading) → the inner `some->>` yields `nil` (the
+      `not-empty` guard drops a `""`/whitespace heading), so the outer
+      `(or … id)` falls back to the id. Only branches (1) and (2) are pinned:
+      `open-tasks-test`
+      (`context_manager_friction_task_files_test.clj`) has "titles from
+      design.md heading" (branch 1, `"# Alpha issue"`) and "falls back to id
+      as title when design.md missing" (branch 2, no design.md); no
+      `open-tasks`/`recent-closed-tasks`/`task-title` test writes a design.md
+      that **exists without a `# ` heading** (e.g. body-only, or a `## `
+      sub-heading, or a blank-after-`# ` heading the `not-empty` guard is
+      there to reject). This branch is reachable in production:
+      `open-tasks`/`recent-closed-tasks` scan **every** task directory under
+      `munera/open/`/`munera/closed/` — including human-authored or
+      malformed ones — not just this analyzer's own always-`# `-headed
+      generated tasks, so a headingless/oddly-headed design.md is a real
+      dedup-list input. The title feeds straight into `render-task-list` →
+      `build-friction-prompt`'s dedup list (design.md 'Dedup'); a regression
+      dropping the `not-empty` guard or the outer `(or … id)` fallback would
+      emit a `NNN-slug: ` line with an **empty/nil title** (or throw on a
+      nil title) into the list the friction helper matches against —
+      degrading dedup accuracy (AC3) — yet pass both current `open-tasks`
+      cases, since neither drives a file-present-but-headingless task. Add an
+      `open-tasks`/`recent-closed-tasks` case with a design.md that exists
+      but has no usable `# ` heading (body-only and, ideally, a blank
+      `# \n`), asserting the title falls back to the directory id (branch 3),
+      distinct from the file-missing fallback branch (2) already covered.
+
 ## Follow-up (test-shaper skill, round 7)
 
 - [x] `recent-closed-tasks`'s **git-listed-but-absent-from-disk filtering**
