@@ -5,6 +5,73 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 3)
+
+- [ ] The **in-flight-claim release on a no-op / throwing first run** is
+      untested. `friction-analysis`
+      (`extensions/context-manager/src/extensions/context_manager.clj`)
+      claims `session-id` in `friction-in-flight-session-ids` via
+      `swap-vals!`, then runs `friction-analysis*` inside a `try` whose
+      `finally` does `(swap! friction-in-flight-session-ids disj
+      session-id)` — so the claim is released on **every** exit path (no-op,
+      success, or thrown). But the only test proving the guard "doesn't leak
+      across runs" (`sequential-runs-same-session-not-blocked-test`,
+      `context_manager_friction_analysis_test.clj`) drives **two fully
+      `:success` runs** (both via `(collaborators {})`, which returns a
+      valid model + history + worktree). No test proves the claim is
+      released when the *first* run returns a **no-op** (e.g. `:session-info`
+      → no worktree, `:select-model` → nil, blank history) or when it
+      **throws before returning**. A regression that moved the `disj` out of
+      the `finally` and into only the success branch — or that returned the
+      "already in flight" no-op without ever claiming/releasing — would
+      permanently wedge any session that ever no-ops or errors (every
+      subsequent `session_turn_finished` for that session would return
+      `"analysis already in flight for this session"` forever), yet every
+      current test would still pass, since the only release test's first run
+      always succeeds. This is the same "guard state must not leak across
+      runs" contract `sequential-runs-same-session-not-blocked-test` already
+      pins for the success case, applied to the no-op/throw exits the
+      `finally` actually exists to cover. Add a test: a first
+      `friction-analysis` call whose collaborators force a no-op (e.g.
+      `:session-info` → `{:worktree-root nil}`) — and, separately, one whose
+      `:session-info` throws (reaching the outer `try`'s error `finally`) —
+      followed by a second call for the *same* `session-id` with normal
+      collaborators, asserting the second run reaches `:status :success`
+      (the claim was released) rather than the "already in flight" no-op.
+- [ ] The **four distinct no-op branches of `run-analysis` are only
+      diagnostic-pinned for two of them.** `friction/run-analysis`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      returns four different `:no-op` results with distinct `:diagnostic`
+      strings — `"known helper/infra session excluded"` (known-helper),
+      `"no worktree"`, `"no local model"`, and `"no history"` — each
+      guarding a different skip reason. `missing-local-model-no-op-test` and
+      `missing-worktree-no-op-test`
+      (`context_manager_friction_analysis_test.clj`) assert their exact
+      `:diagnostic` strings, but the **five exclusion tests**
+      (`own-helper-session-excluded-test`,
+      `entity-resolution-helper-session-excluded-test`,
+      `other-known-helper-session-excluded-test`,
+      `other-known-workflow-step-session-excluded-test`,
+      `other-known-auto-session-name-session-excluded-test`) and
+      `blank-history-no-op-test` assert only `(= :no-op (:status result))`
+      for the exclusion cases — none assert `:diagnostic "known helper/infra
+      session excluded"`. Because `known-helper-session?` is evaluated
+      *first* in `run-analysis`'s `cond` (before the worktree/model/history
+      guards), a regression that (e.g.) inverted the known-helper predicate
+      so an ordinarily-analyzable session fell through to a *different*
+      no-op branch — or that mis-routed a real helper session into the
+      no-worktree branch — would still produce *some* `:no-op` and pass
+      every exclusion test, since none pins *which* branch fired. This is
+      the same "assert the specific diagnostic, not just that it no-op'd"
+      contract `missing-local-model-no-op-test`/`missing-worktree-no-op-test`
+      already embody, absent from the exclusion tests. Add a
+      `:diagnostic "known helper/infra session excluded"` assertion to at
+      least one exclusion test (ideally each — they exercise distinct
+      exclusion sources: own-helper atom, entity-resolution atom,
+      literal-name set, `workflow-step-session?`, and `auto-session-name`),
+      pinning that the exclusion path — not some other no-op branch — is
+      what fired.
+
 ## Follow-up (test-shaper skill)
 
 - [x] The **`create-task!` failure/nil-return path on the success branch**

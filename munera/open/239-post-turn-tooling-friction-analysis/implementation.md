@@ -1176,3 +1176,16 @@
   review pass and is left for its owning workflow / human decision.
 - `bb test --focus extensions.context-manager-friction-analysis-test`:
   19 tests, 160 assertions, 0 failures; clj-kondo clean.
+
+## Test review (test-shaper skill, round 3)
+
+- added 2 steps to steps.md: in-flight-claim release untested on the
+  no-op/throw exit paths (`sequential-runs-same-session-not-blocked-test`
+  only proves release after a `:success` first run); exclusion no-op
+  branch not diagnostic-pinned (five exclusion tests + blank-history
+  assert only `:status :no-op`, never the specific `:diagnostic`, unlike
+  the no-model/no-worktree tests).
+- Non-compliance note: the two `Follow-up (task-test-review skill)` items
+  (friction helper `:tool-ids []` grant assertion; mislabeled "retry
+  exhaustion" testing block) remain unchecked/unaddressed — still valid,
+  not re-added.
