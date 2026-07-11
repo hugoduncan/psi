@@ -7,7 +7,7 @@
 
 ## Follow-up (task-test-review skill, round 3)
 
-- [ ] The **default-collaborator resolution in `friction-analysis*`**
+- [x] The **default-collaborator resolution in `friction-analysis*`**
       (`extensions/context_manager.clj`) — the `or`-bindings that connect the
       orchestration core (`friction/run-analysis`) to the *real*
       disk-touching collaborators (`:select-model` →
@@ -54,7 +54,7 @@
       the entity-resolution registration test does) so the wiring — not just
       the orchestration — is proven. Without it, the seam between
       `run-analysis` and the real filesystem/EQL collaborators is untested.
-- [ ] The **`session_turn_finished` future body's outer catch-all** in
+- [x] The **`session_turn_finished` future body's outer catch-all** in
       `init` (`extensions/context_manager.clj`) — the `(future (try
       (friction-analysis api payload) (catch Throwable e … "uncaught error:"
       …)))` belt-and-braces guard — is **unexercised**. The wiring test

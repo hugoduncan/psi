@@ -1441,3 +1441,22 @@
   bindings); (2) the `session_turn_finished` future's outer catch-all and
   its success path are unexercised — the wiring test drives only the
   no-worktree no-op path.
+
+- addressed 2 task-test-review round-3 steps: new
+  `context_manager_friction_default_wiring_test.clj` (3 tests, 9 assertions,
+  green). (1) `default-collaborators-write-a-real-task-through-the-wiring-test`
+  calls `friction-analysis` with only `:select-model`/`:run-helper` injected
+  (the model/helper infra boundary) and a nullable `:query-session` returning
+  a real worktree-path + non-helper session-name + real message history —
+  driving the real default `:session-info`/`:fetch-history`/`:list-tasks`/
+  `:create-task!` bindings through to an actual
+  `munera/open/001-slow-tests/design.md` written on a temp worktree; pins the
+  wiring, not just `run-analysis`. (2) two `init`-handler future tests:
+  `turn-finished-future-logs-a-success-path-diagnostic-test` (redef
+  `friction-analysis` to log a success line → future body's non-throwing arm
+  observed via the api log) and
+  `turn-finished-future-outer-catch-all-swallows-a-thrown-analysis-test`
+  (redef `friction-analysis` to throw → handler still returns nil promptly,
+  future's outer catch logs `"uncaught error: boom"`), pinning the
+  belt-and-braces last-line-of-defence arm the existing wiring test never
+  reaches. Full context-manager friction suites green.
