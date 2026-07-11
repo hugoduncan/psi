@@ -965,3 +965,16 @@
   800-line `file-length-legacy-max-lines` ratchet with no exception entry —
   the round-9 additions pushed it over and `bb commit-check:file-lengths`
   now fails on it (tests pass, kondo clean otherwise).
+
+## Implementation review, round 11 (task-implementation-review skill)
+
+- added 1 step to steps.md: the uncommitted working-tree round-10
+  file-length fix is broken — `history-line`/`tail-lines-within`/
+  `slash-command-only?` moved to `friction.clj` but their three call sites
+  in `context_manager.clj` still use unqualified names (3 kondo unresolved-
+  symbol errors; ns won't compile). Finishing the qualify-the-call-sites
+  edit both fixes the compile break and drops the file under the 800-line
+  ratchet (~786 lines), resolving the round-10 item too. Non-compliance
+  note: the working tree currently holds a partial/broken (non-compiling)
+  change that must not be committed as-is. HEAD itself is clean (tests pass,
+  kondo clean) except the already-flagged round-10 file-length ratchet.

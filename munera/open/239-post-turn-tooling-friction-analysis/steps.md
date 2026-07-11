@@ -5,6 +5,32 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (implementation review, round 11)
+
+- [ ] The **uncommitted working-tree change** that begins the round-10
+      file-length fix is broken: `history-line`, `tail-lines-within`, and
+      `slash-command-only?` were *moved out of*
+      `extensions/context-manager/src/extensions/context_manager.clj` into
+      `extensions/context-manager/src/extensions/context_manager/friction.clj`
+      (as public `defn`s), but the three remaining call sites in
+      `context_manager.clj` were **not** re-pointed at the `friction/` alias:
+      `render-history-excerpt` still calls unqualified `history-line`
+      (line ~157) and `tail-lines-within` (line ~163), and
+      `entity-resolution-augmentation` still calls unqualified
+      `slash-command-only?` (line ~692). `clj-kondo --lint
+      extensions/context-manager/src/extensions/context_manager.clj` reports
+      exactly three `error: Unresolved symbol` (`history-line`,
+      `tail-lines-within`, `slash-command-only?`) — the namespace will not
+      compile / load as-is, so this in-progress fix breaks the extension.
+      Complete the move by qualifying those three call sites (e.g.
+      `friction/history-line`, `friction/tail-lines-within`,
+      `friction/slash-command-only?`), re-lint, load the ns under
+      `clojure -M:test --focus extensions.context-manager`, and re-run
+      `bb commit-check:file-lengths` to confirm both the compile fix and that
+      the file is now under the 800-line ratchet (the move drops it to ~786
+      lines, resolving the round-10 item below in the same edit). Do not
+      commit the partial/broken working-tree state.
+
 ## Follow-up (implementation review, round 10)
 
 - [ ] `extensions/context-manager/src/extensions/context_manager.clj` is now
