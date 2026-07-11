@@ -190,14 +190,13 @@
    - all other models keep their catalog-defined transport.
 
    The base entry is read from the merged catalog (`find-model`) so the
-   override shapes a single, catalog-normalized model shape."
+   override shapes a single, catalog-normalized model shape, then composes the
+   shared `structured-output/with-openai-codex-transport` rule rather than
+   re-stating the codex transport/capability literals."
   [provider-kw model-id]
   (when (and (= :openai provider-kw)
              (contains? openai-oauth-codex-model-ids model-id))
-    (-> (find-model :openai model-id)
-        (assoc :api :openai-codex-responses
-               :base-url "https://chatgpt.com/backend-api")
-        structured-output/with-openai-codex-native-capability)))
+    (structured-output/with-openai-codex-transport (find-model :openai model-id))))
 
 (defn resolve-runtime-model
   "Resolve the runtime model map for provider/model-id, optionally considering

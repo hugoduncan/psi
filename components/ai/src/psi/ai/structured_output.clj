@@ -25,6 +25,14 @@
    :strategies [:provider-native :prompted-json]
    :native-mechanism :anthropic/json-schema-output})
 
+(def openai-codex-api
+  "Transport `:api` for the ChatGPT/Codex responses backend."
+  :openai-codex-responses)
+
+(def openai-codex-base-url
+  "Transport `:base-url` for the ChatGPT/Codex responses backend."
+  "https://chatgpt.com/backend-api")
+
 (def openai-codex-native-capability
   {:supported? true
    :strategies [:provider-native :prompted-json]
@@ -71,6 +79,20 @@
   "Replace any model structured-output capability with ChatGPT/Codex native streaming support."
   [model]
   (with-structured-output-capability model openai-codex-native-capability))
+
+(defn with-openai-codex-transport
+  "Shape model onto the ChatGPT/Codex responses transport.
+
+   Single owner of the \"how a model becomes codex\" rule: sets the codex
+   transport (`:api` + `:base-url`) and attaches the codex native
+   structured-output capability. The catalog's declarative `:openai-codex-responses`
+   entries and any runtime override compose this one rule rather than restating
+   the transport/capability literals independently."
+  [model]
+  (-> model
+      (assoc :api openai-codex-api
+             :base-url openai-codex-base-url)
+      with-openai-codex-native-capability))
 
 (defn with-openai-codex-fallback-capability
   "Replace any model structured-output capability with Codex-safe fallback-only support."

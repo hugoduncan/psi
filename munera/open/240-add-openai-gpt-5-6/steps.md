@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups (round 2)
 
-- [ ] Remove the duplicated codex-transport shaping in `openai-oauth-runtime-model`
+- [x] Remove the duplicated codex-transport shaping in `openai-oauth-runtime-model`
       (`model_registry.clj` ~195–200). The override re-derives the ChatGPT/Codex
       transport triple imperatively — `(assoc :api :openai-codex-responses :base-url
       "https://chatgpt.com/backend-api")` plus

@@ -254,3 +254,17 @@
   transport triple (`:api`/`:base-url`/codex capability) imperatively, duplicating
   the declarative shape the codex catalog entries + `built-in-structured-output-capability`
   already own; the two definitions drift independently. No behaviour or coverage change.
+
+## Code-shaper round-2 follow-up applied
+
+- addressed 1 review step. Introduced a single owner for the "how a model
+  becomes codex" rule in `structured_output.clj`: `openai-codex-api` +
+  `openai-codex-base-url` constants and `with-openai-codex-transport` (sets the
+  codex transport triple + attaches codex native capability in one place).
+  `openai-oauth-runtime-model` now composes `with-openai-codex-transport` over
+  the catalog entry instead of re-stating the `:api`/`:base-url`/capability
+  literals imperatively, so the override can no longer drift from the codex
+  transport definition. Catalog map-literal `:api`/`:base-url` entries left
+  as-authored (out of this item's scope: the item targets the override's
+  imperative re-derivation). Tests: model-registry 15/15, core 9/9,
+  openai-structured-output + models pass; clj-kondo clean.
