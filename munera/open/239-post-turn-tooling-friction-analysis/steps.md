@@ -5,6 +5,60 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 7)
+
+- [ ] `recent-closed-tasks`'s **git-listed-but-absent-from-disk filtering**
+      is untested. `closed-ids-by-git-order`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      derives closure order from `git log --diff-filter=A -- munera/closed/`,
+      whose `A`-records are **append-only history**: an id committed into
+      `munera/closed/` and *later deleted/renamed off disk* still appears in
+      that log. `recent-closed-ids-git-filtered` guards against this with
+      `(filter all-ids ids)`, where `all-ids` is the set of directory names
+      *currently* present under `munera/closed/`, so a git-listed id no
+      longer on disk is dropped before it reaches the dedup list. This is a
+      load-bearing correctness contract: a stale git-derived id in the dedup
+      list would tell the friction helper an existing task exists that
+      doesn't — a phantom against which it might wrongly suppress a real new
+      issue (defeating AC2/AC3). Verified directly against the current code
+      (temp git repo, two closed tasks committed, then `rm -rf` one on disk):
+      `recent-closed-tasks` returns only the surviving task
+      (`[{:id "002-second" :title "Second"}]`), not the deleted one. But
+      `recent-closed-tasks-test`'s git case
+      (`context_manager_friction_task_files_test.clj`) only ever lists
+      on-disk tasks that were committed and never removed, so the
+      `(filter all-ids …)` step is dead as far as the tests are concerned — a
+      regression dropping it (e.g. trusting git order directly) would emit a
+      phantom `NNN-slug` into the dedup list yet pass every current test. Add
+      a `recent-closed-tasks` test: commit two closed tasks in git, `rm -rf`
+      one from disk, assert the result contains only the surviving task and
+      never the deleted id — pinning the git-history-vs-disk reconciliation.
+- [ ] `recent-closed-tasks`'s **git-repo-but-no-`munera/closed/`-history
+      fallback branch** is untested. `closed-ids-by-git-order` returns `nil`
+      via its `(when (seq ids) ids)` tail whenever the `git log` succeeds
+      (exit 0) but yields **no** `A`-records for `munera/closed/` — a real
+      scenario: closed-task directories present on disk in a valid git repo
+      whose moves into `munera/closed/` were never committed (or committed
+      without the `A` diff-filter matching). `recent-closed-tasks` then falls
+      back to name-descending order via
+      `(or git-ids (sort #(compare %2 %1) all-ids))`. The two current cases
+      (`context_manager_friction_task_files_test.clj`) are **git-with-commits**
+      (git branch taken) and **non-git dir** (git *failure* branch → fallback);
+      neither drives the git-*success-but-empty* path. Verified directly
+      (git-init'd temp repo, two uncommitted closed dirs on disk):
+      `recent-closed-tasks` returns them name-descending
+      (`[{:id "002-b" ..} {:id "001-a" ..}]`), i.e. the fallback fires even
+      inside a git repo. A regression collapsing `(when (seq ids) ids)` to
+      `ids` (returning `[]` instead of `nil` from the empty git branch) would
+      short-circuit the `or` and return an **empty** closed-task list in a
+      valid repo — silently emptying the recently-closed dedup list whenever
+      closed tasks aren't yet git-committed, yet pass both current tests
+      (which exercise only the committed and non-git branches). Add a
+      `recent-closed-tasks` test in a git-init'd repo with on-disk-but-
+      uncommitted closed tasks, asserting the name-descending fallback ordering
+      is returned — pinning the git-success-empty → fallback branch distinct
+      from the git-failure → fallback branch the non-git test already covers.
+
 ## Follow-up (test-shaper skill, round 6)
 
 - [x] The analyzer's **own literal helper session-name `"friction-analysis"`

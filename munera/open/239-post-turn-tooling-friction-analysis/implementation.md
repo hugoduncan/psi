@@ -1313,3 +1313,12 @@
   `create-friction-task-test` mislabeled-"retry exhaustion" rename in
   task-test-review) predate this review pass and are left for their
   owning workflow / human.
+
+## Review note (test-shaper skill, round 7)
+
+- added 2 steps: both target untested `recent-closed-tasks` branches —
+  git-listed-but-deleted-off-disk `(filter all-ids …)` reconciliation, and
+  the git-success-but-empty-history → name-descending fallback (distinct
+  from the non-git git-failure fallback the existing test covers). Both
+  verified directly against the current code; both are load-bearing for the
+  dedup-list correctness (a phantom/empty closed-task list defeats AC2/AC3).
