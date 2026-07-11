@@ -1,3 +1,16 @@
+## Implementation review (round 15)
+
+- added 0 steps: full independent pass (design/plan alignment, friction.clj
+  + context_manager.clj wiring, all 6 friction test namespaces = 51 tests
+  green, clj-kondo clean, docs/CHANGELOG present, slug path-traversal guard,
+  atomic in-flight claim, round-10 string-`:type` end-to-end coverage
+  confirmed) surfaced no new actionable issue.
+- Non-compliance: the single long-standing unchecked step remains — the
+  `create-friction-task-test` "retry exhaustion → nil, no task created"
+  block whose body asserts `(some? …)` (a task *is* created), contradicting
+  its label; verified still valid against current code. Pre-existing, owned
+  by the task-test-review workflow; not duplicated here.
+
 ## Test-shaper review (round 10)
 
 - added 1 step: `friction/message-snippet`'s content-block `:type` filter is
