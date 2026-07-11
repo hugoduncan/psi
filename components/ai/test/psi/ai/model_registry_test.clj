@@ -19,6 +19,17 @@
 
 ;; ── Helpers ──────────────────────────────────────────────────────────────────
 
+;; Far-future fixed expiry (year ~5138) keeps the oauth fixture deterministic and
+;; time-independent; oauth-backed? only requires a non-expired credential.
+(def ^:private far-future-expiry 99999999999999)
+
+(defn- oauth-openai-ctx []
+  {:oauth-ctx (oauth/create-null-context
+               {:credentials {:openai {:type    :oauth
+                                       :access  "tok"
+                                       :refresh "ref"
+                                       :expires far-future-expiry}}})})
+
 (defn- write-temp-models! [config]
   (let [tmp (java.io.File/createTempFile "psi-test-models" ".edn")]
     (spit tmp (pr-str config))
@@ -87,43 +98,26 @@
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model)))))
 
-  (testing "openai gpt-5.5 resolves to codex transport when oauth credential is present"
-    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
-                                                                             :access "tok"
-                                                                             :refresh "ref"
-                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
-          model (registry/resolve-runtime-model ctx :openai "gpt-5.5")]
-      (is (= :openai-codex-responses (:api model)))
-      (is (= "https://chatgpt.com/backend-api" (:base-url model)))
-      (is (= "gpt-5.5" (:id model)))
-      (is (= [:provider-native :prompted-json]
-             (get-in model [:capabilities :structured-output :strategies])))
-      (is (= :openai/responses-text-format-json-schema
-             (get-in model [:capabilities :structured-output :native-mechanism])))))
-
-  (testing "openai gpt-5.6 resolves to codex transport when oauth credential is present"
-    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
-                                                                             :access "tok"
-                                                                             :refresh "ref"
-                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
-          model (registry/resolve-runtime-model ctx :openai "gpt-5.6")]
-      (is (= :openai-codex-responses (:api model)))
-      (is (= "https://chatgpt.com/backend-api" (:base-url model)))
-      (is (= "gpt-5.6" (:id model)))
-      (is (= [:provider-native :prompted-json]
-             (get-in model [:capabilities :structured-output :strategies])))
-      (is (= :openai/responses-text-format-json-schema
-             (get-in model [:capabilities :structured-output :native-mechanism])))))
+  ;; Codex-set members share one transport/capability contract under oauth;
+  ;; each id is a representative case, so state it once and vary only the id.
+  (doseq [id ["gpt-5.5" "gpt-5.6"]]
+    (testing (str "openai " id " resolves to codex transport when oauth credential is present")
+      (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai id)]
+        (is (= :openai-codex-responses (:api model)) (str id " api"))
+        (is (= "https://chatgpt.com/backend-api" (:base-url model)) (str id " base-url"))
+        (is (= id (:id model)))
+        (is (= [:provider-native :prompted-json]
+               (get-in model [:capabilities :structured-output :strategies]))
+            (str id " strategies"))
+        (is (= :openai/responses-text-format-json-schema
+               (get-in model [:capabilities :structured-output :native-mechanism]))
+            (str id " native-mechanism")))))
 
   (testing "non-member chat-completions model stays chat-completions under oauth"
     ;; Genuine negative control: gpt-5.4-mini's catalog transport is
     ;; :openai-completions and it is NOT in openai-oauth-codex-model-ids, so the
     ;; OAuth override must not apply and the model must retain chat-completions.
-    (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
-                                                                             :access "tok"
-                                                                             :refresh "ref"
-                                                                             :expires (+ (System/currentTimeMillis) 60000)}}})}
-          model (registry/resolve-runtime-model ctx :openai "gpt-5.4-mini")]
+    (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.4-mini")]
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model)))))
 

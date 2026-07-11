@@ -81,7 +81,7 @@
 
 ## Test-shaper follow-ups
 
-- [ ] Compress duplicated OAuth-context setup in
+- [x] Compress duplicated OAuth-context setup in
       `resolve-runtime-model-openai-oauth-routing-test`
       (`model_registry_test.clj` ~91–94, ~105–108, ~122–125): the
       `{:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
@@ -92,7 +92,7 @@
       (model-id + expected transport) is the only thing that varies. Compresses
       ceremony without hiding intent (test-shaper: `minimal_incidental_setup`,
       `consistent(fixtures)`, `helpers_that_compress(ceremony)`).
-- [ ] Remove wall-clock time from the OAuth fixture
+- [x] Remove wall-clock time from the OAuth fixture
       (`model_registry_test.clj` ~94/108/125): `:expires (+
       (System/currentTimeMillis) 60000)` derives expiry from real time in setup,
       which is uncontrolled time in tests. Use a fixed/large constant expiry (or
@@ -100,7 +100,7 @@
       time-independent (test-shaper: `deterministic → control(time)`). Verify
       `oauth-backed?` only requires a non-expired credential, not a specific
       value.
-- [ ] Reduce case-duplication between the two codex-routing `testing` blocks for
+- [x] Reduce case-duplication between the two codex-routing `testing` blocks for
       `gpt-5.5` and `gpt-5.6` (`model_registry_test.clj` ~89–115): they assert
       the identical transport/capability contract and differ only by model-id
       and expected `:id`. Consider a small data-driven form (`doseq` over

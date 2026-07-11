@@ -153,3 +153,9 @@
   fixture, gpt-5.5/gpt-5.6 codex-routing case duplication). Coverage is complete;
   these are clarity/economy/determinism shaping only, no coverage or production
   change.
+
+- addressed 3 test-shaper review steps in model_registry_test.clj: extracted
+  `oauth-openai-ctx` helper (removes 3x duplicated oauth-ctx literal), replaced
+  wall-clock `:expires` with fixed `far-future-expiry` constant (deterministic),
+  and collapsed gpt-5.5/gpt-5.6 codex-routing blocks into a data-driven `doseq`
+  with id-specific failure messages. Focused test 173 assertions pass, lint clean.
