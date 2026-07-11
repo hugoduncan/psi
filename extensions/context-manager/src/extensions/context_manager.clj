@@ -73,15 +73,6 @@
 (def ^:private helper-wall-clock-ms 120000)
 (def ^:private max-history-chars 4000)
 
-(defn- slash-command-only?
-  "True when the whole turn's user text is a slash-command invocation
-   (trimmed, non-empty, starts with `/`) — same predicate shape as
-   `auto-session-name`'s `slash-command-text?`, applied turn-level."
-  [text]
-  (let [trimmed (some-> text str/trim)]
-    (boolean (and (seq trimmed)
-                  (str/starts-with? trimmed "/")))))
-
 (defn- no-op-envelope
   ([] {:turn-augmentation/status :no-op
        :turn-augmentation/operations []
@@ -143,39 +134,6 @@
    "the mapping lines. If you cannot confidently resolve anything, output "
    "nothing."))
 
-(defn- history-line
-  "Render a single history tail entry (237 projection shape:
-   `{:role .. :snippet ..}`) into a `Role: text` line, or nil to drop it.
-
-   When the entry carries `:is-error true` (persisted tool-result
-   failures set `:role \"toolResult\"` + `:is-error true` out-of-band from
-   the content blocks — see `default-fetch-history` /
-   `friction/message-snippet`), the line is prefixed with an `[error]`
-   marker so the friction helper can distinguish a failed tool result from
-   a successful one (design.md names 'tool errors/retries' as a primary
-   friction target; round-9 follow-up)."
-  [entry]
-  (let [role (:role entry)
-        text (some-> (:snippet entry) str str/trim not-empty)]
-    (when (and role text (not (slash-command-only? text)))
-      (str (when (:is-error entry) "[error] ")
-           (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
-
-(defn- tail-lines-within
-  "Keep the longest tail-suffix of `lines` whose newline-joined length is
-   `<= limit`, dropping whole leading lines. Every surviving line stays intact
-   with its `Role:` prefix — no mid-line/mid-word cut. If the last (most
-   recent) line alone exceeds `limit`, keep it alone (it is the highest-value
-   anaphora context) rather than emit nothing."
-  [lines limit]
-  (loop [kept (list (last lines))
-         remaining (butlast lines)]
-    (let [candidate (cons (last remaining) kept)]
-      (if (or (empty? remaining)
-              (> (count (str/join "\n" candidate)) limit))
-        kept
-        (recur candidate (butlast remaining))))))
-
 (defn- render-history-excerpt
   "Render a bounded, tail-truncated excerpt of the turn history for anaphora
    resolution. Consumes the 237 `:turn-augmentation/history` projection map
@@ -196,13 +154,13 @@
                  (vec (take-last turn-count tail))
                  tail)
          lines (->> tail
-                    (keep history-line)
+                    (keep friction/history-line)
                     vec)]
      (when (seq lines)
        (let [text (str/join "\n" lines)]
          (if (<= (count text) char-cap)
            text
-           (str/join "\n" (tail-lines-within lines char-cap))))))))
+           (str/join "\n" (friction/tail-lines-within lines char-cap))))))))
 
 (defn build-entity-resolution-prompt
   "Compose the helper system + user prompt from the turn projection.
@@ -731,7 +689,7 @@
        (blank? cwd)
        (no-op-envelope "no effective cwd")
 
-       (slash-command-only? user-text)
+       (friction/slash-command-only? user-text)
        (no-op-envelope "slash-command-only prompt")
 
        :else

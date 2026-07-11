@@ -978,3 +978,14 @@
   note: the working tree currently holds a partial/broken (non-compiling)
   change that must not be committed as-is. HEAD itself is clean (tests pass,
   kondo clean) except the already-flagged round-10 file-length ratchet.
+
+## Round-11 follow-up addressed (ψ)
+
+- Completed the interrupted round-10 file-length fix: re-pointed the three
+  remaining call sites in `context_manager.clj` at the `friction/` alias —
+  `friction/history-line`, `friction/tail-lines-within` (render-history-excerpt)
+  and `friction/slash-command-only?` (entity-resolution-augmentation).
+- kondo clean (0 errors), ns compiles/loads (all 12 context-manager test
+  namespaces pass), `bb commit-check:file-lengths` reports no violation
+  (file at 786 lines, under the 800 ratchet). Resolves round-11 and, in the
+  same edit, round-10.

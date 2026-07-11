@@ -25,6 +25,53 @@
 ;; 2/3 (task-listing, orchestration) where they are first referenced, to
 ;; avoid an unused-private-var lint warning here.
 
+;; ---------------------------------------------------------------------------
+;; Pure history-excerpt rendering helpers (shared by the ns's
+;; render-history-excerpt; factored here to keep extensions.context-manager
+;; within the file-length ratchet — round-10 review follow-up).
+;; ---------------------------------------------------------------------------
+
+(defn slash-command-only?
+  "True when the whole turn's user text is a slash-command invocation
+   (trimmed, non-empty, starts with `/`) — same predicate shape as
+   `auto-session-name`'s `slash-command-text?`, applied turn-level."
+  [text]
+  (let [trimmed (some-> text str/trim)]
+    (boolean (and (seq trimmed)
+                  (str/starts-with? trimmed "/")))))
+
+(defn history-line
+  "Render a single history tail entry (237 projection shape:
+   `{:role .. :snippet ..}`) into a `Role: text` line, or nil to drop it.
+
+   When the entry carries `:is-error true` (persisted tool-result
+   failures set `:role \"toolResult\"` + `:is-error true` out-of-band from
+   the content blocks — see `default-fetch-history` / [[message-snippet]]),
+   the line is prefixed with an `[error]` marker so the friction helper can
+   distinguish a failed tool result from a successful one (design.md names
+   'tool errors/retries' as a primary friction target; round-9 follow-up)."
+  [entry]
+  (let [role (:role entry)
+        text (some-> (:snippet entry) str str/trim not-empty)]
+    (when (and role text (not (slash-command-only? text)))
+      (str (when (:is-error entry) "[error] ")
+           (str/capitalize (name role)) ": " (str/replace text #"\s+" " ")))))
+
+(defn tail-lines-within
+  "Keep the longest tail-suffix of `lines` whose newline-joined length is
+   `<= limit`, dropping whole leading lines. Every surviving line stays intact
+   with its `Role:` prefix — no mid-line/mid-word cut. If the last (most
+   recent) line alone exceeds `limit`, keep it alone (it is the highest-value
+   anaphora context) rather than emit nothing."
+  [lines limit]
+  (loop [kept (list (last lines))
+         remaining (butlast lines)]
+    (let [candidate (cons (last remaining) kept)]
+      (if (or (empty? remaining)
+              (> (count (str/join "\n" candidate)) limit))
+        kept
+        (recur candidate (butlast remaining))))))
+
 (defn- render-task-list
   "Render `[{:id .. :title ..} ...]` as `NNN-slug: title` lines, one per
    task, for embedding in the dedup section of the helper prompt. Empty

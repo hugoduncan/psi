@@ -7,7 +7,7 @@
 
 ## Follow-up (implementation review, round 11)
 
-- [ ] The **uncommitted working-tree change** that begins the round-10
+- [x] The **uncommitted working-tree change** that begins the round-10
       file-length fix is broken: `history-line`, `tail-lines-within`, and
       `slash-command-only?` were *moved out of*
       `extensions/context-manager/src/extensions/context_manager.clj` into
@@ -33,7 +33,7 @@
 
 ## Follow-up (implementation review, round 10)
 
-- [ ] `extensions/context-manager/src/extensions/context_manager.clj` is now
+- [x] `extensions/context-manager/src/extensions/context_manager.clj` is now
       **828 lines**, over the default 800-line `file-length-legacy-max-lines`
       ratchet (`bb.edn`) — confirmed by `bb commit-check:file-lengths`, which
       reports it as the only violation:
