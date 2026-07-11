@@ -5,6 +5,67 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (test-shaper skill, round 5)
+
+- [ ] The **negative boundary of the known-helper exclusion** is untested:
+      no narrow test pins that a session whose name *superficially resembles*
+      an excluded pattern is **not** excluded and analysis proceeds.
+      `known-helper-session?`
+      (`extensions/context-manager/src/extensions/context_manager.clj`)
+      excludes a session when `friction/workflow-step-session?` matches, and
+      that predicate
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      is a **two-sided** boundary — `(and (str/starts-with? name "workflow ")
+      (str/ends-with? name " attempt"))`. Every exclusion test drives an
+      *exact* excluded name (`"workflow builder attempt"`,
+      `"entity-resolution"`, `"auto-session-name"`) → `:no-op`; the only
+      "not excluded" evidence is the default `collaborators`'
+      `:session-name "top-level"` in the happy-path tests
+      (`issue-creates-task-test` etc.), which conflate the
+      *not-excluded* contract with the task-creation contract and use a name
+      that doesn't resemble the boundary at all. Verified directly against
+      the current predicate: `"my workflow builder attempt notes"`,
+      `"run workflow attempt"`, and `"workflow builder"` all return `false`
+      (correctly not excluded), but a regression loosening either arm to a
+      `str/includes?` — a natural "match workflow sessions" simplification —
+      would flip the mid-string case to `true` and silently **over-exclude**
+      a legitimate session whose name merely *contains* `"workflow … attempt"`
+      (e.g. a user-named session), suppressing all friction analysis for it,
+      yet pass every current test (all exact excluded names still match; the
+      `"top-level"` happy path doesn't touch the boundary). This is the exact
+      negative-boundary contract `entity-resolution-slash-command-only-
+      negative-boundary-test` (`context_manager_test.clj`) already pins for
+      the slash-command predicate, absent for the exclusion predicate. Add a
+      direct `friction/workflow-step-session?` test (or a `friction-analysis`
+      exclusion test) asserting a name that only *contains* the pattern
+      (`"my workflow builder attempt notes"`), and one missing each arm
+      (`"run workflow attempt"`, `"workflow builder"`), is **not** excluded —
+      the predicate returns `false` / analysis reaches `:success` — pinning
+      the starts-with ∧ ends-with boundary against a substring-match
+      regression.
+- [ ] `friction/render-task-list`'s **multi-task rendering** (via
+      `build-friction-prompt`) is untested: no test drives more than one
+      task into either dedup list.
+      `render-task-list`
+      (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
+      `str/join`s `[{:id .. :title ..} ...]` into one `NNN-slug: title` line
+      per task and renders `(none)` on empty — but `build-friction-prompt-
+      test` (`context_manager_friction_parsing_test.clj`) drives exactly
+      **one** open task and **one** closed task, and every
+      `friction-analysis` test passes `{:open [] :recent-closed []}`. The
+      realistic dedup-list shape is *all* open tasks plus up to 20
+      recently-closed (design.md: 'Dedup') — so the multi-task path is the
+      production path, not an edge. Verified directly: two open tasks render
+      as two ordered lines (`010-a: A\n011-b: B`). A regression that
+      collapsed the `str/join`, emitted only the first task, or dropped
+      ordering would still pass every current test, since single-task input
+      can't distinguish "render all in order" from "render first" — and the
+      dedup list silently losing entries directly defeats AC3 (the helper
+      can't match against tasks it never sees). Add a `build-friction-
+      prompt` (or `render-task-list`) assertion that multiple open and
+      multiple recently-closed tasks each render as distinct `NNN-slug:
+      title` lines, in order, in the user prompt.
+
 ## Follow-up (test-shaper skill, round 4)
 
 - [x] `parse-friction-output`'s **multi-block splitting and

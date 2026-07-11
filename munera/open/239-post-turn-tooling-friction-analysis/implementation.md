@@ -1,3 +1,18 @@
+## Test-shaper review (round 5)
+
+- added 2 steps: (1) the known-helper exclusion's negative boundary is
+  untested — `friction/workflow-step-session?`'s starts-with ∧ ends-with
+  boundary is pinned only by exact positive names; a `str/includes?`
+  regression would over-exclude legitimate sessions and pass every test.
+  (2) `render-task-list`'s multi-task rendering (the production dedup-list
+  shape) is untested — only single/empty task lists are driven. Both gaps
+  verified real against the current code before filing.
+- Non-compliance: one long-standing round-1 `Follow-up (task-test-review
+  skill)` item remains unchecked (the mislabeled "retry exhaustion → nil"
+  `testing` block whose body actually asserts a task *is* created) —
+  confirmed still valid against current code, pre-existing, owned by the
+  task-test-review workflow, not duplicated here.
+
 ## Test-shaper review (round 4)
 
 - added 1 step: `parse-friction-output` lacks direct-layer coverage of its
