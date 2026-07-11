@@ -302,6 +302,82 @@
       (is (= :success (:status first-result)))
       (is (= :success (:status second-result))))))
 
+(deftest in-flight-claim-released-on-non-success-first-run-test
+  (testing "test-shaper round-3 follow-up: the in-flight claim is released
+            on every exit path of the first run — a no-op or a throwing
+            first run must not permanently wedge the session; a second
+            run for the same session-id still reaches :success. Mirrors
+            sequential-runs-same-session-not-blocked-test's success-case
+            leak contract, applied to the no-op/throw exits the `finally`
+            exists to cover."
+    (testing "first run no-ops (no worktree) → claim released → second run succeeds"
+      (let [first-result  (context-manager/friction-analysis
+                           {} {:session-id "s1"}
+                           (collaborators {:session-info (fn [_sid] {:worktree-root nil})}))
+            second-result (context-manager/friction-analysis
+                           {} {:session-id "s1"} (collaborators {}))]
+        (is (= :no-op (:status first-result)))
+        (is (= "no worktree" (:diagnostic first-result)))
+        (is (= :success (:status second-result))
+            "second run is not turned away as already-in-flight")
+        (is (not (contains? @context-manager/friction-in-flight-session-ids "s1"))
+            "the in-flight slot is empty after both runs")))
+    (testing "first run throws (session-info throws) → claim still released → second run succeeds"
+      (reset! context-manager/friction-in-flight-session-ids #{})
+      (let [first-result  (context-manager/friction-analysis
+                           {} {:session-id "s1"}
+                           (collaborators {:session-info (fn [_sid] (throw (ex-info "boom" {})))}))
+            second-result (context-manager/friction-analysis
+                           {} {:session-id "s1"} (collaborators {}))]
+        (is (= :no-op (:status first-result))
+            "the throw is swallowed to a no-op, not propagated")
+        (is (= :success (:status second-result))
+            "second run is not turned away as already-in-flight")
+        (is (not (contains? @context-manager/friction-in-flight-session-ids "s1"))
+            "the in-flight slot is empty after both runs")))))
+
+(deftest exclusion-no-op-branch-diagnostic-pinned-test
+  (testing "test-shaper round-3 follow-up: the known-helper exclusion path
+            (evaluated first in run-analysis's cond) pins its specific
+            :diagnostic \"known helper/infra session excluded\", not just
+            that some no-op fired — so a regression that mis-routed an
+            excluded session into a different no-op branch (or that let an
+            analyzable session fall into exclusion) would be caught. Mirrors
+            missing-local-model-no-op-test/missing-worktree-no-op-test's
+            specific-diagnostic contract, applied across the distinct
+            exclusion sources."
+    (testing "own tracked helper session"
+      (swap! context-manager/friction-helper-session-ids conj "s1")
+      (let [result (context-manager/friction-analysis {} {:session-id "s1"} (collaborators {}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))
+    (testing "entity-resolution tracked helper session"
+      (swap! context-manager/entity-resolution-helper-session-ids conj "s1")
+      (let [result (context-manager/friction-analysis {} {:session-id "s1"} (collaborators {}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))
+    (testing "known helper session by literal name"
+      (let [result (context-manager/friction-analysis
+                    {} {:session-id "s2"}
+                    (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                              :session-name "entity-resolution"})}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))
+    (testing "workflow step-attempt child session (workflow-step-session? path)"
+      (let [result (context-manager/friction-analysis
+                    {} {:session-id "s3"}
+                    (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                              :session-name "workflow builder attempt"})}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))
+    (testing "auto-session-name helper child session"
+      (let [result (context-manager/friction-analysis
+                    {} {:session-id "s4"}
+                    (collaborators {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                              :session-name "auto-session-name"})}))]
+        (is (= :no-op (:status result)))
+        (is (= "known helper/infra session excluded" (:diagnostic result)))))))
+
 (deftest all-collaborators-throw-never-throws-test
   (testing "friction-analysis never throws, even when every collaborator throws"
     (let [boom (fn [& _] (throw (ex-info "boom" {})))

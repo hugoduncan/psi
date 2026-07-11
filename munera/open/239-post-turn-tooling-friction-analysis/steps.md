@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 3)
 
-- [ ] The **in-flight-claim release on a no-op / throwing first run** is
+- [x] The **in-flight-claim release on a no-op / throwing first run** is
       untested. `friction-analysis`
       (`extensions/context-manager/src/extensions/context_manager.clj`)
       claims `session-id` in `friction-in-flight-session-ids` via
@@ -38,7 +38,7 @@
       followed by a second call for the *same* `session-id` with normal
       collaborators, asserting the second run reaches `:status :success`
       (the claim was released) rather than the "already in flight" no-op.
-- [ ] The **four distinct no-op branches of `run-analysis` are only
+- [x] The **four distinct no-op branches of `run-analysis` are only
       diagnostic-pinned for two of them.** `friction/run-analysis`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       returns four different `:no-op` results with distinct `:diagnostic`

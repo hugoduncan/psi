@@ -1189,3 +1189,23 @@
   (friction helper `:tool-ids []` grant assertion; mislabeled "retry
   exhaustion" testing block) remain unchecked/unaddressed — still valid,
   not re-added.
+
+## Address test-shaper round-3 follow-ups
+
+- addressed 2 test-shaper round-3 review steps in
+  `context_manager_friction_analysis_test.clj`:
+  - `in-flight-claim-released-on-non-success-first-run-test`: first run
+    no-ops (no worktree) and, separately, throws (`:session-info` throws) →
+    second run for same session-id still reaches `:success`, and the
+    in-flight set is empty after — pins the `finally` release on the
+    no-op/throw exits, not just the `:success` path.
+  - `exclusion-no-op-branch-diagnostic-pinned-test`: asserts
+    `:diagnostic "known helper/infra session excluded"` across all five
+    exclusion sources (own-helper atom, entity-resolution atom, literal
+    name, `workflow-step-session?`, auto-session-name), pinning which
+    no-op branch fired — not just that some no-op occurred.
+- `clojure -M:test --focus extensions.context-manager-friction-analysis-test`:
+  21 tests, 177 assertions, 0 failures; clj-kondo clean.
+- older unchecked items (top-of-file per-session in-flight-guard note;
+  `create-friction-task-test` rename in task-test-review) predate this
+  review pass and are left for their owning workflow / human.
