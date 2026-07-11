@@ -25,6 +25,37 @@
            {:history-excerpt nil :open-tasks [] :recent-closed-tasks []})]
       (is (str/includes? user-prompt "(none)")))))
 
+(deftest build-friction-prompt-multi-task-test
+  (testing "multiple open and multiple recently-closed tasks each render as
+            distinct `NNN-slug: title` lines, in order, in the user prompt"
+    ;; The realistic dedup-list shape is *all* open tasks plus up to 20
+    ;; recently-closed (design.md 'Dedup') — the multi-task path is the
+    ;; production path, not an edge. `build-friction-prompt-test` drives
+    ;; exactly one open + one closed task, so single-task input can't
+    ;; distinguish "render all in order" from "render first". A regression
+    ;; collapsing the `str/join`, emitting only the first task, or dropping
+    ;; ordering would pass every current test yet silently lose dedup-list
+    ;; entries (defeating AC3 — the helper can't match tasks it never sees).
+    (let [{:keys [user-prompt]}
+          (context-manager/build-friction-prompt
+           {:history-excerpt "User: do X"
+            :open-tasks [{:id "010-a" :title "A open"}
+                         {:id "011-b" :title "B open"}
+                         {:id "012-c" :title "C open"}]
+            :recent-closed-tasks [{:id "005-x" :title "X closed"}
+                                  {:id "006-y" :title "Y closed"}]})]
+      ;; each task renders as its own line
+      (is (str/includes? user-prompt "010-a: A open"))
+      (is (str/includes? user-prompt "011-b: B open"))
+      (is (str/includes? user-prompt "012-c: C open"))
+      (is (str/includes? user-prompt "005-x: X closed"))
+      (is (str/includes? user-prompt "006-y: Y closed"))
+      ;; ordering is preserved within each list (adjacent, in order)
+      (is (str/includes? user-prompt "010-a: A open\n011-b: B open\n012-c: C open")
+          "open tasks render as ordered, distinct lines")
+      (is (str/includes? user-prompt "005-x: X closed\n006-y: Y closed")
+          "recently-closed tasks render as ordered, distinct lines"))))
+
 (deftest parse-friction-output-nominal-test
   (testing "parses a single well-formed ISSUE block"
     (is (= {:issues [{:slug "flaky-bash-tool"

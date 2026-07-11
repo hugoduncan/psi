@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill, round 5)
 
-- [ ] The **negative boundary of the known-helper exclusion** is untested:
+- [x] The **negative boundary of the known-helper exclusion** is untested:
       no narrow test pins that a session whose name *superficially resembles*
       an excluded pattern is **not** excluded and analysis proceeds.
       `known-helper-session?`
@@ -43,7 +43,7 @@
       the predicate returns `false` / analysis reaches `:success` — pinning
       the starts-with ∧ ends-with boundary against a substring-match
       regression.
-- [ ] `friction/render-task-list`'s **multi-task rendering** (via
+- [x] `friction/render-task-list`'s **multi-task rendering** (via
       `build-friction-prompt`) is untested: no test drives more than one
       task into either dedup list.
       `render-task-list`

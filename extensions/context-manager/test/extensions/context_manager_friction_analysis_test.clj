@@ -146,6 +146,33 @@
                                                             :session-name "workflow builder attempt"})}))]
       (is (= :no-op (:status result))))))
 
+(deftest workflow-step-session-exclusion-negative-boundary-test
+  (testing "a session name that only *resembles* the two-sided `\"workflow …
+            attempt\"` exclusion boundary is NOT excluded — the
+            starts-with ∧ ends-with predicate must not over-exclude a
+            legitimate session whose name merely *contains* the pattern or
+            is missing one arm; analysis proceeds to :success. Mirrors
+            `entity-resolution-slash-command-only-negative-boundary-test`
+            for the slash-command predicate. A regression loosening either
+            arm to `str/includes?` (a natural 'match workflow sessions'
+            simplification) would flip these to excluded and pass every
+            exact-name exclusion test."
+    (doseq [name ["my workflow builder attempt notes" ; contains pattern mid-string
+                  "run workflow attempt"               ; missing the starts-with arm
+                  "workflow builder"]]                 ; missing the ends-with arm
+      (let [ran-helper (atom false)
+            result (context-manager/friction-analysis
+                    {} {:session-id "s5"}
+                    (collaborators
+                     {:session-info (fn [_sid] {:worktree-root "/repo"
+                                                :session-name name})
+                      :run-helper   (fn [_opts] (reset! ran-helper true)
+                                      {:child-session-id "h1" :text issue-output})}))]
+        (is (= :success (:status result))
+            (str "not excluded — analysis reaches :success for " (pr-str name)))
+        (is (true? @ran-helper)
+            (str "the helper run is reached for " (pr-str name)))))))
+
 (deftest other-known-auto-session-name-session-excluded-test
   (testing "the auto-session-name extension's helper child session is excluded by name"
     (let [result (context-manager/friction-analysis

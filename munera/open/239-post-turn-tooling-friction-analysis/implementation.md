@@ -1,3 +1,29 @@
+## Test-shaper follow-up (round 5, addressed)
+
+- addressed 2 review steps.
+- (1) known-helper exclusion negative boundary: added
+  `workflow-step-session-exclusion-negative-boundary-test`
+  (`context_manager_friction_analysis_test.clj`) — drives three names that
+  only *resemble* the two-sided `"workflow … attempt"` boundary
+  (`"my workflow builder attempt notes"` mid-string,
+  `"run workflow attempt"` missing starts-with arm, `"workflow builder"`
+  missing ends-with arm) through `friction-analysis` and asserts each
+  reaches `:success` (not excluded) and the helper run fires — pinning the
+  starts-with ∧ ends-with boundary against a `str/includes?` regression.
+  Verified all three return `false` from `friction/workflow-step-session?`
+  before filing.
+- (2) multi-task dedup-list rendering: added
+  `build-friction-prompt-multi-task-test`
+  (`context_manager_friction_parsing_test.clj`) — drives 3 open + 2
+  recently-closed tasks through `build-friction-prompt` and asserts each
+  renders as a distinct `NNN-slug: title` line, in order, in the user
+  prompt — pinning the production multi-task path against a str/join
+  collapse / first-only / order-drop regression.
+- focused tests: `bb test --focus
+  extensions.context-manager-friction-analysis-test --focus
+  extensions.context-manager-friction-parsing-test` → 33 tests, 223
+  assertions, 0 failures. clj-kondo clean on both files.
+
 ## Test-shaper review (round 5)
 
 - added 2 steps: (1) the known-helper exclusion's negative boundary is
