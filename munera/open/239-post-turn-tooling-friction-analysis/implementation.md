@@ -1005,3 +1005,14 @@
   block in `context_manager_friction_task_files_test.clj`) remain
   unchecked and unaddressed — still valid, not new. No steps added (would
   duplicate existing unchecked items).
+
+## Follow-up execution (post-round-12 review pass)
+
+- No actionable items to execute. The immediately preceding review pass —
+  implementation review round 12 (commit `b607947e3`) — added zero
+  follow-up items to steps.md. The only unchecked items (the two
+  `Follow-up (task-test-review skill)` steps) were added by the earlier
+  task-test-review pass (commit `9bf3b9142`), which predates rounds 9–12;
+  they are left for their owning workflow / human decision per the
+  execute-only-preceding-review-pass constraint.
+- addressed 0 review steps
