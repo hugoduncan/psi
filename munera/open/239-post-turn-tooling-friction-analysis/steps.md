@@ -644,7 +644,7 @@
 
 ## Follow-up (test-shaper skill, round 2)
 
-- [ ] The **per-run-cap dropped-issues diagnostic log** is unasserted.
+- [x] The **per-run-cap dropped-issues diagnostic log** is unasserted.
       `friction/run-analysis`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       does `(when (seq dropped) (log (str "context-manager: friction-analysis: "
@@ -666,7 +666,7 @@
       complementary negative — assert **no** such line fires when
       `issues ≤ cap` (mirroring `cap-issues-test`'s `:dropped []` cases at
       the orchestration level).
-- [ ] No `friction-analysis`/`run-analysis` test drives a **mixed
+- [x] No `friction-analysis`/`run-analysis` test drives a **mixed
       issue+duplicate helper output** (some new ISSUE blocks → task created,
       some DUPLICATE lines → diagnostic) in a single run — the realistic
       model-output shape. `issue-creates-task-test` uses issue-only output;

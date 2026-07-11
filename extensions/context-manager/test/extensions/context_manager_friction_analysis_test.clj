@@ -53,6 +53,30 @@
              (:duplicate-diagnostics result)))
       (is (some #(re-find #"duplicate" %) @logged)))))
 
+(deftest mixed-issue-and-duplicate-test
+  (testing "test-shaper follow-up: a single run whose helper output contains
+            one well-formed ISSUE block plus one DUPLICATE line creates the
+            issue's task AND emits the duplicate diagnostic — the two
+            coexist (orchestration-level analog of
+            parse-friction-output-mixed-test)"
+    (let [logged (atom [])
+          mixed-output (str issue-output
+                            "\nDUPLICATE: flaky-lint ~ 001-flaky-lint\n")
+          result (context-manager/friction-analysis
+                  {:log #(swap! logged conj %)}
+                  {:session-id "s1"}
+                  (collaborators
+                   {:run-helper (fn [_opts]
+                                  {:child-session-id "h1" :text mixed-output})}))]
+      (is (= :success (:status result)))
+      (is (= ["042-slow-tests"] (:created-task-ids result))
+          "the new ISSUE block still creates its task")
+      (is (= [{:slug "flaky-lint" :existing-id "001-flaky-lint"}]
+             (:duplicate-diagnostics result))
+          "the DUPLICATE line still surfaces as a diagnostic")
+      (is (some #(re-find #"duplicate" %) @logged)
+          "the dedup log line still fires alongside task creation"))))
+
 (deftest helper-failure-no-op-test
   (testing "a throwing helper run yields no task, no throw"
     (let [result (context-manager/friction-analysis
@@ -130,14 +154,19 @@
                                                             :session-name "auto-session-name"})}))]
       (is (= :no-op (:status result))))))
 
+(def ^:private two-issue-output
+  (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
+       "ISSUE: b | B\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n"))
+
 (deftest cap-applied-test
   (testing "3 detected issues yield only 2 created tasks (per-run cap)"
     (let [three-issues (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
                             "ISSUE: b | B\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
                             "ISSUE: c | C\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n")
           created (atom [])
+          logged  (atom [])
           result (context-manager/friction-analysis
-                  {} {:session-id "s1"}
+                  {:log #(swap! logged conj %)} {:session-id "s1"}
                   (collaborators
                    {:run-helper (fn [_opts] {:child-session-id "h1" :text three-issues})
                     :create-task! (fn [_root issue]
@@ -146,11 +175,20 @@
       (is (= :success (:status result)))
       (is (= 2 (count (:created-task-ids result))))
       (is (= ["a" "b"] @created))
-      (is (= 1 (:dropped-count result))))))
-
-(def ^:private two-issue-output
-  (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
-       "ISSUE: b | B\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n"))
+      (is (= 1 (:dropped-count result)))
+      (is (some #(re-find #"dropped by per-run cap" %) @logged)
+          "test-shaper follow-up: the per-run-cap dropped-issues diagnostic log fires")))
+  (testing "test-shaper follow-up: no dropped-cap log line fires when issues <= cap"
+    (let [logged (atom [])
+          result (context-manager/friction-analysis
+                  {:log #(swap! logged conj %)} {:session-id "s1"}
+                  (collaborators
+                   {:run-helper (fn [_opts] {:child-session-id "h1" :text two-issue-output})
+                    :create-task! (fn [_root issue] (str "0-" (:slug issue)))}))]
+      (is (= :success (:status result)))
+      (is (= 0 (:dropped-count result)))
+      (is (not-any? #(re-find #"dropped by per-run cap" %) @logged)
+          "no cap diagnostic when the issue count is within the cap"))))
 
 (deftest create-task-partial-failure-still-completes-test
   (testing "test-shaper follow-up: on the success branch, an issue whose

@@ -1157,3 +1157,22 @@
   (friction helper `:tool-ids []` grant assertion; mislabeled "retry
   exhaustion" testing block) remain unchecked/unaddressed — still valid,
   not re-added.
+
+## Test-shaper round-2 follow-up (addressed)
+
+- addressed 2 test-shaper round-2 follow-up steps (immediately preceding
+  review pass, commit `49ee0aefd`):
+  - `cap-applied-test`: added a `:log` collaborator + assertion that a
+    `#"dropped by per-run cap"` line fires when issues > cap, plus a
+    sibling negative case asserting no cap line fires when issues <= cap.
+  - added `mixed-issue-and-duplicate-test`
+    (`context_manager_friction_analysis_test.clj`): one ISSUE block + one
+    DUPLICATE line in a single `run-helper` output → `:status :success`,
+    `:created-task-ids` = the one created id, `:duplicate-diagnostics` =
+    the one duplicate entry, and a dedup log line fires — orchestration
+    analog of `parse-friction-output-mixed-test`.
+- the one remaining unchecked `Follow-up (task-test-review skill)` item
+  (mislabeled "retry exhaustion → nil" testing block) predates this
+  review pass and is left for its owning workflow / human decision.
+- `bb test --focus extensions.context-manager-friction-analysis-test`:
+  19 tests, 160 assertions, 0 failures; clj-kondo clean.
