@@ -2,7 +2,7 @@
 
 ## Code-shaper follow-ups (round 5)
 
-- [ ] Extend the codex drift-guard to the *capability* axis, or make
+- [x] Extend the codex drift-guard to the *capability* axis, or make
       `with-openai-codex-transport` the single owner the guard fully covers
       (`codex-catalog-transport-matches-shared-constants-test`,
       `model_registry_test.clj` ~273–295; `structured_output.clj` ~83–95;

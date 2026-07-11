@@ -329,3 +329,22 @@
   drifted-`:api`/codex-`:base-url` entry is selected and the `:api` assertion
   fails on it. `bb test --focus psi.ai.model-registry-test` → 16/16 (186
   assertions); clj-kondo clean.
+
+## Code-shaper follow-ups addressed (round 5)
+
+- addressed 1 review step (test-only, no production change). Chose option (a) —
+  extend the drift-guard to the capability facet — over option (b) rewriting the
+  catalog `case`, consistent with the round-3/4 precedent of guarding data-authored
+  catalog against a shared owner rather than broadening scope into shared codex
+  machinery (the round-5 item's scope caveat). Extended
+  `codex-catalog-transport-matches-shared-constants-test` to also assert every
+  selected codex entry's *effective structured-output capability* equals
+  `openai-codex-native-capability`. The capability is attached only during catalog
+  normalization (not in raw `all-models`), so the assertion reads the normalized
+  entry via `find-model` and compares against
+  `normalize-structured-output-capability` of the codex constant. All three facets
+  of the codex rule (`:api`/`:base-url`/native capability) are now drift-guarded
+  together. REPL-verified meaningful: a codex entry's effective capability matches
+  the codex constant and a *different* capability value fails the assertion.
+  `bb test --focus psi.ai.model-registry-test` → 16/16 (194 assertions, up from
+  186); clj-kondo clean.

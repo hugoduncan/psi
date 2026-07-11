@@ -284,7 +284,17 @@
   ;; tautological against its own selector. An entry that set only one codex
   ;; field (the exact drift this guard exists to catch) is still selected and
   ;; then flagged, rather than filtered out and silently skipped.
-  (testing "every codex-transport catalog entry's :api AND :base-url equal the shared constants"
+  ;;
+  ;; The single owner `with-openai-codex-transport` shapes *three* facets of the
+  ;; codex rule: :api, :base-url, AND the codex native structured-output
+  ;; capability. The catalog attaches the capability by a *second*, independent
+  ;; mechanism (`built-in-structured-output-capability`'s :openai-codex-responses
+  ;; branch → openai-codex-native-capability), which could drift from the
+  ;; override's composed capability with no test flagging it. Guard all three
+  ;; facets together so the "how a model becomes codex" rule is drift-checked as
+  ;; one invariant. The capability is only attached during catalog normalization,
+  ;; so assert it on the normalized entry (via find-model), not the raw map.
+  (testing "every codex-transport catalog entry's :api, :base-url, and native capability equal the shared constants"
     (let [codex? (fn [model]
                    (or (= structured-output/openai-codex-api (:api model))
                        (= structured-output/openai-codex-base-url (:base-url model))))
@@ -295,7 +305,14 @@
         (is (= structured-output/openai-codex-api (:api model))
             (str model-key " :api must equal structured-output/openai-codex-api"))
         (is (= structured-output/openai-codex-base-url (:base-url model))
-            (str model-key " :base-url must equal structured-output/openai-codex-base-url"))))))
+            (str model-key " :base-url must equal structured-output/openai-codex-base-url"))
+        (let [normalized (registry/find-model (:provider model) (:id model))]
+          (is (= (structured-output/normalize-structured-output-capability
+                  structured-output/openai-codex-native-capability)
+                 (structured-output/effective-capability normalized))
+              (str model-key
+                   " effective structured-output capability must equal"
+                   " structured-output/openai-codex-native-capability")))))))
 
 ;; ── Init with user models ────────────────────────────────────────────────────
 
