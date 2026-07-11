@@ -1432,3 +1432,12 @@
   the round-9 `[error]` marker reach the excerpt. Addressed 1 review step.
   Friction suites all green (collaborators 9/50, plus parsing/analysis/
   task-files/helper-runtime/wiring).
+
+- task-test-review round 3: added 2 steps — (1) the default-collaborator
+  wiring in `friction-analysis*` (the `or`-bindings connecting `run-analysis`
+  to the real `default-fetch-history`/`open-tasks`/`recent-closed-tasks`/
+  `create-friction-task!`/`friction-task-cap`) is never exercised through
+  `friction-analysis` (all tests inject collaborators, masking the default
+  bindings); (2) the `session_turn_finished` future's outer catch-all and
+  its success path are unexercised — the wiring test drives only the
+  no-worktree no-op path.

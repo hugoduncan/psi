@@ -5,6 +5,84 @@
       `session-id` while a previous run for that same `session-id` is still
       in flight).
 
+## Follow-up (task-test-review skill, round 3)
+
+- [ ] The **default-collaborator resolution in `friction-analysis*`**
+      (`extensions/context_manager.clj`) — the `or`-bindings that connect the
+      orchestration core (`friction/run-analysis`) to the *real*
+      disk-touching collaborators (`:select-model` →
+      `default-select-model`, `:run-helper` → `default-friction-run-helper`,
+      `:fetch-history` → `default-fetch-history`, `:session-info` →
+      `default-session-info`, `:list-tasks` → `{:open (open-tasks root)
+      :recent-closed (recent-closed-tasks root)}`, `:create-task!` →
+      `create-friction-task!`, `:task-cap` → `friction-task-cap`) — is
+      **never exercised through `friction-analysis`**. Every
+      `friction-analysis` test in
+      `context_manager_friction_analysis_test.clj` (including
+      `issue-creates-task-test`, `cap-applied-test`,
+      `create-task-partial-failure-still-completes-test`) injects its own
+      `:create-task!`/`:list-tasks`/`:fetch-history`/`:session-info` via the
+      `collaborators` helper, so `run-analysis` is well-covered but the wiring
+      map that binds those slots to the real fns is not. The real
+      collaborators are each unit-tested in isolation
+      (`create-friction-task!`, `open-tasks`, `recent-closed-tasks` in
+      `context_manager_friction_task_files_test.clj`;
+      `default-fetch-history`/`default-session-info` in
+      `context_manager_friction_collaborators_test.clj`), but nothing pins
+      that `friction-analysis*` binds each real fn into the *correct* slot.
+      A regression that (a) swapped the `:list-tasks`/`:create-task!`
+      bindings, (b) mis-referenced `create-friction-task!` (e.g. dropped a
+      currying arg so `run-analysis`'s `(create-task! worktree-root issue)`
+      arity mismatched), (c) bound `:fetch-history` to `default-session-info`
+      (or vice versa), or (d) forgot `:task-cap friction-task-cap` — would
+      pass **every** current test, since the injected collaborators mask the
+      default bindings entirely. This is the friction-path analog of
+      `context_manager_entity_resolution_registration_test.clj`, which
+      deliberately drives the *real* `default-select-model`/`default-run-helper`
+      through the threaded api ("real default-select-model ran through the
+      threaded api → no-op") for the entity-resolution augmenter. Add a
+      `friction-analysis`-level test that calls it with **no** `collaborators`
+      (`nil`), backing the api with a nullable/fake `:query-session` that
+      returns a real worktree-path + non-helper session-name and a small
+      real message history, and either (i) an injected-model-only override so
+      it reaches the real `default-fetch-history` → real `open-tasks`/
+      `recent-closed-tasks` → real `create-friction-task!` against a temp
+      worktree, asserting an actual `munera/open/NNN-slug/design.md` is
+      written on disk from a well-formed helper output; or, if a full real
+      run is impractical, at minimum a test that pins the default binding map
+      (e.g. drives the real `default-select-model → nil` no-op path the way
+      the entity-resolution registration test does) so the wiring — not just
+      the orchestration — is proven. Without it, the seam between
+      `run-analysis` and the real filesystem/EQL collaborators is untested.
+- [ ] The **`session_turn_finished` future body's outer catch-all** in
+      `init` (`extensions/context_manager.clj`) — the `(future (try
+      (friction-analysis api payload) (catch Throwable e … "uncaught error:"
+      …)))` belt-and-braces guard — is **unexercised**. The wiring test
+      (`context_manager_friction_wiring_test.clj`,
+      `turn-finished-handler-does-not-block-on-slow-friction-analysis-test`)
+      drives the handler only through the *no-worktree no-op* path (the
+      nullable `:query-session` default yields no worktree), asserting the
+      handler returns promptly and the async run logs *some* `friction-
+      analysis:` diagnostic — but never the **success** path (a real detected
+      issue flowing through the future to a created task) nor the
+      **uncaught-error** path the outer catch exists to swallow. The comment
+      itself concedes `friction-analysis` "never throws (belt-and-braces
+      outer catch)", making the catch arm effectively dead — but "dead" is an
+      assertion no test pins: a future refactor that let `friction-analysis`
+      throw (e.g. a change moving the in-flight `swap-vals!`/`finally` such
+      that a throw escapes) would silently rely on this untested arm, and a
+      regression that dropped the outer `try` (or its logging) would surface
+      an uncaught exception on the future's thread with no test catching it.
+      Add a wiring-level test that (a) drives the handler's future through a
+      **successful** friction-analysis (real or injected collaborators
+      yielding a created-task diagnostic, asserting the success log line
+      appears via the existing `await-log-line` poll), and (b) — to pin the
+      catch-all — injects a `friction-analysis` seam that throws (or an api
+      whose `:log`/collaborator throws in a way that escapes the inner
+      guards) and asserts the handler still returns nil promptly and the
+      `"uncaught error:"` diagnostic is logged, proving the future's last
+      line of defence actually fires rather than crashing the thread.
+
 ## Follow-up (test-shaper skill, round 10)
 
 - [x] `friction/message-snippet`'s **content-block `:type` filter is
