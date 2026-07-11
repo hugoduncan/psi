@@ -7,7 +7,7 @@
 
 ## Follow-up (test-shaper skill)
 
-- [ ] The **`create-task!` failure/nil-return path on the success branch**
+- [x] The **`create-task!` failure/nil-return path on the success branch**
       is untested. `friction/run-analysis`
       (`extensions/context-manager/src/extensions/context_manager/friction.clj`)
       creates tasks via
@@ -33,7 +33,7 @@
       "collaborator degrades mid-success-path, analysis still completes"
       contract the empty-`list-tasks` and dedup-diagnostic cases embody,
       applied to the create step.
-- [ ] The **`list-tasks` throwing/nil-return degradation on the success
+- [x] The **`list-tasks` throwing/nil-return degradation on the success
       branch** is untested. `friction/run-analysis` wraps the dedup-list
       fetch in `(try (list-tasks worktree-root) (catch Throwable _ nil))`
       and then destructures `{:keys [open recent-closed]}` from the result

@@ -148,6 +148,52 @@
       (is (= ["a" "b"] @created))
       (is (= 1 (:dropped-count result))))))
 
+(def ^:private two-issue-output
+  (str "ISSUE: a | A\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n\n"
+       "ISSUE: b | B\nFRICTION: f\nEVIDENCE: e\nSUGGESTION: s\n"))
+
+(deftest create-task-partial-failure-still-completes-test
+  (testing "test-shaper follow-up: on the success branch, an issue whose
+            create-task! returns nil or throws is silently dropped from
+            :created-task-ids while sibling issues still succeed — analysis
+            still completes :success with only the successful id (no nil, no
+            throw)"
+    (doseq [failing-create [(fn [_root _issue] nil)
+                            (fn [_root _issue] (throw (ex-info "boom" {})))]]
+      (let [;; first issue "a" succeeds, second issue "b" fails (nil/throw)
+            result (context-manager/friction-analysis
+                    {} {:session-id "s1"}
+                    (collaborators
+                     {:run-helper (fn [_opts] {:child-session-id "h1"
+                                               :text two-issue-output})
+                      :create-task! (fn [root issue]
+                                      (if (= "a" (:slug issue))
+                                        "042-a"
+                                        (failing-create root issue)))}))]
+        (is (= :success (:status result)))
+        (is (= ["042-a"] (:created-task-ids result))
+            "only the successful id is recorded; no nil, no thrown escape")))))
+
+(deftest list-tasks-degradation-still-detects-test
+  (testing "test-shaper follow-up: on the success branch, a list-tasks that
+            throws or returns nil yields empty dedup lists — analysis still
+            reaches run-helper and creates the detected task (dedup
+            unavailable → detect without dedup, don't abort)"
+    (doseq [degraded-list [(fn [_root] (throw (ex-info "boom" {})))
+                           (fn [_root] nil)]]
+      (let [ran-helper (atom false)
+            result (context-manager/friction-analysis
+                    {} {:session-id "s1"}
+                    (collaborators
+                     {:list-tasks degraded-list
+                      :run-helper (fn [_opts]
+                                    (reset! ran-helper true)
+                                    {:child-session-id "h1" :text issue-output})}))]
+        (is (true? @ran-helper) "run-helper still reached despite degraded list-tasks")
+        (is (= :success (:status result)))
+        (is (= ["042-slow-tests"] (:created-task-ids result))
+            "detected task still created without dedup context")))))
+
 (deftest concurrent-run-same-session-guarded-test
   (testing "round-4 review follow-up: a second run for a session already
             in-flight is skipped (not raced), so two overlapping runs on

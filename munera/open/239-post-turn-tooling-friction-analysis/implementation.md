@@ -1135,3 +1135,13 @@
   dedup-degradation path in `friction/run-analysis` (both success-branch
   collaborator-degradation contracts the all-throwing test misses by
   short-circuiting at `session-info`).
+
+## Follow-up execution (test-shaper skill)
+
+- addressed 2 test-shaper review steps: added
+  `create-task-partial-failure-still-completes-test` (partial create-task!
+  nil/throw → :success, only successful id in :created-task-ids) and
+  `list-tasks-degradation-still-detects-test` (throwing/nil list-tasks →
+  run-helper still reached, task still created) to
+  `context_manager_friction_analysis_test.clj`. Both green; 18 tests,
+  152 assertions, 0 failures; lint clean.
