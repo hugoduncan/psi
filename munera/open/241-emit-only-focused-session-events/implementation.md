@@ -186,3 +186,14 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
     the target id is a behavioural change, not silent drift.
   - `bb test --focus psi.rpc-events-test` (18 tests) and
     `psi.rpc-session-navigation-test` (3 tests) pass; lint clean on both files.
+
+## Test review pass 2 (task-test-review, ψ)
+
+- no new steps. Independently verified: structural focus gate, cross-session
+  payload classification, `:default-session-id` state, and all design
+  acceptance criteria (a)-(d) are covered by real-dependency tests (no
+  mocks/stubs in the focus-gate/navigation suites; the only `with-redefs` are
+  pre-existing footer-projection tests). rpc-events-test (18) +
+  rpc-invariants/navigation/command-results (12) all green. Prior test-review
+  follow-ups (L160 pinning, tree-switch feedback classification) confirmed
+  present and load-bearing.
