@@ -214,7 +214,7 @@
 
 ## Test-shaper review follow-ups (ψ)
 
-- [ ] **`emit-event-single-session-connection-behaviour-preserved-test`
+- [x] **`emit-event-single-session-connection-behaviour-preserved-test`
       asserts only `(= 6 (count @captured))`, which gives weak meaningful-failure
       signal and leaves `tool/*` focus-gating un-pinned.** The test drives six
       distinct event names (`session/updated`, `assistant/delta`, `tool/start`,
@@ -227,8 +227,13 @@
       input set (or map event→emitted?), so each session-scoped event is
       individually pinned as emitted-when-focused. Behaviour-focused, not
       implementation-detail: it asserts observable per-event emission.
+      (Done: the test now asserts `(= (set single-session-events)
+      (set (map :event @captured)))` (plus the count), pinning each
+      session-scoped event — including `tool/start` — as emitted-when-focused.
+      Extracted a `session-scoped-event-data` helper + `single-session-events`
+      vec, reused by the new suppression test below.)
 
-- [ ] **No test pins `tool/*` (or `session/updated`/`footer/updated`)
+- [x] **No test pins `tool/*` (or `session/updated`/`footer/updated`)
       SUPPRESSION for a non-focused session.** The only per-event suppression
       test (`emit-event-suppresses-session-scoped-event-for-non-focused-session-test`)
       uses `assistant/delta`. The structural gate keys on payload `:session-id`
@@ -240,8 +245,11 @@
       non-focused `:session-id`, closing the gap between the design enumeration
       and the test net. (If the strengthened single-session test above is made
       to also cover a non-focused variant, this can fold into it.)
+      (Done: added `emit-event-suppresses-tool-start-for-non-focused-session-test`
+      asserting a `tool/start` payload stamped with a non-focused `:session-id`
+      is suppressed, closing the design-enumeration/test-net gap for `tool/*`.)
 
-- [ ] **`emit-event-legacy-prompt-tree-switch-feedback-...` pins the exact
+- [x] **`emit-event-legacy-prompt-tree-switch-feedback-...` pins the exact
       prose literal `"[session switch requested: target]"`, coupling the test to
       `command_results.clj`'s message-format detail.** The test's load-bearing
       contract is source-vs-target `:session-id` classification (payload
@@ -253,3 +261,7 @@
       (e.g. `str/includes?`) while the payload `:session-id` is the source,
       rather than pinning the exact literal — keep the classification contract,
       drop the incidental prose coupling.
+      (Done: the text assertion is now
+      `(str/includes? … "target")` instead of the exact literal, keeping the
+      source-vs-target classification contract while dropping the incidental
+      prose coupling. Added `clojure.string` to the ns requires.)

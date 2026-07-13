@@ -1,5 +1,6 @@
 (ns psi.rpc-events-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
@@ -117,9 +118,12 @@
         (is (= "assistant/message" (:event frame)))
         (is (= "src" (get-in frame [:data :session-id]))
             "payload :session-id must be the source session, not the switch target")
-        (is (= "[session switch requested: target]"
-               (get-in frame [:data :content 0 :text]))
-            "switch target appears only in the message text"))))
+        ;; Assert only that the switch TARGET id appears in the message text
+        ;; (the load-bearing source-vs-target classification), not the exact
+        ;; prose wording, so a benign copy-edit of the feedback string does not
+        ;; fail this test for the wrong reason.
+        (is (str/includes? (get-in frame [:data :content 0 :text]) "target")
+            "switch target appears in the message text"))))
   (testing "the same :tree-switch feedback is suppressed once focus moves off the source session"
     (let [state       (rpc.state/make-rpc-state {:session-id "src"})
           captured    (atom [])
@@ -150,26 +154,51 @@
       (is (= 1 (count @captured)))
       (is (= "foreground" (get-in (first @captured) [:data :text]))))))
 
+(defn- session-scoped-event-data
+  "Payload data for a session-scoped event, stamped with session-id."
+  [event session-id]
+  (merge {:session-id session-id}
+         (case event
+           "session/updated" {:phase :idle :is-streaming false
+                              :is-compacting false :pending-message-count 0
+                              :retry-attempt 0 :retry nil :interrupt-pending false}
+           "tool/start" {:tool-id "t1" :tool-name "read" :call-summary "read"}
+           "session/resumed" {:session-file "f" :message-count 0}
+           "session/rehydrated" {:messages [] :tool-calls {} :tool-order []}
+           "footer/updated" {:path-line "p" :stats-line "s"}
+           {:text "hi"})))
+
+(def ^:private single-session-events
+  ["session/updated" "assistant/delta" "tool/start"
+   "footer/updated" "session/resumed" "session/rehydrated"])
+
 (deftest emit-event-single-session-connection-behaviour-preserved-test
-  (testing "a single-session connection emits everything as before (common case)"
+  (testing "a single-session connection emits every session-scoped event (common case)"
     (let [state       (rpc.state/make-rpc-state {:session-id "only"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
-      (doseq [event ["session/updated" "assistant/delta" "tool/start"
-                     "footer/updated" "session/resumed" "session/rehydrated"]]
+      (doseq [event single-session-events]
         (rpc.events/emit-event! emit-frame! state
                                 {:event event
-                                 :data (merge {:session-id "only"}
-                                              (case event
-                                                "session/updated" {:phase :idle :is-streaming false
-                                                                   :is-compacting false :pending-message-count 0
-                                                                   :retry-attempt 0 :retry nil :interrupt-pending false}
-                                                "tool/start" {:tool-id "t1" :tool-name "read" :call-summary "read"}
-                                                "session/resumed" {:session-file "f" :message-count 0}
-                                                "session/rehydrated" {:messages [] :tool-calls {} :tool-order []}
-                                                "footer/updated" {:path-line "p" :stats-line "s"}
-                                                {:text "hi"}))}))
-      (is (= 6 (count @captured))))))
+                                 :data (session-scoped-event-data event "only")}))
+      ;; Assert the emitted event-name set equals the input set, so each
+      ;; session-scoped event is individually pinned as emitted-when-focused
+      ;; (a count-only check would pass if one event were dropped while
+      ;; another double-emitted).
+      (is (= (set single-session-events)
+             (set (map :event @captured))))
+      (is (= (count single-session-events) (count @captured))))))
+
+(deftest emit-event-suppresses-tool-start-for-non-focused-session-test
+  (testing "a tool/* session-scoped event for a non-focused session is suppressed"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "tool/start"
+                               :data (session-scoped-event-data "tool/start" "s2")})
+      (is (= [] @captured)))))
 
 (deftest emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test
   (testing "non-session-scoped topics emit regardless of focus"

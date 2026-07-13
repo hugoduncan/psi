@@ -205,3 +205,13 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   `tool/*`/`session/updated` suppression for a non-focused session; tree-switch
   feedback test pins an exact prose literal, coupling to message-format detail
   rather than the source-vs-target classification contract.
+
+- addressed 3 test-shaper review steps (rpc_events_test.clj): strengthened
+  single-session test to assert emitted event-name set == input set (pins each
+  session-scoped event incl. `tool/start` as emitted-when-focused); added
+  `emit-event-suppresses-tool-start-for-non-focused-session-test` (pins `tool/*`
+  suppression); replaced exact prose literal in the tree-switch feedback test
+  with `str/includes? … "target"` (keeps source-vs-target classification,
+  drops prose coupling). Extracted `session-scoped-event-data` helper +
+  `single-session-events` vec. `bb test --focus psi.rpc-events-test` → 19 pass;
+  clj-kondo clean.
