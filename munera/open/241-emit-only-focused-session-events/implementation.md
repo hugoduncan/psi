@@ -50,6 +50,17 @@ No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
 
 - plan ambiguity review added 1 new design step: plan Key decision 1 freezes `:default-session-id` at construction, but design defines the nil-focus fallback as the live `default-session-id-in` (first-listed session); frozen-vs-live equivalence unverified at setup and divergence-on-session-set-change unspecified.
 
+## Notes for the frozen-vs-live default-session-id design-step
+
+Principles to maintain:
+- Keep effective-focus resolution a pure function of connection state + event (no ctx threading into `emit-event!`), per design Constraint — but do not let that purity goal silently reinterpret the design's `default-session-id-in` (live first-listed session) as a frozen snapshot without an explicit, documented decision.
+- If choosing "frozen is acceptable", state the invariant that makes it safe (e.g. the connection's default session is stable for the connection's lifetime); if not, the gate must resolve the live first-listed session, which reintroduces a ctx dependency to reconcile against the purity constraint.
+
+Task facts an implementer will need:
+- `make-rpc-state` (state.clj L11) already initializes `:focus-session-id` to the passed `session-id` (NOT nil), so the nil-focus branch only triggers when the construction `session-id` is nil or focus is later cleared — verify when that actually happens before relying on the fallback.
+- Construction `session-id` originates from `session-ctx-factory` (runtime.clj `start-runtime!`, ~L96); `default-session-id-in` (transport.clj L95) = `(some-> (ss/list-context-sessions-in ctx) first :session-id)`. Equivalence of these two at setup is the unverified assertion.
+- Relevant files: `components/rpc/src/psi/rpc/state.clj` (make-rpc-state, initialize-transport-state!, focus-session-id reader), `components/rpc/src/psi/rpc/transport.clj` (default-session-id-in), `components/rpc/src/psi/rpc/runtime.clj` (session-ctx-factory session-id source).
+
 ## Plan-review session, turn 2 (plan/steps inconsistency review)
 
 - no inconsistency review feedback — plan slice order, effective-focus formula, gate placement, silent-suppression semantics, initialize-transport-state! preservation, acceptance tests, and rehydration ordering all agree across design/plan/steps/design-steps. The design↔plan frozen-vs-live `default-session-id` divergence is already captured by the turn-1 ambiguity design-step; not re-filed here.
