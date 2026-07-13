@@ -76,3 +76,34 @@
       describes RPC delivery gating. (No existing section describes RPC
       per-connection delivery gating in that level of detail; no update
       needed.)
+
+## Review follow-ups (implementation review)
+
+- [ ] **Cross-session `command-result` DOES carry a bare `:session-id` — the
+      Slice-2 audit "No finding" claim is incorrect.**
+      `command-results/handle-command-result!`
+      (`components/rpc/src/psi/rpc/session/command_results.clj` L122-124) emits
+      `{:type "session_switch" :session-id (:session-id cmd-result)}` for
+      `:tree-switch`/`:session-switch` results. The structural gate treats any
+      payload with `:session-id` as session-scoped, so this cross-session
+      `command-result` is silently **suppressed** whenever its target
+      `:session-id` ≠ the connection's effective focus. This is exactly the
+      latent-coupling hazard the design flagged ("keep cross-session payloads
+      free of a bare `:session-id`; raise if found, do not special-case
+      silently"). Focus is NOT moved to the target before this emission for the
+      dispatched-command path (`handle-new-session-command-result!` only
+      re-focuses `:new-session`), so the switch notification can be dropped.
+      Resolve per the design guardrail: rename the key on this cross-session
+      payload (e.g. `:switched-session-id` / `:target-session-id`) so the
+      structural rule and the intended never-gated classification agree — do
+      not special-case the event string in the gate.
+- [ ] Add a characterization test asserting a `session_switch` `command-result`
+      whose `:session-id` differs from the current focus is still emitted
+      (protects the intended cross-session classification against the structural
+      gate; acceptance criterion (c) currently only covers `context/updated`,
+      which has no bare `:session-id`, so it does not catch this case).
+- [ ] Correct the two now-inaccurate claims that `command-result` always emits
+      regardless of focus: the Slice-2 audit note in this file (L44-46) and the
+      CHANGELOG `[Unreleased]` entry (`command-result … continue to emit
+      regardless of focus`). Both are false while the `session_switch` payload
+      carries a bare `:session-id`; update them alongside the fix above.

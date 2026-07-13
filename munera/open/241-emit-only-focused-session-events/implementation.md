@@ -139,3 +139,7 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
 - Verified from code that the nil-focus branch is a narrow pre-first-focus window: `make-rpc-state` (state.clj L21) initializes `:focus-session-id` to the construction `session-id` (NOT nil), and no code path calls `set-focus-session-id!` with nil (grep: all callers pass a concrete sid — commands.clj L42, ops.clj L232, emit.clj L94). So the frozen default only governs the window before any explicit focus, during which session-set divergence from the live `default-session-id-in` is immaterial.
 - Added a Slice-1 verification step in steps.md asserting setup equivalence (`:default-session-id` == `default-session-id-in` at construction) — closes plan point (a)'s previously-unverified assertion.
 - Implementer note: `initialize-transport-state!` (state.clj) merges `:focus-session-id nil` as a default only when `:connection` is absent (existing connection wins). Ensure `:default-session-id` is likewise added to that default merge (plan Slice 1) so a re-initialized connection does not lose the frozen default.
+
+## Implementation review pass
+
+- added 3 steps: the `session_switch` `command-result` carries a bare `:session-id`, so the structural gate silently suppresses it for non-focused targets — the Slice-2 "No finding" audit claim and the CHANGELOG "command-result … regardless of focus" note are both inaccurate.
