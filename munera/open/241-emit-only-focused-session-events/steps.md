@@ -119,7 +119,7 @@
 
 ## Review follow-ups (implementation review — pass 2, ψ)
 
-- [ ] **Legacy prompt-path `assistant/message` emissions bypass the focus gate
+- [x] **Legacy prompt-path `assistant/message` emissions bypass the focus gate
       because they omit `:session-id`.** The design lists `assistant/message`
       among the session-scoped, focus-gated events, but
       `command-results/handle-prompt-command-result!`
@@ -143,10 +143,19 @@
       updating the design's session-scoped enumeration to note the split.
       Prefer (a) unless a concrete reason to exempt the legacy path is
       identified — do not special-case the event string in the gate.
-- [ ] Add a characterization test covering the chosen resolution of the item
+      (Resolved via (a): `handle-prompt-command-result!` now takes `session-id`
+      and stamps `:session-id` on every emitted `assistant/message`, so the
+      legacy path gates through `focus-allows?` identically to the streaming
+      path. The gate is unchanged — no event-string special-casing. Caller
+      `session/prompt.clj` passes the already-available `session-id`.)
+- [x] Add a characterization test covering the chosen resolution of the item
       above: if (a), assert a legacy-prompt-path `assistant/message` for a
       non-focused session is suppressed and for the focused session emitted;
       if (b), assert it emits regardless of focus and record the rationale in
       the test. Current `rpc_events_test.clj` `assistant/*` coverage only
       exercises `:session-id`-stamped payloads, so neither branch of this
       asymmetry is currently pinned.
+      (Added `emit-event-legacy-prompt-assistant-message-suppressed-for-non-focused-session-test`
+      in `rpc_events_test.clj`, wiring `handle-prompt-command-result!` through
+      `emit-event!`: focused-session feedback emits, non-focused-session
+      feedback is suppressed by the structural gate.)

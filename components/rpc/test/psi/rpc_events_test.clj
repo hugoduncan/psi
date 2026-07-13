@@ -5,6 +5,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.session-state.state :as ss]
    [psi.rpc.events :as rpc.events]
+   [psi.rpc.session.command-results :as command-results]
    [psi.rpc.state :as rpc.state]
    [psi.rpc-test-support :as support]))
 
@@ -76,6 +77,26 @@
       (is (= 1 (count @captured)))
       (is (= "command-result" (:event (first @captured))))
       (is (= "s2" (get-in (first @captured) [:data :target-session-id]))))))
+
+(deftest emit-event-legacy-prompt-assistant-message-suppressed-for-non-focused-session-test
+  (testing "a legacy prompt-path assistant/message stamps :session-id so it gates like the streaming path"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)
+          emit!       (fn [event data]
+                        (rpc.events/emit-event! emit-frame! state
+                                                {:event event :data data}))]
+      (rpc.state/set-focus-session-id! state "s1")
+      ;; Legacy feedback for the FOCUSED session emits.
+      (command-results/handle-prompt-command-result!
+       "s1" {:type :text :message "focused feedback"} emit!)
+      ;; Same legacy feedback path for a NON-FOCUSED session is suppressed by
+      ;; the structural focus gate (resolution (a): payload carries :session-id).
+      (command-results/handle-prompt-command-result!
+       "s2" {:type :text :message "background feedback"} emit!)
+      (is (= 1 (count @captured)))
+      (is (= "assistant/message" (:event (first @captured))))
+      (is (= "s1" (get-in (first @captured) [:data :session-id]))))))
 
 (deftest emit-event-after-refocus-suppresses-previous-session-events-test
   (testing "after focus moves to session B, session-scoped events stamped with A's session-id are suppressed"

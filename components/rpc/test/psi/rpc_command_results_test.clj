@@ -86,6 +86,7 @@
           emit!  (fn [event data]
                    (swap! events conj [event data]))]
       (sut/handle-prompt-command-result!
+       "s1"
        {:type :extension-cmd
         :name "work-on"
         :args ""

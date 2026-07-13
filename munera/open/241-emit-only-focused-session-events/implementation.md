@@ -152,3 +152,7 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
 ## Implementation review pass 2 (ψ)
 
 - added 2 steps: legacy prompt-path `assistant/message` (`handle-prompt-command-result!`, reached via the RPC `"prompt"` op) omits `:session-id`, so the structural gate never gates it — an undocumented in-event-type asymmetry vs the `:session-id`-stamped streaming path, plus missing test coverage for either branch of that asymmetry.
+
+## Review follow-up pass 2 (ψ)
+
+- addressed 2 review steps: resolution (a) — `handle-prompt-command-result!` now takes `session-id` and stamps `:session-id` on every legacy-prompt-path `assistant/message`, so it gates through `focus-allows?` identically to the streaming path (no in-event-type asymmetry, no gate special-casing). Caller `session/prompt.clj` passes the already-in-scope `session-id`; existing `rpc_command_results_test.clj` call updated for the new arity. Added characterization test `emit-event-legacy-prompt-assistant-message-suppressed-for-non-focused-session-test` (`rpc_events_test.clj`) proving focused-session legacy feedback emits and non-focused is suppressed. `bb test --focus psi.rpc-events-test` (17 tests) and `psi.rpc-command-results-test` (3 tests) pass; lint/repair clean.
