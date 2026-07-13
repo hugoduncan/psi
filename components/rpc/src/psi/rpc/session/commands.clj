@@ -154,5 +154,8 @@
 
             :else
             (handle-unknown-command! emit! request-id text))]
-      (emit-command-snapshots! emit! ctx state session-id)
+      ;; Commands that switch RPC focus (e.g. /new, /resume, /tree) move
+      ;; focus before this point; emit the trailing snapshot for the
+      ;; currently-focused session so it is not gated out as stale.
+      (emit-command-snapshots! emit! ctx state (or (events/focus-session-id state) session-id))
       response)))

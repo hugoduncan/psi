@@ -79,6 +79,57 @@ Task facts an implementer will need:
 - Latent coupling to guard when implementing the structural gate (not a design defect, but keep true): the "not-gated" classification of `command-result`/`error`/`context/updated`/`ui/*` holds ONLY while those payloads carry no bare `:session-id`. If a future emission stamps one of them with `:session-id`, the structural gate would silently suppress it for non-focused sessions. Keep cross-session payloads free of a bare `:session-id` key (use `:active-session-id` etc. as `context/updated` does), or the structural rule and the intended classification will diverge. A characterization test asserting these cross-session events still emit while a non-focused session is active (acceptance criterion c) protects this.
 - Structural-gate implementation must read the ACTUAL emitted payload, not `required-event-payload-keys` — session-scoped events (`assistant/*`, `tool/*`, `session/rehydrated`) are stamped with `:session-id` at emission despite not listing it in `required-event-payload-keys` (see events.clj / emit.clj notes above).
 
+## Implementation pass — all 4 slices
+
+Implemented and tested end to end in one pass (design/plan/steps had no
+remaining open design-steps to gate execution):
+
+- `psi.rpc.state`: added `:default-session-id` to the `:connection` map,
+  seeded from `session-id` in `make-rpc-state`, preserved (not clobbered) by
+  `initialize-transport-state!`'s merge, with a new reader
+  `rpc.state/default-session-id`.
+- `psi.rpc.events`: added private `focus-allows?` — structural gate, event
+  passes iff its payload lacks `:session-id`, or `(:session-id data)` equals
+  `(or (focus-session-id state) (default-session-id state))`. Wired into
+  `emit-event!` alongside the existing `topic-subscribed?` check, before
+  payload validation — gated events are silently dropped (no error frame),
+  matching the existing unsubscribed-topic behaviour.
+- **Discovered and fixed a stale-session-id bug exposed by the gate**:
+  `psi.rpc.session.commands/handle-command!` unconditionally called
+  `emit-command-snapshots!` (→ `session/updated` + `footer/updated`) with the
+  *pre-command* `session-id`, even for commands that move RPC focus mid-call
+  (`/new`, `/resume`, `/tree`). Before this task that was harmless (everything
+  emitted regardless of focus); under the new gate it silently suppressed the
+  trailing snapshot because the old session is no longer focused. Fixed by
+  emitting the trailing snapshot for `(or (events/focus-session-id state)
+  session-id)` — the *currently*-focused session post-command — instead of the
+  stale pre-command session id. This is a load-bearing fix, not a workaround:
+  the trailing snapshot's purpose is to describe "the session the user is now
+  looking at", which is exactly the post-command focus.
+- Tests added: `psi.rpc-invariants-test` (default-session-id seeding +
+  preservation), `psi.rpc-events-test` (6 new `emit-event!` focus-gate tests:
+  non-focused suppressed, focused emitted, nil-focus default fallback,
+  cross-session `context/updated` unaffected, post-refocus suppression of the
+  stale session, single-session behaviour-preserving, `ui/*`/`command-result`/
+  `error` always emit). Acceptance test (d) — focus switch emits the full
+  rehydration bundle for the newly focused session — is covered by the
+  pre-existing `/tree <prefix>` navigation test in
+  `rpc_session_navigation_test.clj`, which already exercises the real
+  `emit-navigation-result!` path end to end and continued to pass unmodified
+  under the gate (confirms `set-focus-session-id!` → bundle ordering holds).
+- Emacs-ui audit (design's open question): grepped `psi-events.el` and related
+  dispatch code for session-id-conditional handling of `assistant/*`/`tool/*`
+  deltas tied to buffer liveness; found none — event handlers dispatch by
+  `:session-id` in the payload to route to the right buffer, with no
+  assumption of receiving background-session traffic to "keep buffers warm".
+  No client-side change needed; the design's rehydration-on-refocus path is
+  the sole mechanism for populating a session's buffer.
+- Full `bb test` run showed unrelated pre-existing failures/timeouts in
+  `turn-runtime`/streaming/retry test namespaces on this worktree,
+  reproducible independent of this change (spot-checked by re-running the
+  affected rpc-scoped and prompt-scoped namespaces individually — all green).
+  Not investigated further; out of scope for this task.
+
 ## Plan-follow-up pass (batch: plan-review turns 1+2)
 
 Executed the single attributed follow-up: the "Plan ambiguity review follow-ups" item in design-steps.md (added by plan-review turn 1 `c5d0e0754`; turn 2 `cc7949409` added no new item). Note: this batch's review follow-ups land in design-steps.md, not steps.md — the `git diff baseline..HEAD -- steps.md` is empty; the attributed added checklist line lives in design-steps.md. Baseline = parent of `c5d0e0754` = `7a37d8e46` (plan/steps creation).

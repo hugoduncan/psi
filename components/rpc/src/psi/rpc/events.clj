@@ -78,6 +78,18 @@
     (or (empty? subs)
         (contains? subs topic))))
 
+(defn- focus-allows?
+  "An event is session-scoped iff its payload carries a `:session-id` key.
+   Session-scoped events emit only for the connection's effective focus
+   (explicit focus, or the frozen construction-time default session when
+   focus has not yet been set). Non-session-scoped events always pass."
+  [state data]
+  (if (contains? data :session-id)
+    (let [effective-focus (or (rpc.state/focus-session-id state)
+                              (rpc.state/default-session-id state))]
+      (= (:session-id data) effective-focus))
+    true))
+
 (defn- next-event-seq!
   [state]
   (rpc.state/next-event-seq! state))
@@ -85,7 +97,8 @@
 (defn emit-event!
   [emit-frame! state {:keys [event data id]}]
   (when (and (contains? event-topics event)
-             (topic-subscribed? state event))
+             (topic-subscribed? state event)
+             (focus-allows? state (or data {})))
     (let [required (get required-event-payload-keys event #{})
           payload  (or data {})
           missing  (seq (remove #(contains? payload %) required))]

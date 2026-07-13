@@ -3,7 +3,7 @@
 
    State shape:
    {:transport  {:ready? :negotiated-protocol-version :pending :max-pending-requests :err}
-    :connection {:focus-session-id :subscribed-topics :event-seq}
+    :connection {:focus-session-id :default-session-id :subscribed-topics :event-seq}
     :workers    {:inflight-futures :rpc-run-fn-registered? :external-event-loop :projection-listener-id :projection-listener-stop-fn}}")
 
 (def default-max-pending-requests 64)
@@ -19,6 +19,7 @@
           :err err}
          :connection
          {:focus-session-id session-id
+          :default-session-id session-id
           :subscribed-topics #{}
           :event-seq 0}
          :workers
@@ -45,6 +46,7 @@
                (update :connection
                        (fn [connection]
                          (merge {:focus-session-id nil
+                                 :default-session-id nil
                                  :subscribed-topics #{}
                                  :event-seq 0}
                                 (or connection {}))))
@@ -98,6 +100,10 @@
   [state session-id]
   (swap! state assoc-in [:connection :focus-session-id] session-id)
   state)
+
+(defn default-session-id
+  [state]
+  (get-in @state [:connection :default-session-id]))
 
 (defn subscribed-topics
   [state]

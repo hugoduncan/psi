@@ -5,7 +5,111 @@
    [psi.agent-session.runtime :as runtime]
    [psi.session-state.state :as ss]
    [psi.rpc.events :as rpc.events]
+   [psi.rpc.state :as rpc.state]
    [psi.rpc-test-support :as support]))
+
+(defn- captured-emit-frame!
+  [captured]
+  (fn [frame] (swap! captured conj frame)))
+
+(deftest emit-event-suppresses-session-scoped-event-for-non-focused-session-test
+  (testing "session-scoped event for a non-focused session is not emitted"
+    (let [state     (rpc.state/make-rpc-state {:session-id "s1"})
+          captured  (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "s2" :text "hi"}})
+      (is (= [] @captured)))))
+
+(deftest emit-event-emits-session-scoped-event-for-focused-session-test
+  (testing "session-scoped event for the focused session is emitted"
+    (let [state     (rpc.state/make-rpc-state {:session-id "s1"})
+          captured  (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "s1" :text "hi"}})
+      (is (= 1 (count @captured)))
+      (is (= "assistant/delta" (:event (first @captured)))))))
+
+(deftest emit-event-nil-focus-uses-default-session-id-test
+  (testing "with nil explicit focus, events for the default session emit and others are suppressed"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state nil)
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "s1" :text "hi"}})
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "s2" :text "hi"}})
+      (is (= 1 (count @captured)))
+      (is (= "s1" (get-in (first @captured) [:data :session-id]))))))
+
+(deftest emit-event-cross-session-event-emits-regardless-of-focus-test
+  (testing "context/updated (no :session-id in payload) emits while a different session has focus"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "context/updated"
+                               :data {:active-session-id "s2" :sessions []}})
+      (is (= 1 (count @captured))))))
+
+(deftest emit-event-after-refocus-suppresses-previous-session-events-test
+  (testing "after focus moves to session B, session-scoped events stamped with A's session-id are suppressed"
+    (let [state       (rpc.state/make-rpc-state {:session-id "a"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "b")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "a" :text "background"}})
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data {:session-id "b" :text "foreground"}})
+      (is (= 1 (count @captured)))
+      (is (= "foreground" (get-in (first @captured) [:data :text]))))))
+
+(deftest emit-event-single-session-connection-behaviour-preserved-test
+  (testing "a single-session connection emits everything as before (common case)"
+    (let [state       (rpc.state/make-rpc-state {:session-id "only"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (doseq [event ["session/updated" "assistant/delta" "tool/start"
+                     "footer/updated" "session/resumed" "session/rehydrated"]]
+        (rpc.events/emit-event! emit-frame! state
+                                {:event event
+                                 :data (merge {:session-id "only"}
+                                              (case event
+                                                "session/updated" {:phase :idle :is-streaming false
+                                                                   :is-compacting false :pending-message-count 0
+                                                                   :retry-attempt 0 :retry nil :interrupt-pending false}
+                                                "tool/start" {:tool-id "t1" :tool-name "read" :call-summary "read"}
+                                                "session/resumed" {:session-file "f" :message-count 0}
+                                                "session/rehydrated" {:messages [] :tool-calls {} :tool-order []}
+                                                "footer/updated" {:path-line "p" :stats-line "s"}
+                                                {:text "hi"}))}))
+      (is (= 6 (count @captured))))))
+
+(deftest emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test
+  (testing "non-session-scoped topics emit regardless of focus"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "ui/widget-specs-updated" :data {}})
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "command-result" :data {:type "ok"}})
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "error" :data {:error-code "e" :error-message "m"}})
+      (is (= 3 (count @captured))))))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
