@@ -37,3 +37,7 @@ No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
 ## Architecture review pass (design-review session, turn 1)
 
 - no architectural review feedback — design is a strong fit: gate homed at RPC fanout boundary per doc/architecture.md projection-delivery rule; focus is transport-scoped RPC-owned fallback state; structural `:session-id` derivation honors single-source principle; emission stays a pure function of connection state + event. Prior architectural design-step already resolved.
+
+## Ambiguity review pass (design-review session, turn 2)
+
+- no ambiguity review feedback — the two crux ambiguities (nil-focus multi-session fallback; session/updated terminal-phase partition) plus resumed/rehydrated classification were already resolved into design.md by the prior batch. Remaining open question (Emacs client background-delta assumption) is a losslessness verification pinned by acceptance criterion (d), not an unresolved design-spec ambiguity. All design statements now single-interpretation.
