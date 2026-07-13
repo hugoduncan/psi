@@ -197,3 +197,11 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   rpc-invariants/navigation/command-results (12) all green. Prior test-review
   follow-ups (L160 pinning, tree-switch feedback classification) confirmed
   present and load-bearing.
+
+## Test-shaper review pass (ψ)
+
+- added 3 steps: single-session test asserts count-only (weak
+  meaningful-failure signal, leaves `tool/*` gating un-pinned); no test pins
+  `tool/*`/`session/updated` suppression for a non-focused session; tree-switch
+  feedback test pins an exact prose literal, coupling to message-format detail
+  rather than the source-vs-target classification contract.

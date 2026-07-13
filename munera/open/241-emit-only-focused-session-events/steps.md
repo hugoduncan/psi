@@ -211,3 +211,45 @@
       (b) once focus moves to the target the source-stamped feedback is gated
       out — pinning that a future edit stamping the target id would be a
       behavioural change, not silent drift.)
+
+## Test-shaper review follow-ups (ψ)
+
+- [ ] **`emit-event-single-session-connection-behaviour-preserved-test`
+      asserts only `(= 6 (count @captured))`, which gives weak meaningful-failure
+      signal and leaves `tool/*` focus-gating un-pinned.** The test drives six
+      distinct event names (`session/updated`, `assistant/delta`, `tool/start`,
+      `footer/updated`, `session/resumed`, `session/rehydrated`) but asserts only
+      a total count. A regression that wrongly suppressed one focused-session
+      event while double-emitting another would still count 6 and pass. This is
+      also the ONLY place `tool/start` (and by proxy the `tool/*` design-listed
+      session-scoped events) is exercised against the gate at all — and only via
+      the count. Strengthen to assert the emitted event-name *set* equals the
+      input set (or map event→emitted?), so each session-scoped event is
+      individually pinned as emitted-when-focused. Behaviour-focused, not
+      implementation-detail: it asserts observable per-event emission.
+
+- [ ] **No test pins `tool/*` (or `session/updated`/`footer/updated`)
+      SUPPRESSION for a non-focused session.** The only per-event suppression
+      test (`emit-event-suppresses-session-scoped-event-for-non-focused-session-test`)
+      uses `assistant/delta`. The structural gate keys on payload `:session-id`
+      presence (not event name), so a single representative suppression case is
+      economical and defensible — but the design explicitly enumerates
+      `tool/*` and `session/updated` as focus-gated, and nothing asserts they
+      are actually suppressed for a non-focused session. Add one representative
+      suppression assertion for a `tool/*` (or `session/updated`) payload with a
+      non-focused `:session-id`, closing the gap between the design enumeration
+      and the test net. (If the strengthened single-session test above is made
+      to also cover a non-focused variant, this can fold into it.)
+
+- [ ] **`emit-event-legacy-prompt-tree-switch-feedback-...` pins the exact
+      prose literal `"[session switch requested: target]"`, coupling the test to
+      `command_results.clj`'s message-format detail.** The test's load-bearing
+      contract is source-vs-target `:session-id` classification (payload
+      `:session-id` = source; target appears only in text). Asserting the full
+      formatted string additionally ties the test to prose wording that is not
+      the behaviour under test — a robustness/behaviour-focus concern: a benign
+      copy-edit of the feedback string would fail this test for the wrong
+      reason. Prefer asserting the target id is *present in* the message text
+      (e.g. `str/includes?`) while the payload `:session-id` is the source,
+      rather than pinning the exact literal — keep the classification contract,
+      drop the incidental prose coupling.
