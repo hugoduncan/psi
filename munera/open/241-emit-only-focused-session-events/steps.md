@@ -162,7 +162,7 @@
 
 ## Test review follow-ups (task-test-review, ψ)
 
-- [ ] **The load-bearing `handle-command!` trailing-snapshot fix
+- [x] **The load-bearing `handle-command!` trailing-snapshot fix
       (`commands.clj` L160, `(or (events/focus-session-id state) session-id)`)
       is only incidentally protected for the `/new` path.** implementation.md
       describes this fix as load-bearing across all focus-moving commands
@@ -180,7 +180,13 @@
       `/resume` and after a `/tree`/`/tree <prefix>` focus switch — i.e. it is
       stamped with the new focus, not the stale pre-command session — so the
       L160 fix is pinned for every focus-moving command path, not just `/new`.
-- [ ] **The `tree-switch` legacy prompt-path feedback
+      (Added two characterization tests in `rpc_session_navigation_test.clj`:
+      `/resume <path>` and `/tree <prefix>` now subscribe to
+      `session/updated` + `footer/updated` and assert the trailing snapshot IS
+      emitted stamped with the newly-focused session. Verified they pin the
+      fix: reverting L160 to bare `session-id` fails 6 asserts across both new
+      cases; restored fix → all pass.)
+- [x] **The `tree-switch` legacy prompt-path feedback
       (`command_results.clj` `handle-prompt-command-result!` L64) is untested
       and its `:session-id` stamping is semantically ambiguous.** It emits
       `assistant/message` with `[session switch requested: <target-sid>]` in the
@@ -197,3 +203,11 @@
       from a focused session). Covers a `handle-prompt-command-result!` case
       currently exercised by neither `rpc_events_test.clj` nor
       `rpc_command_results_test.clj`.
+      (Added `emit-event-legacy-prompt-tree-switch-feedback-stamped-with-source-session-test`
+      in `rpc_events_test.clj`, wiring `handle-prompt-command-result!` with a
+      `:tree-switch` cmd-result through `emit-event!`: asserts (a) the payload
+      `:session-id` is the SOURCE session (not the switch target, which appears
+      only in the message text) and it emits while the source is focused, and
+      (b) once focus moves to the target the source-stamped feedback is gated
+      out — pinning that a future edit stamping the target id would be a
+      behavioural change, not silent drift.)

@@ -168,3 +168,21 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   emission unpinned); `tree-switch` legacy prompt-path feedback
   (`handle-prompt-command-result!` L64) untested and its source-vs-target
   `:session-id` stamping unpinned.
+
+## Test-review follow-up pass (ψ)
+
+- addressed 2 test-review steps (pure test additions; no src change):
+  - L160 trailing-snapshot fix now pinned for `/resume` and `/tree` focus
+    switches. Added two `rpc_session_navigation_test.clj` cases subscribing to
+    `session/updated` + `footer/updated` and asserting the trailing snapshot IS
+    emitted stamped with the newly-focused (resumed/child) session. Verified
+    they are load-bearing: reverting L160 to bare `session-id` fails 6 asserts
+    across both cases; restored fix → all pass.
+  - `:tree-switch` legacy prompt-path feedback classification pinned. Added
+    `emit-event-legacy-prompt-tree-switch-feedback-stamped-with-source-session-test`
+    in `rpc_events_test.clj`: (a) payload `:session-id` is the SOURCE session
+    (target id only in the message text) and emits while source is focused;
+    (b) suppressed once focus moves to the target — so a future edit stamping
+    the target id is a behavioural change, not silent drift.
+  - `bb test --focus psi.rpc-events-test` (18 tests) and
+    `psi.rpc-session-navigation-test` (3 tests) pass; lint clean on both files.

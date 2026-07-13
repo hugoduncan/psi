@@ -98,6 +98,43 @@
       (is (= "assistant/message" (:event (first @captured))))
       (is (= "s1" (get-in (first @captured) [:data :session-id]))))))
 
+(deftest emit-event-legacy-prompt-tree-switch-feedback-stamped-with-source-session-test
+  (testing "a :tree-switch legacy prompt-path assistant/message is stamped with the SOURCE session-id (not the switch target) so it emits for the focused source and gates otherwise"
+    (let [state       (rpc.state/make-rpc-state {:session-id "src"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)
+          emit!       (fn [event data]
+                        (rpc.events/emit-event! emit-frame! state
+                                                {:event event :data data}))]
+      (rpc.state/set-focus-session-id! state "src")
+      ;; :tree-switch feedback belongs to the CURRENT (source) view: its payload
+      ;; :session-id is the source session-id, while the switch TARGET id appears
+      ;; only inside the message text. So it emits while the source is focused.
+      (command-results/handle-prompt-command-result!
+       "src" {:type :tree-switch :session-id "target"} emit!)
+      (is (= 1 (count @captured)))
+      (let [frame (first @captured)]
+        (is (= "assistant/message" (:event frame)))
+        (is (= "src" (get-in frame [:data :session-id]))
+            "payload :session-id must be the source session, not the switch target")
+        (is (= "[session switch requested: target]"
+               (get-in frame [:data :content 0 :text]))
+            "switch target appears only in the message text"))))
+  (testing "the same :tree-switch feedback is suppressed once focus moves off the source session"
+    (let [state       (rpc.state/make-rpc-state {:session-id "src"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)
+          emit!       (fn [event data]
+                        (rpc.events/emit-event! emit-frame! state
+                                                {:event event :data data}))]
+      ;; Focus has already moved to the target: the source-stamped feedback is
+      ;; gated out. This pins that a future edit stamping the TARGET id (which
+      ;; would make it emit here) is a behavioural change, not silent drift.
+      (rpc.state/set-focus-session-id! state "target")
+      (command-results/handle-prompt-command-result!
+       "src" {:type :tree-switch :session-id "target"} emit!)
+      (is (= [] @captured)))))
+
 (deftest emit-event-after-refocus-suppresses-previous-session-events-test
   (testing "after focus moves to session B, session-scoped events stamped with A's session-id are suppressed"
     (let [state       (rpc.state/make-rpc-state {:session-id "a"})
