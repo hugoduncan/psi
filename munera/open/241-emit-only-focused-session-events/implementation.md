@@ -50,6 +50,10 @@ No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
 
 - plan ambiguity review added 1 new design step: plan Key decision 1 freezes `:default-session-id` at construction, but design defines the nil-focus fallback as the live `default-session-id-in` (first-listed session); frozen-vs-live equivalence unverified at setup and divergence-on-session-set-change unspecified.
 
+## Plan-review session, turn 2 (plan/steps inconsistency review)
+
+- no inconsistency review feedback — plan slice order, effective-focus formula, gate placement, silent-suppression semantics, initialize-transport-state! preservation, acceptance tests, and rehydration ordering all agree across design/plan/steps/design-steps. The design↔plan frozen-vs-live `default-session-id` divergence is already captured by the turn-1 ambiguity design-step; not re-filed here.
+
 ## Design-review session outcome (3-turn batch: architecture + ambiguity + inconsistency)
 
 - This review batch added NO new design-steps. All four pre-existing design-steps were already resolved into design.md by the earlier batch; nothing new to address from these three passes. Implementation can proceed against the current design as-is.
