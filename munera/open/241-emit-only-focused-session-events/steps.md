@@ -159,3 +159,41 @@
       in `rpc_events_test.clj`, wiring `handle-prompt-command-result!` through
       `emit-event!`: focused-session feedback emits, non-focused-session
       feedback is suppressed by the structural gate.)
+
+## Test review follow-ups (task-test-review, ψ)
+
+- [ ] **The load-bearing `handle-command!` trailing-snapshot fix
+      (`commands.clj` L160, `(or (events/focus-session-id state) session-id)`)
+      is only incidentally protected for the `/new` path.** implementation.md
+      describes this fix as load-bearing across all focus-moving commands
+      (`/new`, `/resume`, `/tree`): the trailing `session/updated` /
+      `footer/updated` snapshot must be stamped with the *post-command* focus
+      so it passes the gate, not the *pre-command* `session-id` (which the gate
+      would suppress). Only the `/new` navigation test
+      (`rpc_session_navigation_test.clj` L76-92) subscribes to `footer/updated`
+      and would fail if L160 reverted to bare `session-id`. The `/resume <path>`
+      and `/tree <session-id>`/`<prefix>` navigation tests do NOT subscribe to
+      `footer/updated` or `session/updated`, so a regression of L160 for those
+      paths (trailing snapshot silently gated for the newly-focused session)
+      would go undetected. Add a characterization test asserting the trailing
+      `footer/updated` (and/or `session/updated`) snapshot IS emitted after a
+      `/resume` and after a `/tree`/`/tree <prefix>` focus switch — i.e. it is
+      stamped with the new focus, not the stale pre-command session — so the
+      L160 fix is pinned for every focus-moving command path, not just `/new`.
+- [ ] **The `tree-switch` legacy prompt-path feedback
+      (`command_results.clj` `handle-prompt-command-result!` L64) is untested
+      and its `:session-id` stamping is semantically ambiguous.** It emits
+      `assistant/message` with `[session switch requested: <target-sid>]` in the
+      TEXT but stamps the payload `:session-id` with the CURRENT (source)
+      `session-id` (from the L39 arg), not the switch target. Under the focus
+      gate this feedback therefore emits only when the *source* session is
+      focused — which is the intended "feedback belongs to the current view"
+      behaviour, but nothing pins it: there is no test that a `:tree-switch`
+      cmd-result through `handle-prompt-command-result!` (a) emits its feedback
+      for the focused source session and (b) carries the source `:session-id`
+      (not the target). Add a characterization test so this cross-session-switch
+      feedback classification does not silently drift (e.g. if a future edit
+      stamps the target id, the feedback would be gated away when switching
+      from a focused session). Covers a `handle-prompt-command-result!` case
+      currently exercised by neither `rpc_events_test.clj` nor
+      `rpc_command_results_test.clj`.

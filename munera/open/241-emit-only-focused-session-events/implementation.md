@@ -160,3 +160,11 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
 ## Implementation review pass 3 (ψ)
 
 - no new steps. Verified end-to-end against code: gate homed in `emit-event!` per design (structural `:session-id` rule, effective focus = focus-or-frozen-default); all cross-session payloads (`error` at session.clj/prompt.clj, every `command-result` variant, `context/updated`, `ui/*`) carry no bare `:session-id` (`:tree-rename` embeds the id only in its message string; `session_switch` uses `:target-session-id`); `state.clj` seeds/preserves/reads `:default-session-id` as claimed; CHANGELOG accurate. Tests pass: rpc-events-test (17), rpc-invariants-test (6), rpc-session-navigation-test (3, covers acceptance (d) via real `emit-navigation-result!` under the gate). Both real latent-coupling hazards were already caught and fixed by prior review passes.
+
+## Test review pass (task-test-review, ψ)
+
+- added 2 steps: the load-bearing `handle-command!` L160 trailing-snapshot fix
+  is only protected for `/new` (`/resume` + `/tree` focus-switch snapshot
+  emission unpinned); `tree-switch` legacy prompt-path feedback
+  (`handle-prompt-command-result!` L64) untested and its source-vs-target
+  `:session-id` stamping unpinned.
