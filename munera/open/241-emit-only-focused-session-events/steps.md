@@ -350,3 +350,25 @@
       override it); (2) subscribed-topic event for a NON-focused session is
       suppressed by the focus gate. Pins the two gates as conjunctive/
       independent — neither short-circuits the other.)
+
+## Test-shaper review follow-ups (ψ, pass 4)
+
+- [ ] **`emit-event-after-refocus-suppresses-previous-session-events-test`
+      (`rpc_events_test.clj` L161-172) asserts the survivor via its payload
+      `:text` (`(= "foreground" (get-in (first @captured) [:data :text]))`)
+      rather than its `:session-id`, coupling the meaningful-failure signal to
+      a non-gate payload field and diverging from the sibling per-frame
+      assertion style.** The focus gate discriminates on payload `:session-id`
+      (event "b" survives, "a" is suppressed after refocus to "b"); every other
+      positive-emission emit test asserts the surviving frame's `:session-id`
+      (e.g. the nil-focus and legacy-prompt tests). This test instead uses a
+      hand-crafted distinguishing `:text` ("foreground"/"background") as an
+      indirect proxy for which session survived. It still fails on a gate
+      regression, but (a) it is inconsistent with the established per-frame
+      `:session-id` assertion style, and (b) its meaningful-failure explanation
+      points at a payload field the gate does not key on, which is weaker
+      signal about the actual contract violated. Strengthen to also (or
+      instead) assert `(= "b" (get-in (first @captured) [:data :session-id]))`,
+      pinning the surviving frame by the gate's actual discriminator and
+      matching the sibling assertion style; the `:text` payloads can then be
+      simplified/dropped as incidental setup.

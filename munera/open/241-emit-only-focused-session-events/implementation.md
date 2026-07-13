@@ -257,3 +257,10 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
     gate — neither gate short-circuits the other.
   - `bb test --focus psi.rpc-events-test` → 20 tests, 64 asserts, all pass;
     clj-kondo clean, clj-paren-repair clean.
+
+## Test-shaper review pass 4 (ψ)
+
+- added 1 step: `emit-event-after-refocus-...` asserts the survivor via payload
+  `:text` (a non-gate field) instead of `:session-id`, diverging from the
+  established per-frame `:session-id` assertion style and weakening the
+  meaningful-failure signal for the gate's actual discriminator.
