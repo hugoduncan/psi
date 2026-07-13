@@ -109,6 +109,21 @@ surfaces stay correct:
   that session's activity is relevant, and background sessions stay gated even
   before an explicit focus is set. (Refocusing later rehydrates any suppressed
   session losslessly via the navigation path.)
+  - **Frozen vs live default (resolved).** The nil-focus default is resolved as
+    the connection's *construction-time* default session — the `session-id`
+    passed to `make-rpc-state`, which equals `default-session-id-in` (the live
+    first-listed session) *at connection setup* because both derive from the
+    same initial session bootstrapped for the connection. The gate reads this
+    frozen construction-time value (stored as connection-local
+    `:default-session-id`), **not** a per-emission recomputation of the live
+    `default-session-id-in`. This is intentional and safe under the invariant
+    that the nil-focus window exists only *before any explicit focus is set*,
+    and `focus-session-id` is only ever advanced to explicit sessions (never
+    cleared back to `nil`). Consequently the frozen default never needs to
+    track later session-set changes (a session closing, or a new session being
+    inserted first): once focus is explicit, the frozen default no longer
+    governs emission. The frozen value is therefore stable-but-authoritative
+    for its whole window of relevance, not stale.
 - Behaviour-preserving for the single-session case (the common case): one session
   is always focused, everything emits as before.
 

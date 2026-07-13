@@ -30,6 +30,27 @@ Gate logic:
    keep existing). This keeps `emit-event!`'s signature unchanged and emission
    a pure function of connection state + event.
 
+   *Frozen-vs-live reconciliation (design alignment).* The design's nil-focus
+   fallback is defined as `default-session-id-in` (a *live* first-listed-session
+   function of `ctx`); this plan stores a *frozen* construction-time snapshot.
+   These agree because:
+   - **(a) Equivalence at setup.** The construction `session-id` (from
+     `session-ctx-factory`, `runtime.clj`) is the same initial session that
+     `default-session-id-in` returns as the first-listed session at connection
+     setup, so `:default-session-id` == `default-session-id-in` at that instant.
+     Slice 1 adds an explicit test asserting this equivalence rather than
+     leaving it as an unverified assertion.
+   - **(b) Divergence over the connection lifetime is out of scope by
+     invariant.** The nil-focus branch only governs emission *before any
+     explicit focus is set*, and `focus-session-id` is only ever advanced to
+     explicit sessions (never cleared back to `nil`). Once focus is explicit,
+     the frozen default no longer participates in the gate, so later session-set
+     changes (a session closing, a new session inserted first) that would move
+     the live `default-session-id-in` cannot make the frozen value wrong for its
+     window of relevance. The frozen snapshot is therefore intentionally
+     stable-but-authoritative, not stale. See design Constraints ("Frozen vs
+     live default").
+
 2. **No changes at emitter call sites.** `make-request-emitter`, the progress
    loop, the external event loop, and `ops.clj` all funnel through
    `emit-event!`; the gate covers them all. The rehydration bundle

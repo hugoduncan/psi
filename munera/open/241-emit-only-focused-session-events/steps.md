@@ -11,6 +11,13 @@
 - [ ] Add reader `psi.rpc.state/default-session-id`.
 - [ ] Tests: `make-rpc-state` stores it; `initialize-transport-state!` does
       not clobber it.
+- [ ] Verify setup equivalence (plan Key decision 1a): assert the construction
+      `:default-session-id` equals `default-session-id-in` for the connection's
+      initial ctx, so the frozen snapshot matches the live first-listed session
+      at setup. Frozen-vs-live divergence over the connection lifetime is out of
+      scope by invariant (nil-focus window precedes any explicit focus; focus is
+      never cleared back to `nil`) — see plan Key decision 1b / design
+      Constraints "Frozen vs live default".
 
 ## Slice 2 — Gate: focus filtering in emit-event!
 
