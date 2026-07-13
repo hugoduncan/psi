@@ -37,6 +37,26 @@ information the UI needs: on refocus it pulls the missed content from the backen
 Change server-side emission so that **session-scoped** events are emitted only
 when their `:session-id` matches the connection's `focus-session-id`.
 
+### Where the gate lives (resolved)
+
+Focus gating is homed inside `emit-event!` (`psi.rpc.events`), at RPC's single
+subscriber-aware fanout/delivery boundary, alongside the existing
+`topic-subscribed?` gate. This is consistent with the projection-delivery rule
+in `doc/architecture.md`, which makes RPC the one point that recomputes
+delivery from canonical state plus connection-local focus. Focus is
+transport-scoped, RPC-owned connection state; the gate is *not* pushed into
+per-session emitter call-sites (`make-request-emitter` / progress loop), which
+would fragment fanout policy across emission sites and duplicate the
+session-scoped/cross-session partition.
+
+"Session-scoped" is derived **structurally**: an event is session-scoped iff its
+emitted payload carries a `:session-id` key. This avoids maintaining a second
+hand-curated event set. (Note: several session-scoped events carry `:session-id`
+in their runtime payload even though `required-event-payload-keys` does not list
+it — e.g. `session/rehydrated`, `assistant/*`, `tool/*` are stamped with
+`:session-id` at emission. The gate reads the actual payload, not the required
+key set.)
+
 ### Session-scoped events (subject to focus gating)
 
 Events whose payload carries a `:session-id` and that describe activity of one
@@ -46,6 +66,17 @@ specific session:
 - `tool/start`, `tool/executing`, `tool/update`, `tool/result`
 - `session/updated`, `footer/updated`
 - `session/resumed`, `session/rehydrated`
+
+`session/resumed` and `session/rehydrated` **are** in the focus-gated set
+(their payloads carry `:session-id`, so they are session-scoped by the
+structural rule). There is no contradiction with treating them as the
+navigation/rehydration bundle: their *only* emission path is
+`emit-navigation-result!`, which calls `set-focus-session-id!` to the target
+session **before** emitting the bundle (`emit.clj`). By that ordering the target
+session is already the focused session, so these events always pass the focus
+check. They are gated in principle, but never suppressed in practice because
+they are only ever emitted for the just-focused session. There is no
+non-focused emission path for them to suppress.
 
 ### Non-session-scoped / cross-session events (NOT gated)
 
@@ -68,25 +99,41 @@ surfaces stay correct:
   that point the target session is/has become the focused session — the natural
   ordering (`set-focus-session-id!` before emitting the new session's snapshots)
   must be preserved so those emissions pass the focus check.
-- `focus-session-id` may be `nil` (fresh connection before any focus). Define
-  behaviour: when focus is `nil`, session-scoped events for the connection's
-  initial/default session should still emit (avoid a dead first session).
+- `focus-session-id` may be `nil` (fresh connection before any focus). Resolved
+  behaviour: when focus is `nil`, the effective focus is the connection's
+  default session — `default-session-id-in` (`psi.rpc.transport`), i.e. the
+  first-listed session. Session-scoped events whose `:session-id` equals that
+  default session still emit; session-scoped events for any *other* session are
+  suppressed, exactly as they would be under an explicit focus. This is
+  intended: a fresh connection is viewing its first/default session, so only
+  that session's activity is relevant, and background sessions stay gated even
+  before an explicit focus is set. (Refocusing later rehydrates any suppressed
+  session losslessly via the navigation path.)
 - Behaviour-preserving for the single-session case (the common case): one session
   is always focused, everything emits as before.
 
+## Resolved decisions
+
+- **Focus-gate placement** (was: where to place the gate). Resolved: inside
+  `emit-event!`, at RPC's fanout/delivery boundary, with "session-scoped"
+  derived structurally from the presence of `:session-id` in the emitted
+  payload. See "Where the gate lives" under Scope.
+
+- **`session/updated` partition** (was: the crux — should non-focused sessions
+  emit a terminal `session/updated`?). Resolved: `session/updated` is a
+  session-scoped, focus-gated event. A non-focused session does **not** emit a
+  terminal `session/updated` on phase-completion. Per-session phase for the
+  session tree is carried by `context/updated` (payload
+  `#{:active-session-id :sessions}`), which is cross-session and always emits;
+  its `:sessions` entries reflect each session's current phase from canonical
+  state, so the tree shows a non-focused session's "done" status without
+  requiring its own `session/updated`. On refocus, the navigation path re-emits
+  that session's `session/updated`/`footer/updated` with its full current state.
+  This keeps the session-scoped vs cross-session partition clean: per-session
+  streaming/status detail is focus-gated; the global tree summary is not.
+
 ## Open questions
 
-- Where to place the focus gate: inside `emit-event!` (centralized, needs the
-  event payload's `:session-id`), or at the per-session emitter boundary
-  (`emit/make-request-emitter` / progress loop) where the session-id is known
-  structurally? Centralizing in `emit-event!` couples it to payload shape;
-  gating at the emitter boundary is more explicit but must cover every
-  session-scoped emission path.
-- Should non-focused sessions still emit a terminal `session/updated` on
-  phase-completion (so the session tree shows "done" without refocus), or does
-  `context/updated` already carry enough per-session phase for the tree? Decide
-  which events are truly "session-scoped, focus-gated" vs "cross-session
-  summary" — this partition is the crux of the design.
 - Does any current Emacs client code assume it receives background-session deltas
   (e.g. to keep hidden buffers live)? Confirm the refocus-rehydration path fully
   reconstructs state, including in-flight streaming, so gating is lossless.

@@ -16,3 +16,20 @@ Relevant project files:
 - `components/rpc/src/psi/rpc/state.clj` — `focus-session-id` / `set-focus-session-id!` (connection-local focus).
 - `components/rpc/src/psi/rpc/transport.clj` — `default-session-id-in` (= first listed session; relevant to the nil-focus fallback design-step).
 - `components/rpc/src/psi/rpc/session/emit.clj`, `.../session/ops.clj`, `.../session/commands.clj`, `.../session/navigation.clj` — set-focus ordering + rehydration bundle emission paths (relevant to the resumed/rehydrated classification design-step).
+
+## Design-follow-up pass (batch: architectural + ambiguity + inconsistency reviews)
+
+All 4 design-steps resolved into design.md:
+
+- **Focus-gate placement** → gate homed in `emit-event!` at RPC fanout boundary; "session-scoped" derived structurally from `:session-id` presence in the emitted payload.
+- **nil-focus fallback** → effective focus = `default-session-id-in` (first-listed session); only that session's events emit, others suppressed.
+- **`session/updated` partition** (the crux) → `session/updated` is focus-gated; non-focused sessions do NOT emit terminal `session/updated`; per-session phase for the tree is carried by cross-session `context/updated` (`:sessions`).
+- **resumed/rehydrated classification** → they ARE in the focus-gated set (payloads carry `:session-id`) but their sole emission path (`emit-navigation-result!`) sets focus BEFORE emitting, so they always pass the gate — no non-focused path to suppress. No contradiction.
+
+### Discovered facts an implementer will need
+
+- `required-event-payload-keys` (events.clj) does NOT list `:session-id` for `session/rehydrated`, `assistant/*`, `tool/*`, but those payloads ARE stamped with `:session-id` at runtime (see `emit.clj`: `emit-session-rehydrated!` L43 adds `:session-id`; `make-request-emitter`/progress loop stamp session-id). The structural gate must read the actual emitted payload, not `required-event-payload-keys`.
+- `emit-navigation-result!` (emit.clj L93-99) ordering: `set-focus-session-id!` → rehydration bundle → session/updated → footer/updated → context/updated. This ordering is load-bearing for the resumed/rehydrated always-pass guarantee; do not reorder.
+- `context/updated` payload = `#{:active-session-id :sessions}` — carries per-session phase, and is the cross-session (never-gated) channel the tree relies on when a session's own `session/updated` is suppressed.
+
+No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
