@@ -223,3 +223,11 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   count-only, inconsistent with the per-frame `:event` assertion style the
   prior test-shaper pass established and leaving the never-gated event names
   un-pinned.
+
+- addressed 2 test-shaper pass-2 review steps: strengthened
+  `emit-event-cross-session-event-emits-regardless-of-focus-test` (now
+  asserts `:event` = `context/updated` and surviving `:active-session-id`)
+  and `emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test`
+  (now asserts emitted event-name set `#{ui/widget-specs-updated command-result
+  error}`), closing the count-only meaningful-failure gaps for the never-gated
+  events. `psi.rpc-events-test` green (19 tests, 62 asserts); lint clean.

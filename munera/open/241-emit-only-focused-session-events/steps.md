@@ -268,7 +268,7 @@
 
 ## Test-shaper review follow-ups (ψ, pass 2)
 
-- [ ] **`emit-event-cross-session-event-emits-regardless-of-focus-test`
+- [x] **`emit-event-cross-session-event-emits-regardless-of-focus-test`
       (`rpc_events_test.clj` L54-63) asserts only `(= 1 (count @captured))`,
       giving weaker meaningful-failure signal than its sibling emit tests and
       inconsistent assertion style.** Every other positive-emission emit test
@@ -284,8 +284,13 @@
       per the sibling tests, that the payload survives — e.g.
       `:active-session-id`), matching the consistent per-frame assertion style
       and closing the meaningful-failure gap for the acceptance-(c) event.
+      (Done: the test now also asserts
+      `(= "context/updated" (:event (first @captured)))` and
+      `(= "s2" (get-in (first @captured) [:data :active-session-id]))`,
+      matching the sibling per-frame assertion style and pinning the
+      acceptance-(c) event by name and surviving payload key.)
 
-- [ ] **`emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test`
+- [x] **`emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test`
       (`rpc_events_test.clj` L191-204) asserts only `(= 3 (count @captured))`
       across three distinct never-gated event names (`ui/widget-specs-updated`,
       `command-result`, `error`).** Like the single-session test the prior
@@ -298,3 +303,7 @@
       `#{"ui/widget-specs-updated" "command-result" "error"}` (plus the count),
       individually pinning each never-gated event as emitted-when-a-different-
       session-is-implied, consistent with the strengthened single-session test.
+      (Done: the test now also asserts
+      `(= #{"ui/widget-specs-updated" "command-result" "error"}
+      (set (map :event @captured)))`, individually pinning each never-gated
+      event by name and consistent with the strengthened single-session test.)

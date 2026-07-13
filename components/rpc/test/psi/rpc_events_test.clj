@@ -61,7 +61,9 @@
       (rpc.events/emit-event! emit-frame! state
                               {:event "context/updated"
                                :data {:active-session-id "s2" :sessions []}})
-      (is (= 1 (count @captured))))))
+      (is (= 1 (count @captured)))
+      (is (= "context/updated" (:event (first @captured))))
+      (is (= "s2" (get-in (first @captured) [:data :active-session-id]))))))
 
 (deftest emit-event-session-switch-command-result-emits-for-non-focused-target-test
   (testing "a session_switch command-result whose target differs from focus is still emitted"
@@ -212,7 +214,9 @@
                               {:event "command-result" :data {:type "ok"}})
       (rpc.events/emit-event! emit-frame! state
                               {:event "error" :data {:error-code "e" :error-message "m"}})
-      (is (= 3 (count @captured))))))
+      (is (= 3 (count @captured)))
+      (is (= #{"ui/widget-specs-updated" "command-result" "error"}
+             (set (map :event @captured)))))))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
