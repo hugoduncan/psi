@@ -287,3 +287,10 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   an established idiom, not incidental coupling — so it is left as-is rather
   than over-reaching. `bb test --focus psi.rpc-events-test` → 20 tests, 64
   asserts, all pass.
+
+## Docs review pass (review-task-docs, ψ)
+
+- added 1 step: `doc/architecture.md` Projection delivery rule / `rpc` owns
+  does not name the new focus-based session-scoped-suppression delivery rule
+  (Slice-4 "no doc update needed" is too narrow — L55-62 owns RPC's
+  connection-local-focus delivery semantics). CHANGELOG is accurate.

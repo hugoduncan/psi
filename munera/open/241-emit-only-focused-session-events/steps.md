@@ -379,3 +379,28 @@
       to plain `"hi"` — `:text` itself is retained only because
       `assistant/delta` payload validation requires it, so it is now clearly
       incidental setup rather than the assertion target.)
+
+## Docs review follow-ups (review-task-docs, ψ)
+
+- [ ] **`doc/architecture.md`'s Projection delivery rule (L55-62) and the
+      `rpc` owns list (L86) do not reflect the new standing focus-based
+      delivery-gating behaviour this task introduced.** The task adds a
+      first-class, permanent RPC delivery rule — session-scoped events (payload
+      carries `:session-id`) are *suppressed entirely* for any session other
+      than the connection's effective focus, while cross-session events
+      (`context/updated`, `ui/*`, `command-result`, `error`) always emit — but
+      `doc/architecture.md` still describes RPC delivery only as "recomputing
+      payloads from current canonical state plus connection-local focus" (L61)
+      and "subscriber-aware fanout ... with per-connection payload
+      recomputation" (L86), which reads as payload *shaping*, not
+      focus-based *suppression*. The Slice-4 doc check concluded "no update
+      needed" because no section described gating "in that level of detail",
+      but L55-62 is precisely the section that owns RPC's connection-local-focus
+      delivery semantics and should now name the focused-only suppression rule
+      (and its lossless-on-refocus rehydration counterpart). Add a short
+      statement to the Projection delivery rule (or `rpc` owns) capturing:
+      session-scoped events are delivered only to the focused session;
+      cross-session events are focus-independent; refocus rehydrates the newly
+      focused session losslessly via the navigation path. This is the sole
+      user/AI-facing architecture doc for RPC delivery; CHANGELOG (accurate)
+      is release-note granularity, not the standing behaviour reference.
