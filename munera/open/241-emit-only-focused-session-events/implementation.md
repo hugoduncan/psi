@@ -41,3 +41,7 @@ No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
 ## Ambiguity review pass (design-review session, turn 2)
 
 - no ambiguity review feedback — the two crux ambiguities (nil-focus multi-session fallback; session/updated terminal-phase partition) plus resumed/rehydrated classification were already resolved into design.md by the prior batch. Remaining open question (Emacs client background-delta assumption) is a losslessness verification pinned by acceptance criterion (d), not an unresolved design-spec ambiguity. All design statements now single-interpretation.
+
+## Inconsistency review pass (design-review session, turn 3)
+
+- no inconsistency review feedback — verified the structural gate (`:session-id` presence) and the explicit non-gated enumeration agree in current code: `emit-command-result!`, `error`, and `context/updated` payloads carry no bare `:session-id`, so the enumeration faithfully describes the structural outcome (not a competing rule). resumed/rehydrated dual-classification already reconciled by prior pass; acceptance cross-session list is a subset of Scope's non-gated list; single-session-preserving claim consistent with nil-focus default-session fallback.
