@@ -33,3 +33,7 @@ All 4 design-steps resolved into design.md:
 - `context/updated` payload = `#{:active-session-id :sessions}` — carries per-session phase, and is the cross-session (never-gated) channel the tree relies on when a session's own `session/updated` is suppressed.
 
 No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
+
+## Architecture review pass (design-review session, turn 1)
+
+- no architectural review feedback — design is a strong fit: gate homed at RPC fanout boundary per doc/architecture.md projection-delivery rule; focus is transport-scoped RPC-owned fallback state; structural `:session-id` derivation honors single-source principle; emission stays a pure function of connection state + event. Prior architectural design-step already resolved.
