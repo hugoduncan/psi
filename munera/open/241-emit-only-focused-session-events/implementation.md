@@ -239,3 +239,21 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   setup hiding a cross-gate dependency); and no test pins the two gates as
   independent/conjunctive (a focused-session event on an unsubscribed topic is
   not proven suppressed).
+
+## Test-shaper follow-up pass 3 (ψ)
+
+- addressed 2 test-shaper pass-3 review steps (pure test additions/refactor;
+  no src change):
+  - Made the focus-gate tests' topic-subscription precondition explicit via a
+    new `make-focus-gate-state` helper that subscribes every event topic
+    (`subscribe-topics! rpc.events/event-topics`); routed all `emit-event!`
+    focus-gate tests through it. Removes the silent reliance on
+    `topic-subscribed?`'s empty-subs default-open, so a future change to that
+    default no longer reinterprets what these tests prove.
+  - Added `emit-event-focus-and-subscription-gates-are-independent-test`
+    pinning both directions of two-gate independence: a focused-session event
+    on an UNSUBSCRIBED topic is dropped by the subscription gate; a
+    subscribed-topic event for a NON-focused session is dropped by the focus
+    gate — neither gate short-circuits the other.
+  - `bb test --focus psi.rpc-events-test` → 20 tests, 64 asserts, all pass;
+    clj-kondo clean, clj-paren-repair clean.

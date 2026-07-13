@@ -310,7 +310,7 @@
 
 ## Test-shaper review follow-ups (ψ, pass 3)
 
-- [ ] **Every `emit-event!` focus-gate test in `rpc_events_test.clj` silently
+- [x] **Every `emit-event!` focus-gate test in `rpc_events_test.clj` silently
       depends on `topic-subscribed?`'s "empty subscriptions ⇒ all topics pass"
       default, so the focus-gate behaviour under test is coupled to an
       unrelated gate's default-open state.** These tests build `state` via
@@ -324,7 +324,13 @@
       subscribed (or that asserts/relies on the empty-subs default via a named
       wrapper) — so a future change to `topic-subscribed?`'s default does not
       silently reinterpret what these tests prove.
-- [ ] **No test pins that the focus gate and the topic-subscription gate are
+      (Done: added `make-focus-gate-state` helper that EXPLICITLY subscribes
+      every event topic (`subscribe-topics! rpc.events/event-topics`), routed
+      all focus-gate tests through it. The topic-subscription gate is now held
+      open by an explicit subscription, not by silent reliance on the
+      empty-subs default — a future change to `topic-subscribed?`'s default no
+      longer reinterprets these tests.)
+- [x] **No test pins that the focus gate and the topic-subscription gate are
       independent (conjunctive): a focused-session, session-scoped event that
       is NOT topic-subscribed must still be suppressed.** `emit-event!` ANDs
       `topic-subscribed?` with `focus-allows?` (`events.clj` L99-101), but the
@@ -338,3 +344,9 @@
       conversely (already covered) a subscribed-but-non-focused event is
       dropped by the focus gate. This closes the two-gate-independence gap the
       empty-subs default currently masks.
+      (Done: added `emit-event-focus-and-subscription-gates-are-independent-test`
+      with both directions — (1) focused-session event on an UNSUBSCRIBED
+      topic is suppressed by the subscription gate (focus-passing does not
+      override it); (2) subscribed-topic event for a NON-focused session is
+      suppressed by the focus gate. Pins the two gates as conjunctive/
+      independent — neither short-circuits the other.)

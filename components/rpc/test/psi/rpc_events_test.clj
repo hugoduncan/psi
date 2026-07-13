@@ -14,9 +14,26 @@
   [captured]
   (fn [frame] (swap! captured conj frame)))
 
+(defn- make-focus-gate-state
+  "Build RPC state for the focus-gate tests with EVERY event topic explicitly
+   subscribed, so the focus gate is exercised in isolation.
+
+   Rationale: `emit-event!` ANDs `topic-subscribed?` with `focus-allows?`.
+   `make-rpc-state` leaves `:subscribed-topics` empty, and `topic-subscribed?`
+   treats empty subscriptions as \"all topics pass\". Building focus-gate state
+   this way makes the topic-subscription gate unconditionally open by an
+   EXPLICIT subscription rather than by silent reliance on that default-open
+   behaviour, so these tests prove focus-gate behaviour without being coupled
+   to an unrelated gate's default. (Two-gate independence is pinned separately
+   by `emit-event-focus-and-subscription-gates-are-independent-test`.)"
+  [{:keys [session-id]}]
+  (let [state (rpc.state/make-rpc-state {:session-id session-id})]
+    (rpc.state/subscribe-topics! state rpc.events/event-topics)
+    state))
+
 (deftest emit-event-suppresses-session-scoped-event-for-non-focused-session-test
   (testing "session-scoped event for a non-focused session is not emitted"
-    (let [state     (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state     (make-focus-gate-state {:session-id "s1"})
           captured  (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -27,7 +44,7 @@
 
 (deftest emit-event-emits-session-scoped-event-for-focused-session-test
   (testing "session-scoped event for the focused session is emitted"
-    (let [state     (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state     (make-focus-gate-state {:session-id "s1"})
           captured  (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -39,7 +56,7 @@
 
 (deftest emit-event-nil-focus-uses-default-session-id-test
   (testing "with nil explicit focus, events for the default session emit and others are suppressed"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state nil)
@@ -54,7 +71,7 @@
 
 (deftest emit-event-cross-session-event-emits-regardless-of-focus-test
   (testing "context/updated (no :session-id in payload) emits while a different session has focus"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -67,7 +84,7 @@
 
 (deftest emit-event-session-switch-command-result-emits-for-non-focused-target-test
   (testing "a session_switch command-result whose target differs from focus is still emitted"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -83,7 +100,7 @@
 
 (deftest emit-event-legacy-prompt-assistant-message-suppressed-for-non-focused-session-test
   (testing "a legacy prompt-path assistant/message stamps :session-id so it gates like the streaming path"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)
           emit!       (fn [event data]
@@ -103,7 +120,7 @@
 
 (deftest emit-event-legacy-prompt-tree-switch-feedback-stamped-with-source-session-test
   (testing "a :tree-switch legacy prompt-path assistant/message is stamped with the SOURCE session-id (not the switch target) so it emits for the focused source and gates otherwise"
-    (let [state       (rpc.state/make-rpc-state {:session-id "src"})
+    (let [state       (make-focus-gate-state {:session-id "src"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)
           emit!       (fn [event data]
@@ -127,7 +144,7 @@
         (is (str/includes? (get-in frame [:data :content 0 :text]) "target")
             "switch target appears in the message text"))))
   (testing "the same :tree-switch feedback is suppressed once focus moves off the source session"
-    (let [state       (rpc.state/make-rpc-state {:session-id "src"})
+    (let [state       (make-focus-gate-state {:session-id "src"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)
           emit!       (fn [event data]
@@ -143,7 +160,7 @@
 
 (deftest emit-event-after-refocus-suppresses-previous-session-events-test
   (testing "after focus moves to session B, session-scoped events stamped with A's session-id are suppressed"
-    (let [state       (rpc.state/make-rpc-state {:session-id "a"})
+    (let [state       (make-focus-gate-state {:session-id "a"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "b")
@@ -176,7 +193,7 @@
 
 (deftest emit-event-single-session-connection-behaviour-preserved-test
   (testing "a single-session connection emits every session-scoped event (common case)"
-    (let [state       (rpc.state/make-rpc-state {:session-id "only"})
+    (let [state       (make-focus-gate-state {:session-id "only"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (doseq [event single-session-events]
@@ -193,7 +210,7 @@
 
 (deftest emit-event-suppresses-tool-start-for-non-focused-session-test
   (testing "a tool/* session-scoped event for a non-focused session is suppressed"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -204,7 +221,7 @@
 
 (deftest emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test
   (testing "non-session-scoped topics emit regardless of focus"
-    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+    (let [state       (make-focus-gate-state {:session-id "s1"})
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "s1")
@@ -217,6 +234,37 @@
       (is (= 3 (count @captured)))
       (is (= #{"ui/widget-specs-updated" "command-result" "error"}
              (set (map :event @captured)))))))
+
+(deftest emit-event-focus-and-subscription-gates-are-independent-test
+  (testing "focus-passing does not override an unsubscribed topic: a focused-session, session-scoped event on a topic that is NOT subscribed is still suppressed by the subscription gate"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      ;; Subscribe to a topic set that EXCLUDES the emitted event's topic.
+      (rpc.state/subscribe-topics! state #{"context/updated"})
+      ;; The event is stamped with the FOCUSED session-id, so `focus-allows?`
+      ;; passes it; it must still be dropped because its topic is unsubscribed.
+      ;; This pins the two gates as conjunctive/independent: neither gate
+      ;; short-circuits the other.
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data (session-scoped-event-data "assistant/delta" "s1")})
+      (is (= [] @captured)
+          "focus-passing must not override an unsubscribed topic")))
+  (testing "conversely, a subscribed-but-non-focused session-scoped event is dropped by the focus gate (two-gate independence, other direction)"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      ;; Subscribe to the emitted topic (subscription gate open) but stamp the
+      ;; payload with a NON-focused session-id (focus gate closed).
+      (rpc.state/subscribe-topics! state #{"assistant/delta"})
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "assistant/delta"
+                               :data (session-scoped-event-data "assistant/delta" "s2")})
+      (is (= [] @captured)
+          "subscription-passing must not override the focus gate"))))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
