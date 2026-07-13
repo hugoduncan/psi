@@ -148,3 +148,7 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
 
 - addressed 3 review steps: renamed the `session_switch` cross-session `command-result` key from `:session-id` to `:target-session-id` (`command_results.clj`) and updated the emacs-ui consumer (`psi-events.el`) + its dispatch test; the structural focus gate is unchanged (no event-string special-case). Added `emit-event-session-switch-command-result-emits-for-non-focused-target-test` (`rpc_events_test.clj`) proving a non-focused-target switch still emits. Corrected the Slice-2 audit note (steps.md) and the CHANGELOG `[Unreleased]` entry.
 - Verified: `bb test --focus psi.rpc-events-test` (16 tests) and `psi.rpc-command-results-test` (3 tests) pass; lint clean. The emacs `psi-dispatch-command-test.el` session-switch test passes; the two failures there (`psi-resume-explicit-path-command-clears-transcript-via-rehydrate-events`, `psi-session-rehydrated-event-replays-messages-without-get-messages`) are pre-existing (reproduce with my changes stashed) and unrelated to this change.
+
+## Implementation review pass 2 (ψ)
+
+- added 2 steps: legacy prompt-path `assistant/message` (`handle-prompt-command-result!`, reached via the RPC `"prompt"` op) omits `:session-id`, so the structural gate never gates it — an undocumented in-event-type asymmetry vs the `:session-id`-stamped streaming path, plus missing test coverage for either branch of that asymmetry.
