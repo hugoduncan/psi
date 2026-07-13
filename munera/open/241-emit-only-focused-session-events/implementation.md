@@ -271,3 +271,19 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   is retained only because `assistant/delta` payload validation requires it
   (dropping it emits an error frame), so distinguishing values collapse to plain
   `"hi"` and `:text` is now clearly incidental setup. Tests: 20 pass, 0 fail.
+
+## Test-shaper review pass 5 (ψ)
+
+- no new steps. Independently re-applied the test-shaper lens to this task's
+  added tests (rpc_events_test.clj focus-gate suite; the two rpc_session_
+  navigation_test.clj trailing-snapshot cases). Prior passes 1-4 already
+  resolved the meaningful-failure/consistency/coupling issues (per-frame
+  `:session-id` assertions, `tool/*` gating coverage, prose→`str/includes?`,
+  set-equality over count-only, explicit topic-subscription precondition,
+  two-gate independence). Verified determinism: the added navigation snapshot
+  tests use `run-loop` with default `wait-ms=0` (synchronous, no time-based
+  flakiness). The remaining `[:content 0 :text]` index in the tree-switch
+  feedback test reads the stable `assistant/message` `:content` block shape —
+  an established idiom, not incidental coupling — so it is left as-is rather
+  than over-reaching. `bb test --focus psi.rpc-events-test` → 20 tests, 64
+  asserts, all pass.
