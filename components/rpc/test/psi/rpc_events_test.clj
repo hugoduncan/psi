@@ -164,14 +164,20 @@
           captured    (atom [])
           emit-frame! (captured-emit-frame! captured)]
       (rpc.state/set-focus-session-id! state "b")
+      ;; :text is required by assistant/delta payload validation (incidental
+      ;; setup); the load-bearing discriminator asserted below is :session-id.
       (rpc.events/emit-event! emit-frame! state
                               {:event "assistant/delta"
-                               :data {:session-id "a" :text "background"}})
+                               :data {:session-id "a" :text "hi"}})
       (rpc.events/emit-event! emit-frame! state
                               {:event "assistant/delta"
-                               :data {:session-id "b" :text "foreground"}})
+                               :data {:session-id "b" :text "hi"}})
       (is (= 1 (count @captured)))
-      (is (= "foreground" (get-in (first @captured) [:data :text]))))))
+      ;; Pin the survivor by the gate's actual discriminator (payload
+      ;; :session-id), matching the sibling per-frame assertion style — the
+      ;; focus gate keys on :session-id, so :session-id "b" is the surviving
+      ;; frame's contract.
+      (is (= "b" (get-in (first @captured) [:data :session-id]))))))
 
 (defn- session-scoped-event-data
   "Payload data for a session-scoped event, stamped with session-id."

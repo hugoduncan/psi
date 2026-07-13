@@ -353,7 +353,7 @@
 
 ## Test-shaper review follow-ups (ψ, pass 4)
 
-- [ ] **`emit-event-after-refocus-suppresses-previous-session-events-test`
+- [x] **`emit-event-after-refocus-suppresses-previous-session-events-test`
       (`rpc_events_test.clj` L161-172) asserts the survivor via its payload
       `:text` (`(= "foreground" (get-in (first @captured) [:data :text]))`)
       rather than its `:session-id`, coupling the meaningful-failure signal to
@@ -372,3 +372,10 @@
       pinning the surviving frame by the gate's actual discriminator and
       matching the sibling assertion style; the `:text` payloads can then be
       simplified/dropped as incidental setup.
+      (Done: the test now asserts
+      `(= "b" (get-in (first @captured) [:data :session-id]))`, pinning the
+      survivor by the gate's actual discriminator and matching the sibling
+      per-frame assertion style. The distinguishing `:text` values are dropped
+      to plain `"hi"` — `:text` itself is retained only because
+      `assistant/delta` payload validation requires it, so it is now clearly
+      incidental setup rather than the assertion target.)

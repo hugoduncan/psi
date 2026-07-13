@@ -264,3 +264,10 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   `:text` (a non-gate field) instead of `:session-id`, diverging from the
   established per-frame `:session-id` assertion style and weakening the
   meaningful-failure signal for the gate's actual discriminator.
+
+- addressed 1 test-shaper pass-4 review step: `emit-event-after-refocus-...`
+  now asserts the survivor by payload `:session-id` (`"b"`) — the focus gate's
+  actual discriminator — matching the sibling per-frame assertion style. `:text`
+  is retained only because `assistant/delta` payload validation requires it
+  (dropping it emits an error frame), so distinguishing values collapse to plain
+  `"hi"` and `:text` is now clearly incidental setup. Tests: 20 pass, 0 fail.
