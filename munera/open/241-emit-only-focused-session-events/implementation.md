@@ -294,3 +294,6 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   does not name the new focus-based session-scoped-suppression delivery rule
   (Slice-4 "no doc update needed" is too narrow — L55-62 owns RPC's
   connection-local-focus delivery semantics). CHANGELOG is accurate.
+
+- addressed 1 docs-review follow-up: documented the focus-gated RPC delivery
+  rule in `doc/architecture.md` (Projection delivery rule + `rpc` owns).

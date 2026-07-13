@@ -61,6 +61,16 @@ For runtime-owned interactive projections, canonical state changes first and pub
 - RPC delivers those projections to subscribed clients by recomputing payloads from current canonical state plus connection-local focus
 - runtime-owned context/session-tree and shared UI updates are event-driven rather than polling-driven
 
+RPC delivery is also focus-gated per connection: session-scoped events (payloads
+that carry a `:session-id`, e.g. `assistant/*`, `tool/*`, `session/updated`,
+`footer/updated`) are delivered only when their `:session-id` matches the
+connection's effective focus, and are suppressed entirely for any other session.
+Cross-session events (`context/updated`, `ui/*`, `command-result`, `error`) carry
+no bare `:session-id` and always emit, focus-independently. This loses no
+information: refocusing a session rehydrates it losslessly via the
+navigation/rehydration bundle, which sets focus before emitting the newly focused
+session's snapshots so they pass the gate.
+
 ### Ownership target
 
 #### `app-runtime` owns
@@ -84,6 +94,7 @@ For runtime-owned interactive projections, canonical state changes first and pub
 - explicit `session-id` routing whenever the operation can reasonably carry it
 - RPC-local focus pointer only as transport-scoped adapter fallback state
 - subscriber-aware fanout of runtime-owned projection invalidations (`:projection/context-changed`, `:projection/ui-changed`) with per-connection payload recomputation
+- per-connection focus-gated delivery: session-scoped events emit only for the connection's focused session; cross-session events emit focus-independently; refocus rehydrates the newly focused session losslessly
 
 RPC should not be the long-term home for selector semantics, footer semantics,
 or session navigation domain logic.

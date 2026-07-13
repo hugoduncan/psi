@@ -382,7 +382,7 @@
 
 ## Docs review follow-ups (review-task-docs, ψ)
 
-- [ ] **`doc/architecture.md`'s Projection delivery rule (L55-62) and the
+- [x] **`doc/architecture.md`'s Projection delivery rule (L55-62) and the
       `rpc` owns list (L86) do not reflect the new standing focus-based
       delivery-gating behaviour this task introduced.** The task adds a
       first-class, permanent RPC delivery rule — session-scoped events (payload
@@ -404,3 +404,8 @@
       focused session losslessly via the navigation path. This is the sole
       user/AI-facing architecture doc for RPC delivery; CHANGELOG (accurate)
       is release-note granularity, not the standing behaviour reference.
+      (Done: added a focus-gating delivery paragraph to the Projection delivery
+      rule and a focus-gated-delivery bullet to the `rpc` owns list in
+      `doc/architecture.md`, naming the session-scoped suppression rule, the
+      cross-session focus-independent events, and the lossless-on-refocus
+      rehydration counterpart.)
