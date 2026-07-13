@@ -61,6 +61,10 @@ Task facts an implementer will need:
 - Construction `session-id` originates from `session-ctx-factory` (runtime.clj `start-runtime!`, ~L96); `default-session-id-in` (transport.clj L95) = `(some-> (ss/list-context-sessions-in ctx) first :session-id)`. Equivalence of these two at setup is the unverified assertion.
 - Relevant files: `components/rpc/src/psi/rpc/state.clj` (make-rpc-state, initialize-transport-state!, focus-session-id reader), `components/rpc/src/psi/rpc/transport.clj` (default-session-id-in), `components/rpc/src/psi/rpc/runtime.clj` (session-ctx-factory session-id source).
 
+## Plan-review session (re-run), turn 1 (plan/steps ambiguity review)
+
+- no ambiguity review feedback — the frozen-vs-live `:default-session-id` ambiguity (only plan/steps ambiguity previously surfaced) is already an `[x]` design-step and reconciled across design (Constraints "Frozen vs live default"), plan (Key decision 1a/1b), and steps (Slice 1 verify step). Verified code grounding: `make-rpc-state` seeds `:focus-session-id` from `session-id`, `initialize-transport-state!` merge keeps existing connection, `emit-event!` hosts the `topic-subscribed?` gate, `default-session-id-in` exists. Plan/steps effective-focus formula, gate placement, silent-suppression, and slice order are single-interpretation.
+
 ## Plan-review session, turn 2 (plan/steps inconsistency review)
 
 - no inconsistency review feedback — plan slice order, effective-focus formula, gate placement, silent-suppression semantics, initialize-transport-state! preservation, acceptance tests, and rehydration ordering all agree across design/plan/steps/design-steps. The design↔plan frozen-vs-live `default-session-id` divergence is already captured by the turn-1 ambiguity design-step; not re-filed here.
