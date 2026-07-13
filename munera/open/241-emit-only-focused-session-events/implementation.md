@@ -215,3 +215,11 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   drops prose coupling). Extracted `session-scoped-event-data` helper +
   `single-session-events` vec. `bb test --focus psi.rpc-events-test` → 19 pass;
   clj-kondo clean.
+
+## Test-shaper review pass 2 (ψ)
+
+- added 2 steps: two positive-emission emit tests (`cross-session-event-emits`
+  acceptance-(c) and `ui-and-command-result-and-error-emit`) still assert
+  count-only, inconsistent with the per-frame `:event` assertion style the
+  prior test-shaper pass established and leaving the never-gated event names
+  un-pinned.

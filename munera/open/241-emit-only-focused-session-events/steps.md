@@ -265,3 +265,36 @@
       `(str/includes? … "target")` instead of the exact literal, keeping the
       source-vs-target classification contract while dropping the incidental
       prose coupling. Added `clojure.string` to the ns requires.)
+
+## Test-shaper review follow-ups (ψ, pass 2)
+
+- [ ] **`emit-event-cross-session-event-emits-regardless-of-focus-test`
+      (`rpc_events_test.clj` L54-63) asserts only `(= 1 (count @captured))`,
+      giving weaker meaningful-failure signal than its sibling emit tests and
+      inconsistent assertion style.** Every other positive-emission emit test
+      (`…-emits-session-scoped-event-for-focused-session-test`,
+      `…-session-switch-command-result-emits-…`,
+      `…-legacy-prompt-assistant-message-…`) asserts both the count AND the
+      captured frame's `:event` (and often payload key). This cross-session
+      test — the acceptance-criterion (c) case for `context/updated`, the
+      canonical never-gated event — asserts only the count, so a regression
+      that emitted a *different* event (or dropped `context/updated` while an
+      unrelated event leaked through) would still count 1 and pass. Strengthen
+      to also assert `(= "context/updated" (:event (first @captured)))` (and,
+      per the sibling tests, that the payload survives — e.g.
+      `:active-session-id`), matching the consistent per-frame assertion style
+      and closing the meaningful-failure gap for the acceptance-(c) event.
+
+- [ ] **`emit-event-ui-and-command-result-and-error-emit-regardless-of-focus-test`
+      (`rpc_events_test.clj` L191-204) asserts only `(= 3 (count @captured))`
+      across three distinct never-gated event names (`ui/widget-specs-updated`,
+      `command-result`, `error`).** Like the single-session test the prior
+      test-shaper pass strengthened, a count-only check would pass if one of
+      the three were wrongly suppressed while another double-emitted, and it
+      does not pin *which* events survived. This is the ONLY coverage that the
+      `ui/*`, `command-result` (`type "ok"`), and `error` topics emit
+      regardless of focus — the design's non-session-scoped enumeration.
+      Strengthen to assert the emitted event-name *set* equals
+      `#{"ui/widget-specs-updated" "command-result" "error"}` (plus the count),
+      individually pinning each never-gated event as emitted-when-a-different-
+      session-is-implied, consistent with the strengthened single-session test.
