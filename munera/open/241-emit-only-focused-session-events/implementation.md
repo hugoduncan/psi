@@ -46,6 +46,10 @@ No SCOPE_QUESTION items in this batch. No items left unchecked/blocked.
 
 - no inconsistency review feedback — verified the structural gate (`:session-id` presence) and the explicit non-gated enumeration agree in current code: `emit-command-result!`, `error`, and `context/updated` payloads carry no bare `:session-id`, so the enumeration faithfully describes the structural outcome (not a competing rule). resumed/rehydrated dual-classification already reconciled by prior pass; acceptance cross-session list is a subset of Scope's non-gated list; single-session-preserving claim consistent with nil-focus default-session fallback.
 
+## Plan-review session, turn 1 (plan/steps ambiguity review)
+
+- plan ambiguity review added 1 new design step: plan Key decision 1 freezes `:default-session-id` at construction, but design defines the nil-focus fallback as the live `default-session-id-in` (first-listed session); frozen-vs-live equivalence unverified at setup and divergence-on-session-set-change unspecified.
+
 ## Design-review session outcome (3-turn batch: architecture + ambiguity + inconsistency)
 
 - This review batch added NO new design-steps. All four pre-existing design-steps were already resolved into design.md by the earlier batch; nothing new to address from these three passes. Implementation can proceed against the current design as-is.
