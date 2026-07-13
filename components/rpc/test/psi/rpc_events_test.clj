@@ -61,6 +61,22 @@
                                :data {:active-session-id "s2" :sessions []}})
       (is (= 1 (count @captured))))))
 
+(deftest emit-event-session-switch-command-result-emits-for-non-focused-target-test
+  (testing "a session_switch command-result whose target differs from focus is still emitted"
+    (let [state       (rpc.state/make-rpc-state {:session-id "s1"})
+          captured    (atom [])
+          emit-frame! (captured-emit-frame! captured)]
+      (rpc.state/set-focus-session-id! state "s1")
+      ;; Target key must not be a bare :session-id, else the structural focus
+      ;; gate would suppress this never-gated cross-session notification.
+      (rpc.events/emit-event! emit-frame! state
+                              {:event "command-result"
+                               :data {:type "session_switch"
+                                      :target-session-id "s2"}})
+      (is (= 1 (count @captured)))
+      (is (= "command-result" (:event (first @captured))))
+      (is (= "s2" (get-in (first @captured) [:data :target-session-id]))))))
+
 (deftest emit-event-after-refocus-suppresses-previous-session-events-test
   (testing "after focus moves to session B, session-scoped events stamped with A's session-id are suppressed"
     (let [state       (rpc.state/make-rpc-state {:session-id "a"})

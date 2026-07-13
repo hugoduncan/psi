@@ -265,7 +265,7 @@ while keeping `context/updated` authoritative for whether the tree is present."
       ("quit"
        (psi-emacs--request-frontend-exit))
       ("session_switch"
-       (let ((sid (psi-emacs--event-data-get data '(:session-id session-id))))
+       (let ((sid (psi-emacs--event-data-get data '(:target-session-id target-session-id))))
          (when (and (stringp sid) (not (string-empty-p sid)))
            (psi-emacs--request-switch-session-by-id psi-emacs--state sid))))
       (_

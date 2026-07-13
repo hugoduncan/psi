@@ -120,8 +120,12 @@
                                                       " to " (pr-str (:session-name cmd-result)))})
 
       (:tree-switch :session-switch)
+      ;; Cross-session command-result: carry the switch target under a
+      ;; distinct key (not a bare `:session-id`) so the focus gate's
+      ;; structural session-scoped rule does not suppress this never-gated
+      ;; notification when the target differs from the connection focus.
       (emit/emit-command-result! emit! {:type "session_switch"
-                                        :session-id (:session-id cmd-result)})
+                                        :target-session-id (:session-id cmd-result)})
 
       :frontend-action
       (emit/emit-frontend-action-request! emit! request-id cmd-result)

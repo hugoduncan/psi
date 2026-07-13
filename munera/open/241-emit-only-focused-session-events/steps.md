@@ -41,9 +41,13 @@
       focus is on a different session.
 - [x] Test: `ui/*`, `command-result`, `error` emit regardless of focus.
 - [x] Audit all emission sites to confirm no cross-session event payload
-      carries `:session-id` (would be wrongly gated); raise if found. (No
-      finding — `context-updated-payload`, `command-result`, `error`, and all
-      `ui/*` payloads carry no bare `:session-id` key.)
+      carries `:session-id` (would be wrongly gated); raise if found.
+      (Corrected after review: the `session_switch` cross-session
+      `command-result` DID carry a bare `:session-id`, so it was wrongly
+      gated. Fixed by renaming its key to `:target-session-id` in
+      `command_results.clj` — see "Review follow-ups" below. `error` and all
+      `ui/*` payloads carry no bare `:session-id`; `context-updated-payload`
+      carries `:active-session-id`, not a bare `:session-id`.)
 - [x] Run `bb test --focus psi.rpc-events-test` and lint changed files.
 
 ## Slice 3 — Integration: navigation/rehydration ordering
@@ -79,7 +83,7 @@
 
 ## Review follow-ups (implementation review)
 
-- [ ] **Cross-session `command-result` DOES carry a bare `:session-id` — the
+- [x] **Cross-session `command-result` DOES carry a bare `:session-id` — the
       Slice-2 audit "No finding" claim is incorrect.**
       `command-results/handle-command-result!`
       (`components/rpc/src/psi/rpc/session/command_results.clj` L122-124) emits
@@ -97,12 +101,17 @@
       payload (e.g. `:switched-session-id` / `:target-session-id`) so the
       structural rule and the intended never-gated classification agree — do
       not special-case the event string in the gate.
-- [ ] Add a characterization test asserting a `session_switch` `command-result`
+      (Fixed: `command_results.clj` now emits `:target-session-id` instead of a
+      bare `:session-id`; `psi-events.el` reads `:target-session-id`. The gate
+      is unchanged — no event-string special-casing.)
+- [x] Add a characterization test asserting a `session_switch` `command-result`
       whose `:session-id` differs from the current focus is still emitted
       (protects the intended cross-session classification against the structural
       gate; acceptance criterion (c) currently only covers `context/updated`,
       which has no bare `:session-id`, so it does not catch this case).
-- [ ] Correct the two now-inaccurate claims that `command-result` always emits
+      (Added `emit-event-session-switch-command-result-emits-for-non-focused-target-test`
+      in `rpc_events_test.clj`.)
+- [x] Correct the two now-inaccurate claims that `command-result` always emits
       regardless of focus: the Slice-2 audit note in this file (L44-46) and the
       CHANGELOG `[Unreleased]` entry (`command-result … continue to emit
       regardless of focus`). Both are false while the `session_switch` payload

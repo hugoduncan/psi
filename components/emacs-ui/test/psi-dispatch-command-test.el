@@ -166,7 +166,7 @@ filtered against the old selected session and the stale footer survives."
             (psi-emacs--handle-rpc-event
              '((:event . "command-result")
                (:data . ((:type . "session_switch")
-                         (:session-id . "s-new"))))))
+                         (:target-session-id . "s-new"))))))
           (setq rpc-calls (nreverse rpc-calls))
           (should (equal '("switch_session" "get_messages" "query_eql")
                          (mapcar #'car rpc-calls)))
