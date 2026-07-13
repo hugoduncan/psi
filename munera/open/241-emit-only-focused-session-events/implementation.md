@@ -231,3 +231,11 @@ Resolution recorded (frozen-vs-live `:default-session-id`):
   (now asserts emitted event-name set `#{ui/widget-specs-updated command-result
   error}`), closing the count-only meaningful-failure gaps for the never-gated
   events. `psi.rpc-events-test` green (19 tests, 62 asserts); lint clean.
+
+## Test-shaper review pass 3 (ψ)
+
+- added 2 steps: the `emit-event!` focus-gate tests silently rely on
+  `topic-subscribed?`'s empty-subscriptions default-open behaviour (incidental
+  setup hiding a cross-gate dependency); and no test pins the two gates as
+  independent/conjunctive (a focused-session event on an unsubscribed topic is
+  not proven suppressed).

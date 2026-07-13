@@ -307,3 +307,34 @@
       `(= #{"ui/widget-specs-updated" "command-result" "error"}
       (set (map :event @captured)))`, individually pinning each never-gated
       event by name and consistent with the strengthened single-session test.)
+
+## Test-shaper review follow-ups (ψ, pass 3)
+
+- [ ] **Every `emit-event!` focus-gate test in `rpc_events_test.clj` silently
+      depends on `topic-subscribed?`'s "empty subscriptions ⇒ all topics pass"
+      default, so the focus-gate behaviour under test is coupled to an
+      unrelated gate's default-open state.** These tests build `state` via
+      `make-rpc-state` (empty `:subscribed-topics`) and never subscribe to the
+      topics they emit; they pass only because `topic-subscribed?` returns
+      `true` when `subs` is empty (`events.clj` L78-79). This is incidental
+      setup that hides intent (single_concern / behavior_focused): the focus
+      assertions rely on a second gate being open, and nothing in the test
+      makes that dependency explicit. Make the focus-gate tests' precondition
+      explicit — e.g. a shared helper that seeds state with the emitted topic
+      subscribed (or that asserts/relies on the empty-subs default via a named
+      wrapper) — so a future change to `topic-subscribed?`'s default does not
+      silently reinterpret what these tests prove.
+- [ ] **No test pins that the focus gate and the topic-subscription gate are
+      independent (conjunctive): a focused-session, session-scoped event that
+      is NOT topic-subscribed must still be suppressed.** `emit-event!` ANDs
+      `topic-subscribed?` with `focus-allows?` (`events.clj` L99-101), but the
+      only coverage of their interaction is the accidental empty-subs default
+      above. If a refactor made `focus-allows?` short-circuit or bypass
+      `topic-subscribed?` (or vice versa), the current suite would not catch
+      it. Add a characterization test: subscribe to a specific topic set that
+      EXCLUDES the emitted event, emit a session-scoped event for the FOCUSED
+      session, and assert it is suppressed (dropped by the subscription gate)
+      — pinning that focus-passing does not override an unsubscribed topic, and
+      conversely (already covered) a subscribed-but-non-focused event is
+      dropped by the focus gate. This closes the two-gate-independence gap the
+      empty-subs default currently masks.
