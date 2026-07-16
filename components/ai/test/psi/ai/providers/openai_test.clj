@@ -403,3 +403,27 @@
                 @events))
       (is (some #(= :toolcall-end (:type %)) @events))
       (is (some #(= :done (:type %)) @events)))))
+
+(deftest unresolved-model-fails-fast-test
+  ;; An unknown/unresolved model key yields nil from model lookup; the
+  ;; provider boundary must reject it rather than sending `:model null`
+  ;; and hanging the request.
+  (testing "nil model throws on stream dispatch"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo #"resolved model"
+         ((:stream openai/provider) (conv/create "sys") nil {} identity))))
+  (testing "nil model throws on execute dispatch"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo #"resolved model"
+         ((:execute openai/provider) (conv/create "sys") nil {}))))
+  (testing "model without :id throws"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo #"resolved model"
+         ((:execute openai/provider) (conv/create "sys") {:api :openai-completions} {}))))
+  (testing "resolved model with :id passes validation"
+    (with-redefs [http/post (fn [_ _] {:body (stream-body "data: [DONE]\n\n")})]
+      (is (nil? ((:stream openai/provider)
+                 (conv/create "sys")
+                 (models/get-model :gpt-5.1)
+                 {:api-key "t"}
+                 identity))))))
