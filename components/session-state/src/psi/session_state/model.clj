@@ -394,6 +394,9 @@
    #"(?i)overloaded"
    #"(?i)status[ .:_]429"
    #"(?i)status[ .:_]5\d\d"
+   #"(?i)an error occurred while processing your request"
+   #"(?i)\bserver_error\b"
+   #"(?i)internal server error"
    #"(?i)premature end of chunk coded message body"
    #"(?i)closing chunk expected"])
 
@@ -412,6 +415,14 @@
 
 (def ^:private overloaded-error-patterns
   [#"(?i)overloaded"])
+
+(def ^:private server-error-patterns
+  ;; Canonical OpenAI transient server error delivered as a mid-stream
+  ;; error/response.failed event without an HTTP status. The provider
+  ;; explicitly invites a retry ("You can retry your request").
+  [#"(?i)an error occurred while processing your request"
+   #"(?i)\bserver_error\b"
+   #"(?i)internal server error"])
 
 (def ^:private invalid-request-error-patterns
   [#"(?i)invalid request"
@@ -463,7 +474,8 @@
           (some #(re-find % message) invalid-request-error-patterns))
       :invalid-request
 
-      (contains? #{500 502 503 529} http-status)
+      (or (contains? #{500 502 503 529} http-status)
+          (some #(re-find % message) server-error-patterns))
       :provider-unavailable
 
       (some #(re-find % message) transport-error-patterns)

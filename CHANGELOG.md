@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Fixed
+- Transient OpenAI server errors delivered as a mid-stream `error`/`response.failed` event without an HTTP status (the canonical "An error occurred while processing your request … You can retry your request … Please include the request ID …" message, and `server_error`/"internal server error" wording) are now classified as retryable provider-unavailable errors and go through automatic provider-boundary retry instead of failing the turn immediately.
+
 ### Changed
 - RPC now streams session-scoped events (`assistant/*`, `tool/*`, `session/updated`, `footer/updated`, `session/resumed`, `session/rehydrated`) only for the connection's currently focused session; background sessions no longer push their activity over the wire. Cross-session events (`context/updated`, `ui/*`, `command-result`, `error`) continue to emit regardless of focus; cross-session command-results carry their switch target under `:target-session-id` (not a bare `:session-id`) so the structural focus gate never suppresses them. Refocusing a session rehydrates its full current content via the existing navigation path, so no information is lost.
 
