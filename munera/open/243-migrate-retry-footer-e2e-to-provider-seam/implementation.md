@@ -40,6 +40,17 @@
   ("Verification" bullet: baseline 2450/24/38, with-change 2451/24/38 — the +1
   pass being the added test).
 
+## Plan-review ambiguity pass
+
+- ambiguity review added 1 new design step: plan conflates the two
+  `execute-prepared-request! [ai-ctx ctx …]` context params. Verified against
+  source that provider resolution uses only the first `ai-ctx` arg
+  (`do-stream!` → `stream-response-in` → `context-provider-registry ai-ctx`),
+  currently `{:provider-registry (atom {})}`; the second `ctx` carries session
+  state / `:provider-retry-sleep-fn` and is not consulted for resolution. The
+  stub `:provider-registry` (from `create-context`) must replace the first
+  `ai-ctx` arg, not be merged into the app-runtime `ctx`.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
