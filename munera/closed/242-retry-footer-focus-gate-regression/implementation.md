@@ -768,6 +768,17 @@
   `:status-line`; `required-event-payload-keys` is a required-keys set, not an
   allow-list). No new design-steps.
 
+## design-review session (all three turns) — aggregate outcome
+
+- No new design-steps from any turn (architecture, ambiguity, inconsistency). No
+  design-step-addressing follow-up task is warranted from this session: the only
+  design-step (AC1 contingency) is already resolved in design.md. If any
+  AC1-adjacent work arises later, keep failing-then-passing contingent on the
+  Approach step-1 focused-vs-background diagnosis, never widen frozen scope, and
+  preserve the task-241 no-cross-session-leakage invariant. Authoritative
+  references: doc/architecture.md §"Projection delivery rule" (focus-gated
+  `footer/updated`); components/rpc/src/psi/rpc/events.clj (`focus-allows?`).
+
 ## code-shaper review session (7th pass) — outcome
 
 - No new follow-up steps. Re-reviewed the retry-footer E2E harness against
