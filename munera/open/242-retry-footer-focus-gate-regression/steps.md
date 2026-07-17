@@ -269,3 +269,32 @@ If background-only (working as intended):
       sleep-fn / drain path does not silently make the assertion pass
       vacuously (the focused sub-test is already guarded by
       `await-retry-footer-text!`; the background sub-test has no such guard).
+
+## Slice 13 — Test-review follow-ups (test-shaper pass, 5th)
+
+- [ ] Slice 10's dedup claim is inaccurate; the `expected-text` derivation
+      remains triplicated. Slice 10 (steps.md L225-226) and its implementation.md
+      note both state routing the sibling through `await-retry-footer-text!`
+      "collapses the remaining duplicated sleep-fn / `expected-text`
+      (`(str "retry in " (quot (long delay-ms) 1000) "s")`) logic". It did not:
+      the helper takes `expected-text` as a *parameter*, so the identical
+      delay→text derivation
+      `(fn [delay-ms] (await-retry-footer-text! <captured> (str "retry in " (quot (long delay-ms) 1000) "s")))`
+      is still hand-built at **three** `:provider-retry-sleep-fn` call sites
+      (rpc_prompt_test.clj L258 focused, L313 background pre-gate control, L388
+      sibling). Slice 10 unified only the await/timeout mechanism, not the
+      expected-text-from-delay logic. This is a `consistent`/`economical`
+      residual (incidental variation across three copies: a footer-format change
+      to the `"retry in Ns"` string must be edited in three places) **and** a
+      doc↔code coherence gap (a completed slice claims a dedup the code does not
+      reflect). Fix: fold the delay→expected-text derivation into a single
+      authority — either have `await-retry-footer-text!` accept `delay-ms` and
+      derive the `"retry in Ns"` text internally (call sites pass only
+      `captured` + `delay-ms`), or extract a named
+      `retry-footer-sleep-fn`/`expected-retry-text` builder the three sites
+      share — so the sleep-fn is constructed once. If judged out of scope for
+      task 242's frozen coverage or better folded into task 243's harness
+      rewrite, correct the overstated Slice-10 claim (steps.md + implementation.md)
+      to say only the await/timeout was unified and forward the expected-text
+      dedup explicitly to 243 rather than leaving the inaccurate
+      "collapses ... `expected-text`" wording standing.

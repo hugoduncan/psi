@@ -392,3 +392,11 @@
 - Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 60 assertions,
   +4 from the pre-gate control), `clj-kondo` clean, `clj-paren-repair` clean.
   Test-only; no product/behaviour change, no CHANGELOG entry.
+
+## task-test-review session (test-shaper pass, 5th) — outcome
+
+- added 1 step (Slice 13): Slice 10's dedup claim is inaccurate — the
+  `expected-text` derivation `(str "retry in " (quot (long delay-ms) 1000) "s")`
+  is still triplicated across three `:provider-retry-sleep-fn` sites; Slice 10
+  unified only the await/timeout mechanism, not the delay→text logic
+  (a `consistent`/`economical` residual + a doc↔code coherence gap).
