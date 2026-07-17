@@ -141,6 +141,22 @@
   framing needs correcting. plan.md and steps.md are already consistent — do not
   re-touch them.
 
+## Plan-follow-up pass (preceding plan-review batch — no attributed steps.md work)
+
+- Batch baseline: previous plan-follow-up completion `650992100`; the immediately
+  preceding plan-review batch is `7c7ce6651` (ambiguity turn) + `b207ac329`
+  (inconsistency turn) + `565f34746` (notes), run back-to-back. Baseline =
+  parent of oldest batch commit = `650992100`.
+- `git diff 650992100..HEAD -- steps.md` is **empty**: the batch added no new
+  checklist lines to steps.md. Candidate work set for this plan-follow-up is
+  therefore empty — nothing executed, plan.md/steps.md unchanged.
+- The one checklist line the batch added went to **design-steps.md** (open
+  inconsistency: design.md Scope still asserts "two `with-redefs` sites" /
+  sibling "inlines its own", contradicting reconciled plan/steps + code). That
+  is a design-editable step, out of scope for the plan-follow-up profile
+  (design.md read-only here). Next actor: a design-editable pass must correct
+  design.md **Scope** to the single-shared-driver shape to fully close it.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
