@@ -114,6 +114,16 @@
   left underspecified. Residual design.md Scope "two with-redefs sites" is an
   inconsistency-turn concern (design.md), not a plan/steps ambiguity.
 
+## Plan-review session — inconsistency turn (batch second turn)
+
+- inconsistency review added 1 new design step: design.md Scope still asserts
+  "two `with-redefs` sites" (sibling "inlines its own") — contradicts the
+  already-reconciled plan/steps and the verified single-driver code. Prior
+  design-step 3 was marked done after reconciling only plan/steps; the design.md
+  Scope correction remained an unactioned residual (design.md read-only that
+  pass), so a fresh unchecked step now targets it for a design-editable pass.
+  Not a duplicate: item 3 is checked and its design.md portion was never executed.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
