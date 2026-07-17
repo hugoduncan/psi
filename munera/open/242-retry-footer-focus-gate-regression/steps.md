@@ -451,7 +451,7 @@ If background-only (working as intended):
 
 ## Slice 18 — Review follow-ups (code-shaper pass, 2nd)
 
-- [ ] Slice 17's `activation-retry-delay-ms`/`changed-retry-delay-ms` constants
+- [x] Slice 17's `activation-retry-delay-ms`/`changed-retry-delay-ms` constants
       do **not** achieve their own stated goal: their docstrings claim each is
       the "single authority so the matcher tracks the driving config", but the
       *actual* driving config lives in `drive-provider-retry-through-progress-loop!`'s
@@ -483,7 +483,7 @@ If background-only (working as intended):
       forward it to 243 rather than leaving the driver-vs-matcher config-coupling
       (and the inaccurate "single authority ... tracks the driving config"
       wording) standing.
-- [ ] The retry-driving session config `{:persist? false :config
+- [x] The retry-driving session config `{:persist? false :config
       {:auto-retry-base-delay-ms 8000 :auto-retry-max-retries 2}}` passed to
       `support/create-session-context` is duplicated verbatim at four sites
       (rpc_prompt_test.clj L350-353 focused, L434-437 background pre-gate control,

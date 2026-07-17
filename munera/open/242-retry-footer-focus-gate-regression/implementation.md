@@ -613,3 +613,32 @@
   Slice 17's own "single authority" docstring); and the `{:auto-retry-base-delay-ms
   8000 :auto-retry-max-retries 2}` session config is duplicated verbatim at four
   `create-session-context` sites (a fourth copy of the same 8s delay).
+
+## Slice 18 — code-shaper follow-ups (addressed 2 review steps)
+
+- **Driver ↔ matcher single authority (item 1):** the driver's `error-turn`
+  429 headers now derive from the same constants the assertion matchers use.
+  Added `retry-after-seconds` (ms → whole-second `Retry-After` string) and
+  `retry-rate-limit` (5000) / `changed-retry-remaining` (2) constants; the
+  first/second 429 `Retry-After` headers are built via
+  `(retry-after-seconds activation-retry-delay-ms)` /
+  `(retry-after-seconds changed-retry-delay-ms)`, and the `RateLimit-*` headers
+  from `retry-rate-limit`/`changed-retry-remaining`. `remaining-fragment` and
+  `changed-retry-footer?` now match against the same rate-limit constants.
+  Driver and matchers can no longer drift: changing a delay or rate-limit value
+  updates one authority, not both the driver header literals and the matcher
+  constants. Docstrings corrected to state the single-authority relationship
+  accurately (driver derives *from* the constants).
+- **Session-config single authority (item 2):** extracted
+  `retry-footer-session-context!` — one builder returning the non-persisted
+  `[ctx session-id]` with `:auto-retry-base-delay-ms activation-retry-delay-ms`
+  (fourth copy of the 8s delay folded onto the same authority) and
+  `:auto-retry-max-retries 2`. Replaced all four verbatim
+  `create-session-context` call sites (focused, background pre-gate control,
+  background gated, sibling) with the builder.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6, 62 assertions —
+  unchanged, behaviour-preserving), `bb test --focus psi.rpc-events-test`
+  (20/20, task-241 focus-gate invariants untouched), `clj-kondo` clean,
+  `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
+  entry.
+- addressed 2 review steps.

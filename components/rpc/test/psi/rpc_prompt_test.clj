@@ -194,24 +194,64 @@
 ;; assertion matchers from drifting from the config that produces them: a
 ;; footer-format or delay change updates one place, not ≥3 assertion sites.
 
+;; Single authorities for the retry delays / rate-limit metadata (task 242
+;; Slices 17/18). `drive-provider-retry-through-progress-loop!` derives its 429
+;; `error-turn` headers *from* these constants (ms → whole-second `Retry-After`,
+;; and the rate-limit values), and the assertion matchers derive their awaited
+;; footer text from them too — so the driver config and the matchers cannot
+;; drift (a delay/rate-limit change updates one place, not both the driver
+;; headers and the matcher constants).
+
 (def ^:private activation-retry-delay-ms
-  "First-attempt retry delay driven by `drive-provider-retry-through-progress-loop!`
-   (`Retry-After: 8`). Single authority so the activation matcher tracks the
-   driving config."
+  "First-attempt retry delay. Single authority: `drive-provider-retry-through-progress-loop!`
+   derives its first 429 `Retry-After` header from this (ms → seconds), and the
+   activation matcher derives its awaited text from it."
   8000)
 
 (def ^:private changed-retry-delay-ms
-  "Second-attempt retry delay driven by `drive-provider-retry-through-progress-loop!`
-   (`Retry-After: 4`). Single authority so the changed-metadata matcher tracks
-   the driving config."
+  "Second-attempt retry delay. Single authority: `drive-provider-retry-through-progress-loop!`
+   derives its second 429 `Retry-After` header from this (ms → seconds), and the
+   changed-metadata matcher derives its awaited text from it."
   4000)
+
+(def ^:private retry-rate-limit
+  "Second 429's `RateLimit-Limit`. Single authority: driven into the
+   `error-turn` header and matched by the changed-retry footer's
+   `remaining R/L` fragment."
+  5000)
+
+(def ^:private changed-retry-remaining
+  "Second 429's `RateLimit-Remaining`. Single authority: driven into the
+   `error-turn` header and matched by the changed-retry footer's
+   `remaining R/L` fragment."
+  2)
+
+(defn- retry-after-seconds
+  "Whole-second `Retry-After` header value the driver emits for a retry
+   `delay-ms`, so the driver header and the matcher constant share one
+   authority."
+  [delay-ms]
+  (str (quot (long delay-ms) 1000)))
 
 (defn- remaining-fragment
   "The `\"remaining R/L\"` status-line fragment for a changed-retry footer,
    derived from the rate-limit metadata `drive-provider-retry-through-progress-loop!`'s
-   second 429 supplies (`RateLimit-Remaining: 2`, `RateLimit-Limit: 5000`)."
+   second 429 supplies (`RateLimit-Remaining`, `RateLimit-Limit`)."
   [remaining limit]
   (str "remaining " remaining "/" limit))
+
+(defn- retry-footer-session-context!
+  "Builds the non-persisted `[ctx session-id]` the retry-footer E2E harnesses
+   share (task 242 Slice 18): a single authority for the retry test session
+   config so the `:auto-retry-base-delay-ms` (the same first-attempt delay
+   `activation-retry-delay-ms` / the driver `Retry-After` encode) and
+   `:auto-retry-max-retries` are not duplicated at each `create-session-context`
+   site."
+  []
+  (support/create-session-context
+   {:persist? false
+    :config {:auto-retry-base-delay-ms activation-retry-delay-ms
+             :auto-retry-max-retries 2}}))
 
 (defn- activation-retry-footer?
   "Matches the retry-*activation* footer frame (first attempt: `\"retry in 8s\"`)."
@@ -225,7 +265,8 @@
   [frame]
   (let [status-line (frame-status-line frame)]
     (and (str/includes? status-line (expected-retry-text changed-retry-delay-ms))
-         (str/includes? status-line (remaining-fragment 2 5000)))))
+         (str/includes? status-line (remaining-fragment changed-retry-remaining
+                                                        retry-rate-limit)))))
 
 (defn- retry-footer-sleep-fn
   "Builds the deterministic `:provider-retry-sleep-fn` used by the retry-footer
@@ -305,12 +346,12 @@
       (with-redefs [turn-runtime/execute-live-turn!
                     (fn [& _]
                       (case (swap! attempts* inc)
-                        1 (error-turn {"Retry-After" "8"
-                                       "RateLimit-Limit" "5000"
+                        1 (error-turn {"Retry-After" (retry-after-seconds activation-retry-delay-ms)
+                                       "RateLimit-Limit" (str retry-rate-limit)
                                        "RateLimit-Remaining" "0"})
-                        2 (error-turn {"Retry-After" "4"
-                                       "RateLimit-Limit" "5000"
-                                       "RateLimit-Remaining" "2"})
+                        2 (error-turn {"Retry-After" (retry-after-seconds changed-retry-delay-ms)
+                                       "RateLimit-Limit" (str retry-rate-limit)
+                                       "RateLimit-Remaining" (str changed-retry-remaining)})
                         {:turn-id "turn-retry-footer"
                          :model {:provider "anthropic" :id "stub"}
                          :ai-options {}
@@ -347,10 +388,7 @@
   (testing "focused session: retry footer/updated frames pass the focus gate"
     (let [captured    (atom [])
           emit-frame! (fn [frame] (swap! captured conj frame))
-          [ctx session-id] (support/create-session-context
-                            {:persist? false
-                             :config {:auto-retry-base-delay-ms 8000
-                                      :auto-retry-max-retries 2}})
+          [ctx session-id] (retry-footer-session-context!)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
           state       (rpc.state/make-rpc-state {:session-id session-id})
@@ -430,11 +468,7 @@
     ;; pre-gate production assertion; the gated `empty?` proves those same
     ;; frames are dropped by `focus-allows?`.
     (let [pre-gate-captured (atom [])
-          [pre-gate-ctx pre-gate-session-id]
-          (support/create-session-context
-           {:persist? false
-            :config {:auto-retry-base-delay-ms 8000
-                     :auto-retry-max-retries 2}})
+          [pre-gate-ctx pre-gate-session-id] (retry-footer-session-context!)
           pre-gate-ctx (assoc pre-gate-ctx :provider-retry-sleep-fn
                               (retry-footer-sleep-fn pre-gate-captured))
           pre-gate-emit! (fn [event data]
@@ -448,10 +482,7 @@
           "the background retry config must produce retry footer/updated frames absent the focus gate — otherwise the gated `empty?` assertion below is vacuous"))
     (let [captured    (atom [])
           emit-frame! (fn [frame] (swap! captured conj frame))
-          [ctx session-id] (support/create-session-context
-                            {:persist? false
-                             :config {:auto-retry-base-delay-ms 8000
-                                      :auto-retry-max-retries 2}})
+          [ctx session-id] (retry-footer-session-context!)
           ctx         (assoc ctx :provider-retry-sleep-fn (fn [_delay-ms] nil))
           other-session-id "some-other-focused-session"
           state       (rpc.state/make-rpc-state {:session-id other-session-id})
@@ -494,10 +525,7 @@
   ;; headers, attempt sequence, or progress-loop lifecycle.
   (testing "provider retry activation, visible change, and clear emit footer/updated"
     (let [emitted* (atom [])
-          [ctx0 session-id] (support/create-session-context
-                             {:persist? false
-                              :config {:auto-retry-base-delay-ms 8000
-                                       :auto-retry-max-retries 2}})
+          [ctx0 session-id] (retry-footer-session-context!)
           ctx (assoc ctx0
                      :provider-retry-sleep-fn
                      ;; Route through the hardened `await-retry-footer-text!`
