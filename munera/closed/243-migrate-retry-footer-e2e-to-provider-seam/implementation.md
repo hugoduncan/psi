@@ -412,3 +412,7 @@
 ## Test-shaper pass 4 follow-up execution
 
 - addressed 1 test-shaper review step: added `assert-clear-footer-produced! [footer-events label]` folding the duplicated two-line clear-footer control pair (`some? clear-footer` + `not retry-status-line?`) into one authority, `label` interpolated into both failure messages. Wired into both focus-gate sub-tests (explicit-focus, default-session-id fallback). Sibling pre-gate test left out per the follow-up's scope note (its `clear-footer` binding interleaves with the session-id-stamping 3-way `=` control). No assertion weakened. `bb test --focus psi.rpc-prompt-test` green (60 assertions, 3 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.
+
+## Task-test-review pass 5 (test-shaper skill)
+
+- added 2 follow-up steps: stale `error-turn` terminology (migration replaced the fabricated turn map with a stub `:error` stream event / `error-event`, but three comment/docstring sites still name `error-turn`), and the single-authority-drift rationale re-spelled across two floating comment blocks plus each of the four retry-constant docstrings. Both non-blocking documentation economy/accuracy; behaviour and all frozen assertions unchanged. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — steps/note appended to the closed task in place.
