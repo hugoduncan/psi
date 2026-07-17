@@ -758,6 +758,16 @@
   "retry backoff text" → `:status-line` containing `retry in …`; focused vs
   background/delegated sessions distinguished in Context. No new design-steps.
 
+## design-review session (third turn — inconsistency pass) — outcome
+
+- no inconsistency review feedback. design.md is internally consistent: AC1's
+  contingent branch matches the Approach focused-vs-background diagnosis, and the
+  "characterize + record determination" criterion aligns with the
+  working-as-intended outcome. Referenced artifacts verified in prior passes
+  (quoted `focus-allows?` ≡ actual events.clj; `footer/updated` carries
+  `:status-line`; `required-event-payload-keys` is a required-keys set, not an
+  allow-list). No new design-steps.
+
 ## code-shaper review session (7th pass) — outcome
 
 - No new follow-up steps. Re-reviewed the retry-footer E2E harness against
