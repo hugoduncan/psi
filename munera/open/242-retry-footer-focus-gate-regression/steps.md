@@ -531,3 +531,50 @@ If background-only (working as intended):
       folded into task 243's harness rewrite, record the explicit rationale and
       forward it to 243 rather than leaving the duplicated `"retry in"` literal /
       unrouted clear negation standing.
+
+## Slice 20 — Review follow-ups (code-shaper pass, 4th)
+
+- [ ] The focus-gated emitter construction sequence is duplicated verbatim
+      across the two focus-gated sub-tests of
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`,
+      a `consistent`/`economical` residual distinct from every prior dedup slice
+      (Slice 18 extracted only the *session-config* builder
+      `retry-footer-session-context!`; the *emitter wiring* around it was never
+      touched, and the pre-gate raw-`emit!` control uses a different capture
+      strategy entirely). The focused sub-test (rpc_prompt_test.clj L398-406)
+      and the background gated sub-test (L492-500) each re-spell the identical
+      6-line sequence — `captured` atom, `emit-frame!` closure,
+      `rpc.state/make-rpc-state`, `subscribe-topics! … rpc.events/event-topics`,
+      `set-focus-session-id!`, `rpc.emit/make-request-emitter … "req-1"` —
+      differing only in *which* session-id is set as focus (the retrying session
+      vs `other-session-id`). So a change to the focus-gated emitter wiring (the
+      topic set, the request-id, the emitter constructor, or the rpc-state
+      shape) must be edited at both sites and can silently drift between the two
+      sub-tests that are meant to exercise the *same* gate under opposite focus.
+      Extract a single named builder (e.g.
+      `focus-gated-emitter!` returning `[emit! captured]` given the
+      focus-session-id) that both sub-tests share, so the focus-gated emit
+      boundary has one construction authority and the focused-vs-background pair
+      cannot diverge in anything but the focus session-id under test. If judged
+      out of scope for task 242's frozen coverage or better folded into task
+      243's harness rewrite, record the explicit rationale and forward it to 243
+      rather than leaving the duplicated emitter-construction sequence standing.
+- [ ] The `footer/updated` frame-filter idiom
+      `(filterv #(= "footer/updated" (:event %)) …)` is hand-repeated at four
+      retry-footer sites (rpc_prompt_test.clj L415 focused, L487 background
+      pre-gate control, L521 background gated, L554 sibling) — plus the
+      unrelated L116 in another test — each re-spelling the same
+      `"footer/updated"` event-topic literal + filter with no shared authority.
+      This is a `consistent`/`economical` residual parallel to Slice 17's
+      `frame-status-line` accessor extraction (which unified the *status-line*
+      access but not the *frame selection*): the same footer-event topic string
+      and filter shape are re-derived at every site, so a change to the event
+      name or the frame `:event` path must be edited at ≥4 places, and a typo in
+      one copy (e.g. `"footer/update"`) would silently filter to `[]` and pass
+      the downstream `empty?`/`seq` assertions vacuously. Extract one named
+      selector (e.g. `footer-updated-frames` over a captured-frames coll) the
+      retry-footer sites share so the footer-frame selection has one authority.
+      If judged out of scope for task 242's frozen coverage or better folded
+      into task 243's harness rewrite, record the explicit rationale and forward
+      it to 243 rather than leaving the duplicated footer-frame-filter idiom
+      standing.

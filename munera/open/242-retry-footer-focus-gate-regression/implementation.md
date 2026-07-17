@@ -661,3 +661,14 @@
   shared by `expected-retry-text` (positive builder) and `retry-status-line?`
   (substring predicate), collapsing the duplicated literal to one place.
 - rpc-prompt-test green (62 assertions), clj-kondo clean.
+
+## code-shaper review session (4th pass) — outcome
+
+- added 2 steps (Slice 20): the focus-gated emitter construction sequence
+  (`make-rpc-state` → `subscribe-topics!` → `set-focus-session-id!` →
+  `make-request-emitter`) is duplicated verbatim across the two focus-gated
+  sub-tests (differing only in focus session-id) — untouched by Slice 18's
+  session-config builder; and the `(filterv #(= "footer/updated" (:event %)) …)`
+  frame-filter idiom is repeated at four retry-footer sites with no shared
+  selector — parallel to Slice 17's `frame-status-line` accessor but for frame
+  *selection* rather than status-line access.
