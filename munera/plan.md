@@ -4,8 +4,6 @@
 
 Not yet started:
 
-- `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/` — follow-up from task 242 test-review: migrate both retry-footer E2E test call sites off `with-redefs` of the `turn-runtime/execute-live-turn!` logic boundary onto the confirmed injectable per-ctx `:provider-registry` seam (¬mock/¬stub); re-evaluate parallel `with-redefs` flakiness. Design-only.
-- `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/` — follow-up from closed 242: migrate the retry-footer E2E test off the `with-redefs execute-live-turn!` logic-boundary stub onto the injectable provider-registry seam (co-migrate both call sites); re-evaluate parallel `with-redefs` flakiness. Design-only.
 - `munera/open/202-document-at-bounds-in-scheduler-doc/` — (from master) document the resolved-millisecond-delay absolute `:at` bounds in `doc/scheduler.md`. NNN collides with closed `202-reusable-review-follow-up-step` (left as-is per convention).
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
