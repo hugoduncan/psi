@@ -272,7 +272,7 @@ If background-only (working as intended):
 
 ## Slice 13 — Test-review follow-ups (test-shaper pass, 5th)
 
-- [ ] Slice 10's dedup claim is inaccurate; the `expected-text` derivation
+- [x] Slice 10's dedup claim is inaccurate; the `expected-text` derivation
       remains triplicated. Slice 10 (steps.md L225-226) and its implementation.md
       note both state routing the sibling through `await-retry-footer-text!`
       "collapses the remaining duplicated sleep-fn / `expected-text`

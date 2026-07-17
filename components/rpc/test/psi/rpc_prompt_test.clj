@@ -159,6 +159,25 @@
         (str "retry footer sync timed out awaiting status-line text: " expected-text))
     result))
 
+(defn- expected-retry-text
+  "Single authority for the retry-footer status-line text a retry of `delay-ms`
+   produces (`\"retry in Ns\"`). Previously hand-derived at each
+   `:provider-retry-sleep-fn` call site; centralized so a footer-format change
+   has one place to edit."
+  [delay-ms]
+  (str "retry in " (quot (long delay-ms) 1000) "s"))
+
+(defn- retry-footer-sleep-fn
+  "Builds the deterministic `:provider-retry-sleep-fn` used by the retry-footer
+   E2E harnesses: for each retry `delay-ms` it blocks (bounded) until `captured`
+   has delivered the corresponding `\"retry in Ns\"` footer, keeping the retry
+   state live until the async progress loop drains it. Constructs the sleep-fn
+   once from `captured`, folding the delay→text derivation in (via
+   `expected-retry-text`) so it is no longer hand-built per call site."
+  [captured]
+  (fn [delay-ms]
+    (await-retry-footer-text! captured (expected-retry-text delay-ms))))
+
 (defn- drive-provider-retry-through-progress-loop!
   "Runs the real provider-boundary retry → progress-queue → footer-refresh
    pipeline (`mark-active-retry!` → `:retry-updated` → `footer-refresh-progress-event?`
@@ -252,10 +271,7 @@
                              :config {:auto-retry-base-delay-ms 8000
                                       :auto-retry-max-retries 2}})
           ctx         (assoc ctx :provider-retry-sleep-fn
-                             (fn [delay-ms]
-                               (await-retry-footer-text!
-                                captured
-                                (str "retry in " (quot (long delay-ms) 1000) "s"))))
+                             (retry-footer-sleep-fn captured))
           state       (rpc.state/make-rpc-state {:session-id session-id})
           _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
           _           (rpc.state/set-focus-session-id! state session-id)
@@ -307,10 +323,7 @@
             :config {:auto-retry-base-delay-ms 8000
                      :auto-retry-max-retries 2}})
           pre-gate-ctx (assoc pre-gate-ctx :provider-retry-sleep-fn
-                              (fn [delay-ms]
-                                (await-retry-footer-text!
-                                 pre-gate-captured
-                                 (str "retry in " (quot (long delay-ms) 1000) "s"))))
+                              (retry-footer-sleep-fn pre-gate-captured))
           pre-gate-emit! (fn [event data]
                            (swap! pre-gate-captured conj {:event event :data data}))
           pre-gate-attempts (drive-provider-retry-through-progress-loop!
@@ -382,10 +395,7 @@
                      ;; "must publish footer/updated" regression. `emitted*`
                      ;; frames carry `:status-line` at `[:data :status-line]`,
                      ;; the path the helper inspects.
-                     (fn [delay-ms]
-                       (await-retry-footer-text!
-                        emitted*
-                        (str "retry in " (quot (long delay-ms) 1000) "s"))))
+                     (retry-footer-sleep-fn emitted*))
           ;; Pre-gate raw emit!: capture every event directly, without routing
           ;; through the RPC focus gate.
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))

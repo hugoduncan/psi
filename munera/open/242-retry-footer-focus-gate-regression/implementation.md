@@ -400,3 +400,21 @@
   is still triplicated across three `:provider-retry-sleep-fn` sites; Slice 10
   unified only the await/timeout mechanism, not the delay→text logic
   (a `consistent`/`economical` residual + a doc↔code coherence gap).
+
+## Slice 13 — test-shaper 5th pass follow-up (addressed 1 review step)
+
+- **expected-text dedup:** folded the triplicated delay→text derivation
+  `(str "retry in " (quot (long delay-ms) 1000) "s")` into a single authority.
+  Added `expected-retry-text` (delay-ms → "retry in Ns") and a
+  `retry-footer-sleep-fn` builder that constructs the `:provider-retry-sleep-fn`
+  once from `captured`, deriving the text internally via `expected-retry-text`.
+  All three call sites (focused L~254, background pre-gate control L~313, sibling
+  L~388) now read `(retry-footer-sleep-fn <captured>)` instead of a hand-built
+  `(fn [delay-ms] (await-retry-footer-text! <captured> (str "retry in " …)))`.
+  Slice 10 had unified only the await/timeout mechanism, not the delay→text
+  logic — this closes that `consistent`/`economical` residual and the doc↔code
+  coherence gap (a completed slice claiming a dedup the code did not reflect).
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 60 assertions —
+  unchanged, behaviour-preserving), `clj-kondo` clean, `clj-paren-repair` clean.
+  Test-only; no product/behaviour change, no CHANGELOG entry.
+- addressed 1 review step.
