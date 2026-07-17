@@ -1,6 +1,6 @@
 # Design steps
 
-- [ ] Ambiguity: reconcile acceptance criterion 1's unconditional
+- [x] Ambiguity: reconcile acceptance criterion 1's unconditional
       "failing-then-passing end-to-end test" for the **focused** session with the
       Approach/Context branch that the focused case may be "working as intended"
       (only background/delegated sessions affected). If the focused case already

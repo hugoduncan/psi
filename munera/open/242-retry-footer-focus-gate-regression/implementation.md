@@ -17,6 +17,15 @@
   AC1-vs-working-as-intended tension is already captured by the ambiguity pass,
   not re-filed here.
 
+## AC1 ambiguity resolved (design-follow-up)
+
+- AC1 rewritten to make failing-then-passing **contingent** on Approach step 1's
+  diagnosis: mandatory only if the focused session is the actual regression;
+  otherwise the same test stands as a green regression-lock characterization test
+  plus the recorded "working as intended" determination. Scope unchanged (no
+  cross-session leakage; task-241 invariant preserved). The prior design-step
+  notes below drove this resolution.
+
 ## Notes for the design-steps task (AC1 ambiguity resolution)
 
 - Principle: do not resolve by changing the frozen scope. The design-step asks

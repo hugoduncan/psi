@@ -82,9 +82,19 @@ in the focused session or a background/delegated one?
 
 ## Acceptance criteria
 
-- A failing-then-passing end-to-end test demonstrates that a provider-boundary
-  retry in the focused session produces a `footer/updated` event whose
-  `status-line` contains retry backoff text, reaching the RPC emit boundary.
+- An end-to-end test locks the focused-session retry→footer behaviour at the RPC
+  emit boundary: it drives a provider-boundary retry in the focused session and
+  asserts a `footer/updated` event whose `status-line` contains retry backoff
+  text reaches the emit boundary. The required outcome is contingent on the
+  diagnosis in Approach step 1:
+  - If the focused session is the actual regression (footer suppressed), this
+    test MUST be demonstrably failing before the fix and passing after
+    (failing-then-passing), proving the repair.
+  - If the focused case is working as intended (only background/delegated
+    sessions are affected), no failing-then-passing sequence is required —
+    instead the same test stands as a green regression-lock characterization
+    test asserting the focused retry footer already emits correctly, paired with
+    the recorded "working as intended" determination (see next criterion).
 - The observed behaviour (focused vs background) is characterized and the fix
   or the "working as intended" determination is recorded in
   `implementation.md`.
