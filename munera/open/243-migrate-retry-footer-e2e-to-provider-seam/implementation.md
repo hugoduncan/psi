@@ -114,6 +114,17 @@
   left underspecified. Residual design.md Scope "two with-redefs sites" is an
   inconsistency-turn concern (design.md), not a plan/steps ambiguity.
 
+## Plan-review session (re-run) — ambiguity turn (batch first turn)
+
+- no ambiguity review feedback: plan.md/steps.md remain fully reconciled.
+  Re-verified against rpc_prompt_test.clj — single driver-level `with-redefs`
+  (~430); first `execute-prepared-request!` arg `{:provider-registry (atom {})}`
+  (~454); attempts/rate-limit/delays pinned by constants; `(= 3 attempts)` at 4
+  sites; stub stream-event shape framed as Slice-1 verification; recovery turn
+  and flakiness record-and-compare done-condition already specified. Residual
+  design.md Scope "two with-redefs sites" is an inconsistency-turn concern
+  (design.md), tracked by the open design-step, not a plan/steps ambiguity.
+
 ## Plan-review session — inconsistency turn (batch second turn)
 
 - inconsistency review added 1 new design step: design.md Scope still asserts
