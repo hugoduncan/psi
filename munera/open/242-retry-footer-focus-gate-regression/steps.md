@@ -614,7 +614,7 @@ If background-only (working as intended):
 
 ## Slice 22 — Review follow-ups (code-shaper pass, 6th)
 
-- [ ] The active-retry `"retry in "` **prefix** literal is still a hand-copied
+- [x] The active-retry `"retry in "` **prefix** literal is still a hand-copied
       second authority in the test, un-routed to the production authority — a
       `consistent`/`robust` residual distinct from every prior prefix slice.
       Slice 19 unified the prefix only *within* the test (`active-retry-text-prefix`

@@ -739,3 +739,30 @@
   status-line format literal Slices 16/21 did not fold onto the
   `retry-display` authority, leaving a `retry_display.clj`↔matcher drift the
   seconds and remaining fragment no longer have.
+
+## Slice 22 — code-shaper 6th pass follow-up (addressed 1 review step)
+
+- **`"retry in "` prefix production-authority routing:** folded the last
+  hand-copied status-line format literal onto `retry-display`. `expected-retry-text`
+  now derives the *whole* active-retry text (prefix + seconds) from the
+  production authority `retry-display/retry-status-text` — building the leading
+  `" · "` fragment from `{:active? true :resume-at delay-ms}` at `now-ms 0`
+  (no rate-limit, so the status-line is just the delay fragment `"retry in Ns"`)
+  — instead of `(str active-retry-text-prefix (format-relative-seconds …))` with
+  a hand-copied `"retry in "` literal. `active-retry-text-prefix` (used by the
+  `retry-status-line?` substring predicate + both clear negations) is now itself
+  *derived from production*: `retry-status-text {:active? true :resume-at 0}`
+  minus the `format-relative-seconds 0` suffix = `"retry in "`. So a footer-format
+  change to the prefix in `retry_display.clj` cannot desync the matcher/predicate
+  — completing the Slice 16 (seconds via `format-relative-seconds`) + Slice 21
+  (remaining fragment via `retry-status-text`) folding for the fixed prefix.
+  Removes the `retry_display.clj`↔matcher prefix drift the seconds and remaining
+  fragment no longer had. Kept here (not forwarded to 243) since it hardens the
+  existing in-place matcher authorities.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged, behaviour-preserving; `retry-status-text` of the whole-second
+  8000/4000 delays yields the same `"retry in 8s"`/`"retry in 4s"` text),
+  `bb test --focus psi.rpc-events-test` (20/20 pass, task-241 focus-gate
+  invariants untouched), `clj-kondo` clean, `clj-paren-repair` clean. Test-only;
+  no product/behaviour change, no CHANGELOG entry.
+- addressed 1 review step.

@@ -177,27 +177,46 @@
         (str "retry footer sync timed out awaiting status-line text: " expected-text))
     result))
 
-(def ^:private active-retry-text-prefix
-  "Single authority for the active-retry status-line prefix (task 242 Slice 19).
-   Both the positive `expected-retry-text` builder and the `retry-status-line?`
-   substring predicate share this so the positive-match and negated-clear
-   spellings of \"active retry text\" cannot diverge on a footer-format change."
-  "retry in ")
-
 (defn- expected-retry-text
   "Single authority for the retry-footer status-line text a retry of `delay-ms`
-   produces (`\"retry in Ns\"`). Derives the seconds from the *same* production
-   authority the footer uses — `retry-display/format-relative-seconds`
-   (`Math/ceil`) — rather than a `(quot delay-ms 1000)` floor approximation, so
-   the deterministic sync waits for the text production will actually emit
-   instead of one that coincides only for whole-second `Retry-After` values
-   (task 242 Slice 16). `resume-at = now₀ + delay-ms`, so at delivery the footer
-   shows `ceil((resume-at - now-delivery)/1000)`; matching production's `ceil`
-   formula keeps the awaited text aligned even for non-whole-second delays
-   (sub-`retry-footer-sync-timeout-ms` delivery drift stays within the same
-   second)."
+   produces (`\"retry in Ns\"`). Derives the *whole* active-retry text — prefix
+   and seconds — from the same production authority the footer emits,
+   `retry-display/retry-status-text`, by building the leading `\" · \"` fragment
+   from retry metadata `{:active? true :resume-at delay-ms}` (no rate-limit, so
+   the status-line is just the delay fragment). This folds the last hand-copied
+   status-line format literal (the `\"retry in \"` prefix) onto the
+   `retry-display` authority, matching how Slice 16 aligned the seconds
+   (`format-relative-seconds` `Math/ceil`) and Slice 21 aligned the remaining
+   fragment (`retry-status-text`) — so a footer-format change to the prefix in
+   `retry_display.clj` cannot desync this matcher (task 242 Slice 22).
+   `resume-at = now₀ + delay-ms`, so at delivery the footer shows
+   `ceil((resume-at - now-delivery)/1000)`; building the awaited text from
+   `retry-status-text` at `now-ms 0` keeps it aligned even for non-whole-second
+   delays (sub-`retry-footer-sync-timeout-ms` delivery drift stays within the
+   same second)."
   [delay-ms]
-  (str active-retry-text-prefix (retry-display/format-relative-seconds (long delay-ms))))
+  (let [now-ms 0]
+    (first (str/split (retry-display/retry-status-text
+                       {:active? true :resume-at (long delay-ms)}
+                       now-ms)
+                      #" · " 2))))
+
+(def ^:private active-retry-text-prefix
+  "The active-retry status-line prefix (`\"retry in \"`), derived from the same
+   production authority the footer emits rather than a hand-copied literal
+   (task 242 Slice 22): `retry-display/retry-status-text` builds
+   `(str \"retry in \" delay-text)` and `format-relative-seconds` builds the
+   `delay-text` suffix, so the prefix is the status-line text with the seconds
+   suffix removed. Used by the `retry-status-line?` substring predicate; folding
+   it onto `retry-display` (like Slice 16's seconds and Slice 21's remaining
+   fragment) means a footer-format change to the prefix in `retry_display.clj`
+   cannot desync the predicate."
+  (let [now-ms 0
+        status-line (retry-display/retry-status-text
+                     {:active? true :resume-at now-ms}
+                     now-ms)
+        seconds (retry-display/format-relative-seconds now-ms)]
+    (subs status-line 0 (- (count status-line) (count seconds)))))
 
 ;; Shared retry-frame matchers (task 242 Slice 17). The `8000`/`4000` activation
 ;; and changed delays are the delivered-footer form of
@@ -311,9 +330,11 @@
 
 (defn- retry-status-line?
   "A `footer/updated` frame whose `:status-line` still carries active-retry
-   text (`\"retry in Ns\"`). Shares `active-retry-text-prefix` with
-   `expected-retry-text` so the positive-match and negated-clear checks recognise
-   the same active-retry literal (task 242 Slice 19)."
+   text (`\"retry in Ns\"`). Recognises the active-retry literal via
+   `active-retry-text-prefix`, which is derived from the production authority
+   `retry-display/retry-status-text` (task 242 Slice 22) — so this predicate and
+   `expected-retry-text` (also production-derived) cannot diverge from the footer
+   the pipeline actually emits."
   [frame]
   (str/includes? (frame-status-line frame) active-retry-text-prefix))
 
