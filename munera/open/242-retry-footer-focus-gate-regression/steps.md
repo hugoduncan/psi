@@ -365,7 +365,7 @@ If background-only (working as intended):
 
 ## Slice 16 — Test-review follow-ups (test-shaper pass, 8th)
 
-- [ ] The deterministic-sync helper derives the awaited text with a **different
+- [x] The deterministic-sync helper derives the awaited text with a **different
       formula** than the production footer, so the sync coincides only for the
       exact values the test happens to use — a latent `deterministic`/`robust`
       coupling distinct from every prior expected-text slice (which only *dedup'd*

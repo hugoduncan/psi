@@ -508,3 +508,31 @@
   `Retry-After` values, and can surface as a false Slice-9 sync-timeout naming a
   text production never emits. Distinct from Slices 10/13 (which only dedup'd the
   derivation, never questioned its correctness).
+
+## Slice 16 — test-shaper 8th pass follow-up (addressed 1 review step)
+
+- **quot-vs-ceil sync-text formula alignment:** changed `expected-retry-text`
+  (the single authority the deterministic-sync helper `await-retry-footer-text!`
+  / `retry-footer-sleep-fn` uses) to derive the awaited `"retry in Ns"` seconds
+  from the *same* production authority the footer uses —
+  `psi.app-runtime.retry-display/format-relative-seconds` (`Math/ceil`) —
+  instead of the prior `(quot (long delay-ms) 1000)` floor. Production builds
+  the footer text via `format-relative-seconds (- resume-at now-ms)` re-read at
+  async delivery time (`retry_display.clj`); with `resume-at = now₀ + delay-ms`
+  (`session-state/model.clj retry-metadata`), the delivered text is
+  `ceil((resume-at - now-delivery)/1000)`. The old `quot` floor coincided only
+  for whole-second `Retry-After` values with sub-second delivery drift; for a
+  non-whole-second delay it could await `"retry in Ns"` while production emits
+  `"retry in (N+1)s"`, making the Slice-9 sync fail-fast fire on a text that is
+  never produced (a false timeout masking a live-and-correct pipeline). Matching
+  production's `ceil` closes that latent `deterministic`/`robust` desync. Added
+  the `psi.app-runtime.retry-display` require (already on the rpc component's
+  classpath via `psi/app-runtime`). Kept here (not forwarded to 243) since it
+  hardens the existing in-place sync helper.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged; `format-relative-seconds` of the whole-second 8000/4000 delays
+  yields the same `8s`/`4s` text, so behaviour-preserving),
+  `bb test --focus psi.rpc-events-test` (20/20 pass, task-241 focus-gate
+  invariants untouched), `clj-kondo` clean, `clj-paren-repair` clean. Test-only;
+  no product/behaviour change, no CHANGELOG entry.
+- addressed 1 review step.

@@ -7,6 +7,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.ai.models :as ai-models]
    [psi.agent-session.core :as session]
+   [psi.app-runtime.retry-display :as retry-display]
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.tools :as tools]
@@ -161,11 +162,18 @@
 
 (defn- expected-retry-text
   "Single authority for the retry-footer status-line text a retry of `delay-ms`
-   produces (`\"retry in Ns\"`). Previously hand-derived at each
-   `:provider-retry-sleep-fn` call site; centralized so a footer-format change
-   has one place to edit."
+   produces (`\"retry in Ns\"`). Derives the seconds from the *same* production
+   authority the footer uses — `retry-display/format-relative-seconds`
+   (`Math/ceil`) — rather than a `(quot delay-ms 1000)` floor approximation, so
+   the deterministic sync waits for the text production will actually emit
+   instead of one that coincides only for whole-second `Retry-After` values
+   (task 242 Slice 16). `resume-at = now₀ + delay-ms`, so at delivery the footer
+   shows `ceil((resume-at - now-delivery)/1000)`; matching production's `ceil`
+   formula keeps the awaited text aligned even for non-whole-second delays
+   (sub-`retry-footer-sync-timeout-ms` delivery drift stays within the same
+   second)."
   [delay-ms]
-  (str "retry in " (quot (long delay-ms) 1000) "s"))
+  (str "retry in " (retry-display/format-relative-seconds (long delay-ms))))
 
 (defn- retry-footer-sleep-fn
   "Builds the deterministic `:provider-retry-sleep-fn` used by the retry-footer
