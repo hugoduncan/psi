@@ -574,3 +574,32 @@
   the sync-side sleep-fn/expected-text, never the assertion matchers); and the
   `(or (get-in frame [:data :status-line]) "")` status-line accessor idiom is
   repeated at ~8 sites without a shared accessor.
+
+## Slice 17 — code-shaper follow-ups (addressed 2 review steps)
+
+- **Assertion-matcher single-authority (item 1):** extracted shared
+  `activation-retry-footer?` / `changed-retry-footer?` predicates that derive
+  their awaited text from the existing `expected-retry-text` authority (aligned
+  to production's `ceil` in Slice 16) via named `activation-retry-delay-ms`
+  (8000) / `changed-retry-delay-ms` (4000) constants — the delivered-footer form
+  of `drive-provider-retry-through-progress-loop!`'s first/second `Retry-After`
+  headers — plus a `remaining-fragment` builder for the changed frame's
+  `remaining 2/5000` rate-limit text. Both harnesses now match retry frames
+  through these predicates instead of re-inlining raw `"retry in 8s"` /
+  `"retry in 4s"` / `"remaining 2/5000"` literals at the ≥3 assertion sites
+  (focused sub-test L~323/327, sibling `first-retry-footer`/`changed-retry-footer`
+  L~473/477). A footer-format or driving-delay change now updates one authority
+  rather than drifting silently across assertion copies.
+- **Status-line accessor (item 2):** extracted `frame-status-line` (returns `""`
+  on absence) as the single authority for the `[:data :status-line]` frame path
+  and routed all retry-footer matchers/predicates/assertions through it
+  (`await-retry-footer-text!`, `retry-status-line?`, `activation-retry-footer?`,
+  `changed-retry-footer?`, both harnesses' clear-footer assertions). The
+  `(or (get-in frame [:data :status-line]) "")` idiom is no longer hand-repeated
+  at ~8 sites; a frame-shape change is edited once.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged, behaviour-preserving), `bb test --focus psi.rpc-events-test`
+  (20/20 pass, task-241 focus-gate invariants untouched), `clj-kondo` clean,
+  `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
+  entry.
+- addressed 2 review steps.

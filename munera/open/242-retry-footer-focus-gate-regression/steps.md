@@ -405,7 +405,7 @@ If background-only (working as intended):
 
 ## Slice 17 — Review follow-ups (code-shaper pass)
 
-- [ ] Assertion-side retry-frame matchers hard-code the `"retry in 8s"` /
+- [x] Assertion-side retry-frame matchers hard-code the `"retry in 8s"` /
       `"retry in 4s"` + `"remaining 2/5000"` strings, duplicated across both
       harnesses' assertion sites and coupled by hand to the driving config — a
       `consistent`/`economical` residual distinct from every prior dedup slice
@@ -436,7 +436,7 @@ If background-only (working as intended):
       into task 243's harness rewrite, record the explicit rationale and forward
       it to 243 rather than leaving the triplicated assertion-matcher / config-
       coupling residual standing.
-- [ ] The `(or (get-in frame [:data :status-line]) "")` status-line accessor
+- [x] The `(or (get-in frame [:data :status-line]) "")` status-line accessor
       idiom is hand-repeated at ~8 sites across the two retry-footer tests and
       the helpers (`retry-status-line?` L193, focused-test L323/L326/L336,
       background pre-gate L400, sibling L473/L477-478/L484). This is a

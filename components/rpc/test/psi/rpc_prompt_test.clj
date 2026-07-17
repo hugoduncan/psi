@@ -133,6 +133,14 @@
    the shared `await-retry-footer-text!` helper, which consumes this deadline."
   500)
 
+(defn- frame-status-line
+  "Single nil-safe accessor for a `footer/updated` frame's status-line text,
+   returning `\"\"` when absent (task 242 Slice 17). One authority for the
+   `[:data :status-line]` path so a frame-shape change is edited once, not at
+   every retry-footer matcher/predicate site."
+  [frame]
+  (or (get-in frame [:data :status-line]) ""))
+
 (defn- await-retry-footer-text!
   "Blocks (bounded) until `captured` contains a frame whose `:data
    :status-line` includes `expected-text`. Used as a `:provider-retry-sleep-fn`
@@ -153,7 +161,7 @@
   [captured expected-text]
   (let [result (support/await-until
                 #(some (fn [frame]
-                         (str/includes? (or (get-in frame [:data :status-line]) "") expected-text))
+                         (str/includes? (frame-status-line frame) expected-text))
                        @captured)
                 retry-footer-sync-timeout-ms)]
     (is (not= support/timeout-token result)
@@ -175,6 +183,50 @@
   [delay-ms]
   (str "retry in " (retry-display/format-relative-seconds (long delay-ms))))
 
+;; Shared retry-frame matchers (task 242 Slice 17). The `8000`/`4000` activation
+;; and changed delays are the delivered-footer form of
+;; `drive-provider-retry-through-progress-loop!`'s first/second `Retry-After`
+;; headers (8s/4s), and the `remaining` fragment is that second attempt's
+;; `RateLimit-Remaining`/`RateLimit-Limit` (2/5000). Deriving the activation and
+;; changed text from the single `expected-retry-text` authority (the same one
+;; the sync-side sleep-fn uses, aligned to production's `ceil` in Slice 16)
+;; rather than re-inlining raw `"retry in 8s"`/`"retry in 4s"` literals keeps the
+;; assertion matchers from drifting from the config that produces them: a
+;; footer-format or delay change updates one place, not ≥3 assertion sites.
+
+(def ^:private activation-retry-delay-ms
+  "First-attempt retry delay driven by `drive-provider-retry-through-progress-loop!`
+   (`Retry-After: 8`). Single authority so the activation matcher tracks the
+   driving config."
+  8000)
+
+(def ^:private changed-retry-delay-ms
+  "Second-attempt retry delay driven by `drive-provider-retry-through-progress-loop!`
+   (`Retry-After: 4`). Single authority so the changed-metadata matcher tracks
+   the driving config."
+  4000)
+
+(defn- remaining-fragment
+  "The `\"remaining R/L\"` status-line fragment for a changed-retry footer,
+   derived from the rate-limit metadata `drive-provider-retry-through-progress-loop!`'s
+   second 429 supplies (`RateLimit-Remaining: 2`, `RateLimit-Limit: 5000`)."
+  [remaining limit]
+  (str "remaining " remaining "/" limit))
+
+(defn- activation-retry-footer?
+  "Matches the retry-*activation* footer frame (first attempt: `\"retry in 8s\"`)."
+  [frame]
+  (str/includes? (frame-status-line frame)
+                 (expected-retry-text activation-retry-delay-ms)))
+
+(defn- changed-retry-footer?
+  "Matches the *changed-metadata* retry footer frame (second attempt:
+   `\"retry in 4s\"` + `\"remaining 2/5000\"`)."
+  [frame]
+  (let [status-line (frame-status-line frame)]
+    (and (str/includes? status-line (expected-retry-text changed-retry-delay-ms))
+         (str/includes? status-line (remaining-fragment 2 5000)))))
+
 (defn- retry-footer-sleep-fn
   "Builds the deterministic `:provider-retry-sleep-fn` used by the retry-footer
    E2E harnesses: for each retry `delay-ms` it blocks (bounded) until `captured`
@@ -190,7 +242,7 @@
   "A `footer/updated` frame whose `:status-line` still carries active-retry
    text (`\"retry in Ns\"`)."
   [frame]
-  (str/includes? (or (get-in frame [:data :status-line]) "") "retry in"))
+  (str/includes? (frame-status-line frame) "retry in"))
 
 (defn- clear-footer-produced-after-retry
   "Positive control for the retry→inactive **clear** footer (task 242 Slice 14):
@@ -320,13 +372,9 @@
         ;; retry frame the sibling pre-gate test verifies (activation, changed
         ;; metadata, clear) also crosses the RPC focus gate, so a regression
         ;; that gates only the later frames cannot go undetected.
-        (is (some #(str/includes? (or (get-in % [:data :status-line]) "") "retry in 8s")
-                  footer-events)
+        (is (some activation-retry-footer? footer-events)
             "focused session must receive the retry-activation footer text through the focus gate")
-        (is (some #(let [status-line (or (get-in % [:data :status-line]) "")]
-                     (and (str/includes? status-line "retry in 4s")
-                          (str/includes? status-line "remaining 2/5000")))
-                  footer-events)
+        (is (some changed-retry-footer? footer-events)
             "focused session must receive the changed retry metadata footer through the focus gate")
         ;; Positive control (task 242 Slice 14): the bare negative below passes
         ;; both when a real clear footer landed last and when some unrelated
@@ -337,8 +385,7 @@
         (let [clear-footer (clear-footer-produced-after-retry footer-events)]
           (is (some? clear-footer)
               "focused session must receive a clear footer/updated frame after the retry sequence through the focus gate")
-          (is (not (str/includes? (or (get-in clear-footer [:data :status-line]) "")
-                                  "retry in"))
+          (is (not (str/includes? (frame-status-line clear-footer) "retry in"))
               "focused session's clear footer must carry no stale retry text (through the focus gate)"))
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
@@ -397,8 +444,7 @@
           pre-gate-footers (filterv #(= "footer/updated" (:event %)) @pre-gate-captured)]
       (is (= 3 pre-gate-attempts)
           "the full activate→change→clear retry sequence must have executed (pre-gate control)")
-      (is (some #(str/includes? (or (get-in % [:data :status-line]) "") "retry in")
-                pre-gate-footers)
+      (is (some retry-status-line? pre-gate-footers)
           "the background retry config must produce retry footer/updated frames absent the focus gate — otherwise the gated `empty?` assertion below is vacuous"))
     (let [captured    (atom [])
           emit-frame! (fn [frame] (swap! captured conj frame))
@@ -469,16 +515,8 @@
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
           attempts (drive-provider-retry-through-progress-loop! ctx session-id emit!)
           footer-events (filterv #(= "footer/updated" (:event %)) @emitted*)
-          first-retry-footer (some #(when (str/includes? (or (get-in % [:data :status-line]) "")
-                                                         "retry in 8s")
-                                      %)
-                                   footer-events)
-          changed-retry-footer (some #(when (and (str/includes? (or (get-in % [:data :status-line]) "")
-                                                                "retry in 4s")
-                                                 (str/includes? (or (get-in % [:data :status-line]) "")
-                                                                "remaining 2/5000"))
-                                        %)
-                                     footer-events)
+          first-retry-footer (some #(when (activation-retry-footer? %) %) footer-events)
+          changed-retry-footer (some #(when (changed-retry-footer? %) %) footer-events)
           ;; Positive control (task 242 Slice 14): the clear footer is the
           ;; footer *produced after* the last active-retry frame, not merely the
           ;; last footer overall — so the no-stale-`retry in` assertion is
@@ -495,8 +533,7 @@
       (is (= (get-in first-retry-footer [:data :session-id])
              (get-in changed-retry-footer [:data :session-id])
              (get-in clear-footer [:data :session-id])))
-      (is (not (str/includes? (or (get-in clear-footer [:data :status-line]) "")
-                              "retry in"))
+      (is (not (str/includes? (frame-status-line clear-footer) "retry in"))
           "retry clear must publish a footer without stale retry text"))))
 
 (deftest rpc-thinking-delta-after-tool-start-begins-fresh-segment-test
