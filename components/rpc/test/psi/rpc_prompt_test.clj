@@ -174,24 +174,12 @@
                      now-ms)]
     (subs status-line 0 (- (count status-line) (count "0s")))))
 
-;; Shared retry-frame matchers (task 242 Slice 17). The `8000`/`4000` activation
-;; and changed delays are the delivered-footer form of
-;; `drive-provider-retry-through-progress-loop!`'s first/second `Retry-After`
-;; headers (8s/4s), and the `remaining` fragment is that second attempt's
-;; `RateLimit-Remaining`/`RateLimit-Limit` (2/5000). Deriving the activation and
-;; changed text from the single `expected-retry-text` authority (the same one
-;; the sync-side sleep-fn uses, aligned to production's `ceil` in Slice 16)
-;; rather than re-inlining raw `"retry in 8s"`/`"retry in 4s"` literals keeps the
-;; assertion matchers from drifting from the config that produces them: a
-;; footer-format or delay change updates one place, not ≥3 assertion sites.
-
-;; Single authorities for the retry delays / rate-limit metadata (task 242
-;; Slices 17/18). `drive-provider-retry-through-progress-loop!` derives its 429
-;; `error-turn` headers *from* these constants (ms → whole-second `Retry-After`,
-;; and the rate-limit values), and the assertion matchers derive their awaited
-;; footer text from them too — so the driver config and the matchers cannot
-;; drift (a delay/rate-limit change updates one place, not both the driver
-;; headers and the matcher constants).
+;; Single authorities for the retry delays / rate-limit metadata. The stub
+;; provider's `:error` stream events (`error-event`) derive their 429 headers
+;; *from* these constants, and the assertion matchers derive their awaited
+;; footer text from them too, so the driver config and the matchers cannot
+;; drift (a delay/rate-limit change updates one place). Per-def docstrings below
+;; carry the specifics.
 
 (def ^:private activation-retry-delay-ms
   "First-attempt retry delay. Single authority: `drive-provider-retry-through-progress-loop!`
@@ -206,15 +194,15 @@
   4000)
 
 (def ^:private retry-rate-limit
-  "Second 429's `RateLimit-Limit`. Single authority: driven into the
-   `error-turn` header and matched by the changed-retry footer's
-   `remaining R/L` fragment."
+  "Second 429's `RateLimit-Limit`. Single authority: driven into the stub's
+   second `:error` stream event (`error-event`) header and matched by the
+   changed-retry footer's `remaining R/L` fragment."
   5000)
 
 (def ^:private changed-retry-remaining
-  "Second 429's `RateLimit-Remaining`. Single authority: driven into the
-   `error-turn` header and matched by the changed-retry footer's
-   `remaining R/L` fragment."
+  "Second 429's `RateLimit-Remaining`. Single authority: driven into the stub's
+   second `:error` stream event (`error-event`) header and matched by the
+   changed-retry footer's `remaining R/L` fragment."
   2)
 
 (def ^:private expected-retry-attempts
