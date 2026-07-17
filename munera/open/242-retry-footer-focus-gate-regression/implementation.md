@@ -7,3 +7,7 @@
   `:projection/ui-changed` recompute-at-delivery convergence target is a
   pre-existing pattern; re-architecting it would widen the frozen scope, so it
   was not filed as an actionable misfit for this design.
+- ambiguity review added 1 new design step — AC1's unconditional
+  "failing-then-passing" focused-session test conflicts with the design's own
+  "focused case may be working as intended" branch (a passing-immediately test
+  cannot be failing-then-passing).
