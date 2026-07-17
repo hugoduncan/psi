@@ -136,6 +136,34 @@ If background-only (working as intended):
       proven to have executed. (Optional: also assert the focused sub-test drove
       all 3 attempts.)
 
+## Slice 9 — Test-review follow-ups (test-shaper pass)
+
+- [ ] `await-retry-footer-text!` silently swallows its timeout, defeating
+      meaningful-failure signal. It calls `support/await-until` (which returns
+      `timeout-token`, not an exception, on the 500ms deadline) purely for the
+      blocking side-effect and **discards the return value**. If the awaited
+      retry footer never arrives within 500ms (e.g. CI load, GC pause), the
+      sleep-fn returns anyway, the retry can clear before delivery, and the
+      subsequent `(is (some … "retry in Ns") footer-events)` assertion then
+      fails with a generic "not found" message that **cannot distinguish** a
+      genuine focus-gate regression (the behaviour under test) from a mere
+      timing timeout (a flake). This reopens exactly the race the
+      `await-retry-footer-text!` pattern was introduced to close (Slice 2 /
+      implementation.md test-construction pitfall). Make the timeout observable:
+      have `await-retry-footer-text!` detect `support/timeout-token` and fail
+      fast with a message that names the missing expected-text (e.g.
+      `(is (not= support/timeout-token …) "retry footer sync timed out awaiting <text>")`),
+      so a sync timeout surfaces as its own diagnosable failure rather than
+      masquerading as a footer-gating regression. Task 243 explicitly *keeps*
+      this sleep-fn pattern, so the fix belongs here (or must be explicitly
+      forwarded to 243), not silently deferred.
+- [ ] The 500ms sync bound is an unnamed magic number duplicated across three
+      call sites (`await-retry-footer-text!` and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test`'s inline
+      `support/await-until … 500`). Extract a single named constant (e.g.
+      `retry-footer-sync-timeout-ms`) so the deterministic-sync bound has one
+      authority and future tuning does not drift between the two harness copies.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the

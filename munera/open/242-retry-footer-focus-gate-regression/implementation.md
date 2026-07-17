@@ -256,6 +256,16 @@
   Test green (rpc-prompt 6/6, 52 assertions, +2 from the new controls), lint
   clean.
 
+## task-test-review session (test-shaper pass) — outcome
+
+- added 2 steps (Slice 9): `await-retry-footer-text!` discards `await-until`'s
+  `timeout-token`, so a sync timeout fails as a generic "footer not found"
+  (indistinguishable from a real focus-gate regression) rather than a
+  diagnosable timeout — reopening the very race the pattern was added to close;
+  and the 500ms sync bound is an unnamed magic number duplicated across three
+  call sites. (Harness/`with-redefs` duplication is already tracked by task 243;
+  not re-filed.)
+
 ## task-test-review session (4th pass) — outcome
 
 - no new follow-up steps. Re-verified the E2E footer tests independently:
