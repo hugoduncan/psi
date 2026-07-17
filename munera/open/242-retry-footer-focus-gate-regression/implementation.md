@@ -78,3 +78,67 @@
 - Retry footer status-line is built in
   components/app-runtime/src/psi/app_runtime/footer.clj (~L279/L317) from
   `:psi.agent-session/retry` only when `(:active? retry)`.
+
+## Slice 1–4 outcome — diagnosis: focused session is NOT broken (working as intended)
+
+- Gap identified: `components/rpc/test/psi/rpc_prompt_test.clj` already had
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test`, but it
+  captures at the **pre-gate** `emit!` (a plain fn passed straight into
+  `streams/start-progress-loop!`), never touching `rpc.events/emit-event!` /
+  `focus-allows?`. So the actual RPC focus-gate boundary the design's AC1
+  targets had zero coverage — that was the real gap, not a code regression.
+- Added `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  in the same namespace. It builds real `psi.rpc.state` connection state
+  (`make-rpc-state` + `subscribe-topics!` + `set-focus-session-id!`), wires
+  `emit!` via `psi.rpc.session.emit/make-request-emitter` (the real emitter
+  used in production, which routes through `rpc.events/emit-event!` →
+  `focus-allows?`), then drives the same provider-boundary retry sequence
+  (429 → activation → changed metadata → recovery/clear) through
+  `turn-runtime/execute-prepared-request!` + the real
+  `streams/start-progress-loop!`.
+  - **Focused case** (focus-session-id = the retrying session): asserts
+    `footer/updated` frames reach the captured `emit-frame!` output and one
+    contains `retry in 8s` in `:status-line`. **Result: passes** — the focus
+    gate does not suppress the focused session's retry footer.
+  - **Background case** (focus-session-id = a different session, retry
+    happens in a non-focused session): asserts no `footer/updated` frames
+    reach `emit-frame!` at all. **Result: passes** — this is the intended
+    task-241 no-cross-session-leakage behaviour, not a bug.
+- **Diagnosis: background-only / working as intended.** The focused-session
+  retry→footer path was never actually broken by task 241's focus gate. AC1's
+  contingent branch applies: no failing-then-passing sequence was required or
+  produced; the new test stands as a green regression-lock characterization
+  test for the focused case, plus this recorded determination.
+- **Test-construction pitfall discovered (not a product bug):** an initial
+  draft of the focused-case test used a no-op `:provider-retry-sleep-fn`
+  (`(fn [_] nil)`). That raced the async `streams/start-progress-loop!`
+  (10ms poll interval) against `turn-runtime.core`'s
+  `mark-active-retry!` → `clear-active-retry!` sequence — with no
+  synchronizing sleep, the retry state could be written *and cleared* before
+  the progress loop ever polled and delivered the footer frame, since
+  `footer-updated-payload` reads **live** session data at delivery time, not
+  a snapshot from the triggering event. This produced a false failure
+  (`status-line` observed `nil` on every captured frame) that looked like the
+  suspected regression but was purely a test race. Fixed by making
+  `:provider-retry-sleep-fn` block (bounded, 500ms, matching the existing
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test` pattern)
+  until the expected retry text has actually been captured by `emit-frame!`,
+  keeping retry state live until the async loop catches up. Anyone adding
+  similar retry/footer E2E tests should reuse this synchronization pattern
+  (`await-retry-footer-text!`) rather than a no-op sleep.
+- **Possible follow-up (not implemented, out of scope):** background/delegated
+  session retry state is currently invisible to the focused connection by
+  design. If that's ever desired, a session-activity-line style surface (see
+  `footer/session-activity`) would be the natural place — a *different*
+  aggregate signal, not routing the raw session-scoped `footer/updated` event
+  around the focus gate.
+- **Verification:** `bb test --focus psi.rpc-prompt-test` (6/6 pass, incl. new
+  test) and `bb test --focus psi.rpc-events-test` (20/20 pass, task-241
+  focus-gate invariants untouched) are green. Full `bb test` run: baseline
+  (stashed, pre-change) shows 2450 passed/24 failed/38 errored from
+  pre-existing parallel `with-redefs` test-isolation flakiness (same failing
+  test names with and without this change); with this change: 2451
+  passed/24 failed/38 errored — the +1 pass is the new test, no new
+  failures/errors introduced.
+- No code fix was needed; only test coverage was added. No CHANGELOG entry
+  (no user-visible behaviour change).

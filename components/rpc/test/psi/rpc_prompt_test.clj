@@ -10,7 +10,9 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.tools :as tools]
+   [psi.rpc.session.emit :as rpc.emit]
    [psi.rpc.session.streams :as streams]
+   [psi.rpc.state :as rpc.state]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]
    [psi.rpc-test-support :as support]))
@@ -123,6 +125,134 @@
       (is (= "/repo/project"
              (get-in (last footer-events) [:data :path-line])))
       (is (empty? runtime-failed)))))
+
+(defn- await-retry-footer-text!
+  "Blocks (bounded) until `captured` contains a frame whose `:data
+   :status-line` includes `expected-text`. Used as a `:provider-retry-sleep-fn`
+   so the retry state stays live until the progress loop has actually
+   delivered the corresponding footer/updated frame, avoiding a race where the
+   retry clears before the async progress loop drains it."
+  [captured expected-text]
+  (support/await-until
+   #(some (fn [frame]
+            (str/includes? (or (get-in frame [:data :status-line]) "") expected-text))
+          @captured)
+   500))
+
+(defn- drive-provider-retry-through-progress-loop!
+  "Runs the real provider-boundary retry → progress-queue → footer-refresh
+   pipeline (`mark-active-retry!` → `:retry-updated` → `footer-refresh-progress-event?`
+   → `emit-footer-updated!`) with `emit!` supplied by the caller, then blocks
+   until the retry sequence (activate → change → clear) completes."
+  [ctx session-id emit!]
+  (let [attempts*  (atom 0)
+        progress-q (java.util.concurrent.LinkedBlockingQueue.)
+        error-turn (fn [headers]
+                     {:turn-id "turn-retry-footer"
+                      :model {:provider "anthropic" :id "stub"}
+                      :ai-options {}
+                      :turn-ctx nil
+                      :assistant-message {:role "assistant"
+                                          :content [{:type :error :text "rate limit exceeded"}]
+                                          :stop-reason :error
+                                          :error-message "rate limit exceeded"
+                                          :http-status 429
+                                          :provider-error/headers headers
+                                          :timestamp (java.time.Instant/now)}})
+        {:keys [stop? thread]} (streams/start-progress-loop!
+                                {:start-daemon-thread! (fn [f name]
+                                                         (doto (Thread. ^Runnable f name)
+                                                           (.setDaemon true)
+                                                           (.start)))
+                                 :ctx ctx
+                                 :session-id session-id
+                                 :emit! emit!
+                                 :progress-q progress-q
+                                 :thread-name "rpc-retry-footer-focus-test"})]
+    (try
+      (with-redefs [turn-runtime/execute-live-turn!
+                    (fn [& _]
+                      (case (swap! attempts* inc)
+                        1 (error-turn {"Retry-After" "8"
+                                       "RateLimit-Limit" "5000"
+                                       "RateLimit-Remaining" "0"})
+                        2 (error-turn {"Retry-After" "4"
+                                       "RateLimit-Limit" "5000"
+                                       "RateLimit-Remaining" "2"})
+                        {:turn-id "turn-retry-footer"
+                         :model {:provider "anthropic" :id "stub"}
+                         :ai-options {}
+                         :turn-ctx nil
+                         :assistant-message {:role "assistant"
+                                             :content [{:type :text :text "recovered"}]
+                                             :stop-reason :stop
+                                             :timestamp (java.time.Instant/now)}}))]
+        (turn-runtime/execute-prepared-request!
+         {:provider-registry (atom {})}
+         ctx
+         session-id
+         {:prepared-request/id "turn-retry-footer"
+          :prepared-request/model {:provider :anthropic :id "stub"}
+          :prepared-request/ai-options {}
+          :prepared-request/response-mode :streaming}
+         progress-q)
+        (streams/stop-progress-loop! {:stop? stop?
+                                      :thread thread
+                                      :progress-q progress-q
+                                      :emit! emit!
+                                      :ctx ctx
+                                      :session-id session-id}))
+      (finally
+        (reset! stop? true)
+        (.join ^Thread thread 200)))
+    @attempts*))
+
+(deftest rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test
+  ;; Regression lock (task 242): the retry footer must still reach
+  ;; `emit-frame!` at the RPC focus-gate boundary (`rpc.events/emit-event!` →
+  ;; `focus-allows?`) for the focused/retrying session, not just at the
+  ;; pre-gate `emit!` used by task 242's earlier characterization test above.
+  (testing "focused session: retry footer/updated frames pass the focus gate"
+    (let [captured    (atom [])
+          emit-frame! (fn [frame] (swap! captured conj frame))
+          [ctx session-id] (support/create-session-context
+                            {:persist? false
+                             :config {:auto-retry-base-delay-ms 8000
+                                      :auto-retry-max-retries 2}})
+          ctx         (assoc ctx :provider-retry-sleep-fn
+                             (fn [delay-ms]
+                               (await-retry-footer-text!
+                                captured
+                                (str "retry in " (quot (long delay-ms) 1000) "s"))))
+          state       (rpc.state/make-rpc-state {:session-id session-id})
+          _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
+          _           (rpc.state/set-focus-session-id! state session-id)
+          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
+      (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+      (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
+        (is (seq footer-events)
+            "focused session must still receive footer/updated frames through the focus gate")
+        (is (some #(str/includes? (or (get-in % [:data :status-line]) "") "retry in 8s")
+                  footer-events)
+            "focused session must receive the retry-activation footer text through the focus gate")
+        (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
+  (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
+    (let [captured    (atom [])
+          emit-frame! (fn [frame] (swap! captured conj frame))
+          [ctx session-id] (support/create-session-context
+                            {:persist? false
+                             :config {:auto-retry-base-delay-ms 8000
+                                      :auto-retry-max-retries 2}})
+          ctx         (assoc ctx :provider-retry-sleep-fn (fn [_delay-ms] nil))
+          other-session-id "some-other-focused-session"
+          state       (rpc.state/make-rpc-state {:session-id other-session-id})
+          _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
+          _           (rpc.state/set-focus-session-id! state other-session-id)
+          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
+      (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+      (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
+        (is (empty? footer-events)
+            "retry footer for a non-focused (background) session must not leak to the focused connection")))))
 
 (deftest rpc-prompt-provider-retry-state-publishes-footer-updated-test
   ;; Provider-boundary retry state changes drive Emacs-visible footer refreshes.
