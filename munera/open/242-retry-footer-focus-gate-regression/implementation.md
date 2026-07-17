@@ -497,3 +497,14 @@
   `clj-paren-repair` clean. Comment/doc-only; no product/behaviour change, no
   test-logic change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## task-test-review session (test-shaper pass, 8th) — outcome
+
+- added 1 step (Slice 16): the deterministic-sync helper's `expected-retry-text`
+  derives the awaited footer text with `(quot delay-ms 1000)` (floor), but
+  production builds it with `Math/ceil` of a delivery-time `resume-at - now-ms`
+  delta (`retry_display/format-relative-seconds`) — a `quot`-vs-`ceil` +
+  snapshot-vs-live-delta coupling that coincides only for whole-second
+  `Retry-After` values, and can surface as a false Slice-9 sync-timeout naming a
+  text production never emits. Distinct from Slices 10/13 (which only dedup'd the
+  derivation, never questioned its correctness).

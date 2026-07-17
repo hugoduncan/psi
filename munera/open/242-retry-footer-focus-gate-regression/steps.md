@@ -362,3 +362,43 @@ If background-only (working as intended):
       task 243's harness rewrite, record the explicit rationale and forward it to
       243 rather than leaving the config-divergence / inaccurate-"identical"
       residual standing.
+
+## Slice 16 — Test-review follow-ups (test-shaper pass, 8th)
+
+- [ ] The deterministic-sync helper derives the awaited text with a **different
+      formula** than the production footer, so the sync coincides only for the
+      exact values the test happens to use — a latent `deterministic`/`robust`
+      coupling distinct from every prior expected-text slice (which only *dedup'd*
+      the derivation, Slices 10/13, never questioned its correctness). Chain:
+      `expected-retry-text` (rpc_prompt_test.clj) computes `(quot delay-ms 1000)`
+      (integer floor) from the `delay-ms` the retry loop passes to
+      `:provider-retry-sleep-fn` (`turn_runtime/core.clj` L621 →
+      `sleep-for-retry!` receives `(:delay-ms retry-metadata)`). The *actual*
+      footer text is built by
+      `app_runtime/retry_display.clj`'s `format-relative-seconds` as
+      `(Math/ceil (/ (- resume-at now-ms) 1000.0))` — `ceil`, not `floor`, and
+      computed from `resume-at - now-ms` re-read **at delivery time** (the async
+      progress loop reads live session data when it polls, not a snapshot). So
+      the helper waits for `"retry in 8s"`/`"retry in 4s"` while the footer's
+      seconds depend on how much wall-clock elapsed between `mark-active-retry!`
+      and the 10ms-poll delivery: `resume-at ≈ now₀ + delay-ms`, and at delivery
+      `now-ms > now₀`, so `ceil((resume-at - now-ms)/1000)` can be `N-1` (e.g.
+      `ceil(7998/1000) = 8` today, but `ceil(7000/1000)`… a >1s poll/GC delay
+      would yield `"retry in 7s"`). Today green only because `Retry-After` = 8/4
+      are whole seconds and drift stays sub-second within the 500ms bound. The
+      failure mode this creates is exactly the one Slice 9 set out to remove: if
+      the footer emits `"retry in 7s"` while the helper awaits `"retry in 8s"`,
+      the sync *times out on the wrong expected text* and now surfaces as the
+      Slice-9 "retry footer sync timed out awaiting <text>" diagnostic — a
+      **false timeout** naming a text production never intended to emit, masking
+      a live-and-correct pipeline as a regression. Fix: derive the awaited text
+      from the *same* authority the footer uses (call
+      `retry-display/format-relative-seconds` / `retry-status-text`, or compute
+      `ceil` from the retry metadata's `:resume-at`/`:delay-ms` the same way),
+      so the helper waits for the text production will actually emit rather than
+      a floor-approximation that coincides only for whole-second `Retry-After`
+      values. Alternatively, if kept as-is for task 242's frozen coverage,
+      record the explicit rationale (relies on whole-second `Retry-After` +
+      sub-500ms drift) and forward the formula-coupling to task 243's harness
+      rewrite rather than leaving the `quot`-vs-`ceil` divergence as an
+      untracked latent-desync residual.
