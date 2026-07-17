@@ -458,3 +458,5 @@
 ## Task-test-review pass 11 (test-shaper skill)
 
 - added 1 follow-up step: sibling pre-gate test derives the same two frame-predicate matches through two divergent lookup idioms over the same coll — frame bindings via `(first (filter pred …))` (lines ~756–757) and, over the same predicates/coll, indices via the pass-8 `first-frame-index` authority inside `activation-precedes-changed?` — a `consistent(test_abstractions)`/`economical` seam (double traversal, two spellings for one "first matching frame" concept) distinct from pass 6's frame-idiom-only fix. Non-blocking. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
+
+- addressed 1 review step (test-shaper pass 11): added `first-frame` lookup authority; reconciled sibling test's frame bindings with the `first-frame-index` index authority (one "first matching frame" convention). Tests green (60/3), lint clean.

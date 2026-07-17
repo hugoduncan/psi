@@ -307,6 +307,15 @@
   [frame]
   (str/includes? (frame-status-line frame) active-retry-text-prefix))
 
+(defn- first-frame
+  "Single authority for \"the first frame matching `pred`\" over a footer-frame
+   seq, or `nil` if none matches. Frame-returning sibling of
+   `first-frame-index`; both flow from one \"first matching frame\" lookup
+   convention so the frame-binding sites and the index-based ordering controls
+   do not diverge into two spellings for the same need."
+  [pred frames]
+  (first (filter pred frames)))
+
 (defn- first-frame-index
   "Single authority for \"index of the first frame matching `pred`\" over a
    footer-frame seq, or `nil` if none matches. Isolates the
@@ -753,8 +762,8 @@
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
           retry-run (drive-provider-retry-through-progress-loop! ctx session-id emit!)
           footer-events (footer-updated-frames @emitted*)
-          first-retry-footer (first (filter activation-retry-footer? footer-events))
-          changed-retry-footer (first (filter changed-retry-footer? footer-events))
+          first-retry-footer (first-frame activation-retry-footer? footer-events)
+          changed-retry-footer (first-frame changed-retry-footer? footer-events)
           ;; Positive control (task 242 Slice 14): the clear footer is the
           ;; footer *produced after* the last active-retry frame, not merely the
           ;; last footer overall — so the no-stale-`retry in` assertion is
