@@ -142,3 +142,12 @@
   failures/errors introduced.
 - No code fix was needed; only test coverage was added. No CHANGELOG entry
   (no user-visible behaviour change).
+
+## implementation-review session — outcome
+
+- Verified the new test is genuinely load-bearing: with `focus-allows?`
+  bypassed, the background `(is (empty? footer-events))` sub-test fails (4 leaked
+  frames) — so the focus-gate regression lock is real, not vacuous.
+- added 2 steps (Slice 5): tick the deferred Slice-4 commit checkbox, and
+  document the background sub-test's synchronous-drain dependency (unguarded,
+  unlike the focused sub-test's `await-retry-footer-text!`).
