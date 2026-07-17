@@ -732,3 +732,37 @@ If background-only (working as intended):
       recur on other tasks); if a driver/workflow re-ran earlier lifecycle
       phases on a closed task, that ordering should be prevented rather than
       just tolerated because the passes happened to be no-ops here.
+
+## Slice 25 — Test-review follow-ups (task-test-review pass)
+
+- [ ] The E2E focused-session regression lock never exercises the
+      `focus-allows?` **default-session-id fallback** arm with a retry footer —
+      the very single-focused-session path the design's Context names as the
+      prime suspect. `focus-gated-emitter!` (rpc_prompt_test.clj ~L459) always
+      calls `rpc.state/set-focus-session-id!` with the retrying session, so the
+      focused sub-test of
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+      only ever hits the **explicit-focus** branch of
+      `focus-allows?` (`(or (focus-session-id state) (default-session-id state))`,
+      events.clj L88-89). In production the common single-session case has *no
+      explicit focus set*, so the focused retry footer is delivered via the
+      `default-session-id` fallback — a branch this E2E lock never drives with a
+      `footer/updated` retry frame. The prior 4th-pass dismissal (implementation.md
+      L279-280: "the fallback arm is covered at the unit level by
+      `emit-event-nil-focus-uses-default-session-id-test`, so not a gap here")
+      conflates two distinct things: the fallback *logic* is unit-tested with a
+      synthetic `assistant/delta`, but the *retry-footer behaviour under the
+      fallback* — the actual regression class task 241 introduced and this task
+      locks against — is not proven end-to-end. A future change to the
+      `(or explicit-focus default-session-id)` fallback (removal, or a
+      session-id-stamping change in `emit-footer-updated!`) could suppress the
+      focused retry footer in the real single-session/no-explicit-focus scenario
+      while this E2E test stays green (it forces explicit focus). Add a focused
+      sub-test variant that leaves explicit focus **nil** (relying on
+      `default-session-id`) and asserts the retry `footer/updated` frames still
+      reach `emit-frame!` for the retrying session — closing the fallback-arm
+      E2E gap the design's prime-suspect scenario actually depends on. If judged
+      out of scope for task 242's frozen coverage or better folded into task
+      243's harness rewrite, record the explicit rationale (and correct the
+      overstated "not a gap here" 4th-pass note) rather than leaving the
+      default-session-id E2E fallback arm uncovered.

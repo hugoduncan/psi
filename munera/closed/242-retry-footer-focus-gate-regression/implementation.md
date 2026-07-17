@@ -957,3 +957,16 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task was
   closed at `58a16fd53` before this review.
+
+## task-test-review session (4th pass, deep) — outcome
+
+- added 1 step (Slice 25): the E2E focused regression lock only exercises the
+  `focus-allows?` *explicit-focus* arm (`focus-gated-emitter!` always sets
+  focus); the `default-session-id` fallback arm — the single-focused-session /
+  no-explicit-focus path the design names as the prime suspect — is never driven
+  with a retry footer end-to-end. The prior 4th-pass "not a gap here" dismissal
+  conflated fallback *logic* (unit-tested) with retry-*footer*-under-fallback
+  (uncovered E2E).
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
+  at `58a16fd53` before this review.
