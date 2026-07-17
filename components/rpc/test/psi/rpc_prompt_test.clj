@@ -288,6 +288,39 @@
             "focused session must receive the cleared footer (no stale retry text) through the focus gate")
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
+    ;; Pre-gate production control (task 242 Slice 12): the gated `(is (empty?
+    ;; footer-events))` below cannot, on its own, distinguish "footer frames
+    ;; were produced then suppressed by `focus-allows?`" (the intended
+    ;; behaviour) from "footer frames were never produced for this background
+    ;; config" (a footer-production regression, e.g. in
+    ;; `footer-refresh-progress-event?` matching `:retry-updated` or in
+    ;; `emit-footer-updated!` / status-line construction). `(= 3 attempts)`
+    ;; below only proves the retry *turns* fired, not that `footer/updated`
+    ;; frames were produced. So first drive the *identical* background config
+    ;; through a pre-gate raw `emit!` (no focus gate) and prove it produces ≥1
+    ;; retry footer — this credits the gated `empty?` assertion against a
+    ;; live-and-producing pipeline rather than a dead/no-op one.
+    (let [pre-gate-captured (atom [])
+          [pre-gate-ctx pre-gate-session-id]
+          (support/create-session-context
+           {:persist? false
+            :config {:auto-retry-base-delay-ms 8000
+                     :auto-retry-max-retries 2}})
+          pre-gate-ctx (assoc pre-gate-ctx :provider-retry-sleep-fn
+                              (fn [delay-ms]
+                                (await-retry-footer-text!
+                                 pre-gate-captured
+                                 (str "retry in " (quot (long delay-ms) 1000) "s"))))
+          pre-gate-emit! (fn [event data]
+                           (swap! pre-gate-captured conj {:event event :data data}))
+          pre-gate-attempts (drive-provider-retry-through-progress-loop!
+                             pre-gate-ctx pre-gate-session-id pre-gate-emit!)
+          pre-gate-footers (filterv #(= "footer/updated" (:event %)) @pre-gate-captured)]
+      (is (= 3 pre-gate-attempts)
+          "the full activate→change→clear retry sequence must have executed (pre-gate control)")
+      (is (some #(str/includes? (or (get-in % [:data :status-line]) "") "retry in")
+                pre-gate-footers)
+          "the background retry config must produce retry footer/updated frames absent the focus gate — otherwise the gated `empty?` assertion below is vacuous"))
     (let [captured    (atom [])
           emit-frame! (fn [frame] (swap! captured conj frame))
           [ctx session-id] (support/create-session-context
@@ -315,7 +348,9 @@
       ;; synchronously) before this assertion runs — unlike the focused sub-test,
       ;; this background sub-test has no `await-retry-footer-text!` guard, so any
       ;; change to the drain path / sleep-fn must preserve that synchronous drain
-      ;; or this assertion could pass vacuously.
+      ;; or this assertion could pass vacuously. The pre-gate production control
+      ;; above proves this same config *would* emit retry footers absent the
+      ;; gate, so `empty?` here credits suppression, not footer-non-production.
       (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
         (is (empty? footer-events)
             "retry footer for a non-focused (background) session must not leak to the focused connection")))))

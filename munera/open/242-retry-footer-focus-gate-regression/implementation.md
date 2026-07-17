@@ -372,3 +372,23 @@
   `(= 3 attempts)` proves retry turns fired, not that `footer/updated` frames
   were produced, so a background footer-production regression would pass green;
   the load-bearing evidence is only a one-time manual bypass check, not encoded.
+
+## Slice 12 — test-shaper 4th pass follow-up (addressed 1 review step)
+
+- **Production-vs-gating positive control:** encoded the distinguishing control
+  the review flagged (option (a)). Before the gated run, the background sub-test
+  now drives the *identical* background retry config through a pre-gate raw
+  `emit!` (synchronized via the shared `await-retry-footer-text!`) and asserts
+  it produces ≥1 retry `footer/updated` frame (`retry in …`). Only then does the
+  second run (through `make-request-emitter` with foreign focus) assert
+  `(is (empty? footer-events))`. This credits the `empty?` assertion against a
+  live-and-producing pipeline: a footer-production regression (e.g. in
+  `footer-refresh-progress-event?` matching `:retry-updated` or in
+  `emit-footer-updated!` / status-line construction) now fails the pre-gate
+  production assertion instead of passing green as a false "correctly gated".
+  The prior one-time manual bypass check is now encoded as a standing
+  assertion. `(= 3 attempts)` still proves the retry turns fired; the new
+  pre-gate footer assertion proves frames were produced.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 60 assertions,
+  +4 from the pre-gate control), `clj-kondo` clean, `clj-paren-repair` clean.
+  Test-only; no product/behaviour change, no CHANGELOG entry.

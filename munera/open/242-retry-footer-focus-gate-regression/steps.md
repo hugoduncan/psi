@@ -138,7 +138,7 @@ If background-only (working as intended):
 
 ## Slice 12 — Test-review follow-ups (test-shaper pass, 4th)
 
-- [ ] Background sub-test cannot distinguish gate-suppression from
+- [x] Background sub-test cannot distinguish gate-suppression from
       footer-non-production — a distinct vacuity branch from the two already
       closed. The background sub-test's sole outcome signal is
       `(is (empty? footer-events))`. Its two existing guards close different
