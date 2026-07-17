@@ -87,6 +87,28 @@ If background-only (working as intended):
       explicit rationale (no clean seam at `execute-live-turn!`) so future
       readers know it is a deliberate, bounded exception.
 
+## Slice 7 — Test-review follow-ups (2nd task-test-review pass)
+
+- [ ] Standing ¬mock/¬stub violation has no tracked exit: Slice 6 item 2
+      *evaluated and deferred* the `with-redefs turn-runtime/execute-live-turn!`
+      logic-boundary stub, and the recorded rationale confirms a **clean
+      injectable seam exists** (stub provider via
+      `psi.ai.core/create-context`'s per-ctx `:provider-registry`, emitting
+      stream `:error` events carrying `:http-status` /
+      `:provider-error/headers`). Deferring migration is defensible for task
+      242's frozen scope, but no concrete follow-up captures the eventual
+      removal of the violation — so it risks becoming a permanent unnoticed
+      exception. Create (or reference) a dedicated follow-up task to migrate the
+      retry-footer E2E harness onto the confirmed provider-registry seam,
+      scoped to co-migrate **both** call sites that share the stub:
+      `drive-provider-retry-through-progress-loop!` (used by
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`)
+      **and** the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test`, which
+      inlines its own identical `with-redefs`. This also targets the recorded
+      parallel `with-redefs` test-isolation flakiness attributed to the same
+      pattern.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the

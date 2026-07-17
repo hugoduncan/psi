@@ -214,3 +214,10 @@
   exists and the `with-redefs` is a deliberate, scoped deferral — a natural
   follow-up task (migrate both retry-turn E2E tests to a stub provider seam) if
   the parallel `with-redefs` flakiness is worth eliminating.
+
+## task-test-review session (2nd pass) — outcome
+
+- added 1 step (Slice 7): the confirmed ¬mock/¬stub violation (`with-redefs
+  execute-live-turn!`, shared by both retry-footer E2E tests) was evaluated and
+  deferred in Slice 6 but has no tracked exit — recommend a dedicated follow-up
+  task to migrate both call sites onto the confirmed provider-registry seam.
