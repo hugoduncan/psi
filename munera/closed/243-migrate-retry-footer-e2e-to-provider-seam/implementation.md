@@ -460,3 +460,8 @@
 - added 1 follow-up step: sibling pre-gate test derives the same two frame-predicate matches through two divergent lookup idioms over the same coll — frame bindings via `(first (filter pred …))` (lines ~756–757) and, over the same predicates/coll, indices via the pass-8 `first-frame-index` authority inside `activation-precedes-changed?` — a `consistent(test_abstractions)`/`economical` seam (double traversal, two spellings for one "first matching frame" concept) distinct from pass 6's frame-idiom-only fix. Non-blocking. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
 
 - addressed 1 review step (test-shaper pass 11): added `first-frame` lookup authority; reconciled sibling test's frame bindings with the `first-frame-index` index authority (one "first matching frame" convention). Tests green (60/3), lint clean.
+
+## Task-test-review pass 12 (test-shaper skill)
+
+- added 1 follow-up step: three constant/helper docstrings still name "the driver" as the emitter/supplier of the `Retry-After`/429 headers (`retry-after-seconds`, `remaining-fragment`, `retry-footer-session-context!`) — the same stale-terminology class pass 5 fixed for `retry-rate-limit`/`changed-retry-remaining` but left incomplete; verified the driver body constructs no `Retry-After`/`RateLimit`/`error-event` (those live in `retry-stub-provider-ai-ctx`'s `error-event`). `locally_comprehensible`/`consistent(naming)`; non-blocking.
+- non-compliance note: the review request targeted `munera/open/243-…`, but the task is closed (`munera/closed/243-…`); step/note appended to the closed task in place.
