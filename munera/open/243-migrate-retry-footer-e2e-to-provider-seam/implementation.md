@@ -275,3 +275,77 @@
   derivation, `focus-gated-emitter!`/`default-focus-emitter!` consolidation.
   Deferred to Slice 6: full-suite `bb test` post-migration run + flakiness
   comparison against the recorded baseline above.
+
+## Implementation pass (Slice 5 — harness consolidation)
+
+- `active-retry-text-prefix`: replaced the length-subtraction derivation
+  (`subs status-line 0 (- (count status-line) (count (format-relative-seconds
+  now-ms)))`) with a direct derivation — `retry-status-text {:active? true
+  :resume-at 0} 0` at zero delay/no rate-limit metadata returns exactly
+  `"retry in 0s"` with no `" · "` join fragment, so stripping the trailing
+  literal `"0s"` yields the fixed prefix straight from the production string
+  without an independent `format-relative-seconds` call.
+- Collapsed `focus-gated-emitter!` / `default-focus-emitter!` into one
+  `focus-emitter! [session-id focus]` builder (`focus` = explicit
+  session-id, or `nil` to exercise the `focus-allows?` default-session-id
+  fallback branch — `make-rpc-state {:session-id session-id}` already seeds
+  both `:focus-session-id` and `:default-session-id`, so `focus nil` still
+  resolves the session as its own default focus via the fallback). Updated
+  all three call sites (focused-session test, default-session-id fallback
+  test, background-session test).
+- No other matcher/format helpers were found redundant after the seam
+  migration — `expected-retry-text`, `remaining-fragment`,
+  `retry-footer-sleep-fn`, `retry-status-line?`,
+  `clear-footer-produced-after-retry`, `activation-precedes-changed?` each
+  retain a distinct single-authority role (delay→text, rate-limit fragment,
+  sync, stale-text predicate, positive control, ordering control) not
+  subsumed by the provider-seam change.
+- `bb test --focus psi.rpc-prompt-test`: 5 passed / 0 failed / 0 errored (58
+  assertions). `clj-paren-repair`: no changes needed. `clj-kondo --lint`:
+  0 errors, 0 warnings.
+
+## Implementation pass (Slice 6 — flakiness re-evaluation + close-out)
+
+- Post-migration full-suite `bb test`: **2450 passed / 25 failed / 38
+  errored** (18660 assertions: 18660 passed / 52 failed / 38 errored).
+- Comparison against this task's own pre-migration baseline (recorded in
+  the Slice 1-4 pass above): **2451 passed / 24 failed / 38 errored**.
+  Total test count is unchanged (2513 both runs); one test flipped from
+  passed → failed between the two runs (errored count unchanged at 38).
+- Checked the post-migration failure/error set
+  (`.scry-results/*.edn`, 63 files) for either retry-footer test under
+  migration
+  (`rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`,
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test`): **neither
+  appears** in the failure/error set. Both migrated tests passed in the
+  post-migration run (confirmed directly: `bb test --focus
+  psi.rpc-prompt-test` green, 5/5, immediately before this full-suite run).
+- **Finding: the parallel-isolation failure set is unchanged (not reduced,
+  not eliminated) by this migration.** The two retry-footer `with-redefs`
+  call sites removed by this task were not a/the cause of the pre-existing
+  parallel-isolation flakiness — the failures observed post-migration are in
+  unrelated namespaces (`psi.turn-runtime.response-mode-test`,
+  `psi.rpc-prompt-command-test`,
+  `psi.agent-session.statechart-actions-test`, per `.scry-results` file
+  names), none of which reference the migrated tests or the
+  provider-registry seam. The ±1 failed/passed count between the two runs is
+  consistent with the same pre-existing suite-wide parallel test-isolation
+  issue (unrelated to this migration) intermittently flipping which specific
+  test loses the race on a given run, not with a regression this migration
+  introduced.
+- Acceptance criteria verified:
+  - Neither retry-footer test uses `with-redefs` of
+    `turn-runtime/execute-live-turn!` (or any logic boundary) — confirmed;
+    `grep with-redefs` in the file shows exactly one remaining site
+    (`session/query-in` in an unrelated test, out of scope, noted in the
+    Slice 3/4 pass above).
+  - Both retry-footer tests still assert the same three frames / focus-gate
+    behaviour / pre-gate footer sequence — confirmed unchanged in this pass
+    (only the emitter-builder and prefix-derivation *construction* changed,
+    not the assertions).
+  - `bb test --focus psi.rpc-prompt-test` is green — confirmed (5/5).
+  - The task-242 deferred-exception comment is removed — confirmed in the
+    Slice 3/4 pass.
+  - Flakiness re-evaluation recorded with a stated outcome (unchanged) —
+    this entry.
+- All design.md acceptance criteria are met. Task ready to close.

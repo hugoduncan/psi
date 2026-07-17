@@ -33,15 +33,15 @@
 
 ## Slice 5 — Harness consolidation (forwarded from task 242)
 
-- [ ] Replace `active-retry-text-prefix` length-subtraction derivation with a direct derivation from `psi.app-runtime.retry-display/retry-status-text` or an explicit literal
-- [ ] Collapse `focus-gated-emitter!` and `default-focus-emitter!` into one parameterized `focus-emitter! [session-id focus]` builder; update both call-site tests
-- [ ] Prune matcher/format/config-coupling helpers made redundant by the provider-seam harness (no churn beyond redundancy)
-- [ ] Run `bb test --focus psi.rpc-prompt-test`; green; lint clean
-- [ ] Commit
+- [x] Replace `active-retry-text-prefix` length-subtraction derivation with a direct derivation from `psi.app-runtime.retry-display/retry-status-text` or an explicit literal
+- [x] Collapse `focus-gated-emitter!` and `default-focus-emitter!` into one parameterized `focus-emitter! [session-id focus]` builder; update both call-site tests
+- [x] Prune matcher/format/config-coupling helpers made redundant by the provider-seam harness (no churn beyond redundancy) — none found redundant; the retained helpers each still have a distinct single-authority role
+- [x] Run `bb test --focus psi.rpc-prompt-test`; green; lint clean
+- [x] Commit
 
 ## Slice 6 — Flakiness re-evaluation + close-out
 
-- [ ] Run full-suite `bb test` (post-migration); record passed/failed/errored counts in implementation.md
-- [ ] Record the before/after comparison against the baseline and state whether the parallel-isolation failure set is unchanged, reduced, or eliminated (unchanged ⇒ recorded finding: these two sites were not the isolation cause)
-- [ ] Verify all design.md acceptance criteria; note verification in implementation.md
-- [ ] Commit
+- [x] Run full-suite `bb test` (post-migration); record passed/failed/errored counts in implementation.md
+- [x] Record the before/after comparison against the baseline and state whether the parallel-isolation failure set is unchanged, reduced, or eliminated (unchanged ⇒ recorded finding: these two sites were not the isolation cause)
+- [x] Verify all design.md acceptance criteria; note verification in implementation.md
+- [x] Commit
