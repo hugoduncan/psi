@@ -39,3 +39,14 @@
   `munera/closed/242-retry-footer-focus-gate-regression/implementation.md`
   ("Verification" bullet: baseline 2450/24/38, with-change 2451/24/38 — the +1
   pass being the added test).
+
+## Design-review session outcome (arch + ambiguity + inconsistency)
+
+- Shared design-review session (all three turns) found no new actionable
+  feedback: the design is architecturally clean (¬mock/¬stub via injectable
+  per-ctx `:provider-registry` seam, behaviour-preserving, no shims, focus-gate
+  invariants intact) and internally consistent. The only design-step is the
+  already-resolved flakiness done-condition.
+- Principles to hold when addressing the design-step: keep the two frozen call
+  sites and behaviour-preserving constraint; resolve via record-and-compare, not
+  by chasing a green full suite (record-not-fix).
