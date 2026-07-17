@@ -116,7 +116,7 @@ If background-only (working as intended):
 
 ## Slice 8 — Test-review follow-ups (3rd task-test-review pass)
 
-- [ ] Background sub-test lacks a "retry actually fired" positive control:
+- [x] Background sub-test lacks a "retry actually fired" positive control:
       `drive-provider-retry-through-progress-loop!` returns `@attempts*` (retry
       attempts driven), and the sibling
       `rpc-prompt-provider-retry-state-publishes-footer-updated-test` asserts

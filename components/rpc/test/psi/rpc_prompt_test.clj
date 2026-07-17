@@ -239,8 +239,15 @@
           state       (rpc.state/make-rpc-state {:session-id session-id})
           _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
           _           (rpc.state/set-focus-session-id! state session-id)
-          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
-      (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")
+          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+      ;; Positive control (matches the sibling
+      ;; `rpc-prompt-provider-retry-state-publishes-footer-updated-test`): prove
+      ;; the full activate→change→clear retry sequence actually ran, so the
+      ;; footer assertions below are credited against a live retry pipeline, not
+      ;; a no-op/mis-wired one.
+      (is (= 3 attempts)
+          "the full activate→change→clear retry sequence must have executed")
       (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
         (is (seq footer-events)
             "focused session must still receive footer/updated frames through the focus gate")
@@ -272,8 +279,16 @@
           state       (rpc.state/make-rpc-state {:session-id other-session-id})
           _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
           _           (rpc.state/set-focus-session-id! state other-session-id)
-          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
-      (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")
+          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+      ;; Positive control: `(is (empty? footer-events))` alone passes both when
+      ;; the retry fired-but-was-gated (intended) and when the retry never fired
+      ;; at all (e.g. the no-op sleep-fn or a mis-wired background config
+      ;; silently skips the loop). Assert the full activate→change→clear retry
+      ;; sequence ran (matching the sibling test) so the empty-footer assertion
+      ;; is only credited when the retry pipeline is proven live.
+      (is (= 3 attempts)
+          "the full activate→change→clear retry sequence must have executed")
       ;; This `(is (empty? ...))` is non-vacuous only because
       ;; `drive-provider-retry-through-progress-loop!` calls
       ;; `streams/stop-progress-loop!` (which drains the progress queue

@@ -240,3 +240,18 @@
   from "retry never fired" — a positive control `(is (= 3 attempts))` (as in
   the sibling test) is missing. Distinct from the already-documented drain
   dependency.
+
+## Slice 8 — 3rd test-review follow-up addressed
+
+- addressed 1 test-review follow-up step: captured
+  `drive-provider-retry-through-progress-loop!`'s returned attempt count in both
+  sub-tests of
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  and added the positive control `(is (= 3 attempts))` (matching the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test`). The
+  background `(is (empty? footer-events))` is now only credited when the full
+  activate→change→clear retry sequence is proven to have executed, so it can no
+  longer pass vacuously if the retry never fires (no-op sleep-fn / mis-wired
+  config). Added the same control to the focused sub-test (the optional part).
+  Test green (rpc-prompt 6/6, 52 assertions, +2 from the new controls), lint
+  clean.
