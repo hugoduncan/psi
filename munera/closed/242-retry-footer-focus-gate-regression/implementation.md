@@ -1108,3 +1108,17 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: executed against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed at
   `58a16fd53` before this follow-up.
+
+## code-shaper review session (2nd pass) — outcome
+
+- No new steps: no genuinely-new actionable code-shaper issue. Re-read the
+  retry-footer harness (`components/rpc/test/psi/rpc_prompt_test.clj`) fresh
+  against simplicity/consistency/robustness. All candidate residuals are already
+  captured and explicitly owned: the aggregate over-abstraction and the brittle
+  `active-retry-text-prefix` length-subtraction derivation (Slice 23,
+  forward-to-243); the `focus-gated-emitter!`/`default-focus-emitter!`
+  near-duplicate builders (Slice 28, forward-to-243); driver-header↔matcher
+  constant coupling (Slices 17/18, resolved). Tests green, `clj-kondo` clean.
+  Adding a slice would duplicate existing forwarded items.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path).
