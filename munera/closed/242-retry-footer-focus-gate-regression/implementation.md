@@ -848,3 +848,14 @@
   contradicts steps.md's `rpc_prompt_test.clj` home — the divergence is normal
   plan→steps refinement, documented in implementation.md. No new design-steps
   filed.
+
+## task-implementation-review session — outcome
+
+- added 2 steps (Slice 23): aggregate test-helper over-abstraction relative to
+  the frozen test-only scope (esp. `active-retry-text-prefix`'s brittle
+  length-subtraction prefix derivation), and a lifecycle-ordering anomaly
+  (design/plan review passes ran *after* the task was closed).
+- Non-compliance note: the review was run against an already-*closed* task
+  (`munera/closed/242-…`, not `munera/open/…` as the request path assumed); the
+  task was closed at `58a16fd53` before this review. Steps added to closed
+  task's steps.md accordingly.

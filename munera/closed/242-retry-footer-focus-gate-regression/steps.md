@@ -651,3 +651,49 @@ If background-only (working as intended):
       forward it to 243 rather than leaving the duplicated `"retry in "` prefix
       (a `retry_display.clj`↔matcher coupling the seconds and remaining fragment
       no longer have) standing.
+
+## Slice 23 — Review follow-ups (task-implementation-review)
+
+- [ ] Aggregate test-helper apparatus is disproportionate to the frozen,
+      test-only, no-code-change scope — an `unnecessary_abstraction`/`simplicity`
+      residual the individual code-shaper/test-shaper slices (17–22) each
+      justified locally but never assessed in aggregate. The retry-footer E2E
+      harness now carries ~15 extracted single-authority helpers/constants
+      (`frame-status-line`, `footer-updated-frames`, `focus-gated-emitter!`,
+      `retry-footer-session-context!`, `expected-retry-text`, `remaining-fragment`,
+      `active-retry-text-prefix`, `activation-retry-delay-ms`,
+      `changed-retry-delay-ms`, `retry-rate-limit`, `changed-retry-remaining`,
+      `retry-after-seconds`, `retry-footer-sleep-fn`, `retry-status-line?`,
+      `clear-footer-produced-after-retry`, `drive-provider-retry-through-progress-loop!`)
+      for a *single* test pair. `active-retry-text-prefix` is the sharpest case:
+      it derives the fixed `"retry in "` prefix by computing
+      `retry-status-text {:active? true :resume-at 0}` at `now-ms 0`, then
+      *string-length-subtracting* `(format-relative-seconds 0)` from the tail
+      (`(subs status-line 0 (- (count status-line) (count seconds)))`) — an
+      indirect, fragile derivation (breaks silently if production ever emits a
+      trailing/leading space or reorders the fragment) that is far more complex
+      than the one-line literal it replaced, to remove a drift risk on a
+      *test-only* frozen harness that will (per task 243) be rewritten anyway.
+      Assess whether the later dedup slices (esp. Slice 22's prefix derivation
+      and the driver-header↔matcher constant folding) are net-positive for this
+      frozen harness or are incidental complexity added chasing convergence; if
+      the harness is being migrated by 243, prefer forwarding the format-coupling
+      concerns to 243's rewrite over encoding brittle derivations in a
+      soon-to-be-replaced harness. Record the explicit judgement (keep vs revert
+      vs forward-to-243) rather than leaving the aggregate over-abstraction
+      unassessed.
+
+- [ ] Lifecycle-ordering anomaly: design-review and plan-review passes ran on
+      the task *after* it was already closed. The close commit is `58a16fd53`
+      (`⊘ 242: close`, git-mv open/ → closed/), but four design-review commits
+      (`4f30a1a1e`, `1c9caf4d3`, `516cb062e`, `0a616983e`) and two plan-review
+      commits (`2ee8ba795`, `d48c15c9b`) landed *after* it, running the
+      design/plan review turns against an already-closed, already-implemented
+      task. All produced "no new feedback" so there is no functional impact, but
+      running design→plan review *after* implementation+close inverts the
+      intended lifecycle order (design/plan review precede implementation) and
+      the reviews are largely vacuous against a frozen closed task. Confirm this
+      was intentional catch-up bookkeeping (not a lifecycle-driver bug that will
+      recur on other tasks); if a driver/workflow re-ran earlier lifecycle
+      phases on a closed task, that ordering should be prevented rather than
+      just tolerated because the passes happened to be no-ops here.
