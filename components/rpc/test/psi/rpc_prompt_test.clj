@@ -216,21 +216,20 @@
                       #" · " 2))))
 
 (def ^:private active-retry-text-prefix
-  "The active-retry status-line prefix (`\"retry in \"`), derived from the same
-   production authority the footer emits rather than a hand-copied literal
-   (task 242 Slice 22): `retry-display/retry-status-text` builds
-   `(str \"retry in \" delay-text)` and `format-relative-seconds` builds the
-   `delay-text` suffix, so the prefix is the status-line text with the seconds
-   suffix removed. Used by the `retry-status-line?` substring predicate; folding
-   it onto `retry-display` (like Slice 16's seconds and Slice 21's remaining
-   fragment) means a footer-format change to the prefix in `retry_display.clj`
-   cannot desync the predicate."
+  "The active-retry status-line prefix (`\"retry in \"`), derived directly from
+   the production authority `retry-display/retry-status-text` (task 243:
+   replaces the prior length-subtraction derivation off
+   `format-relative-seconds`, which broke silently if production reordered or
+   space-padded the status-line fragment). At `now-ms 0` with no rate-limit
+   metadata, `retry-status-text` returns exactly `\"retry in 0s\"` with no
+   `\" · \"` join fragment, so stripping the trailing `\"0s\"` yields the fixed
+   prefix straight from the production string. Used by the
+   `retry-status-line?` substring predicate."
   (let [now-ms 0
         status-line (retry-display/retry-status-text
                      {:active? true :resume-at now-ms}
-                     now-ms)
-        seconds (retry-display/format-relative-seconds now-ms)]
-    (subs status-line 0 (- (count status-line) (count seconds)))))
+                     now-ms)]
+    (subs status-line 0 (- (count status-line) (count "0s")))))
 
 ;; Shared retry-frame matchers (task 242 Slice 17). The `8000`/`4000` activation
 ;; and changed delays are the delivered-footer form of
@@ -486,41 +485,25 @@
         (.join ^Thread thread 200)))
     @attempts*))
 
-(defn- focus-gated-emitter!
-  "Builds the focus-gated `emit!` boundary the two focus-gated retry-footer
-   sub-tests share (task 242 Slice 20): wires a capture atom through the real
-   `rpc.events/emit-event!` → `focus-allows?` path via `make-request-emitter`,
-   with `focus-session-id` set as effective focus. Returns `[emit! captured]`.
-   Single authority for the emitter-construction sequence (`make-rpc-state` →
-   `subscribe-topics!` → `set-focus-session-id!` → `make-request-emitter`) so
-   the focused-vs-background pair cannot drift in anything but the focus
-   session-id under test."
-  [focus-session-id]
+(defn- focus-emitter!
+  "Builds the focus-gated `emit!` boundary the retry-footer sub-tests share
+   (task 242 Slices 20/25; consolidated task 243): wires a capture atom through
+   the real `rpc.events/emit-event!` → `focus-allows?` path via
+   `make-request-emitter`. Single authority for the emitter-construction
+   sequence (`make-rpc-state` → `subscribe-topics!` → `set-focus-session-id!` →
+   `make-request-emitter`) parameterized on `focus`, the explicit focus
+   session-id to set (or `nil` to exercise the `focus-allows?`
+   `(or (focus-session-id state) (default-session-id state))`
+   default-session-id **fallback** branch instead). `session-id` seeds both
+   `:focus-session-id` and `:default-session-id` on `make-rpc-state`, so
+   `focus nil` still resolves the session as its own default focus via the
+   fallback. Returns `[emit! captured]`."
+  [session-id focus]
   (let [captured    (atom [])
         emit-frame! (fn [frame] (swap! captured conj frame))
-        state       (rpc.state/make-rpc-state {:session-id focus-session-id})
+        state       (rpc.state/make-rpc-state {:session-id session-id})
         _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
-        _           (rpc.state/set-focus-session-id! state focus-session-id)
-        emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
-    [emit! captured]))
-
-(defn- default-focus-emitter!
-  "Builds the emit! boundary for the `focus-allows?` **default-session-id
-   fallback** arm (task 242 Slice 25): the common single-session case where the
-   connection has *no explicit focus set*, so session-scoped events are gated
-   against the frozen construction-time `default-session-id` rather than an
-   explicit focus. `make-rpc-state {:session-id default-session-id}` seeds both
-   `:focus-session-id` and `:default-session-id`; we then clear explicit focus
-   (`set-focus-session-id!` nil) so `focus-allows?` must take its
-   `(or (focus-session-id state) (default-session-id state))` fallback branch.
-   Distinct from `focus-gated-emitter!`, which sets explicit focus and only
-   exercises the explicit-focus branch. Returns `[emit! captured]`."
-  [default-session-id]
-  (let [captured    (atom [])
-        emit-frame! (fn [frame] (swap! captured conj frame))
-        state       (rpc.state/make-rpc-state {:session-id default-session-id})
-        _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
-        _           (rpc.state/set-focus-session-id! state nil)
+        _           (rpc.state/set-focus-session-id! state focus)
         emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
     [emit! captured]))
 
@@ -531,7 +514,7 @@
   ;; pre-gate `emit!` used by task 242's earlier characterization test above.
   (testing "focused session: retry footer/updated frames pass the focus gate"
     (let [[ctx session-id] (retry-footer-session-context!)
-          [emit! captured] (focus-gated-emitter! session-id)
+          [emit! captured] (focus-emitter! session-id session-id)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
           attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
@@ -579,14 +562,14 @@
     ;; retry footer is delivered via `focus-allows?`'s
     ;; `(or (focus-session-id state) (default-session-id state))` *fallback*
     ;; branch — not the explicit-focus branch the sub-test above drives.
-    ;; `default-focus-emitter!` leaves explicit focus nil so this sub-test
+    ;; `focus-emitter!` with `focus` nil leaves explicit focus nil so this sub-test
     ;; exercises the `default-session-id` fallback arm end-to-end with real
     ;; retry `footer/updated` frames, closing the gap a future change to the
     ;; fallback (removal, or a session-id-stamping change in
     ;; `emit-footer-updated!`) could otherwise leave green while suppressing the
     ;; focused retry footer in the real single-session scenario.
     (let [[ctx session-id] (retry-footer-session-context!)
-          [emit! captured] (default-focus-emitter! session-id)
+          [emit! captured] (focus-emitter! session-id nil)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
           attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
@@ -667,7 +650,7 @@
     (let [[ctx session-id] (retry-footer-session-context!)
           ctx         (assoc ctx :provider-retry-sleep-fn (fn [_delay-ms] nil))
           other-session-id "some-other-focused-session"
-          [emit! captured] (focus-gated-emitter! other-session-id)
+          [emit! captured] (focus-emitter! other-session-id other-session-id)
           attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       ;; Positive control: `(is (empty? footer-events))` alone passes both when
       ;; the retry fired-but-was-gated (intended) and when the retry never fired
