@@ -672,3 +672,33 @@
   frame-filter idiom is repeated at four retry-footer sites with no shared
   selector — parallel to Slice 17's `frame-status-line` accessor but for frame
   *selection* rather than status-line access.
+
+## Slice 20 — code-shaper 4th pass follow-ups (addressed 2 review steps)
+
+- **Focus-gated emitter builder (item 1):** extracted `focus-gated-emitter!`
+  (given a focus-session-id, returns `[emit! captured]`) as the single authority
+  for the `make-rpc-state` → `subscribe-topics! … rpc.events/event-topics` →
+  `set-focus-session-id!` → `make-request-emitter … "req-1"` sequence. Both
+  focus-gated sub-tests of
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  (focused: focus = retrying session; background: focus = `other-session-id`)
+  now call it, differing only in the focus session-id under test — so the
+  focus-gated emit boundary has one construction authority and the
+  focused-vs-background pair cannot drift in the topic set, request-id, emitter
+  constructor, or rpc-state shape.
+- **Footer-frame selector (item 2):** extracted `footer-updated-frames`
+  (`(filterv #(= "footer/updated" (:event %)) frames)`) as the single authority
+  for footer-frame selection, routing all four retry-footer sites (focused,
+  background pre-gate control, background gated, sibling) through it. A change to
+  the `"footer/updated"` topic string or the `:event` frame path is now edited
+  once, and a topic typo can no longer silently filter to `[]` and pass a
+  downstream `empty?`/`seq` assertion vacuously at a retry-footer site. Left the
+  unrelated L116 `footer-updated` filter in
+  `rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test` as-is (the
+  Slice-20 item scopes the extraction to the retry-footer sites).
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged, behaviour-preserving), `bb test --focus psi.rpc-events-test`
+  (20/20 pass, task-241 focus-gate invariants untouched), `clj-kondo` clean,
+  `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
+  entry.
+- addressed 2 review steps.

@@ -534,7 +534,7 @@ If background-only (working as intended):
 
 ## Slice 20 — Review follow-ups (code-shaper pass, 4th)
 
-- [ ] The focus-gated emitter construction sequence is duplicated verbatim
+- [x] The focus-gated emitter construction sequence is duplicated verbatim
       across the two focus-gated sub-tests of
       `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`,
       a `consistent`/`economical` residual distinct from every prior dedup slice
@@ -559,7 +559,7 @@ If background-only (working as intended):
       out of scope for task 242's frozen coverage or better folded into task
       243's harness rewrite, record the explicit rationale and forward it to 243
       rather than leaving the duplicated emitter-construction sequence standing.
-- [ ] The `footer/updated` frame-filter idiom
+- [x] The `footer/updated` frame-filter idiom
       `(filterv #(= "footer/updated" (:event %)) …)` is hand-repeated at four
       retry-footer sites (rpc_prompt_test.clj L415 focused, L487 background
       pre-gate control, L521 background gated, L554 sibling) — plus the

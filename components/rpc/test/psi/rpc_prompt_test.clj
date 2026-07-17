@@ -141,6 +141,15 @@
   [frame]
   (or (get-in frame [:data :status-line]) ""))
 
+(defn- footer-updated-frames
+  "Single selector for `footer/updated` frames in a captured-frames coll (task
+   242 Slice 20). One authority for the `\"footer/updated\"` event-topic literal
+   + `:event` frame path so a change to the event name / frame shape is edited
+   once, and a typo in the topic string cannot silently filter to `[]` and pass
+   downstream `empty?`/`seq` assertions vacuously at each retry-footer site."
+  [frames]
+  (filterv #(= "footer/updated" (:event %)) frames))
+
 (defn- await-retry-footer-text!
   "Blocks (bounded) until `captured` contains a frame whose `:data
    :status-line` includes `expected-text`. Used as a `:provider-retry-sleep-fn`
@@ -389,21 +398,34 @@
         (.join ^Thread thread 200)))
     @attempts*))
 
+(defn- focus-gated-emitter!
+  "Builds the focus-gated `emit!` boundary the two focus-gated retry-footer
+   sub-tests share (task 242 Slice 20): wires a capture atom through the real
+   `rpc.events/emit-event!` → `focus-allows?` path via `make-request-emitter`,
+   with `focus-session-id` set as effective focus. Returns `[emit! captured]`.
+   Single authority for the emitter-construction sequence (`make-rpc-state` →
+   `subscribe-topics!` → `set-focus-session-id!` → `make-request-emitter`) so
+   the focused-vs-background pair cannot drift in anything but the focus
+   session-id under test."
+  [focus-session-id]
+  (let [captured    (atom [])
+        emit-frame! (fn [frame] (swap! captured conj frame))
+        state       (rpc.state/make-rpc-state {:session-id focus-session-id})
+        _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
+        _           (rpc.state/set-focus-session-id! state focus-session-id)
+        emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
+    [emit! captured]))
+
 (deftest rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test
   ;; Regression lock (task 242): the retry footer must still reach
   ;; `emit-frame!` at the RPC focus-gate boundary (`rpc.events/emit-event!` →
   ;; `focus-allows?`) for the focused/retrying session, not just at the
   ;; pre-gate `emit!` used by task 242's earlier characterization test above.
   (testing "focused session: retry footer/updated frames pass the focus gate"
-    (let [captured    (atom [])
-          emit-frame! (fn [frame] (swap! captured conj frame))
-          [ctx session-id] (retry-footer-session-context!)
+    (let [[ctx session-id] (retry-footer-session-context!)
+          [emit! captured] (focus-gated-emitter! session-id)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
-          state       (rpc.state/make-rpc-state {:session-id session-id})
-          _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
-          _           (rpc.state/set-focus-session-id! state session-id)
-          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")
           attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       ;; Positive control (matches the sibling
       ;; `rpc-prompt-provider-retry-state-publishes-footer-updated-test`): prove
@@ -412,7 +434,7 @@
       ;; a no-op/mis-wired one.
       (is (= 3 attempts)
           "the full activate→change→clear retry sequence must have executed")
-      (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
+      (let [footer-events (footer-updated-frames @captured)]
         (is (seq footer-events)
             "focused session must still receive footer/updated frames through the focus gate")
         ;; Per-frame focus gating is the regression under test: assert every
@@ -484,20 +506,15 @@
                            (swap! pre-gate-captured conj {:event event :data data}))
           pre-gate-attempts (drive-provider-retry-through-progress-loop!
                              pre-gate-ctx pre-gate-session-id pre-gate-emit!)
-          pre-gate-footers (filterv #(= "footer/updated" (:event %)) @pre-gate-captured)]
+          pre-gate-footers (footer-updated-frames @pre-gate-captured)]
       (is (= 3 pre-gate-attempts)
           "the full activate→change→clear retry sequence must have executed (pre-gate control)")
       (is (some retry-status-line? pre-gate-footers)
           "the background retry config must produce retry footer/updated frames absent the focus gate — otherwise the gated `empty?` assertion below is vacuous"))
-    (let [captured    (atom [])
-          emit-frame! (fn [frame] (swap! captured conj frame))
-          [ctx session-id] (retry-footer-session-context!)
+    (let [[ctx session-id] (retry-footer-session-context!)
           ctx         (assoc ctx :provider-retry-sleep-fn (fn [_delay-ms] nil))
           other-session-id "some-other-focused-session"
-          state       (rpc.state/make-rpc-state {:session-id other-session-id})
-          _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
-          _           (rpc.state/set-focus-session-id! state other-session-id)
-          emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")
+          [emit! captured] (focus-gated-emitter! other-session-id)
           attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       ;; Positive control: `(is (empty? footer-events))` alone passes both when
       ;; the retry fired-but-was-gated (intended) and when the retry never fired
@@ -518,7 +535,7 @@
       ;; blocking vs no-op sleep-fn — see the divergence note above) and proves
       ;; it *would* emit retry footers absent the gate, so `empty?` here credits
       ;; suppression, not footer-non-production.
-      (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
+      (let [footer-events (footer-updated-frames @captured)]
         (is (empty? footer-events)
             "retry footer for a non-focused (background) session must not leak to the focused connection")))))
 
@@ -551,7 +568,7 @@
           ;; through the RPC focus gate.
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
           attempts (drive-provider-retry-through-progress-loop! ctx session-id emit!)
-          footer-events (filterv #(= "footer/updated" (:event %)) @emitted*)
+          footer-events (footer-updated-frames @emitted*)
           first-retry-footer (some #(when (activation-retry-footer? %) %) footer-events)
           changed-retry-footer (some #(when (changed-retry-footer? %) %) footer-events)
           ;; Positive control (task 242 Slice 14): the clear footer is the
