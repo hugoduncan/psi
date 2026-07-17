@@ -941,3 +941,19 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   unchanged, comment-only), `clj-kondo` clean, `clj-paren-repair` clean.
   Test-only; no product/behaviour change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## task-implementation-review session (3rd) — outcome
+
+- No new actionable steps. Independently verified: implementation matches the
+  design (background-only / working-as-intended diagnosis; characterization test
+  at the RPC `emit-frame!` boundary crossing the real `emit-event!`/`focus-allows?`
+  gate), preserves the task-241 focus-gating invariant, and every vacuity branch
+  (attempts, activation, changed, background production, clear) carries a
+  positive control. Tests green (rpc-prompt 6/6, 62 assertions). The 3 unchecked
+  steps.md items are the Slice-3 "focused-broken" conditional arm, correctly
+  left unchecked for the working-as-intended outcome. The aggregate
+  over-abstraction / brittle-derivation residual is already owned (Slice 23,
+  forwarded to task 243). No genuinely-new defect found.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task was
+  closed at `58a16fd53` before this review.
