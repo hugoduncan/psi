@@ -164,6 +164,35 @@ If background-only (working as intended):
       `retry-footer-sync-timeout-ms`) so the deterministic-sync bound has one
       authority and future tuning does not drift between the two harness copies.
 
+## Slice 10 — Test-review follow-ups (test-shaper pass, 2nd)
+
+- [ ] Slice 9's observable-timeout fix is asymmetric: it hardened only
+      `await-retry-footer-text!` (used by the focused sub-test of
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`),
+      but the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test` retains
+      the *identical* swallowed-timeout defect Slice 9 diagnosed. Its inline
+      `:provider-retry-sleep-fn` calls
+      `(support/await-until … retry-footer-sync-timeout-ms)` purely for the
+      blocking side-effect and **discards the returned value** (the `let` body
+      is the bare `await-until` call, whose `support/timeout-token` on timeout
+      is never checked). So on the sibling's exact same race (sync deadline hit
+      → retry clears before delivery), its downstream `(is (some? …))`
+      assertions fail generically ("retry activation must publish
+      footer/updated with retry text") — indistinguishable from a genuine
+      pre-gate regression, the very ambiguity Slice 9 removed for the focused
+      test. Apply the same observable-timeout guard to the sibling's sleep-fn
+      (detect `support/timeout-token` and fail fast naming the missing text),
+      ideally by routing the sibling through the now-hardened
+      `await-retry-footer-text!` helper rather than its inline copy — this also
+      collapses the remaining duplicated sleep-fn / `expected-text`
+      (`(str "retry in " (quot (long delay-ms) 1000) "s")`) logic that
+      `retry-footer-sync-timeout-ms` only partially unified. If instead deferred
+      to task 243's harness migration, forward it explicitly there (243's design
+      commits to "keep the deterministic `await-retry-footer-text!`
+      synchronization pattern") rather than leaving the sibling's silent
+      timeout as an untracked residual.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the

@@ -282,6 +282,14 @@
   `execute-live-turn!`) remains documented with tracked exit (task 243).
   Tests green (rpc-prompt 6/6, 52 assertions).
 
+## task-test-review session (test-shaper pass, 2nd) — outcome
+
+- added 1 step (Slice 10): Slice 9 hardened only `await-retry-footer-text!`; the
+  sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+  retains the identical swallowed-timeout defect (inline sleep-fn discards
+  `support/await-until`'s `timeout-token`), so its sync-timeout still
+  masquerades as a pre-gate regression.
+
 ## Slice 9 — test-shaper follow-ups addressed
 
 - addressed 2 test-shaper follow-up steps.
