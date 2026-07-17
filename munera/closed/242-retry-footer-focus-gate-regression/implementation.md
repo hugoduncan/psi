@@ -837,3 +837,14 @@
   gate-preserving (no `focus-allows?` weakening). The only ambiguity (AC1
   contingency) was already filed and resolved in a prior pass; no new actionable
   ambiguity found. No new design-steps filed.
+
+## plan-review session (inconsistency turn — batch review) — outcome
+
+- no inconsistency review feedback. plan.md ↔ steps.md ↔ design.md ↔
+  design-steps.md agree on the AC1 contingency, the diagnosis outcome
+  (background-only / working as intended), the `emit-frame!` test boundary, and
+  the `retry in` matcher. plan.md's `rpc_events_test.clj` mention is a *pattern*
+  citation (focus-gate characterization style), not a location directive that
+  contradicts steps.md's `rpc_prompt_test.clj` home — the divergence is normal
+  plan→steps refinement, documented in implementation.md. No new design-steps
+  filed.
