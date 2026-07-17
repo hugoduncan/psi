@@ -45,3 +45,8 @@
 - [x] Record the before/after comparison against the baseline and state whether the parallel-isolation failure set is unchanged, reduced, or eliminated (unchanged ⇒ recorded finding: these two sites were not the isolation cause)
 - [x] Verify all design.md acceptance criteria; note verification in implementation.md
 - [x] Commit
+
+## Implementation-review follow-ups (task-implementation-review pass)
+
+- [ ] Residual standing `¬mock/¬stub` violation, same file, untracked: `rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test` still `with-redefs [session/query-in …]` (`components/rpc/test/psi/rpc_prompt_test.clj` ~line 93) — a **logic-boundary** redefinition of a query/resolver, the same class of violation task 243 removed for `execute-live-turn!`. Correctly excluded from 243's frozen scope (Slice 4 noted it), but not tracked by any open task. Open a follow-up Munera task to migrate it onto the Pathom resolver/query seam (inject a stub footer-query source rather than redefining `session/query-in`), or record an explicit deferral rationale so the standing violation is tracked rather than silently carried.
+- [ ] Robustness note (non-blocking) on `active-retry-text-prefix` derivation (rpc_prompt_test.clj ~line 219): it strips a trailing literal `"0s"` off `retry-status-text {:active? true :resume-at 0} 0`, so it silently breaks if `retry-display/format-relative-seconds` ever renders the zero-second case as a non-`"Ns"` form (e.g. `"now"`). This was a deliberate improvement over the length-subtraction idiom and is acceptable, but if a footer-format authority test does not already lock the zero-second rendering, add one so a future `retry_display.clj` change fails the authority test rather than silently desyncing this prefix.

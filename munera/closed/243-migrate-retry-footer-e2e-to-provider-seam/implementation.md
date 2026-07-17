@@ -349,3 +349,7 @@
   - Flakiness re-evaluation recorded with a stated outcome (unchanged) —
     this entry.
 - All design.md acceptance criteria are met. Task ready to close.
+
+## Implementation-review pass (task-implementation-review)
+
+- added 2 follow-up steps: untracked sibling `session/query-in` `with-redefs` logic-boundary violation (same file), and an optional zero-second retry-text-authority lock for `active-retry-text-prefix`. Neither is a task-243 defect (both out of 243's frozen scope); all 243 acceptance criteria hold and focused tests are green (5/5, lint clean).
