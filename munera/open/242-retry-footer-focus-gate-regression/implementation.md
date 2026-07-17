@@ -460,3 +460,40 @@
   `retry-footer-sleep-fn` while the gated `empty?` run uses a no-op sleep — a
   `meaningful_failures` gap (the control vouches for a different config than the
   one under test) plus a doc↔code coherence gap (inaccurate "identical" wording).
+
+## Slice 15 — test-shaper 7th pass follow-up (addressed 1 review step)
+
+- **Config-divergence / inaccurate-"identical" residual:** the Slice-12 comment
+  claimed the pre-gate production control drives the "identical background
+  config", but the pre-gate control uses the *blocking* `retry-footer-sleep-fn`
+  while the gated `empty?` run uses a *no-op* `(fn [_delay-ms] nil)` sleep.
+  Empirically confirmed via `bb test` that the divergence is **necessary, not
+  incidental**: driving the pre-gate control under the no-op sleep produces 4
+  `footer/updated` frames all carrying `:status-line nil` — the retry
+  activates and clears before the 10ms progress loop polls, so no `retry in Ns`
+  text is ever delivered and the production assertion (`some … "retry in"`)
+  fails. The blocking sleep is required precisely because the pre-gate control
+  must positively assert live retry *text*; the gated run needs only that *any*
+  `footer/updated` frame is dropped by `focus-allows?`, which the synchronous
+  `stop-progress-loop!` drain credits without live retry text.
+- **Resolution: option (b) — corrected the wording and recorded the deliberate
+  divergence** (option (a) is not viable, as the no-op-sleep control cannot
+  deterministically produce `retry in` text). Replaced the inaccurate
+  "identical background config" comment with a precise DELIBERATE-divergence
+  note explaining: the two runs drive the *same retry scenario and config*
+  (identical `drive-provider-retry-through-progress-loop!` 429→429→recovery
+  sequence, identical config, identical synchronous drain), differing only in
+  the sleep-fn, and each run uses the sleep-fn appropriate to what it must prove
+  — production (needs live text → blocking) vs suppression (needs only drained
+  frames → no-op). Updated the gated run's comment to reference the divergence
+  note rather than re-asserting "identical". This closes the
+  `meaningful_failures` gap (the control now honestly credits the config under
+  test for what it can prove) and the doc↔code coherence gap (no inaccurate
+  "identical" wording standing). Kept here (not forwarded to 243) since it
+  hardens the existing in-place documentation.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged, doc-only), `bb test --focus psi.rpc-events-test` (20/20 pass,
+  task-241 focus-gate invariants untouched), `clj-kondo` clean,
+  `clj-paren-repair` clean. Comment/doc-only; no product/behaviour change, no
+  test-logic change, no CHANGELOG entry.
+- addressed 1 review step.

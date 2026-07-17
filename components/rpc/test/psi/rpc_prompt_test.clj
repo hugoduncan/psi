@@ -342,10 +342,38 @@
     ;; `footer-refresh-progress-event?` matching `:retry-updated` or in
     ;; `emit-footer-updated!` / status-line construction). `(= 3 attempts)`
     ;; below only proves the retry *turns* fired, not that `footer/updated`
-    ;; frames were produced. So first drive the *identical* background config
-    ;; through a pre-gate raw `emit!` (no focus gate) and prove it produces ≥1
-    ;; retry footer — this credits the gated `empty?` assertion against a
-    ;; live-and-producing pipeline rather than a dead/no-op one.
+    ;; frames were produced. So first drive the background config through a
+    ;; pre-gate raw `emit!` (no focus gate) and prove it produces ≥1 retry
+    ;; footer with live `retry in Ns` text — this credits the gated `empty?`
+    ;; assertion against a live-and-producing pipeline rather than a dead/no-op
+    ;; one.
+    ;;
+    ;; DELIBERATE sleep-fn divergence (task 242 Slice 15): the pre-gate control
+    ;; uses the *blocking* `retry-footer-sleep-fn`, while the gated run below
+    ;; uses a *no-op* `(fn [_delay-ms] nil)` sleep. The two are NOT identical,
+    ;; and cannot be:
+    ;;   - The pre-gate control must positively assert `retry in Ns` *text* was
+    ;;     produced. That text is only live while `:retry {:active? true}` is
+    ;;     set; the async progress loop (10ms poll) reads live session data at
+    ;;     delivery time. Under a no-op sleep the retry activates and clears
+    ;;     before the loop polls, so every delivered footer carries a `nil`
+    ;;     status-line (verified: 4 frames, all `:status-line nil`). Only the
+    ;;     blocking sleep keeps the retry state live until the loop delivers the
+    ;;     `retry in Ns` footer, so the production assertion is meaningful.
+    ;;   - The gated run asserts only that *no* `footer/updated` frame (of any
+    ;;     status-line) crosses the focus gate. That is credited by the
+    ;;     synchronous `stop-progress-loop!` drain alone; it needs no live retry
+    ;;     text, so the no-op sleep suffices and avoids coupling to the blocking
+    ;;     helper's timing.
+    ;; The divergence does not undermine the control: the two runs drive the
+    ;; *same* retry scenario (identical config, identical
+    ;; `drive-provider-retry-through-progress-loop!` 429→429→recovery sequence,
+    ;; identical synchronous drain). Only the sleep-fn differs, and each run
+    ;; uses the sleep-fn appropriate to what it must prove — production (needs
+    ;; live text → blocking) vs suppression (needs only drained frames → no-op).
+    ;; A footer-production regression under the background config fails the
+    ;; pre-gate production assertion; the gated `empty?` proves those same
+    ;; frames are dropped by `focus-allows?`.
     (let [pre-gate-captured (atom [])
           [pre-gate-ctx pre-gate-session-id]
           (support/create-session-context
@@ -392,8 +420,10 @@
       ;; this background sub-test has no `await-retry-footer-text!` guard, so any
       ;; change to the drain path / sleep-fn must preserve that synchronous drain
       ;; or this assertion could pass vacuously. The pre-gate production control
-      ;; above proves this same config *would* emit retry footers absent the
-      ;; gate, so `empty?` here credits suppression, not footer-non-production.
+      ;; above drives the *same retry scenario and config* (differing only in a
+      ;; blocking vs no-op sleep-fn — see the divergence note above) and proves
+      ;; it *would* emit retry footers absent the gate, so `empty?` here credits
+      ;; suppression, not footer-non-production.
       (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
         (is (empty? footer-events)
             "retry footer for a non-focused (background) session must not leak to the focused connection")))))

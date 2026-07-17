@@ -333,7 +333,7 @@ If background-only (working as intended):
 
 ## Slice 15 — Test-review follow-ups (test-shaper pass, 7th)
 
-- [ ] Slice-12's pre-gate production control does not drive the *identical*
+- [x] Slice-12's pre-gate production control does not drive the *identical*
       config it claims, weakening the production-vs-gating guarantee it was
       added to provide. In
       `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`'s
