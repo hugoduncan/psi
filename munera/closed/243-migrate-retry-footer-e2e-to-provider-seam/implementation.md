@@ -400,3 +400,7 @@
 ## Task-test-review pass 3 (test-shaper skill)
 
 - added 3 follow-up steps (all non-blocking, clarity/consistency/economy): missing failure messages on the three session-id-stamping assertions (inconsistent with every other `is` in the same tests), a stale `retry-stub-provider-ai-ctx` docstring implying a caller-facing `attempts*` use that no longer exists, and the repeated `(= 3 attempts)` magic number + recovery-control pairing across four/five call sites lacking a single authority. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — steps/notes appended to the closed task in place.
+
+## Test-shaper follow-up execution
+
+- addressed 3 test-shaper review steps in `components/rpc/test/psi/rpc_prompt_test.clj`: (1) added distinct failure messages to the three session-id-stamping assertions (two `every?` sites + the sibling 3-way `=`); (2) corrected the stale `retry-stub-provider-ai-ctx` docstring to state the driver consumes `@attempts*` and re-exports it as `:attempts` (no caller-facing direct-atom site); (3) added `expected-retry-attempts` const (single authority for `3`) and folded the attempts+recovery pair into `assert-full-retry-sequence-ran!`, wired into all four recovery-carrying sites, pre-gate control now uses the const. Non-vacuity re-verified (stub `NOTRECOVERED` mutation fails). `bb test --focus psi.rpc-prompt-test` green (66 assertions, 4 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.
