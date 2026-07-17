@@ -766,3 +766,40 @@ If background-only (working as intended):
       243's harness rewrite, record the explicit rationale (and correct the
       overstated "not a gap here" 4th-pass note) rather than leaving the
       default-session-id E2E fallback arm uncovered.
+
+## Slice 26 — Test-review follow-ups (test-shaper pass, 9th)
+
+- [ ] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+      asserts retry-frame session-id *consistency* but never *correctness* — a
+      distinct `meaningful_failures`/`behavior_focused` gap from every prior
+      session-id slice (Slice 25 closed the *focused* E2E's fallback-arm
+      coverage; the focused sub-tests already assert
+      `(is (every? #(= session-id (get-in % [:data :session-id])) footer-events))`).
+      The sibling's sole session-id assertion (rpc_prompt_test.clj ~L695-697) is
+      `(is (= (get-in first-retry-footer [:data :session-id])
+              (get-in changed-retry-footer [:data :session-id])
+              (get-in clear-footer [:data :session-id])))` — it only checks the
+      three retry frames' session-ids are *mutually equal*, never that they
+      equal the driving `session-id` (in scope at the `let` binding). The design
+      Context stage 4 makes `emit.clj` stamping the *correct* `:session-id` onto
+      the `footer/updated` payload load-bearing (Emacs routes the footer to the
+      session by that id). So a session-id-*stamping* regression that mis-stamps
+      all three frames identically-but-wrong (e.g. `emit-footer-updated!` /
+      `emit.clj` stamping a constant, `nil`, or a stale/foreign session-id, or a
+      frame-shape change moving the id off `[:data :session-id]`) would leave the
+      three equal and pass this assertion green — precisely the stamping
+      regression the design names, undetected in the very test that
+      characterizes footer session-id publication pre-gate. This is not the same
+      as the focus-gate coverage the focused test provides: the sibling is the
+      raw pre-gate stamping characterization, so it is the natural home for the
+      *stamping-correctness* control. Strengthen the assertion to bind the
+      three frames' session-id to the driving `session-id` (e.g.
+      `(is (= session-id
+              (get-in first-retry-footer [:data :session-id])
+              (get-in changed-retry-footer [:data :session-id])
+              (get-in clear-footer [:data :session-id])))`), matching the
+      focused sub-tests' `every? #(= session-id …)` correctness control, so a
+      mis-stamped-but-consistent regression fails rather than passing on internal
+      agreement alone. If judged out of scope for task 242's frozen coverage or
+      better folded into task 243's harness rewrite, record the explicit
+      rationale rather than leaving the session-id-correctness gap standing.

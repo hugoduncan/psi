@@ -1002,3 +1002,15 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   stage-4 retry rendering) found already covered. No genuinely-new defect.
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path).
+
+## task-test-review session (9th pass, test-shaper) — outcome
+
+- added 1 step (Slice 26): the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test` asserts
+  retry-frame session-id *consistency* (three frames mutually equal) but never
+  *correctness* against the driving `session-id`, so a stamping regression that
+  mis-stamps all frames identically-but-wrong passes green — the exact
+  design-stage-4 `emit.clj` session-id stamping the test characterizes.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
+  at `58a16fd53` before this review.
