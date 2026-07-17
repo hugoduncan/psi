@@ -58,6 +58,28 @@
   (verified in rpc_prompt_test.clj). Slice 4's "remove its inline with-redefs"
   is a no-op; the real migration removes one driver-level site (Slice 3).
 
+## Notes for the plan-review design-step task
+
+- Both plan-review design-steps are wording/scope sharpenings of task files, not
+  scope changes: keep the behaviour-preserving constraint and the frozen
+  assertions intact when reconciling them.
+- Provider-resolution seam facts (verified this pass), for the ai-ctx-vs-ctx step:
+  - `execute-prepared-request! [ai-ctx ctx session-id prepared-request progress-queue]`
+    is in `components/turn-runtime/src/psi/turn_runtime/core.clj` (~line 513);
+    provider resolution flows `execute-provider-attempt!` → `do-stream!` (core ~28)
+    → `stream/do-stream!` (`components/turn-runtime/src/psi/turn_runtime/stream.clj` ~15)
+    → `ai/stream-response-in` → `context-provider-registry ai-ctx`
+    (`components/ai/src/psi/ai/core.clj` ~162/166).
+  - `create-context` (ai/core.clj ~45) returns exactly `{:provider-registry (atom providers)}`,
+    i.e. the correct shape to pass as the **first `ai-ctx`** arg (drop-in for the
+    current `{:provider-registry (atom {})}` literal at the call site).
+  - `resolve-provider` matches `(:provider model)` then `(:api model)`; prepared
+    model is `{:provider :anthropic :id "stub"}`, so register the stub under `:anthropic`.
+- For the single-with-redefs step: the only `execute-live-turn!` `with-redefs` is
+  inside `drive-provider-retry-through-progress-loop!` (rpc_prompt_test.clj ~430);
+  removing it there migrates all four retry sub-tests at once. The unrelated
+  `session/query-in` `with-redefs` (~line 91) is a different test and out of scope.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
