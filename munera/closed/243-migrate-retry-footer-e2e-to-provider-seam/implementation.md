@@ -383,3 +383,7 @@
 ## Implementation-review pass 3 (task-implementation-review)
 
 - no new actionable feedback: prior passes' follow-ups all executed (task 244 opened, zero-second authority test added, redundant `is` split). Re-verified migration against source — stub `:stream` signature and `:error` event shape (`:http-status`/`:provider-error/headers`/`:error-message`) match the real provider/consumer contract; behaviour-preserving; `psi.rpc-prompt-test` green (5/5, 58 assertions), `retry-display-test` green (2/2), lint clean; design.md Scope corrected to single-shared-driver shape.
+
+## Task-test-review pass (task-test-review skill)
+
+- added 1 follow-up step: recovery-turn shape (stub attempt-3+ `:text-delta "recovered"`/`:done :stop`) is modelled as behaviour (design Approach/Acceptance + stub docstring) but only indirectly covered — the clear-footer check is negative-only and cannot distinguish a real recovery `:stop` from retry exhaustion. Non-blocking coverage gap; ¬mock/¬stub, behaviour, and well-formedness criteria otherwise met (`execute-live-turn!` violation resolved via injectable `:provider-registry`; residual `session/query-in` `with-redefs` already tracked by task 244); `psi.rpc-prompt-test` green (5/5, 58 assertions), `retry-display-test` green (2/2).
