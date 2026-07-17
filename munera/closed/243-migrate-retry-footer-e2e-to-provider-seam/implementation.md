@@ -353,3 +353,21 @@
 ## Implementation-review pass (task-implementation-review)
 
 - added 2 follow-up steps: untracked sibling `session/query-in` `with-redefs` logic-boundary violation (same file), and an optional zero-second retry-text-authority lock for `active-retry-text-prefix`. Neither is a task-243 defect (both out of 243's frozen scope); all 243 acceptance criteria hold and focused tests are green (5/5, lint clean).
+
+## Implementation-review follow-up execution pass
+
+- addressed 2 review follow-up steps (both from the immediately preceding
+  task-implementation-review pass, commit `11626c6eb`):
+  - Opened follow-up task `244-migrate-footer-query-in-with-redefs-to-resolver-seam`
+    (design-only, registered in `munera/plan.md`) tracking the untracked
+    `session/query-in` `with-redefs` logic-boundary violation in
+    `rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test`. The
+    standing `¬mock/¬stub` violation is now tracked rather than silently carried.
+  - Added the missing zero-second retry-text authority test:
+    `components/app-runtime/test/psi/app_runtime/retry_display_test.clj` locks
+    `format-relative-seconds 0`/`-500` → `"0s"` and
+    `retry-status-text {:active? true :resume-at 0} 0` → `"retry in 0s"`, so a
+    future `retry_display.clj` change to the zero-second rendering fails the
+    authority test rather than silently desyncing `active-retry-text-prefix`.
+    `bb test --focus psi.app-runtime.retry-display-test`: 2 passed / 0 failed /
+    0 errored (4 assertions); `clj-kondo` clean.
