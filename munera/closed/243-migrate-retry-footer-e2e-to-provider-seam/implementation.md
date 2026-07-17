@@ -408,3 +408,7 @@
 ## Task-test-review pass 4 (test-shaper skill)
 
 - added 1 follow-up step: duplicated clear-footer control pair across the two focus-gate sub-tests (same class of copied two-line control the prior pass folded into `assert-full-retry-sequence-ran!`, left unconsolidated). Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
+
+## Test-shaper pass 4 follow-up execution
+
+- addressed 1 test-shaper review step: added `assert-clear-footer-produced! [footer-events label]` folding the duplicated two-line clear-footer control pair (`some? clear-footer` + `not retry-status-line?`) into one authority, `label` interpolated into both failure messages. Wired into both focus-gate sub-tests (explicit-focus, default-session-id fallback). Sibling pre-gate test left out per the follow-up's scope note (its `clear-footer` binding interleaves with the session-id-stamping 3-way `=` control). No assertion weakened. `bb test --focus psi.rpc-prompt-test` green (60 assertions, 3 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.

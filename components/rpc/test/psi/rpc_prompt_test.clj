@@ -484,6 +484,23 @@
       "the full activate→change→clear retry sequence must have executed")
   (assert-recovery-turn-succeeded! recovery-result))
 
+(defn- assert-clear-footer-produced!
+  "Positive control (task 242 Slice 14; consolidated task 243 test-shaper
+   pass 4): the bare no-stale-`retry in` negative check passes both when a real
+   clear footer landed last *and* when some unrelated non-retry footer
+   incidentally trailed with no clear ever emitted. This asserts a
+   *distinguishable* clear footer was actually produced after the last
+   active-retry frame (via `clear-footer-produced-after-retry`) and carries no
+   stale retry text, crediting the clear-path against a live emission. `label`
+   names the focus arm (explicit-focus vs default-session-id fallback) so a
+   failure reports which arm's clear path regressed."
+  [footer-events label]
+  (let [clear-footer (clear-footer-produced-after-retry footer-events)]
+    (is (some? clear-footer)
+        (str label " must receive a clear footer/updated frame after the retry sequence through the focus gate"))
+    (is (not (retry-status-line? clear-footer))
+        (str label "'s clear footer must carry no stale retry text (through the focus gate)"))))
+
 (defn- focus-emitter!
   "Builds the focus-gated `emit!` boundary the retry-footer sub-tests share
    (task 242 Slices 20/25; consolidated task 243): wires a capture atom through
@@ -547,11 +564,7 @@
         ;; Assert a distinguishable clear footer was actually *produced* after
         ;; the last active-retry frame, so the no-stale-`retry in` check is
         ;; credited against a live clear-path emission crossing the focus gate.
-        (let [clear-footer (clear-footer-produced-after-retry footer-events)]
-          (is (some? clear-footer)
-              "focused session must receive a clear footer/updated frame after the retry sequence through the focus gate")
-          (is (not (retry-status-line? clear-footer))
-              "focused session's clear footer must carry no stale retry text (through the focus gate)"))
+        (assert-clear-footer-produced! footer-events "focused session")
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)
             "every focused-session footer frame must be stamped with the driving session-id at [:data :session-id]"))))
   (testing "focused session via default-session-id fallback (no explicit focus): retry footer/updated frames pass the focus gate"
@@ -587,11 +600,7 @@
         ;; fallback arm too.
         (is (activation-precedes-changed? footer-events)
             "default-session-id fallback's retry-activation footer must precede the changed-metadata footer through the focus gate")
-        (let [clear-footer (clear-footer-produced-after-retry footer-events)]
-          (is (some? clear-footer)
-              "default-session-id fallback must receive a clear footer/updated frame after the retry sequence through the focus gate")
-          (is (not (retry-status-line? clear-footer))
-              "default-session-id fallback's clear footer must carry no stale retry text (through the focus gate)"))
+        (assert-clear-footer-produced! footer-events "default-session-id fallback")
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)
             "every default-session-id-fallback footer frame must be stamped with the driving session-id at [:data :session-id]"))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
