@@ -396,3 +396,7 @@
 
 - no new actionable feedback. All three criteria met: tests well-formed (positive/ordering/clear-path controls, non-vacuity notes, documented THREAD-AFFINITY invariant); every design.md behaviour covered (frames/gate/fallback/recovery/session-id stamping; flakiness is record-not-fix by design); infra deps injectable/nullable via per-ctx `:provider-registry` seam (¬mock/¬stub) with the sole residual `session/query-in` `with-redefs` already tracked by task 244. Recovery-turn gap already closed by the prior pass's `assert-recovery-turn-succeeded!` control. `psi.rpc-prompt-test` green (4 tests / 66 assertions), `retry-display-test` green (2/2).
   - Non-compliance note (minor, non-test): earlier implementation.md passes record the namespace as "5 tests / 58 assertions"; the namespace has 4 deftests and now runs 66 assertions post-recovery-control — a stale count in the closed record, not a test defect.
+
+## Task-test-review pass 3 (test-shaper skill)
+
+- added 3 follow-up steps (all non-blocking, clarity/consistency/economy): missing failure messages on the three session-id-stamping assertions (inconsistent with every other `is` in the same tests), a stale `retry-stub-provider-ai-ctx` docstring implying a caller-facing `attempts*` use that no longer exists, and the repeated `(= 3 attempts)` magic number + recovery-control pairing across four/five call sites lacking a single authority. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — steps/notes appended to the closed task in place.
