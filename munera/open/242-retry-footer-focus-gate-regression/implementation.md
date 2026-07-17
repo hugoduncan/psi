@@ -642,3 +642,12 @@
   `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
   entry.
 - addressed 2 review steps.
+
+## code-shaper review session (3rd pass) — outcome
+
+- added 1 step (Slice 19): the two clear-footer negatives re-spell
+  `(not (str/includes? (frame-status-line clear-footer) "retry in"))` longhand
+  instead of `(not (retry-status-line? clear-footer))`, so the active-retry
+  `"retry in"` literal has ≥3 independent copies (predicate + two negations +
+  `expected-retry-text` prefix) — Slice 17 routed only the positive matchers,
+  never the negated clear assertions, onto their authority.

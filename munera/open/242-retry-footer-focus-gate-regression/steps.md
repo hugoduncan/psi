@@ -501,3 +501,33 @@ If background-only (working as intended):
       242's frozen coverage or better folded into task 243's harness rewrite,
       record the explicit rationale and forward it to 243 rather than leaving the
       four-way config duplication standing.
+
+## Slice 19 — Review follow-ups (code-shaper pass, 3rd)
+
+- [ ] The active-retry recognition literal `"retry in"` is not fully routed
+      through its one authority `retry-status-line?`, leaving a
+      `consistent`/`economical` residual distinct from every prior matcher slice
+      (Slice 17 extracted `retry-status-line?`/`activation-retry-footer?`/`changed-retry-footer?`
+      but only routed the *positive* activation/changed matchers onto shared
+      authorities; the *negated* clear assertions were never touched). The two
+      clear-footer negatives —
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+      focused sub-test (rpc_prompt_test.clj L426) and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test` (L564) —
+      each re-spell the negation longhand as
+      `(not (str/includes? (frame-status-line clear-footer) "retry in"))` rather
+      than `(not (retry-status-line? clear-footer))`, so the raw `"retry in"`
+      substring is a third and fourth independent copy of the literal the
+      `retry-status-line?` predicate (L286) already owns (and which
+      `expected-retry-text`'s `"retry in "` prefix also embeds). A footer-format
+      change to the retry-text prefix must therefore be edited at ≥3 places, and
+      the clear negatives can silently drift from the predicate that defines what
+      "active retry text" means. Route both clear-footer negatives through
+      `(not (retry-status-line? clear-footer))` so the active-retry recognition
+      literal has one authority; optionally fold the `"retry in "` prefix in
+      `expected-retry-text`/`retry-status-line?` onto a single shared prefix
+      constant so the positive-match and substring-check spellings cannot
+      diverge. If judged out of scope for task 242's frozen coverage or better
+      folded into task 243's harness rewrite, record the explicit rationale and
+      forward it to 243 rather than leaving the duplicated `"retry in"` literal /
+      unrouted clear negation standing.
