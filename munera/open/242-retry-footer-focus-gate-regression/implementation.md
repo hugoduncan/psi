@@ -564,3 +564,13 @@
   in `doc/architecture.md` (per-connection focus-gated delivery, background
   suppression) and in the CHANGELOG `### Changed` focus-gating entry; no new or
   stale references, examples, or missing docs. No new CHANGELOG entry warranted.
+
+## code-shaper review session — outcome
+
+- added 2 steps (Slice 17): assertion-side retry-frame matchers (`retry in
+  8s`/`retry in 4s` + `remaining 2/5000`) are hand-duplicated across both
+  harnesses and re-derived from the driving config as raw literals rather than
+  the existing `expected-retry-text` authority (prior slices deduplicated only
+  the sync-side sleep-fn/expected-text, never the assertion matchers); and the
+  `(or (get-in frame [:data :status-line]) "")` status-line accessor idiom is
+  repeated at ~8 sites without a shared accessor.

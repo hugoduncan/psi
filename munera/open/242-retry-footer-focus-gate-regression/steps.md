@@ -402,3 +402,49 @@ If background-only (working as intended):
       sub-500ms drift) and forward the formula-coupling to task 243's harness
       rewrite rather than leaving the `quot`-vs-`ceil` divergence as an
       untracked latent-desync residual.
+
+## Slice 17 — Review follow-ups (code-shaper pass)
+
+- [ ] Assertion-side retry-frame matchers hard-code the `"retry in 8s"` /
+      `"retry in 4s"` + `"remaining 2/5000"` strings, duplicated across both
+      harnesses' assertion sites and coupled by hand to the driving config — a
+      `consistent`/`economical` residual distinct from every prior dedup slice
+      (Slices 10/13/16 unified only the *sleep-fn/await/expected-text* on the
+      *sync* side; the *assertion* matchers were never touched). Sites:
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+      focused sub-test (rpc_prompt_test.clj L323, L327-328) and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+      (L473, L477-479) each re-inline `(str/includes? … "retry in 8s")` and the
+      `retry in 4s` + `remaining 2/5000` pair. The `8s`/`4s` literals are the
+      *delivered-footer* form of the shared helper's `8000`/`4000`
+      `:auto-retry-base-delay-ms` sequence, but are re-derived as raw strings on
+      the assertion side rather than via the existing single-authority
+      `expected-retry-text` (which Slice 16 aligned to production's `ceil`). So
+      a footer-format change (`"retry in Ns"` string) or a delay change in
+      `drive-provider-retry-through-progress-loop!`'s 429 `Retry-After` headers
+      must be edited in ≥3 assertion places and can silently drift from the
+      driving config — the assertion could still match the *old* string after
+      the driver changes, passing green against a stale expectation. Fold the
+      activation/changed matchers onto the shared authority: derive the awaited
+      activation/changed text from `expected-retry-text` (the driver's
+      first-attempt 8000ms / second-attempt 4000ms delays) plus a named
+      `remaining`-fragment builder, or extract `activation-retry-footer?` /
+      `changed-retry-footer?` predicates (alongside the existing
+      `retry-status-line?`) both harnesses share, so the retry-frame recognition
+      logic has one authority and cannot drift from the config that produces it.
+      If judged out of scope for task 242's frozen coverage or better folded
+      into task 243's harness rewrite, record the explicit rationale and forward
+      it to 243 rather than leaving the triplicated assertion-matcher / config-
+      coupling residual standing.
+- [ ] The `(or (get-in frame [:data :status-line]) "")` status-line accessor
+      idiom is hand-repeated at ~8 sites across the two retry-footer tests and
+      the helpers (`retry-status-line?` L193, focused-test L323/L326/L336,
+      background pre-gate L400, sibling L473/L477-478/L484). This is a
+      `consistent`/`locally_comprehensible` residual: the same nil-safe
+      status-line extraction is re-spelled everywhere instead of a single named
+      accessor (e.g. `frame-status-line` returning `""` on absence), so a change
+      to the frame shape (`[:data :status-line]` path) must be edited at every
+      site. Extract one accessor helper and route the matchers/predicates
+      through it. If judged out of scope for task 242's frozen coverage or
+      better folded into task 243's harness rewrite, record the rationale and
+      forward it to 243.
