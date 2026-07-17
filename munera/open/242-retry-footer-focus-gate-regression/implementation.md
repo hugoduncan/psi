@@ -536,3 +536,21 @@
   invariants untouched), `clj-kondo` clean, `clj-paren-repair` clean. Test-only;
   no product/behaviour change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## task-test-review session (test-shaper pass, 9th) — outcome
+
+- no new follow-up steps. Re-reviewed the retry-footer E2E tests against
+  `simple ∧ consistent ∧ robust ∧ economical`: every vacuity branch has a
+  positive control (attempts Slice 8; activation/changed/background production
+  Slice 12; clear-frame Slice 14), timeouts are observable and symmetric across
+  both harnesses (Slices 9/10), the retry-driving body / sleep-fn / expected-text
+  are deduped to single authorities (Slices 11/13), and the sole `with-redefs`
+  exception has a tracked exit (task 243). Checked candidates for genuinely-new
+  issues and found each already covered: the sleep-fn awaits only `retry in 4s`
+  while the changed-metadata assertion also needs `remaining 2/5000`, but
+  `mark-active-retry!` writes `:retry` (delay + rate-limit) atomically before the
+  `:retry-updated` emit, so no partial-frame race; the `expected-retry-text`
+  delay-ms vs production live `resume-at - now-ms` delta coupling is already
+  Slice 16's recorded bounded residual; slow-test metadata isolation is not a
+  project convention (zero `^:slow`/`^:integration` usages), so not filed.
+  Tests green (rpc-prompt 6/6, 62 assertions).
