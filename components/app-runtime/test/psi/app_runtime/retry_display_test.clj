@@ -22,6 +22,6 @@
     ;; fails first (rather than the derived prefix silently desyncing).
     (is (= "retry in 0s"
            (retry-display/retry-status-text {:active? true :resume-at 0} 0)))
-    (is (= "retry in 0s"
-           (retry-display/retry-status-text {:active? true :resume-at 0} 0)
+    ;; An omitted `:resume-at` renders identically to explicit `:resume-at 0`.
+    (is (= (retry-display/retry-status-text {:active? true :resume-at 0} 0)
            (retry-display/retry-status-text {:active? true} 0)))))

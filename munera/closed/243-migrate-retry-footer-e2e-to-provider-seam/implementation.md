@@ -375,3 +375,7 @@
 ## Implementation-review pass 2 (task-implementation-review)
 
 - added 1 follow-up step: redundant assertion term in the added zero-second retry-display authority test (second `is` repeats the whole first `is` in its first two args). Non-blocking test-clarity only; core migration verified independently as sound (¬mock/¬stub via injectable per-ctx `:provider-registry`, behaviour-preserving), all 243 acceptance criteria hold, `psi.rpc-prompt-test` green (5/5, 58 assertions) and `retry-display-test` green (2/2), lint clean.
+
+## Implementation-review pass 2 follow-up execution
+
+- addressed 1 review step: split the redundant `is` in `retry-status-text-locks-zero-second-active-prefix-test` (`retry_display_test.clj`) — kept the literal-lock `is` and made the second `is` a distinct 2-way `=` asserting only omitted-`:resume-at` ≡ explicit-`:resume-at 0`. `retry-display-test` green (2/2, 4 assertions); `clj-kondo` clean.
