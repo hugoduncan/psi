@@ -330,3 +330,35 @@ If background-only (working as intended):
       to say only the await/timeout was unified and forward the expected-text
       dedup explicitly to 243 rather than leaving the inaccurate
       "collapses ... `expected-text`" wording standing.
+
+## Slice 15 — Test-review follow-ups (test-shaper pass, 7th)
+
+- [ ] Slice-12's pre-gate production control does not drive the *identical*
+      config it claims, weakening the production-vs-gating guarantee it was
+      added to provide. In
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`'s
+      background sub-test, the Slice-12 comment says it drives "the *identical*
+      background config through a pre-gate raw `emit!`" so the gated
+      `(is (empty? footer-events))` is credited against a live-and-producing
+      pipeline. But the two runs use **different** `:provider-retry-sleep-fn`s:
+      the pre-gate control uses `(retry-footer-sleep-fn pre-gate-captured)` (the
+      **blocking** sync helper), while the gated run uses
+      `(fn [_delay-ms] nil)` (a **no-op** sleep). So the control proves a
+      *blocking-sleep* config produces footers, not the *no-op-sleep* config the
+      `empty?` assertion actually exercises. This is (a) a `meaningful_failures`
+      gap — a footer-production regression that manifests only under the no-op
+      sleep timing (e.g. a race that the blocking sync would have masked) would
+      still let the gated `empty?` pass green while the pre-gate control passes,
+      so the control does not fully credit the config under test; and (b) a
+      doc↔code coherence gap — the "identical background config" wording is
+      inaccurate. Fix: make the pre-gate control drive the *same* sleep-fn the
+      gated run uses (either both no-op relying on the documented synchronous
+      `stop-progress-loop!` drain, or both blocking), so the control vouches for
+      the exact config the `empty?` assertion exercises; or, if the divergence
+      is deliberate (the gated run intentionally omits the blocking sync because
+      it relies on the drain), correct the "identical" wording to name the
+      sleep-fn difference and record why it does not undermine the control. If
+      judged out of scope for task 242's frozen coverage or better folded into
+      task 243's harness rewrite, record the explicit rationale and forward it to
+      243 rather than leaving the config-divergence / inaccurate-"identical"
+      residual standing.

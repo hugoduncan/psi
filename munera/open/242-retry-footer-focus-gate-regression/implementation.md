@@ -452,3 +452,11 @@
   `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
   entry.
 - addressed 1 review step.
+
+## task-test-review session (test-shaper pass, 7th) — outcome
+
+- added 1 step (Slice 15): Slice-12's pre-gate production control claims to
+  drive the "identical background config" but uses a blocking
+  `retry-footer-sleep-fn` while the gated `empty?` run uses a no-op sleep — a
+  `meaningful_failures` gap (the control vouches for a different config than the
+  one under test) plus a doc↔code coherence gap (inaccurate "identical" wording).
