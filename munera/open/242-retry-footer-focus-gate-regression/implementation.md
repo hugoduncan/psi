@@ -51,6 +51,10 @@
 
 ## plan-review session — outcome
 
+- plan-review inconsistency pass: no inconsistency review feedback. Verified
+  design.md ↔ plan.md ↔ steps.md agree on AC1 contingency, test location/boundary
+  (`emit-frame!`), retry-text matcher (`retry in`), gate-preserving fix
+  constraint, pipeline function references, and 4-slice order. No new design-steps.
 - plan-review ambiguity pass: no new ambiguity review feedback. plan.md/steps.md
   are diagnosis-first and coherent with the resolved (contingent) AC1; the
   fix-location and reproduction/flakiness uncertainties are already captured as
