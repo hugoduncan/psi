@@ -331,3 +331,12 @@
 - Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 56 assertions),
   `clj-kondo` clean, `clj-paren-repair` clean. Test-only; no product/behaviour
   change, no CHANGELOG entry.
+
+## task-test-review session (test-shaper pass, 3rd) — outcome
+
+- added 1 step (Slice 11): Slice 10 unified only the sleep-fn, but the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test` still inlines
+  the whole retry-driving body (`error-turn`, `with-redefs`, attempt `case`,
+  `execute-prepared-request!`, progress-loop lifecycle) that the parameterized
+  `drive-provider-retry-through-progress-loop!` already encapsulates — a
+  divergent second copy reusable today (distinct from 243's mechanism migration).

@@ -193,6 +193,30 @@ If background-only (working as intended):
       synchronization pattern") rather than leaving the sibling's silent
       timeout as an untracked residual.
 
+## Slice 11 — Test-review follow-ups (test-shaper pass, 3rd)
+
+- [ ] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+      still inlines a full copy of the retry-driving body that
+      `drive-provider-retry-through-progress-loop!` already encapsulates —
+      `error-turn`, `attempts*`, the `with-redefs turn-runtime/execute-live-turn!`
+      429→429→recovery `case`, the `execute-prepared-request!` call, and the
+      `streams/start-progress-loop!` / `stop-progress-loop!` lifecycle. Prior
+      passes only unified the *sleep-fn* (Slice 10) and tracked the *stub
+      mechanism* migration (task 243); the retry-driving **body** remains a
+      second divergent definition of the identical retry scenario. Since
+      `drive-provider-retry-through-progress-loop!` is already parameterized on
+      `emit!` and returns `@attempts*`, the sibling could call it directly with
+      its pre-gate raw `emit!` (`(fn [event data] (swap! emitted* conj {:event
+      event :data data}))`) and then inspect `@emitted*` for its
+      activation/changed/clear/session-id assertions — collapsing ~60 duplicated
+      lines to one call and guaranteeing the two harnesses cannot drift in the
+      429 headers, attempt sequence, or thread lifecycle. This is
+      `economical`/`consistent` harness reuse available **today**, distinct from
+      243's ¬mock/¬stub mechanism swap. If instead folded into 243's rewrite
+      (which co-migrates both sites and will naturally consolidate them),
+      forward it explicitly to 243's plan rather than leaving the divergent
+      inline copy as an untracked residual — do not silently defer.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the
