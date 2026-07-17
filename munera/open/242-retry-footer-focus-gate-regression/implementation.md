@@ -48,3 +48,21 @@
     (`mark-active-retry!`), `rpc/session/streams.clj`
     (`footer-refresh-progress-event?`), `app-runtime/footer.clj` + retry_display,
     `emit.clj` (stamps `:session-id`), Emacs `psi-events.el` "footer/updated".
+
+## design-review session (arch + ambiguity + inconsistency) — outcome
+
+- Re-ran all three design-review passes: no new design-steps filed. The only
+  design-step (AC1 ambiguity) is already resolved in design.md, so no open
+  actionable design-steps remain for a follow-up task to address.
+- Principle for any AC1-adjacent work: keep failing-then-passing **contingent**
+  on Approach step 1's focused-vs-background diagnosis; do not make it
+  unconditional, and never resolve by widening scope or reintroducing
+  cross-session event leakage (task-241 invariant).
+- Verified during inconsistency pass: `footer/updated` carries `:status-line`
+  via `emit-footer-updated!` (components/rpc/src/psi/rpc/session/emit.clj:18);
+  `required-event-payload-keys` `#{:path-line :stats-line}`
+  (components/rpc/src/psi/rpc/events.clj:71) is a required-keys set, not an
+  exhaustive allow-list — `:status-line` presence is expected, not a mismatch.
+- Retry footer status-line is built in
+  components/app-runtime/src/psi/app_runtime/footer.clj (~L279/L317) from
+  `:psi.agent-session/retry` only when `(:active? retry)`.
