@@ -313,3 +313,21 @@
   branch (background-only outcome was taken); the Slice-3 "focused broken" arm
   is intentionally left unchecked per the recorded working-as-intended
   determination.
+
+## Slice 10 — test-shaper 2nd pass follow-up (addressed 1 review step)
+
+- **Symmetric observable-timeout (item 1):** routed the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test`'s inline
+  `:provider-retry-sleep-fn` through the now-hardened `await-retry-footer-text!`
+  helper (shared with the focused sub-test), replacing its bare
+  `support/await-until … retry-footer-sync-timeout-ms` that discarded the
+  return value. The sibling now inherits the same fail-fast timeout guard: a
+  sync deadline miss surfaces as "retry footer sync timed out awaiting <text>"
+  rather than masquerading as a generic "must publish footer/updated"
+  regression — closing the residual swallowed-timeout defect Slice 9 removed
+  only for the focused test. This also collapses the duplicated sleep-fn /
+  `expected-text` logic that `retry-footer-sync-timeout-ms` had only partially
+  unified; both harnesses now share one helper.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 56 assertions),
+  `clj-kondo` clean, `clj-paren-repair` clean. Test-only; no product/behaviour
+  change, no CHANGELOG entry.

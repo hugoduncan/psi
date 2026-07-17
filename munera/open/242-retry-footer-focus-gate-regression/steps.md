@@ -166,7 +166,7 @@ If background-only (working as intended):
 
 ## Slice 10 — Test-review follow-ups (test-shaper pass, 2nd)
 
-- [ ] Slice 9's observable-timeout fix is asymmetric: it hardened only
+- [x] Slice 9's observable-timeout fix is asymmetric: it hardened only
       `await-retry-footer-text!` (used by the focused sub-test of
       `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`),
       but the sibling

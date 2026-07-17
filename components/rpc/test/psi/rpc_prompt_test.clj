@@ -129,18 +129,19 @@
 (def ^:private retry-footer-sync-timeout-ms
   "Bounded deadline for the deterministic retry-footer sync used by the
    retry/footer E2E tests' `:provider-retry-sleep-fn`. Single authority so the
-   two harness copies (`await-retry-footer-text!` and the inline
-   `support/await-until` in
-   `rpc-prompt-provider-retry-state-publishes-footer-updated-test`) do not
-   drift when the bound is tuned."
+   bound has one place to tune; both harnesses now route their sleep-fn through
+   the shared `await-retry-footer-text!` helper, which consumes this deadline."
   500)
 
 (defn- await-retry-footer-text!
   "Blocks (bounded) until `captured` contains a frame whose `:data
    :status-line` includes `expected-text`. Used as a `:provider-retry-sleep-fn`
-   so the retry state stays live until the progress loop has actually
-   delivered the corresponding footer/updated frame, avoiding a race where the
-   retry clears before the async progress loop drains it.
+   by both retry-footer E2E harnesses
+   (`rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+   and `rpc-prompt-provider-retry-state-publishes-footer-updated-test`) so the
+   retry state stays live until the progress loop has actually delivered the
+   corresponding footer/updated frame, avoiding a race where the retry clears
+   before the async progress loop drains it.
 
    Fails fast (rather than returning silently) if the awaited footer never
    arrives within the bound: `support/await-until` returns
@@ -329,15 +330,19 @@
                                                              :auto-retry-max-retries 2}})
           ctx (assoc ctx0
                      :provider-retry-sleep-fn
+                     ;; Route through the hardened `await-retry-footer-text!`
+                     ;; helper (shared with the focused sub-test of
+                     ;; `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`)
+                     ;; so a sync timeout surfaces as its own diagnosable
+                     ;; failure (naming the missing text) instead of silently
+                     ;; letting the retry clear and masquerading as a generic
+                     ;; "must publish footer/updated" regression. `emitted*`
+                     ;; frames carry `:status-line` at `[:data :status-line]`,
+                     ;; the path the helper inspects.
                      (fn [delay-ms]
-                       (let [expected-text (str "retry in " (quot (long delay-ms) 1000) "s")]
-                         (support/await-until
-                          #(some (fn [event]
-                                   (when (str/includes? (or (get-in event [:data :status-line]) "")
-                                                        expected-text)
-                                     event))
-                                 @emitted*)
-                          retry-footer-sync-timeout-ms))))
+                       (await-retry-footer-text!
+                        emitted*
+                        (str "retry in " (quot (long delay-ms) 1000) "s"))))
           session-id (first (map :session-id (ss/list-context-sessions-in ctx)))
           attempts* (atom 0)
           progress-q (java.util.concurrent.LinkedBlockingQueue.)
