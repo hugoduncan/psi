@@ -161,3 +161,12 @@
   non-vacuous only because `drive-provider-retry-through-progress-loop!` drains
   the progress queue synchronously via `stop-progress-loop!` before the
   assertion (unlike the guarded focused sub-test). Test still green (6/6).
+
+## implementation-review session (2nd pass) — outcome
+
+- Re-reviewed against design/plan/acceptance criteria; verified E2E test crosses
+  the real `emit-event!`/`focus-allows?` boundary via `make-request-emitter`,
+  and confirmed the background `(empty? footer-events)` assertion is non-vacuous
+  (retry `:retry-updated` events are always queued, drained by
+  `stop-progress-loop!`, and dropped only at the focus gate). Tests green
+  (rpc-prompt 6/6, rpc-events 20/20), lint clean. No new follow-up steps added.
