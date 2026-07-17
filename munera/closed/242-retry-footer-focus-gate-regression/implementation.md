@@ -984,3 +984,21 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   Sub-test asserts activation + changed + clear footers reach `emit-frame!` for
   the retrying session and are session-id-stamped. Green: 24 assertions in the
   test, 71/6 across the namespace; clj-kondo clean.
+
+## task-test-review session (5th pass) — outcome
+
+- No new actionable steps. Re-verified the three skill criteria against the
+  current test: (1) well-formed — rpc-prompt 5/5 green (55 assertions); (2)
+  design-behaviour coverage — the full pipeline is locked end-to-end across two
+  suites: RPC E2E covers stages 1–3 at the focus-gate `emit-frame!` boundary
+  (explicit-focus + default-session-id fallback + background suppression, each
+  with positive controls), and elisp ERT tests
+  `psi-extension-ui-footer-updated-renders-retry-text-visibly` / `-replaces-` /
+  `-clears-` cover stage 4 (Emacs `psi-emacs--projection-footer-text` rendering
+  of activation/change/clear); (3) ¬mock/¬stub — the sole
+  `with-redefs turn-runtime/execute-live-turn!` logic-boundary stub is a
+  documented bounded exception with a confirmed provider-registry seam and a
+  tracked migration follow-up (task 243). Candidate gap investigated (Emacs
+  stage-4 retry rendering) found already covered. No genuinely-new defect.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path).
