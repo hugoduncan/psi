@@ -489,6 +489,49 @@
     (is (not (retry-status-line? clear-footer))
         (str label "'s clear footer must carry no stale retry text (through the focus gate)"))))
 
+(defn- assert-retry-footers-crossed-gate!
+  "Positive control folding the shared focus-gate footer-verification block into
+   one authority (task 243 test-shaper pass 7): the two focus-gate sub-tests
+   (explicit-focus and default-session-id fallback) exercise the *same* gate
+   contract — which retry frames must cross, their ordering, the clear path, and
+   session-id stamping — differing only in how focus is resolved. Asserts that
+   the retry lifecycle's frames crossed the focus gate: ≥1 footer frame reached
+   the emit boundary, the activation and changed-metadata frames are present and
+   ordered (activate precedes change), a distinguishable clear footer landed
+   (via `assert-clear-footer-produced!`), and every crossing frame is stamped
+   with the driving `session-id`. `label` names the focus arm so a failure
+   reports which arm's gate crossing regressed. The background sub-test asserts
+   the *opposite* (suppression) contract and the sibling pre-gate test
+   interleaves its stamping control with the clear-footer binding, so neither is
+   a caller of this helper."
+  [footer-events session-id label]
+  (is (seq footer-events)
+      (str label " must still receive footer/updated frames through the focus gate"))
+  ;; Per-frame focus gating is the regression under test: assert every retry
+  ;; frame the sibling pre-gate test verifies (activation, changed metadata,
+  ;; clear) also crosses the RPC focus gate, so a regression that gates only the
+  ;; later frames cannot go undetected.
+  (is (some activation-retry-footer? footer-events)
+      (str label " must receive the retry-activation footer text through the focus gate"))
+  (is (some changed-retry-footer? footer-events)
+      (str label " must receive the changed retry metadata footer through the focus gate"))
+  ;; Ordering positive control (task 242 Slice 27): the retry lifecycle is
+  ;; inherently ordered (activate → change → clear). The existence matchers
+  ;; above cannot catch a reordering regression that delivered the
+  ;; changed-metadata footer before the activation footer; assert the activation
+  ;; frame precedes the changed frame.
+  (is (activation-precedes-changed? footer-events)
+      (str label "'s retry-activation footer must precede the changed-metadata footer through the focus gate"))
+  ;; Positive control (task 242 Slice 14): the bare negative below passes both
+  ;; when a real clear footer landed last and when some unrelated non-retry
+  ;; footer incidentally trailed with no clear ever emitted. Assert a
+  ;; distinguishable clear footer was actually *produced* after the last
+  ;; active-retry frame, so the no-stale-`retry in` check is credited against a
+  ;; live clear-path emission crossing the focus gate.
+  (assert-clear-footer-produced! footer-events label)
+  (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)
+      (str "every " label " footer frame must be stamped with the driving session-id at [:data :session-id]")))
+
 (defn- focus-emitter!
   "Builds the focus-gated `emit!` boundary the retry-footer sub-tests share
    (task 242 Slices 20/25; consolidated task 243): wires a capture atom through
@@ -529,32 +572,7 @@
       ;; assertions below are credited against a live retry pipeline.
       (assert-full-retry-sequence-ran! retry-run)
       (let [footer-events (footer-updated-frames @captured)]
-        (is (seq footer-events)
-            "focused session must still receive footer/updated frames through the focus gate")
-        ;; Per-frame focus gating is the regression under test: assert every
-        ;; retry frame the sibling pre-gate test verifies (activation, changed
-        ;; metadata, clear) also crosses the RPC focus gate, so a regression
-        ;; that gates only the later frames cannot go undetected.
-        (is (some activation-retry-footer? footer-events)
-            "focused session must receive the retry-activation footer text through the focus gate")
-        (is (some changed-retry-footer? footer-events)
-            "focused session must receive the changed retry metadata footer through the focus gate")
-        ;; Ordering positive control (task 242 Slice 27): the retry lifecycle is
-        ;; inherently ordered (activate → change → clear). The existence
-        ;; matchers above cannot catch a reordering regression that delivered
-        ;; the changed-metadata footer before the activation footer; assert the
-        ;; activation frame precedes the changed frame.
-        (is (activation-precedes-changed? footer-events)
-            "focused session's retry-activation footer must precede the changed-metadata footer through the focus gate")
-        ;; Positive control (task 242 Slice 14): the bare negative below passes
-        ;; both when a real clear footer landed last and when some unrelated
-        ;; non-retry footer incidentally trailed with no clear ever emitted.
-        ;; Assert a distinguishable clear footer was actually *produced* after
-        ;; the last active-retry frame, so the no-stale-`retry in` check is
-        ;; credited against a live clear-path emission crossing the focus gate.
-        (assert-clear-footer-produced! footer-events "focused session")
-        (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)
-            "every focused-session footer frame must be stamped with the driving session-id at [:data :session-id]"))))
+        (assert-retry-footers-crossed-gate! footer-events session-id "focused session"))))
   (testing "focused session via default-session-id fallback (no explicit focus): retry footer/updated frames pass the focus gate"
     ;; Fallback-arm regression lock (task 242 Slice 25): the design's Context
     ;; names the single-focused-session case as the prime suspect. In
@@ -577,20 +595,7 @@
       ;; via a successful recovery turn (task 243 test-review follow-up).
       (assert-full-retry-sequence-ran! retry-run)
       (let [footer-events (footer-updated-frames @captured)]
-        (is (seq footer-events)
-            "focused session (default-session-id fallback) must still receive footer/updated frames through the focus gate")
-        (is (some activation-retry-footer? footer-events)
-            "default-session-id fallback must receive the retry-activation footer text through the focus gate")
-        (is (some changed-retry-footer? footer-events)
-            "default-session-id fallback must receive the changed retry metadata footer through the focus gate")
-        ;; Ordering positive control (task 242 Slice 27): activation must
-        ;; precede the changed-metadata footer under the default-session-id
-        ;; fallback arm too.
-        (is (activation-precedes-changed? footer-events)
-            "default-session-id fallback's retry-activation footer must precede the changed-metadata footer through the focus gate")
-        (assert-clear-footer-produced! footer-events "default-session-id fallback")
-        (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)
-            "every default-session-id-fallback footer frame must be stamped with the driving session-id at [:data :session-id]"))))
+        (assert-retry-footers-crossed-gate! footer-events session-id "default-session-id fallback"))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
     ;; Pre-gate production control (task 242 Slice 12): the gated `(is (empty?
     ;; footer-events))` below cannot, on its own, distinguish "footer frames
