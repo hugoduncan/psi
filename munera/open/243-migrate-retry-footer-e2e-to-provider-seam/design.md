@@ -105,6 +105,21 @@ co-migrated together:
   matcher config-coupling authorities. Task 242 kept these helpers in place
   (green, frozen) and forwarded the over-abstraction concern here rather than
   churn a soon-to-be-replaced harness.
+- Forwarded from task 242 Slice 28 (code-shaper review): `focus-gated-emitter!`
+  (Slice 20) and `default-focus-emitter!` (Slice 25) are near-duplicate 6-line
+  emitter builders in `rpc_prompt_test.clj` differing *only* in the
+  `set-focus-session-id!` argument (explicit `session-id` for the explicit-focus
+  branch vs `nil` for the `default-session-id` fallback branch). Both re-spell
+  the identical `make-rpc-state → subscribe-topics! → set-focus-session-id! →
+  make-request-emitter` sequence, so a change to the shared emitter wiring must
+  be edited at both sites and can drift between the two builders meant to
+  exercise the *same* gate under explicit-vs-fallback focus. When this rewrite
+  reconstructs the harness, collapse them onto one parameterized builder (e.g.
+  `focus-emitter! [session-id focus]` where `focus` is the explicit `session-id`
+  or `nil`) co-migrated alongside the two `with-redefs` call sites. Task 242 left
+  the two builders in place (green, frozen) and forwarded the dedup here per
+  Slice 23's aggregate-over-abstraction judgement, rather than encode yet another
+  helper in the soon-to-be-replaced harness.
 - Related: `munera/closed/242-retry-footer-focus-gate-regression/` (see its
   implementation.md Slice 6 for the seam-existence verification),
   `munera/closed/241-emit-only-focused-session-events/` (focus-gate origin).

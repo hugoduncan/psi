@@ -837,7 +837,7 @@ If background-only (working as intended):
 
 ## Slice 28 — Review follow-ups (code-shaper pass)
 
-- [ ] `default-focus-emitter!` and `focus-gated-emitter!` are near-duplicate
+- [x] `default-focus-emitter!` and `focus-gated-emitter!` are near-duplicate
       6-line emitter builders that differ *only* in the
       `set-focus-session-id!` argument — a `consistent`/`economical` residual
       that no prior slice captures. Slice 20 extracted `focus-gated-emitter!`
@@ -864,3 +864,12 @@ If background-only (working as intended):
       243's harness rewrite** (which co-migrates both call sites) over encoding
       yet another helper here — but capture it so it is not lost, and correct
       the note that this residual is untracked.
+      - Resolved: forwarded to task 243. Per Slice 23's aggregate-over-abstraction
+        judgement on this frozen, task-243-migration-bound harness, the two
+        near-duplicate emitter builders are kept in place (green, frozen) rather
+        than collapsed into yet another helper here. Added a Notes entry to
+        `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/design.md`
+        capturing the `focus-gated-emitter!`/`default-focus-emitter!` dedup for
+        co-migration onto one parameterized `focus-emitter! [session-id focus]`
+        builder alongside the two `with-redefs` call sites — so the residual is
+        tracked, not untracked.

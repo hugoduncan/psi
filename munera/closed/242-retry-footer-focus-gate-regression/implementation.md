@@ -1093,3 +1093,18 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
   at `58a16fd53` before this review.
+
+## Slice 28 follow-up execution — outcome
+
+- addressed 1 review step (Slice 28, code-shaper review): the
+  `focus-gated-emitter!` / `default-focus-emitter!` near-duplicate emitter-builder
+  dedup. Per the item's own directive and Slice 23's aggregate-over-abstraction
+  judgement on this frozen, task-243-migration-bound harness, forwarded the dedup
+  to task 243 rather than encoding another helper here — added a Notes entry to
+  `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/design.md` capturing
+  the `focus-emitter! [session-id focus]` collapse for co-migration alongside the
+  two `with-redefs` call sites. The two builders stay in place (green, frozen);
+  residual now tracked, not untracked. No code/test/doc change.
+- Non-compliance note: executed against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed at
+  `58a16fd53` before this follow-up.
