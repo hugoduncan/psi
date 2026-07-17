@@ -288,7 +288,7 @@ If background-only (working as intended):
 
 ## Slice 24 — Review follow-ups (task-implementation-review, 2nd)
 
-- [ ] `await-retry-footer-text!`'s Slice-9 observable-timeout guard depends on an
+- [x] `await-retry-footer-text!`'s Slice-9 observable-timeout guard depends on an
       **undocumented thread-affinity invariant** that no prior slice names, and
       whose violation would silently re-open the exact swallowed-timeout blind
       spot Slice 9 closed. The helper calls `clojure.test/is` (its

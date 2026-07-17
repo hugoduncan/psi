@@ -915,3 +915,29 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
   at `58a16fd53` before this review.
+
+## Slice 24 — implementation-review 2nd-pass follow-up (addressed 1 review step)
+
+- **Thread-affinity invariant encoded (option (a)):** documented the previously
+  undocumented invariant that `await-retry-footer-text!`'s
+  `(is (not= support/timeout-token …))` guard is only *counted* when the
+  `:provider-retry-sleep-fn` runs on the **test thread**. Verified the invariant
+  holds today: `sleep-for-retry!` (`turn_runtime/core.clj` L622) is on the
+  synchronous retry-loop path driven by `execute-prepared-request!`, which
+  `drive-provider-retry-through-progress-loop!` calls *directly* on the test
+  thread; the daemon thread from `streams/start-progress-loop!` only drains the
+  progress queue. Added (1) a THREAD-AFFINITY INVARIANT section to
+  `await-retry-footer-text!`'s docstring explaining the `is`/`*report-counters*`
+  thread-local dependency and mandating that any move of the retry loop
+  off-thread must re-home the timeout failure to a thread-safe channel; and (2)
+  a THREAD-AFFINITY marker comment at the `execute-prepared-request!` drive site
+  in `drive-provider-retry-through-progress-loop!` cross-referencing the
+  docstring, so an edit that moves the drive off-thread encounters the warning.
+  Chose option (a) (documenting the invariant) over option (b) (restructuring to
+  a promise/atom asserted post-drive) since the change is test-only, frozen, and
+  comment-only preserves behaviour; task 243 keeps the `await-retry-footer-text!`
+  sync pattern, so the invariant is documented in-place rather than forwarded.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions —
+  unchanged, comment-only), `clj-kondo` clean, `clj-paren-repair` clean.
+  Test-only; no product/behaviour change, no CHANGELOG entry.
+- addressed 1 review step.

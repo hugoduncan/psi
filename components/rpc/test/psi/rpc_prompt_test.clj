@@ -166,7 +166,24 @@
    retry clear before delivery and surface later as a generic \"retry in Ns
    not found\" assertion — indistinguishable from a genuine focus-gate
    regression. Detecting the timeout here names the missing text, so a sync
-   timeout is diagnosable as its own failure."
+   timeout is diagnosable as its own failure.
+
+   THREAD-AFFINITY INVARIANT (task 242 Slice 24): the `(is (not= …))` fail-fast
+   below reports via the thread-local `clojure.test/*report-counters*`, so its
+   pass/fail is only *counted* when this sleep-fn runs on the **test thread**.
+   That holds today only because `drive-provider-retry-through-progress-loop!`
+   calls `turn-runtime/execute-prepared-request!` directly (not on the daemon
+   thread started by `streams/start-progress-loop!`), so the retry loop →
+   `sleep-for-retry!` → this sleep-fn → `is` all run on the test thread while the
+   daemon thread only drains the progress queue. This split is load-bearing: if
+   a future edit moves the retry loop onto the progress / daemon thread (or
+   routes the sleep-fn through an executor), the `is` would fire on a non-test
+   thread with unbound counters — the timeout would be silently dropped (no
+   pass, no fail), re-opening the swallowed-timeout masquerade this guard
+   removes, while the test still shows green. Any such move MUST re-home the
+   timeout failure to a thread-safe channel (e.g. deliver `support/timeout-token`
+   to an atom the test thread asserts on after the drive) rather than relying on
+   `is` inside the sleep-fn."
   [captured expected-text]
   (let [result (support/await-until
                 #(some (fn [frame]
@@ -413,6 +430,12 @@
                                              :content [{:type :text :text "recovered"}]
                                              :stop-reason :stop
                                              :timestamp (java.time.Instant/now)}}))]
+        ;; THREAD-AFFINITY (task 242 Slice 24): this runs the retry loop (and its
+        ;; `:provider-retry-sleep-fn` → `await-retry-footer-text!` `is` guard)
+        ;; *synchronously on the test thread* — the daemon `start-progress-loop!`
+        ;; thread only drains the progress queue. Do not move this drive onto the
+        ;; progress/daemon thread without re-homing the sleep-fn timeout `is`; see
+        ;; the `await-retry-footer-text!` THREAD-AFFINITY INVARIANT docstring.
         (turn-runtime/execute-prepared-request!
          {:provider-registry (atom {})}
          ctx
