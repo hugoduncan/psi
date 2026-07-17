@@ -581,7 +581,7 @@ If background-only (working as intended):
 
 ## Slice 21 — Review follow-ups (code-shaper pass, 5th)
 
-- [ ] The `remaining R/L` matcher fragment is hand-spelled independently of the
+- [x] The `remaining R/L` matcher fragment is hand-spelled independently of the
       production authority that builds it, a `consistent`/`robust` residual
       distinct from every prior matcher slice (Slice 16 aligned only the *delay*
       text to production's `retry-display/format-relative-seconds`; Slice 18

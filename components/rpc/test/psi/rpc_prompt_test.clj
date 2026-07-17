@@ -252,9 +252,23 @@
 (defn- remaining-fragment
   "The `\"remaining R/L\"` status-line fragment for a changed-retry footer,
    derived from the rate-limit metadata `drive-provider-retry-through-progress-loop!`'s
-   second 429 supplies (`RateLimit-Remaining`, `RateLimit-Limit`)."
+   second 429 supplies (`RateLimit-Remaining`, `RateLimit-Limit`). Built from the
+   *same production authority* the footer uses — `retry-display/retry-status-text`
+   (which composes `\"remaining \" + \"R/L\"`) — rather than a hand-rolled
+   `(str \"remaining \" remaining \"/\" limit)` copy, so a footer-format change to
+   the `\"remaining \"` prefix or the `\"/\"` separator in `retry_display.clj`
+   tracks the matcher automatically (task 242 Slice 21). The `retry-status-text`
+   output joins fragments with `\" · \"`; the remaining fragment is extracted as
+   the part after the leading `\"retry in Ns · \"` delay fragment."
   [remaining limit]
-  (str "remaining " remaining "/" limit))
+  (let [now-ms 0
+        status-line (retry-display/retry-status-text
+                     {:active? true
+                      :resume-at now-ms
+                      :rate-limit {:remaining remaining :limit limit}}
+                     now-ms)]
+    ;; Drop the leading delay fragment ("retry in 0s · "), leaving "remaining R/L".
+    (second (str/split status-line #" · " 2))))
 
 (defn- retry-footer-session-context!
   "Builds the non-persisted `[ctx session-id]` the retry-footer E2E harnesses

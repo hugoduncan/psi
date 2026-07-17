@@ -711,3 +711,22 @@
   delay text to production's `format-relative-seconds`, and Slice 18 unified only
   the rate-limit *values*, leaving the remaining-fragment *format string* as a
   hand-rolled second copy that can drift on a footer-format change.
+
+## Slice 21 implementation (code-shaper 5th-pass follow-up)
+
+- Routed `remaining-fragment` through the production authority
+  `retry-display/retry-status-text`: it now builds `"retry in 0s · remaining R/L"`
+  from constructed retry metadata (`:active? true :resume-at 0 :rate-limit
+  {:remaining :limit}`) and extracts the fragment after the leading delay part
+  via `(str/split status-line #" · " 2)` → `second`. The hand-rolled
+  `(str "remaining " remaining "/" limit)` copy is removed, so the `"remaining "`
+  prefix and `"/"` separator now have a single authority in `retry_display.clj`;
+  a footer-format change there tracks the `changed-retry-footer?` matcher
+  automatically (removes the `quot`-vs-`ceil`-class drift Slice 16 removed for the
+  delay text, now also for the remaining fragment).
+- Behaviour-preserving: derived fragment `"remaining 2/5000"` equals the prior
+  literal (verified via REPL against `retry-display/retry-status-text`).
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions),
+  `clj-kondo` clean, `clj-paren-repair` clean. Test-only; no product/behaviour
+  change, no CHANGELOG entry.
+- addressed 1 review step.
