@@ -178,6 +178,27 @@
   (fn [delay-ms]
     (await-retry-footer-text! captured (expected-retry-text delay-ms))))
 
+(defn- retry-status-line?
+  "A `footer/updated` frame whose `:status-line` still carries active-retry
+   text (`\"retry in Ns\"`)."
+  [frame]
+  (str/includes? (or (get-in frame [:data :status-line]) "") "retry in"))
+
+(defn- clear-footer-produced-after-retry
+  "Positive control for the retry→inactive **clear** footer (task 242 Slice 14):
+   returns the `footer/updated` frame that follows the last active-retry frame,
+   or `nil` if no footer was emitted after the retry frames. A non-nil result
+   proves the clear path actually *produced* a distinguishable footer after the
+   retry sequence — unlike a bare negative on `(last footer-events)`, which
+   passes both when a real clear footer landed last and when some unrelated
+   non-retry footer incidentally trailed with no clear ever emitted."
+  [footer-events]
+  (let [last-retry-idx (some (fn [[i frame]] (when (retry-status-line? frame) i))
+                             (reverse (map-indexed vector footer-events)))]
+    (when (and last-retry-idx
+               (< (inc last-retry-idx) (count footer-events)))
+      (nth footer-events (inc last-retry-idx)))))
+
 (defn- drive-provider-retry-through-progress-loop!
   "Runs the real provider-boundary retry → progress-queue → footer-refresh
    pipeline (`mark-active-retry!` → `:retry-updated` → `footer-refresh-progress-event?`
@@ -299,9 +320,18 @@
                           (str/includes? status-line "remaining 2/5000")))
                   footer-events)
             "focused session must receive the changed retry metadata footer through the focus gate")
-        (is (not (str/includes? (or (get-in (last footer-events) [:data :status-line]) "")
-                                "retry in"))
-            "focused session must receive the cleared footer (no stale retry text) through the focus gate")
+        ;; Positive control (task 242 Slice 14): the bare negative below passes
+        ;; both when a real clear footer landed last and when some unrelated
+        ;; non-retry footer incidentally trailed with no clear ever emitted.
+        ;; Assert a distinguishable clear footer was actually *produced* after
+        ;; the last active-retry frame, so the no-stale-`retry in` check is
+        ;; credited against a live clear-path emission crossing the focus gate.
+        (let [clear-footer (clear-footer-produced-after-retry footer-events)]
+          (is (some? clear-footer)
+              "focused session must receive a clear footer/updated frame after the retry sequence through the focus gate")
+          (is (not (str/includes? (or (get-in clear-footer [:data :status-line]) "")
+                                  "retry in"))
+              "focused session's clear footer must carry no stale retry text (through the focus gate)"))
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
     ;; Pre-gate production control (task 242 Slice 12): the gated `(is (empty?
@@ -411,16 +441,23 @@
                                                                 "remaining 2/5000"))
                                         %)
                                      footer-events)
-          final-footer (last footer-events)]
+          ;; Positive control (task 242 Slice 14): the clear footer is the
+          ;; footer *produced after* the last active-retry frame, not merely the
+          ;; last footer overall — so the no-stale-`retry in` assertion is
+          ;; credited against a live clear-path emission rather than an
+          ;; incidentally-trailing unrelated footer.
+          clear-footer (clear-footer-produced-after-retry footer-events)]
       (is (= 3 attempts))
       (is (some? first-retry-footer)
           "retry activation must publish footer/updated with retry text")
       (is (some? changed-retry-footer)
           "changed retry metadata must publish footer/updated with latest visible text")
+      (is (some? clear-footer)
+          "retry clear must publish a distinguishable footer/updated frame after the retry sequence")
       (is (= (get-in first-retry-footer [:data :session-id])
              (get-in changed-retry-footer [:data :session-id])
-             (get-in final-footer [:data :session-id])))
-      (is (not (str/includes? (or (get-in final-footer [:data :status-line]) "")
+             (get-in clear-footer [:data :session-id])))
+      (is (not (str/includes? (or (get-in clear-footer [:data :status-line]) "")
                               "retry in"))
           "retry clear must publish a footer without stale retry text"))))
 

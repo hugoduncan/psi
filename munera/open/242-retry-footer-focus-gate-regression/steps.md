@@ -256,7 +256,7 @@ If background-only (working as intended):
 
 ## Slice 14 — Test-review follow-ups (test-shaper pass, 6th)
 
-- [ ] The retry-**clear** assertion is a bare negative on `(last footer-events)`
+- [x] The retry-**clear** assertion is a bare negative on `(last footer-events)`
       with no positive control that a clear footer was actually produced — a
       distinct vacuity branch from the activation/changed/attempts/background
       controls already closed (Slices 8/12). In both

@@ -426,3 +426,29 @@
   positive control that a clear footer was actually produced — a distinct
   production-vs-gating vacuity branch (clear-path) from the
   activation/changed/attempts/background controls closed in Slices 8/12.
+
+## Slice 14 — test-shaper 6th pass follow-up (addressed 1 review step)
+
+- **Clear-frame production-vs-gating positive control:** added
+  `clear-footer-produced-after-retry` (returns the `footer/updated` frame that
+  follows the *last* active-retry frame, or `nil` if none) plus a
+  `retry-status-line?` predicate, and asserted `(is (some? clear-footer))` in
+  both retry-footer tests (focused sub-test of
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  and the sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`).
+  The no-stale-`retry in` check is now applied to that positively-identified
+  clear frame instead of a bare `(last footer-events)`. Verified frame sequence
+  via nREPL: activation (`retry in 8s`), changed (`retry in 4s`, twice from the
+  poll), then a trailing `nil`-status clear footer — the helper returns that
+  clear frame and `nil` when no footer follows the retry frames, so a
+  clear-path regression (clear footer never emitted, some unrelated non-retry
+  footer incidentally trailing) now fails `(is (some? clear-footer))` rather
+  than passing green — the same production-vs-gating `meaningful_failures` gap
+  Slices 8/12 closed for the activation/changed/background frames, now closed
+  for the clear transition. Kept here (not forwarded to 243) since it hardens
+  the existing assertions in-place.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 62 assertions,
+  +2 from the two `some? clear-footer` controls), `clj-kondo` clean,
+  `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
+  entry.
+- addressed 1 review step.
