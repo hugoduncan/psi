@@ -199,3 +199,79 @@
 - Principles to hold when addressing the design-step: keep the two frozen call
   sites and behaviour-preserving constraint; resolve via record-and-compare, not
   by chasing a green full suite (record-not-fix).
+
+## Implementation pass (Slices 1–4 executed; design-step 4 resolved)
+
+- Resolved the last open design-step: rewrote design.md **Scope** to the
+  verified single-shared-driver shape (one `with-redefs` inside
+  `drive-provider-retry-through-progress-loop!`; both retry sub-tests and the
+  sibling reach the stub only via that shared driver, no inline `with-redefs`
+  anywhere else). Marked design-steps.md item 4 done.
+
+- Baseline `bb test` (pre-migration): **2451 passed / 24 failed / 38 errored**
+  (matches the task-242 reference baseline of 2450/24/38 within the expected
+  +1 pass task 242 recorded for its added test).
+
+- Seam contract pinned by reading source (no surprises vs. plan.md):
+  - Provider-impl contract: a map with `:stream (fn [conversation model
+    options consume-fn] ...)` — the exact shape `psi.ai.streaming/stream-response`
+    invokes. The stub can call `consume-fn` synchronously inside its `:stream`
+    fn; `stream-response` already wraps the whole call in a `future`, and
+    `handle-event!` delivers `done-p` synchronously as each `:done`/`:error`
+    event is consumed, so a synchronous stub still exercises the async
+    `await-assistant-message!` wait path correctly.
+  - `turn-runtime/make-provider-event-consumer`'s `:error` case reads
+    `:http-status` and `(or :provider-error/headers :headers)` off the event
+    map and forwards them via `turn-sc/send-event! :turn/error`, which
+    `accumulator/handle-error!` uses to build the assistant-message carrying
+    `:http-status` / `:provider-error/headers` — confirmed this is the same
+    shape the removed fabricated-turn stub built directly.
+  - Recovery-turn event vocabulary used: `:text-start` / `:text-delta` /
+    `:text-end` / `:done {:reason :stop :usage {}}`.
+
+- Stub provider + ctx helper (`retry-stub-provider-ai-ctx`) added, registered
+  under `:anthropic` via `psi.ai.core/create-context`, returning
+  `[ai-ctx attempts*]`. `drive-provider-retry-through-progress-loop!` rewritten
+  to call `turn-runtime/execute-prepared-request!` with `ai-ctx` as the first
+  arg (no `with-redefs`), preserving the THREAD-AFFINITY invariant (still
+  called synchronously on the test thread) and the `start-progress-loop!` /
+  `stop-progress-loop!` wiring.
+
+- **Two additional preconditions discovered that plan.md's contract-pinning
+  step did not name** (both `execute-live-turn!` → `do-stream!` →
+  `ai/stream-response-in` schema preconditions), needed to reach the stub's
+  `:stream` fn at all instead of failing before it (an uncaught
+  `AssertionError` inside `execute-live-turn!`'s `(catch Throwable t ...)`,
+  which silently produced a headerless error assistant-message and `attempts*`
+  staying at `0`):
+  - `:prepared-request/provider-conversation` must be a schema-valid
+    `Conversation` (was previously irrelevant — the fabricated-turn
+    `with-redefs` never touched it). Fixed by supplying
+    `(ai/create-conversation nil)`.
+  - `:prepared-request/model` must be a schema-valid `Model` (closed map with
+    all required capability keys), not the ad hoc `{:provider :anthropic :id
+    "stub"}` literal the old stub tolerated. Fixed by using a real model,
+    `(psi.ai.models/get-model :claude-3-5-sonnet)` (still resolves the stub
+    provider via `:provider :anthropic`).
+  - Both fixes required requiring `psi.ai.core` (`ai/create-context`,
+    `ai/create-conversation`) and `psi.ai.models` (`ai.models/get-model`) in
+    the test namespace.
+
+- Removed the task-242 "deliberate bounded exception to ¬mock/¬stub" comment
+  block along with the `with-redefs`. `grep with-redefs` in the file now shows
+  exactly one remaining site: the unrelated `session/query-in` redef in
+  `rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test` (~line
+  91) — out of scope for this task, left as-is.
+
+- `bb test --focus psi.rpc-prompt-test`: **5 passed / 0 failed / 0 errored**
+  (all five tests in the namespace, including both retry-footer tests, still
+  assert the same activation/changed/clear frames, focus-gate behaviour, and
+  attempt counts as before the migration).
+
+- `clj-paren-repair` run on the edited file (reformatted, no structural
+  issues); re-read; `clj-kondo --lint` clean (0 errors, 0 warnings).
+
+- Deferred to Slice 5 (unchanged from plan): `active-retry-text-prefix`
+  derivation, `focus-gated-emitter!`/`default-focus-emitter!` consolidation.
+  Deferred to Slice 6: full-suite `bb test` post-migration run + flakiness
+  comparison against the recorded baseline above.

@@ -4,6 +4,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.ai.core :as ai]
+   [psi.ai.models :as ai.models]
    [psi.app-runtime.retry-display :as retry-display]
    [psi.rpc.events :as rpc.events]
    [psi.rpc.session.emit :as rpc.emit]
@@ -384,26 +386,68 @@
                              (map-indexed vector footer-events))]
     (boolean (and activation-idx changed-idx (< activation-idx changed-idx)))))
 
+(defn- retry-stub-provider-ai-ctx
+  "Builds a per-test AI context (`psi.ai.core/create-context`) seeded with a
+   stub `:anthropic` provider, registered via the injectable per-ctx
+   `:provider-registry` seam rather than `with-redefs` of a logic boundary
+   (task 243). Returns `[ai-ctx attempts*]`, where `attempts*` is the atom
+   counting stream attempts so callers can assert the same attempt counts the
+   prior fabricated-turn `with-redefs` stub asserted.
+
+   The stub's `:stream` fn (the provider-impl contract
+   `psi.ai.streaming/stream-response` invokes as `(stream conversation model
+   options consume-fn)`) emits, per attempt:
+     1. a stream `:error` event carrying `:http-status 429` and
+        `:provider-error/headers` with the activation `Retry-After`/rate-limit
+        headers
+     2. a stream `:error` event with the changed `Retry-After`/rate-limit
+        headers
+     3+. a successful recovery stream (`:text-start`/`:text-delta`/`:text-end`/
+        `:done`)
+   `turn-runtime/make-provider-event-consumer`'s `:error` case propagates
+   `:http-status`/`:provider-error/headers` into the assistant-message, driving
+   the same `mark-active-retry!` → retry → `footer/updated` pipeline the
+   fabricated-turn stub drove directly."
+  []
+  (let [attempts* (atom 0)
+        error-event (fn [headers]
+                      {:type :error
+                       :error-message "rate limit exceeded"
+                       :http-status 429
+                       :provider-error/headers headers})
+        stub-provider
+        {:stream (fn [_conversation _model _options consume-fn]
+                   (case (swap! attempts* inc)
+                     1 (consume-fn (error-event {"Retry-After" (retry-after-seconds activation-retry-delay-ms)
+                                                 "RateLimit-Limit" (str retry-rate-limit)
+                                                 "RateLimit-Remaining" "0"}))
+                     2 (consume-fn (error-event {"Retry-After" (retry-after-seconds changed-retry-delay-ms)
+                                                 "RateLimit-Limit" (str retry-rate-limit)
+                                                 "RateLimit-Remaining" (str changed-retry-remaining)}))
+                     (do (consume-fn {:type :text-start :content-index 0})
+                         (consume-fn {:type :text-delta :content-index 0 :delta "recovered"})
+                         (consume-fn {:type :text-end :content-index 0})
+                         (consume-fn {:type :done :reason :stop :usage {}}))))}]
+    [(ai/create-context {:providers {:anthropic stub-provider}}) attempts*]))
+
 (defn- drive-provider-retry-through-progress-loop!
   "Runs the real provider-boundary retry → progress-queue → footer-refresh
    pipeline (`mark-active-retry!` → `:retry-updated` → `footer-refresh-progress-event?`
    → `emit-footer-updated!`) with `emit!` supplied by the caller, then blocks
-   until the retry sequence (activate → change → clear) completes."
+   until the retry sequence (activate → change → clear) completes.
+
+   Drives the retry sequence through the real live-turn path
+   (`turn-runtime/execute-prepared-request!`) against a stub provider
+   registered via the injectable per-ctx `:provider-registry` seam
+   (`retry-stub-provider-ai-ctx`), not a `with-redefs` of
+   `execute-live-turn!` (task 243). The stub `ai-ctx` is passed as the
+   **first** `execute-prepared-request!` argument — the only param provider
+   resolution consults (`do-stream!` → `ai/stream-response-in` →
+   `context-provider-registry ai-ctx`) — leaving the second app-runtime `ctx`
+   (session state, `:provider-retry-sleep-fn`, retry state) unchanged."
   [ctx session-id emit!]
-  (let [attempts*  (atom 0)
+  (let [[ai-ctx attempts*] (retry-stub-provider-ai-ctx)
         progress-q (java.util.concurrent.LinkedBlockingQueue.)
-        error-turn (fn [headers]
-                     {:turn-id "turn-retry-footer"
-                      :model {:provider "anthropic" :id "stub"}
-                      :ai-options {}
-                      :turn-ctx nil
-                      :assistant-message {:role "assistant"
-                                          :content [{:type :error :text "rate limit exceeded"}]
-                                          :stop-reason :error
-                                          :error-message "rate limit exceeded"
-                                          :http-status 429
-                                          :provider-error/headers headers
-                                          :timestamp (java.time.Instant/now)}})
         {:keys [stop? thread]} (streams/start-progress-loop!
                                 {:start-daemon-thread! (fn [f name]
                                                          (doto (Thread. ^Runnable f name)
@@ -415,56 +459,28 @@
                                  :progress-q progress-q
                                  :thread-name "rpc-retry-footer-focus-test"})]
     (try
-      ;; NOTE (task 242 test-review, deliberate bounded exception to ¬mock/¬stub):
-      ;; `execute-live-turn!` is redefined here to fabricate 429/recovery turns.
-      ;; A clean injectable seam does exist — `psi.ai.core/create-context` seeds
-      ;; a per-ctx `:provider-registry`, and a stub provider emitting stream
-      ;; `:error` events carrying `:http-status`/`:provider-error/headers` would
-      ;; drive the same retry path (the stream consumer propagates those keys to
-      ;; the assistant-message). Migrating to that seam is deferred: it would
-      ;; also require rewriting the sibling
-      ;; `rpc-prompt-provider-retry-state-publishes-footer-updated-test` and
-      ;; standing up a stub provider matching the provider protocol, which
-      ;; exceeds task 242's frozen behaviour-preserving test-coverage scope.
-      ;; Recorded in implementation.md as a bounded, intentional exception.
-      (with-redefs [turn-runtime/execute-live-turn!
-                    (fn [& _]
-                      (case (swap! attempts* inc)
-                        1 (error-turn {"Retry-After" (retry-after-seconds activation-retry-delay-ms)
-                                       "RateLimit-Limit" (str retry-rate-limit)
-                                       "RateLimit-Remaining" "0"})
-                        2 (error-turn {"Retry-After" (retry-after-seconds changed-retry-delay-ms)
-                                       "RateLimit-Limit" (str retry-rate-limit)
-                                       "RateLimit-Remaining" (str changed-retry-remaining)})
-                        {:turn-id "turn-retry-footer"
-                         :model {:provider "anthropic" :id "stub"}
-                         :ai-options {}
-                         :turn-ctx nil
-                         :assistant-message {:role "assistant"
-                                             :content [{:type :text :text "recovered"}]
-                                             :stop-reason :stop
-                                             :timestamp (java.time.Instant/now)}}))]
-        ;; THREAD-AFFINITY (task 242 Slice 24): this runs the retry loop (and its
-        ;; `:provider-retry-sleep-fn` → `await-retry-footer-text!` `is` guard)
-        ;; *synchronously on the test thread* — the daemon `start-progress-loop!`
-        ;; thread only drains the progress queue. Do not move this drive onto the
-        ;; progress/daemon thread without re-homing the sleep-fn timeout `is`; see
-        ;; the `await-retry-footer-text!` THREAD-AFFINITY INVARIANT docstring.
-        (turn-runtime/execute-prepared-request!
-         {:provider-registry (atom {})}
-         ctx
-         session-id
-         {:prepared-request/id "turn-retry-footer"
-          :prepared-request/model {:provider :anthropic :id "stub"}
-          :prepared-request/ai-options {}
-          :prepared-request/response-mode :streaming}
-         progress-q)
-        (streams/stop-progress-loop! {:stop? stop?
-                                      :thread thread
-                                      :progress-q progress-q
-                                      :emit! emit!
-                                      :ctx ctx
-                                      :session-id session-id}))
+      ;; THREAD-AFFINITY (task 242 Slice 24): this runs the retry loop (and its
+      ;; `:provider-retry-sleep-fn` → `await-retry-footer-text!` `is` guard)
+      ;; *synchronously on the test thread* — the daemon `start-progress-loop!`
+      ;; thread only drains the progress queue. Do not move this drive onto the
+      ;; progress/daemon thread without re-homing the sleep-fn timeout `is`; see
+      ;; the `await-retry-footer-text!` THREAD-AFFINITY INVARIANT docstring.
+      (turn-runtime/execute-prepared-request!
+       ai-ctx
+       ctx
+       session-id
+       {:prepared-request/id "turn-retry-footer"
+        :prepared-request/model (ai.models/get-model :claude-3-5-sonnet)
+        :prepared-request/ai-options {}
+        :prepared-request/response-mode :streaming
+        :prepared-request/provider-conversation (ai/create-conversation nil)}
+       progress-q)
+      (streams/stop-progress-loop! {:stop? stop?
+                                    :thread thread
+                                    :progress-q progress-q
+                                    :emit! emit!
+                                    :ctx ctx
+                                    :session-id session-id})
       (finally
         (reset! stop? true)
         (.join ^Thread thread 200)))

@@ -34,16 +34,20 @@ This task is the tracked exit for that deferred violation.
 
 ## Scope
 
-Two call sites in `components/rpc/test/psi/rpc_prompt_test.clj` share the
-identical `with-redefs turn-runtime/execute-live-turn!` stub and must be
-co-migrated together:
+`components/rpc/test/psi/rpc_prompt_test.clj` has exactly **one**
+`with-redefs [turn-runtime/execute-live-turn! …]` site, inside the shared
+helper `drive-provider-retry-through-progress-loop!`. All retry sub-tests reach
+the fabricated 429/recovery turns only by calling that shared driver, so
+migrating this single site migrates all of them at once:
 
-1. `drive-provider-retry-through-progress-loop!` — the helper used by
-   `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
-   (the task-242 focus-gate boundary test).
-2. `rpc-prompt-provider-retry-state-publishes-footer-updated-test` — the sibling
-   pre-gate characterization test, which inlines its own identical
-   `with-redefs`.
+1. `drive-provider-retry-through-progress-loop!` — the shared driver holding
+   the `with-redefs`, called by every retry sub-test below.
+2. `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+   (the task-242 focus-gate boundary test) — reaches the stub solely via the
+   shared driver; no inline `with-redefs` of its own.
+3. `rpc-prompt-provider-retry-state-publishes-footer-updated-test` — the
+   sibling pre-gate characterization test — likewise reaches the stub solely
+   via the shared driver; no inline `with-redefs` of its own.
 
 ## Approach (design-only; details deferred to plan)
 
