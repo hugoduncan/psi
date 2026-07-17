@@ -371,3 +371,7 @@
     authority test rather than silently desyncing `active-retry-text-prefix`.
     `bb test --focus psi.app-runtime.retry-display-test`: 2 passed / 0 failed /
     0 errored (4 assertions); `clj-kondo` clean.
+
+## Implementation-review pass 2 (task-implementation-review)
+
+- added 1 follow-up step: redundant assertion term in the added zero-second retry-display authority test (second `is` repeats the whole first `is` in its first two args). Non-blocking test-clarity only; core migration verified independently as sound (¬mock/¬stub via injectable per-ctx `:provider-registry`, behaviour-preserving), all 243 acceptance criteria hold, `psi.rpc-prompt-test` green (5/5, 58 assertions) and `retry-display-test` green (2/2), lint clean.
