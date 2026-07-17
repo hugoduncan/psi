@@ -170,16 +170,16 @@
   3)
 
 (defn- retry-after-seconds
-  "Whole-second `Retry-After` header value the driver emits for a retry
-   `delay-ms`, so the driver header and the matcher constant share one
-   authority."
+  "Whole-second `Retry-After` header value the stub's `:error` stream event
+   (`error-event`) emits for a retry `delay-ms`, so the stub header and the
+   matcher constant share one authority."
   [delay-ms]
   (str (quot (long delay-ms) 1000)))
 
 (defn- remaining-fragment
   "The `\"remaining R/L\"` status-line fragment for a changed-retry footer,
-   derived from the rate-limit metadata `drive-provider-retry-through-progress-loop!`'s
-   second 429 supplies (`RateLimit-Remaining`, `RateLimit-Limit`). Built from the
+   derived from the rate-limit metadata the stub's second `:error` stream event
+   (`error-event`) supplies (`RateLimit-Remaining`, `RateLimit-Limit`). Built from the
    *same production authority* the footer uses — `retry-display/retry-status-text`
    (which composes `\"remaining \" + \"R/L\"`) — rather than a hand-rolled
    `(str \"remaining \" remaining \"/\" limit)` copy, so a footer-format change to
@@ -201,7 +201,8 @@
   "Builds the non-persisted `[ctx session-id]` the retry-footer E2E harnesses
    share (task 242 Slice 18): a single authority for the retry test session
    config so the `:auto-retry-base-delay-ms` (the same first-attempt delay
-   `activation-retry-delay-ms` / the driver `Retry-After` encode) and
+   `activation-retry-delay-ms` the stub's `:error` stream event (`error-event`)
+   encodes as its `Retry-After`) and
    `:auto-retry-max-retries` are not duplicated at each `create-session-context`
    site."
   []
