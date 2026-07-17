@@ -970,3 +970,17 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
   at `58a16fd53` before this review.
+
+## Slice 25 resolution — default-session-id fallback E2E lock
+
+- Addressed 1 review step (Slice 25). Added focused sub-test variant to
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  driving retry `footer/updated` frames through `focus-allows?`'s
+  `default-session-id` fallback arm (no explicit focus). New helper
+  `default-focus-emitter!` seeds `:default-session-id` via `make-rpc-state` then
+  clears explicit focus (`set-focus-session-id!` nil), forcing
+  `(or (focus-session-id state) (default-session-id state))` to take the
+  fallback branch — the prime-suspect single-session/no-explicit-focus path.
+  Sub-test asserts activation + changed + clear footers reach `emit-frame!` for
+  the retrying session and are session-id-stamped. Green: 24 assertions in the
+  test, 71/6 across the namespace; clj-kondo clean.

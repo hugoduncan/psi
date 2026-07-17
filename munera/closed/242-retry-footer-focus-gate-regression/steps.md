@@ -735,7 +735,7 @@ If background-only (working as intended):
 
 ## Slice 25 — Test-review follow-ups (task-test-review pass)
 
-- [ ] The E2E focused-session regression lock never exercises the
+- [x] The E2E focused-session regression lock never exercises the
       `focus-allows?` **default-session-id fallback** arm with a retry footer —
       the very single-focused-session path the design's Context names as the
       prime suspect. `focus-gated-emitter!` (rpc_prompt_test.clj ~L459) always

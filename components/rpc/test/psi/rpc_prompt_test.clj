@@ -474,6 +474,26 @@
         emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
     [emit! captured]))
 
+(defn- default-focus-emitter!
+  "Builds the emit! boundary for the `focus-allows?` **default-session-id
+   fallback** arm (task 242 Slice 25): the common single-session case where the
+   connection has *no explicit focus set*, so session-scoped events are gated
+   against the frozen construction-time `default-session-id` rather than an
+   explicit focus. `make-rpc-state {:session-id default-session-id}` seeds both
+   `:focus-session-id` and `:default-session-id`; we then clear explicit focus
+   (`set-focus-session-id!` nil) so `focus-allows?` must take its
+   `(or (focus-session-id state) (default-session-id state))` fallback branch.
+   Distinct from `focus-gated-emitter!`, which sets explicit focus and only
+   exercises the explicit-focus branch. Returns `[emit! captured]`."
+  [default-session-id]
+  (let [captured    (atom [])
+        emit-frame! (fn [frame] (swap! captured conj frame))
+        state       (rpc.state/make-rpc-state {:session-id default-session-id})
+        _           (rpc.state/subscribe-topics! state rpc.events/event-topics)
+        _           (rpc.state/set-focus-session-id! state nil)
+        emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
+    [emit! captured]))
+
 (deftest rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test
   ;; Regression lock (task 242): the retry footer must still reach
   ;; `emit-frame!` at the RPC focus-gate boundary (`rpc.events/emit-event!` →
@@ -514,6 +534,39 @@
               "focused session must receive a clear footer/updated frame after the retry sequence through the focus gate")
           (is (not (retry-status-line? clear-footer))
               "focused session's clear footer must carry no stale retry text (through the focus gate)"))
+        (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
+  (testing "focused session via default-session-id fallback (no explicit focus): retry footer/updated frames pass the focus gate"
+    ;; Fallback-arm regression lock (task 242 Slice 25): the design's Context
+    ;; names the single-focused-session case as the prime suspect. In
+    ;; production that common case has *no explicit focus set*, so the focused
+    ;; retry footer is delivered via `focus-allows?`'s
+    ;; `(or (focus-session-id state) (default-session-id state))` *fallback*
+    ;; branch — not the explicit-focus branch the sub-test above drives.
+    ;; `default-focus-emitter!` leaves explicit focus nil so this sub-test
+    ;; exercises the `default-session-id` fallback arm end-to-end with real
+    ;; retry `footer/updated` frames, closing the gap a future change to the
+    ;; fallback (removal, or a session-id-stamping change in
+    ;; `emit-footer-updated!`) could otherwise leave green while suppressing the
+    ;; focused retry footer in the real single-session scenario.
+    (let [[ctx session-id] (retry-footer-session-context!)
+          [emit! captured] (default-focus-emitter! session-id)
+          ctx         (assoc ctx :provider-retry-sleep-fn
+                             (retry-footer-sleep-fn captured))
+          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+      (is (= 3 attempts)
+          "the full activate→change→clear retry sequence must have executed")
+      (let [footer-events (footer-updated-frames @captured)]
+        (is (seq footer-events)
+            "focused session (default-session-id fallback) must still receive footer/updated frames through the focus gate")
+        (is (some activation-retry-footer? footer-events)
+            "default-session-id fallback must receive the retry-activation footer text through the focus gate")
+        (is (some changed-retry-footer? footer-events)
+            "default-session-id fallback must receive the changed retry metadata footer through the focus gate")
+        (let [clear-footer (clear-footer-produced-after-retry footer-events)]
+          (is (some? clear-footer)
+              "default-session-id fallback must receive a clear footer/updated frame after the retry sequence through the focus gate")
+          (is (not (retry-status-line? clear-footer))
+              "default-session-id fallback's clear footer must carry no stale retry text (through the focus gate)"))
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
     ;; Pre-gate production control (task 242 Slice 12): the gated `(is (empty?
