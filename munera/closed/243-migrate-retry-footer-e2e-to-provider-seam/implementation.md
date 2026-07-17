@@ -404,3 +404,7 @@
 ## Test-shaper follow-up execution
 
 - addressed 3 test-shaper review steps in `components/rpc/test/psi/rpc_prompt_test.clj`: (1) added distinct failure messages to the three session-id-stamping assertions (two `every?` sites + the sibling 3-way `=`); (2) corrected the stale `retry-stub-provider-ai-ctx` docstring to state the driver consumes `@attempts*` and re-exports it as `:attempts` (no caller-facing direct-atom site); (3) added `expected-retry-attempts` const (single authority for `3`) and folded the attempts+recovery pair into `assert-full-retry-sequence-ran!`, wired into all four recovery-carrying sites, pre-gate control now uses the const. Non-vacuity re-verified (stub `NOTRECOVERED` mutation fails). `bb test --focus psi.rpc-prompt-test` green (66 assertions, 4 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.
+
+## Task-test-review pass 4 (test-shaper skill)
+
+- added 1 follow-up step: duplicated clear-footer control pair across the two focus-gate sub-tests (same class of copied two-line control the prior pass folded into `assert-full-retry-sequence-ran!`, left unconsolidated). Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
