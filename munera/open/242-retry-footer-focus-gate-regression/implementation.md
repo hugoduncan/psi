@@ -740,6 +740,28 @@
   `retry-display` authority, leaving a `retry_display.clj`↔matcher drift the
   seconds and remaining fragment no longer have.
 
+## code-shaper review session (7th pass) — outcome
+
+- No new follow-up steps. Re-reviewed the retry-footer E2E harness against
+  `simple ∧ consistent ∧ robust`. The prior code-shaper passes (Slices 17–22)
+  have folded every status-line format literal (`"retry in "` prefix, seconds,
+  `"remaining R/L"` fragment) onto the production authority
+  `psi.app-runtime.retry-display`, and unified the matchers, `frame-status-line`
+  accessor, `footer-updated-frames` selector, `focus-gated-emitter!`,
+  `retry-footer-session-context!`, and the driver-header ↔ matcher constants onto
+  single authorities. Every vacuity branch (attempts / activation / changed /
+  background production / clear) carries a positive control, timeouts are
+  observable and symmetric across both harnesses, and the sole `with-redefs`
+  ¬mock exception has a tracked exit (task 243). Checked residual candidates and
+  found each already deliberately scoped or load-bearing: the L116/L151
+  `footer/updated` filter duplication is the unrelated
+  `rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test`, explicitly
+  excluded from Slice 20's retry-footer extraction with recorded rationale; the
+  extensive `task 242 Slice N` provenance comments (incl. the Slice-15 divergence
+  note) document load-bearing rationale, not incidental prose. No genuinely-new
+  `consistency`/`simplicity`/`robustness` defect remains — filing further
+  micro-dedup steps would manufacture findings against a converged harness.
+
 ## Slice 22 — code-shaper 6th pass follow-up (addressed 1 review step)
 
 - **`"retry in "` prefix production-authority routing:** folded the last
