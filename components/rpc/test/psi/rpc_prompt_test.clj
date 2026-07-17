@@ -706,8 +706,8 @@
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
           retry-run (drive-provider-retry-through-progress-loop! ctx session-id emit!)
           footer-events (footer-updated-frames @emitted*)
-          first-retry-footer (some #(when (activation-retry-footer? %) %) footer-events)
-          changed-retry-footer (some #(when (changed-retry-footer? %) %) footer-events)
+          first-retry-footer (first (filter activation-retry-footer? footer-events))
+          changed-retry-footer (first (filter changed-retry-footer? footer-events))
           ;; Positive control (task 242 Slice 14): the clear footer is the
           ;; footer *produced after* the last active-retry frame, not merely the
           ;; last footer overall — so the no-stale-`retry in` assertion is
