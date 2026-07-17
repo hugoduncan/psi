@@ -1082,3 +1082,14 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   mentions (`doc/extensions.md`, `ramora/IMPLEMENTED.md`) stay accurate.
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path).
+
+## code-shaper review session — outcome
+
+- added 1 step (Slice 28): `default-focus-emitter!` / `focus-gated-emitter!`
+  near-duplicate emitter builders — an emitter-wiring dedup no prior slice
+  captured (Slice 20 predates the second builder; Slice 25 created it without
+  revisiting the duplication). Forwarded to task 243 per Slice 23's frozen-harness
+  judgement.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
+  at `58a16fd53` before this review.

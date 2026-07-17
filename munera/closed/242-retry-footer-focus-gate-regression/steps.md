@@ -834,3 +834,33 @@ If background-only (working as intended):
       task 242's frozen coverage or better folded into task 243's harness
       rewrite, record the explicit rationale rather than leaving the
       activation→changed ordering unasserted.
+
+## Slice 28 — Review follow-ups (code-shaper pass)
+
+- [ ] `default-focus-emitter!` and `focus-gated-emitter!` are near-duplicate
+      6-line emitter builders that differ *only* in the
+      `set-focus-session-id!` argument — a `consistent`/`economical` residual
+      that no prior slice captures. Slice 20 extracted `focus-gated-emitter!`
+      but *predates* `default-focus-emitter!` (created later in Slice 25 to
+      exercise the `default-session-id` fallback arm), and Slice 25 introduced
+      the second builder without revisiting the duplication it created. Both
+      re-spell the identical sequence — `captured` atom, `emit-frame!` closure,
+      `rpc.state/make-rpc-state {:session-id …}`,
+      `subscribe-topics! … rpc.events/event-topics`,
+      `set-focus-session-id!`, `make-request-emitter … "req-1"`, return
+      `[emit! captured]`. The sole difference is the focus argument:
+      `focus-gated-emitter!` passes the session-id (explicit-focus branch),
+      `default-focus-emitter!` passes `nil` (default-session-id fallback branch).
+      So a change to the shared emitter wiring (topic set, request-id, emitter
+      constructor, rpc-state shape) must be edited at both sites and can
+      silently drift between the two builders that are meant to exercise the
+      *same* gate under explicit vs fallback focus. Collapse them onto one
+      parameterized builder (e.g. `focus-emitter! [session-id focus]` where
+      `focus` is the explicit `session-id` or `nil`), so the emitter
+      construction has one authority and the explicit-vs-fallback pair cannot
+      diverge in anything but the focus argument under test. Per Slice 23's
+      recorded aggregate-over-abstraction judgement on this frozen,
+      task-243-migration-bound harness, prefer **forwarding this dedup to task
+      243's harness rewrite** (which co-migrates both call sites) over encoding
+      yet another helper here — but capture it so it is not lost, and correct
+      the note that this residual is untracked.
