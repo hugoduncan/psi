@@ -806,7 +806,7 @@ If background-only (working as intended):
 
 ## Slice 27 — Test-review follow-ups (test-shaper pass, 10th)
 
-- [ ] The retry lifecycle's **activation→changed** ordering is unasserted — a
+- [x] The retry lifecycle's **activation→changed** ordering is unasserted — a
       distinct `behavior_focused`/`meaningful_failures` gap from the
       clear-ordering control already closed (Slice 14). The retry sequence is
       inherently ordered (activate `retry in 8s` → change `retry in 4s` +

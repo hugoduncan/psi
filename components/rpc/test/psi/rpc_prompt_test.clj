@@ -365,6 +365,25 @@
                (< (inc last-retry-idx) (count footer-events)))
       (nth footer-events (inc last-retry-idx)))))
 
+(defn- activation-precedes-changed?
+  "Ordering positive control for the retry lifecycle (task 242 Slice 27):
+   returns true iff the retry-*activation* footer frame (`\"retry in 8s\"`)
+   appears at an earlier index than the *changed-metadata* footer frame
+   (`\"retry in 4s\"` + `\"remaining 2/5000\"`). Mirrors
+   `clear-footer-produced-after-retry`'s index-based clear-after-retry check for
+   the earlier activation→changed edge. Existence-only `some` matchers cannot
+   catch a progress-loop / footer-refresh reordering regression that delivered
+   the changed-metadata footer *before* activation; this control does. Returns
+   false (fails) if either frame is absent or the ordering is inverted."
+  [footer-events]
+  (let [activation-idx (some (fn [[i frame]]
+                               (when (activation-retry-footer? frame) i))
+                             (map-indexed vector footer-events))
+        changed-idx    (some (fn [[i frame]]
+                               (when (changed-retry-footer? frame) i))
+                             (map-indexed vector footer-events))]
+    (boolean (and activation-idx changed-idx (< activation-idx changed-idx)))))
+
 (defn- drive-provider-retry-through-progress-loop!
   "Runs the real provider-boundary retry → progress-queue → footer-refresh
    pipeline (`mark-active-retry!` → `:retry-updated` → `footer-refresh-progress-event?`
@@ -518,6 +537,13 @@
             "focused session must receive the retry-activation footer text through the focus gate")
         (is (some changed-retry-footer? footer-events)
             "focused session must receive the changed retry metadata footer through the focus gate")
+        ;; Ordering positive control (task 242 Slice 27): the retry lifecycle is
+        ;; inherently ordered (activate → change → clear). The existence
+        ;; matchers above cannot catch a reordering regression that delivered
+        ;; the changed-metadata footer before the activation footer; assert the
+        ;; activation frame precedes the changed frame.
+        (is (activation-precedes-changed? footer-events)
+            "focused session's retry-activation footer must precede the changed-metadata footer through the focus gate")
         ;; Positive control (task 242 Slice 14): the bare negative below passes
         ;; both when a real clear footer landed last and when some unrelated
         ;; non-retry footer incidentally trailed with no clear ever emitted.
@@ -557,6 +583,11 @@
             "default-session-id fallback must receive the retry-activation footer text through the focus gate")
         (is (some changed-retry-footer? footer-events)
             "default-session-id fallback must receive the changed retry metadata footer through the focus gate")
+        ;; Ordering positive control (task 242 Slice 27): activation must
+        ;; precede the changed-metadata footer under the default-session-id
+        ;; fallback arm too.
+        (is (activation-precedes-changed? footer-events)
+            "default-session-id fallback's retry-activation footer must precede the changed-metadata footer through the focus gate")
         (let [clear-footer (clear-footer-produced-after-retry footer-events)]
           (is (some? clear-footer)
               "default-session-id fallback must receive a clear footer/updated frame after the retry sequence through the focus gate")
@@ -688,6 +719,13 @@
           "retry activation must publish footer/updated with retry text")
       (is (some? changed-retry-footer)
           "changed retry metadata must publish footer/updated with latest visible text")
+      ;; Ordering positive control (task 242 Slice 27): the retry lifecycle is
+      ;; ordered (activate → change → clear). Existence matchers alone would
+      ;; pass a reordering regression that emitted the changed-metadata footer
+      ;; before activation; assert activation precedes changed at the pre-gate
+      ;; characterization boundary too.
+      (is (activation-precedes-changed? footer-events)
+          "retry-activation footer must precede the changed-metadata footer")
       (is (some? clear-footer)
           "retry clear must publish a distinguishable footer/updated frame after the retry sequence")
       ;; Session-id *correctness* control (task 242 Slice 26): bind all three

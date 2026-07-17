@@ -1040,3 +1040,19 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
   at `58a16fd53` before this review.
+
+## Slice 27 — activation→changed ordering control (test-only)
+
+- addressed 1 review step (Slice 27, test-shaper 10th pass): added
+  `activation-precedes-changed?` index-based ordering positive control
+  (mirrors `clear-footer-produced-after-retry`'s index approach for the
+  earlier activation→changed edge) and wired it into all three retry-footer
+  harnesses — focused sub-test, default-session-id fallback sub-test, and the
+  sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`. A
+  frame-reordering regression that delivered the changed-metadata footer before
+  activation now fails rather than passing on mere `some`-existence.
+- Load-bearing verified: temporarily inverting the ordering comparison
+  (`< → >`) fails 2 of the retry-footer tests; reverted.
+- Scope: test-only, behaviour-preserving; no code/doc change. `bb test --focus
+  psi.rpc-prompt-test` green (58 assertions, 5 tests). clj-kondo clean;
+  clj-paren-repair success.
