@@ -803,3 +803,34 @@ If background-only (working as intended):
       agreement alone. If judged out of scope for task 242's frozen coverage or
       better folded into task 243's harness rewrite, record the explicit
       rationale rather than leaving the session-id-correctness gap standing.
+
+## Slice 27 — Test-review follow-ups (test-shaper pass, 10th)
+
+- [ ] The retry lifecycle's **activation→changed** ordering is unasserted — a
+      distinct `behavior_focused`/`meaningful_failures` gap from the
+      clear-ordering control already closed (Slice 14). The retry sequence is
+      inherently ordered (activate `retry in 8s` → change `retry in 4s` +
+      `remaining 2/5000` → clear), and
+      `drive-provider-retry-through-progress-loop!` produces the frames in that
+      order deterministically (attempt 1 → activation header, attempt 2 →
+      changed header, recovery → clear). `clear-footer-produced-after-retry`
+      (Slice 14) *does* encode one ordering edge — the clear footer must land
+      *after* the last active-retry frame — but the activation-precedes-changed
+      edge is left entirely to independent `some`/`(some? …)` existence matchers
+      in **all three** harnesses (focused sub-test rpc_prompt_test.clj ~L516/L519,
+      default-fallback sub-test ~L556/L558, and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test` ~L680/L682).
+      So a progress-loop / footer-refresh reordering regression that delivered
+      the changed-metadata footer *before* the activation footer (or emitted the
+      second retry's `4s`/`remaining 2/5000` metadata first) would still satisfy
+      every `some activation-retry-footer?` + `some changed-retry-footer?`
+      assertion and pass green — the ordering half of the lifecycle contract the
+      design's stage-1→4 pipeline delivers is only *half*-encoded (clear-last
+      asserted, activation-before-changed not). Add an ordering positive control
+      that the activation footer's frame index precedes the changed-metadata
+      footer's (mirroring `clear-footer-produced-after-retry`'s
+      index-based clear-after-retry check), so a frame-reordering regression
+      fails rather than passing on mere co-existence. If judged out of scope for
+      task 242's frozen coverage or better folded into task 243's harness
+      rewrite, record the explicit rationale rather than leaving the
+      activation→changed ordering unasserted.

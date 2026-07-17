@@ -1030,3 +1030,13 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Slice 3 unchecked items (focused-session-broken branch) left as-is: they
   predate this review pass and were superseded by the background-only /
   working-as-intended diagnosis; owned by their branch, not this pass.
+
+## task-test-review session (10th pass, test-shaper) — outcome
+
+- added 1 step (Slice 27): the retry lifecycle's activation→changed ordering is
+  unasserted across all three harnesses — the existence matchers use `some`, so
+  a frame-reordering regression (changed footer delivered before activation)
+  passes green; only the clear-after-retry edge is index-encoded (Slice 14).
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
+  at `58a16fd53` before this review.
