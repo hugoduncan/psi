@@ -730,3 +730,12 @@
   `clj-kondo` clean, `clj-paren-repair` clean. Test-only; no product/behaviour
   change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## code-shaper review session (6th pass) — outcome
+
+- added 1 step (Slice 22): the active-retry `"retry in "` prefix literal remains
+  a hand-copied second authority (test `active-retry-text-prefix` vs production
+  `retry-display/retry-status-text`), un-routed to production — the last
+  status-line format literal Slices 16/21 did not fold onto the
+  `retry-display` authority, leaving a `retry_display.clj`↔matcher drift the
+  seconds and remaining fragment no longer have.

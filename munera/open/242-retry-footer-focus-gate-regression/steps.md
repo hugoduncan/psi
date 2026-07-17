@@ -611,3 +611,43 @@ If background-only (working as intended):
       task 243's harness rewrite, record the explicit rationale and forward it to
       243 rather than leaving the `remaining`-fragment format-string copy (a
       `retry_display.clj`↔matcher coupling the delay text no longer has) standing.
+
+## Slice 22 — Review follow-ups (code-shaper pass, 6th)
+
+- [ ] The active-retry `"retry in "` **prefix** literal is still a hand-copied
+      second authority in the test, un-routed to the production authority — a
+      `consistent`/`robust` residual distinct from every prior prefix slice.
+      Slice 19 unified the prefix only *within* the test (`active-retry-text-prefix`
+      shared between the positive `expected-retry-text` builder and the
+      `retry-status-line?`/clear negations), and Slice 16 (seconds via
+      `format-relative-seconds`) + Slice 21 (remaining fragment via
+      `retry-status-text`) folded the *variable* parts of the status-line onto
+      the production authority `psi.app-runtime.retry-display`. But the fixed
+      `"retry in "` prefix itself is spelled *twice*: once in production at
+      `retry_display.clj` L38 (`(str "retry in " delay-text)` inside
+      `retry-status-text`) and once in the test at rpc_prompt_test.clj L185
+      (`active-retry-text-prefix "retry in "`). These are independent copies —
+      the test's `active-retry-text-prefix` is not derived from `retry-status-text`
+      nor vice versa. So a footer-format change to the prefix in
+      `retry_display.clj` (e.g. `"retry in "` → `"retrying in "`, or dropping the
+      trailing space) silently desyncs *every* test matcher and predicate that
+      routes through `active-retry-text-prefix` (`expected-retry-text`,
+      `activation-retry-footer?`, `changed-retry-footer?`, `retry-status-line?`,
+      and both clear negations) while production still emits correctly — exactly
+      the drift class Slices 16/21 removed for the seconds and remaining fragment
+      but left open for the prefix. The failure surfaces as a confusing
+      `some activation-retry-footer? → nil` "not found" or a Slice-9
+      "retry footer sync timed out awaiting <text>" false timeout naming a text
+      production never emits, masking a live-and-correct pipeline as a
+      regression. Note that `expected-retry-text` already imports
+      `retry-display` and reads `format-relative-seconds` from it — so the
+      cleanest fix derives the *whole* active-retry text (prefix + seconds) from
+      `retry-display/retry-status-text` (build `"retry in Ns"` from constructed
+      retry metadata `{:active? true :resume-at delay-ms}` and take the leading
+      `" · "`-split fragment, mirroring `remaining-fragment`'s Slice-21 pattern),
+      collapsing the last hand-copied production-format literal onto the single
+      authority. If judged out of scope for task 242's frozen coverage or better
+      folded into task 243's harness rewrite, record the explicit rationale and
+      forward it to 243 rather than leaving the duplicated `"retry in "` prefix
+      (a `retry_display.clj`↔matcher coupling the seconds and remaining fragment
+      no longer have) standing.
