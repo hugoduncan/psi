@@ -426,3 +426,7 @@
 ## Test-shaper pass 6 follow-up execution
 
 - addressed 1 test-shaper pass-6 review step: replaced the two obscured `(some #(when (pred %) %) footer-events)` bindings (`first-retry-footer`, `changed-retry-footer`) in the sibling pre-gate test with the direct `(first (filter pred footer-events))` spelling. States "first matching frame" intent without depending on frame map-truthiness; reads consistently against the `some`-existence idiom used at the focus-gate sites. Behaviour identical (first matching frame, `nil` if none; the downstream `(some? …)` stamping checks stay meaningful). `bb test --focus psi.rpc-prompt-test` green (60 assertions, 3 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.
+
+## Task-test-review pass 7 (test-shaper skill)
+
+- added 1 follow-up step: the two focus-gate sub-tests still each carry a verbatim ~6-assertion footer-verification block (seq/activation/changed/ordering/clear/stamping) differing only in the `focus-emitter!` argument and label strings — the same copied-control class prior passes folded into `assert-full-retry-sequence-ran!` (pass 3) and `assert-clear-footer-produced!` (pass 4); the enclosing block was left unconsolidated. Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
