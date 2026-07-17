@@ -554,3 +554,13 @@
   Slice 16's recorded bounded residual; slow-test metadata isolation is not a
   project convention (zero `^:slow`/`^:integration` usages), so not filed.
   Tests green (rpc-prompt 6/6, 62 assertions).
+
+## review-task-docs session — outcome
+
+- No actionable user-facing documentation issues; no steps added. Task 242 is
+  test-only (single changed file `components/rpc/test/psi/rpc_prompt_test.clj`;
+  "working as intended" diagnosis, no code/behaviour change). The focus-gated
+  `footer/updated` delivery rule 242 confirmed is already accurately documented
+  in `doc/architecture.md` (per-connection focus-gated delivery, background
+  suppression) and in the CHANGELOG `### Changed` focus-gating entry; no new or
+  stale references, examples, or missing docs. No new CHANGELOG entry warranted.
