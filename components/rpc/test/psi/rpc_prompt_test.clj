@@ -168,6 +168,13 @@
         (str "retry footer sync timed out awaiting status-line text: " expected-text))
     result))
 
+(def ^:private active-retry-text-prefix
+  "Single authority for the active-retry status-line prefix (task 242 Slice 19).
+   Both the positive `expected-retry-text` builder and the `retry-status-line?`
+   substring predicate share this so the positive-match and negated-clear
+   spellings of \"active retry text\" cannot diverge on a footer-format change."
+  "retry in ")
+
 (defn- expected-retry-text
   "Single authority for the retry-footer status-line text a retry of `delay-ms`
    produces (`\"retry in Ns\"`). Derives the seconds from the *same* production
@@ -181,7 +188,7 @@
    (sub-`retry-footer-sync-timeout-ms` delivery drift stays within the same
    second)."
   [delay-ms]
-  (str "retry in " (retry-display/format-relative-seconds (long delay-ms))))
+  (str active-retry-text-prefix (retry-display/format-relative-seconds (long delay-ms))))
 
 ;; Shared retry-frame matchers (task 242 Slice 17). The `8000`/`4000` activation
 ;; and changed delays are the delivered-footer form of
@@ -281,9 +288,11 @@
 
 (defn- retry-status-line?
   "A `footer/updated` frame whose `:status-line` still carries active-retry
-   text (`\"retry in Ns\"`)."
+   text (`\"retry in Ns\"`). Shares `active-retry-text-prefix` with
+   `expected-retry-text` so the positive-match and negated-clear checks recognise
+   the same active-retry literal (task 242 Slice 19)."
   [frame]
-  (str/includes? (frame-status-line frame) "retry in"))
+  (str/includes? (frame-status-line frame) active-retry-text-prefix))
 
 (defn- clear-footer-produced-after-retry
   "Positive control for the retry→inactive **clear** footer (task 242 Slice 14):
@@ -423,7 +432,7 @@
         (let [clear-footer (clear-footer-produced-after-retry footer-events)]
           (is (some? clear-footer)
               "focused session must receive a clear footer/updated frame after the retry sequence through the focus gate")
-          (is (not (str/includes? (frame-status-line clear-footer) "retry in"))
+          (is (not (retry-status-line? clear-footer))
               "focused session's clear footer must carry no stale retry text (through the focus gate)"))
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
@@ -561,7 +570,7 @@
       (is (= (get-in first-retry-footer [:data :session-id])
              (get-in changed-retry-footer [:data :session-id])
              (get-in clear-footer [:data :session-id])))
-      (is (not (str/includes? (frame-status-line clear-footer) "retry in"))
+      (is (not (retry-status-line? clear-footer))
           "retry clear must publish a footer without stale retry text"))))
 
 (deftest rpc-thinking-delta-after-tool-start-begins-fresh-segment-test

@@ -504,7 +504,7 @@ If background-only (working as intended):
 
 ## Slice 19 — Review follow-ups (code-shaper pass, 3rd)
 
-- [ ] The active-retry recognition literal `"retry in"` is not fully routed
+- [x] The active-retry recognition literal `"retry in"` is not fully routed
       through its one authority `retry-status-line?`, leaving a
       `consistent`/`economical` residual distinct from every prior matcher slice
       (Slice 17 extracted `retry-status-line?`/`activation-retry-footer?`/`changed-retry-footer?`

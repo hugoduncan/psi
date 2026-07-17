@@ -651,3 +651,13 @@
   `"retry in"` literal has ≥3 independent copies (predicate + two negations +
   `expected-retry-text` prefix) — Slice 17 routed only the positive matchers,
   never the negated clear assertions, onto their authority.
+
+## Slice 19 (code-shaper 3rd) — addressed
+
+- Routed both clear-footer negatives (focused sub-test + sibling) through
+  `(not (retry-status-line? clear-footer))`, replacing the inlined
+  `(not (str/includes? (frame-status-line clear-footer) "retry in"))` longhand.
+- Extracted `active-retry-text-prefix` ("retry in ") as the single authority
+  shared by `expected-retry-text` (positive builder) and `retry-status-line?`
+  (substring predicate), collapsing the duplicated literal to one place.
+- rpc-prompt-test green (62 assertions), clj-kondo clean.
