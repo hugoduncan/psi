@@ -135,6 +135,17 @@
   (design-steps.md, item 4); not re-added to avoid duplication. Its correction
   requires a design-editable pass (out of scope for the plan-review profile).
 
+## Notes for the design-step task (plan-review re-run batch)
+
+- This plan-review batch added no new design-steps; the sole remaining open item
+  is design-steps.md item 4 (design.md Scope "two with-redefs sites" correction).
+- Principle: it is a design.md Scope wording fix only — keep the
+  behaviour-preserving constraint and the two frozen call sites; do not let the
+  rewording imply a second migration site. Concrete single-driver shape to write
+  is already in the prior "Notes for the design-step task (plan-review
+  inconsistency slice)" section above; do not re-touch plan.md/steps.md (already
+  consistent).
+
 ## Plan-review session — inconsistency turn (batch second turn, prior)
 
 - inconsistency review added 1 new design step: design.md Scope still asserts
