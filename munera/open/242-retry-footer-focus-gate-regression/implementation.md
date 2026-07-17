@@ -170,3 +170,11 @@
   (retry `:retry-updated` events are always queued, drained by
   `stop-progress-loop!`, and dropped only at the focus gate). Tests green
   (rpc-prompt 6/6, rpc-events 20/20), lint clean. No new follow-up steps added.
+
+## task-test-review session — outcome
+
+- added 2 steps (Slice 6): focused sub-test only locks the retry *activation*
+  footer through the gate (sibling pre-gate test verifies activation + changed
+  + clear); and the `with-redefs` stub of `execute-live-turn!` is a logic
+  boundary rather than a nullable/injectable seam (linked to the recorded
+  parallel `with-redefs` flakiness).
