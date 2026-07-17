@@ -254,6 +254,38 @@ If background-only (working as intended):
       forward it explicitly to 243's plan rather than leaving the divergent
       inline copy as an untracked residual — do not silently defer.
 
+## Slice 14 — Test-review follow-ups (test-shaper pass, 6th)
+
+- [ ] The retry-**clear** assertion is a bare negative on `(last footer-events)`
+      with no positive control that a clear footer was actually produced — a
+      distinct vacuity branch from the activation/changed/attempts/background
+      controls already closed (Slices 8/12). In both
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+      (focused sub-test, ~L300) and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test` (~L423),
+      the clear is verified only as
+      `(is (not (str/includes? (get-in (last footer-events) [:data :status-line]) "retry in")))`.
+      Unlike the activation (`some … "retry in 8s"`) and changed-metadata
+      (`some … "retry in 4s"`) frames — which are *positively* asserted to have
+      been produced — the clear frame has only this negative-on-`last`
+      assertion. It therefore passes both when (A) the retry genuinely cleared
+      and emitted an inactive-retry footer as the last frame (intended), and
+      when (B) `clear-active-retry!` / the clear footer refresh never emitted a
+      footer at all but some *other* non-retry `footer/updated` frame happened
+      to land last (a clear-path regression). This is the same
+      production-vs-gating `meaningful_failures` gap Slices 8/12 removed for the
+      earlier frames, still open for the clear transition. Add a positive
+      control that a retry→inactive **clear footer** was actually produced
+      (e.g. assert the final retry-bearing footer is followed by a
+      distinguishable clear footer, or that a footer emitted after the last
+      `retry in` frame carries the post-retry status-line), so the
+      no-stale-`retry in` assertion is credited only against a live clear-path
+      emission rather than an incidentally-trailing unrelated footer. If judged
+      out of scope for task 242's frozen coverage or better folded into task
+      243's harness rewrite, record the explicit rationale and forward it to
+      243 rather than leaving the clear-frame production ambiguity as an
+      untracked residual.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the

@@ -418,3 +418,11 @@
   unchanged, behaviour-preserving), `clj-kondo` clean, `clj-paren-repair` clean.
   Test-only; no product/behaviour change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## task-test-review session (test-shaper pass, 6th) — outcome
+
+- added 1 step (Slice 14): the retry-**clear** frame is verified only by a
+  bare negative on `(last footer-events)` in both retry-footer tests, with no
+  positive control that a clear footer was actually produced — a distinct
+  production-vs-gating vacuity branch (clear-path) from the
+  activation/changed/attempts/background controls closed in Slices 8/12.
