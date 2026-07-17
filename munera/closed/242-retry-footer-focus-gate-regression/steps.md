@@ -654,7 +654,7 @@ If background-only (working as intended):
 
 ## Slice 23 — Review follow-ups (task-implementation-review)
 
-- [ ] Aggregate test-helper apparatus is disproportionate to the frozen,
+- [x] Aggregate test-helper apparatus is disproportionate to the frozen,
       test-only, no-code-change scope — an `unnecessary_abstraction`/`simplicity`
       residual the individual code-shaper/test-shaper slices (17–22) each
       justified locally but never assessed in aggregate. The retry-footer E2E
@@ -683,7 +683,7 @@ If background-only (working as intended):
       vs forward-to-243) rather than leaving the aggregate over-abstraction
       unassessed.
 
-- [ ] Lifecycle-ordering anomaly: design-review and plan-review passes ran on
+- [x] Lifecycle-ordering anomaly: design-review and plan-review passes ran on
       the task *after* it was already closed. The close commit is `58a16fd53`
       (`⊘ 242: close`, git-mv open/ → closed/), but four design-review commits
       (`4f30a1a1e`, `1c9caf4d3`, `516cb062e`, `0a616983e`) and two plan-review

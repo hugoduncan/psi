@@ -859,3 +859,48 @@
   (`munera/closed/242-…`, not `munera/open/…` as the request path assumed); the
   task was closed at `58a16fd53` before this review. Steps added to closed
   task's steps.md accordingly.
+
+## Slice 23 — implementation-review follow-ups (determinations, addressed 2 review steps)
+
+Both Slice-23 items are assessment/determination items (not code changes). The
+harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
+6/6, 62 assertions), and is scheduled for a full rewrite by task 243.
+
+- **Item 1 — aggregate test-helper over-abstraction: judgement = FORWARD-TO-243
+  (keep in place for 242, do not revert).** The ~15 single-authority
+  helpers/constants (Slices 17–22) are a real `unnecessary_abstraction`
+  residual for a single test pair; the sharpest case, `active-retry-text-prefix`,
+  derives the fixed `"retry in "` prefix by length-subtracting
+  `(format-relative-seconds 0)` off `retry-status-text {:active? true :resume-at 0}`
+  — indirect and brittle (silently breaks if production reorders/space-pads the
+  fragment) versus the one-line literal it replaced. Reverting now was rejected:
+  it would churn a green, frozen, soon-to-be-replaced harness for no lasting
+  benefit and risk destabilizing the deterministic sync the E2E test depends on.
+  Keeping-as-unassessed was rejected: the residual must be explicitly owned. The
+  format-coupling / prefix-derivation concern is therefore forwarded to task
+  243's harness rewrite (which co-migrates both call sites onto the
+  provider-registry seam and will naturally reconstruct the matcher/format
+  helpers) — see 243 design.md Notes. Task 243 should prefer the direct
+  production authority (`retry-status-text` / a literal) over the
+  length-subtraction derivation when it rebuilds the matchers.
+
+- **Item 2 — post-close lifecycle ordering: determination = lifecycle-driver
+  gap, NOT intentional catch-up bookkeeping; recurs; fix out-of-scope for 242.**
+  Evidence: close commit `58a16fd53` (git-mv open/ → closed/, 13:06) preceded
+  four design-review commits (`4f30a1a1e`/`1c9caf4d3`/`516cb062e`/`0a616983e`,
+  13:36–13:38) and two plan-review commits (`2ee8ba795`/`d48c15c9b`, 13:40),
+  then implementation-review (`0c39c2687`, 13:45). `.psi/workflows/task-lifecycle.edn`
+  runs steps in a fixed linear order (review-task-design → create-task-plan →
+  review-task-plan → implement-task → review-task-implementation) with **no
+  already-closed guard** at entry: re-invoking the chained lifecycle on an
+  already-closed+implemented task re-runs the earlier design/plan-review phases
+  against the frozen artifacts. That is exactly the observed sequence; the
+  passes were vacuous ("no new feedback") only because the artifacts were
+  frozen. So this is a driver behaviour that would recur on any closed task the
+  workflow is re-invoked on, not deliberate bookkeeping. Fixing it (adding an
+  entry short-circuit that detects `munera/closed/…` and skips the pre-implement
+  lifecycle phases) belongs to the `task-lifecycle` workflow owner, not to task
+  242's frozen test-only scope (per the workflow-runtime / owning-workflow
+  boundary). Recommendation recorded here for that owner; no change made under 242.
+
+- addressed 2 review steps.

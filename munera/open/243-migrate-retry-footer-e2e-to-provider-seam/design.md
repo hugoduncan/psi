@@ -90,6 +90,21 @@ co-migrated together:
 ## Notes
 
 - Origin: task 242 steps.md Slice 7 (2nd task-test-review pass) follow-up.
+- Forwarded from task 242 Slice 23 (implementation-review): the retry-footer
+  harness accumulated ~15 single-authority matcher/format helpers/constants
+  (Slices 17–22) that are disproportionate to a single test pair. The sharpest
+  case is `active-retry-text-prefix`, which derives the fixed `"retry in "`
+  prefix by length-subtracting `(format-relative-seconds 0)` off
+  `retry-status-text {:active? true :resume-at 0}` — indirect and brittle
+  (breaks silently if production reorders/space-pads the status-line fragment).
+  When this rewrite reconstructs the matcher/format helpers, prefer deriving the
+  awaited retry-footer text directly from the production authority
+  `psi.app-runtime.retry-display/retry-status-text` (or an explicit literal)
+  rather than the length-subtraction idiom, and collapse the aggregate helper
+  count where the provider-seam harness no longer needs the separate driver-vs-
+  matcher config-coupling authorities. Task 242 kept these helpers in place
+  (green, frozen) and forwarded the over-abstraction concern here rather than
+  churn a soon-to-be-replaced harness.
 - Related: `munera/closed/242-retry-footer-focus-gate-regression/` (see its
   implementation.md Slice 6 for the seam-existence verification),
   `munera/closed/241-emit-only-focused-session-events/` (focus-gate origin).
