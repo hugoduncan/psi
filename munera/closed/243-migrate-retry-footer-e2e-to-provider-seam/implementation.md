@@ -387,3 +387,7 @@
 ## Task-test-review pass (task-test-review skill)
 
 - added 1 follow-up step: recovery-turn shape (stub attempt-3+ `:text-delta "recovered"`/`:done :stop`) is modelled as behaviour (design Approach/Acceptance + stub docstring) but only indirectly covered — the clear-footer check is negative-only and cannot distinguish a real recovery `:stop` from retry exhaustion. Non-blocking coverage gap; ¬mock/¬stub, behaviour, and well-formedness criteria otherwise met (`execute-live-turn!` violation resolved via injectable `:provider-registry`; residual `session/query-in` `with-redefs` already tracked by task 244); `psi.rpc-prompt-test` green (5/5, 58 assertions), `retry-display-test` green (2/2).
+
+## Task-test-review follow-up (recovery-turn positive control)
+
+- addressed 1 test-review follow-up step: added a positive recovery-turn success control to the retry-footer E2E harness. `drive-provider-retry-through-progress-loop!` return shape changed from a bare attempt count to `{:attempts N :recovery-result execution-result}` (recovery result captured from `execute-prepared-request!`). New shared `assert-recovery-turn-succeeded!` asserts `:turn.outcome/stop`, `:stop` stop-reason, and the `"recovered"` assistant-message text, wired into all four driver call sites across both retry-footer tests. Closes the gap where the negative no-stale-`retry in` clear check passed whether the footer cleared via genuine recovery or retry exhaustion. Verified non-vacuous (recovery-text mutation fails the control). `bb test --focus psi.rpc-prompt-test` green; lint clean.

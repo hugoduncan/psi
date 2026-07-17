@@ -443,7 +443,15 @@
    **first** `execute-prepared-request!` argument — the only param provider
    resolution consults (`do-stream!` → `ai/stream-response-in` →
    `context-provider-registry ai-ctx`) — leaving the second app-runtime `ctx`
-   (session state, `:provider-retry-sleep-fn`, retry state) unchanged."
+   (session state, `:provider-retry-sleep-fn`, retry state) unchanged.
+
+   Returns `{:attempts N :recovery-result execution-result}`, where
+   `recovery-result` is the shaped execution-result the stub's attempt-3+
+   *recovery* stream produced (task 243 test-review follow-up): callers assert
+   it positively completed as a success (`:turn.outcome/stop` / non-error
+   `:stop` reason carrying the recovered text), so a future stub/pipeline change
+   that clears the footer via retry *exhaustion* rather than *recovery* fails
+   instead of passing on the negative no-stale-`retry in` check alone."
   [ctx session-id emit!]
   (let [[ai-ctx attempts*] (retry-stub-provider-ai-ctx)
         progress-q (java.util.concurrent.LinkedBlockingQueue.)
@@ -464,26 +472,49 @@
       ;; thread only drains the progress queue. Do not move this drive onto the
       ;; progress/daemon thread without re-homing the sleep-fn timeout `is`; see
       ;; the `await-retry-footer-text!` THREAD-AFFINITY INVARIANT docstring.
-      (turn-runtime/execute-prepared-request!
-       ai-ctx
-       ctx
-       session-id
-       {:prepared-request/id "turn-retry-footer"
-        :prepared-request/model (ai.models/get-model :claude-3-5-sonnet)
-        :prepared-request/ai-options {}
-        :prepared-request/response-mode :streaming
-        :prepared-request/provider-conversation (ai/create-conversation nil)}
-       progress-q)
-      (streams/stop-progress-loop! {:stop? stop?
-                                    :thread thread
-                                    :progress-q progress-q
-                                    :emit! emit!
-                                    :ctx ctx
-                                    :session-id session-id})
+      (let [recovery-result
+            (turn-runtime/execute-prepared-request!
+             ai-ctx
+             ctx
+             session-id
+             {:prepared-request/id "turn-retry-footer"
+              :prepared-request/model (ai.models/get-model :claude-3-5-sonnet)
+              :prepared-request/ai-options {}
+              :prepared-request/response-mode :streaming
+              :prepared-request/provider-conversation (ai/create-conversation nil)}
+             progress-q)]
+        (streams/stop-progress-loop! {:stop? stop?
+                                      :thread thread
+                                      :progress-q progress-q
+                                      :emit! emit!
+                                      :ctx ctx
+                                      :session-id session-id})
+        {:attempts @attempts* :recovery-result recovery-result})
       (finally
         (reset! stop? true)
-        (.join ^Thread thread 200)))
-    @attempts*))
+        (.join ^Thread thread 200)))))
+
+(defn- assert-recovery-turn-succeeded!
+  "Positive control (task 243 test-review follow-up) that the retry sequence
+   cleared because the stub's attempt-3+ *recovery* stream actually landed a
+   successful turn — not because retries were merely *exhausted* with no
+   recovery. The bare no-stale-`retry in` clear check passes either way; the
+   `(= 3 attempts)` control only proves the third `:stream` call fired, not that
+   it produced recovery-shaped events (vs. a third error). This asserts the
+   shaped `execution-result` the recovery turn produced carries the modelled
+   success: `:turn.outcome/stop` outcome, a non-`:error` `:stop` stop-reason,
+   and the stub's `\"recovered\"` text — so a future stub/pipeline change that
+   clears the footer via exhaustion rather than recovery fails here instead of
+   passing green on the negative clear check alone."
+  [recovery-result]
+  (is (= :turn.outcome/stop (:execution-result/turn-outcome recovery-result))
+      "the retry sequence must clear via a successful recovery turn, not retry exhaustion")
+  (is (= :stop (:execution-result/stop-reason recovery-result))
+      "the recovery turn must complete with a non-error :stop stop-reason")
+  (is (str/includes?
+       (pr-str (:content (:execution-result/assistant-message recovery-result)))
+       "recovered")
+      "the recovery turn's assistant message must carry the recovered text"))
 
 (defn- focus-emitter!
   "Builds the focus-gated `emit!` boundary the retry-footer sub-tests share
@@ -517,7 +548,8 @@
           [emit! captured] (focus-emitter! session-id session-id)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
-          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+          {:keys [attempts recovery-result]}
+          (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       ;; Positive control (matches the sibling
       ;; `rpc-prompt-provider-retry-state-publishes-footer-updated-test`): prove
       ;; the full activate→change→clear retry sequence actually ran, so the
@@ -525,6 +557,9 @@
       ;; a no-op/mis-wired one.
       (is (= 3 attempts)
           "the full activate→change→clear retry sequence must have executed")
+      ;; Recovery positive control (task 243 test-review follow-up): prove the
+      ;; sequence cleared via a successful recovery turn, not retry exhaustion.
+      (assert-recovery-turn-succeeded! recovery-result)
       (let [footer-events (footer-updated-frames @captured)]
         (is (seq footer-events)
             "focused session must still receive footer/updated frames through the focus gate")
@@ -572,9 +607,12 @@
           [emit! captured] (focus-emitter! session-id nil)
           ctx         (assoc ctx :provider-retry-sleep-fn
                              (retry-footer-sleep-fn captured))
-          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+          {:keys [attempts recovery-result]}
+          (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       (is (= 3 attempts)
           "the full activate→change→clear retry sequence must have executed")
+      ;; Recovery positive control (task 243 test-review follow-up).
+      (assert-recovery-turn-succeeded! recovery-result)
       (let [footer-events (footer-updated-frames @captured)]
         (is (seq footer-events)
             "focused session (default-session-id fallback) must still receive footer/updated frames through the focus gate")
@@ -640,8 +678,9 @@
                               (retry-footer-sleep-fn pre-gate-captured))
           pre-gate-emit! (fn [event data]
                            (swap! pre-gate-captured conj {:event event :data data}))
-          pre-gate-attempts (drive-provider-retry-through-progress-loop!
-                             pre-gate-ctx pre-gate-session-id pre-gate-emit!)
+          {pre-gate-attempts :attempts}
+          (drive-provider-retry-through-progress-loop!
+           pre-gate-ctx pre-gate-session-id pre-gate-emit!)
           pre-gate-footers (footer-updated-frames @pre-gate-captured)]
       (is (= 3 pre-gate-attempts)
           "the full activate→change→clear retry sequence must have executed (pre-gate control)")
@@ -651,7 +690,8 @@
           ctx         (assoc ctx :provider-retry-sleep-fn (fn [_delay-ms] nil))
           other-session-id "some-other-focused-session"
           [emit! captured] (focus-emitter! other-session-id other-session-id)
-          attempts    (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
+          {:keys [attempts recovery-result]}
+          (drive-provider-retry-through-progress-loop! ctx session-id emit!)]
       ;; Positive control: `(is (empty? footer-events))` alone passes both when
       ;; the retry fired-but-was-gated (intended) and when the retry never fired
       ;; at all (e.g. the no-op sleep-fn or a mis-wired background config
@@ -660,6 +700,8 @@
       ;; is only credited when the retry pipeline is proven live.
       (is (= 3 attempts)
           "the full activate→change→clear retry sequence must have executed")
+      ;; Recovery positive control (task 243 test-review follow-up).
+      (assert-recovery-turn-succeeded! recovery-result)
       ;; This `(is (empty? ...))` is non-vacuous only because
       ;; `drive-provider-retry-through-progress-loop!` calls
       ;; `streams/stop-progress-loop!` (which drains the progress queue
@@ -683,8 +725,9 @@
   ;; `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`.
   ;; The retry-driving body is shared via
   ;; `drive-provider-retry-through-progress-loop!` (parameterized on `emit!`,
-  ;; returns the attempt count) so the two harnesses cannot drift in the 429
-  ;; headers, attempt sequence, or progress-loop lifecycle.
+  ;; returns `{:attempts N :recovery-result execution-result}`) so the two
+  ;; harnesses cannot drift in the 429 headers, attempt sequence, or
+  ;; progress-loop lifecycle.
   (testing "provider retry activation, visible change, and clear emit footer/updated"
     (let [emitted* (atom [])
           [ctx0 session-id] (retry-footer-session-context!)
@@ -703,7 +746,8 @@
           ;; Pre-gate raw emit!: capture every event directly, without routing
           ;; through the RPC focus gate.
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
-          attempts (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+          {:keys [attempts recovery-result]}
+          (drive-provider-retry-through-progress-loop! ctx session-id emit!)
           footer-events (footer-updated-frames @emitted*)
           first-retry-footer (some #(when (activation-retry-footer? %) %) footer-events)
           changed-retry-footer (some #(when (changed-retry-footer? %) %) footer-events)
@@ -714,6 +758,10 @@
           ;; incidentally-trailing unrelated footer.
           clear-footer (clear-footer-produced-after-retry footer-events)]
       (is (= 3 attempts))
+      ;; Recovery positive control (task 243 test-review follow-up): prove the
+      ;; clear footer landed because the recovery turn succeeded, not because
+      ;; retries were exhausted.
+      (assert-recovery-turn-succeeded! recovery-result)
       (is (some? first-retry-footer)
           "retry activation must publish footer/updated with retry text")
       (is (some? changed-retry-footer)
