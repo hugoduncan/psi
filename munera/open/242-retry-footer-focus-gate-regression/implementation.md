@@ -281,3 +281,27 @@
   so it is not a gap here. Sole infra-dep exception (`with-redefs`
   `execute-live-turn!`) remains documented with tracked exit (task 243).
   Tests green (rpc-prompt 6/6, 52 assertions).
+
+## Slice 9 — test-shaper follow-ups addressed
+
+- addressed 2 test-shaper follow-up steps.
+- **Observable await timeout (item 1):** `await-retry-footer-text!` now captures
+  `support/await-until`'s return and asserts `(is (not= support/timeout-token
+  result) …)` naming the missing expected status-line text. A sync timeout now
+  fails as its own diagnosable "retry footer sync timed out awaiting <text>"
+  assertion instead of silently returning and letting the later `retry in Ns`
+  text assertion fail generically (indistinguishable from a real focus-gate
+  regression). Fix kept here per the step (task 243 explicitly keeps this
+  sleep-fn pattern). The per-attempt call adds 2 assertions (52 → 54).
+- **Named sync-bound constant (item 2):** extracted `retry-footer-sync-timeout-ms`
+  (500) as the single authority for the deterministic retry-footer sync bound,
+  replacing the three duplicated literal `500`s: both uses in
+  `await-retry-footer-text!` and the inline `support/await-until … 500` in the
+  sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`.
+  Future tuning no longer drifts between the two harness copies.
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 54 assertions),
+  `clj-kondo` clean, `clj-paren-repair` clean. No product/behaviour change; no
+  CHANGELOG entry (test-only). Slice 3 items remain the untouched diagnosis
+  branch (background-only outcome was taken); the Slice-3 "focused broken" arm
+  is intentionally left unchecked per the recorded working-as-intended
+  determination.

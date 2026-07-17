@@ -126,18 +126,38 @@
              (get-in (last footer-events) [:data :path-line])))
       (is (empty? runtime-failed)))))
 
+(def ^:private retry-footer-sync-timeout-ms
+  "Bounded deadline for the deterministic retry-footer sync used by the
+   retry/footer E2E tests' `:provider-retry-sleep-fn`. Single authority so the
+   two harness copies (`await-retry-footer-text!` and the inline
+   `support/await-until` in
+   `rpc-prompt-provider-retry-state-publishes-footer-updated-test`) do not
+   drift when the bound is tuned."
+  500)
+
 (defn- await-retry-footer-text!
   "Blocks (bounded) until `captured` contains a frame whose `:data
    :status-line` includes `expected-text`. Used as a `:provider-retry-sleep-fn`
    so the retry state stays live until the progress loop has actually
    delivered the corresponding footer/updated frame, avoiding a race where the
-   retry clears before the async progress loop drains it."
+   retry clears before the async progress loop drains it.
+
+   Fails fast (rather than returning silently) if the awaited footer never
+   arrives within the bound: `support/await-until` returns
+   `support/timeout-token` on timeout, so a swallowed timeout would let the
+   retry clear before delivery and surface later as a generic \"retry in Ns
+   not found\" assertion — indistinguishable from a genuine focus-gate
+   regression. Detecting the timeout here names the missing text, so a sync
+   timeout is diagnosable as its own failure."
   [captured expected-text]
-  (support/await-until
-   #(some (fn [frame]
-            (str/includes? (or (get-in frame [:data :status-line]) "") expected-text))
-          @captured)
-   500))
+  (let [result (support/await-until
+                #(some (fn [frame]
+                         (str/includes? (or (get-in frame [:data :status-line]) "") expected-text))
+                       @captured)
+                retry-footer-sync-timeout-ms)]
+    (is (not= support/timeout-token result)
+        (str "retry footer sync timed out awaiting status-line text: " expected-text))
+    result))
 
 (defn- drive-provider-retry-through-progress-loop!
   "Runs the real provider-boundary retry → progress-queue → footer-refresh
@@ -317,7 +337,7 @@
                                                         expected-text)
                                      event))
                                  @emitted*)
-                          500))))
+                          retry-footer-sync-timeout-ms))))
           session-id (first (map :session-id (ss/list-context-sessions-in ctx)))
           attempts* (atom 0)
           progress-q (java.util.concurrent.LinkedBlockingQueue.)

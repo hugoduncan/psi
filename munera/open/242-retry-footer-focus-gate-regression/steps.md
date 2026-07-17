@@ -138,7 +138,7 @@ If background-only (working as intended):
 
 ## Slice 9 — Test-review follow-ups (test-shaper pass)
 
-- [ ] `await-retry-footer-text!` silently swallows its timeout, defeating
+- [x] `await-retry-footer-text!` silently swallows its timeout, defeating
       meaningful-failure signal. It calls `support/await-until` (which returns
       `timeout-token`, not an exception, on the 500ms deadline) purely for the
       blocking side-effect and **discards the return value**. If the awaited
@@ -157,7 +157,7 @@ If background-only (working as intended):
       masquerading as a footer-gating regression. Task 243 explicitly *keeps*
       this sleep-fn pattern, so the fix belongs here (or must be explicitly
       forwarded to 243), not silently deferred.
-- [ ] The 500ms sync bound is an unnamed magic number duplicated across three
+- [x] The 500ms sync bound is an unnamed magic number duplicated across three
       call sites (`await-retry-footer-text!` and the sibling
       `rpc-prompt-provider-retry-state-publishes-footer-updated-test`'s inline
       `support/await-until … 500`). Extract a single named constant (e.g.
