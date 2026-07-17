@@ -690,7 +690,16 @@
           "changed retry metadata must publish footer/updated with latest visible text")
       (is (some? clear-footer)
           "retry clear must publish a distinguishable footer/updated frame after the retry sequence")
-      (is (= (get-in first-retry-footer [:data :session-id])
+      ;; Session-id *correctness* control (task 242 Slice 26): bind all three
+      ;; retry frames to the driving `session-id`, not merely to each other.
+      ;; A stamping regression that mis-stamps every frame identically-but-wrong
+      ;; (constant/nil/stale/foreign id, or a frame-shape change moving the id
+      ;; off `[:data :session-id]`) keeps the three mutually equal, so a
+      ;; consistency-only check passes green — precisely the emit.clj stamping
+      ;; regression the design names. This pre-gate characterization is the
+      ;; natural home for the stamping-correctness control.
+      (is (= session-id
+             (get-in first-retry-footer [:data :session-id])
              (get-in changed-retry-footer [:data :session-id])
              (get-in clear-footer [:data :session-id])))
       (is (not (retry-status-line? clear-footer))

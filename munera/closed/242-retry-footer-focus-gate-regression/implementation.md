@@ -1014,3 +1014,19 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
   at `58a16fd53` before this review.
+
+## Slice 26 follow-up execution — outcome
+
+- addressed 1 review step (Slice 26): strengthened the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test` session-id
+  assertion to bind all three retry frames (activation/changed/clear) to the
+  driving `session-id` (`(is (= session-id …))`), matching the focused
+  sub-tests' `every? #(= session-id …)` correctness control. Consistency-only
+  check (three frames mutually equal) replaced by correctness; a
+  mis-stamped-but-consistent regression now fails.
+- verified: `bb test --focus
+  psi.rpc-prompt-test/rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+  green (8 assertions). clj-kondo clean, clj-paren-repair formatted.
+- Slice 3 unchecked items (focused-session-broken branch) left as-is: they
+  predate this review pass and were superseded by the background-only /
+  working-as-intended diagnosis; owned by their branch, not this pass.

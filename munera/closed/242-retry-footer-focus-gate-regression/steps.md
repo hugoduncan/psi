@@ -769,7 +769,7 @@ If background-only (working as intended):
 
 ## Slice 26 — Test-review follow-ups (test-shaper pass, 9th)
 
-- [ ] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+- [x] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
       asserts retry-frame session-id *consistency* but never *correctness* — a
       distinct `meaningful_failures`/`behavior_focused` gap from every prior
       session-id slice (Slice 25 closed the *focused* E2E's fallback-arm
