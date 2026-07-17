@@ -702,3 +702,12 @@
   `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
   entry.
 - addressed 2 review steps.
+
+## code-shaper review session (5th pass) — outcome
+
+- added 1 step (Slice 21): the `remaining-fragment` matcher re-spells the
+  `"remaining R/L"` fragment format independently of the production authority
+  `retry-display/retry-status-text`/`remaining-text` — Slice 16 aligned only the
+  delay text to production's `format-relative-seconds`, and Slice 18 unified only
+  the rate-limit *values*, leaving the remaining-fragment *format string* as a
+  hand-rolled second copy that can drift on a footer-format change.

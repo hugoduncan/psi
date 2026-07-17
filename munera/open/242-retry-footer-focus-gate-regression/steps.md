@@ -578,3 +578,36 @@ If background-only (working as intended):
       into task 243's harness rewrite, record the explicit rationale and forward
       it to 243 rather than leaving the duplicated footer-frame-filter idiom
       standing.
+
+## Slice 21 — Review follow-ups (code-shaper pass, 5th)
+
+- [ ] The `remaining R/L` matcher fragment is hand-spelled independently of the
+      production authority that builds it, a `consistent`/`robust` residual
+      distinct from every prior matcher slice (Slice 16 aligned only the *delay*
+      text to production's `retry-display/format-relative-seconds`; Slice 18
+      unified only the driver-vs-matcher *rate-limit values* `2`/`5000`, not the
+      fragment *format string*). The production footer status-line is built by
+      `psi.app-runtime.retry-display/retry-status-text`, which composes the
+      remaining fragment as `(str "remaining " remaining)` over
+      `remaining-text`'s `(str remaining "/" limit)` — i.e. the `"remaining "`
+      prefix and the `"/"` separator both live in `retry_display.clj`. The test's
+      `remaining-fragment` (rpc_prompt_test.clj) re-derives that exact fragment
+      as `(str "remaining " remaining "/" limit)` — a second, independent copy of
+      the production format string. So a footer-format change in
+      `retry-status-text`/`remaining-text` (e.g. `"remaining "` → `"rem "`, or
+      `"/"` → `" of "`, or reordering to `remaining:R/L`) silently drifts the
+      `changed-retry-footer?` matcher: it either stops matching (`some
+      changed-retry-footer?` → "not found", surfacing as a confusing regression
+      rather than a coupling error) or continues matching a stale form the
+      footer no longer emits — exactly the drift class Slice 16 removed for the
+      `"retry in Ns"` delay text but left open for the remaining fragment.
+      Derive the matcher's remaining fragment from the same authority the delay
+      text now uses: build the expected changed-frame text from
+      `retry-display/retry-status-text` (or `retry-display`'s `remaining-text`)
+      given the retry metadata, so the matcher tracks the production fragment
+      format automatically — the delay text (Slice 16) and the remaining
+      fragment then share one authority instead of one aligned + one hand-rolled.
+      If judged out of scope for task 242's frozen coverage or better folded into
+      task 243's harness rewrite, record the explicit rationale and forward it to
+      243 rather than leaving the `remaining`-fragment format-string copy (a
+      `retry_display.clj`↔matcher coupling the delay text no longer has) standing.
