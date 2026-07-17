@@ -379,3 +379,7 @@
 ## Implementation-review pass 2 follow-up execution
 
 - addressed 1 review step: split the redundant `is` in `retry-status-text-locks-zero-second-active-prefix-test` (`retry_display_test.clj`) — kept the literal-lock `is` and made the second `is` a distinct 2-way `=` asserting only omitted-`:resume-at` ≡ explicit-`:resume-at 0`. `retry-display-test` green (2/2, 4 assertions); `clj-kondo` clean.
+
+## Implementation-review pass 3 (task-implementation-review)
+
+- no new actionable feedback: prior passes' follow-ups all executed (task 244 opened, zero-second authority test added, redundant `is` split). Re-verified migration against source — stub `:stream` signature and `:error` event shape (`:http-status`/`:provider-error/headers`/`:error-message`) match the real provider/consumer contract; behaviour-preserving; `psi.rpc-prompt-test` green (5/5, 58 assertions), `retry-display-test` green (2/2), lint clean; design.md Scope corrected to single-shared-driver shape.
