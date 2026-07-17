@@ -84,8 +84,17 @@ co-migrated together:
   the same activation/changed/clear footer sequence at the pre-gate `emit!`.
 - `bb test --focus psi.rpc-prompt-test` is green.
 - The task-242 code comment recording the deferred `with-redefs` exception is
-  removed (the seam is now in use), and the parallel `with-redefs`
-  test-isolation flakiness attributed to this pattern is re-evaluated.
+  removed (the seam is now in use).
+- The parallel `with-redefs` test-isolation flakiness attributed to this
+  pattern is re-evaluated with a recorded outcome: run full-suite `bb test`
+  before and after this migration and record, in task 243 `implementation.md`,
+  the passed/failed/errored counts for both runs against the task-242 baseline
+  (2450 passed / 24 failed / 38 errored pre-change), stating whether removing
+  `with-redefs` from these two call sites leaves the pre-existing
+  parallel-isolation failure set unchanged, reduced, or eliminated. This task
+  does not fix unrelated flaky tests: if the failure set is unchanged, the
+  recorded finding is that these two sites were not the isolation cause; the
+  criterion is met by the recorded comparison, not by a green full suite.
 
 ## Notes
 

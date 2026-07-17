@@ -21,3 +21,21 @@
   `components/turn-runtime/src/psi/turn_runtime/core.clj`
   (`make-provider-event-consumer` `:error` case). Retry-footer text authority is
   `psi.app-runtime.retry-display/retry-status-text`.
+
+## Design-follow-up pass (ambiguity design-step resolved)
+
+- Resolved the ambiguity design-step by sharpening the flakiness acceptance
+  criterion into a verifiable record-and-compare done-condition (split into two
+  acceptance bullets: comment removal, and recorded before/after `bb test`
+  count comparison against the task-242 baseline).
+- Chosen done-condition is record-not-fix, because task 242's own verification
+  (implementation.md, "Verification" note) observed the *same* failing test
+  names with and without its change — the pre-existing parallel-isolation
+  failure set (2450 passed / 24 failed / 38 errored) is broad and not confirmed
+  to originate in these two retry-footer sites. Requiring a green full suite
+  would over-scope this behaviour-preserving migration; the plan author's
+  measurable target is the recorded comparison in implementation.md.
+- Concrete task-242 baseline numbers to compare against are in
+  `munera/closed/242-retry-footer-focus-gate-regression/implementation.md`
+  ("Verification" bullet: baseline 2450/24/38, with-change 2451/24/38 — the +1
+  pass being the added test).
