@@ -1071,3 +1071,14 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   frozen, task-243-migration-bound harness.
 - Non-compliance note: review run against an already-*closed* task
   (`munera/closed/242-…`, not the requested `munera/open/…` path).
+
+## review-task-docs session (2nd pass) — outcome
+
+- No new steps: no actionable user-facing documentation issues. Independently
+  confirmed the prior docs-review determination — only non-task/non-test file
+  touched across the task is `components/rpc/test/psi/rpc_prompt_test.clj`
+  (test-only, "working as intended", behaviour-preserving), so no README/doc/
+  ramora update and no CHANGELOG entry are warranted; existing footer/retry
+  mentions (`doc/extensions.md`, `ramora/IMPLEMENTED.md`) stay accurate.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path).
