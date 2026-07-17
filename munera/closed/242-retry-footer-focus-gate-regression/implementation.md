@@ -827,3 +827,13 @@
   invariants untouched), `clj-kondo` clean, `clj-paren-repair` clean. Test-only;
   no product/behaviour change, no CHANGELOG entry.
 - addressed 1 review step.
+
+## plan-review session (ambiguity turn — batch review) — outcome
+
+- no ambiguity review feedback. plan.md/steps.md are unambiguous: AC1's
+  failing-then-passing requirement is pinned as **contingent** on Approach
+  step-1's focused-vs-background diagnosis, the test boundary is pinned to
+  `emit-frame!`, the retry-text matcher to `retry in`, and the fix constraint to
+  gate-preserving (no `focus-allows?` weakening). The only ambiguity (AC1
+  contingency) was already filed and resolved in a prior pass; no new actionable
+  ambiguity found. No new design-steps filed.
