@@ -11,20 +11,20 @@
 
 - [ ] Add a stub-provider constructor in `components/rpc/test/psi/rpc_prompt_test.clj` with an internal attempt counter: attempt 1 → `:error` event with `:http-status 429`, headers `Retry-After` = activation delay, `RateLimit-Limit`, `RateLimit-Remaining "0"`; attempt 2 → `:error` with `Retry-After` = changed delay and changed `RateLimit-Remaining`; attempt 3+ → successful recovery stream (text "recovered", stop)
 - [ ] Expose the attempt counter (or return it alongside the provider) so both tests keep asserting attempt counts as today
-- [ ] Add a ctx helper using `psi.ai.core/create-context {:anthropic stub}`; verify stub resolution via `resolve-provider` path works for model `{:provider :anthropic :id "stub"}`
+- [ ] Add a ctx helper using `psi.ai.core/create-context {:anthropic stub}` yielding `{:provider-registry (atom {:anthropic stub})}`; this is the value to pass as the **first `ai-ctx` arg** of `execute-prepared-request!` (provider resolution consults only that arg), not merged into the app-runtime `ctx`; verify stub resolution via `resolve-provider` path works for model `{:provider :anthropic :id "stub"}`
 - [ ] Commit
 
 ## Slice 3 — Migrate the shared driver + focus-gate test
 
-- [ ] Rewrite `drive-provider-retry-through-progress-loop!`: remove `with-redefs [turn-runtime/execute-live-turn! ...]`; pass the stub-provider ctx into `execute-prepared-request!` (real registry, not `(atom {})`); keep `start-progress-loop!` wiring, THREAD-AFFINITY invariant (drive on test thread), and `await-retry-footer-text!` sync via `:provider-retry-sleep-fn`
+- [ ] Rewrite `drive-provider-retry-through-progress-loop!`: remove the single `with-redefs [turn-runtime/execute-live-turn! ...]` site (all retry sub-tests reach the stub through this shared driver, so this migrates them all at once); pass the stub `ai-ctx` (`{:provider-registry ...}` from `create-context`) as the **first `execute-prepared-request!` arg**, replacing `{:provider-registry (atom {})}`, leaving the second app-runtime `ctx` unchanged; keep `start-progress-loop!` wiring, THREAD-AFFINITY invariant (drive on test thread), and `await-retry-footer-text!` sync via `:provider-retry-sleep-fn`
 - [ ] Verify `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test` still asserts all three retry frames for the focused session and zero frames for the background session, unchanged
 - [ ] Run `bb test --focus psi.rpc-prompt-test`; green
 - [ ] Run `clj-paren-repair` on the edited file; re-read; `clj-kondo` clean
 - [ ] Commit
 
-## Slice 4 — Migrate the sibling test
+## Slice 4 — Verify the sibling test + comment removal
 
-- [ ] Rewrite `rpc-prompt-provider-retry-state-publishes-footer-updated-test` onto the shared stub driver; remove its inline `with-redefs`
+- [ ] Confirm the sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test` is already migrated by Slice 3 — it has no inline `with-redefs` to remove; it reaches the stub only via the shared `drive-provider-retry-through-progress-loop!` driver (~line 707)
 - [ ] Verify it still asserts the same activation/changed/clear footer sequence at the pre-gate `emit!`
 - [ ] Remove the task-242 "deliberate bounded exception to ¬mock/¬stub" comment block (and any other now-stale comments referencing the deferred seam migration)
 - [ ] Confirm `grep with-redefs` in the retry-footer tests shows no logic-boundary redefinition remains (the unrelated `session/query-in` site at ~line 91 is out of scope — leave it, note it in implementation.md)

@@ -32,17 +32,28 @@ Migration shape:
 
 1. Build one stub-provider constructor (attempt-counter atom inside), returning
    the provider-impl map, plus a `retry-test-ctx` helper that calls
-   `psi.ai.core/create-context {:anthropic stub}` — replacing whatever ctx the
-   tests currently build with `(atom {})` registries.
+   `psi.ai.core/create-context {:anthropic stub}` and yields its
+   `{:provider-registry (atom {:anthropic stub})}` map. This map is the **first
+   `ai-ctx` argument** of `execute-prepared-request! [ai-ctx ctx session-id
+   prepared-request progress-queue]` — the only param provider resolution
+   consults (`do-stream!` → `ai/stream-response-in` → `context-provider-registry
+   ai-ctx`). It replaces the current `{:provider-registry (atom {})}` literal
+   passed there; the second app-runtime `ctx` (session state,
+   `:provider-retry-sleep-fn`, retry state) is left unchanged and its
+   `:provider-registry`, if any, is not consulted.
 2. Rewrite `drive-provider-retry-through-progress-loop!` to drop `with-redefs`
-   and instead run `execute-prepared-request!` (or `execute-live-turn!` via the
-   real path) against the stub-provider ctx, keeping the LinkedBlockingQueue /
+   and instead run `execute-prepared-request!` against the real path, passing the
+   stub-provider `ai-ctx` (from step 1) as the first arg and the unchanged
+   app-runtime `ctx` as the second, keeping the LinkedBlockingQueue /
    `start-progress-loop!` wiring, the THREAD-AFFINITY invariant (drive runs
    synchronously on the test thread), and the `await-retry-footer-text!`
    deterministic sync via `:provider-retry-sleep-fn`.
-3. Migrate the sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
-   inline `with-redefs` onto the same shared driver/stub — co-migrated in one
-   slice since they share the identical stub.
+3. There is exactly one `with-redefs turn-runtime/execute-live-turn!` site — the
+   one inside `drive-provider-retry-through-progress-loop!` (step 2). The sibling
+   `rpc-prompt-provider-retry-state-publishes-footer-updated-test` has no inline
+   `with-redefs`; it reaches the stub solely by calling that shared driver, so
+   rewriting the driver (step 2) migrates it automatically. No second
+   `with-redefs` removal is needed.
 4. Remove the task-242 "deliberate bounded exception to ¬mock/¬stub" comment
    block.
 5. Forwarded harness cleanup (design Notes, in-scope while reconstructing):
@@ -100,13 +111,17 @@ Migration shape:
 2. **Slice 2 — Stub provider + ctx helper.** Implement the stub-provider
    constructor and `create-context`-based ctx helper in the test namespace.
 3. **Slice 3 — Migrate the shared driver.** Rewrite
-   `drive-provider-retry-through-progress-loop!` off `with-redefs`; migrate the
-   focus-gate boundary test; green under
+   `drive-provider-retry-through-progress-loop!` off its single `with-redefs`;
+   pass the stub `ai-ctx` as the first `execute-prepared-request!` arg; this
+   migrates every retry sub-test that calls the driver (focus-gate boundary,
+   background, and the sibling test) at once; green under
    `bb test --focus psi.rpc-prompt-test`.
-4. **Slice 4 — Migrate the sibling test.** Move
-   `rpc-prompt-provider-retry-state-publishes-footer-updated-test` onto the
-   shared stub driver; remove its inline `with-redefs`; remove the task-242
-   exception comment; green.
+4. **Slice 4 — Verify the sibling test + comment removal.** The sibling
+   `rpc-prompt-provider-retry-state-publishes-footer-updated-test` is already
+   migrated by Slice 3 (no inline `with-redefs` exists to remove); verify it
+   still asserts the same activation/changed/clear footer sequence at the
+   pre-gate `emit!`, remove the task-242 exception comment, confirm no
+   logic-boundary `with-redefs` remains; green.
 5. **Slice 5 — Harness consolidation.** `active-retry-text-prefix` direct
    derivation; collapse the two emitter builders into `focus-emitter!`; prune
    helpers made redundant by the seam; green.

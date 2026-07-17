@@ -80,6 +80,28 @@
   removing it there migrates all four retry sub-tests at once. The unrelated
   `session/query-in` `with-redefs` (~line 91) is a different test and out of scope.
 
+## Plan-follow-up pass (both plan-review design-steps executed)
+
+- Executed both plan-review follow-up items (design-steps.md items 2 & 3):
+  - Provider-seam wiring: plan.md migration-shape steps 1–2 and Slice-order
+    Slice 2/3, plus steps.md Slice 2/3, now state explicitly that the stub
+    `{:provider-registry …}` (from `create-context {:anthropic stub}`) is passed
+    as the **first `ai-ctx` arg** of `execute-prepared-request!` (the only param
+    provider resolution consults), replacing `{:provider-registry (atom {})}`,
+    leaving the second app-runtime `ctx` unchanged.
+  - Single-with-redefs reconciliation: plan.md migration-shape step 3 and
+    Slice-order Slice 4, plus steps.md Slice 4, now reflect the real
+    single-shared-driver shape — Slice 3 removes the one driver-level
+    `with-redefs` and thereby migrates the sibling test; Slice 4 is
+    verify-assertions + task-242 comment removal, not a second `with-redefs`
+    removal (the previous "remove its inline `with-redefs`" wording was a no-op).
+- RESIDUAL for a design-level pass (out of scope here — design.md is read-only
+  in the plan-follow-up profile): design.md **Scope** still asserts two
+  `with-redefs` sites and that the sibling test "inlines its own identical
+  `with-redefs`". Code has exactly one site (in the shared driver); the sibling
+  has none. design.md Scope should be corrected to the single-shared-driver
+  shape to fully close the inconsistency. plan.md/steps.md are already reconciled.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
