@@ -255,3 +255,19 @@
   config). Added the same control to the focused sub-test (the optional part).
   Test green (rpc-prompt 6/6, 52 assertions, +2 from the new controls), lint
   clean.
+
+## task-test-review session (4th pass) — outcome
+
+- no new follow-up steps. Re-verified the E2E footer tests independently:
+  pipeline routes `emit-footer-updated!` → `make-request-emitter` →
+  `rpc.events/emit-event!` → `focus-allows?` (real gate), `:status-line`
+  sourced from `footer/lines`; per-attempt `await-retry-footer-text!` sync makes
+  the changed-metadata (`retry in 4s`) frame reliably captured before its
+  clear; positive `(is (= 3 attempts))` controls guard both sub-tests; a
+  missing-required-keys regression would surface as an `error` frame and fail
+  the `retry in …` text assertions (so absence-of-error coverage is effectively
+  present). The `focus-allows?` default-session-id fallback arm is covered at
+  the unit level by `rpc-events-test/emit-event-nil-focus-uses-default-session-id-test`,
+  so it is not a gap here. Sole infra-dep exception (`with-redefs`
+  `execute-live-turn!`) remains documented with tracked exit (task 243).
+  Tests green (rpc-prompt 6/6, 52 assertions).
