@@ -444,3 +444,7 @@
 ## Task-test-review pass 9 (test-shaper skill)
 
 - added 1 follow-up step: the stub's first 429 sets `RateLimit-Limit`/`RateLimit-Remaining "0"` headers no assertion exercises — either dead incidental setup or an uncovered activation→changed rate-limit-transition behaviour (`activation-retry-footer?` matches delay text only, never the activation `remaining 0/5000` fragment). Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
+
+## Task-test-review pass 9 follow-up execution
+
+- addressed 1 test-shaper (pass 9) follow-up: option (i) — added `activation-retry-remaining` const (`0`), sourced the stub's first `:error` `RateLimit-Remaining` from it (load-bearing), and tightened `activation-retry-footer?` to also assert the activation footer's `remaining 0/5000` fragment (reusing `remaining-fragment`). Now the first-429 rate-limit propagation and the `0/5000`→`2/5000` activation→changed transition are positively pinned at both ends. No frame/gate/recovery/stamping assertion weakened; changed matcher's `2/5000` intact. Non-vacuity verified (stub first-`RateLimit-Remaining` → `9` fails both retry-footer tests). `bb test --focus psi.rpc-prompt-test` green (60 assertions, 3 tests); `clj-kondo` clean. Task is in `munera/closed/` (already closed); executed in place per the review-follow-up request.

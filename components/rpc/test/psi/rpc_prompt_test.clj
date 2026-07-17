@@ -199,6 +199,15 @@
    changed-retry footer's `remaining R/L` fragment."
   5000)
 
+(def ^:private activation-retry-remaining
+  "First 429's `RateLimit-Remaining`. Single authority: driven into the stub's
+   first `:error` stream event (`error-event`) header and matched by the
+   activation-retry footer's `remaining R/L` fragment, so the first-attempt
+   rate-limit metadata is load-bearing (its propagation into the activation
+   footer is asserted, not merely set) and the `0/5000`→`2/5000` change across
+   activation→changed footers is positively covered at both ends."
+  0)
+
 (def ^:private changed-retry-remaining
   "Second 429's `RateLimit-Remaining`. Single authority: driven into the stub's
    second `:error` stream event (`error-event`) header and matched by the
@@ -256,10 +265,17 @@
              :auto-retry-max-retries 2}}))
 
 (defn- activation-retry-footer?
-  "Matches the retry-*activation* footer frame (first attempt: `\"retry in 8s\"`)."
+  "Matches the retry-*activation* footer frame (first attempt: `\"retry in 8s\"` +
+   `\"remaining 0/5000\"`). Asserts the `remaining` fragment too — not just the
+   delay text — so the first 429's rate-limit metadata is load-bearing (a
+   regression where it fails to propagate into the activation footer is caught)
+   and the `0/5000`→`2/5000` change to the changed footer is pinned at both
+   ends, not only the changed end."
   [frame]
-  (str/includes? (frame-status-line frame)
-                 (expected-retry-text activation-retry-delay-ms)))
+  (let [status-line (frame-status-line frame)]
+    (and (str/includes? status-line (expected-retry-text activation-retry-delay-ms))
+         (str/includes? status-line (remaining-fragment activation-retry-remaining
+                                                        retry-rate-limit)))))
 
 (defn- changed-retry-footer?
   "Matches the *changed-metadata* retry footer frame (second attempt:
@@ -375,7 +391,7 @@
                    (case (swap! attempts* inc)
                      1 (consume-fn (error-event {"Retry-After" (retry-after-seconds activation-retry-delay-ms)
                                                  "RateLimit-Limit" (str retry-rate-limit)
-                                                 "RateLimit-Remaining" "0"}))
+                                                 "RateLimit-Remaining" (str activation-retry-remaining)}))
                      2 (consume-fn (error-event {"Retry-After" (retry-after-seconds changed-retry-delay-ms)
                                                  "RateLimit-Limit" (str retry-rate-limit)
                                                  "RateLimit-Remaining" (str changed-retry-remaining)}))
