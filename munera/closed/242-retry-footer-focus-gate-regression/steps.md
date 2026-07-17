@@ -286,6 +286,41 @@ If background-only (working as intended):
       243 rather than leaving the clear-frame production ambiguity as an
       untracked residual.
 
+## Slice 24 — Review follow-ups (task-implementation-review, 2nd)
+
+- [ ] `await-retry-footer-text!`'s Slice-9 observable-timeout guard depends on an
+      **undocumented thread-affinity invariant** that no prior slice names, and
+      whose violation would silently re-open the exact swallowed-timeout blind
+      spot Slice 9 closed. The helper calls `clojure.test/is` (its
+      `(is (not= support/timeout-token result) …)` fail-fast) from *inside* a
+      `:provider-retry-sleep-fn`. `is` reports via the thread-local
+      `clojure.test/*report-counters*`, so its pass/fail is only counted when the
+      sleep-fn runs on the **test thread**. It does today, but only incidentally:
+      `drive-provider-retry-through-progress-loop!` calls
+      `turn-runtime/execute-prepared-request!` *directly* (not on the daemon
+      thread started by `streams/start-progress-loop!`), so the retry loop →
+      `sleep-for-retry!` → sleep-fn → `is` all run on the test thread while the
+      daemon thread only drains the progress queue. This thread split is
+      load-bearing for the Slice-9 guard's correctness but is **nowhere
+      documented**: a future edit that moves the retry loop onto the progress /
+      daemon thread (or routes the sleep-fn through an executor) would make the
+      timeout `is` fire on a non-test thread, where its counters are unbound — the
+      timeout would then be *silently dropped* (no pass, no fail), regressing to
+      the very swallowed-timeout masquerade Slice 9 removed, while the test still
+      shows green. Encode the invariant so it cannot silently break: either (a)
+      add a one-line comment at `await-retry-footer-text!` / the sleep-fn call
+      sites noting the `is` assertion is only valid because the sleep-fn runs on
+      the test thread (and that moving the retry loop off-thread must re-home the
+      timeout failure to a thread-safe channel — e.g. deliver `timeout-token` to
+      an atom the test thread asserts on after the drive), or (b) restructure the
+      timeout signal to be thread-safe by construction (capture the timeout in a
+      promise/atom and assert it on the test thread post-drive rather than via
+      `is` inside the sleep-fn). If judged out of scope for task 242's frozen
+      coverage or better folded into task 243's harness rewrite (which keeps the
+      `await-retry-footer-text!` sync pattern per 243's design), record the
+      explicit rationale and forward the thread-affinity invariant to 243 rather
+      than leaving the undocumented `is`-on-test-thread dependency standing.
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the

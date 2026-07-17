@@ -904,3 +904,14 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
   boundary). Recommendation recorded here for that owner; no change made under 242.
 
 - addressed 2 review steps.
+
+## task-implementation-review session (2nd) — outcome
+
+- added 1 step (Slice 24): `await-retry-footer-text!`'s Slice-9 timeout guard
+  calls `clojure.test/is` from inside the `:provider-retry-sleep-fn`, valid only
+  because the retry loop runs on the test thread (`execute-prepared-request!`
+  called directly) — an undocumented thread-affinity invariant whose violation
+  would silently re-open the swallowed-timeout blind spot Slice 9 closed.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path); task closed
+  at `58a16fd53` before this review.
