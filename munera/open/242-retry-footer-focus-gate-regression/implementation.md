@@ -231,3 +231,12 @@
   and the sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`)
   onto the confirmed per-ctx `:provider-registry` seam. No code/test change in
   task 242 (the migration itself is task 243's scope).
+
+## task-test-review session (3rd pass) — outcome
+
+- added 1 step (Slice 8): background sub-test discards
+  `drive-provider-retry-through-progress-loop!`'s `@attempts*` return, so
+  `(is (empty? footer-events))` cannot distinguish "retry fired then gated"
+  from "retry never fired" — a positive control `(is (= 3 attempts))` (as in
+  the sibling test) is missing. Distinct from the already-documented drain
+  dependency.

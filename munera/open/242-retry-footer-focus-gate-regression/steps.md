@@ -114,6 +114,28 @@ If background-only (working as intended):
         provider-registry seam and re-evaluate the parallel `with-redefs`
         flakiness.
 
+## Slice 8 — Test-review follow-ups (3rd task-test-review pass)
+
+- [ ] Background sub-test lacks a "retry actually fired" positive control:
+      `drive-provider-retry-through-progress-loop!` returns `@attempts*` (retry
+      attempts driven), and the sibling
+      `rpc-prompt-provider-retry-state-publishes-footer-updated-test` asserts
+      `(is (= 3 @attempts*))` to prove the full activate→change→clear retry
+      sequence ran. The new
+      `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+      discards that return value in **both** sub-tests. For the **background**
+      sub-test this is a distinct vacuity risk from the drain dependency
+      already documented (Slice 5 item 2): `(is (empty? footer-events))` passes
+      both when "retry fired but was gated by `focus-allows?`" (intended) and
+      when "retry never fired at all" (e.g. the no-op `:provider-retry-sleep-fn`
+      or a mis-wired background config silently skips the retry loop) — the
+      assertion cannot distinguish a working-and-gated pipeline from a
+      dead/no-op one. Capture the returned attempt count and add a positive
+      control `(is (= 3 attempts))` (matching the sibling) to both sub-tests so
+      the empty-footer assertion is only credited when the retry sequence is
+      proven to have executed. (Optional: also assert the focused sub-test drove
+      all 3 attempts.)
+
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
 - [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the
