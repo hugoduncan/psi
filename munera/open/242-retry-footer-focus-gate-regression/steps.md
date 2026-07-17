@@ -64,7 +64,7 @@ If background-only (working as intended):
 
 ## Slice 6 — Test-review follow-ups (task-test-review)
 
-- [ ] Focus-gate coverage is asymmetric with the pre-gate sibling test: the
+- [x] Focus-gate coverage is asymmetric with the pre-gate sibling test: the
       focused sub-test in
       `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
       only asserts the retry *activation* footer (`retry in 8s`) crosses the
@@ -75,7 +75,7 @@ If background-only (working as intended):
       text). Extend the focused sub-test to assert the changed-metadata and
       cleared footers also reach `emit-frame!` through the gate — otherwise a
       regression that gates only the later frames would go undetected.
-- [ ] Infra-dep is a `with-redefs` stub of a logic boundary, not a nullable:
+- [x] Infra-dep is a `with-redefs` stub of a logic boundary, not a nullable:
       `drive-provider-retry-through-progress-loop!` redefines
       `turn-runtime/execute-live-turn!` to fabricate 429/recovery turns.
       implementation.md already attributes parallel `with-redefs`

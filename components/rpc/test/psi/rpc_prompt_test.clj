@@ -170,6 +170,18 @@
                                  :progress-q progress-q
                                  :thread-name "rpc-retry-footer-focus-test"})]
     (try
+      ;; NOTE (task 242 test-review, deliberate bounded exception to ¬mock/¬stub):
+      ;; `execute-live-turn!` is redefined here to fabricate 429/recovery turns.
+      ;; A clean injectable seam does exist — `psi.ai.core/create-context` seeds
+      ;; a per-ctx `:provider-registry`, and a stub provider emitting stream
+      ;; `:error` events carrying `:http-status`/`:provider-error/headers` would
+      ;; drive the same retry path (the stream consumer propagates those keys to
+      ;; the assistant-message). Migrating to that seam is deferred: it would
+      ;; also require rewriting the sibling
+      ;; `rpc-prompt-provider-retry-state-publishes-footer-updated-test` and
+      ;; standing up a stub provider matching the provider protocol, which
+      ;; exceeds task 242's frozen behaviour-preserving test-coverage scope.
+      ;; Recorded in implementation.md as a bounded, intentional exception.
       (with-redefs [turn-runtime/execute-live-turn!
                     (fn [& _]
                       (case (swap! attempts* inc)
@@ -232,9 +244,21 @@
       (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
         (is (seq footer-events)
             "focused session must still receive footer/updated frames through the focus gate")
+        ;; Per-frame focus gating is the regression under test: assert every
+        ;; retry frame the sibling pre-gate test verifies (activation, changed
+        ;; metadata, clear) also crosses the RPC focus gate, so a regression
+        ;; that gates only the later frames cannot go undetected.
         (is (some #(str/includes? (or (get-in % [:data :status-line]) "") "retry in 8s")
                   footer-events)
             "focused session must receive the retry-activation footer text through the focus gate")
+        (is (some #(let [status-line (or (get-in % [:data :status-line]) "")]
+                     (and (str/includes? status-line "retry in 4s")
+                          (str/includes? status-line "remaining 2/5000")))
+                  footer-events)
+            "focused session must receive the changed retry metadata footer through the focus gate")
+        (is (not (str/includes? (or (get-in (last footer-events) [:data :status-line]) "")
+                                "retry in"))
+            "focused session must receive the cleared footer (no stale retry text) through the focus gate")
         (is (every? #(= session-id (get-in % [:data :session-id])) footer-events)))))
   (testing "background session: retry footer/updated frames stay suppressed by design (task 241 invariant)"
     (let [captured    (atom [])

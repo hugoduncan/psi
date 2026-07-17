@@ -178,3 +178,39 @@
   + clear); and the `with-redefs` stub of `execute-live-turn!` is a logic
   boundary rather than a nullable/injectable seam (linked to the recorded
   parallel `with-redefs` flakiness).
+
+## Slice 6 — test-review follow-ups addressed
+
+- addressed 2 test-review follow-up steps.
+- **Gate-coverage asymmetry (item 1):** extended the focused sub-test in
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  to assert all three retry frames cross the RPC focus gate, matching the
+  sibling pre-gate test's coverage: activation (`retry in 8s`), changed metadata
+  (`retry in 4s` + `remaining 2/5000`), and clear (last footer has no stale
+  `retry in` text). Previously only the activation frame was asserted through
+  the gate, so a per-frame regression gating only the later frames would have
+  gone undetected. The existing `await-retry-footer-text!` sleep-fn already
+  synchronizes per-attempt (keyed by each delay), so the changed-metadata frame
+  is delivered before its `clear-active-retry!`; the new assertions pass without
+  further sync changes. Test green (rpc-prompt 6/6, 50 assertions).
+- **Provider seam evaluation (item 2):** a clean injectable/nullable seam **does
+  exist** — `psi.ai.core/create-context` seeds a per-ctx `:provider-registry`,
+  and a stub provider that emits stream `:error` events carrying `:http-status`
+  and `:provider-error/headers` would drive the same retry path, because
+  `make-provider-event-consumer`'s `:error` case propagates those keys through
+  the statechart to the assistant-message (verified in
+  `components/turn-runtime/src/psi/turn_runtime/core.clj`). So the earlier
+  "logic boundary, not a nullable" framing was imprecise: the seam is available,
+  not absent.
+- **Decision: deferred as a bounded, intentional exception (left as-is).**
+  Migrating off `with-redefs` would also require rewriting the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test` and standing up
+  a stub provider matching the provider protocol — a larger refactor that
+  exceeds task 242's frozen behaviour-preserving test-coverage scope (design.md
+  Constraints/Approach are scoped to *adding* E2E footer coverage, not
+  restructuring the retry-turn test harness). Recorded the explicit rationale in
+  a code comment above the `with-redefs` in
+  `drive-provider-retry-through-progress-loop!` so future readers know the seam
+  exists and the `with-redefs` is a deliberate, scoped deferral — a natural
+  follow-up task (migrate both retry-turn E2E tests to a stub provider seam) if
+  the parallel `with-redefs` flakiness is worth eliminating.
