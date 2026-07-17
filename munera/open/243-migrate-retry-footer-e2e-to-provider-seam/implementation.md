@@ -102,6 +102,18 @@
   has none. design.md Scope should be corrected to the single-shared-driver
   shape to fully close the inconsistency. plan.md/steps.md are already reconciled.
 
+## Plan-review session — ambiguity turn (batch first turn)
+
+- no ambiguity review feedback: plan.md/steps.md already reconciled by the prior
+  plan-review ambiguity + plan-follow-up passes (ai-ctx-vs-ctx param sharpened;
+  single-shared-driver `with-redefs` shape). Verified against rpc_prompt_test.clj:
+  one driver-level `with-redefs` (~430), first `execute-prepared-request!` arg is
+  `{:provider-registry (atom {})}` (~453), `(= 3 attempts)` asserted at 4 sites,
+  rate-limit values pinned by `changed-retry-remaining`/`retry-rate-limit`
+  constants. Stub-shape and sleep-fn sync are framed as Slice-1 verification, not
+  left underspecified. Residual design.md Scope "two with-redefs sites" is an
+  inconsistency-turn concern (design.md), not a plan/steps ambiguity.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
