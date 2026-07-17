@@ -49,6 +49,14 @@
     (`footer-refresh-progress-event?`), `app-runtime/footer.clj` + retry_display,
     `emit.clj` (stamps `:session-id`), Emacs `psi-events.el` "footer/updated".
 
+## plan-review session — outcome
+
+- plan-review ambiguity pass: no new ambiguity review feedback. plan.md/steps.md
+  are diagnosis-first and coherent with the resolved (contingent) AC1; the
+  fix-location and reproduction/flakiness uncertainties are already captured as
+  bounded Risks in plan.md, and "retry backoff text" is pinned to a `:status-line`
+  matching `retry in`. No new design-steps filed.
+
 ## design-review session (arch + ambiguity + inconsistency) — outcome
 
 - Re-ran all three design-review passes: no new design-steps filed. The only
