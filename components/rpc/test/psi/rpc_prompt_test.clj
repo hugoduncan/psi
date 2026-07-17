@@ -250,6 +250,13 @@
           _           (rpc.state/set-focus-session-id! state other-session-id)
           emit!       (rpc.emit/make-request-emitter emit-frame! state "req-1")]
       (drive-provider-retry-through-progress-loop! ctx session-id emit!)
+      ;; This `(is (empty? ...))` is non-vacuous only because
+      ;; `drive-provider-retry-through-progress-loop!` calls
+      ;; `streams/stop-progress-loop!` (which drains the progress queue
+      ;; synchronously) before this assertion runs — unlike the focused sub-test,
+      ;; this background sub-test has no `await-retry-footer-text!` guard, so any
+      ;; change to the drain path / sleep-fn must preserve that synchronous drain
+      ;; or this assertion could pass vacuously.
       (let [footer-events (filterv #(= "footer/updated" (:event %)) @captured)]
         (is (empty? footer-events)
             "retry footer for a non-focused (background) session must not leak to the focused connection")))))

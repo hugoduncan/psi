@@ -151,3 +151,13 @@
 - added 2 steps (Slice 5): tick the deferred Slice-4 commit checkbox, and
   document the background sub-test's synchronous-drain dependency (unguarded,
   unlike the focused sub-test's `await-retry-footer-text!`).
+
+## Slice 5 — review follow-ups addressed
+
+- addressed 2 implementation-review follow-up steps: ticked the deferred
+  Slice-4 commit checkbox (commit `d8a32994b`), and added a one-line comment in
+  `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`
+  documenting that the background sub-test's `(is (empty? footer-events))` is
+  non-vacuous only because `drive-provider-retry-through-progress-loop!` drains
+  the progress queue synchronously via `stop-progress-loop!` before the
+  assertion (unlike the guarded focused sub-test). Test still green (6/6).

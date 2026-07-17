@@ -60,14 +60,14 @@ If background-only (working as intended):
 - [x] Update `implementation.md` with final diagnosis, outcome, and any scope
       notes; check doc coherence (no user-facing doc change needed — the
       focused footer behaviour did not change, only test coverage was added).
-- [ ] Commit with a symbol-tagged message (⊘/⚒) referencing task 242.
+- [x] Commit with a symbol-tagged message (⊘/⚒) referencing task 242.
 
 ## Slice 5 — Review follow-ups (task-implementation-review)
 
-- [ ] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the
+- [x] Tick the Slice-4 "Commit with a symbol-tagged message" checkbox — the
       implementation commit (`d8a32994b`) was made but the step is still
       unchecked (bookkeeping drift only; no functional impact).
-- [ ] Document the background-case test-net dependency in
+- [x] Document the background-case test-net dependency in
       `rpc-prompt-provider-retry-footer-reaches-focused-session-emit-boundary-test`:
       the background `(is (empty? footer-events))` assertion is only meaningful
       because `stop-progress-loop!` drains the progress queue synchronously
