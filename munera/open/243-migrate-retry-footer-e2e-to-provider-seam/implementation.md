@@ -124,6 +124,23 @@
   pass), so a fresh unchecked step now targets it for a design-editable pass.
   Not a duplicate: item 3 is checked and its design.md portion was never executed.
 
+## Notes for the design-step task (plan-review inconsistency slice)
+
+- The new inconsistency design-step is a design.md Scope wording correction only —
+  not a scope change. Hold the behaviour-preserving constraint and the two frozen
+  call sites; do not let the rewording imply a second migration site.
+- Concrete shape to write into design.md Scope: one `with-redefs
+  [turn-runtime/execute-live-turn! …]` lives in the shared driver
+  `drive-provider-retry-through-progress-loop!` (`components/rpc/test/psi/rpc_prompt_test.clj`
+  ~line 430; the `execute-prepared-request!` call passing `{:provider-registry (atom {})}`
+  is ~line 453). All retry sub-tests (focus-gate boundary ~521, background ~576,
+  pre-gate sibling ~644/707) reach the stub only by calling that driver, so
+  migrating the one driver-level site migrates them all.
+- design.md Acceptance/Approach already speak in the correct (single-seam) terms;
+  only the **Scope** section's "two `with-redefs` sites" / sibling "inlines its own"
+  framing needs correcting. plan.md and steps.md are already consistent — do not
+  re-touch them.
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
