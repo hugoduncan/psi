@@ -51,6 +51,13 @@
   stub `:provider-registry` (from `create-context`) must replace the first
   `ai-ctx` arg, not be merged into the app-runtime `ctx`.
 
+- inconsistency review added 1 new design step: design.md Scope (and plan/steps
+  Slice 3–4) assume two `with-redefs` sites incl. an inline one in the sibling
+  test; code has a single shared `with-redefs` inside
+  `drive-provider-retry-through-progress-loop!`, reached by all retry tests
+  (verified in rpc_prompt_test.clj). Slice 4's "remove its inline with-redefs"
+  is a no-op; the real migration removes one driver-level site (Slice 3).
+
 ## Design-review session outcome (arch + ambiguity + inconsistency)
 
 - Shared design-review session (all three turns) found no new actionable
