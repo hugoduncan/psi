@@ -466,6 +466,18 @@
         (reset! stop? true)
         (.join ^Thread thread 200)))))
 
+(defn- assistant-message-text
+  "Extract the observable text value of an assistant-message: joins the `:text`
+   of each content block (`:content` is a vector of `{:type :text :text ...}`
+   blocks, per `turn-runtime/core` `:execution-result/assistant-message`). Used
+   to assert the recovered text as a value rather than substring-matching the
+   `pr-str` serialization of the whole content vector (task 243 test-shaper
+   pass 10 `behavior_focused`)."
+  [assistant-message]
+  (->> (:content assistant-message)
+       (keep :text)
+       (str/join)))
+
 (defn- assert-recovery-turn-succeeded!
   "Positive control (task 243 test-review follow-up) that the retry sequence
    cleared because the stub's attempt-3+ *recovery* stream actually landed a
@@ -484,7 +496,7 @@
   (is (= :stop (:execution-result/stop-reason recovery-result))
       "the recovery turn must complete with a non-error :stop stop-reason")
   (is (str/includes?
-       (pr-str (:content (:execution-result/assistant-message recovery-result)))
+       (assistant-message-text (:execution-result/assistant-message recovery-result))
        "recovered")
       "the recovery turn's assistant message must carry the recovered text"))
 
