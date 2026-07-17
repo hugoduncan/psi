@@ -438,3 +438,5 @@
 ## Task-test-review pass 8 (test-shaper skill)
 
 - added 1 follow-up step: the "index of the (first|last) frame matching a predicate" idiom (`(some (fn [[i frame]] (when (pred frame) i)) (map-indexed vector …))`) is hand-spelled 3× across `activation-precedes-changed?` and `clear-footer-produced-after-retry` with no single authority — a distinct site set from the pass-6 frame-lookup fix (those need the index, not the frame). Non-compliance note: the task is closed (`munera/closed/`), not open as the review request assumed — step/note appended to the closed task in place.
+
+- addressed 1 test-review (pass 8) follow-up: extracted `first-frame-index`/`last-frame-index` single authority; derived the three frame-index lookup sites (`activation-precedes-changed?` ×2, `clear-footer-produced-after-retry` ×1); behaviour-preserving; tests green (60/3), lint clean.

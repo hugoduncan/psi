@@ -291,6 +291,25 @@
   [frame]
   (str/includes? (frame-status-line frame) active-retry-text-prefix))
 
+(defn- first-frame-index
+  "Single authority for \"index of the first frame matching `pred`\" over a
+   footer-frame seq, or `nil` if none matches. Isolates the
+   `map-indexed`/`when`-index destructure idiom (relies on index `0` being
+   truthy in Clojure, so a match at position 0 is returned, not skipped) so the
+   ordering/after-retry controls below share one convention instead of
+   hand-respelling it."
+  [pred frames]
+  (some (fn [[i frame]] (when (pred frame) i))
+        (map-indexed vector frames)))
+
+(defn- last-frame-index
+  "Single authority for \"index of the last frame matching `pred`\" over a
+   footer-frame seq, or `nil` if none matches. Derived from `first-frame-index`
+   over the reversed frames, re-mapped back to a forward index."
+  [pred frames]
+  (when-let [rev-idx (first-frame-index pred (reverse frames))]
+    (- (dec (count frames)) rev-idx)))
+
 (defn- clear-footer-produced-after-retry
   "Positive control for the retry→inactive **clear** footer (task 242 Slice 14):
    returns the `footer/updated` frame that follows the last active-retry frame,
@@ -300,8 +319,7 @@
    passes both when a real clear footer landed last and when some unrelated
    non-retry footer incidentally trailed with no clear ever emitted."
   [footer-events]
-  (let [last-retry-idx (some (fn [[i frame]] (when (retry-status-line? frame) i))
-                             (reverse (map-indexed vector footer-events)))]
+  (let [last-retry-idx (last-frame-index retry-status-line? footer-events)]
     (when (and last-retry-idx
                (< (inc last-retry-idx) (count footer-events)))
       (nth footer-events (inc last-retry-idx)))))
@@ -317,12 +335,8 @@
    the changed-metadata footer *before* activation; this control does. Returns
    false (fails) if either frame is absent or the ordering is inverted."
   [footer-events]
-  (let [activation-idx (some (fn [[i frame]]
-                               (when (activation-retry-footer? frame) i))
-                             (map-indexed vector footer-events))
-        changed-idx    (some (fn [[i frame]]
-                               (when (changed-retry-footer? frame) i))
-                             (map-indexed vector footer-events))]
+  (let [activation-idx (first-frame-index activation-retry-footer? footer-events)
+        changed-idx    (first-frame-index changed-retry-footer? footer-events)]
     (boolean (and activation-idx changed-idx (< activation-idx changed-idx)))))
 
 (defn- retry-stub-provider-ai-ctx
