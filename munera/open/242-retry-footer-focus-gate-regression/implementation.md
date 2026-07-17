@@ -340,3 +340,26 @@
   `execute-prepared-request!`, progress-loop lifecycle) that the parameterized
   `drive-provider-retry-through-progress-loop!` already encapsulates — a
   divergent second copy reusable today (distinct from 243's mechanism migration).
+
+## Slice 11 — test-shaper 3rd pass follow-up (addressed 1 review step)
+
+- **Retry-driving body dedup:** collapsed the sibling
+  `rpc-prompt-provider-retry-state-publishes-footer-updated-test`'s ~60-line
+  inline retry body (`error-turn`, `attempts*`, `with-redefs
+  turn-runtime/execute-live-turn!` 429→429→recovery `case`,
+  `execute-prepared-request!`, `start-progress-loop!`/`stop-progress-loop!`
+  lifecycle) into a single call to the already-parameterized
+  `drive-provider-retry-through-progress-loop!`, passing its pre-gate raw
+  `emit!` (`(fn [event data] (swap! emitted* conj {:event event :data data}))`)
+  and asserting against `@emitted*` for the activation/changed/clear/session-id
+  footers. The two harnesses now share one definition of the 429 headers,
+  attempt sequence, and thread lifecycle, so they cannot drift; only the
+  `emit!` capture strategy differs (pre-gate raw `emitted*` here vs the focus-
+  gated `make-request-emitter` in the sibling). The single remaining
+  `with-redefs turn-runtime/execute-live-turn!` (inside the shared helper) is
+  the tracked ¬mock/¬stub exception whose exit is task 243. Removed the now-
+  unused `psi.session-state.state` require (session-id now comes from
+  `create-session-context`'s return, matching the focused test).
+- Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 56 assertions —
+  unchanged, behaviour-preserving), `clj-kondo` clean, `clj-paren-repair`
+  clean. Test-only; no product/behaviour change, no CHANGELOG entry.

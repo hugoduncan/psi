@@ -195,7 +195,7 @@ If background-only (working as intended):
 
 ## Slice 11 — Test-review follow-ups (test-shaper pass, 3rd)
 
-- [ ] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+- [x] The sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`
       still inlines a full copy of the retry-driving body that
       `drive-provider-retry-through-progress-loop!` already encapsulates —
       `error-turn`, `attempts*`, the `with-redefs turn-runtime/execute-live-turn!`
