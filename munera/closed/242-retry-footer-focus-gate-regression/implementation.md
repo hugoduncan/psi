@@ -750,6 +750,14 @@
   push-emit vs recompute-at-delivery divergence stays out of frozen scope. No
   new design-steps.
 
+## design-review session (second turn — ambiguity pass) — outcome
+
+- no ambiguity review feedback. The sole ambiguity (AC1 failing-then-passing vs
+  working-as-intended branch) is already filed as the design-step and resolved
+  in design.md (AC1 made contingent on Approach step-1 diagnosis). Terms pinned:
+  "retry backoff text" → `:status-line` containing `retry in …`; focused vs
+  background/delegated sessions distinguished in Context. No new design-steps.
+
 ## code-shaper review session (7th pass) — outcome
 
 - No new follow-up steps. Re-reviewed the retry-footer E2E harness against
