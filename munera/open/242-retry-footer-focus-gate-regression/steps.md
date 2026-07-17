@@ -89,7 +89,7 @@ If background-only (working as intended):
 
 ## Slice 7 — Test-review follow-ups (2nd task-test-review pass)
 
-- [ ] Standing ¬mock/¬stub violation has no tracked exit: Slice 6 item 2
+- [x] Standing ¬mock/¬stub violation has no tracked exit: Slice 6 item 2
       *evaluated and deferred* the `with-redefs turn-runtime/execute-live-turn!`
       logic-boundary stub, and the recorded rationale confirms a **clean
       injectable seam exists** (stub provider via
@@ -108,6 +108,11 @@ If background-only (working as intended):
       inlines its own identical `with-redefs`. This also targets the recorded
       parallel `with-redefs` test-isolation flakiness attributed to the same
       pattern.
+      - Resolved: created dedicated follow-up task
+        `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/`
+        (design-only), scoped to co-migrate both call sites onto the confirmed
+        provider-registry seam and re-evaluate the parallel `with-redefs`
+        flakiness.
 
 ## Slice 5 — Review follow-ups (task-implementation-review)
 

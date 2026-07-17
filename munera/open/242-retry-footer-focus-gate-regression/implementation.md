@@ -221,3 +221,13 @@
   execute-live-turn!`, shared by both retry-footer E2E tests) was evaluated and
   deferred in Slice 6 but has no tracked exit — recommend a dedicated follow-up
   task to migrate both call sites onto the confirmed provider-registry seam.
+
+## Slice 7 — 2nd test-review follow-up addressed
+
+- addressed 1 test-review follow-up step: created dedicated follow-up task
+  `munera/open/243-migrate-retry-footer-e2e-to-provider-seam/` (design-only) as
+  the tracked exit for the deferred ¬mock/¬stub violation, scoped to co-migrate
+  both retry-footer E2E call sites (`drive-provider-retry-through-progress-loop!`
+  and the sibling `rpc-prompt-provider-retry-state-publishes-footer-updated-test`)
+  onto the confirmed per-ctx `:provider-registry` seam. No code/test change in
+  task 242 (the migration itself is task 243's scope).
