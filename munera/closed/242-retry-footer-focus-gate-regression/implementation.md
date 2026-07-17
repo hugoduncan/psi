@@ -740,6 +740,16 @@
   `retry-display` authority, leaving a `retry_display.clj`↔matcher drift the
   seconds and remaining fragment no longer have.
 
+## design-review session (first turn — architecture pass) — outcome
+
+- no architectural review feedback. Independently re-confirmed against
+  doc/architecture.md focus-gated delivery rule (session-scoped `footer/updated`
+  delivered only on focus match, suppressed otherwise; §"Projection delivery
+  rule"), the app-runtime/RPC footer ownership boundary, and the task-241
+  no-cross-session-leakage invariant. Design conforms; the pre-existing
+  push-emit vs recompute-at-delivery divergence stays out of frozen scope. No
+  new design-steps.
+
 ## code-shaper review session (7th pass) — outcome
 
 - No new follow-up steps. Re-reviewed the retry-footer E2E harness against
