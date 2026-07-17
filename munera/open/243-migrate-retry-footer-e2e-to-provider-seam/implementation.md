@@ -125,7 +125,17 @@
   design.md Scope "two with-redefs sites" is an inconsistency-turn concern
   (design.md), tracked by the open design-step, not a plan/steps ambiguity.
 
-## Plan-review session — inconsistency turn (batch second turn)
+## Plan-review session (re-run) — inconsistency turn (batch second turn)
+
+- no inconsistency review feedback: plan.md ↔ steps.md ↔ code ↔ implementation.md
+  are mutually consistent (single-shared-driver `with-redefs`, first `ai-ctx`
+  arg, Slice 3/4 split, `(= 3 attempts)`). The one remaining cross-file
+  inconsistency — design.md Scope's "two with-redefs sites" / sibling "inlines
+  its own" framing — is already captured by the open unchecked design-step
+  (design-steps.md, item 4); not re-added to avoid duplication. Its correction
+  requires a design-editable pass (out of scope for the plan-review profile).
+
+## Plan-review session — inconsistency turn (batch second turn, prior)
 
 - inconsistency review added 1 new design step: design.md Scope still asserts
   "two `with-redefs` sites" (sibling "inlines its own") — contradicts the
