@@ -1056,3 +1056,18 @@ harness is frozen, test-only, green (`bb test --focus psi.rpc-prompt-test` →
 - Scope: test-only, behaviour-preserving; no code/doc change. `bb test --focus
   psi.rpc-prompt-test` green (58 assertions, 5 tests). clj-kondo clean;
   clj-paren-repair success.
+
+## task-test-review session (11th pass, test-shaper) — outcome
+
+- No new steps: all 27 slices closed; suite green (58 assertions, 5 tests).
+  Tests are simple/consistent/robust/economical per test-shaper — deterministic
+  bounded sync + documented thread-affinity invariant, positive controls at
+  every branch (attempts, production-vs-gating, ordering, clear, session-id
+  correctness, fallback arm), single authorities for matchers/config. The one
+  marginal residual considered (find-frame idiom `(some #(when (pred %) %) …)`
+  in the sibling vs `(some pred …)` existence in the focused tests) is a
+  legitimate find-vs-test distinction, not a defect; extracting a helper would
+  contradict Slice 23's recorded aggregate-over-abstraction judgement on this
+  frozen, task-243-migration-bound harness.
+- Non-compliance note: review run against an already-*closed* task
+  (`munera/closed/242-…`, not the requested `munera/open/…` path).
