@@ -603,3 +603,13 @@
   `clj-paren-repair` clean. Test-only; no product/behaviour change, no CHANGELOG
   entry.
 - addressed 2 review steps.
+
+## code-shaper review session (2nd pass) — outcome
+
+- added 2 steps (Slice 18): Slice 17's `activation-retry-delay-ms`/`changed-retry-delay-ms`
+  constants do not actually track the driving config — the driver's
+  `Retry-After "8"`/`"4"` (and `RateLimit-Remaining`/`-Limit`) header literals
+  are independent copies, so driver-vs-matcher can silently drift (contradicting
+  Slice 17's own "single authority" docstring); and the `{:auto-retry-base-delay-ms
+  8000 :auto-retry-max-retries 2}` session config is duplicated verbatim at four
+  `create-session-context` sites (a fourth copy of the same 8s delay).

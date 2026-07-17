@@ -448,3 +448,56 @@ If background-only (working as intended):
       through it. If judged out of scope for task 242's frozen coverage or
       better folded into task 243's harness rewrite, record the rationale and
       forward it to 243.
+
+## Slice 18 — Review follow-ups (code-shaper pass, 2nd)
+
+- [ ] Slice 17's `activation-retry-delay-ms`/`changed-retry-delay-ms` constants
+      do **not** achieve their own stated goal: their docstrings claim each is
+      the "single authority so the matcher tracks the driving config", but the
+      *actual* driving config lives in `drive-provider-retry-through-progress-loop!`'s
+      429 `error-turn` `Retry-After` header literals (`"8"` at
+      rpc_prompt_test.clj L308, `"4"` at L311) — which are wholly independent
+      string literals, not derived from (nor deriving) the `8000`/`4000` ms
+      matcher constants (L201/L207). So the two remain **two authorities** for
+      the same "8s"/"4s" retry delay: change the driver header `Retry-After "8"`
+      → `"6"` and the matcher still awaits `expected-retry-text 8000` =
+      `"retry in 8s"`, so `(some activation-retry-footer? footer-events)` matches
+      nothing and fails as a confusing "not found" rather than a coupling error —
+      exactly the "assertion could still match the *old* string after the driver
+      changes, passing green against a stale expectation" drift Slice 17 set out
+      to remove (steps.md L424-426). The same disconnect holds for the
+      rate-limit fragment: `remaining-fragment 2 5000` (L228) hard-codes `2`/`5000`
+      re-derived by hand from the driver's second-429 `RateLimit-Remaining "2"` /
+      `RateLimit-Limit "5000"` headers (L309-310), a third independent copy of
+      those values. This is a `consistent`/`robust` residual distinct from Slice
+      17 (which unified the *assertion-side* matcher against the *sync-side*
+      `expected-retry-text`, but left the **driver-header ↔ matcher-constant**
+      coupling standing). Fold the driver `Retry-After`/`RateLimit-*` header
+      values and the matcher delay/remaining constants onto one authority (e.g.
+      derive the `error-turn` headers *from* `activation-retry-delay-ms`/`changed-retry-delay-ms`
+      and the rate-limit constants, so the driver and the matchers cannot drift),
+      or correct the Slice-17 docstrings/notes to say the constants only track
+      the config *by convention* (a hand-maintained coupling), not as a single
+      authority. If judged out of scope for task 242's frozen coverage or better
+      folded into task 243's harness rewrite, record the explicit rationale and
+      forward it to 243 rather than leaving the driver-vs-matcher config-coupling
+      (and the inaccurate "single authority ... tracks the driving config"
+      wording) standing.
+- [ ] The retry-driving session config `{:persist? false :config
+      {:auto-retry-base-delay-ms 8000 :auto-retry-max-retries 2}}` passed to
+      `support/create-session-context` is duplicated verbatim at four sites
+      (rpc_prompt_test.clj L350-353 focused, L434-437 background pre-gate control,
+      L451-454 background gated, L497-500 sibling). The `8000`
+      `:auto-retry-base-delay-ms` is a *fourth* independent copy of the same
+      "8s first-attempt delay" the driver `Retry-After "8"` header and the
+      `activation-retry-delay-ms 8000` matcher constant already encode (see the
+      item above), so it participates in the same drift risk *and* is repeated
+      config boilerplate. This is a `consistent`/`economical` residual not
+      touched by any prior slice (which addressed sleep-fn, expected-text,
+      retry-driving body, and assertion matchers — never the shared
+      session-context construction). Extract a single named builder (e.g.
+      `retry-footer-session-context!` / a shared config constant) so the retry
+      test session config has one authority. If judged out of scope for task
+      242's frozen coverage or better folded into task 243's harness rewrite,
+      record the explicit rationale and forward it to 243 rather than leaving the
+      four-way config duplication standing.
