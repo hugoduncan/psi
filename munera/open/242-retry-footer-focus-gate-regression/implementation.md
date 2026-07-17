@@ -363,3 +363,12 @@
 - Verification: `bb test --focus psi.rpc-prompt-test` (6/6 pass, 56 assertions —
   unchanged, behaviour-preserving), `clj-kondo` clean, `clj-paren-repair`
   clean. Test-only; no product/behaviour change, no CHANGELOG entry.
+
+## task-test-review session (test-shaper pass, 4th) — outcome
+
+- added 1 step (Slice 12): background sub-test's `(is (empty? footer-events))`
+  cannot distinguish gate-suppression from footer-non-production — a distinct
+  vacuity branch from Slice 8 (retry-never-fired) and Slice 5 item 2 (drain).
+  `(= 3 attempts)` proves retry turns fired, not that `footer/updated` frames
+  were produced, so a background footer-production regression would pass green;
+  the load-bearing evidence is only a one-time manual bypass check, not encoded.

@@ -136,6 +136,43 @@ If background-only (working as intended):
       proven to have executed. (Optional: also assert the focused sub-test drove
       all 3 attempts.)
 
+## Slice 12 — Test-review follow-ups (test-shaper pass, 4th)
+
+- [ ] Background sub-test cannot distinguish gate-suppression from
+      footer-non-production — a distinct vacuity branch from the two already
+      closed. The background sub-test's sole outcome signal is
+      `(is (empty? footer-events))`. Its two existing guards close different
+      branches: `(is (= 3 attempts))` (Slice 8) proves the retry *turns* fired,
+      and the drain comment (Slice 5 item 2) protects the synchronous queue
+      drain. Neither proves the retry pipeline *produced* `footer/updated`
+      frames at all. `attempts` counts `turn-runtime/execute-live-turn!` calls,
+      not `:retry-updated` progress events reaching `emit-footer-updated!`. So
+      `(is (empty? footer-events))` still passes both when (A) footer frames were
+      produced-then-gated by `focus-allows?` (the intended behaviour under test)
+      and when (B) footer frames were *never produced* for the background config
+      (e.g. a regression in `footer-refresh-progress-event?` matching
+      `:retry-updated`, or in `emit-footer-updated!` / footer status-line
+      construction). The one-time manual mutation check recorded in
+      implementation.md ("with `focus-allows?` bypassed, the background
+      sub-test fails with 4 leaked frames") confirmed gating is load-bearing
+      *once by hand* but is **not encoded** as a standing assertion — so a future
+      footer-production regression under the background config would let
+      `(is (empty? footer-events))` pass green (a false PASS masquerading as
+      "correctly gated"), the exact `meaningful_failures` failure mode the
+      focused/sibling tests avoid by positively asserting production. Encode the
+      distinguishing positive control: prove the background config *would* have
+      produced ≥1 retry `footer/updated` frame absent the focus gate, so the
+      `empty?` assertion is credited only against a live-and-producing pipeline.
+      Options: (a) capture the same run's pre-gate frames (drive the background
+      retry once with a raw `emit!`, assert it produces retry footers, then a
+      second run through `make-request-emitter` with foreign focus asserts
+      `empty?`); or (b) assert the pre-gate production count equals the focused
+      sub-test's, since both drive the identical
+      `drive-provider-retry-through-progress-loop!` scenario. If judged
+      out-of-scope for task 242's frozen coverage, record the explicit rationale
+      (rely on the one-time bypass check) rather than leaving the production-vs-
+      gating ambiguity as an untracked residual.
+
 ## Slice 9 — Test-review follow-ups (test-shaper pass)
 
 - [x] `await-retry-footer-text!` silently swallows its timeout, defeating
