@@ -92,3 +92,6 @@
 - 2026-07-27 fourth docs review: added 1 step to be addressed.
 - 2026-07-27 fourth docs review follow-up: addressed 1 review step. Updated Emacs/RPC model-cycling docs in `doc/emacs-ui.md` and `ramora/rpc-edn/op-mapping.md` to state that OAuth-unsupported or unresolvable scoped candidates such as OpenAI OAuth-backed `gpt-5.6` are skipped/not persisted by cycle commands.
 - 2026-07-27 fifth docs review: added 2 steps to be addressed.
+
+- 2026-07-27 fifth docs review follow-up: addressed 2 review steps. Updated `doc/cli.md` and `doc/configuration.md` so CLI/env, config, and session-profile model selection document the OpenAI catalog-vs-OAuth runtime boundary: non-OAuth/API-key `gpt-5.6` remains catalog-valid, OAuth-backed `gpt-5.6` is unsupported/rejected or fails preflight without fallback, and OAuth-backed `gpt-5.5` remains on the OAuth/ChatGPT Codex path.
+- addressed 2 review steps

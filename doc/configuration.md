@@ -104,7 +104,15 @@ layers.
 | `:llm-stream-idle-timeout-ms` | positive integer | `1200000` | Milliseconds without provider stream progress before the backend aborts the run |
 
 Both `:model-provider` and `:model-id` must be set together; a partial entry is
-ignored and the next lower source is used instead.
+ignored and the next lower source is used instead. Catalog validation is distinct
+from credential-specific runtime support: `{:model-provider "openai" :model-id
+"gpt-5.6"}` is a valid catalog selection for non-OAuth/API-key OpenAI use, but
+OpenAI OAuth-backed `gpt-5.6` is unsupported until an evidenced ChatGPT/Codex
+alias or alternate OAuth-compatible transport is added. When OpenAI is backed by
+stored OAuth credentials, configured or profiled `gpt-5.6` is rejected at
+selection surfaces or fails turn preflight with an unsupported-model error rather
+than silently falling back; OAuth-backed `gpt-5.5` remains on the OAuth/ChatGPT
+Codex path.
 
 ## Session profiles
 
@@ -144,8 +152,13 @@ whole profile. This profile-specific merge does not change ordinary top-level
 `:agent-session` setting resolution.
 
 A profile is valid when it has at least one supported concrete setting, its
-model provider/id pair is complete and known, enum values are valid, and its
-name is a selectable unqualified keyword that is not reserved. Selectable names
+model provider/id pair is complete and known in the catalog, enum values are
+valid, and its name is a selectable unqualified keyword that is not reserved.
+Credential-specific runtime policy is checked when the profile is applied or a
+turn is prepared, so a catalog-known OpenAI `gpt-5.6` profile is not
+credential-agnostically supported: with stored OpenAI OAuth credentials it is
+unsupported and is rejected or fails preflight rather than falling back.
+Selectable names
 match the `/session-profile` command token grammar: the first character must be
 a letter or digit, and later characters may be letters, digits, `.`, `_`, or
 `-`. Namespaced keywords such as `:team/coding` and command-unparseable names

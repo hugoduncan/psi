@@ -109,6 +109,11 @@ All other flags are forwarded unchanged to `psi.main`.
   - Select model key (same keys as `psi.ai.models/all-models`).
   - In TUI mode, the `/model` command lists the available model keys.
   - Falls back to `PSI_MODEL` when not provided.
+  - OpenAI catalog keys and OpenAI OAuth runtime support are distinct. `gpt-5.6`
+    is a catalog key for non-OAuth/API-key OpenAI use, but OpenAI OAuth-backed
+    `gpt-5.6` is unsupported until an evidenced ChatGPT/Codex alias or
+    alternate OAuth-compatible transport is added; OpenAI OAuth-backed `gpt-5.5`
+    remains on the OAuth/ChatGPT Codex path.
 - `--log-level <LEVEL>`
   - Set Timbre minimum level.
   - Valid: `TRACE | DEBUG | INFO | WARN | ERROR | FATAL | REPORT` (case-insensitive).
