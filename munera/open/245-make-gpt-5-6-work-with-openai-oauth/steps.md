@@ -49,3 +49,7 @@
 - [x] Run broader `bb test` if focused validation indicates cross-component risk.
 - [x] Review the final diff for catalog/runtime/test/doc coherence.
 - [x] Update `implementation.md` with final decisions, validation results, and any remaining follow-up.
+
+## Implementation review follow-up
+
+- [ ] Encode OAuth-backed `gpt-5.6` as explicitly unavailable/unsupported unless a supported ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced; do not let an OAuth-backed `gpt-5.6` request silently fall through to the catalog `https://api.openai.com/v1` chat-completions transport, since the design says platform quota responses are not the OAuth runtime policy surface and absence of support evidence requires no silent fallback.
