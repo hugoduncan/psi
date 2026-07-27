@@ -6,6 +6,7 @@
    shaping for one prepared turn."
   (:require
    [psi.ai.core :as ai]
+   [psi.ai.model-registry :as model-registry]
    [psi.ai.models :as models]
    [psi.ai.structured-output :as structured-output]
    [psi.ai.textual-tool-calls :as textual-tool-calls]
@@ -306,8 +307,7 @@
 
 (defn- unsupported-runtime-model-result
   [turn-id ai-model]
-  (let [message (or (:runtime/unsupported-message ai-model)
-                    "Selected model is not supported by the current runtime credentials.")]
+  (let [message (model-registry/unsupported-runtime-model-message ai-model)]
     {:turn-id turn-id
      :model ai-model
      :ai-options nil

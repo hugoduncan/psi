@@ -255,7 +255,8 @@
         (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
         (is (= :openai-oauth-model-unsupported
                (:execution-result/runtime-unsupported-reason result)))
-        (is (= message (:execution-result/error-message result)))
+        (is (= (str "Unsupported model: openai gpt-5.6 — " message)
+               (:execution-result/error-message result)))
         (is (= :error (:execution-result/stop-reason result)))
         (is (empty? (get-in result [:execution-result/provider-captures :request-captures])))))))
 
