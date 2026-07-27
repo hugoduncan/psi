@@ -8,3 +8,4 @@
 - next slice should treat `model_registry.clj` as the policy join point between user-visible catalog ids and OAuth transport/backend ids; keep `models.clj` catalog exposure coherent and pin the behavior in `model_registry_test.clj` rather than relying on live OAuth probes.
 - no new ambiguity review feedback
 - third-turn inconsistency review: no new feedback
+- when implementing the resolved policy, keep live OAuth/Codex probes as diagnostic evidence only; regression coverage should be deterministic unit tests, and any user-visible selection change should be reflected in `CHANGELOG.md`/docs before commit.
