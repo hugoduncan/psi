@@ -59,3 +59,4 @@
 
 - 2026-07-27 ninth review follow-up: addressed 1 review step. Cycle-model now filters scoped models through runtime model resolution and skips `:runtime/unsupported?` candidates, so OAuth-backed scoped `gpt-5.6` is not selected by cycling. Added agent-session and RPC `cycle_model` regression coverage. Validation passed: `clj-kondo --lint components/agent-session/src/psi/agent_session/session_settings.clj components/agent-session/test/psi/agent_session/session_settings_test.clj components/rpc/test/psi/rpc_test.clj`, `bb test --focus psi.agent-session.session-settings-test`, `bb test --focus psi.rpc-test`, and equivalent focused Scry runs for both namespaces.
 - 2026-07-27 tenth implementation review: no new feedback.
+- 2026-07-27 test review: added 3 steps to be addressed.
