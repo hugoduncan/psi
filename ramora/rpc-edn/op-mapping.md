@@ -27,7 +27,7 @@ Runtime-owned public projection delivery is event-driven:
 | `switch_session` | `{:session-id s? :session-path s}` | `session/resume-session-in!` | `{:session-id s :session-file s?}` | `transport/not-ready`, `request/invalid-params`, `request/not-found`, `runtime/failed` |
 | `fork` | `{:session-id s? :entry-id s}` | `session/fork-session-in!` | `{:session-id s :session-file s?}` | `transport/not-ready`, `request/invalid-params`, `runtime/failed` |
 | `set_session_name` | `{:name s}` | `session/set-session-name-in!` | `{:session-name s}` | `transport/not-ready`, `request/invalid-params`, `runtime/failed` |
-| `set_model` | `{:provider s :model-id s}` | resolve model + `session/set-model-in!` | `{:model {:provider s :id s}}` | `transport/not-ready`, `request/invalid-params`, `request/unknown-model`, `runtime/failed` |
+| `set_model` | `{:provider s :model-id s}` | resolve model + reject unsupported runtime models + `session/set-model-in!`; with OpenAI OAuth, catalog-visible `gpt-5.6` is currently rejected as unsupported rather than persisted | `{:model {:provider s :id s}}` | `transport/not-ready`, `request/invalid-params`, `request/unknown-model`, `request/unsupported-model`, `runtime/failed` |
 | `cycle_model` | `{:direction ("next"\|"prev")?}` | `session/cycle-model-in!` | `{:model {:provider s :id s}}` | `transport/not-ready`, `request/invalid-params`, `runtime/failed` |
 | `set_thinking_level` | `{:level keyword\|string\|int}` | `session/set-thinking-level-in!` | `{:thinking-level any}` | `transport/not-ready`, `request/invalid-params`, `runtime/failed` |
 | `cycle_thinking_level` | `{}` | `session/cycle-thinking-level-in!` | `{:thinking-level any}` | `transport/not-ready`, `request/invalid-params`, `runtime/failed` |

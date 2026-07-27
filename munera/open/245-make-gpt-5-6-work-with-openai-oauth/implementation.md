@@ -84,3 +84,5 @@
 - 2026-07-27 docs review follow-up: addressed 2 review steps. Documented the OpenAI catalog-vs-OAuth-runtime boundary in `doc/tui.md` and `ramora/META.md`: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key use, OAuth-backed `gpt-5.6` is unsupported until evidenced runtime policy is added, and `gpt-5.5` remains on the OAuth/Codex path.
 
 - 2026-07-27 second docs review: added 1 step to be addressed.
+
+- 2026-07-27 second docs review follow-up: addressed 1 review step. Documented direct RPC `set_model` unsupported-runtime-model behaviour in `ramora/rpc-edn/op-mapping.md`, including OpenAI OAuth-backed `gpt-5.6` returning `request/unsupported-model`; added `request/unsupported-model` to the canonical RPC error-code taxonomy.

@@ -100,4 +100,4 @@
 
 ## Second docs review follow-up
 
-- [ ] Update `ramora/rpc-edn/op-mapping.md` and `ramora/rpc-edn/error-codes.md` so the direct RPC `set_model` unsupported-runtime-model behaviour is documented: OAuth-backed `gpt-5.6` can return `request/unsupported-model`, and the canonical error-code taxonomy includes that code.
+- [x] Update `ramora/rpc-edn/op-mapping.md` and `ramora/rpc-edn/error-codes.md` so the direct RPC `set_model` unsupported-runtime-model behaviour is documented: OAuth-backed `gpt-5.6` can return `request/unsupported-model`, and the canonical error-code taxonomy includes that code.

@@ -20,6 +20,7 @@ Minimum set for Story #76.
 - `request/session-not-idle`
 - `request/not-found`
 - `request/unknown-model`
+- `request/unsupported-model` — model exists in the catalog/request surface but is unavailable for the current runtime policy; for example direct RPC `set_model` with OpenAI OAuth-backed `gpt-5.6` until an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport is added.
 
 ## Runtime
 - `runtime/query-failed`
