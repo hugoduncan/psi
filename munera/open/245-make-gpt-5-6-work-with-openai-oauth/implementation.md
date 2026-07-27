@@ -44,3 +44,5 @@
 - 2026-07-27 sixth implementation review: added 1 step to be addressed.
 
 - 2026-07-27 sixth review follow-up: addressed 1 implementation-review step. Consolidated unsupported-runtime-model message formatting behind `psi.ai.model-registry/unsupported-runtime-model-message` and routed agent-session `/model`, RPC `set_model`, RPC picker selection, and TUI picker selection through it. Validation passed: `clj-kondo --lint` on changed Clojure files and RPC test, `bb test --focus psi.rpc-test` (16 tests, 141 assertions), `bb test --focus psi.agent-session.commands-test` (53 tests, 214 assertions), `bb test --focus psi.app-runtime.tui-frontend-actions-test` (2 tests, 4 assertions), plus equivalent focused Scry runs for those three namespaces.
+
+- 2026-07-27 seventh implementation review: added 1 step to be addressed.
