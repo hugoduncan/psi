@@ -40,3 +40,5 @@
 - 2026-07-27 fifth implementation review: added 1 step to be addressed.
 
 - 2026-07-27 fifth review follow-up: addressed 1 implementation-review step. TUI picker-backed model selection now returns a clear unsupported-model text result for `:runtime/unsupported?` resolved models and does not persist OAuth-backed `gpt-5.6`. Added app-runtime regression coverage. Validation passed: `clj-kondo --lint components/app-runtime/src/psi/app_runtime/tui_frontend_actions.clj components/app-runtime/test/psi/app_runtime/tui_frontend_actions_test.clj`, `bb test --focus psi.app-runtime.tui-frontend-actions-test` (2 tests, 4 assertions), and `bb clojure:test:scry --namespace psi.app-runtime.tui-frontend-actions-test` (2 tests, 4 assertions).
+
+- 2026-07-27 sixth implementation review: added 1 step to be addressed.
