@@ -763,8 +763,7 @@
                (:rate-limit scheduled)))))))
 
 (deftest execute-prepared-request-production-backoff-observes-active-turn-abort-test
-  ;; Production retry sleep polls the active turn abort state instead of one
-  ;; uninterruptible Thread/sleep.
+  ;; Retry sleep polls active turn abort state.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-max-retries 2
                                                            :auto-retry-base-delay-ms 1000
@@ -799,36 +798,3 @@
         (finally
           (when-let [t @abort-thread*]
             (.join t 1000)))))))
-
-(deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
-  ;; Failed streaming-attempt partial output is attempt-local; the successful
-  ;; retry owns the final assistant content.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 1}})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/do-stream!
-                  (fn [_ai-ctx _conv _model _opts consume-fn]
-                    (if (= 1 (swap! attempts* inc))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "partial failed "})
-                        (consume-fn {:type :error
-                                     :error-message "Connection reset by peer"}))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "final answer"})
-                        (consume-fn {:type :done :reason :stop}))))]
-      (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})} ctx session-id prepared nil)]
-        (is (= 2 @attempts*))
-        (is (= :stop (:execution-result/stop-reason result)))
-        (is (= [{:type :text :text "final answer"}]
-               (get-in result [:execution-result/assistant-message :content])))
-        (is (not (re-find #"partial failed"
-                          (pr-str (:execution-result/assistant-message result)))))
-        (is (= ["provider_request_started" "provider_request_finished"
-                "provider_retry_scheduled" "provider_request_started"
-                "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))))))

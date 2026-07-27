@@ -41,10 +41,6 @@
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]))
 
-;; ============================================================
-;; Formatting helpers (pure — return strings, no side effects)
-;; ============================================================
-
 (defn format-status
   "Return a status string for the current session."
   [ctx session-id]
@@ -802,4 +798,3 @@
     (when-let [f (:post-command-fn opts)]
       (f ctx session-id result))
     result))
-
