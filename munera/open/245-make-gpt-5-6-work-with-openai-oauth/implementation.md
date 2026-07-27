@@ -36,3 +36,5 @@
 - 2026-07-27 fourth implementation review: added 1 step to be addressed.
 
 - 2026-07-27 fourth review follow-up: addressed 1 implementation-review step. RPC picker-backed model selection now emits a clear `unsupported_model` command result for `:runtime/unsupported?` resolved models and does not persist OAuth-backed `gpt-5.6`. Added RPC regression coverage. Validation passed: `clj-kondo --lint components/rpc/src/psi/rpc/session/command_pickers.clj components/rpc/test/psi/rpc_test.clj`, `bb test --focus psi.rpc-test` (16 tests, 141 assertions), and `bb clojure:test:scry --namespace psi.rpc-test` (16 tests, 141 assertions).
+
+- 2026-07-27 fifth implementation review: added 1 step to be addressed.
