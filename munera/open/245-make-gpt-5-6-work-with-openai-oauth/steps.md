@@ -77,3 +77,7 @@
 ## Third test review follow-up
 
 - [x] Restore direct RPC `set_model` unsupported-runtime-model regression coverage using a real OAuth session context, asserting the `request/unsupported-model` error frame and unchanged session model; the previous coverage for this surface was removed when RPC model-scope tests were split out, leaving only picker/frontend-action unsupported-model coverage.
+
+## Fourth test review follow-up
+
+- [ ] Add an integration-style turn preflight regression that starts from a real OAuth session context with session model `openai` `gpt-5.6` and builds the prepared request through the normal prompt-request/runtime resolution path, asserting the shaped unsupported-model assistant error and empty provider captures; the current turn-runtime test manually constructs a `:runtime/unsupported?` model map, so it does not prove persisted/startup-selected OAuth-backed `gpt-5.6` reaches the preflight boundary through actual model resolution.
