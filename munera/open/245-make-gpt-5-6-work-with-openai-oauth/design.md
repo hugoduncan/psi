@@ -34,6 +34,13 @@ That causes OAuth-backed OpenAI `gpt-5.6` requests to use the ChatGPT/Codex back
 - Keep catalog entries and runtime transport overrides coherent.
 - Do not silently fall back to another model unless the fallback is explicitly specified by catalog/runtime policy and covered by tests.
 
+
+## OAuth runtime policy source of truth
+
+For OpenAI OAuth-backed execution, the authoritative runtime-policy evidence is the behaviour of the same backend and account class the runtime will use, not the platform Chat Completions quota response. A ChatGPT-account OAuth policy may be based on the ChatGPT/Codex backend only when a structured probe against `https://chatgpt.com/backend-api/codex/responses` reaches execution for the candidate runtime model id; explicit model-support rejection from that endpoint is negative evidence for that backend/id combination.
+
+Current evidence establishes that the literal `gpt-5.6` id is not supported on the ChatGPT/Codex backend for a ChatGPT account, while `gpt-5.5` remains accepted far enough to fail only because the one-off probe was non-streaming. The implementation must therefore not keep `gpt-5.6` on the OAuth/Codex path with the literal `gpt-5.6` backend id. If implementation chooses aliasing to a different Codex id, or chooses a different OAuth-compatible transport, that choice must be backed by equivalent structured probe evidence and encoded as explicit catalog/runtime policy with regression tests. Absence of such evidence means there is no permitted silent fallback.
+
 ## Acceptance criteria
 
 - Selecting `gpt-5.6` with OpenAI OAuth credentials no longer routes to a backend/model-id combination known to return `The 'gpt-5.6' model is not supported when using Codex with a ChatGPT account.`

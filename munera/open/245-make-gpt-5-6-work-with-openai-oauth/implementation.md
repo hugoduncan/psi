@@ -2,3 +2,4 @@
 - ambiguity review added 1 new design step
 - no inconsistency review feedback
 - addressing the ambiguity should preserve explicit catalog/runtime policy (no silent fallback); relevant files: `components/ai/src/psi/ai/model_registry.clj`, `components/ai/src/psi/ai/models.clj`, `components/ai/test/psi/ai/model_registry_test.clj`
+- 2026-07-27 design follow-up: The review-batch baseline was `5a103d6bc` (oldest review commit parent), yielding one current unchecked design-step. Added the source-of-truth rule to `design.md`: OAuth policy evidence must come from the runtime-equivalent ChatGPT/Codex backend/account class or equivalent OAuth-compatible transport probe; current evidence only invalidates literal `gpt-5.6` on Codex and does not authorize silent fallback.
