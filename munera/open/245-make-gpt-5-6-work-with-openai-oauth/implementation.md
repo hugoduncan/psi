@@ -50,3 +50,5 @@
 - 2026-07-27 seventh review follow-up: addressed 1 implementation-review step. Turn-runtime unsupported model preflight now uses `psi.ai.model-registry/unsupported-runtime-model-message`, so persisted/startup-selected OAuth-backed `gpt-5.6` reports the same clear unsupported-model prefix/detail as command and picker selection surfaces. Validation passed: `clj-kondo --lint components/turn-runtime/src/psi/turn_runtime/core.clj components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj`, `bb test --focus psi.turn-runtime.response-mode-test` (21 tests, 132 assertions), and `bb clojure:test:scry --namespace psi.turn-runtime.response-mode-test` (21 tests, 132 assertions).
 
 - 2026-07-27 eighth implementation review: no new feedback.
+
+- 2026-07-27 test review: no new feedback.
