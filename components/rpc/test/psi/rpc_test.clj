@@ -8,6 +8,7 @@
    [psi.agent-session.mutations :as mutations]
    [psi.rpc :as rpc]
    [psi.rpc.session.projections :as rpc.projections]
+   [psi.rpc.session :as rpc.session]
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
@@ -727,29 +728,26 @@
              @captured))))
 
   (testing "picker-backed model selection rejects unsupported resolved models without persisting"
-    (let [[ctx sid]  (support/create-session-context)
-          emitted    (atom [])
-          set-model? (atom false)
-          emit!      (fn [event payload]
-                       (swap! emitted conj {:event event :payload payload}))]
-      (with-redefs [session/set-model-in! (fn [& _]
-                                            (reset! set-model? true)
-                                            (throw (ex-info "set-model-in! should not be called" {})))]
-        (psi.rpc.session.command-pickers/handle-model-selection!
-         ctx sid
-         (fn [ctx' provider id]
-           (when (and (= ctx' ctx)
-                      (= [provider id] ["openai" "gpt-5.6"]))
-             {:provider :openai
-              :id "gpt-5.6"
-              :runtime/unsupported? true
-              :runtime/unsupported-message "gpt-5.6 is not supported for OpenAI OAuth"}))
-         emit!
-         {:provider "openai" :id "gpt-5.6"}))
-      (is (false? @set-model?))
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original  (:model (ss/get-session-data-in ctx sid))
+          emitted   (atom [])
+          emit!     (fn [event payload]
+                      (swap! emitted conj {:event event :payload payload}))]
+      (psi.rpc.session.command-pickers/handle-model-selection!
+       ctx sid
+       (fn [ctx' provider id]
+         (rpc.session/resolve-model ctx' provider id))
+       emit!
+       {:provider "openai" :id "gpt-5.6"})
+      (is (= original (:model (ss/get-session-data-in ctx sid))))
       (is (= [{:event "command-result"
                :payload {:type "unsupported_model"
-                         :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth"
+                         :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
                          :provider "openai"
                          :model-id "gpt-5.6"}}]
              @emitted))))
@@ -762,7 +760,7 @@
                                              :expires 99999999999999}}})
           [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
           original  {:provider "openai" :id "gpt-5.5" :reasoning true}
-          selected  {:provider "anthropic" :id "claude-sonnet" :reasoning true}
+          selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}
           state     (atom {:transport {:ready? true :pending {}}
                            :connection {}})
           handler   (support/make-handler ctx state)
@@ -782,7 +780,39 @@
           frames    (support/parse-frames out-lines)
           resp      (some #(when (and (= :response (:kind %)) (= "cycle_model" (:op %))) %) frames)]
       (is (some? resp))
-      (is (= {:provider "anthropic" :id "claude-sonnet"}
+      (is (= {:provider "anthropic" :id "claude-sonnet-4-6"}
+             (get-in resp [:data :model])))
+      (is (= selected (:model (ss/get-session-data-in ctx sid))))))
+
+  (testing "cycle_model skips unsupported scoped models backward"
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
+          selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}
+          original  {:provider "openai" :id "gpt-5.5" :reasoning true}
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          _         (ss/apply-root-state-update-in!
+                     ctx
+                     (ss/session-update sid #(assoc %
+                                                    :model original
+                                                    :scoped-models [{:model selected :thinking-level :off}
+                                                                    {:model {:provider "openai"
+                                                                             :id "gpt-5.6"
+                                                                             :reasoning true}
+                                                                     :thinking-level :off}
+                                                                    {:model original :thinking-level :off}])))
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"c1\" :kind :request :op \"cycle_model\" :params {:direction \"prev\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          resp      (some #(when (and (= :response (:kind %)) (= "cycle_model" (:op %))) %) frames)]
+      (is (some? resp))
+      (is (= {:provider "anthropic" :id "claude-sonnet-4-6"}
              (get-in resp [:data :model])))
       (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
 
@@ -816,4 +846,3 @@
       (is (seq event-indexes))
       (is (some #(< prompt-response-index %) event-indexes))
       (is (some #(= "assistant/delta" (:event %)) (filter #(= :event (:kind %)) frames))))))
-

@@ -21,7 +21,7 @@
           sid       (:session-id sd)
           original  {:provider "openai" :id "gpt-5.5" :reasoning true}
           skipped   {:provider "openai" :id "gpt-5.6" :reasoning true}
-          selected  {:provider "anthropic" :id "claude-sonnet" :reasoning true}]
+          selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
       (ss/apply-root-state-update-in!
        ctx
        (ss/session-update sid #(assoc %
@@ -30,6 +30,31 @@
                                                       {:model skipped :thinking-level :off}
                                                       {:model selected :thinking-level :off}])))
       (settings/cycle-model-in! ctx sid :forward)
+      (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
+
+(deftest cycle-model-in-skips-unsupported-runtime-models-backward-test
+  ;; Tests that reverse model cycling skips scoped models that resolve to an
+  ;; explicitly unsupported runtime policy for the active auth context.
+  (testing "skips OAuth-unsupported scoped models while cycling backward"
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx oauth-ctx}))
+          sd        (session/new-session-in! ctx nil {})
+          sid       (:session-id sd)
+          selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}
+          skipped   {:provider "openai" :id "gpt-5.6" :reasoning true}
+          original  {:provider "openai" :id "gpt-5.5" :reasoning true}]
+      (ss/apply-root-state-update-in!
+       ctx
+       (ss/session-update sid #(assoc %
+                                      :model original
+                                      :scoped-models [{:model selected :thinking-level :off}
+                                                      {:model skipped :thinking-level :off}
+                                                      {:model original :thinking-level :off}])))
+      (settings/cycle-model-in! ctx sid :backward)
       (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
 
 (deftest cycle-model-in-preserves-current-model-when-all-candidates-unsupported-test

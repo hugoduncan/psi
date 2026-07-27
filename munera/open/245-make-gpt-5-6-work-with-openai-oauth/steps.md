@@ -64,6 +64,6 @@
 
 ## Test review follow-up
 
-- [ ] Replace the direct RPC picker unsupported-model regression test's `with-redefs`/`set-model-in!` interaction guard with state/output-based coverage using a real session context, so it satisfies the no-mocks/no-stubs test rule while still proving unsupported selection does not persist.
-- [ ] Update cycle-model unsupported-model regression fixtures to use a catalog-resolvable supported next model (for example `anthropic` `claude-sonnet-4-6`) or add explicit unknown-candidate coverage, so the tests cannot pass because unknown scoped candidates currently resolve to nil and are treated as supported.
-- [ ] Add backward/`prev` cycle-model regression coverage that skips OAuth-unsupported `gpt-5.6` in the reverse direction for both the core cycle path and the RPC `cycle_model` surface, not only forward/`next` cycling.
+- [x] Replace the direct RPC picker unsupported-model regression test's `with-redefs`/`set-model-in!` interaction guard with state/output-based coverage using a real session context, so it satisfies the no-mocks/no-stubs test rule while still proving unsupported selection does not persist.
+- [x] Update cycle-model unsupported-model regression fixtures to use a catalog-resolvable supported next model (for example `anthropic` `claude-sonnet-4-6`) or add explicit unknown-candidate coverage, so the tests cannot pass because unknown scoped candidates currently resolve to nil and are treated as supported.
+- [x] Add backward/`prev` cycle-model regression coverage that skips OAuth-unsupported `gpt-5.6` in the reverse direction for both the core cycle path and the RPC `cycle_model` surface, not only forward/`next` cycling.
