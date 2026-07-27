@@ -1,3 +1,4 @@
 - no architectural review feedback
 - ambiguity review added 1 new design step
 - no inconsistency review feedback
+- addressing the ambiguity should preserve explicit catalog/runtime policy (no silent fallback); relevant files: `components/ai/src/psi/ai/model_registry.clj`, `components/ai/src/psi/ai/models.clj`, `components/ai/test/psi/ai/model_registry_test.clj`
