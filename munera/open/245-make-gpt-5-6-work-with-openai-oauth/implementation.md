@@ -32,3 +32,5 @@
 - 2026-07-27 third implementation review: added 1 step to be addressed.
 
 - 2026-07-27 third review follow-up: addressed 1 implementation-review step. RPC `set_model` now rejects `:runtime/unsupported?` resolved models with `request/unsupported-model`, includes a clear unsupported-model message, and leaves the session model unchanged. Added RPC regression coverage. Validation passed: `clj-kondo --lint components/rpc/src/psi/rpc/session/ops.clj components/rpc/test/psi/rpc_test.clj`, `bb test --focus psi.rpc-test` (16 tests, 134 assertions), and `bb clojure:test:scry --namespace psi.rpc-test` (16 tests, 134 assertions).
+
+- 2026-07-27 fourth implementation review: added 1 step to be addressed.
