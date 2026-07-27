@@ -29,3 +29,4 @@
 
 - 2026-07-27 second implementation review: added 1 step to be addressed.
 - 2026-07-27 second review follow-up: addressed 1 implementation-review step. OAuth-backed `gpt-5.6` now resolves to an explicit unsupported runtime model map instead of throwing at model-registry resolution; `/model` reports a clear unsupported-model message without mutating session model, and turn runtime preflights unsupported runtime models into a shaped assistant error before provider execution. Validation passed: `clj-kondo --lint` on changed Clojure files, focused Scry for `psi.ai.model-registry-test` (198 assertions), `psi.agent-session.commands-test` (214 assertions), `psi.turn-runtime.response-mode-test` (137 assertions), and `bb test:ai` (163 tests, 1183 assertions).
+- 2026-07-27 third implementation review: added 1 step to be addressed.
