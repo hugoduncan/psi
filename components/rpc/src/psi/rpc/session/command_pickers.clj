@@ -27,17 +27,29 @@
      request-id
      (ui-actions/thinking-picker-action))))
 
+(defn- unsupported-runtime-model-message
+  [model]
+  (str "Unsupported model: " (name (:provider model)) " " (:id model)
+       (when-let [message (:runtime/unsupported-message model)]
+         (str " — " message))))
+
 (defn handle-model-selection!
   [ctx session-id resolve-model emit! value]
   (when-let [{:keys [provider id]} value]
     (when-let [resolved (resolve-model ctx provider id)]
-      (let [provider-str (name (:provider resolved))
-            model {:provider provider-str
-                   :id (:id resolved)
-                   :reasoning (:supports-reasoning resolved)}]
-        (session/set-model-in! ctx session-id model)
-        (command-results/emit-text-command-result! emit!
-                                                   (str "✓ Model set to " provider-str " " (:id resolved)))))))
+      (if (:runtime/unsupported? resolved)
+        (emit/emit-command-result! emit!
+                                   {:type "unsupported_model"
+                                    :message (unsupported-runtime-model-message resolved)
+                                    :provider (name (:provider resolved))
+                                    :model-id (:id resolved)})
+        (let [provider-str (name (:provider resolved))
+              model {:provider provider-str
+                     :id (:id resolved)
+                     :reasoning (:supports-reasoning resolved)}]
+          (session/set-model-in! ctx session-id model)
+          (command-results/emit-text-command-result! emit!
+                                                     (str "✓ Model set to " provider-str " " (:id resolved))))))))
 
 (defn handle-thinking-level-selection!
   [ctx session-id emit! value]

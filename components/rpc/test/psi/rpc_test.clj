@@ -418,6 +418,39 @@
       (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
       (is (some? footer-updated))))
 
+  (testing "submitted select-model frontend action rejects unsupported runtime models without mutating session model"
+    (let [oauth-ctx        (oauth/create-null-context
+                            {:credentials {:openai {:type :oauth
+                                                    :access "tok"
+                                                    :refresh "ref"
+                                                    :expires 99999999999999}}})
+          [ctx session-id] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original         (:model (ss/get-session-data-in ctx session-id))
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id
+                                               :subscribed-topics #{"command-result"
+                                                                    "session/updated"
+                                                                    "footer/updated"}}})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value {:provider \"openai\" :id \"gpt-5.6\"}}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames           (support/parse-frames out-lines)
+          response         (some #(when (and (= :response (:kind %))
+                                             (= "frontend_action_result" (:op %))) %)
+                                 frames)
+          command-result   (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= "unsupported_model" (get-in command-result [:data :type])))
+      (is (str/includes? (get-in command-result [:data :message])
+                         "Unsupported model: openai gpt-5.6"))
+      (is (str/includes? (get-in command-result [:data :message])
+                         "not supported for OpenAI OAuth"))
+      (is (= "openai" (get-in command-result [:data :provider])))
+      (is (= "gpt-5.6" (get-in command-result [:data :model-id])))
+      (is (= original (:model (ss/get-session-data-in ctx session-id))))))
+
   (testing "submitted select-thinking-level frontend action updates thinking and emits command/session snapshots"
     (let [[ctx session-id] (support/create-session-context)
           state            (atom {:transport {:ready? true :pending {}}
