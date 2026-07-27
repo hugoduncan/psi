@@ -7,3 +7,4 @@
 - no new inconsistency review feedback
 - next slice should treat `model_registry.clj` as the policy join point between user-visible catalog ids and OAuth transport/backend ids; keep `models.clj` catalog exposure coherent and pin the behavior in `model_registry_test.clj` rather than relying on live OAuth probes.
 - no new ambiguity review feedback
+- third-turn inconsistency review: no new feedback
