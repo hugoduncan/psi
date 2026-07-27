@@ -90,3 +90,4 @@
 
 - 2026-07-27 third docs review follow-up: addressed 2 review steps. Updated `README.md` model-control guidance with the OpenAI catalog-vs-OAuth runtime boundary and documented Emacs/RPC model-selection rejection of OAuth-backed `gpt-5.6` with `request/unsupported-model`.
 - 2026-07-27 fourth docs review: added 1 step to be addressed.
+- 2026-07-27 fourth docs review follow-up: addressed 1 review step. Updated Emacs/RPC model-cycling docs in `doc/emacs-ui.md` and `ramora/rpc-edn/op-mapping.md` to state that OAuth-unsupported or unresolvable scoped candidates such as OpenAI OAuth-backed `gpt-5.6` are skipped/not persisted by cycle commands.

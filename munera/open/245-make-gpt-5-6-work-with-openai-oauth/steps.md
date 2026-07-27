@@ -109,4 +109,4 @@
 
 ## Fourth docs review follow-up
 
-- [ ] Update the Emacs/RPC model-cycling documentation (`doc/emacs-ui.md` and `ramora/rpc-edn/op-mapping.md`) so it states that OAuth-unsupported or unresolvable scoped model candidates such as OpenAI OAuth-backed `gpt-5.6` are skipped/not persisted by `cycle_model`/cycle commands, matching the implemented cycle-model regression coverage rather than only documenting direct `set_model` rejection.
+- [x] Update the Emacs/RPC model-cycling documentation (`doc/emacs-ui.md` and `ramora/rpc-edn/op-mapping.md`) so it states that OAuth-unsupported or unresolvable scoped model candidates such as OpenAI OAuth-backed `gpt-5.6` are skipped/not persisted by `cycle_model`/cycle commands, matching the implemented cycle-model regression coverage rather than only documenting direct `set_model` rejection.

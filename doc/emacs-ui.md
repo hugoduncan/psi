@@ -89,11 +89,14 @@ current input begins so earlier transcript text is not resent by accident:
 ## Model selection
 
 Use `C-c m m` (`M-x psi-emacs-set-model`) to select a model through the RPC
-`set_model` path, or `C-c m n` / `C-c m p` to cycle. If the OpenAI provider is
-backed by stored OAuth credentials, selecting `openai` `gpt-5.6` is rejected
-with the RPC `request/unsupported-model` error and is not persisted; `gpt-5.6`
-remains catalog-selectable for non-OAuth/API-key OpenAI use. OpenAI OAuth-backed
-`gpt-5.5` remains on the OAuth/ChatGPT Codex runtime path.
+`set_model` path, or `C-c m n` / `C-c m p` to cycle through available models.
+If the OpenAI provider is backed by stored OAuth credentials, selecting `openai`
+`gpt-5.6` directly is rejected with the RPC `request/unsupported-model` error
+and is not persisted; `gpt-5.6` remains catalog-selectable for non-OAuth/API-key
+OpenAI use. Model cycling also skips OAuth-unsupported or unresolvable scoped
+candidates, so OpenAI OAuth-backed `gpt-5.6` is not selected or persisted by
+cycle commands. OpenAI OAuth-backed `gpt-5.5` remains on the OAuth/ChatGPT Codex
+runtime path.
 
 ## Customizing `psi-emacs-command`
 
