@@ -115,9 +115,14 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 
 ### Model controls
 
-Interactive sessions support `/speed` for provider throughput-tier selection and
-`/effort` for provider reasoning-effort override. Named session profiles bundle
-reusable model/thinking/speed/effort settings for interactive selection
+Interactive sessions support `/model` for model selection, `/speed` for provider
+throughput-tier selection, and `/effort` for provider reasoning-effort override.
+OpenAI catalog exposure and OpenAI OAuth runtime support are distinct:
+`gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, but
+OpenAI OAuth-backed `gpt-5.6` is unsupported until an evidenced ChatGPT/Codex
+alias or alternate OAuth-compatible transport is added; `gpt-5.5` remains on the
+OAuth/ChatGPT Codex path. Named session profiles bundle reusable
+model/thinking/speed/effort settings for interactive selection
 (`/session-profile`) and workflow steps (`:session-profile`); see
 [`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
 [`doc/workflows.md`](doc/workflows.md).

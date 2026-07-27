@@ -104,5 +104,5 @@
 
 ## Third docs review follow-up
 
-- [ ] Update `README.md` model-control guidance so the OpenAI catalog-vs-OAuth-runtime boundary is discoverable from the primary user documentation: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, OpenAI OAuth-backed `gpt-5.6` is unsupported until an evidenced runtime policy is added, and `gpt-5.5` remains on the OAuth/Codex path.
-- [ ] Update `doc/emacs-ui.md` (or the canonical Emacs/RPC model-selection user doc) so Emacs/RPC users can discover that selecting OpenAI OAuth-backed `gpt-5.6` is rejected with the unsupported-model error instead of being persisted, matching the documented TUI and RPC taxonomy behaviour.
+- [x] Update `README.md` model-control guidance so the OpenAI catalog-vs-OAuth-runtime boundary is discoverable from the primary user documentation: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, OpenAI OAuth-backed `gpt-5.6` is unsupported until an evidenced runtime policy is added, and `gpt-5.5` remains on the OAuth/Codex path.
+- [x] Update `doc/emacs-ui.md` (or the canonical Emacs/RPC model-selection user doc) so Emacs/RPC users can discover that selecting OpenAI OAuth-backed `gpt-5.6` is rejected with the unsupported-model error instead of being persisted, matching the documented TUI and RPC taxonomy behaviour.
