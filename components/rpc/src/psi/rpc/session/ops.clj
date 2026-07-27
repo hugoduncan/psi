@@ -142,6 +142,14 @@
     (when-not resolved
       (throw (ex-info "unknown model"
                       {:error-code "request/unknown-model"})))
+    (when (:runtime/unsupported? resolved)
+      (throw (ex-info (str "unsupported model: " (name (:provider resolved)) " " (:id resolved)
+                           (when-let [message (:runtime/unsupported-message resolved)]
+                             (str " — " message)))
+                      {:error-code "request/unsupported-model"
+                       :provider (name (:provider resolved))
+                       :model-id (:id resolved)
+                       :runtime/unsupported-reason (:runtime/unsupported-reason resolved)})))
     (let [provider-str (name (:provider resolved))
           model        {:provider provider-str
                         :id (:id resolved)

@@ -1,5 +1,6 @@
 (ns psi.rpc-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
@@ -10,6 +11,7 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.rpc-test-support :as support]
    [psi.rpc.session.command-pickers]))
 
@@ -642,6 +644,28 @@
       (is (= "request/invalid-params" (:error-code err)))
       (is (= "invalid request parameter :scope: session, project, or user"
              (:error-message err)))))
+
+  (testing "set_model rejects unsupported runtime models without mutating session model"
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original  (:model (ss/get-session-data-in ctx sid))
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.6\" :scope \"session\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          err       (some #(when (and (= :error (:kind %)) (= "set_model" (:op %))) %) frames)]
+      (is (some? err))
+      (is (= "request/unsupported-model" (:error-code err)))
+      (is (str/includes? (:error-message err) "unsupported model: openai gpt-5.6"))
+      (is (str/includes? (:error-message err) "not supported for OpenAI OAuth"))
+      (is (= original (:model (ss/get-session-data-in ctx sid))))))
 
   (testing "picker-backed model selection preserves omitted-scope/default helper semantics"
     (let [[ctx sid] (support/create-session-context)
