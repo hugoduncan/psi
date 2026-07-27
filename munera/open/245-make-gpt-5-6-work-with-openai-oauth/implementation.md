@@ -5,3 +5,4 @@
 - 2026-07-27 design follow-up: The review-batch baseline was `5a103d6bc` (oldest review commit parent), yielding one current unchecked design-step. Added the source-of-truth rule to `design.md`: OAuth policy evidence must come from the runtime-equivalent ChatGPT/Codex backend/account class or equivalent OAuth-compatible transport probe; current evidence only invalidates literal `gpt-5.6` on Codex and does not authorize silent fallback.
 - no new ambiguity review feedback
 - no new inconsistency review feedback
+- next slice should treat `model_registry.clj` as the policy join point between user-visible catalog ids and OAuth transport/backend ids; keep `models.clj` catalog exposure coherent and pin the behavior in `model_registry_test.clj` rather than relying on live OAuth probes.
