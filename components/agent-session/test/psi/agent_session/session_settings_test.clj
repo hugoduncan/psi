@@ -78,3 +78,39 @@
                                       :scoped-models [{:model skipped :thinking-level :off}])))
       (settings/cycle-model-in! ctx sid :forward)
       (is (= original (:model (ss/get-session-data-in ctx sid)))))))
+
+(deftest cycle-model-in-skips-unknown-runtime-models-test
+  ;; Tests that model cycling does not select scoped models that do not resolve
+  ;; to any runtime model for the active auth context.
+  (testing "skips unknown scoped models"
+    (let [ctx      (session/create-context (test-support/safe-context-opts {}))
+          sd       (session/new-session-in! ctx nil {})
+          sid      (:session-id sd)
+          original {:provider "openai" :id "gpt-5.5" :reasoning true}
+          skipped  {:provider "openai" :id "definitely-not-a-model" :reasoning true}
+          selected {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}]
+      (ss/apply-root-state-update-in!
+       ctx
+       (ss/session-update sid #(assoc %
+                                      :model original
+                                      :scoped-models [{:model original :thinking-level :off}
+                                                      {:model skipped :thinking-level :off}
+                                                      {:model selected :thinking-level :off}])))
+      (settings/cycle-model-in! ctx sid :forward)
+      (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
+
+(deftest cycle-model-in-preserves-current-model-when-all-candidates-unknown-test
+  ;; Tests that cycling is a no-op when every scoped candidate is unresolvable.
+  (testing "does not select an unknown scoped model"
+    (let [ctx      (session/create-context (test-support/safe-context-opts {}))
+          sd       (session/new-session-in! ctx nil {})
+          sid      (:session-id sd)
+          original {:provider "openai" :id "gpt-5.5" :reasoning true}
+          skipped  {:provider "openai" :id "definitely-not-a-model" :reasoning true}]
+      (ss/apply-root-state-update-in!
+       ctx
+       (ss/session-update sid #(assoc %
+                                      :model original
+                                      :scoped-models [{:model skipped :thinking-level :off}])))
+      (settings/cycle-model-in! ctx sid :forward)
+      (is (= original (:model (ss/get-session-data-in ctx sid)))))))

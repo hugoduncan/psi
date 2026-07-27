@@ -148,4 +148,55 @@
       (is (some? resp))
       (is (= {:provider "anthropic" :id "claude-sonnet-4-6"}
              (get-in resp [:data :model])))
-      (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
+      (is (= selected (:model (ss/get-session-data-in ctx sid))))))
+
+  (testing "cycle_model skips unknown scoped models"
+    (let [[ctx sid] (support/create-session-context {})
+          original  {:provider "openai" :id "gpt-5.5" :reasoning true}
+          selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          _         (ss/apply-root-state-update-in!
+                     ctx
+                     (ss/session-update sid #(assoc %
+                                                    :model original
+                                                    :scoped-models [{:model original :thinking-level :off}
+                                                                    {:model {:provider "openai"
+                                                                             :id "definitely-not-a-model"
+                                                                             :reasoning true}
+                                                                     :thinking-level :off}
+                                                                    {:model selected :thinking-level :off}])))
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"c1\" :kind :request :op \"cycle_model\" :params {:direction \"next\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          resp      (some #(when (and (= :response (:kind %)) (= "cycle_model" (:op %))) %) frames)]
+      (is (some? resp))
+      (is (= {:provider "anthropic" :id "claude-sonnet-4-6"}
+             (get-in resp [:data :model])))
+      (is (= selected (:model (ss/get-session-data-in ctx sid))))))
+
+  (testing "cycle_model preserves current model when all candidates are unknown"
+    (let [[ctx sid] (support/create-session-context {})
+          original  {:provider "openai" :id "gpt-5.5" :reasoning true}
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          _         (ss/apply-root-state-update-in!
+                     ctx
+                     (ss/session-update sid #(assoc %
+                                                    :model original
+                                                    :scoped-models [{:model {:provider "openai"
+                                                                             :id "definitely-not-a-model"
+                                                                             :reasoning true}
+                                                                     :thinking-level :off}])))
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"c1\" :kind :request :op \"cycle_model\" :params {:direction \"next\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          resp      (some #(when (and (= :response (:kind %)) (= "cycle_model" (:op %))) %) frames)]
+      (is (some? resp))
+      (is (= {:provider "openai" :id "gpt-5.5"}
+             (get-in resp [:data :model])))
+      (is (= original (:model (ss/get-session-data-in ctx sid)))))))

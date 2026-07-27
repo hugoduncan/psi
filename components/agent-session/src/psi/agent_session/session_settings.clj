@@ -48,8 +48,9 @@
 
 (defn- supported-scoped-model?
   [ctx {:keys [model]}]
-  (not (:runtime/unsupported?
-        (model-registry/resolve-runtime-model ctx (:provider model) (:id model)))))
+  (boolean
+   (when-let [resolved (model-registry/resolve-runtime-model ctx (:provider model) (:id model))]
+     (not (:runtime/unsupported? resolved)))))
 
 (defn- candidate-for-model
   [candidates model]
