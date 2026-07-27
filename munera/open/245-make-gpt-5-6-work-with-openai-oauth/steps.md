@@ -76,4 +76,4 @@
 
 ## Third test review follow-up
 
-- [ ] Restore direct RPC `set_model` unsupported-runtime-model regression coverage using a real OAuth session context, asserting the `request/unsupported-model` error frame and unchanged session model; the previous coverage for this surface was removed when RPC model-scope tests were split out, leaving only picker/frontend-action unsupported-model coverage.
+- [x] Restore direct RPC `set_model` unsupported-runtime-model regression coverage using a real OAuth session context, asserting the `request/unsupported-model` error frame and unchanged session model; the previous coverage for this surface was removed when RPC model-scope tests were split out, leaving only picker/frontend-action unsupported-model coverage.

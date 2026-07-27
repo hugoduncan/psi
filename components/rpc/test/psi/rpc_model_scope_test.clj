@@ -36,6 +36,31 @@
       (is (= "gpt-5.3-codex" (get-in (read-string (slurp local-f)) [:agent-session :model-id]))))))
 
 (deftest rpc-set-model-scope-test
+  (testing "direct set_model rejects unsupported runtime models without persisting"
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original  (:model (ss/get-session-data-in ctx sid))
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.6\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          error     (some #(when (and (= :error (:kind %))
+                                      (= "set_model" (:op %))) %)
+                          frames)]
+      (is (some? error))
+      (is (= "m1" (:id error)))
+      (is (= "request/unsupported-model" (:error-code error)))
+      (is (= "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
+             (:error-message error)))
+      (is (= original (:model (ss/get-session-data-in ctx sid))))))
+
   (testing "picker-backed model selection rejects unsupported resolved models without persisting"
     (let [oauth-ctx (oauth/create-null-context
                      {:credentials {:openai {:type :oauth
