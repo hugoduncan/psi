@@ -26,3 +26,5 @@
 - 2026-07-27 final coherence review: diff keeps catalog exposure unchanged, removes only the unsupported OAuth/Codex override for `gpt-5.6`, preserves the `gpt-5.5` OAuth/Codex control path, updates deterministic registry tests, and corrects the user-facing changelog entry. No remaining implementation follow-up identified for this task slice.
 - 2026-07-27 implementation review: added 1 step to be addressed.
 - 2026-07-27 review follow-up: addressed 1 implementation-review step. OAuth-backed `gpt-5.6` now throws explicit `:openai-oauth-model-unsupported` instead of falling through to catalog chat-completions; updated registry test and changelog. Validation passed: `clj-kondo --lint components/ai/src/psi/ai/model_registry.clj components/ai/test/psi/ai/model_registry_test.clj`, `bb clojure:test:scry --namespace psi.ai.model-registry-test` (196 assertions), and `bb test:ai` (163 tests, 1181 assertions).
+
+- 2026-07-27 second implementation review: added 1 step to be addressed.
