@@ -64,3 +64,4 @@
 - 2026-07-27 second test review: added 3 steps to be addressed.
 
 - 2026-07-27 second test review follow-up: addressed 3 review steps. Reworked TUI model-selection tests to use real session context state/output assertions; added RPC picker success coverage using real omitted-scope project persistence; removed the turn-runtime provider-call interaction guard and asserted shaped error output, empty provider captures, and no provider telemetry. Validation passed: `clj-kondo --lint` on touched test files, `bb test --focus` for `psi.app-runtime.tui-frontend-actions-test`, `psi.rpc-model-scope-test`, and `psi.turn-runtime.response-mode-test`, plus equivalent focused Scry runs.
+- 2026-07-27 third test review: added 1 step to be addressed.
