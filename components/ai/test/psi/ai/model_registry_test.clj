@@ -97,40 +97,38 @@
 (deftest resolve-runtime-model-openai-oauth-routing-test
   (registry/init! {})
 
-  ;; Codex-set members share one no-oauth contract: with no ctx the override is
-  ;; skipped and each member retains its catalog chat-completions transport.
-  ;; State it once and vary only the id (mirrors the codex-transport pair below).
   (doseq [id ["gpt-5.5" "gpt-5.6"]]
     (testing (str "openai " id " remains chat-completions without oauth context")
       (let [model (registry/resolve-runtime-model nil :openai id)]
         (is (= :openai-completions (:api model)) (str id " api"))
         (is (= "https://api.openai.com/v1" (:base-url model)) (str id " base-url")))))
 
-  ;; Codex-set members share one transport-override contract under oauth; each
-  ;; id is a representative case, so state it once and vary only the id. This
-  ;; seam owns transport routing only — the codex structured-output capability
-  ;; is covered by built-in-structured-output-capabilities-test and
-  ;; providers/openai_structured_output_test, so it is not re-asserted here.
-  (doseq [id ["gpt-5.5" "gpt-5.6"]]
-    (testing (str "openai " id " resolves to codex transport when oauth credential is present")
-      (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai id)]
-        (is (= :openai-codex-responses (:api model)) (str id " api"))
-        (is (= "https://chatgpt.com/backend-api" (:base-url model)) (str id " base-url"))
-        (is (= id (:id model))))))
+  (testing "openai gpt-5.5 resolves to codex transport when oauth credential is present"
+    (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.5")]
+      (is (= :openai-codex-responses (:api model)))
+      (is (= "https://chatgpt.com/backend-api" (:base-url model)))
+      (is (= "gpt-5.5" (:id model)))))
+
+  (testing "openai gpt-5.6 does not use the known-rejected literal codex id under oauth"
+    (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.6")]
+      (is (not (and (= :openai-codex-responses (:api model))
+                    (= "gpt-5.6" (:id model)))))
+      (is (= :openai-completions (:api model)))
+      (is (= "https://api.openai.com/v1" (:base-url model)))
+      (is (= "gpt-5.6" (:id model)))))
 
   (testing "non-member chat-completions model stays chat-completions under oauth"
     ;; Genuine negative control: gpt-5.4-mini's catalog transport is
-    ;; :openai-completions and it is NOT in openai-oauth-codex-model-ids, so the
-    ;; OAuth override must not apply and the model must retain chat-completions.
+    ;; :openai-completions and it has no OpenAI OAuth runtime override, so the
+    ;; model must retain chat-completions.
     (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.4-mini")]
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model)))))
 
-  (testing "codex-member gpt-5.6 falls back to chat-completions when ctx is present but not oauth-backed"
+  (testing "gpt-5.6 keeps chat-completions when ctx is present but not oauth-backed"
     ;; ctx-present-but-not-oauth-backed branch: an api-key credential (not
-    ;; oauth) leaves oauth-backed? false, so the codex override is guarded off
-    ;; and gpt-5.6 must fall back to its catalog :openai-completions transport
-    ;; despite being in openai-oauth-codex-model-ids.
+    ;; oauth) leaves oauth-backed? false, so no OAuth override can apply and
+    ;; gpt-5.6 must keep its catalog :openai-completions transport.
     (let [model (registry/resolve-runtime-model (api-key-openai-ctx) :openai "gpt-5.6")]
       (is (= :openai-completions (:api model)))
       (is (= "https://api.openai.com/v1" (:base-url model))))))

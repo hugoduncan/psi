@@ -175,10 +175,9 @@
   (get (ensure-catalog) [provider-kw model-id]))
 
 (def ^:private openai-oauth-codex-model-ids
-  "OpenAI model ids that use the ChatGPT/Codex backend under OpenAI OAuth so
-   the same user-visible model id works with ChatGPT credentials, matching
-   Codex-style account capabilities."
-  #{"gpt-5.5" "gpt-5.6"})
+  "OpenAI model ids with evidence for ChatGPT/Codex backend execution under
+   OpenAI OAuth."
+  #{"gpt-5.5"})
 
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
@@ -187,6 +186,9 @@
    Current policy:
    - models in `openai-oauth-codex-model-ids` use the ChatGPT/Codex backend
      under OpenAI OAuth.
+   - `gpt-5.6` deliberately has no OAuth override: the observed ChatGPT/Codex
+     backend rejects literal `gpt-5.6`, and no supported OAuth alias or
+     alternate transport is evidenced here.
    - all other models keep their catalog-defined transport.
 
    The base entry is read from the merged catalog (`find-model`) so the
