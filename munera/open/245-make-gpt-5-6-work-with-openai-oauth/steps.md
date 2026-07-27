@@ -81,3 +81,6 @@
 ## Fourth test review follow-up
 
 - [x] Add an integration-style turn preflight regression that starts from a real OAuth session context with session model `openai` `gpt-5.6` and builds the prepared request through the normal prompt-request/runtime resolution path, asserting the shaped unsupported-model assistant error and empty provider captures; the current turn-runtime test manually constructs a `:runtime/unsupported?` model map, so it does not prove persisted/startup-selected OAuth-backed `gpt-5.6` reaches the preflight boundary through actual model resolution.
+## Fifth test review follow-up
+
+- [ ] Add core `cycle-model-in!` and RPC `cycle_model` regression coverage for unknown/unresolvable scoped model candidates, and make the cycle path skip or reject them instead of treating `resolve-runtime-model` nil as supported; this guards the task's nil/unknown-model safety requirement on the model-resolution paths touched by the unsupported OAuth policy.
