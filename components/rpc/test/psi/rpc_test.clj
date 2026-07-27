@@ -752,7 +752,39 @@
                          :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth"
                          :provider "openai"
                          :model-id "gpt-5.6"}}]
-             @emitted)))))
+             @emitted))))
+
+  (testing "cycle_model skips unsupported scoped models"
+    (let [oauth-ctx (oauth/create-null-context
+                     {:credentials {:openai {:type :oauth
+                                             :access "tok"
+                                             :refresh "ref"
+                                             :expires 99999999999999}}})
+          [ctx sid] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original  {:provider "openai" :id "gpt-5.5" :reasoning true}
+          selected  {:provider "anthropic" :id "claude-sonnet" :reasoning true}
+          state     (atom {:transport {:ready? true :pending {}}
+                           :connection {}})
+          handler   (support/make-handler ctx state)
+          _         (ss/apply-root-state-update-in!
+                     ctx
+                     (ss/session-update sid #(assoc %
+                                                    :model original
+                                                    :scoped-models [{:model original :thinking-level :off}
+                                                                    {:model {:provider "openai"
+                                                                             :id "gpt-5.6"
+                                                                             :reasoning true}
+                                                                     :thinking-level :off}
+                                                                    {:model selected :thinking-level :off}])))
+          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                         "{:id \"c1\" :kind :request :op \"cycle_model\" :params {:direction \"next\" :session-id \"" sid "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames    (support/parse-frames out-lines)
+          resp      (some #(when (and (= :response (:kind %)) (= "cycle_model" (:op %))) %) frames)]
+      (is (some? resp))
+      (is (= {:provider "anthropic" :id "claude-sonnet"}
+             (get-in resp [:data :model])))
+      (is (= selected (:model (ss/get-session-data-in ctx sid)))))))
 
 (deftest rpc-e2e-handshake-query-and-streaming-test
   (testing "handshake -> query_eql -> prompt with interleaved events"

@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.ai.model-registry :as model-registry]
    [psi.shared-config.session-profiles :as session-profiles]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]))
@@ -45,13 +46,34 @@
                          scope (assoc :scope scope))
                        {:origin :core})))
 
+(defn- supported-scoped-model?
+  [ctx {:keys [model]}]
+  (not (:runtime/unsupported?
+        (model-registry/resolve-runtime-model ctx (:provider model) (:id model)))))
+
+(defn- candidate-for-model
+  [candidates model]
+  (some #(when (= model (:model %)) %) candidates))
+
+(defn- next-supported-model
+  [ctx candidates current direction]
+  (let [candidates* (vec candidates)]
+    (loop [remaining (count candidates*)
+           current*  current]
+      (when (pos? remaining)
+        (when-let [next-m (session/next-model candidates* current* direction)]
+          (let [candidate (candidate-for-model candidates* next-m)]
+            (if (supported-scoped-model? ctx candidate)
+              next-m
+              (recur (dec remaining) next-m))))))))
+
 (defn cycle-model-in!
   "Cycle to the next available scoped model for `session-id`."
   [ctx session-id direction]
   (let [sd         (ss/get-session-data-in ctx session-id)
         candidates (seq (:scoped-models sd))
         next-m     (when candidates
-                     (session/next-model candidates (:model sd) direction))]
+                     (next-supported-model ctx candidates (:model sd) direction))]
     (when next-m
       (set-model-in! ctx session-id next-m))
     (ss/get-session-data-in ctx session-id)))
