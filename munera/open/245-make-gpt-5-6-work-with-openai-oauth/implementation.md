@@ -78,3 +78,4 @@
 
 - 2026-07-27 eighth test review follow-up: addressed 1 review step. Added backward/`prev` all-unknown cycle-model no-op regression coverage for both core `cycle-model-in!` and RPC `cycle_model`, proving reverse cycling preserves the current model when every scoped candidate is unresolvable. Validation passed: `clj-kondo --lint components/agent-session/test/psi/agent_session/session_settings_test.clj components/rpc/test/psi/rpc_model_scope_test.clj`, `bb test --focus psi.agent-session.session-settings-test`, `bb test --focus psi.rpc-model-scope-test`, and equivalent focused Scry runs.
 - addressed 1 review step
+- 2026-07-27 ninth test-shaper review: no new feedback.
