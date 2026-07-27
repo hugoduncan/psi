@@ -9,3 +9,4 @@
 - no new ambiguity review feedback
 - third-turn inconsistency review: no new feedback
 - when implementing the resolved policy, keep live OAuth/Codex probes as diagnostic evidence only; regression coverage should be deterministic unit tests, and any user-visible selection change should be reflected in `CHANGELOG.md`/docs before commit.
+- plan-review ambiguity pass: no new ambiguity feedback
