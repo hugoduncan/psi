@@ -68,6 +68,12 @@ repo-local startup.
 - `/model anthropic claude-opus-4-8` selects Claude Opus 4.8, an Anthropic
   adaptive-thinking model with native JSON Schema structured output and
   mid-conversation system-message support.
+- `/model openai gpt-5.5` uses the OpenAI OAuth/ChatGPT Codex runtime path when
+  the OpenAI provider is backed by stored OAuth credentials. `/model openai
+  gpt-5.6` remains a catalog-selectable OpenAI model for non-OAuth/API-key use,
+  but OpenAI OAuth-backed `gpt-5.6` is explicitly unsupported until a supported
+  ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced and
+  encoded as runtime policy.
 - `/speed` prints the effective speed mode. `/speed fast` selects the provider's
   alternate throughput tier for the current session. Add `project` or `user` to
   persist the setting; `/speed normal session` clears the session override.

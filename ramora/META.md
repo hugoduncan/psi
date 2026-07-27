@@ -37,6 +37,7 @@ A meta model for psi.
 - a custom provider defines: base-url, api protocol, optional auth, and one or more model definitions
 - custom providers reuse existing transport implementations via their declared api protocol
 - provider dispatch resolves by exact provider key first, then falls back to api protocol key
+- OpenAI catalog exposure and OpenAI OAuth runtime support are distinct policy surfaces: `gpt-5.6` remains a built-in OpenAI chat-completions catalog model for non-OAuth/API-key use, but OAuth-backed `gpt-5.6` is explicitly unsupported until a supported ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced and encoded; `gpt-5.5` remains on the OAuth/ChatGPT Codex runtime path
 - api-key resolution supports env var reference (`"env:VAR"`) and literal strings
 - auth-header control allows omitting Authorization for local servers that reject it
 
