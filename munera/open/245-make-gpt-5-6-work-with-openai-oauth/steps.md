@@ -84,3 +84,7 @@
 ## Fifth test review follow-up
 
 - [x] Add core `cycle-model-in!` and RPC `cycle_model` regression coverage for unknown/unresolvable scoped model candidates, and make the cycle path skip or reject them instead of treating `resolve-runtime-model` nil as supported; this guards the task's nil/unknown-model safety requirement on the model-resolution paths touched by the unsupported OAuth policy.
+
+## Seventh test review follow-up
+
+- [ ] Add backward/`prev` cycle-model regression coverage for unknown/unresolvable scoped model candidates for both the core cycle path and the RPC `cycle_model` surface, mirroring the unsupported-model reverse-direction coverage so unknown scoped candidates cannot regress only in reverse cycling.

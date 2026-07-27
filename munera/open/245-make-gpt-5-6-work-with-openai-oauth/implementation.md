@@ -71,3 +71,4 @@
 - 2026-07-27 fifth test review: added 1 step to be addressed.
 - 2026-07-27 fifth test review follow-up: addressed 1 review step. Cycle-model now treats nil `resolve-runtime-model` results as unsupported for scoped candidates, so unknown/unresolvable scoped models are skipped rather than selected. Added core `cycle-model-in!` and RPC `cycle_model` regression coverage for skipping unknown candidates and preserving the current model when all candidates are unknown. Validation passed: `clj-kondo --lint components/agent-session/src/psi/agent_session/session_settings.clj components/agent-session/test/psi/agent_session/session_settings_test.clj components/rpc/test/psi/rpc_model_scope_test.clj`, `bb test --focus psi.agent-session.session-settings-test`, `bb test --focus psi.rpc-model-scope-test`, and equivalent focused Scry runs.
 - 2026-07-27 sixth test review: no new feedback.
+- 2026-07-27 seventh test review: added 1 step to be addressed.
