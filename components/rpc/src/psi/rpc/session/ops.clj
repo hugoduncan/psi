@@ -6,6 +6,7 @@
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
    [psi.app-runtime.messages :as app-messages]
+   [psi.ai.model-registry :as model-registry]
    [psi.rpc.events :as events]
    [psi.rpc.session.projections :as projections]
    [psi.rpc.state :as rpc.state]
@@ -143,9 +144,7 @@
       (throw (ex-info "unknown model"
                       {:error-code "request/unknown-model"})))
     (when (:runtime/unsupported? resolved)
-      (throw (ex-info (str "unsupported model: " (name (:provider resolved)) " " (:id resolved)
-                           (when-let [message (:runtime/unsupported-message resolved)]
-                             (str " — " message)))
+      (throw (ex-info (model-registry/unsupported-runtime-model-message resolved)
                       {:error-code "request/unsupported-model"
                        :provider (name (:provider resolved))
                        :model-id (:id resolved)

@@ -8,12 +8,6 @@
    [psi.app-runtime.ui-actions :as ui-actions]
    [psi.ai.model-registry :as model-registry]))
 
-(defn- unsupported-runtime-model-message
-  [model]
-  (str "Unsupported model: " (name (:provider model)) " " (:id model)
-       (when-let [message (:runtime/unsupported-message model)]
-         (str " — " message))))
-
 (defn handle-action-result
   [{:keys [ctx sid action-result resolve-model-by-provider+id
            switch-session-fn! fork-session-fn! set-focus!]}]
@@ -26,7 +20,7 @@
                                (resolve-model-by-provider+id ctx (:provider value) (:id value)))]
           (if (:runtime/unsupported? resolved)
             {:type :text
-             :message (unsupported-runtime-model-message resolved)}
+             :message (model-registry/unsupported-runtime-model-message resolved)}
             (let [provider-str (name (:provider resolved))
                   model {:provider provider-str
                          :id (:id resolved)

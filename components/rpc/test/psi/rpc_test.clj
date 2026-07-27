@@ -696,7 +696,7 @@
           err       (some #(when (and (= :error (:kind %)) (= "set_model" (:op %))) %) frames)]
       (is (some? err))
       (is (= "request/unsupported-model" (:error-code err)))
-      (is (str/includes? (:error-message err) "unsupported model: openai gpt-5.6"))
+      (is (str/includes? (:error-message err) "Unsupported model: openai gpt-5.6"))
       (is (str/includes? (:error-message err) "not supported for OpenAI OAuth"))
       (is (= original (:model (ss/get-session-data-in ctx sid))))))
 

@@ -185,6 +185,13 @@
    evidenced and encoded as policy."
   #{"gpt-5.6"})
 
+(defn unsupported-runtime-model-message
+  "Return the shared user-facing message for an explicitly unsupported runtime model."
+  [model]
+  (str "Unsupported model: " (name (:provider model)) " " (:id model)
+       (when-let [message (:runtime/unsupported-message model)]
+         (str " — " message))))
+
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
    or nil when the canonical catalog entry should remain unchanged.

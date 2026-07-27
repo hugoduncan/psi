@@ -347,11 +347,6 @@
   [scope]
   (str "Unknown model scope: " scope ". Allowed: session, project, user"))
 
-(defn- unsupported-runtime-model-message
-  [model]
-  (str "Unsupported model: " (name (:provider model)) " " (:id model)
-       " — " (:runtime/unsupported-message model)))
-
 ;; ============================================================
 ;; Login provider selection (pure — returns data)
 ;; ============================================================
@@ -551,7 +546,7 @@
 
                   (:runtime/unsupported? resolved)
                   {:type :text
-                   :message (unsupported-runtime-model-message resolved)}
+                   :message (model-registry/unsupported-runtime-model-message resolved)}
 
                   :else
                   (let [provider-str (name (:provider resolved))
