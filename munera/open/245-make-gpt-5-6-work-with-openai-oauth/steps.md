@@ -110,3 +110,8 @@
 ## Fourth docs review follow-up
 
 - [x] Update the Emacs/RPC model-cycling documentation (`doc/emacs-ui.md` and `ramora/rpc-edn/op-mapping.md`) so it states that OAuth-unsupported or unresolvable scoped model candidates such as OpenAI OAuth-backed `gpt-5.6` are skipped/not persisted by `cycle_model`/cycle commands, matching the implemented cycle-model regression coverage rather than only documenting direct `set_model` rejection.
+
+## Fifth docs review follow-up
+
+- [ ] Update `doc/cli.md` model selection documentation so `--model`/`PSI_MODEL` users can discover the OpenAI catalog-vs-OAuth-runtime boundary: `gpt-5.6` is a catalog key for non-OAuth/API-key OpenAI use, but OpenAI OAuth-backed `gpt-5.6` is unsupported until evidenced runtime policy is added, while `gpt-5.5` remains on the OAuth/Codex path.
+- [ ] Update `doc/configuration.md` model settings/session-profile documentation so configured or profiled `:model-provider "openai"` + `:model-id "gpt-5.6"` does not appear credential-agnostically supported; document that model-id catalog validation is distinct from runtime OAuth support and OAuth-backed `gpt-5.6` will be rejected or fail preflight rather than silently fallback.
