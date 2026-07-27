@@ -89,3 +89,4 @@
 - 2026-07-27 third docs review: added 2 steps to be addressed.
 
 - 2026-07-27 third docs review follow-up: addressed 2 review steps. Updated `README.md` model-control guidance with the OpenAI catalog-vs-OAuth runtime boundary and documented Emacs/RPC model-selection rejection of OAuth-backed `gpt-5.6` with `request/unsupported-model`.
+- 2026-07-27 fourth docs review: added 1 step to be addressed.
