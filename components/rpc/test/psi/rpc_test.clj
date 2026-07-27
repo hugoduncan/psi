@@ -724,7 +724,35 @@
                       :id "gpt-5.3-codex"
                       :reasoning true}
               :scope nil}
-             @captured)))))
+             @captured))))
+
+  (testing "picker-backed model selection rejects unsupported resolved models without persisting"
+    (let [[ctx sid]  (support/create-session-context)
+          emitted    (atom [])
+          set-model? (atom false)
+          emit!      (fn [event payload]
+                       (swap! emitted conj {:event event :payload payload}))]
+      (with-redefs [session/set-model-in! (fn [& _]
+                                            (reset! set-model? true)
+                                            (throw (ex-info "set-model-in! should not be called" {})))]
+        (psi.rpc.session.command-pickers/handle-model-selection!
+         ctx sid
+         (fn [ctx' provider id]
+           (when (and (= ctx' ctx)
+                      (= [provider id] ["openai" "gpt-5.6"]))
+             {:provider :openai
+              :id "gpt-5.6"
+              :runtime/unsupported? true
+              :runtime/unsupported-message "gpt-5.6 is not supported for OpenAI OAuth"}))
+         emit!
+         {:provider "openai" :id "gpt-5.6"}))
+      (is (false? @set-model?))
+      (is (= [{:event "command-result"
+               :payload {:type "unsupported_model"
+                         :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth"
+                         :provider "openai"
+                         :model-id "gpt-5.6"}}]
+             @emitted)))))
 
 (deftest rpc-e2e-handshake-query-and-streaming-test
   (testing "handshake -> query_eql -> prompt with interleaved events"

@@ -53,3 +53,5 @@
 
 - 2026-07-27 test review: no new feedback.
 - 2026-07-27 test-shaper review: added 1 step to be addressed.
+
+- 2026-07-27 test-shaper follow-up: addressed 1 review step by adding direct `handle-model-selection!` regression coverage for `:runtime/unsupported?` resolved models; the test asserts an `unsupported_model` command result and proves `session/set-model-in!` is not called. Validation passed: `clj-kondo --lint components/rpc/test/psi/rpc_test.clj`, `bb test --focus psi.rpc-test` (16 tests, 143 assertions), and `bb clojure:test:scry --namespace psi.rpc-test` (16 tests, 143 assertions).
