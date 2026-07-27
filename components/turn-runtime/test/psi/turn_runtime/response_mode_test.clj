@@ -10,7 +10,6 @@
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]))
-
 (defn- create-session-context
   ([] (create-session-context {}))
   ([opts]
@@ -243,22 +242,18 @@
                                            :runtime/unsupported-reason :openai-oauth-model-unsupported
                                            :runtime/unsupported-message message}
                   :prepared-request/ai-options {}}
-        stream-calls* (atom [])]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! stream-calls* conj :called)
-                    (throw (ex-info "provider stream should not be called" {})))]
-      (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})}
-                    ctx session-id prepared nil)]
-        (is (empty? @stream-calls*))
-        (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
-        (is (= :openai-oauth-model-unsupported
-               (:execution-result/runtime-unsupported-reason result)))
-        (is (= (str "Unsupported model: openai gpt-5.6 — " message)
-               (:execution-result/error-message result)))
-        (is (= :error (:execution-result/stop-reason result)))
-        (is (empty? (get-in result [:execution-result/provider-captures :request-captures])))))))
+        result (turn-runtime/execute-prepared-request!
+                {:provider-registry (atom {})}
+                ctx session-id prepared nil)]
+    (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
+    (is (= :openai-oauth-model-unsupported
+           (:execution-result/runtime-unsupported-reason result)))
+    (is (= (str "Unsupported model: openai gpt-5.6 — " message)
+           (:execution-result/error-message result)))
+    (is (= :error (:execution-result/stop-reason result)))
+    (is (= {:request-captures [] :response-captures []}
+           (:execution-result/provider-captures result)))
+    (is (empty? (provider-events ctx session-id)))))
 
 (deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
   (testing "fallback-forbidden unsupported strategy fails before streaming provider request"

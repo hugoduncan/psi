@@ -70,6 +70,6 @@
 
 ## Second test review follow-up
 
-- [ ] Replace the app-runtime TUI model-selection regression tests' `with-redefs`/`session/set-model-in!` interaction guards with state/output-based coverage using a real session context, so both the success and unsupported-model cases satisfy the no-mocks/no-stubs test rule.
-- [ ] Replace the RPC picker-backed model-selection success regression test's `with-redefs`/`session/set-model-in!` interaction guard with state/output-based coverage using a real session context, while still proving omitted-scope/default persistence semantics.
-- [ ] Remove the turn-runtime unsupported-runtime-model preflight test's `with-redefs` provider-call guard and prove preflight behaviour from outputs/state, such as the shaped error result and empty provider captures, so the test does not assert an internal interaction.
+- [x] Replace the app-runtime TUI model-selection regression tests' `with-redefs`/`session/set-model-in!` interaction guards with state/output-based coverage using a real session context, so both the success and unsupported-model cases satisfy the no-mocks/no-stubs test rule.
+- [x] Replace the RPC picker-backed model-selection success regression test's `with-redefs`/`session/set-model-in!` interaction guard with state/output-based coverage using a real session context, while still proving omitted-scope/default persistence semantics.
+- [x] Remove the turn-runtime unsupported-runtime-model preflight test's `with-redefs` provider-call guard and prove preflight behaviour from outputs/state, such as the shaped error result and empty provider captures, so the test does not assert an internal interaction.
