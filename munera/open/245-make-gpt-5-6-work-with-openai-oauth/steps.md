@@ -97,3 +97,7 @@
 
 - [x] Update the user-facing model-selection documentation (for example `README.md`/`doc/tui.md` or the closest canonical model docs) so the OpenAI OAuth behaviour is discoverable outside `CHANGELOG.md`: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, but OpenAI OAuth-backed `gpt-5.6` is explicitly unsupported until an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport is added; `gpt-5.5` remains on the OAuth/Codex path.
 - [x] Update the relevant `ramora/` capability/architecture documentation to record the same catalog-vs-runtime OAuth policy boundary for OpenAI `gpt-5.6`, so future AI sessions do not infer from catalog exposure that OAuth-backed execution is supported.
+
+## Second docs review follow-up
+
+- [ ] Update `ramora/rpc-edn/op-mapping.md` and `ramora/rpc-edn/error-codes.md` so the direct RPC `set_model` unsupported-runtime-model behaviour is documented: OAuth-backed `gpt-5.6` can return `request/unsupported-model`, and the canonical error-code taxonomy includes that code.
