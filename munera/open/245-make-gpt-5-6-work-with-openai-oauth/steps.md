@@ -53,4 +53,4 @@
 ## Implementation review follow-up
 
 - [x] Encode OAuth-backed `gpt-5.6` as explicitly unavailable/unsupported unless a supported ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced; do not let an OAuth-backed `gpt-5.6` request silently fall through to the catalog `https://api.openai.com/v1` chat-completions transport, since the design says platform quota responses are not the OAuth runtime policy surface and absence of support evidence requires no silent fallback.
-- [ ] Handle `:openai-oauth-model-unsupported` at user-facing runtime model resolution surfaces so selecting or using OAuth-backed `gpt-5.6` reports a clear unsupported-model error without an uncaught command/RPC/runtime exception, while still avoiding any fallback to catalog chat-completions.
+- [x] Handle `:openai-oauth-model-unsupported` at user-facing runtime model resolution surfaces so selecting or using OAuth-backed `gpt-5.6` reports a clear unsupported-model error without an uncaught command/RPC/runtime exception, while still avoiding any fallback to catalog chat-completions.

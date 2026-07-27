@@ -14,6 +14,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.memory.core :as memory]
    [psi.memory.store :as store]
    [psi.prompt-assets.skills :as prompt-skills]
@@ -413,6 +414,23 @@
     (is (str/includes? (:message result) "✓ Model set to"))
     (is (= "anthropic" (get-in session [:model :provider])))
     (is (= "claude-sonnet-5" (get-in session [:model :id])))))
+
+(deftest dispatch-model-openai-oauth-unsupported-test
+  ;; Tests OAuth-backed unsupported model selection reports a command error
+  ;; instead of throwing or falling back to catalog chat-completions.
+  (let [[ctx session-id] (make-test-ctx)
+        oauth-ctx (oauth/create-null-context
+                   {:credentials {:openai {:type :oauth
+                                           :access "tok"
+                                           :refresh "ref"
+                                           :expires 99999999999999}}})
+        result (commands/dispatch-in ctx session-id "/model openai gpt-5.6"
+                                     (assoc cmd-opts :oauth-ctx oauth-ctx))]
+    (is (= :text (:type result)))
+    (is (str/includes? (:message result) "Unsupported model: openai gpt-5.6"))
+    (is (str/includes? (:message result) "not supported for OpenAI OAuth"))
+    (is (= {:provider "anthropic" :id "test-model" :reasoning false}
+           (:model (ss/get-session-data-in ctx session-id))))))
 
 (deftest dispatch-model-invalid-arity-test
   (let [[ctx session-id] (make-test-ctx)

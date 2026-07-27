@@ -207,13 +207,14 @@
     nil
 
     (contains? openai-oauth-unsupported-model-ids model-id)
-    (throw (ex-info "OpenAI model is unsupported with OAuth credentials"
-                    {:provider provider-kw
-                     :model-id model-id
-                     :reason :openai-oauth-model-unsupported
-                     :detail (str model-id " is not supported for OpenAI OAuth "
-                                  "without an evidenced ChatGPT/Codex alias or "
-                                  "alternate OAuth-compatible transport")}))
+    (when-let [model (find-model :openai model-id)]
+      (let [message (str model-id " is not supported for OpenAI OAuth without "
+                         "an evidenced ChatGPT/Codex alias or alternate "
+                         "OAuth-compatible transport")]
+        (assoc model
+               :runtime/unsupported? true
+               :runtime/unsupported-reason :openai-oauth-model-unsupported
+               :runtime/unsupported-message message)))
 
     (contains? openai-oauth-codex-model-ids model-id)
     (structured-output/with-openai-codex-transport (find-model :openai model-id))))

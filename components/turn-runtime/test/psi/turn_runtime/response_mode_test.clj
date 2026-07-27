@@ -22,10 +22,22 @@
   ([ctx session-id]
    (prepared-request ctx session-id "turn-1"))
   ([ctx session-id turn-id]
-   (prompt-request/build-prepared-request
-    ctx session-id {:turn-id turn-id
-                    :user-message {:role "user"
-                                   :content [{:type :text :text "hello"}]}})))
+   (let [augmentation-record {:session-id session-id
+                              :turn-id turn-id
+                              :workflow-run-id nil
+                              :status :no-op
+                              :replay? false
+                              :accepted-operation-count 0
+                              :operations []
+                              :providers []}]
+     (swap! (:state* ctx) assoc-in
+            [:agent-session :sessions session-id :data :turn-augmentations turn-id]
+            augmentation-record)
+     (prompt-request/build-prepared-request
+      ctx session-id {:turn-id turn-id
+                      :user-message {:role "user"
+                                     :content [{:type :text :text "hello"}]}
+                      :runtime-model (:model (ss/get-session-data-in ctx session-id))}))))
 
 (defn- provider-events
   [ctx session-id]
@@ -216,6 +228,36 @@
     (is (empty? (filter #(= "provider_retry_scheduled" (:type %))
                         (provider-events ctx session-id))))
     (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))
+
+(deftest execute-prepared-request-unsupported-runtime-model-preflights-before-provider-test
+  ;; Tests runtime-credential unsupported models fail as a shaped assistant error
+  ;; before any provider request is attempted.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        message "gpt-5.6 is not supported for OpenAI OAuth"
+        prepared {:prepared-request/id "turn-unsupported-runtime-model"
+                  :prepared-request/provider-conversation []
+                  :prepared-request/model {:provider :openai
+                                           :id "gpt-5.6"
+                                           :api :openai-completions
+                                           :runtime/unsupported? true
+                                           :runtime/unsupported-reason :openai-oauth-model-unsupported
+                                           :runtime/unsupported-message message}
+                  :prepared-request/ai-options {}}
+        stream-calls* (atom [])]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! stream-calls* conj :called)
+                    (throw (ex-info "provider stream should not be called" {})))]
+      (let [result (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})}
+                    ctx session-id prepared nil)]
+        (is (empty? @stream-calls*))
+        (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
+        (is (= :openai-oauth-model-unsupported
+               (:execution-result/runtime-unsupported-reason result)))
+        (is (= message (:execution-result/error-message result)))
+        (is (= :error (:execution-result/stop-reason result)))
+        (is (empty? (get-in result [:execution-result/provider-captures :request-captures])))))))
 
 (deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
   (testing "fallback-forbidden unsupported strategy fails before streaming provider request"

@@ -304,6 +304,22 @@
       (when (unsupported-structured-output? strategy)
         (unsupported-structured-output-result turn-id ai-model strategy)))))
 
+(defn- unsupported-runtime-model-result
+  [turn-id ai-model]
+  (let [message (or (:runtime/unsupported-message ai-model)
+                    "Selected model is not supported by the current runtime credentials.")]
+    {:turn-id turn-id
+     :model ai-model
+     :ai-options nil
+     :turn-ctx nil
+     :assistant-message {:role "assistant"
+                         :content [{:type :error :text message}]
+                         :stop-reason :error
+                         :error-message message
+                         :timestamp (java.time.Instant/now)}
+     :logprobs nil
+     :runtime/unsupported-reason (:runtime/unsupported-reason ai-model)}))
+
 (defn- provider-id-for
   [ai-model]
   (or (some-> ai-model :provider name)
@@ -445,7 +461,9 @@
         provider-id      (:provider-id attempt-data)
         model-id         (:model-id attempt-data)
         attempt-id       (attempt-id-for turn-id retry-attempt)
-        preflight-result (unsupported-structured-output-before-generation turn-id ai-model base-ai-options)
+        preflight-result (or (when (:runtime/unsupported? ai-model)
+                               (unsupported-runtime-model-result turn-id ai-model))
+                             (unsupported-structured-output-before-generation turn-id ai-model base-ai-options))
         _                (when-not preflight-result
                            (dispatch-provider-event!
                             ctx
@@ -508,6 +526,7 @@
      :execution-result/stop-reason         (:stop-reason assistant-message)
      :execution-result/logprobs            (:logprobs attempt-result)
      :execution-result/structured-output   (:structured-output attempt-result)
+     :execution-result/runtime-unsupported-reason (:runtime/unsupported-reason attempt-result)
      :execution-result/retry-outcome       retry-outcome*}))
 
 (defn execute-prepared-request!

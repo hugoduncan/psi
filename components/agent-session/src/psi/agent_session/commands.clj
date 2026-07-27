@@ -351,6 +351,11 @@
   [scope]
   (str "Unknown model scope: " scope ". Allowed: session, project, user"))
 
+(defn- unsupported-runtime-model-message
+  [model]
+  (str "Unsupported model: " (name (:provider model)) " " (:id model)
+       " — " (:runtime/unsupported-message model)))
+
 ;; ============================================================
 ;; Login provider selection (pure — returns data)
 ;; ============================================================
@@ -543,9 +548,16 @@
 
               :else
               (let [resolved (resolve-runtime-model ctx provider model-id)]
-                (if-not resolved
+                (cond
+                  (nil? resolved)
                   {:type :text
                    :message (str "Unknown model: " provider " " model-id)}
+
+                  (:runtime/unsupported? resolved)
+                  {:type :text
+                   :message (unsupported-runtime-model-message resolved)}
+
+                  :else
                   (let [provider-str (name (:provider resolved))
                         model {:provider provider-str
                                :id (:id resolved)
@@ -679,7 +691,8 @@
     "/job" (dispatch-job-command ctx session-id trimmed)
     "/cancel-job" (dispatch-cancel-job-command ctx session-id trimmed)
     "/remember" (dispatch-remember-command ctx session-id trimmed)
-    "/model" (dispatch-model-command ctx session-id trimmed)
+    "/model" (dispatch-model-command (cond-> ctx oauth-ctx (assoc :oauth-ctx oauth-ctx))
+                                     session-id trimmed)
     "/thinking" (dispatch-thinking-command ctx session-id trimmed)
     "/speed" (speed-command/dispatch-command ctx session-id trimmed)
     "/effort" (effort-command/dispatch-command ctx session-id trimmed)
