@@ -8,8 +8,18 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]))
+(def ^:private far-future-expiry 99999999999999)
+
+(defn- oauth-openai-ctx []
+  (oauth/create-null-context
+   {:credentials {:openai {:type :oauth
+                           :access "tok"
+                           :refresh "ref"
+                           :expires far-future-expiry}}}))
+
 (defn- create-session-context
   ([] (create-session-context {}))
   ([opts]
@@ -229,26 +239,38 @@
     (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))
 
 (deftest execute-prepared-request-unsupported-runtime-model-preflights-before-provider-test
-  ;; Tests runtime-credential unsupported models fail as a shaped assistant error
-  ;; before any provider request is attempted.
-  (let [[ctx session-id] (create-session-context {:persist? false})
-        message "gpt-5.6 is not supported for OpenAI OAuth"
-        prepared {:prepared-request/id "turn-unsupported-runtime-model"
-                  :prepared-request/provider-conversation []
-                  :prepared-request/model {:provider :openai
-                                           :id "gpt-5.6"
-                                           :api :openai-completions
-                                           :runtime/unsupported? true
-                                           :runtime/unsupported-reason :openai-oauth-model-unsupported
-                                           :runtime/unsupported-message message}
-                  :prepared-request/ai-options {}}
+  ;; Tests persisted/startup-selected OAuth-backed gpt-5.6 reaches the turn
+  ;; preflight boundary through normal prompt-request runtime resolution, and
+  ;; fails as a shaped assistant error before any provider request is attempted.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :oauth-ctx (oauth-openai-ctx)})
+        _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                 (merge (ss/get-session-data-in ctx session-id)
+                        {:model {:provider "openai" :id "gpt-5.6"}}))
+        _ (swap! (:state* ctx) assoc-in
+                 [:agent-session :sessions session-id :data :turn-augmentations "turn-unsupported-runtime-model"]
+                 {:session-id session-id
+                  :turn-id "turn-unsupported-runtime-model"
+                  :workflow-run-id nil
+                  :status :no-op
+                  :replay? false
+                  :accepted-operation-count 0
+                  :operations []
+                  :providers []})
+        prepared (prompt-request/build-prepared-request
+                  ctx session-id {:turn-id "turn-unsupported-runtime-model"
+                                  :user-message {:role "user"
+                                                 :content [{:type :text :text "hello"}]}})
         result (turn-runtime/execute-prepared-request!
                 {:provider-registry (atom {})}
                 ctx session-id prepared nil)]
+    (is (= :openai (:provider (:prepared-request/model prepared))))
+    (is (= "gpt-5.6" (:id (:prepared-request/model prepared))))
+    (is (= true (:runtime/unsupported? (:prepared-request/model prepared))))
     (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
     (is (= :openai-oauth-model-unsupported
            (:execution-result/runtime-unsupported-reason result)))
-    (is (= (str "Unsupported model: openai gpt-5.6 — " message)
+    (is (= "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
            (:execution-result/error-message result)))
     (is (= :error (:execution-result/stop-reason result)))
     (is (= {:request-captures [] :response-captures []}

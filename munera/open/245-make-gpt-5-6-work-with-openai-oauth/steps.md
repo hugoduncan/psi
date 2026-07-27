@@ -80,4 +80,4 @@
 
 ## Fourth test review follow-up
 
-- [ ] Add an integration-style turn preflight regression that starts from a real OAuth session context with session model `openai` `gpt-5.6` and builds the prepared request through the normal prompt-request/runtime resolution path, asserting the shaped unsupported-model assistant error and empty provider captures; the current turn-runtime test manually constructs a `:runtime/unsupported?` model map, so it does not prove persisted/startup-selected OAuth-backed `gpt-5.6` reaches the preflight boundary through actual model resolution.
+- [x] Add an integration-style turn preflight regression that starts from a real OAuth session context with session model `openai` `gpt-5.6` and builds the prepared request through the normal prompt-request/runtime resolution path, asserting the shaped unsupported-model assistant error and empty provider captures; the current turn-runtime test manually constructs a `:runtime/unsupported?` model map, so it does not prove persisted/startup-selected OAuth-backed `gpt-5.6` reaches the preflight boundary through actual model resolution.
