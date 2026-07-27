@@ -52,4 +52,4 @@
 
 ## Implementation review follow-up
 
-- [ ] Encode OAuth-backed `gpt-5.6` as explicitly unavailable/unsupported unless a supported ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced; do not let an OAuth-backed `gpt-5.6` request silently fall through to the catalog `https://api.openai.com/v1` chat-completions transport, since the design says platform quota responses are not the OAuth runtime policy surface and absence of support evidence requires no silent fallback.
+- [x] Encode OAuth-backed `gpt-5.6` as explicitly unavailable/unsupported unless a supported ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced; do not let an OAuth-backed `gpt-5.6` request silently fall through to the catalog `https://api.openai.com/v1` chat-completions transport, since the design says platform quota responses are not the OAuth runtime policy surface and absence of support evidence requires no silent fallback.

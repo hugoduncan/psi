@@ -7,7 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Fixed
-- OpenAI OAuth-backed selection of `gpt-5.6` no longer routes to the ChatGPT/Codex backend with the literal `gpt-5.6` id, which that backend rejects for ChatGPT accounts. `gpt-5.5` continues to use the OAuth/Codex path; `gpt-5.6` remains on its catalog chat-completions transport unless an explicit supported OAuth policy is added later.
+- OpenAI OAuth-backed selection of `gpt-5.6` now fails explicitly unless an evidenced supported ChatGPT/Codex alias or alternate OAuth-compatible transport is added later. It no longer routes to the ChatGPT/Codex backend with the literal `gpt-5.6` id, which that backend rejects for ChatGPT accounts, and no longer silently falls through to the catalog chat-completions transport. `gpt-5.5` continues to use the OAuth/Codex path.
 - OpenAI requests now fail fast with a clear error when the selected model cannot be resolved to a model definition with a valid id (for example an unknown or not-yet-loaded model key). Previously an unresolved model was sent to the provider as `model: null`, which never responded and appeared to hang.
 - Transient OpenAI server errors delivered as a mid-stream `error`/`response.failed` event without an HTTP status (the canonical "An error occurred while processing your request … You can retry your request … Please include the request ID …" message, and `server_error`/"internal server error" wording) are now classified as retryable provider-unavailable errors and go through automatic provider-boundary retry instead of failing the turn immediately.
 

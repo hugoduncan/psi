@@ -179,6 +179,12 @@
    OpenAI OAuth."
   #{"gpt-5.5"})
 
+(def ^:private openai-oauth-unsupported-model-ids
+  "OpenAI model ids that are explicitly unsupported under OpenAI OAuth until a
+   supported ChatGPT/Codex alias or alternate OAuth-compatible transport is
+   evidenced and encoded as policy."
+  #{"gpt-5.6"})
+
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
    or nil when the canonical catalog entry should remain unchanged.
@@ -186,9 +192,9 @@
    Current policy:
    - models in `openai-oauth-codex-model-ids` use the ChatGPT/Codex backend
      under OpenAI OAuth.
-   - `gpt-5.6` deliberately has no OAuth override: the observed ChatGPT/Codex
-     backend rejects literal `gpt-5.6`, and no supported OAuth alias or
-     alternate transport is evidenced here.
+   - `gpt-5.6` is explicitly unavailable under OpenAI OAuth: the observed
+     ChatGPT/Codex backend rejects literal `gpt-5.6`, and no supported OAuth
+     alias or alternate transport is evidenced here.
    - all other models keep their catalog-defined transport.
 
    The base entry is read from the merged catalog (`find-model`) so the
@@ -196,8 +202,20 @@
    shared `structured-output/with-openai-codex-transport` rule rather than
    re-stating the codex transport/capability literals."
   [provider-kw model-id]
-  (when (and (= :openai provider-kw)
-             (contains? openai-oauth-codex-model-ids model-id))
+  (cond
+    (not= :openai provider-kw)
+    nil
+
+    (contains? openai-oauth-unsupported-model-ids model-id)
+    (throw (ex-info "OpenAI model is unsupported with OAuth credentials"
+                    {:provider provider-kw
+                     :model-id model-id
+                     :reason :openai-oauth-model-unsupported
+                     :detail (str model-id " is not supported for OpenAI OAuth "
+                                  "without an evidenced ChatGPT/Codex alias or "
+                                  "alternate OAuth-compatible transport")}))
+
+    (contains? openai-oauth-codex-model-ids model-id)
     (structured-output/with-openai-codex-transport (find-model :openai model-id))))
 
 (defn resolve-runtime-model

@@ -109,13 +109,16 @@
       (is (= "https://chatgpt.com/backend-api" (:base-url model)))
       (is (= "gpt-5.5" (:id model)))))
 
-  (testing "openai gpt-5.6 does not use the known-rejected literal codex id under oauth"
-    (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.6")]
-      (is (not (and (= :openai-codex-responses (:api model))
-                    (= "gpt-5.6" (:id model)))))
-      (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model)))
-      (is (= "gpt-5.6" (:id model)))))
+  (testing "openai gpt-5.6 is explicitly unsupported under oauth without evidenced OAuth policy"
+    (try
+      (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.6")
+      (is false "expected OAuth-backed gpt-5.6 resolution to fail explicitly")
+      (catch clojure.lang.ExceptionInfo e
+        (let [data (ex-data e)]
+          (is (= "OpenAI model is unsupported with OAuth credentials" (ex-message e)))
+          (is (= :openai (:provider data)))
+          (is (= "gpt-5.6" (:model-id data)))
+          (is (= :openai-oauth-model-unsupported (:reason data)))))))
 
   (testing "non-member chat-completions model stays chat-completions under oauth"
     ;; Genuine negative control: gpt-5.4-mini's catalog transport is
