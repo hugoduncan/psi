@@ -74,3 +74,4 @@
 - 2026-07-27 seventh test review: added 1 step to be addressed.
 
 - 2026-07-27 seventh test review follow-up: addressed 1 review step. Added backward/`prev` regression coverage for skipping unknown/unresolvable scoped model candidates in both core `cycle-model-in!` and RPC `cycle_model`. Validation passed: `clj-kondo --lint components/agent-session/test/psi/agent_session/session_settings_test.clj components/rpc/test/psi/rpc_model_scope_test.clj`, `bb clojure:test:scry --namespace psi.agent-session.session-settings-test`, and `bb clojure:test:scry --namespace psi.rpc-model-scope-test`.
+- 2026-07-27 eighth test review: added 1 step to be addressed.

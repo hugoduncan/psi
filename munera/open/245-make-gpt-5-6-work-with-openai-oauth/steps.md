@@ -88,3 +88,7 @@
 ## Seventh test review follow-up
 
 - [x] Add backward/`prev` cycle-model regression coverage for unknown/unresolvable scoped model candidates for both the core cycle path and the RPC `cycle_model` surface, mirroring the unsupported-model reverse-direction coverage so unknown scoped candidates cannot regress only in reverse cycling.
+
+## Eighth test review follow-up
+
+- [ ] Add backward/`prev` all-unknown cycle-model no-op regression coverage for both the core `cycle-model-in!` path and the RPC `cycle_model` surface, mirroring the existing forward all-unknown coverage so reverse cycling is proven to preserve the current model when every scoped candidate is unresolvable.
