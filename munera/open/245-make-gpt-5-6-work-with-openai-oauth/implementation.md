@@ -86,3 +86,4 @@
 - 2026-07-27 second docs review: added 1 step to be addressed.
 
 - 2026-07-27 second docs review follow-up: addressed 1 review step. Documented direct RPC `set_model` unsupported-runtime-model behaviour in `ramora/rpc-edn/op-mapping.md`, including OpenAI OAuth-backed `gpt-5.6` returning `request/unsupported-model`; added `request/unsupported-model` to the canonical RPC error-code taxonomy.
+- 2026-07-27 third docs review: added 2 steps to be addressed.
