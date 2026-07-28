@@ -199,3 +199,7 @@ happens in the build phase per the concrete file list already in this log.
   `rg 'gpt-5\.6' doc/` sweep: only the five already-reconciled docs
   (tui, README-not-in-doc, configuration, cli, emacs-ui) reference the id; no
   other `doc/` prose remains stale.
+
+## Implementation review (2026-07-28, 3rd pass)
+
+- no new steps added; catalog metadata, OAuth/Codex verbatim routing, gpt-5.5 control, bare-gpt-5.6 negative, docs/CHANGELOG prose, and the /model picker surface test all verified coherent against design + acceptance criteria; focused tests green.
