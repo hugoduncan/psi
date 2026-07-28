@@ -203,3 +203,7 @@ happens in the build phase per the concrete file list already in this log.
 ## Implementation review (2026-07-28, 3rd pass)
 
 - no new steps added; catalog metadata, OAuth/Codex verbatim routing, gpt-5.5 control, bare-gpt-5.6 negative, docs/CHANGELOG prose, and the /model picker surface test all verified coherent against design + acceptance criteria; focused tests green.
+
+## Task-test-review (2026-07-28)
+
+- added 1 step: variant *accept*-path surface coverage gap (offer + resolution proven for variants, but no test drives a variant id through the `set_model`/`handle-model-selection!` accept boundary under OAuth; accept/reject machinery is only exercised with generic ids). Low severity — transitively covered. Tests otherwise well-formed: real logic deps, nullable oauth context, injected capturing `emit!` (no mocks/stubs); design acceptance behaviours (catalog metadata, OAuth/Codex verbatim routing, gpt-5.5 control, bare-gpt-5.6 negative, picker enumeration) covered; focused suites green (267/25 registry, 3/1 picker).
