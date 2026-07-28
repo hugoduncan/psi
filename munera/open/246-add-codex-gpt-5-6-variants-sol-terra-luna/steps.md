@@ -42,6 +42,10 @@
 - [x] Final diff review: verbatim ids, no aliasing, shared join point only, task-245 behaviour preserved.
 - [x] Confirm implementation.md contains per-id probe evidence for every id added to the Codex route.
 
+## Implementation-review follow-ups (2)
+
+- [ ] `doc/emacs-ui.md` (~L92–99, "Model selection") was missed by the docs-prose reconciliation. Like the four docs the plan enumerated (`doc/tui.md`, `README.md`, `doc/configuration.md`, `doc/cli.md`), it makes an OAuth-support policy statement — bare `gpt-5.6` is rejected/skipped under OAuth, `gpt-5.5` stays on the Codex path — but does **not** distinguish the newly OAuth/Codex-supported `gpt-5.6-sol/terra/luna` variants, which are now catalog-selectable *and* OAuth-supported (so they are selectable via `C-c m m` and NOT skipped by the cycle commands). Update the prose to add the variants (preserve the true bare-`gpt-5.6`-unsupported statement; single source of truth stays `model_registry.clj`; do not restate codex literals). Root cause: the plan/design enumerated a fixed 4-doc list instead of matching all OAuth-support prose via `rg`; consider an `rg 'gpt-5\.6'` sweep across `doc/` to confirm no other prose remains stale.
+
 ## Implementation-review follow-ups
 
 - [x] Acceptance criterion says variants must be "selectable across all model-selection surfaces" (`/model`, RPC `set_model`, RPC picker, TUI picker, turn preflight), but tests only assert `resolve-runtime-model` + catalog membership. The pickers/preflight derive from this shared join point (low risk), yet no surface-level test proves a variant is offered/accepted at a picker or preflight boundary. Consider adding one surface-level assertion (e.g. picker enumeration or preflight acceptance of a variant under OAuth) to close the acceptance-criteria coverage gap, or explicitly record in implementation.md that shared-join-point coverage is deemed sufficient and why.

@@ -184,3 +184,7 @@ happens in the build phase per the concrete file list already in this log.
   enumerates `all-models-seq` unconditionally, so this is the tightest
   surface-level assertion for the acceptance criterion. Focused test: 3/1 pass;
   `clj-kondo` clean.
+
+## Implementation review (2026-07-28, 2nd pass)
+
+- added 1 step: `doc/emacs-ui.md` OAuth-support prose missed by the docs-prose reconciliation (states bare `gpt-5.6` OAuth-rejected + `gpt-5.5` on Codex path but omits the now-OAuth-supported sol/terra/luna variants, which are selectable/cyclable in emacs-ui). Root cause: fixed 4-doc list in plan/design rather than an `rg` sweep of OAuth-support prose.
