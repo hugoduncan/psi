@@ -188,3 +188,14 @@ happens in the build phase per the concrete file list already in this log.
 ## Implementation review (2026-07-28, 2nd pass)
 
 - added 1 step: `doc/emacs-ui.md` OAuth-support prose missed by the docs-prose reconciliation (states bare `gpt-5.6` OAuth-rejected + `gpt-5.5` on Codex path but omits the now-OAuth-supported sol/terra/luna variants, which are selectable/cyclable in emacs-ui). Root cause: fixed 4-doc list in plan/design rather than an `rg` sweep of OAuth-support prose.
+
+## Implementation-review follow-up (2026-07-28, 2nd pass)
+
+- addressed 1 review step (doc/emacs-ui.md docs-prose gap). Reconciled the
+  "Model selection" OAuth-support prose to add `gpt-5.6-sol/terra/luna` as
+  OAuth/Codex-supported (selectable via `C-c m m`, not skipped by cycle
+  commands), preserving the true bare-`gpt-5.6`-unsupported statement and
+  single-source-of-truth (no codex literals restated). Ran the recommended
+  `rg 'gpt-5\.6' doc/` sweep: only the five already-reconciled docs
+  (tui, README-not-in-doc, configuration, cli, emacs-ui) reference the id; no
+  other `doc/` prose remains stale.

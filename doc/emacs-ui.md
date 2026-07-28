@@ -95,8 +95,10 @@ If the OpenAI provider is backed by stored OAuth credentials, selecting `openai`
 and is not persisted; `gpt-5.6` remains catalog-selectable for non-OAuth/API-key
 OpenAI use. Model cycling also skips OAuth-unsupported or unresolvable scoped
 candidates, so OpenAI OAuth-backed `gpt-5.6` is not selected or persisted by
-cycle commands. OpenAI OAuth-backed `gpt-5.5` remains on the OAuth/ChatGPT Codex
-runtime path.
+cycle commands. OpenAI OAuth-backed `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`,
+and `gpt-5.6-luna` are OAuth/Codex-supported and remain on the OAuth/ChatGPT
+Codex runtime path — they are selectable via `C-c m m` and are not skipped by
+the cycle commands.
 
 ## Customizing `psi-emacs-command`
 
