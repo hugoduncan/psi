@@ -42,6 +42,26 @@ implementation.
 - plan/steps ambiguity review: added 1 new design step (plan Slice 5 docs scope is narrow — "enumerated model lists" — but GPT-5.6 OAuth-support statements live as prose in doc/tui.md, README.md, doc/configuration.md, doc/cli.md that assert bare gpt-5.6 is OAuth-unsupported; those need updating to reflect the newly OAuth/Codex-supported sol/terra/luna variants)
 - plan/steps inconsistency review: no inconsistency review feedback (pricing table, shared fields, 272K/128K, codex/unsupported set literals, and gpt-5.5-mirror API classification agree across design.md/plan.md/steps.md/implementation.md; probe-echoed reasoning.context all_turns vs gpt-5.5 current_turn is a backend default, not a task-file contradiction)
 
+## Notes for the docs-prose design-step (plan/steps ambiguity review)
+
+Concrete OAuth-support prose to reconcile with the newly OAuth/Codex-supported
+sol/terra/luna variants (each currently asserts bare `gpt-5.6` is OAuth-unsupported
+without distinguishing the variants):
+- `doc/tui.md` — L71–80 (`/model` command + picker OAuth/Codex behaviour).
+- `README.md` — L121–123 (catalog-selectable vs OAuth-supported distinction).
+- `doc/configuration.md` — L109–114, L158 (profile/config `gpt-5.6` rejection at OAuth).
+- `doc/cli.md` — L112–115 (catalog keys vs OAuth runtime support are distinct).
+
+Principles when addressing this design-step:
+- Preserve the existing true statement (bare `gpt-5.6` stays OAuth-unsupported);
+  only add that `gpt-5.6-sol/terra/luna` are the OAuth/Codex-supported GPT-5.6 ids.
+- Keep the catalog-selectable vs OAuth-runtime-supported distinction the docs
+  already draw; the variants are both catalog-selectable and OAuth-supported.
+- Single source of truth: docs describe policy, don't restate per-surface literals;
+  the codex/unsupported sets live only in `model_registry.clj`.
+- CHANGELOG [Unreleased]/Added (plan Slice 5) is the user-facing entry point — keep
+  doc-prose edits consistent with that entry's wording.
+
 ## Notes for the design-step task
 
 Relevant project files (non-task):
