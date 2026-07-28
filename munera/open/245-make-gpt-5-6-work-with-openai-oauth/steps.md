@@ -126,3 +126,7 @@
 ## Sixth docs review follow-up
 
 - [x] Update the `CHANGELOG.md` GPT-5.6 added-model entry so it is not credential-agnostic: keep the non-OAuth/API-key chat-completions selection claim, but cross-reference or include the OpenAI OAuth boundary that OAuth-backed `gpt-5.6` is unsupported/rejected until an evidenced runtime policy is added.
+
+## Ninth test review follow-up (task-test-review)
+
+- [ ] Add a direct `model-registry-test` unit test for the shared `psi.ai.model-registry/unsupported-runtime-model-message` helper covering both branches: (a) a model carrying `:runtime/unsupported-message` produces the `"Unsupported model: <provider> <id> — <message>"` form, and (b) a model without `:runtime/unsupported-message` produces the `"Unsupported model: <provider> <id>"` form with no `" — "` suffix. The helper was consolidated across five surfaces (`/model`, RPC `set_model`, RPC picker, TUI picker, turn preflight) specifically to prevent message drift, but it has no direct test; every surface test uses `gpt-5.6`, which always carries `:runtime/unsupported-message`, so the `(when-let [message ...])` false branch (message-absent) is entirely unexercised and a regression in the shared formatter's no-message path would go undetected.
