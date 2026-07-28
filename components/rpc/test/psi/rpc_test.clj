@@ -13,6 +13,34 @@
    [psi.agent-session.test-support :as agent-test-support]
    [psi.rpc-test-support :as support]))
 
+(defn- run-select-model
+  "Run a single submitted `select-model` `frontend_action_result` with the given
+   `{:provider :id}` `value` against a subscribed session, and return
+   `{:response <frontend_action_result response frame>
+     :command-result <command-result event frame>
+     :session-updated <session/updated event frame>
+     :footer-updated <footer/updated event frame>}`.
+
+   Leaves only the per-case selected `value` as the distinct input; all
+   handshake/loop/frame-filter transport ceremony is shared here."
+  [ctx session-id value]
+  (let [state            (atom {:transport {:ready? true :pending {}}
+                                :connection {:focus-session-id session-id
+                                             :subscribed-topics #{"command-result"
+                                                                  "session/updated"
+                                                                  "footer/updated"}}})
+        handler          (support/make-handler ctx state)
+        input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                              "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value " (pr-str value) "}}\n")
+        {:keys [out-lines]} (support/run-loop input handler state)
+        frames           (support/parse-frames out-lines)]
+    {:response        (some #(when (and (= :response (:kind %))
+                                        (= "frontend_action_result" (:op %))) %)
+                            frames)
+     :command-result  (some #(when (= "command-result" (:event %)) %) frames)
+     :session-updated (some #(when (= "session/updated" (:event %)) %) frames)
+     :footer-updated  (some #(when (= "footer/updated" (:event %)) %) frames)}))
+
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
     (let [home    (System/getProperty "user.home")
@@ -389,60 +417,6 @@
       (is (= ["off" "minimal" "low" "medium" "high" "xhigh"]
              (mapv :ui.item/value items)))))
 
-  (testing "submitted select-model frontend action updates model and emits command/session snapshots"
-    (let [[ctx session-id] (support/create-session-context)
-          state            (atom {:transport {:ready? true :pending {}}
-                                  :connection {:focus-session-id session-id
-                                               :subscribed-topics #{"command-result"
-                                                                    "session/updated"
-                                                                    "footer/updated"}}})
-          handler          (support/make-handler ctx state)
-          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value {:provider \"openai\" :id \"gpt-5.4-mini\"}}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state)
-          frames           (support/parse-frames out-lines)
-          response         (some #(when (and (= :response (:kind %))
-                                             (= "frontend_action_result" (:op %))) %)
-                                 frames)
-          command-result   (some #(when (= "command-result" (:event %)) %) frames)
-          session-updated  (some #(when (= "session/updated" (:event %)) %) frames)
-          footer-updated   (some #(when (= "footer/updated" (:event %)) %) frames)]
-      (is (= {:accepted true :request-id "req-model"}
-             (:data response)))
-      (is (= {:type "text"
-              :message "✓ Model set to openai gpt-5.4-mini"}
-             (:data command-result)))
-      (is (= "openai" (get-in session-updated [:data :model-provider])))
-      (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
-      (is (some? footer-updated))))
-
-  (testing "submitted select-model frontend action rejects unsupported runtime models without mutating session model"
-    (let [oauth-ctx        (agent-test-support/oauth-openai-ctx)
-          [ctx session-id] (support/create-session-context {:oauth-ctx oauth-ctx})
-          original         (:model (ss/get-session-data-in ctx session-id))
-          state            (atom {:transport {:ready? true :pending {}}
-                                  :connection {:focus-session-id session-id
-                                               :subscribed-topics #{"command-result"
-                                                                    "session/updated"
-                                                                    "footer/updated"}}})
-          handler          (support/make-handler ctx state)
-          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value {:provider \"openai\" :id \"gpt-5.6\"}}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state)
-          frames           (support/parse-frames out-lines)
-          response         (some #(when (and (= :response (:kind %))
-                                             (= "frontend_action_result" (:op %))) %)
-                                 frames)
-          command-result   (some #(when (= "command-result" (:event %)) %) frames)]
-      (is (= {:accepted true :request-id "req-model"}
-             (:data response)))
-      (is (= "unsupported_model" (get-in command-result [:data :type])))
-      (is (= (agent-test-support/unsupported-runtime-model-message)
-             (get-in command-result [:data :message])))
-      (is (= "openai" (get-in command-result [:data :provider])))
-      (is (= "gpt-5.6" (get-in command-result [:data :model-id])))
-      (is (= original (:model (ss/get-session-data-in ctx session-id))))))
-
   (testing "submitted select-thinking-level frontend action updates thinking and emits command/session snapshots"
     (let [[ctx session-id] (support/create-session-context)
           state            (atom {:transport {:ready? true :pending {}}
@@ -468,6 +442,36 @@
              (:data command-result)))
       (is (= "high" (get-in session-updated [:data :thinking-level])))
       (is (some? footer-updated)))))
+
+(deftest rpc-select-model-frontend-action-updates-model-test
+  (testing "submitted select-model frontend action updates model and emits command/session snapshots"
+    (let [[ctx session-id] (support/create-session-context)
+          {:keys [response command-result session-updated footer-updated]}
+          (run-select-model ctx session-id {:provider "openai" :id "gpt-5.4-mini"})]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= {:type "text"
+              :message "✓ Model set to openai gpt-5.4-mini"}
+             (:data command-result)))
+      (is (= "openai" (get-in session-updated [:data :model-provider])))
+      (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
+      (is (some? footer-updated)))))
+
+(deftest rpc-select-model-frontend-action-rejects-unsupported-runtime-model-test
+  (testing "submitted select-model frontend action rejects unsupported runtime models without mutating session model"
+    (let [oauth-ctx        (agent-test-support/oauth-openai-ctx)
+          [ctx session-id] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original         (:model (ss/get-session-data-in ctx session-id))
+          {:keys [response command-result]}
+          (run-select-model ctx session-id {:provider "openai" :id "gpt-5.6"})]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= "unsupported_model" (get-in command-result [:data :type])))
+      (is (= (agent-test-support/unsupported-runtime-model-message)
+             (get-in command-result [:data :message])))
+      (is (= "openai" (get-in command-result [:data :provider])))
+      (is (= "gpt-5.6" (get-in command-result [:data :model-id])))
+      (is (= original (:model (ss/get-session-data-in ctx session-id)))))))
 
 (deftest rpc-frontend-action-cancelled-and-failed-result-test
   ;; Characterizes RPC frontend_action_result cancelled/failed observable payloads.
