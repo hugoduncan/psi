@@ -157,6 +157,23 @@
       (is (str/includes? (:runtime/unsupported-message model)
                          "not supported for OpenAI OAuth")))))
 
+(deftest unsupported-runtime-model-message-test
+  ;; Direct coverage of the shared formatter consolidated across `/model`, RPC
+  ;; `set_model`, RPC picker, TUI picker, and turn preflight. Every surface test
+  ;; uses gpt-5.6, which always carries :runtime/unsupported-message, so the
+  ;; message-absent (false) branch of the `when-let` is otherwise unexercised.
+  (testing "model with :runtime/unsupported-message includes the ' — <message>' suffix"
+    (is (= "Unsupported model: openai gpt-5.6 — not supported for OpenAI OAuth"
+           (registry/unsupported-runtime-model-message
+            {:provider :openai
+             :id "gpt-5.6"
+             :runtime/unsupported-message "not supported for OpenAI OAuth"}))))
+
+  (testing "model without :runtime/unsupported-message has no ' — ' suffix"
+    (is (= "Unsupported model: openai gpt-5.6"
+           (registry/unsupported-runtime-model-message
+            {:provider :openai :id "gpt-5.6"})))))
+
 (deftest built-in-structured-output-capabilities-test
   (registry/init! {})
 
