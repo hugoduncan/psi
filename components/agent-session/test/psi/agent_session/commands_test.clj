@@ -14,7 +14,6 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-core.core :as agent]
    [psi.ai.model-registry :as model-registry]
-   [psi.provider-auth.oauth.core :as oauth]
    [psi.memory.core :as memory]
    [psi.memory.store :as store]
    [psi.prompt-assets.skills :as prompt-skills]
@@ -419,13 +418,8 @@
   ;; Tests OAuth-backed unsupported model selection reports a command error
   ;; instead of throwing or falling back to catalog chat-completions.
   (let [[ctx session-id] (make-test-ctx)
-        oauth-ctx (oauth/create-null-context
-                   {:credentials {:openai {:type :oauth
-                                           :access "tok"
-                                           :refresh "ref"
-                                           :expires 99999999999999}}})
         result (commands/dispatch-in ctx session-id "/model openai gpt-5.6"
-                                     (assoc cmd-opts :oauth-ctx oauth-ctx))]
+                                     (assoc cmd-opts :oauth-ctx (test-support/oauth-openai-ctx)))]
     (is (= :text (:type result)))
     (is (= (test-support/unsupported-runtime-model-message) (:message result)))
     (is (= {:provider "anthropic" :id "test-model" :reasoning false}
