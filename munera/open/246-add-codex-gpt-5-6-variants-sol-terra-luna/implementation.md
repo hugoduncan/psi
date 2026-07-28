@@ -207,3 +207,15 @@ happens in the build phase per the concrete file list already in this log.
 ## Task-test-review (2026-07-28)
 
 - added 1 step: variant *accept*-path surface coverage gap (offer + resolution proven for variants, but no test drives a variant id through the `set_model`/`handle-model-selection!` accept boundary under OAuth; accept/reject machinery is only exercised with generic ids). Low severity — transitively covered. Tests otherwise well-formed: real logic deps, nullable oauth context, injected capturing `emit!` (no mocks/stubs); design acceptance behaviours (catalog metadata, OAuth/Codex verbatim routing, gpt-5.5 control, bare-gpt-5.6 negative, picker enumeration) covered; focused suites green (267/25 registry, 3/1 picker).
+
+## Task-test-review follow-up (2026-07-28)
+
+- addressed 1 review step (variant accept-path surface coverage gap). Added
+  `model-selection-accepts-gpt-5-6-codex-variants-under-oauth-test` to
+  `components/rpc/test/psi/rpc/session/command_pickers_test.clj`: for each of
+  `gpt-5.6-sol/terra/luna`, drives the id through the picker-backed selection
+  accept boundary (`handle-model-selection!` + `resolve-model`) under an
+  `oauth-openai-ctx` and asserts a model-set **success** `command-result` plus
+  persisted selection — proving the accept boundary treats the variants as
+  supported (codex), distinct from bare `gpt-5.6`'s `unsupported_model` reject.
+  Focused suite now 9/2 pass; `clj-kondo` clean.
