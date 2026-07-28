@@ -42,7 +42,7 @@
 
 ## Review follow-ups
 
-- [ ] Add a direct assertion that `claude-opus-5-0` appears in
+- [x] Add a direct assertion that `claude-opus-5-0` appears in
       `(registry/models-for-provider :anthropic)` — this acceptance criterion is
       currently only covered indirectly via `find-model` presence checks
 - [ ] Before release: resolve the design open question by confirming the real

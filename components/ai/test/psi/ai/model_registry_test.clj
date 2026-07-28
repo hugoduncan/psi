@@ -282,7 +282,12 @@
       (is (= true (:supports-mid-conversation-system-messages model)))
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
-      (is (contains? (set (:strategies capability)) :provider-native))))
+      (is (contains? (set (:strategies capability)) :provider-native))
+      ;; Direct acceptance-criterion coverage: the model must be enumerated by
+      ;; models-for-provider, not merely resolvable via find-model. The map is
+      ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
+      (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
+                     "claude-opus-5-0"))))
 
   (testing "Claude Fable 5 declares native Anthropic JSON Schema output"
     (let [capability (-> (registry/find-model :anthropic "claude-fable-5")
