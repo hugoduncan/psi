@@ -140,3 +140,5 @@
 - 2026-07-28 seventh test-shaper review: added 1 step to be addressed.
 
 - 2026-07-28 seventh test-shaper follow-up: addressed 1 review step. Split the two task-touched `select-model` behaviours out of the six-behaviour mega-`deftest` `rpc-model-and-thinking-picker-frontend-actions-test` into their own single-concern `deftest`s (`rpc-select-model-frontend-action-updates-model-test`, `rpc-select-model-frontend-action-rejects-unsupported-runtime-model-test`), and introduced an intent-revealing `run-select-model` helper that seeds the subscribed session/transport ceremony and runs the `frontend_action_result` `select-model` request, returning `{:response :command-result :session-updated :footer-updated}` so each case supplies only its distinct `{:provider :id}` value. Left the pre-existing `/model`/`/thinking` picker-request and `select-thinking-level` blocks in the mega-`deftest` untouched (narrow scope). Validation passed: `clj-kondo --lint components/rpc/test/psi/rpc_test.clj` (0/0), `bb test --focus psi.rpc-test` (16 tests, 117 assertions).
+
+- 2026-07-28 eighth test-shaper review: added 1 step to be addressed.
