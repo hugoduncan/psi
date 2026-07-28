@@ -10,7 +10,6 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
-   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.test-support :as agent-test-support]
    [psi.rpc-test-support :as support]))
 
@@ -418,11 +417,7 @@
       (is (some? footer-updated))))
 
   (testing "submitted select-model frontend action rejects unsupported runtime models without mutating session model"
-    (let [oauth-ctx        (oauth/create-null-context
-                            {:credentials {:openai {:type :oauth
-                                                    :access "tok"
-                                                    :refresh "ref"
-                                                    :expires 99999999999999}}})
+    (let [oauth-ctx        (agent-test-support/oauth-openai-ctx)
           [ctx session-id] (support/create-session-context {:oauth-ctx oauth-ctx})
           original         (:model (ss/get-session-data-in ctx session-id))
           state            (atom {:transport {:ready? true :pending {}}
