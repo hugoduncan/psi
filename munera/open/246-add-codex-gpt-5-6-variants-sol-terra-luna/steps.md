@@ -33,6 +33,7 @@
 
 - [ ] Add CHANGELOG entry under [Unreleased]/Added for the three newly selectable models.
 - [ ] Check `doc/`/README for model lists; update if the selectable models are enumerated.
+- [ ] Update prose OAuth-support statements that assert bare `gpt-5.6` is OAuth-unsupported so they distinguish the newly OAuth/Codex-supported `gpt-5.6-sol/terra/luna` from bare `gpt-5.6` (still unsupported): `doc/tui.md` (~L71–80), `README.md` (~L121–123), `doc/configuration.md` (~L109–114, L158), `doc/cli.md` (~L112–115). Preserve the true bare-`gpt-5.6` statement and the catalog-selectable vs OAuth-runtime-supported distinction; add only that the three variants are OAuth/Codex-supported; do not restate codex literals (single source of truth = `model_registry.clj`).
 
 ## Slice 6 — Validation
 

@@ -107,3 +107,19 @@ sets (~L305–321). Facts discovered for downstream implementation:
 - No thinking-level-map catalog field exists; reasoning effort comes from the
   shared Codex transport (probe echoed `reasoning.effort:medium`), same as
   `gpt-5.5`. No per-variant reasoning field needed beyond `:supports-reasoning true`.
+
+## Plan-follow-up (plan-review batch: ambiguity + inconsistency)
+
+Batch baseline `d077fa3ee` (plan.md+steps.md creation). Batch commits:
+`4434f0d7d` (plan/steps ambiguity — added docs-prose design step), `efda2d8c2`
+(plan/steps inconsistency — no feedback), `5af7c8dc5` (docs-prose context notes).
+
+`git diff d077fa3ee..HEAD -- steps.md` added **no** checklist lines — the single
+actionable plan-review follow-up was the unchecked design-steps.md ambiguity item
+("clarify docs scope for the OAuth-support boundary"). Executed by folding the
+prose-OAuth-support reconciliation into plan.md Slice 5 (+ Slice-order 5) and
+steps.md Slice 5 with concrete files/line-ranges and preserve-distinction /
+single-source-of-truth principles; design-steps.md item now checked.
+
+Nothing else actionable in the batch. Implementation of Slice 5 doc-prose edits
+happens in the build phase per the concrete file list already in this log.
