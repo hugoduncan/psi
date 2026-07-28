@@ -219,3 +219,7 @@ happens in the build phase per the concrete file list already in this log.
   persisted selection — proving the accept boundary treats the variants as
   supported (codex), distinct from bare `gpt-5.6`'s `unsupported_model` reject.
   Focused suite now 9/2 pass; `clj-kondo` clean.
+
+## Task-test-review (2026-07-28, 2nd pass)
+
+- added 1 step: variant OAuth codex resolution asserts only two of three codex facets — `:api` and `:base-url` are proven verbatim, but the codex native structured-output capability (the third facet `with-openai-codex-transport` owns, attached via a second independent mechanism the drift-guard test warns about) is unasserted for variants after runtime codex resolution. Distinct from the prior offer/accept picker steps. Tests otherwise well-formed: nullable oauth (`create-null-context`), injected capturing `emit!`, no mocks/stubs; behaviours covered; focused suites green (267/25 registry, 9/2 picker).
