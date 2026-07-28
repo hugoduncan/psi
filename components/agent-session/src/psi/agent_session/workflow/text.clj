@@ -14,13 +14,17 @@
   (not (false? (:advertise defn-map))))
 
 (defn available-workflows-text
-  "Return human-readable list of advertised workflows."
+  "Return human-readable list of workflows for the user-facing `/delegate list`.
+
+   Unlike `build-prompt-contribution` (the system-context listing), this
+   discovery surface includes `:advertise false` workflows: they are hidden from
+   the model's prompt yet remain user-invocable via `/delegate <name>`."
   [definitions]
-  (let [advertised (filter (comp advertised? val) (sort-by key definitions))]
-    (if (empty? advertised)
+  (let [entries (sort-by key definitions)]
+    (if (empty? entries)
       "No workflows loaded."
       (str/join "\n"
-                (for [[name defn-map] advertised]
+                (for [[name defn-map] entries]
                   (let [step-count (count (:step-order defn-map))]
                     (str "  " name " — " (or (:summary defn-map) "")
                          (when (> step-count 1)
