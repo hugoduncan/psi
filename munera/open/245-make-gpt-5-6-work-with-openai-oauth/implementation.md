@@ -101,3 +101,5 @@
 - addressed 1 review step
 
 - 2026-07-28 implementation review: no new feedback; policy, all selection surfaces, cycle paths, turn preflight, tests, and docs are coherent.
+
+- 2026-07-28 task-test-review: added 1 step to be addressed.
