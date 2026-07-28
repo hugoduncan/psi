@@ -107,3 +107,18 @@
       dedup steps above land, Opus 5.0's shape should match its siblings —
       verify the remaining Opus 5.0 capability assertion matches the terse
       Fable/Sonnet form rather than the fuller Opus 4.8 form.
+
+## Test-shaper review follow-ups (247 test-shaper pass 2)
+
+- [ ] (optional) Resolve the residual `single_concern` blend in
+      `opus-5-0-catalog-entry-test` (`model_registry_test.clj`, ~L338): its
+      `testing` label reads "carries the agreed metadata, capability, and
+      pricing values", but the deftest also asserts `models-for-provider`
+      enumeration membership (~L362) — an undisclosed second concern that no
+      sibling catalog-entry test (`fable-5`, `sonnet-5`) carries. Either widen
+      the `testing` label to name both concerns, or move the enumeration-
+      membership assertion into its own `testing` block / dedicated
+      provider-enumeration test so the label matches the asserted behaviour and
+      the Opus 5.0 test regains structural parity with its siblings.
+      (test-shaper `single_concern` ∧ `consistent(structure)` ∧
+      `meaningful_failures`.)
