@@ -39,3 +39,15 @@
 - [x] Note in implementation.md that pricing/limits are placeholders pending
       official Anthropic publication
 - [x] Commit with `⚒` symbol
+
+## Review follow-ups
+
+- [ ] Add a direct assertion that `claude-opus-5-0` appears in
+      `(registry/models-for-provider :anthropic)` — this acceptance criterion is
+      currently only covered indirectly via `find-model` presence checks
+- [ ] Before release: resolve the design open question by confirming the real
+      Anthropic model id string and official pricing/context-window/max-tokens,
+      then replace the Opus 4.8 placeholder values in the `:opus-5.0` catalog
+      entry (`anthropic_catalog.clj`) and the CHANGELOG placeholder note
+- [ ] Complete the deferred manual `/model anthropic claude-opus-5-0`
+      live-session selection verification once a live session is available

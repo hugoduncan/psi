@@ -21,3 +21,6 @@
 - Full `bb test` run shows 39 pre-existing failing test files unrelated to this change (turn-augmentation "Missing turn augmentation record" errors, workflow-loader definition mismatches, accumulator stream tests) — confirmed pre-existing by running `psi.turn-runtime.accumulator-test` against `git stash` (same 8 failures on unmodified HEAD). No model-catalog/registry test regressed.
 - CHANGELOG `[Unreleased]/Added` entry added.
 - Manual `/model anthropic claude-opus-5-0` live-session verification deferred (no live session in this pass); registry-level resolution is covered by unit tests, which is the verifiable surface available here.
+
+## Implementation review
+- added 3 follow-up steps (direct `models-for-provider :anthropic` assertion, pre-release id/pricing confirmation, deferred live `/model` verification)
