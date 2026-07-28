@@ -4,6 +4,7 @@
 - ambiguity review: no ambiguity review feedback (attributes fully tabulated, placeholders/open-questions explicitly acknowledged, key convention consistent)
 - inconsistency review: no inconsistency review feedback (attribute table matches actual :opus-4.8 catalog values and json-schema-native set membership; acceptance criteria align with :id/provider)
 - plan-review ambiguity review: no ambiguity review feedback (plan.md + steps.md unambiguous and consistent with actual code; approximate line refs match, gated test target-model-ids extension is clear, placeholders/open-question explicitly non-blocking)
+- plan-review inconsistency review: no inconsistency review feedback (design/plan/steps agree on attributes, scope, placeholders, and json-schema-native key; plan/steps test+CHANGELOG additions align with design acceptance criteria)
 
 ## Notes for implementation slice
 - No design-steps were opened by any design-review pass; design is ready to implement as written.
