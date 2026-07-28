@@ -60,3 +60,28 @@ Principles to maintain when resolving the metadata design-step:
   decide deliberately whether Codex-routed variants match or differ, don't inherit
   by accident.
 - Keep the frozen scope: three variants only; bare `gpt-5.6` stays unsupported.
+
+## Design-follow-up: catalog metadata resolution (2026-07-28)
+
+Resolved the ambiguity-review design step. Authoritative source for per-variant
+values: pi-mono `~/src/pi-mono/packages/ai/scripts/generate-models.ts`,
+`missingOpenAiModels` block (~L2119) and the OpenAI short-context/long-context
+sets (~L305–321). Facts discovered for downstream implementation:
+
+- Variants **differ in pricing** (base flat rates): sol 5/30/0.5/6.25,
+  terra 2.5/15/0.25/3.125, luna 1/6/0.1/1.25 (input/output/cacheRead/cacheWrite).
+  These base rates differ from our existing bare `gpt-5.6` entry (6.0/35.0) — do
+  **not** inherit gpt-5.6's numbers; use the per-variant table in design.md.
+- pi-mono default context window for these ids is 272000 with an opt-in override
+  to 1050000 that triggers long-context pricing (input×2, output×1.5) above the
+  272K threshold. Our catalog schema is flat (no `:tiers`), so design fixes each
+  variant at `:context-window 272000` with flat short-context rates — no tier
+  modelling. If a future task wants the 1.05M window, it must add tier support
+  first.
+- pi-mono classes these as `openai-responses`; our catalog mirrors the working
+  `gpt-5.5` control instead (`:api :openai-completions` + join
+  `openai-chat-completions-native-model-keys`), consistent with the design's
+  "mirror gpt-5.5" constraint and the Codex route.
+- No thinking-level-map catalog field exists; reasoning effort comes from the
+  shared Codex transport (probe echoed `reasoning.effort:medium`), same as
+  `gpt-5.5`. No per-variant reasoning field needed beyond `:supports-reasoning true`.

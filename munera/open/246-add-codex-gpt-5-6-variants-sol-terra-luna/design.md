@@ -77,6 +77,37 @@ verified Codex transport, while leaving bare `gpt-5.6` unsupported under OAuth
   helpers rather than restating codex/capability literals per surface.
 - Do not silently alias one variant to another; each catalog id is sent verbatim.
 
+## Catalog metadata (resolved)
+
+Per-variant metadata is **not** identical: the three variants share shape
+(provider, api, capabilities, context window, max-tokens) but **differ in
+pricing** (sol > terra > luna), mirroring the pi-mono inherited GPT-5.6
+definitions (`packages/ai/scripts/generate-models.ts`, `missingOpenAiModels`).
+
+Context-window/pricing conflict is resolved in favour of the **272K
+short-context tier**: each variant carries `:context-window 272000` with flat
+short-context rates. Our catalog schema has no tiered-pricing field, so the
+larger 1.05M long-context window (and its `input×2 / output×1.5` above-272K
+tier) is **not** modelled here; staying at 272K keeps a single unambiguous flat
+rate per id and matches pi-mono's default. (Bare `gpt-5.6`'s existing 1M/6.0/35.0
+entry is a separate direct-API surface and is left unchanged.)
+
+Shared fields (all three): `:provider :openai`, `:api :openai-completions`,
+`:base-url "https://api.openai.com/v1"`, `:supports-reasoning true`,
+`:supports-images true`, `:supports-text true`, `:context-window 272000`,
+`:max-tokens 128000`. Each variant key also joins
+`openai-chat-completions-native-model-keys`, exactly as `gpt-5.5`/`gpt-5.6` do.
+No per-variant thinking-level map is stored in the catalog; reasoning effort is
+supplied by the shared Codex transport, identical to `gpt-5.5`.
+
+Per-variant differing fields:
+
+| id              | name           | input-cost | output-cost | cache-read-cost | cache-write-cost |
+| --------------- | -------------- | ---------- | ----------- | --------------- | ---------------- |
+| `gpt-5.6-sol`   | GPT-5.6 Sol    | 5.0        | 30.0        | 0.5             | 6.25             |
+| `gpt-5.6-terra` | GPT-5.6 Terra  | 2.5        | 15.0        | 0.25            | 3.125            |
+| `gpt-5.6-luna`  | GPT-5.6 Luna   | 1.0        | 6.0         | 0.1             | 1.25             |
+
 ## Acceptance criteria
 
 - `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` are present in the built-in
@@ -99,7 +130,7 @@ verified Codex transport, while leaving bare `gpt-5.6` unsupported under OAuth
   `gpt-5.6-luna` reach execution on the ChatGPT/Codex backend for the current
   ChatGPT account. Intent is to support all three; if any id is rejected,
   record the negative evidence and exclude only that id.
-- Catalog metadata per variant (context window, reasoning support,
-  thinking-level map, pricing tier) — cross-reference the pi-mono inherited
-  GPT-5.6 metadata (272K short-context tier default; Codex backend exposes a
-  larger context window with long-context pricing).
+- Catalog metadata per variant — **resolved**; see "Catalog metadata
+  (resolved)" above. Per-variant pricing differs (sol/terra/luna) and all three
+  use the 272K short-context tier with flat rates; the larger long-context
+  window/pricing is intentionally not modelled.
