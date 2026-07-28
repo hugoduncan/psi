@@ -41,6 +41,7 @@ implementation.
 - inconsistency review: no inconsistency review feedback (design internally consistent and consistent with model_registry.clj codex/unsupported sets + implementation.md probe evidence; metadata 272K-vs-1M/larger-context tension already captured by ambiguity design step, not duplicated)
 - plan/steps ambiguity review: added 1 new design step (plan Slice 5 docs scope is narrow — "enumerated model lists" — but GPT-5.6 OAuth-support statements live as prose in doc/tui.md, README.md, doc/configuration.md, doc/cli.md that assert bare gpt-5.6 is OAuth-unsupported; those need updating to reflect the newly OAuth/Codex-supported sol/terra/luna variants)
 - plan/steps inconsistency review: no inconsistency review feedback (pricing table, shared fields, 272K/128K, codex/unsupported set literals, and gpt-5.5-mirror API classification agree across design.md/plan.md/steps.md/implementation.md; probe-echoed reasoning.context all_turns vs gpt-5.5 current_turn is a backend default, not a task-file contradiction)
+- plan/steps ambiguity review (re-run): no new ambiguity review feedback (plan/steps are concrete — files, line ranges, per-variant pricing, verbatim-id + single-source-of-truth constraints, slice order; the one prior ambiguity (docs-prose OAuth-support scope, commit 4434f0d7d) is already resolved in design-steps.md)
 
 ## Notes for the docs-prose design-step (plan/steps ambiguity review)
 
