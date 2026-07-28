@@ -75,3 +75,6 @@
 
 ## Docs review pass 2 follow-ups executed (247)
 - addressed 1 docs review step: refreshed `doc/configuration.md` (~L254) adaptive-thinking `:xhigh` example to lead with Claude Opus 5.0 (was Opus 4.8), consistent with the tui.md `/model` refresh. Docs-only; no code/test change.
+
+## Docs review pass 3 (247 review-task-docs, no-op)
+- no new steps: CHANGELOG `[Unreleased]/Added` entry, `doc/extension-api.md` mid-system-message list, `doc/tui.md` `/model` example, and `doc/configuration.md` adaptive-thinking example all include Opus 5.0 and are accurate/consistent with the catalog entry. No stale references or omitted model-enumeration lists remain; no README model list to update.
