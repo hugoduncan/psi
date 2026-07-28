@@ -1,6 +1,5 @@
 (ns psi.rpc-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
@@ -12,6 +11,7 @@
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
    [psi.provider-auth.oauth.core :as oauth]
+   [psi.agent-session.test-support :as agent-test-support]
    [psi.rpc-test-support :as support]))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
@@ -442,10 +442,8 @@
       (is (= {:accepted true :request-id "req-model"}
              (:data response)))
       (is (= "unsupported_model" (get-in command-result [:data :type])))
-      (is (str/includes? (get-in command-result [:data :message])
-                         "Unsupported model: openai gpt-5.6"))
-      (is (str/includes? (get-in command-result [:data :message])
-                         "not supported for OpenAI OAuth"))
+      (is (= (agent-test-support/unsupported-runtime-model-message)
+             (get-in command-result [:data :message])))
       (is (= "openai" (get-in command-result [:data :provider])))
       (is (= "gpt-5.6" (get-in command-result [:data :model-id])))
       (is (= original (:model (ss/get-session-data-in ctx session-id))))))

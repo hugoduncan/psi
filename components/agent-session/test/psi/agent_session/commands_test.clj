@@ -427,8 +427,7 @@
         result (commands/dispatch-in ctx session-id "/model openai gpt-5.6"
                                      (assoc cmd-opts :oauth-ctx oauth-ctx))]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "Unsupported model: openai gpt-5.6"))
-    (is (str/includes? (:message result) "not supported for OpenAI OAuth"))
+    (is (= (test-support/unsupported-runtime-model-message) (:message result)))
     (is (= {:provider "anthropic" :id "test-model" :reasoning false}
            (:model (ss/get-session-data-in ctx session-id))))))
 

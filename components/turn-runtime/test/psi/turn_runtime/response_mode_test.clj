@@ -261,7 +261,7 @@
     (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
     (is (= :openai-oauth-model-unsupported
            (:execution-result/runtime-unsupported-reason result)))
-    (is (= "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
+    (is (= (test-support/unsupported-runtime-model-message)
            (:execution-result/error-message result)))
     (is (= :error (:execution-result/stop-reason result)))
     (is (= {:request-captures [] :response-captures []}

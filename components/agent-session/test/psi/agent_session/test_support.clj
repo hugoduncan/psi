@@ -3,6 +3,7 @@
   (:require
    [clojure.java.io :as io]
    [psi.agent-core.core :as agent]
+   [psi.ai.model-registry :as model-registry]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session-core]
@@ -62,6 +63,19 @@
   []
   (oauth/create-null-context
    {:credentials {:openai (oauth-openai-credentials)}}))
+
+(defn unsupported-runtime-model-message
+  "Return the shared unsupported-model message for `provider`/`model-id` under
+   OpenAI OAuth context, derived from the runtime policy owner
+   (`resolve-runtime-model` + `unsupported-runtime-model-message`) rather than a
+   pasted literal. A policy-wording change flips the one formatter test instead
+   of every surface assertion."
+  ([]
+   (unsupported-runtime-model-message :openai "gpt-5.6"))
+  ([provider model-id]
+   (model-registry/unsupported-runtime-model-message
+    (model-registry/resolve-runtime-model
+     {:oauth-ctx (oauth-openai-ctx)} provider model-id))))
 
 (defn instant
   "Parse an ISO-8601 string into a `java.time.Instant`."

@@ -53,7 +53,7 @@
       (is (some? error))
       (is (= "m1" (:id error)))
       (is (= "request/unsupported-model" (:error-code error)))
-      (is (= "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
+      (is (= (agent-test-support/unsupported-runtime-model-message)
              (:error-message error)))
       (is (= original (:model (ss/get-session-data-in ctx sid)))))))
 
@@ -102,7 +102,7 @@
       (is (= original (:model (ss/get-session-data-in ctx sid))))
       (is (= [{:event "command-result"
                :payload {:type "unsupported_model"
-                         :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"
+                         :message (agent-test-support/unsupported-runtime-model-message)
                          :provider "openai"
                          :model-id "gpt-5.6"}}]
              @emitted)))))

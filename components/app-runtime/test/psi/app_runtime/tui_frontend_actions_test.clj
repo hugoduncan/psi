@@ -52,6 +52,6 @@
     (let [[ctx sid] (create-session-context {:oauth-ctx (test-support/oauth-openai-ctx)})
           original  (:model (ss/get-session-data-in ctx sid))]
       (is (= {:type :text
-              :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"}
+              :message (test-support/unsupported-runtime-model-message)}
              (select-model ctx sid {:provider "openai" :id "gpt-5.6"})))
       (is (= original (:model (ss/get-session-data-in ctx sid)))))))
