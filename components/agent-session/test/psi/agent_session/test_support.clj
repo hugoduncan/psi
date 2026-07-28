@@ -16,6 +16,7 @@
    [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-recording]
    [psi.agent-session.prompt-request]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.agent-session.services :as services]
    [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.agent-session.turn]
@@ -591,3 +592,17 @@
   (swap! (:state* ctx)
          (ss/session-update session-id
                             (fn [session] (assoc session :is-streaming streaming?)))))
+
+(defn seed-augmentation-record!
+  "Seed a well-formed no-op terminal pre-turn augmentation record for `turn-id`
+   in `session-id`.
+
+  Request preparation fails closed on a missing augmentation record. Tests that
+  call `build-prepared-request` directly (bypassing the dispatch-level pre-turn
+  augmentation barrier that normally seeds the record) use this helper to
+  simulate the post-barrier state for their turn-id."
+  [ctx session-id turn-id]
+  (ss/assoc-state-value-in!
+   ctx
+   (conj (ss/session-data-path session-id) :turn-augmentations turn-id)
+   (turn-augmentation/terminal-record session-id turn-id nil [])))

@@ -306,6 +306,7 @@
                                                                           :model {:provider "openai" :id "gpt-5.4"}}})
           first-turn-id "turn-initial"
           second-turn-id "turn-retry"
+          _ (test-support/seed-augmentation-record! ctx session-id first-turn-id)
           first-prepared (prompt-request/build-prepared-request
                           ctx session-id
                           {:turn-id first-turn-id
@@ -331,6 +332,7 @@
               ctx
               #(->> (invoke-handler ctx :on-retry-resume {:session-id session-id})
                     (apply-root-state-update! ctx)))
+          _ (test-support/seed-augmentation-record! ctx session-id second-turn-id)
           second-prepared (prompt-request/build-prepared-request
                            ctx session-id
                            {:turn-id second-turn-id

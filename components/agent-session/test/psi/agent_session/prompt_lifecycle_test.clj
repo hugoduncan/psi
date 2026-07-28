@@ -354,6 +354,7 @@
                            :id "c1"
                            :contribution {:content "Hint A" :priority 10 :enabled true}}
                           {:origin :core})
+    (test-support/seed-augmentation-record! ctx session-id "t1")
     (let [prepared (psi.agent-session.prompt-request/build-prepared-request
                     ctx session-id {:turn-id "t1"
                                     :user-message {:role "user"
@@ -385,6 +386,7 @@
     ;; Simulate stale cached :system-prompt state: request preparation should
     ;; rebuild from canonical base prompt + contribution layers instead.
     (test-support/update-state! ctx :session-data assoc :system-prompt "stale")
+    (test-support/seed-augmentation-record! ctx session-id "t2")
     (let [prepared (psi.agent-session.prompt-request/build-prepared-request
                     ctx session-id {:turn-id "t2"
                                     :user-message {:role "user"
@@ -397,6 +399,7 @@
 (deftest build-prepared-request-allows-explicit-runtime-model-override-test
   (let [[ctx session-id] (create-session-context {:persist? false})
         runtime-model    {:provider "stub" :id "override-model" :context-window 1234}
+        _                (test-support/seed-augmentation-record! ctx session-id "t-override")
         prepared         (psi.agent-session.prompt-request/build-prepared-request
                           ctx session-id {:turn-id "t-override"
                                           :user-message {:role "user"
@@ -419,6 +422,7 @@
                         :disable-model-invocation false}
             [ctx session-id] (create-session-context {:persist? false
                                                       :session-defaults {:skills [skill]}})
+            _          (test-support/seed-augmentation-record! ctx session-id "t-skill")
             prepared   (psi.agent-session.prompt-request/build-prepared-request
                         ctx session-id {:turn-id "t-skill"
                                         :commands []
@@ -440,6 +444,7 @@
                                                                   :content "Summarize: $@"
                                                                   :source :path
                                                                   :file-path "/tmp/summarize.md"}]}})
+        _        (test-support/seed-augmentation-record! ctx session-id "t-template")
         prepared (psi.agent-session.prompt-request/build-prepared-request
                   ctx session-id {:turn-id "t-template"
                                   :commands []
@@ -477,6 +482,7 @@
                           {:session-id session-id
                            :text "Please be brief."}
                           {:origin :core})
+    (test-support/seed-augmentation-record! ctx session-id "turn-2")
     (let [prepared            (psi.agent-session.prompt-request/build-prepared-request
                                ctx session-id {:turn-id "turn-2"
                                                :user-message nil})
