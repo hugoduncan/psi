@@ -132,3 +132,5 @@
 - 2026-07-28 fifth test-shaper review: added 1 step to be addressed.
 
 - 2026-07-28 fifth test-shaper follow-up: addressed 1 review step. Replaced the verbatim inline OpenAI OAuth credential context in `commands_test.clj` (`dispatch-model-openai-oauth-unsupported-test`) with shared `psi.agent-session.test-support/oauth-openai-ctx` and dropped the now-unused `psi.provider-auth.oauth.core` require. Validation passed: `clj-kondo --lint components/agent-session/test/psi/agent_session/commands_test.clj` (0/0), `bb test --focus psi.agent-session.commands-test` (53 tests, 213 assertions).
+
+- 2026-07-28 sixth test-shaper review: added 1 step to be addressed.
