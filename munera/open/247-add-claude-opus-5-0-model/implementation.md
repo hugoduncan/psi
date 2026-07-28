@@ -42,3 +42,6 @@
 
 ## Test review pass (247)
 - added 2 test-review steps (missing `:opus-5.0` pricing/limits catalog-entry test; optional opus-4.8 mirror-invariant guard)
+
+## Test review follow-up pass
+- addressed 2 test-review steps: added `opus-5-0-catalog-entry-test` to `model_registry_test.clj` pinning the full design attribute table (provider/api/base-url/capability flags + pricing/limits) for `:opus-5.0` (297 assertions green, was 281); clj-kondo clean. Optional mirror-invariant guard resolved as subsumed by the concrete-value test (a separate test would duplicate it and conflict once real Opus 5.0 values diverge).

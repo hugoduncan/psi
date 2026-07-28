@@ -345,6 +345,28 @@
       (is (= 0.3 (:cache-read-cost model)))
       (is (= 3.75 (:cache-write-cost model))))))
 
+(deftest opus-5-0-catalog-entry-test
+  (registry/init! {})
+
+  (testing "Claude Opus 5.0 catalog entry carries the agreed metadata, capability, and pricing values"
+    (let [model (registry/find-model :anthropic "claude-opus-5-0")]
+      (is (some? model))
+      (is (= "Claude Opus 5.0" (:name model)))
+      (is (= :anthropic (:provider model)))
+      (is (= :anthropic-messages (:api model)))
+      (is (= "https://api.anthropic.com" (:base-url model)))
+      (is (= true (:adaptive-thinking model)))
+      (is (= true (:supports-mid-conversation-system-messages model)))
+      (is (= true (:supports-reasoning model)))
+      (is (= true (:supports-images model)))
+      (is (= true (:supports-text model)))
+      (is (= 1000000 (:context-window model)))
+      (is (= 128000 (:max-tokens model)))
+      (is (= 5.0 (:input-cost model)))
+      (is (= 25.0 (:output-cost model)))
+      (is (= 0.5 (:cache-read-cost model)))
+      (is (= 6.25 (:cache-write-cost model))))))
+
 (deftest gpt-5-6-catalog-entry-test
   (registry/init! {})
 

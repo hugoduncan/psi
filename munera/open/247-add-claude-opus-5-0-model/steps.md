@@ -60,7 +60,7 @@
 
 ## Test review follow-ups (247 test review)
 
-- [ ] Add an `opus-5-0-catalog-entry-test` to `model_registry_test.clj`
+- [x] Add an `opus-5-0-catalog-entry-test` to `model_registry_test.clj`
       mirroring `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`:
       assert the full design attribute table on `:opus-5.0` — `:provider`,
       `:api`, `:base-url`, `:supports-images`, `:supports-text`,
@@ -70,8 +70,11 @@
       attributes are unguarded (only name + capability flags are asserted),
       so a regression or typo in the placeholder values would go undetected —
       unlike every sibling model, which has a dedicated pricing/limits test.
-- [ ] (optional) Guard the "placeholders mirror `:opus-4.8` exactly" design
+- [x] (optional) Guard the "placeholders mirror `:opus-4.8` exactly" design
       invariant with an assertion equating the `:opus-5.0` pricing/limits fields
       to the `:opus-4.8` ones, so intentional divergence (when real Opus 5.0
       values are published) is distinguished from accidental drift. Subsumed by
       the concrete-value catalog-entry test above if that is added first.
+      — subsumed: `opus-5-0-catalog-entry-test` now pins the exact placeholder
+      values; a separate mirror-invariant test would duplicate that guard and
+      conflict once real Opus 5.0 values diverge, so not added.
