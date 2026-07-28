@@ -95,7 +95,7 @@
 
 ## Test review follow-up (task-test-review)
 
-- [ ] Add a `resolve-runtime-model` regression proving unknown/absent OpenAI model ids stay safe under OAuth context: with `oauth-openai-ctx`, an id not in the catalog (e.g. `"gpt-does-not-exist"`) must resolve to nil rather than an exception or a bogus override map. The current `resolve-runtime-model-openai-oauth-routing-test` only exercises known catalog ids (`gpt-5.5`, `gpt-5.6`, `gpt-5.4-mini`) and the `nil`-ctx branch, so the OAuth branch's `find-model` nil-guard and outer `or` fall-through (slice-3 "nil and unknown model handling remains safe when runtime override resolution consults the catalog") is unproven.
+- [x] Add a `resolve-runtime-model` regression proving unknown/absent OpenAI model ids stay safe under OAuth context: with `oauth-openai-ctx`, an id not in the catalog (e.g. `"gpt-does-not-exist"`) must resolve to nil rather than an exception or a bogus override map. The current `resolve-runtime-model-openai-oauth-routing-test` only exercises known catalog ids (`gpt-5.5`, `gpt-5.6`, `gpt-5.4-mini`) and the `nil`-ctx branch, so the OAuth branch's `find-model` nil-guard and outer `or` fall-through (slice-3 "nil and unknown model handling remains safe when runtime override resolution consults the catalog") is unproven.
 
 ## Docs review follow-up
 

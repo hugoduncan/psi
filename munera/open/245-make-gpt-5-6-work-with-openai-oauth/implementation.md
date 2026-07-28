@@ -103,3 +103,4 @@
 - 2026-07-28 implementation review: no new feedback; policy, all selection surfaces, cycle paths, turn preflight, tests, and docs are coherent.
 
 - 2026-07-28 task-test-review: added 1 step to be addressed.
+- 2026-07-28 task-test-review follow-up: addressed 1 review step. Added `resolve-runtime-model-openai-oauth-routing-test` case proving an unknown OpenAI id (`gpt-does-not-exist`) under OAuth context resolves to nil via the openai-oauth override nil-return + `or` fall-through, guarding the slice-3 nil/unknown-model safety requirement on the OAuth branch. Focused test green (18 assertions), lint clean.

@@ -133,7 +133,17 @@
     ;; gpt-5.6 must keep its catalog :openai-completions transport.
     (let [model (registry/resolve-runtime-model (api-key-openai-ctx) :openai "gpt-5.6")]
       (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model))))))
+      (is (= "https://api.openai.com/v1" (:base-url model)))))
+
+  (testing "unknown openai model id stays safe under oauth context"
+    ;; nil/unknown-model safety on the OAuth branch: an id absent from the
+    ;; catalog is neither in the unsupported set nor the codex set, so
+    ;; openai-oauth-runtime-model returns nil and the outer `or` falls through
+    ;; to find-model, which is also nil. The result must be nil rather than an
+    ;; exception or a bogus override map.
+    (let [model (registry/resolve-runtime-model
+                 (oauth-openai-ctx) :openai "gpt-does-not-exist")]
+      (is (nil? model)))))
 
 (deftest built-in-structured-output-capabilities-test
   (registry/init! {})
