@@ -227,3 +227,7 @@ happens in the build phase per the concrete file list already in this log.
 ## Task-test-review 2nd-pass follow-up addressed (2026-07-28)
 
 - addressed 1 review step: extended `resolve-runtime-model-openai-oauth-gpt-5-6-variants-codex-test` to assert the third codex facet — the OAuth-codex-resolved variant's `structured-output/effective-capability` equals `normalize-structured-output-capability` of `openai-codex-native-capability` (mirroring the gpt-5.4 capability test and the drift-guard's normalization). `bb test --focus psi.ai.model-registry-test`: 270 assertions / 25 tests pass; `clj-kondo` clean.
+
+## Task-test-review (2026-07-28, 3rd pass)
+
+- added 1 step: turn-preflight surface has variant negative coverage (bare `gpt-5.6` blocked) but no variant positive coverage — no test drives a variant through the `execute-prepared-request!` preflight boundary under OAuth to prove it is not preflight-rejected. Distinct from the offer/accept picker steps and the structured-output-facet step. Tests otherwise well-formed: nullable oauth (`create-null-context`/`oauth-openai-ctx`), injected capturing `emit!`, no mocks/stubs; focused suites green (270/25 registry, 9/2 picker).
