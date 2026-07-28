@@ -22,6 +22,8 @@
   ([ctx session-id]
    (prepared-request ctx session-id "turn-1"))
   ([ctx session-id turn-id]
+   (prepared-request ctx session-id turn-id {}))
+  ([ctx session-id turn-id {:keys [resolve-runtime-model?]}]
    (let [augmentation-record {:session-id session-id
                               :turn-id turn-id
                               :workflow-run-id nil
@@ -34,10 +36,11 @@
             [:agent-session :sessions session-id :data :turn-augmentations turn-id]
             augmentation-record)
      (prompt-request/build-prepared-request
-      ctx session-id {:turn-id turn-id
-                      :user-message {:role "user"
-                                     :content [{:type :text :text "hello"}]}
-                      :runtime-model (:model (ss/get-session-data-in ctx session-id))}))))
+      ctx session-id (cond-> {:turn-id turn-id
+                              :user-message {:role "user"
+                                             :content [{:type :text :text "hello"}]}}
+                       (not resolve-runtime-model?)
+                       (assoc :runtime-model (:model (ss/get-session-data-in ctx session-id))))))))
 
 (defn- provider-events
   [ctx session-id]
@@ -238,20 +241,8 @@
         _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                  (merge (ss/get-session-data-in ctx session-id)
                         {:model {:provider "openai" :id "gpt-5.6"}}))
-        _ (swap! (:state* ctx) assoc-in
-                 [:agent-session :sessions session-id :data :turn-augmentations "turn-unsupported-runtime-model"]
-                 {:session-id session-id
-                  :turn-id "turn-unsupported-runtime-model"
-                  :workflow-run-id nil
-                  :status :no-op
-                  :replay? false
-                  :accepted-operation-count 0
-                  :operations []
-                  :providers []})
-        prepared (prompt-request/build-prepared-request
-                  ctx session-id {:turn-id "turn-unsupported-runtime-model"
-                                  :user-message {:role "user"
-                                                 :content [{:type :text :text "hello"}]}})
+        prepared (prepared-request ctx session-id "turn-unsupported-runtime-model"
+                                   {:resolve-runtime-model? true})
         result (turn-runtime/execute-prepared-request!
                 {:provider-registry (atom {})}
                 ctx session-id prepared nil)]
