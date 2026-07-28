@@ -33,3 +33,7 @@ Observed backend echo per variant: `store:false`, `service_tier:"auto"`,
 `reasoning.effort:"medium"`, `reasoning.context:"all_turns"` (vs `gpt-5.5`'s
 `current_turn`), `text.verbosity:"low"` — useful for catalog metadata during
 implementation.
+
+## Review notes
+
+- architectural review: no architectural review feedback (design reuses the shared `model_registry.clj` codex join point + `with-openai-codex-transport`; additive catalog/policy-set slice mirrors existing `gpt-5.5` pattern; single-source-of-truth honored)
