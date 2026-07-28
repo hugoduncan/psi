@@ -170,3 +170,17 @@
 - 2026-07-28 second code-shaper follow-up: addressed 1 review step. Added shared `psi.ai.model-registry/model-set-message` `([model] [model scope])` formatting the success wording `"✓ Model set to <provider> <id>[ [scope]]"` from the persisted `{:provider :id}` map. Routed all three text-result surfaces through it — `commands.clj` `/model` (already post-dispatch + scope suffix), `command_pickers.clj` RPC picker, and `tui_frontend_actions.clj` TUI picker — and switched both pickers from the pre-persist model map to the post-persist `set-model-in!` result `(:model result)` as the echoed provider/id source, resolving both latent drifts (scope-suffix omission + pre-vs-post-persist source). Added a `test-support/model-set-message` wrapper mirroring `unsupported-runtime-model-message`, and updated all surface assertions to derive the expected message from the shared helper instead of pasting the literal: `commands_test.clj` (3×, including the scope test now proving the full `[session]` suffix contract), `rpc_test.clj`, `rpc_model_scope_test.clj`, `tui_frontend_actions_test.clj`, `app_runtime_tui_startup_test.clj`. Behaviour-preserving. Validation: `clj-kondo --lint` 0/0 on all 9 changed files; focused tests 117/662 pass across `model-registry-test`, `commands-test`, `rpc-model-scope-test`, `rpc-test`, `tui-frontend-actions-test`, `app-runtime-tui-startup-test`.
 
 - 2026-07-28 third code-shaper review: no new feedback. Reviewed model_registry.clj policy + shared helpers (persistable-model, model-set-message, unsupported-runtime-model-message) and all four selection surfaces plus the cycle path; the prior :reasoning/message-idiom drift is consolidated and coherent. Residual echo-shape idiom variation in ops.clj (handle-set-model vs handle-cycle-model) is pre-existing (predates this task), and RPC-vs-text metadata differences reflect intrinsic wire shapes, not incidental drift. Lint clean; psi.ai.model-registry-test green (23 tests, 204 assertions).
+
+## Closure
+
+Closed 2026-07-28: completed. Established the authoritative OpenAI OAuth runtime
+policy for `gpt-5.6` from live ChatGPT/Codex backend evidence — bare `gpt-5.6`
+is unsupported on that backend and is surfaced as a uniform unsupported-model
+message across all selection surfaces, while `gpt-5.5` remains on the working
+OAuth/Codex path. Shared helpers (`persistable-model`,
+`unsupported-runtime-model-message`, `model-set-message`) consolidated the
+selection surfaces and fixed a real cross-surface `:reasoning`/message drift.
+Tests, CHANGELOG, and user/AI docs updated; implementation, code-shaper,
+test-shaper, and docs review gates all converged with no new feedback.
+Follow-up work to add the Codex-supported variants (sol/terra/luna) was tracked
+and completed separately as task 246.
