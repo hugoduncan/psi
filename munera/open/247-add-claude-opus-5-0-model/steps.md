@@ -78,3 +78,32 @@
       — subsumed: `opus-5-0-catalog-entry-test` now pins the exact placeholder
       values; a separate mirror-invariant test would duplicate that guard and
       conflict once real Opus 5.0 values diverge, so not added.
+
+## Test-shaper review follow-ups (247 test-shaper pass)
+
+- [ ] Deduplicate the two `:opus-5.0` tests in `model_registry_test.clj`. Since
+      `opus-5-0-catalog-entry-test` was added, the "Claude Opus 5.0 is findable
+      and declares native Anthropic JSON Schema output" block (in
+      `anthropic-json-schema-output-test`, ~L276) now redundantly re-asserts
+      `some?`, `:name`, `:adaptive-thinking`,
+      `:supports-mid-conversation-system-messages`, and `:supports-reasoning` —
+      all of which are already pinned by `opus-5-0-catalog-entry-test`. Reduce
+      the "findable" block to its distinct concern: the structured-output
+      capability (`:supported?`, `:native-mechanism`, `:strategies`) and the
+      `models-for-provider` enumeration membership. (test-shaper `economical`:
+      `minimal(redundant_tests)` ∧ `one_test_per_distinct_behavior`.)
+- [ ] Fix the `single_concern` violation in `anthropic-json-schema-output-test`:
+      the `claude-opus-5-0` `models-for-provider` enumeration-membership
+      assertion (~L289–291) is unrelated to that deftest's stated concern
+      (native Anthropic JSON Schema output). Move it into a behaviour-focused
+      home — e.g. the `opus-5-0-catalog-entry-test` or a dedicated
+      provider-enumeration test — so each test asserts one concern.
+      (test-shaper `single_concern`.)
+- [ ] (optional) Align Opus 5.0 test structure with its `:fable-5` / `:sonnet-5`
+      siblings for `consistent(structure)`. Fable/Sonnet have a shared
+      capability assertion in `anthropic-json-schema-output-test` plus one
+      catalog-entry test; Opus 5.0 uniquely also carries a full per-model
+      "findable" block mirroring Opus 4.8 (metadata + capability). Once the two
+      dedup steps above land, Opus 5.0's shape should match its siblings —
+      verify the remaining Opus 5.0 capability assertion matches the terse
+      Fable/Sonnet form rather than the fuller Opus 4.8 form.

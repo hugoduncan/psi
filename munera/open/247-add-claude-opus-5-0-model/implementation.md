@@ -48,3 +48,6 @@
 
 ## Test review pass (247, no-op)
 - no new steps: tests are well-formed, mirror sibling models, cover every design behaviour, and pass (297 assertions). Unit surface is pure data; the sole external dep (Anthropic HTTP) is gated `^:integration` with graceful skip — no mocks/stubs. The `anthropic-json-schema-native-model-keys` membership criterion is `^:private`, so its behavioural consequence (`effective-capability` → `:anthropic/json-schema-output`) is the correct test surface — direct set assertion intentionally avoided.
+
+## Test-shaper review pass (247)
+- added 3 test-shaper steps: dedup the redundant `:opus-5.0` "findable" block against `opus-5-0-catalog-entry-test`; move the misplaced `models-for-provider` membership assertion out of the JSON-schema-focused deftest; (optional) align Opus 5.0 test structure with `:fable-5`/`:sonnet-5` siblings.
