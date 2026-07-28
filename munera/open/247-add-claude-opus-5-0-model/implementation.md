@@ -51,3 +51,6 @@
 
 ## Test-shaper review pass (247)
 - added 3 test-shaper steps: dedup the redundant `:opus-5.0` "findable" block against `opus-5-0-catalog-entry-test`; move the misplaced `models-for-provider` membership assertion out of the JSON-schema-focused deftest; (optional) align Opus 5.0 test structure with `:fable-5`/`:sonnet-5` siblings.
+
+## Test-shaper review follow-up pass
+- addressed 3 test-shaper steps in `model_registry_test.clj`: (1) reduced the Opus 5.0 block in `built-in-structured-output-capabilities-test` to its distinct concern — the native JSON Schema capability — dropping the redundant name/capability-flag re-assertions now owned by `opus-5-0-catalog-entry-test`; (2) moved the `models-for-provider` enumeration-membership assertion into `opus-5-0-catalog-entry-test`, restoring `single_concern`; (3) the reduced block now mirrors the terse `:fable-5`/`:sonnet-5` form exactly (`(-> (find-model …) effective-capability)` + three capability assertions), achieving `consistent(structure)`. Focused tests green (292 assertions, 26 tests); clj-kondo clean.

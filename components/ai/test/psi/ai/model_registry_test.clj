@@ -273,22 +273,12 @@
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native))))
 
-  (testing "Claude Opus 5.0 is findable and declares native Anthropic JSON Schema output"
-    (let [model      (registry/find-model :anthropic "claude-opus-5-0")
-          capability (structured-output/effective-capability model)]
-      (is (some? model))
-      (is (= "Claude Opus 5.0" (:name model)))
-      (is (= true (:adaptive-thinking model)))
-      (is (= true (:supports-mid-conversation-system-messages model)))
-      (is (= true (:supports-reasoning model)))
+  (testing "Claude Opus 5.0 declares native Anthropic JSON Schema output"
+    (let [capability (-> (registry/find-model :anthropic "claude-opus-5-0")
+                         structured-output/effective-capability)]
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
-      (is (contains? (set (:strategies capability)) :provider-native))
-      ;; Direct acceptance-criterion coverage: the model must be enumerated by
-      ;; models-for-provider, not merely resolvable via find-model. The map is
-      ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
-      (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
-                     "claude-opus-5-0"))))
+      (is (contains? (set (:strategies capability)) :provider-native))))
 
   (testing "Claude Fable 5 declares native Anthropic JSON Schema output"
     (let [capability (-> (registry/find-model :anthropic "claude-fable-5")
@@ -365,7 +355,12 @@
       (is (= 5.0 (:input-cost model)))
       (is (= 25.0 (:output-cost model)))
       (is (= 0.5 (:cache-read-cost model)))
-      (is (= 6.25 (:cache-write-cost model))))))
+      (is (= 6.25 (:cache-write-cost model)))
+      ;; Acceptance-criterion coverage: the model must be enumerated by
+      ;; models-for-provider, not merely resolvable via find-model. The map is
+      ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
+      (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
+                     "claude-opus-5-0")))))
 
 (deftest gpt-5-6-catalog-entry-test
   (registry/init! {})

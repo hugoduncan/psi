@@ -81,7 +81,7 @@
 
 ## Test-shaper review follow-ups (247 test-shaper pass)
 
-- [ ] Deduplicate the two `:opus-5.0` tests in `model_registry_test.clj`. Since
+- [x] Deduplicate the two `:opus-5.0` tests in `model_registry_test.clj`. Since
       `opus-5-0-catalog-entry-test` was added, the "Claude Opus 5.0 is findable
       and declares native Anthropic JSON Schema output" block (in
       `anthropic-json-schema-output-test`, ~L276) now redundantly re-asserts
@@ -92,14 +92,14 @@
       capability (`:supported?`, `:native-mechanism`, `:strategies`) and the
       `models-for-provider` enumeration membership. (test-shaper `economical`:
       `minimal(redundant_tests)` ∧ `one_test_per_distinct_behavior`.)
-- [ ] Fix the `single_concern` violation in `anthropic-json-schema-output-test`:
+- [x] Fix the `single_concern` violation in `anthropic-json-schema-output-test`:
       the `claude-opus-5-0` `models-for-provider` enumeration-membership
       assertion (~L289–291) is unrelated to that deftest's stated concern
       (native Anthropic JSON Schema output). Move it into a behaviour-focused
       home — e.g. the `opus-5-0-catalog-entry-test` or a dedicated
       provider-enumeration test — so each test asserts one concern.
       (test-shaper `single_concern`.)
-- [ ] (optional) Align Opus 5.0 test structure with its `:fable-5` / `:sonnet-5`
+- [x] (optional) Align Opus 5.0 test structure with its `:fable-5` / `:sonnet-5`
       siblings for `consistent(structure)`. Fable/Sonnet have a shared
       capability assertion in `anthropic-json-schema-output-test` plus one
       catalog-entry test; Opus 5.0 uniquely also carries a full per-model
