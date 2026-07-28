@@ -63,3 +63,6 @@
 
 ## Test-shaper review pass 3 (247, no-op)
 - no new steps. Opus 5.0 unit tests (`single_concern`, `economical`, terse-capability parity with fable-5/sonnet-5, full attribute table pinned) and gated `^:integration` boundary test (graceful skip, real boundary, no mocks) are well-shaped; 292 assertions green. Residual second `testing` block in `opus-5-0-catalog-entry-test` is design-mandated `models-for-provider` acceptance coverage — justified deviation, not a defect.
+
+## Docs review pass (247 review-task-docs)
+- added 2 docs steps: `doc/extension-api.md` mid-system-message capability list omits Opus 5.0 (convention-breaking gap vs Sonnet 5 precedent); (optional) `doc/tui.md` `/model` example still cites Opus 4.8 as latest.

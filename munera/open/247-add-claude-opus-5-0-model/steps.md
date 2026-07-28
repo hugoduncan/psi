@@ -108,6 +108,22 @@
       verify the remaining Opus 5.0 capability assertion matches the terse
       Fable/Sonnet form rather than the fuller Opus 4.8 form.
 
+## Docs review follow-ups (247 review-task-docs pass)
+
+- [ ] Update `doc/extension-api.md` (~L217): the mid-conversation
+      system-message capability enumeration lists "Claude Opus 4.8, Claude
+      Fable 5, Claude Sonnet 5" but omits Claude Opus 5.0, which the catalog
+      declares `:supports-mid-conversation-system-messages true`. Sibling task
+      (Sonnet 5, commit `31d93c55c`) established the convention of adding each
+      new supporting model to this list; the doc is now stale/incomplete for
+      Opus 5.0. Add "Claude Opus 5.0" to that enumeration.
+- [ ] (optional) Refresh the `/model` example in `doc/tui.md` (~L68), which
+      still uses Claude Opus 4.8 as the illustrative latest Anthropic
+      adaptive-thinking / mid-conversation-system-message model. Opus 5.0 is
+      now the latest Opus with the same capabilities; consider updating the
+      example (or adding an Opus 5.0 line) for currency. Example-only, not
+      strictly stale.
+
 ## Test-shaper review follow-ups (247 test-shaper pass 2)
 
 - [x] (optional) Resolve the residual `single_concern` blend in
