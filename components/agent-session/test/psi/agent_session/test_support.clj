@@ -12,6 +12,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-recording]
    [psi.agent-session.prompt-request]
    [psi.agent-session.services :as services]
@@ -40,6 +41,27 @@
     :journal :flush-state :turn-ctx
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
     :provider-requests :provider-replies :provider-events})
+
+;; Far-future fixed expiry (year ~5138) keeps the oauth credential fixture
+;; deterministic and time-independent; oauth-backed? only requires a non-expired
+;; credential.
+(def far-future-expiry 99999999999999)
+
+(defn oauth-openai-credentials
+  "Return an OpenAI OAuth credential map with a deterministic far-future expiry,
+   shared across model-selection tests that exercise the OAuth runtime policy."
+  []
+  {:type    :oauth
+   :access  "tok"
+   :refresh "ref"
+   :expires far-future-expiry})
+
+(defn oauth-openai-ctx
+  "Return an oauth null-context carrying an OpenAI OAuth credential, the shared
+   fixture for tests that exercise OpenAI OAuth runtime model policy."
+  []
+  (oauth/create-null-context
+   {:credentials {:openai (oauth-openai-credentials)}}))
 
 (defn instant
   "Parse an ISO-8601 string into a `java.time.Instant`."

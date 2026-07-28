@@ -4,19 +4,13 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.session-settings :as settings]
    [psi.agent-session.test-support :as test-support]
-   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as ss]))
 
 (deftest cycle-model-in-skips-unsupported-runtime-models-test
   ;; Tests that model cycling does not select scoped models that resolve to an
   ;; explicitly unsupported runtime policy for the active auth context.
   (testing "skips OAuth-unsupported scoped models"
-    (let [oauth-ctx (oauth/create-null-context
-                     {:credentials {:openai {:type :oauth
-                                             :access "tok"
-                                             :refresh "ref"
-                                             :expires 99999999999999}}})
-          ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx oauth-ctx}))
+    (let [ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx (test-support/oauth-openai-ctx)}))
           sd        (session/new-session-in! ctx nil {})
           sid       (:session-id sd)
           original  {:provider "openai" :id "gpt-5.5" :reasoning true}
@@ -36,12 +30,7 @@
   ;; Tests that reverse model cycling skips scoped models that resolve to an
   ;; explicitly unsupported runtime policy for the active auth context.
   (testing "skips OAuth-unsupported scoped models while cycling backward"
-    (let [oauth-ctx (oauth/create-null-context
-                     {:credentials {:openai {:type :oauth
-                                             :access "tok"
-                                             :refresh "ref"
-                                             :expires 99999999999999}}})
-          ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx oauth-ctx}))
+    (let [ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx (test-support/oauth-openai-ctx)}))
           sd        (session/new-session-in! ctx nil {})
           sid       (:session-id sd)
           selected  {:provider "anthropic" :id "claude-sonnet-4-6" :reasoning true}
@@ -61,12 +50,7 @@
   ;; Tests that cycling is a no-op when every scoped candidate is unsupported
   ;; for the active auth context.
   (testing "does not select an unsupported scoped model"
-    (let [oauth-ctx (oauth/create-null-context
-                     {:credentials {:openai {:type :oauth
-                                             :access "tok"
-                                             :refresh "ref"
-                                             :expires 99999999999999}}})
-          ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx oauth-ctx}))
+    (let [ctx       (session/create-context (test-support/safe-context-opts {:oauth-ctx (test-support/oauth-openai-ctx)}))
           sd        (session/new-session-in! ctx nil {})
           sid       (:session-id sd)
           original  {:provider "openai" :id "gpt-5.5" :reasoning true}

@@ -5,7 +5,6 @@
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
    [psi.app-runtime.tui-frontend-actions :as sut]
-   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as ss]
    [psi.shared-config.project :as project-prefs]))
 
@@ -43,12 +42,7 @@
 
 (deftest handle-action-result-model-selection-rejects-unsupported-runtime-model-test
   (testing "TUI direct model selection rejects unsupported runtime models without mutating the session"
-    (let [oauth-ctx (oauth/create-null-context
-                     {:credentials {:openai {:type :oauth
-                                             :access "tok"
-                                             :refresh "ref"
-                                             :expires 99999999999999}}})
-          [ctx sid] (create-session-context {:oauth-ctx oauth-ctx})
+    (let [[ctx sid] (create-session-context {:oauth-ctx (test-support/oauth-openai-ctx)})
           original  (:model (ss/get-session-data-in ctx sid))
           result    {:ui.result/action-key :select-model
                      :ui.result/status :submitted
