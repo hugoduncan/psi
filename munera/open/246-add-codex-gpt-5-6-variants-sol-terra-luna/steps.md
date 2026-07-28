@@ -41,3 +41,7 @@
 - [x] `clj-kondo --lint` on touched files.
 - [x] Final diff review: verbatim ids, no aliasing, shared join point only, task-245 behaviour preserved.
 - [x] Confirm implementation.md contains per-id probe evidence for every id added to the Codex route.
+
+## Implementation-review follow-ups
+
+- [ ] Acceptance criterion says variants must be "selectable across all model-selection surfaces" (`/model`, RPC `set_model`, RPC picker, TUI picker, turn preflight), but tests only assert `resolve-runtime-model` + catalog membership. The pickers/preflight derive from this shared join point (low risk), yet no surface-level test proves a variant is offered/accepted at a picker or preflight boundary. Consider adding one surface-level assertion (e.g. picker enumeration or preflight acceptance of a variant under OAuth) to close the acceptance-criteria coverage gap, or explicitly record in implementation.md that shared-join-point coverage is deemed sufficient and why.

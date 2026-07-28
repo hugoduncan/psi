@@ -167,3 +167,7 @@ single-source-of-truth principles; design-steps.md item now checked.
 
 Nothing else actionable in the batch. Implementation of Slice 5 doc-prose edits
 happens in the build phase per the concrete file list already in this log.
+
+## Implementation review (2026-07-28)
+
+- added 1 step: surface-level selectability coverage gap (acceptance criterion names all selection surfaces; tests only cover the shared `resolve-runtime-model` join point + catalog membership).
