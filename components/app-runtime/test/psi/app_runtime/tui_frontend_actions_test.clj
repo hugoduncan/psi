@@ -14,24 +14,31 @@
          sd  (session/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
 
+(defn- select-model
+  "Invoke the TUI select-model action-result handler for `value`, using the
+  fixed resolver/no-op wiring shared by every model-selection case. Returns the
+  handler's result map."
+  [ctx sid value]
+  (sut/handle-action-result
+   {:ctx ctx
+    :sid sid
+    :action-result {:ui.result/action-key :select-model
+                    :ui.result/status :submitted
+                    :ui.result/value value}
+    :resolve-model-by-provider+id model-registry/resolve-runtime-model
+    :switch-session-fn! (fn [_] nil)
+    :fork-session-fn! (fn [_] nil)
+    :set-focus! (fn [_] nil)}))
+
 (deftest handle-action-result-model-selection-uses-omitted-scope-default-test
   (testing "TUI direct model selection persists through the omitted-scope default"
     (let [cwd      (str (System/getProperty "java.io.tmpdir") "/psi-tui-model-scope-" (java.util.UUID/randomUUID))
           _        (.mkdirs (java.io.File. cwd))
           local-f  (project-prefs/project-local-preferences-file cwd)
-          [ctx sid] (create-session-context {:cwd cwd})
-          result   {:ui.result/action-key :select-model
-                    :ui.result/status :submitted
-                    :ui.result/value {:provider "openai" :id "gpt-5.3-codex"}}]
+          [ctx sid] (create-session-context {:cwd cwd})]
       (is (= {:type :text
               :message "✓ Model set to openai gpt-5.3-codex"}
-             (sut/handle-action-result {:ctx ctx
-                                        :sid sid
-                                        :action-result result
-                                        :resolve-model-by-provider+id model-registry/resolve-runtime-model
-                                        :switch-session-fn! (fn [_] nil)
-                                        :fork-session-fn! (fn [_] nil)
-                                        :set-focus! (fn [_] nil)})))
+             (select-model ctx sid {:provider "openai" :id "gpt-5.3-codex"})))
       (is (= {:provider "openai"
               :id "gpt-5.3-codex"
               :reasoning true}
@@ -43,17 +50,8 @@
 (deftest handle-action-result-model-selection-rejects-unsupported-runtime-model-test
   (testing "TUI direct model selection rejects unsupported runtime models without mutating the session"
     (let [[ctx sid] (create-session-context {:oauth-ctx (test-support/oauth-openai-ctx)})
-          original  (:model (ss/get-session-data-in ctx sid))
-          result    {:ui.result/action-key :select-model
-                     :ui.result/status :submitted
-                     :ui.result/value {:provider "openai" :id "gpt-5.6"}}]
+          original  (:model (ss/get-session-data-in ctx sid))]
       (is (= {:type :text
               :message "Unsupported model: openai gpt-5.6 — gpt-5.6 is not supported for OpenAI OAuth without an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport"}
-             (sut/handle-action-result {:ctx ctx
-                                        :sid sid
-                                        :action-result result
-                                        :resolve-model-by-provider+id model-registry/resolve-runtime-model
-                                        :switch-session-fn! (fn [_] nil)
-                                        :fork-session-fn! (fn [_] nil)
-                                        :set-focus! (fn [_] nil)})))
+             (select-model ctx sid {:provider "openai" :id "gpt-5.6"})))
       (is (= original (:model (ss/get-session-data-in ctx sid)))))))
