@@ -231,3 +231,7 @@ happens in the build phase per the concrete file list already in this log.
 ## Task-test-review (2026-07-28, 3rd pass)
 
 - added 1 step: turn-preflight surface has variant negative coverage (bare `gpt-5.6` blocked) but no variant positive coverage — no test drives a variant through the `execute-prepared-request!` preflight boundary under OAuth to prove it is not preflight-rejected. Distinct from the offer/accept picker steps and the structured-output-facet step. Tests otherwise well-formed: nullable oauth (`create-null-context`/`oauth-openai-ctx`), injected capturing `emit!`, no mocks/stubs; focused suites green (270/25 registry, 9/2 picker).
+
+## Task-test-review 3rd-pass follow-up addressed (2026-07-28)
+
+- addressed 1 review step: added `execute-prepared-request-gpt-5-6-variants-pass-preflight-and-reach-provider-test` to `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` — positive counterpart to the bare-`gpt-5.6` negative preflight test. For each of `gpt-5.6-sol/terra/luna`, persists the variant, resolves through the runtime path (`:resolve-runtime-model? true`) under `oauth-openai-ctx`, and asserts: preflight codex-resolves the variant (verbatim id, `:openai-codex-responses` api, `chatgpt.com/backend-api` base-url), carries no `:runtime/unsupported?`, is not error-shaped, and reaches provider dispatch (`execute-live-turn!` receives the codex-resolved variant). `bb test --focus psi.turn-runtime.response-mode-test`: 150 assertions / 20 tests pass; `clj-kondo` clean.

@@ -259,6 +259,57 @@
            (:execution-result/provider-captures result)))
     (is (empty? (provider-events ctx session-id)))))
 
+(deftest execute-prepared-request-gpt-5-6-variants-pass-preflight-and-reach-provider-test
+  ;; Positive counterpart to
+  ;; execute-prepared-request-unsupported-runtime-model-preflights-before-provider-test:
+  ;; the OAuth/Codex-supported gpt-5.6 variants (sol/terra/luna) must NOT be
+  ;; preflight-rejected. Each persisted/startup-selected variant, resolved
+  ;; through the same runtime path (:resolve-runtime-model? true) under OpenAI
+  ;; OAuth, is codex-resolved (verbatim id, codex :api/:base-url), carries no
+  ;; :runtime/unsupported? marker, is not error-shaped at preflight, and reaches
+  ;; provider dispatch (execute-live-turn! called with the codex-resolved model).
+  (doseq [id ["gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"]]
+    (let [[ctx session-id] (create-session-context {:persist? false
+                                                    :oauth-ctx (test-support/oauth-openai-ctx)})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                   (merge (ss/get-session-data-in ctx session-id)
+                          {:model {:provider "openai" :id id}}))
+          prepared (prepared-request ctx session-id "turn-variant-preflight"
+                                     {:resolve-runtime-model? true})
+          seen-model* (atom nil)
+          result (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                               (fn [_ai-ctx _ctx _session-id {:keys [turn-id ai-model]}]
+                                 (reset! seen-model* ai-model)
+                                 {:turn-id turn-id
+                                  :model ai-model
+                                  :ai-options {}
+                                  :turn-ctx nil
+                                  :assistant-message {:role "assistant"
+                                                      :content [{:type :text :text "streamed"}]
+                                                      :stop-reason :stop
+                                                      :timestamp (java.time.Instant/now)}
+                                  :logprobs nil})]
+                   (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})}
+                    ctx session-id prepared nil))]
+      ;; Preflight resolved the variant to the codex transport, verbatim id, and
+      ;; did NOT mark it runtime-unsupported (contrast bare gpt-5.6).
+      (is (= :openai (:provider (:prepared-request/model prepared))) (str id " provider"))
+      (is (= id (:id (:prepared-request/model prepared))) (str id " verbatim id"))
+      (is (= :openai-codex-responses (:api (:prepared-request/model prepared)))
+          (str id " codex api"))
+      (is (= "https://chatgpt.com/backend-api" (:base-url (:prepared-request/model prepared)))
+          (str id " codex base-url"))
+      (is (not (:runtime/unsupported? (:prepared-request/model prepared)))
+          (str id " not runtime-unsupported"))
+      ;; Not error-shaped at preflight; reached provider dispatch.
+      (is (not= :turn.outcome/error (:execution-result/turn-outcome result))
+          (str id " not error-shaped"))
+      (is (nil? (:execution-result/runtime-unsupported-reason result))
+          (str id " no unsupported reason"))
+      (is (= :stop (:execution-result/stop-reason result)) (str id " reached provider"))
+      (is (= id (:id @seen-model*)) (str id " provider dispatch received codex-resolved variant")))))
+
 (deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
   (testing "fallback-forbidden unsupported strategy fails before streaming provider request"
     (let [[ctx session-id] (create-session-context {:persist? false})
