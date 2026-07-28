@@ -60,3 +60,6 @@
 
 ## Test-shaper review pass 2 follow-up execution (247)
 - addressed 1 review step: moved `models-for-provider` enumeration-membership assertion out of `opus-5-0-catalog-entry-test`'s metadata/pricing `testing` block into a dedicated "enumerated by models-for-provider" `testing` block — resolves `single_concern` blend, restores structural parity with `fable-5`/`sonnet-5` siblings. Focused tests green (26 tests, 292 assertions).
+
+## Test-shaper review pass 3 (247, no-op)
+- no new steps. Opus 5.0 unit tests (`single_concern`, `economical`, terse-capability parity with fable-5/sonnet-5, full attribute table pinned) and gated `^:integration` boundary test (graceful skip, real boundary, no mocks) are well-shaped; 292 assertions green. Residual second `testing` block in `opus-5-0-catalog-entry-test` is design-mandated `models-for-provider` acceptance coverage — justified deviation, not a defect.
