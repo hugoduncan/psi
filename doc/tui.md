@@ -70,10 +70,12 @@ repo-local startup.
   mid-conversation system-message support.
 - `/model openai gpt-5.5` uses the OpenAI OAuth/ChatGPT Codex runtime path when
   the OpenAI provider is backed by stored OAuth credentials. `/model openai
-  gpt-5.6` remains a catalog-selectable OpenAI model for non-OAuth/API-key use,
-  but OpenAI OAuth-backed `gpt-5.6` is explicitly unsupported until a supported
-  ChatGPT/Codex alias or alternate OAuth-compatible transport is evidenced and
-  encoded as runtime policy.
+  gpt-5.6-sol`, `/model openai gpt-5.6-terra`, and `/model openai gpt-5.6-luna`
+  are also OAuth/Codex-supported and use the same runtime path. `/model openai
+  gpt-5.6` (the bare id) remains a catalog-selectable OpenAI model for
+  non-OAuth/API-key use, but OpenAI OAuth-backed `gpt-5.6` is explicitly
+  unsupported until a supported ChatGPT/Codex alias or alternate
+  OAuth-compatible transport is evidenced and encoded as runtime policy.
 - Bare `/model` opens the interactive model picker. Selecting an unsupported
   runtime model from the picker — such as OpenAI OAuth-backed `gpt-5.6` when the
   OpenAI provider is backed by stored OAuth credentials — is rejected the same

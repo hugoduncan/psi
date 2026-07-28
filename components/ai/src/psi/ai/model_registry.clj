@@ -177,7 +177,7 @@
 (def ^:private openai-oauth-codex-model-ids
   "OpenAI model ids with evidence for ChatGPT/Codex backend execution under
    OpenAI OAuth."
-  #{"gpt-5.5"})
+  #{"gpt-5.5" "gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"})
 
 (def ^:private openai-oauth-unsupported-model-ids
   "OpenAI model ids that are explicitly unsupported under OpenAI OAuth until a

@@ -98,7 +98,7 @@
 (deftest resolve-runtime-model-openai-no-oauth-stays-chat-completions-test
   (registry/init! {})
 
-  (doseq [id ["gpt-5.5" "gpt-5.6"]]
+  (doseq [id ["gpt-5.5" "gpt-5.6" "gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"]]
     (testing (str "openai " id " remains chat-completions without oauth context")
       (let [model (registry/resolve-runtime-model nil :openai id)]
         (is (= :openai-completions (:api model)) (str id " api"))
@@ -112,6 +112,16 @@
       (is (= :openai-codex-responses (:api model)))
       (is (= "https://chatgpt.com/backend-api" (:base-url model)))
       (is (= "gpt-5.5" (:id model))))))
+
+(deftest resolve-runtime-model-openai-oauth-gpt-5-6-variants-codex-test
+  (registry/init! {})
+
+  (doseq [id ["gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"]]
+    (testing (str "openai " id " resolves to codex transport when oauth credential is present")
+      (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai id)]
+        (is (= :openai-codex-responses (:api model)) (str id " api"))
+        (is (= "https://chatgpt.com/backend-api" (:base-url model)) (str id " base-url"))
+        (is (= id (:id model)) (str id " id sent verbatim"))))))
 
 (deftest resolve-runtime-model-openai-oauth-gpt-5-6-unsupported-test
   (registry/init! {})
@@ -326,6 +336,31 @@
       (is (= 35.0 (:output-cost model)))
       (is (= 0.6 (:cache-read-cost model)))
       (is (= 0.0 (:cache-write-cost model))))))
+
+(deftest gpt-5-6-variants-catalog-entry-test
+  (registry/init! {})
+
+  (doseq [[id name-str input output cache-read cache-write]
+          [["gpt-5.6-sol" "GPT-5.6 Sol" 5.0 30.0 0.5 6.25]
+           ["gpt-5.6-terra" "GPT-5.6 Terra" 2.5 15.0 0.25 3.125]
+           ["gpt-5.6-luna" "GPT-5.6 Luna" 1.0 6.0 0.1 1.25]]]
+    (testing (str id " catalog entry carries the agreed metadata, capability, and pricing values")
+      (let [model (registry/find-model :openai id)]
+        (is (some? model))
+        (is (= id (:id model)))
+        (is (= name-str (:name model)))
+        (is (= :openai (:provider model)))
+        (is (= :openai-completions (:api model)))
+        (is (= "https://api.openai.com/v1" (:base-url model)))
+        (is (= true (:supports-reasoning model)))
+        (is (= true (:supports-images model)))
+        (is (= true (:supports-text model)))
+        (is (= 272000 (:context-window model)))
+        (is (= 128000 (:max-tokens model)))
+        (is (= input (:input-cost model)))
+        (is (= output (:output-cost model)))
+        (is (= cache-read (:cache-read-cost model)))
+        (is (= cache-write (:cache-write-cost model)))))))
 
 (deftest codex-catalog-transport-matches-shared-constants-test
   ;; Drift guard: the codex catalog entries author their transport as data

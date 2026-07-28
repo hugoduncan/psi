@@ -605,7 +605,55 @@
     :input-cost 6.0
     :output-cost 35.0
     :cache-read-cost 0.6
-    :cache-write-cost 0.0}})
+    :cache-write-cost 0.0}
+
+   :gpt-5.6-sol
+   {:id "gpt-5.6-sol"
+    :name "GPT-5.6 Sol"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 5.0
+    :output-cost 30.0
+    :cache-read-cost 0.5
+    :cache-write-cost 6.25}
+
+   :gpt-5.6-terra
+   {:id "gpt-5.6-terra"
+    :name "GPT-5.6 Terra"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 2.5
+    :output-cost 15.0
+    :cache-read-cost 0.25
+    :cache-write-cost 3.125}
+
+   :gpt-5.6-luna
+   {:id "gpt-5.6-luna"
+    :name "GPT-5.6 Luna"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 1.0
+    :output-cost 6.0
+    :cache-read-cost 0.1
+    :cache-write-cost 1.25}})
 
 (def ^:private provider-defaults
   {:anthropic {:locality :cloud
@@ -637,7 +685,10 @@
     :gpt-5.2-pro
     :gpt-5.4-mini
     :gpt-5.5
-    :gpt-5.6})
+    :gpt-5.6
+    :gpt-5.6-sol
+    :gpt-5.6-terra
+    :gpt-5.6-luna})
 
 (def ^:private anthropic-json-schema-native-model-keys
   #{:sonnet-4.5

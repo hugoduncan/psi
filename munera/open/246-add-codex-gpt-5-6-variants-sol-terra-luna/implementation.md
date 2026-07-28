@@ -64,6 +64,48 @@ Principles when addressing this design-step:
 - CHANGELOG [Unreleased]/Added (plan Slice 5) is the user-facing entry point — keep
   doc-prose edits consistent with that entry's wording.
 
+## Build slice: catalog + routing + tests + docs (2026-07-28)
+
+- Catalog: added `:gpt-5.6-sol`, `:gpt-5.6-terra`, `:gpt-5.6-luna` to
+  `components/ai/src/psi/ai/models.clj` immediately after the existing bare
+  `gpt-5.6` entry, with the design-resolved shared shape (`:openai`,
+  `:openai-completions`, `api.openai.com/v1`, reasoning/images/text,
+  context-window 272000, max-tokens 128000) and per-variant pricing from the
+  design table. All three keys joined
+  `openai-chat-completions-native-model-keys`.
+- Routing: added the same three ids (verbatim) to
+  `openai-oauth-codex-model-ids` in `model_registry.clj`.
+  `openai-oauth-unsupported-model-ids` untouched — still `#{"gpt-5.6"}`.
+- `rg "gpt-5.5"` confirmed only `models.clj`, `model_registry.clj`,
+  `model_registry_test.clj`, and `rpc_model_scope_test.clj` reference the id;
+  the rpc test exercises generic OAuth rejection/preservation behaviour (not
+  catalog/codex-route membership), so it needed no change — no other surface
+  restates codex-route literals.
+- Tests added to `model_registry_test.clj`: a new
+  `resolve-runtime-model-openai-oauth-gpt-5-6-variants-codex-test` (doseq over
+  all three variants, mirrors the `gpt-5.5` codex-resolution test — asserts
+  `:api :openai-codex-responses`, `chatgpt.com/backend-api` base-url, and id
+  echoed verbatim); a new `gpt-5-6-variants-catalog-entry-test` (doseq,
+  mirrors the existing bare-`gpt-5.6` catalog-entry test) asserting the full
+  per-variant metadata/pricing table; extended the existing
+  `resolve-runtime-model-openai-no-oauth-stays-chat-completions-test` doseq to
+  include the three variant ids. Existing bare-`gpt-5.6` unsupported test and
+  `gpt-5.5` control test required no changes (already present, still pass).
+  `bb test --focus psi.ai.model-registry-test`: 267 assertions / 25 tests, all
+  passing.
+- Docs: CHANGELOG `[Unreleased]/Added` entry; prose reconciled in
+  `doc/tui.md`, `README.md`, `doc/configuration.md` (two locations —
+  `:model-id` validation prose and the session-profile credential-policy
+  prose), and `doc/cli.md` — each now distinguishes bare `gpt-5.6`
+  (OAuth-unsupported) from the three OAuth/Codex-supported variants, without
+  restating codex-route literals (single source of truth stays
+  `model_registry.clj`).
+- Validation: `bb test` full run — 18937 assertions passed, 44 failed / 17
+  errored, but confirmed via `git stash` that these failures are pre-existing
+  and unrelated (workflow/prompt/streaming tests with randomized seed
+  flakiness); none touch `psi.ai.models`/`psi.ai.model-registry`.
+  `clj-kondo --lint` on all touched `.clj` files: 0 errors, 0 warnings.
+
 ## Notes for the design-step task
 
 Relevant project files (non-task):
