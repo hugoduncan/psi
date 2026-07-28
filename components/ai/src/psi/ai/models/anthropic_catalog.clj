@@ -183,9 +183,9 @@
     :cache-read-cost 0.5
     :cache-write-cost 6.25}
 
-   :opus-5.0
-   {:id "claude-opus-5-0"
-    :name "Claude Opus 5.0"
+   :opus-5
+   {:id "claude-opus-5"
+    :name "Claude Opus 5"
     :provider :anthropic
     :api :anthropic-messages
     :base-url "https://api.anthropic.com"

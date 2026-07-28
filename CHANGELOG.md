@@ -7,7 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
-- Added Claude Opus 5.0 (`claude-opus-5-0`) as a selectable built-in Anthropic model: adaptive-thinking, image + text input, native JSON-Schema structured output, and mid-conversation system-message support. Select with `/model anthropic claude-opus-5-0`. Pricing/context-window/max-tokens mirror Claude Opus 4.8 as placeholders pending official Anthropic publication.
+- Added Claude Opus 5 (`claude-opus-5`) as a selectable built-in Anthropic model: adaptive-thinking, image + text input, native JSON-Schema structured output, and mid-conversation system-message support. Select with `/model anthropic claude-opus-5`. Pricing/context-window/max-tokens mirror Claude Opus 4.8 as placeholders pending official Anthropic publication.
 - Three GPT-5.6 Codex-supported model variants — `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` — are now available in the built-in model catalog and selectable via `/model`, RPC `set_model`, and the RPC/TUI model pickers. Each offers reasoning, image + text input, a 272K-token context, and native JSON-Schema structured output over the Codex path; the three differ only in pricing tier (sol > terra > luna). Under OpenAI OAuth each variant is routed at turn preflight to the ChatGPT/Codex backend with its id sent verbatim (confirmed by live streaming probe), the same path already used by `gpt-5.5`. Bare `gpt-5.6` remains unsupported under OpenAI OAuth.
 
 ### Fixed

@@ -1,13 +1,13 @@
-# Plan — 247 Add Claude Opus 5.0 model
+# Plan — 247 Add Claude Opus 5 model
 
 ## Approach
 
 Pure catalog-data change following the established Opus 4.8 pattern (task 192):
 
-1. Add an `:opus-5.0` entry to `anthropic_catalog.clj` immediately after
+1. Add an `:opus-5` entry to `anthropic_catalog.clj` immediately after
    `:opus-4.8` (line ~168), using the attribute table in design.md verbatim
    (placeholder pricing/limits mirror Opus 4.8).
-2. Add `:opus-5.0` to `anthropic-json-schema-native-model-keys` in
+2. Add `:opus-5` to `anthropic-json-schema-native-model-keys` in
    `models.clj` (line ~483).
 3. Tests: extend the focused unit tests in
    `components/ai/test/psi/ai/model_registry_test.clj` (registry resolution +
@@ -22,7 +22,7 @@ messages, and structured-output shaping all dispatch on model metadata.
 
 ## Key decisions
 
-- Model id `claude-opus-5-0` per established `claude-opus-N-M` naming.
+- Model id `claude-opus-5` per established `claude-opus-N-M` naming.
 - Placeholder pricing/context/max-tokens mirror Opus 4.8 until Anthropic
   publishes official values (sanctioned by design.md).
 - Mirror the task-192 test structure rather than inventing new test files.

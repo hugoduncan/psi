@@ -75,7 +75,7 @@
       (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-7")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-8")))
-      (is (some? (registry/find-model :anthropic "claude-opus-5-0")))
+      (is (some? (registry/find-model :anthropic "claude-opus-5")))
       (is (some? (registry/find-model :anthropic "claude-fable-5")))
       (is (some? (registry/find-model :anthropic "claude-sonnet-5")))
       (is (contains? built-in/all-models :fable-5))
@@ -273,8 +273,8 @@
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native))))
 
-  (testing "Claude Opus 5.0 declares native Anthropic JSON Schema output"
-    (let [capability (-> (registry/find-model :anthropic "claude-opus-5-0")
+  (testing "Claude Opus 5 declares native Anthropic JSON Schema output"
+    (let [capability (-> (registry/find-model :anthropic "claude-opus-5")
                          structured-output/effective-capability)]
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
@@ -335,13 +335,13 @@
       (is (= 0.3 (:cache-read-cost model)))
       (is (= 3.75 (:cache-write-cost model))))))
 
-(deftest opus-5-0-catalog-entry-test
+(deftest opus-5-catalog-entry-test
   (registry/init! {})
 
-  (testing "Claude Opus 5.0 catalog entry carries the agreed metadata, capability, and pricing values"
-    (let [model (registry/find-model :anthropic "claude-opus-5-0")]
+  (testing "Claude Opus 5 catalog entry carries the agreed metadata, capability, and pricing values"
+    (let [model (registry/find-model :anthropic "claude-opus-5")]
       (is (some? model))
-      (is (= "Claude Opus 5.0" (:name model)))
+      (is (= "Claude Opus 5" (:name model)))
       (is (= :anthropic (:provider model)))
       (is (= :anthropic-messages (:api model)))
       (is (= "https://api.anthropic.com" (:base-url model)))
@@ -357,12 +357,12 @@
       (is (= 0.5 (:cache-read-cost model)))
       (is (= 6.25 (:cache-write-cost model)))))
 
-  (testing "Claude Opus 5.0 is enumerated by models-for-provider :anthropic"
+  (testing "Claude Opus 5 is enumerated by models-for-provider :anthropic"
     ;; Acceptance-criterion coverage: the model must be enumerated by
     ;; models-for-provider, not merely resolvable via find-model. The map is
-    ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
+    ;; keyed by [provider id]; assert the id set contains claude-opus-5.
     (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
-                   "claude-opus-5-0"))))
+                   "claude-opus-5"))))
 
 (deftest gpt-5-6-catalog-entry-test
   (registry/init! {})

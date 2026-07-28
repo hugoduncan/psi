@@ -251,7 +251,7 @@ transport implementations.
 
 The level is clamped to what the selected model supports. Models that do not
 support reasoning ignore levels above `:off`. For Anthropic adaptive-thinking
-models such as Claude Opus 5.0 and Claude Sonnet 5, `:xhigh` is distinct from
+models such as Claude Opus 5 and Claude Sonnet 5, `:xhigh` is distinct from
 `:high` and sends the provider effort value `"highest"`; if the provider rejects
 that preview value, psi surfaces the provider error without retrying as `:high`.
 
