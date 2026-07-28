@@ -95,3 +95,4 @@
 
 - 2026-07-27 fifth docs review follow-up: addressed 2 review steps. Updated `doc/cli.md` and `doc/configuration.md` so CLI/env, config, and session-profile model selection document the OpenAI catalog-vs-OAuth runtime boundary: non-OAuth/API-key `gpt-5.6` remains catalog-valid, OAuth-backed `gpt-5.6` is unsupported/rejected or fails preflight without fallback, and OAuth-backed `gpt-5.5` remains on the OAuth/ChatGPT Codex path.
 - addressed 2 review steps
+- 2026-07-27 sixth docs review: added 1 step to be addressed.

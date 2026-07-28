@@ -115,3 +115,6 @@
 
 - [x] Update `doc/cli.md` model selection documentation so `--model`/`PSI_MODEL` users can discover the OpenAI catalog-vs-OAuth-runtime boundary: `gpt-5.6` is a catalog key for non-OAuth/API-key OpenAI use, but OpenAI OAuth-backed `gpt-5.6` is unsupported until evidenced runtime policy is added, while `gpt-5.5` remains on the OAuth/Codex path.
 - [x] Update `doc/configuration.md` model settings/session-profile documentation so configured or profiled `:model-provider "openai"` + `:model-id "gpt-5.6"` does not appear credential-agnostically supported; document that model-id catalog validation is distinct from runtime OAuth support and OAuth-backed `gpt-5.6` will be rejected or fail preflight rather than silently fallback.
+## Sixth docs review follow-up
+
+- [ ] Update the `CHANGELOG.md` GPT-5.6 added-model entry so it is not credential-agnostic: keep the non-OAuth/API-key chat-completions selection claim, but cross-reference or include the OpenAI OAuth boundary that OAuth-backed `gpt-5.6` is unsupported/rejected until an evidenced runtime policy is added.
