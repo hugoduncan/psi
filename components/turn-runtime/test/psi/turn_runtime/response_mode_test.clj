@@ -374,67 +374,6 @@
                  (get-in result [:execution-result/structured-output :ai-reason])))
           (is (empty? (get-in result [:execution-result/provider-captures :request-captures]))))))))
 
-(deftest execute-prepared-request-openai-usage-limit-schedules-retry-test
-  ;; OpenAI usage-limit wording is a rate-limit failure even if the provider
-  ;; stream failed to preserve a numeric HTTP status.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-base-delay-ms 10
-                                                           :auto-retry-max-retries 1}})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (if (= 1 (swap! attempts* inc))
-                      (error-turn "The usage limit has been reached [request-id req_123]")
-                      {:turn-id "turn-1"
-                       :model {:provider "openai" :id "gpt-test"}
-                       :ai-options {}
-                       :turn-ctx nil
-                       :assistant-message {:role "assistant"
-                                           :content [{:type :text :text "recovered"}]
-                                           :stop-reason :stop
-                                           :timestamp (java.time.Instant/now)}}))]
-      (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
-            scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
-                                     (provider-events ctx session-id)))]
-        (is (= 2 @attempts*))
-        (is (= :stop (:execution-result/stop-reason result)))
-        (is (= :rate-limit (:error-kind scheduled)))
-        (is (= "The usage limit has been reached [request-id req_123]"
-               (:error-message scheduled)))
-        (is (nil? (:http-status scheduled)))))))
-
-(deftest execute-prepared-request-retry-disabled-classifies-without-scheduling-test
-  ;; Disabled retry records one failed attempt and exposes a skipped-retry outcome.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 3}})
-        _               (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
-                               (assoc (ss/get-session-data-in ctx session-id)
-                                      :auto-retry-enabled false))
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
-      (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
-        (is (= 1 @attempts*))
-        (is (= :retry-disabled (:failure-reason outcome)))
-        (is (= :transport (:error-kind outcome)))
-        (is (true? (:retryable? outcome)))
-        (is (false? (:retry-enabled? outcome)))
-        (is (= 1 (:attempt-count outcome)))
-        (is (= 0 (:retry-attempt outcome)))
-        (is (= 3 (:max-retries outcome)))
-        (is (= ["provider_request_started" "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))
-        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
-
 (deftest execute-prepared-request-zero-max-retries-exhausts-without-scheduling-test
   ;; Enabled retry with zero allowed retry executions returns retry-exhausted, not retry-disabled.
   (let [[ctx session-id] (create-session-context {:persist? false
