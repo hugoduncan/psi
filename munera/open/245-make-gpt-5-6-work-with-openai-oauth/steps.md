@@ -97,6 +97,10 @@
 
 - [x] Add a `resolve-runtime-model` regression proving unknown/absent OpenAI model ids stay safe under OAuth context: with `oauth-openai-ctx`, an id not in the catalog (e.g. `"gpt-does-not-exist"`) must resolve to nil rather than an exception or a bogus override map. The current `resolve-runtime-model-openai-oauth-routing-test` only exercises known catalog ids (`gpt-5.5`, `gpt-5.6`, `gpt-5.4-mini`) and the `nil`-ctx branch, so the OAuth branch's `find-model` nil-guard and outer `or` fall-through (slice-3 "nil and unknown model handling remains safe when runtime override resolution consults the catalog") is unproven.
 
+## Second test review follow-up (task-test-review)
+
+- [ ] Add a `model-registry-test` `resolve-runtime-model` regression that passes the provider as a **string** (`"openai"`, matching the session `:model` `:provider` shape) under `oauth-openai-ctx` and asserts `gpt-5.6` resolves to the `:runtime/unsupported?` policy. The string→keyword coercion branch of `resolve-runtime-model`'s `cond` is only exercised transitively via RPC integration tests; no direct unit assertion proves that a stored `{:provider "openai" :id "gpt-5.6"}` model reaches the unsupported OAuth override through the string-provider path, so a regression in that coercion could silently drop OAuth policy for the exact provider shape the runtime persists.
+
 ## Docs review follow-up
 
 - [x] Update the user-facing model-selection documentation (for example `README.md`/`doc/tui.md` or the closest canonical model docs) so the OpenAI OAuth behaviour is discoverable outside `CHANGELOG.md`: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, but OpenAI OAuth-backed `gpt-5.6` is explicitly unsupported until an evidenced ChatGPT/Codex alias or alternate OAuth-compatible transport is added; `gpt-5.5` remains on the OAuth/Codex path.
