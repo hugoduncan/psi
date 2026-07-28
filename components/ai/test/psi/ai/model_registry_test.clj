@@ -75,6 +75,7 @@
       (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-7")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-8")))
+      (is (some? (registry/find-model :anthropic "claude-opus-5-0")))
       (is (some? (registry/find-model :anthropic "claude-fable-5")))
       (is (some? (registry/find-model :anthropic "claude-sonnet-5")))
       (is (contains? built-in/all-models :fable-5))
@@ -266,6 +267,17 @@
           capability (structured-output/effective-capability model)]
       (is (some? model))
       (is (= "Claude Opus 4.8" (:name model)))
+      (is (= true (:adaptive-thinking model)))
+      (is (= true (:supports-mid-conversation-system-messages model)))
+      (is (= true (:supported? capability)))
+      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "Claude Opus 5.0 is findable and declares native Anthropic JSON Schema output"
+    (let [model      (registry/find-model :anthropic "claude-opus-5-0")
+          capability (structured-output/effective-capability model)]
+      (is (some? model))
+      (is (= "Claude Opus 5.0" (:name model)))
       (is (= true (:adaptive-thinking model)))
       (is (= true (:supports-mid-conversation-system-messages model)))
       (is (= true (:supported? capability)))

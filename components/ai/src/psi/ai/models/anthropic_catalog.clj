@@ -183,6 +183,24 @@
     :cache-read-cost 0.5
     :cache-write-cost 6.25}
 
+   :opus-5.0
+   {:id "claude-opus-5-0"
+    :name "Claude Opus 5.0"
+    :provider :anthropic
+    :api :anthropic-messages
+    :base-url "https://api.anthropic.com"
+    :supports-reasoning true
+    :adaptive-thinking true
+    :supports-mid-conversation-system-messages true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 5.0
+    :output-cost 25.0
+    :cache-read-cost 0.5
+    :cache-write-cost 6.25}
+
    :fable-5
    {:id "claude-fable-5"
     :name "Claude Fable 5"

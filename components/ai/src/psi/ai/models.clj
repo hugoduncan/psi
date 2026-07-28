@@ -481,6 +481,7 @@
     :haiku-4.5
     :opus-4.7
     :opus-4.8
+    :opus-5.0
     :fable-5
     :sonnet-5})
 

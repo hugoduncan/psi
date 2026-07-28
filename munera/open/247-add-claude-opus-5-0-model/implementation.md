@@ -11,3 +11,13 @@
 - Relevant files: catalog `components/ai/src/psi/ai/models/anthropic_catalog.clj` (add `:opus-5.0` immediately after `:opus-4.8`); json-schema-native set `components/ai/src/psi/ai/models.clj` (`anthropic-json-schema-native-model-keys`, ~L476); capability dispatch predicate `adaptive-thinking?` in `providers/anthropic.clj`.
 - Principle: pure data addition — extend by adding a keyed entry + set member; do not modify dispatch/provider logic (capabilities dispatch generically on model metadata).
 - Placeholder values must mirror `:opus-4.8` exactly until Anthropic publishes official Opus 5.0 pricing/limits (open question on real id string `claude-opus-5-0`).
+
+## Slice 1–3 complete (implementation pass)
+- `:opus-5.0` catalog entry added immediately after `:opus-4.8` in `anthropic_catalog.clj`; attributes mirror `:opus-4.8` exactly per design.md.
+- `:opus-5.0` added to `anthropic-json-schema-native-model-keys` in `models.clj`.
+- Focused unit tests added in `model_registry_test.clj`: built-ins presence check + a dedicated "Claude Opus 5.0 is findable..." test asserting name, `:adaptive-thinking`, `:supports-mid-conversation-system-messages`, and native JSON-Schema structured-output capability.
+- `claude-opus-5-0` added to `target-model-ids` in the gated `^:integration` live-models-API test (`anthropic_models_api_test.clj`); unaffected by non-gated runs.
+- `clj-kondo` clean on all changed files; `bb test --focus psi.ai.model-registry-test` green (279 assertions).
+- Full `bb test` run shows 39 pre-existing failing test files unrelated to this change (turn-augmentation "Missing turn augmentation record" errors, workflow-loader definition mismatches, accumulator stream tests) — confirmed pre-existing by running `psi.turn-runtime.accumulator-test` against `git stash` (same 8 failures on unmodified HEAD). No model-catalog/registry test regressed.
+- CHANGELOG `[Unreleased]/Added` entry added.
+- Manual `/model anthropic claude-opus-5-0` live-session verification deferred (no live session in this pass); registry-level resolution is covered by unit tests, which is the verifiable surface available here.
