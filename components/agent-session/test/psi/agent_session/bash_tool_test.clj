@@ -211,7 +211,7 @@
     (let [result (tools/execute-bash {"command" "nonexistent-command-xyz"})]
       (is (true? (:is-error result)))
       (is (str/includes? (:content result) "Command exited with code 127"))
-      (is (str/includes? (:content result) "Unknown error: 127"))))
+      (is (str/includes? (:content result) "command not found"))))
 
   (testing "exit code 0 does not include error string"
     (let [result (tools/execute-bash {"command" "exit 0"})]

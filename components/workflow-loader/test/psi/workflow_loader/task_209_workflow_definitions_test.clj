@@ -657,6 +657,7 @@
         prompt-filenames ["review-task-design-architecture-review.md"
                           "review-task-design-ambiguity-review.md"
                           "review-task-design-inconsistency-review.md"
+                          "review-task-note-info.md"
                           "review-follow-up-design.md"
                           "create-task-plan-create-plan.md"
                           "review-task-plan-ambiguity-review.md"

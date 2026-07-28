@@ -132,14 +132,17 @@
           "rehydration payload must include externally consumable messages")
       (is (= new-session-id (get-in @state [:connection :focus-session-id]))
           "RPC focus should move to the rehydrated new session")
-      (is (some #(str/includes? (get % :text "") "[New session started]")
-                (get-in assistant [:data :content]))
-          "prompt-path command result should still surface the new-session confirmation")
-      (is (= session-id (get-in updated [:data :session-id]))
-          "prompt command completion should emit the current prompt session snapshot")
-      (is (= session-id (get-in footer [:data :session-id]))
-          "prompt command completion should emit the current prompt footer snapshot")
-      (is (= "(openai) gpt-5.4" (get-in footer [:data :model-text]))))))
+      ;; Task 241 focus-gating: /new moves focus to the new session, so the
+      ;; source session's session-scoped events (the "[New session started]"
+      ;; assistant confirmation and its trailing session/footer snapshots) are
+      ;; suppressed for this connection — only the new session's rehydration
+      ;; stream is delivered.
+      (is (nil? assistant)
+          "old-session /new confirmation is not streamed after focus moves away")
+      (is (nil? updated)
+          "no old-session snapshot is streamed for a focus-changing /new command")
+      (is (nil? footer)
+          "no old-session footer snapshot is streamed for a focus-changing /new command"))))
 
 (deftest rpc-prompt-new-slash-command-uses-callback-rehydrate-payload-test
   ;; Tests prompt-op /new preserves callback-provided startup transcript and
@@ -202,9 +205,11 @@
           "rehydrated event must include callback-provided tool ordering")
       (is (= new-session-id (get-in @state [:connection :focus-session-id]))
           "RPC focus should move to the callback-created new session")
-      (is (some #(str/includes? (get % :text "") "[New session started]")
-                (get-in assistant [:data :content]))
-          "prompt-path command result should still surface the new-session confirmation"))))
+      ;; Task 241 focus-gating: the source-session "[New session started]"
+      ;; assistant confirmation is suppressed once focus moves to the new
+      ;; callback-created session.
+      (is (nil? assistant)
+          "old-session /new confirmation is not streamed after focus moves away"))))
 
 (deftest rpc-prompt-expands-skill-input-during-request-preparation-test
   (testing "non-command /skill prompt is expanded during request preparation"
@@ -392,11 +397,12 @@
               "URL must appear in assistant/message content")))))
 
   (testing "login-start manual flow uses pending-code path and shared oauth completion"
-    (let [[ctx _]      (support/create-session-context {:oauth-ctx {:mode :test}})
+    (let [[ctx session-id] (support/create-session-context {:oauth-ctx {:mode :test}})
           loop-called? (atom false)
           dispatches   (atom [])
           completions  (atom [])
           state        (atom {:transport {:ready? true :pending {}}
+                              :connection {:focus-session-id session-id}
                               :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
                                                              (reset! loop-called? true)
@@ -448,10 +454,11 @@
             "agent loop must not run during manual login completion"))))
 
   (testing "login-start callback flow auto-completes with nil input"
-    (let [[ctx _]      (support/create-session-context {:oauth-ctx {:mode :test}})
+    (let [[ctx session-id] (support/create-session-context {:oauth-ctx {:mode :test}})
           loop-called? (atom false)
           completions  (atom [])
           state        (atom {:transport {:ready? true :pending {}}
+                              :connection {:focus-session-id session-id}
                               :rpc-ai-model {:provider "openai" :id "stub" :supports-reasoning true}
                               :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
                                                              (reset! loop-called? true)

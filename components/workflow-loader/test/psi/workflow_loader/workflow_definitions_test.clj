@@ -88,10 +88,10 @@
 (defn- assert-design-core-shape
   [definitions workflow-name]
   (let [steps (get-in definitions [workflow-name :steps])]
-    (is (= 3 (count steps)))
-    (is (= ["design-review" "design-follow-up" "status-not-converged"]
+    (is (= 4 (count steps)))
+    (is (= ["design-review" "design-follow-up" "status-converged" "status-not-converged"]
            (mapv :name steps)))
-    (is (= [:session :session :session]
+    (is (= [:session :session :session :session]
            (mapv :type steps)))
     (let [step-by-name (into {} (map (juxt :name identity) steps))
           design-review (get step-by-name "design-review")
@@ -114,7 +114,7 @@
                                                  :output :final-llm-reply}}}}
              (:judge design-review)))
       (is (= {"REPEAT" {:goto "design-follow-up"}
-              "DONE" {:goto :done}}
+              "DONE" {:goto "status-converged"}}
              (:on design-review)))
       (is (= (constant-routing-judge "DONE") (:judge design-follow-up)))
       (is (= {"DONE" {:goto "design-review"
@@ -182,9 +182,9 @@
         step-by-name (into {} (map (juxt :name identity) steps))
         plan-review (get step-by-name "plan-review")
         plan-follow-up (get step-by-name "plan-follow-up")]
-    (is (= ["plan-review" "plan-follow-up" "status-not-converged"]
+    (is (= ["plan-review" "plan-follow-up" "status-converged" "status-not-converged"]
            (mapv :name steps)))
-    (is (= [:session :session :session]
+    (is (= [:session :session :session :session]
            (mapv :type steps)))
     (is (= ["read" "bash" "edit" "write"] (:tools plan-review)))
     (is (= ["work-independently" "task-design"] (:skills plan-review)))
@@ -199,7 +199,7 @@
                                                :output :final-llm-reply}}}}
            (:judge plan-review)))
     (is (= {"REPEAT" {:goto "plan-follow-up"}
-            "DONE" {:goto :done}}
+            "DONE" {:goto "status-converged"}}
            (:on plan-review)))
     (is (= (constant-routing-judge "DONE") (:judge plan-follow-up)))
     (is (= {"DONE" {:goto "plan-review"
