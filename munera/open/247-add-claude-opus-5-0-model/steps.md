@@ -124,6 +124,16 @@
       example (or adding an Opus 5.0 line) for currency. Example-only, not
       strictly stale.
 
+## Docs review follow-ups (247 review-task-docs pass 2)
+
+- [ ] (optional) Refresh the adaptive-thinking example in `doc/configuration.md`
+      (~L254), which still cites "Claude Opus 4.8 and Claude Sonnet 5" as the
+      illustrative Anthropic adaptive-thinking / `:xhigh`-distinct models. Opus
+      5.0 is now the latest adaptive-thinking Opus (same capabilities); for
+      currency and consistency with the already-refreshed `doc/tui.md` `/model`
+      example, consider updating this list to lead with Claude Opus 5.0 (or add
+      it). Example-only, not strictly stale.
+
 ## Test-shaper review follow-ups (247 test-shaper pass 2)
 
 - [x] (optional) Resolve the residual `single_concern` blend in

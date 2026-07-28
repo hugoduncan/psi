@@ -69,3 +69,6 @@
 
 ## Docs review follow-ups executed (247)
 - addressed 2 docs review steps: added "Claude Opus 5.0" to the mid-conversation system-message capability list in `doc/extension-api.md`; refreshed the `doc/tui.md` `/model` example to lead with `claude-opus-5-0` (retaining Opus 4.8 as prior). Docs-only; no code/test change.
+
+## Docs review pass 2 (247 review-task-docs)
+- added 1 optional docs step: `doc/configuration.md` (~L254) adaptive-thinking example still cites Opus 4.8/Sonnet 5, omitting the now-latest adaptive-thinking Opus 5.0 (parallels the already-refreshed tui.md example).
