@@ -80,6 +80,16 @@
   (and (string? value)
        (not (str/blank? value))))
 
+(defn- non-blank-name?
+  "A candidate id name component / member is selector-interpretable when it is a
+   non-blank string OR a symbol. Live Gordian emits string name components for
+   `:namespace` candidate ids but symbols for `:family`/`:community` name
+   components and members, so the shape check must accept both."
+  [value]
+  (or (non-blank-string? value)
+      (and (symbol? value)
+           (not (str/blank? (str value))))))
+
 (defn- architecture-targets-command
   [sh]
   (try
@@ -104,17 +114,17 @@
          (= candidate-type (first candidate-id))
          (case candidate-type
            :namespace (and (= 2 (count candidate-id))
-                           (non-blank-string? (second candidate-id)))
+                           (non-blank-name? (second candidate-id)))
            :family (and (= 2 (count candidate-id))
-                        (non-blank-string? (second candidate-id)))
+                        (non-blank-name? (second candidate-id)))
            :pair (and (= 3 (count candidate-id))
-                      (non-blank-string? (second candidate-id))
-                      (non-blank-string? (nth candidate-id 2)))
+                      (non-blank-name? (second candidate-id))
+                      (non-blank-name? (nth candidate-id 2)))
            :community (and (= 2 (count candidate-id))
                            (integer? (second candidate-id))
                            (vector? members)
                            (seq members)
-                           (every? non-blank-string? members))
+                           (every? non-blank-name? members))
            false))))
 
 (deftest reduce-architectural-complexity-loads-and-shapes-test
