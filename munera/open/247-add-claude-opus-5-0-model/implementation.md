@@ -36,3 +36,6 @@
 
 ## Implementation review follow-up pass (247)
 - addressed 1 review step: added `:supports-reasoning true` assertion for `:opus-5.0` in `model_registry_test.clj` (281 assertions green, was 280); clj-kondo clean.
+
+## Implementation review pass (247, no-op)
+- reviewed code/tests/docs against design + architecture: no new actionable issues; no steps added. Remaining 2 unchecked steps are externally blocked (Anthropic publication, live session).
