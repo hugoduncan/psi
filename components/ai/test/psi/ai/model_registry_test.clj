@@ -95,20 +95,26 @@
       (is (contains? providers :anthropic))
       (is (contains? providers :openai)))))
 
-(deftest resolve-runtime-model-openai-oauth-routing-test
+(deftest resolve-runtime-model-openai-no-oauth-stays-chat-completions-test
   (registry/init! {})
 
   (doseq [id ["gpt-5.5" "gpt-5.6"]]
     (testing (str "openai " id " remains chat-completions without oauth context")
       (let [model (registry/resolve-runtime-model nil :openai id)]
         (is (= :openai-completions (:api model)) (str id " api"))
-        (is (= "https://api.openai.com/v1" (:base-url model)) (str id " base-url")))))
+        (is (= "https://api.openai.com/v1" (:base-url model)) (str id " base-url"))))))
+
+(deftest resolve-runtime-model-openai-oauth-gpt-5-5-codex-test
+  (registry/init! {})
 
   (testing "openai gpt-5.5 resolves to codex transport when oauth credential is present"
     (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.5")]
       (is (= :openai-codex-responses (:api model)))
       (is (= "https://chatgpt.com/backend-api" (:base-url model)))
-      (is (= "gpt-5.5" (:id model)))))
+      (is (= "gpt-5.5" (:id model))))))
+
+(deftest resolve-runtime-model-openai-oauth-gpt-5-6-unsupported-test
+  (registry/init! {})
 
   (testing "openai gpt-5.6 resolves to explicit unsupported runtime policy under oauth"
     (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.6")]
@@ -117,7 +123,10 @@
       (is (= :openai-completions (:api model)) "catalog transport remains visible but must not execute")
       (is (= true (:runtime/unsupported? model)))
       (is (= :openai-oauth-model-unsupported (:runtime/unsupported-reason model)))
-      (is (str/includes? (:runtime/unsupported-message model) "not supported for OpenAI OAuth"))))
+      (is (str/includes? (:runtime/unsupported-message model) "not supported for OpenAI OAuth")))))
+
+(deftest resolve-runtime-model-openai-oauth-non-member-stays-chat-completions-test
+  (registry/init! {})
 
   (testing "non-member chat-completions model stays chat-completions under oauth"
     ;; Genuine negative control: gpt-5.4-mini's catalog transport is
@@ -125,7 +134,10 @@
     ;; model must retain chat-completions.
     (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai "gpt-5.4-mini")]
       (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model)))))
+      (is (= "https://api.openai.com/v1" (:base-url model))))))
+
+(deftest resolve-runtime-model-openai-gpt-5-6-api-key-stays-chat-completions-test
+  (registry/init! {})
 
   (testing "gpt-5.6 keeps chat-completions when ctx is present but not oauth-backed"
     ;; ctx-present-but-not-oauth-backed branch: an api-key credential (not
@@ -133,7 +145,10 @@
     ;; gpt-5.6 must keep its catalog :openai-completions transport.
     (let [model (registry/resolve-runtime-model (api-key-openai-ctx) :openai "gpt-5.6")]
       (is (= :openai-completions (:api model)))
-      (is (= "https://api.openai.com/v1" (:base-url model)))))
+      (is (= "https://api.openai.com/v1" (:base-url model))))))
+
+(deftest resolve-runtime-model-openai-oauth-unknown-id-safe-test
+  (registry/init! {})
 
   (testing "unknown openai model id stays safe under oauth context"
     ;; nil/unknown-model safety on the OAuth branch: an id absent from the
@@ -143,7 +158,10 @@
     ;; exception or a bogus override map.
     (let [model (registry/resolve-runtime-model
                  (oauth-openai-ctx) :openai "gpt-does-not-exist")]
-      (is (nil? model))))
+      (is (nil? model)))))
+
+(deftest resolve-runtime-model-openai-oauth-string-provider-gpt-5-6-unsupported-test
+  (registry/init! {})
 
   (testing "string provider gpt-5.6 resolves to unsupported policy under oauth"
     ;; string->keyword coercion branch: the session :model :provider is stored
