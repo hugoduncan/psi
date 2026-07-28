@@ -549,10 +549,7 @@
                    :message (model-registry/unsupported-runtime-model-message resolved)}
 
                   :else
-                  (let [provider-str (name (:provider resolved))
-                        model {:provider provider-str
-                               :id (:id resolved)
-                               :reasoning (:supports-reasoning resolved)}
+                  (let [model (model-registry/persistable-model resolved)
                         result (session/set-model-in! ctx session-id model scope)]
                     {:type :text
                      :message (str "✓ Model set to "

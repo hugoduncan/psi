@@ -149,10 +149,7 @@
                        :provider (name (:provider resolved))
                        :model-id (:id resolved)
                        :runtime/unsupported-reason (:runtime/unsupported-reason resolved)})))
-    (let [provider-str (name (:provider resolved))
-          model        {:provider provider-str
-                        :id (:id resolved)
-                        :reasoning (:supports-reasoning resolved)}
+    (let [model        (model-registry/persistable-model resolved)
           result       (session/set-model-in! ctx session-id model scope)]
       (response-frame (:id request) (:op request) true {:model {:provider (:provider (:model result))
                                                                 :id (:id (:model result))}}))))

@@ -246,6 +246,20 @@
                (openai-oauth-runtime-model provider-kw model-id))))
          (find-model provider-kw model-id)))))
 
+(defn persistable-model
+  "Return the canonical persistable model map for a resolved runtime model.
+
+   Shapes the single `{:provider :id :reasoning}` selection map that
+   `session/set-model-in!` persists, with `:reasoning` coerced to a strict
+   boolean to match the catalog/mutation/runtime persistence shape. Callers
+   across selection surfaces (`/model`, RPC `set_model`, RPC picker, TUI
+   picker) use this to avoid re-deriving the persist shape and drifting the
+   `:reasoning` coercion."
+  [resolved]
+  {:provider (name (:provider resolved))
+   :id (:id resolved)
+   :reasoning (boolean (:supports-reasoning resolved))})
+
 (defn get-auth
   "Get auth config for a provider keyword.
    Returns {:provider kw :api-key str? :auth-header? bool :headers map?} or nil."
