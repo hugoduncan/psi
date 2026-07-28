@@ -57,3 +57,6 @@
 
 ## Test-shaper review pass 2 (247)
 - added 1 optional follow-up step: residual `single_concern` blend in `opus-5-0-catalog-entry-test` (undisclosed `models-for-provider` enumeration-membership assertion under a metadata/pricing label; breaks structural parity with `fable-5`/`sonnet-5` siblings).
+
+## Test-shaper review pass 2 follow-up execution (247)
+- addressed 1 review step: moved `models-for-provider` enumeration-membership assertion out of `opus-5-0-catalog-entry-test`'s metadata/pricing `testing` block into a dedicated "enumerated by models-for-provider" `testing` block — resolves `single_concern` blend, restores structural parity with `fable-5`/`sonnet-5` siblings. Focused tests green (26 tests, 292 assertions).

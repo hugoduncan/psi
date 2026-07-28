@@ -110,7 +110,7 @@
 
 ## Test-shaper review follow-ups (247 test-shaper pass 2)
 
-- [ ] (optional) Resolve the residual `single_concern` blend in
+- [x] (optional) Resolve the residual `single_concern` blend in
       `opus-5-0-catalog-entry-test` (`model_registry_test.clj`, ~L338): its
       `testing` label reads "carries the agreed metadata, capability, and
       pricing values", but the deftest also asserts `models-for-provider`

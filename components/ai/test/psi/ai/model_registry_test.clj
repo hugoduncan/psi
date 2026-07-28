@@ -355,12 +355,14 @@
       (is (= 5.0 (:input-cost model)))
       (is (= 25.0 (:output-cost model)))
       (is (= 0.5 (:cache-read-cost model)))
-      (is (= 6.25 (:cache-write-cost model)))
-      ;; Acceptance-criterion coverage: the model must be enumerated by
-      ;; models-for-provider, not merely resolvable via find-model. The map is
-      ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
-      (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
-                     "claude-opus-5-0")))))
+      (is (= 6.25 (:cache-write-cost model)))))
+
+  (testing "Claude Opus 5.0 is enumerated by models-for-provider :anthropic"
+    ;; Acceptance-criterion coverage: the model must be enumerated by
+    ;; models-for-provider, not merely resolvable via find-model. The map is
+    ;; keyed by [provider id]; assert the id set contains claude-opus-5-0.
+    (is (contains? (set (map :id (vals (registry/models-for-provider :anthropic))))
+                   "claude-opus-5-0"))))
 
 (deftest gpt-5-6-catalog-entry-test
   (registry/init! {})
