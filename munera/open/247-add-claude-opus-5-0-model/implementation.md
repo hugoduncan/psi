@@ -45,3 +45,6 @@
 
 ## Test review follow-up pass
 - addressed 2 test-review steps: added `opus-5-0-catalog-entry-test` to `model_registry_test.clj` pinning the full design attribute table (provider/api/base-url/capability flags + pricing/limits) for `:opus-5.0` (297 assertions green, was 281); clj-kondo clean. Optional mirror-invariant guard resolved as subsumed by the concrete-value test (a separate test would duplicate it and conflict once real Opus 5.0 values diverge).
+
+## Test review pass (247, no-op)
+- no new steps: tests are well-formed, mirror sibling models, cover every design behaviour, and pass (297 assertions). Unit surface is pure data; the sole external dep (Anthropic HTTP) is gated `^:integration` with graceful skip — no mocks/stubs. The `anthropic-json-schema-native-model-keys` membership criterion is `^:private`, so its behavioural consequence (`effective-capability` → `:anthropic/json-schema-output`) is the correct test surface — direct set assertion intentionally avoided.
