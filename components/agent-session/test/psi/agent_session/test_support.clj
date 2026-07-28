@@ -77,6 +77,15 @@
     (model-registry/resolve-runtime-model
      {:oauth-ctx (oauth-openai-ctx)} provider model-id))))
 
+(defn model-set-message
+  "Return the shared model-selection success message for a persisted
+   `{:provider :id}` model (and optional scope), derived from the runtime
+   policy owner (`model-registry/model-set-message`) rather than a pasted
+   literal, so a wording change flips the formatter test instead of every
+   surface assertion."
+  ([model] (model-registry/model-set-message model))
+  ([model scope] (model-registry/model-set-message model scope)))
+
 (defn instant
   "Parse an ISO-8601 string into a `java.time.Instant`."
   [s]

@@ -451,7 +451,8 @@
       (is (= {:accepted true :request-id "req-model"}
              (:data response)))
       (is (= {:type "text"
-              :message "✓ Model set to openai gpt-5.4-mini"}
+              :message (agent-test-support/model-set-message
+                        {:provider "openai" :id "gpt-5.4-mini"})}
              (:data command-result)))
       (is (= "openai" (get-in session-updated [:data :model-provider])))
       (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))

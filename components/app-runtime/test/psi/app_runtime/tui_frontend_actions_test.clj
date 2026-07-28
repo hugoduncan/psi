@@ -37,7 +37,8 @@
           local-f  (project-prefs/project-local-preferences-file cwd)
           [ctx sid] (create-session-context {:cwd cwd})]
       (is (= {:type :text
-              :message "✓ Model set to openai gpt-5.3-codex"}
+              :message (model-registry/model-set-message
+                        {:provider "openai" :id "gpt-5.3-codex"})}
              (select-model ctx sid {:provider "openai" :id "gpt-5.3-codex"})))
       (is (= {:provider "openai"
               :id "gpt-5.3-codex"

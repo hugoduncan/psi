@@ -393,7 +393,8 @@
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex" cmd-opts)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "✓ Model set to"))
+    (is (= (model-registry/model-set-message {:provider "openai" :id "gpt-5.3-codex"})
+           (:message result)))
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
 
@@ -401,7 +402,8 @@
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex session" cmd-opts)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "[session]"))
+    (is (= (model-registry/model-set-message {:provider "openai" :id "gpt-5.3-codex"} :session)
+           (:message result)))
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
 
@@ -410,7 +412,8 @@
         result     (commands/dispatch-in ctx session-id "/model anthropic claude-sonnet-5" cmd-opts)
         session    (ss/get-session-data-in ctx session-id)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "✓ Model set to"))
+    (is (= (model-registry/model-set-message {:provider "anthropic" :id "claude-sonnet-5"})
+           (:message result)))
     (is (= "anthropic" (get-in session [:model :provider])))
     (is (= "claude-sonnet-5" (get-in session [:model :id])))))
 

@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.test-support :as agent-test-support]
+   [psi.ai.model-registry :as model-registry]
    [psi.rpc.session :as rpc.session]
    [psi.rpc.session.command-pickers]
    [psi.rpc-test-support :as support]
@@ -76,7 +77,8 @@
        {:provider "openai" :id "gpt-5.3-codex"})
       (is (= [{:event "command-result"
                :payload {:type "text"
-                         :message "✓ Model set to openai gpt-5.3-codex"}}]
+                         :message (model-registry/model-set-message
+                                   {:provider "openai" :id "gpt-5.3-codex"})}}]
              @emitted))
       (is (= {:provider "openai"
               :id "gpt-5.3-codex"

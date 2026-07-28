@@ -21,10 +21,10 @@
           (if (:runtime/unsupported? resolved)
             {:type :text
              :message (model-registry/unsupported-runtime-model-message resolved)}
-            (let [model (model-registry/persistable-model resolved)]
-              (session/set-model-in! ctx sid model)
+            (let [model  (model-registry/persistable-model resolved)
+                  result (session/set-model-in! ctx sid model)]
               {:type :text
-               :message (str "✓ Model set to " (:provider model) " " (:id model))}))
+               :message (model-registry/model-set-message (:model result))}))
           {:type :text
            :message (or message
                         (str "Unknown model: " (:provider value) " " (:id value)))})

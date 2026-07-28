@@ -552,11 +552,8 @@
                   (let [model (model-registry/persistable-model resolved)
                         result (session/set-model-in! ctx session-id model scope)]
                     {:type :text
-                     :message (str "✓ Model set to "
-                                   (get-in result [:model :provider]) " "
-                                   (get-in result [:model :id])
-                                   (when scope
-                                     (str " [" (name scope) "]")))}))))))))))
+                     :message (model-registry/model-set-message
+                               (:model result) scope)}))))))))))
 
 (defn- dispatch-thinking-command
   [ctx session-id trimmed]

@@ -192,6 +192,23 @@
        (when-let [message (:runtime/unsupported-message model)]
          (str " — " message))))
 
+(defn model-set-message
+  "Return the shared user-facing success message for a persisted model
+   selection.
+
+   Takes the persisted `{:provider :id}` model map (as returned by
+   `session/set-model-in!`, e.g. `(:model result)`) and an optional scope
+   keyword. Callers across the text-result selection surfaces (`/model`, RPC
+   picker, TUI picker) use this to avoid re-deriving the success wording and
+   drifting the scope suffix or the echoed provider/id source across surfaces.
+
+   Prefer passing the post-persist `{:provider :id}` so the echoed name matches
+   what was actually stored."
+  ([model] (model-set-message model nil))
+  ([{:keys [provider id]} scope]
+   (str "✓ Model set to " provider " " id
+        (when scope (str " [" (name scope) "]")))))
+
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
    or nil when the canonical catalog entry should remain unchanged.

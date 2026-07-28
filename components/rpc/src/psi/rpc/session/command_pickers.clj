@@ -37,10 +37,11 @@
                                     :message (model-registry/unsupported-runtime-model-message resolved)
                                     :provider (name (:provider resolved))
                                     :model-id (:id resolved)})
-        (let [model (model-registry/persistable-model resolved)]
-          (session/set-model-in! ctx session-id model)
-          (command-results/emit-text-command-result! emit!
-                                                     (str "✓ Model set to " (:provider model) " " (:id model))))))))
+        (let [model  (model-registry/persistable-model resolved)
+              result (session/set-model-in! ctx session-id model)]
+          (command-results/emit-text-command-result!
+           emit!
+           (model-registry/model-set-message (:model result))))))))
 
 (defn handle-thinking-level-selection!
   [ctx session-id emit! value]
