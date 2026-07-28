@@ -8,17 +8,8 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
-   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.core :as turn-runtime]))
-(def ^:private far-future-expiry 99999999999999)
-
-(defn- oauth-openai-ctx []
-  (oauth/create-null-context
-   {:credentials {:openai {:type :oauth
-                           :access "tok"
-                           :refresh "ref"
-                           :expires far-future-expiry}}}))
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -243,7 +234,7 @@
   ;; preflight boundary through normal prompt-request runtime resolution, and
   ;; fails as a shaped assistant error before any provider request is attempted.
   (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :oauth-ctx (oauth-openai-ctx)})
+                                                  :oauth-ctx (test-support/oauth-openai-ctx)})
         _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                  (merge (ss/get-session-data-in ctx session-id)
                         {:model {:provider "openai" :id "gpt-5.6"}}))
