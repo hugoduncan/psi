@@ -39,3 +39,6 @@
 
 ## Implementation review pass (247, no-op)
 - reviewed code/tests/docs against design + architecture: no new actionable issues; no steps added. Remaining 2 unchecked steps are externally blocked (Anthropic publication, live session).
+
+## Test review pass (247)
+- added 2 test-review steps (missing `:opus-5.0` pricing/limits catalog-entry test; optional opus-4.8 mirror-invariant guard)

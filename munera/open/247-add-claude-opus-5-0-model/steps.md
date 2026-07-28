@@ -57,3 +57,21 @@
 - [x] (optional) Assert `:supports-reasoning true` on the `:opus-5.0` model in
       `model_registry_test.clj` — the design lists it as a model attribute but no
       test currently guards it (all other capability flags are asserted)
+
+## Test review follow-ups (247 test review)
+
+- [ ] Add an `opus-5-0-catalog-entry-test` to `model_registry_test.clj`
+      mirroring `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`:
+      assert the full design attribute table on `:opus-5.0` — `:provider`,
+      `:api`, `:base-url`, `:supports-images`, `:supports-text`,
+      `:context-window` (1000000), `:max-tokens` (128000), `:input-cost` (5.0),
+      `:output-cost` (25.0), `:cache-read-cost` (0.5),
+      `:cache-write-cost` (6.25). Currently the design's pricing/limits
+      attributes are unguarded (only name + capability flags are asserted),
+      so a regression or typo in the placeholder values would go undetected —
+      unlike every sibling model, which has a dedicated pricing/limits test.
+- [ ] (optional) Guard the "placeholders mirror `:opus-4.8` exactly" design
+      invariant with an assertion equating the `:opus-5.0` pricing/limits fields
+      to the `:opus-4.8` ones, so intentional divergence (when real Opus 5.0
+      values are published) is distinguished from accidental drift. Subsumed by
+      the concrete-value catalog-entry test above if that is added first.
