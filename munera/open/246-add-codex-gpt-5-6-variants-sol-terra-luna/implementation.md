@@ -244,3 +244,15 @@ happens in the build phase per the concrete file list already in this log.
 ## Docs review (2026-07-28)
 
 - added 2 steps: CHANGELOG variant `[Unreleased]/Added` entry gaps — (1) omits the per-model capability/context summary every sibling model-addition entry carries (inconsistent with catalog 272K/per-variant pricing); (2) lists "turn preflight" as a user-facing "selectable via" surface (a runtime routing boundary, not a selection entry point). Five reconciled docs (tui/README/configuration/cli/emacs-ui) verified accurate and consistent with `models.clj`/`model_registry.clj`; no other stale user-facing prose found.
+
+## Docs-review follow-up addressed (2026-07-28)
+
+- addressed 2 review steps (CHANGELOG variant entry). Revised the
+  `[Unreleased]/Added` variant entry: (1) added a capability/context clause
+  consistent with sibling model-addition entries — reasoning, image + text
+  input, 272K-token context, native JSON-Schema structured output over the
+  Codex path, with the sol > terra > luna pricing-tier note (matches
+  `models.clj` context-window 272000 / per-variant costs); (2) reworded so the
+  user-facing selection surfaces (`/model`, RPC `set_model`, RPC/TUI pickers)
+  are what the reader selects "via", and turn preflight now reads as a runtime
+  routing boundary ("routed at turn preflight") rather than a selection surface.

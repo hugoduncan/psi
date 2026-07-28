@@ -7,7 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
-- Three GPT-5.6 Codex-supported model variants — `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` — are now available in the built-in model catalog and selectable via `/model`, RPC `set_model`, the RPC/TUI model pickers, and turn preflight. Under OpenAI OAuth each variant routes to the ChatGPT/Codex backend with its id sent verbatim (confirmed by live streaming probe), the same path already used by `gpt-5.5`. Bare `gpt-5.6` remains unsupported under OpenAI OAuth.
+- Three GPT-5.6 Codex-supported model variants — `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna` — are now available in the built-in model catalog and selectable via `/model`, RPC `set_model`, and the RPC/TUI model pickers. Each offers reasoning, image + text input, a 272K-token context, and native JSON-Schema structured output over the Codex path; the three differ only in pricing tier (sol > terra > luna). Under OpenAI OAuth each variant is routed at turn preflight to the ChatGPT/Codex backend with its id sent verbatim (confirmed by live streaming probe), the same path already used by `gpt-5.5`. Bare `gpt-5.6` remains unsupported under OpenAI OAuth.
 
 ### Fixed
 - OpenAI OAuth-backed selection of `gpt-5.6` now fails explicitly unless an evidenced supported ChatGPT/Codex alias or alternate OAuth-compatible transport is added later. It no longer routes to the ChatGPT/Codex backend with the literal `gpt-5.6` id, which that backend rejects for ChatGPT accounts, and no longer silently falls through to the catalog chat-completions transport. `gpt-5.5` continues to use the OAuth/Codex path.
