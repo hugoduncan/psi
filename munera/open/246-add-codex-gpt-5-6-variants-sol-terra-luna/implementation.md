@@ -39,6 +39,7 @@ implementation.
 - architectural review: no architectural review feedback (design reuses the shared `model_registry.clj` codex join point + `with-openai-codex-transport`; additive catalog/policy-set slice mirrors existing `gpt-5.5` pattern; single-source-of-truth honored)
 - ambiguity review: added 1 new design step (under-determined per-variant catalog metadata: same-vs-differ across sol/terra/luna, and 272K vs larger-context/long-context-pricing conflict for Codex-routed entries)
 - inconsistency review: no inconsistency review feedback (design internally consistent and consistent with model_registry.clj codex/unsupported sets + implementation.md probe evidence; metadata 272K-vs-1M/larger-context tension already captured by ambiguity design step, not duplicated)
+- plan/steps ambiguity review: added 1 new design step (plan Slice 5 docs scope is narrow — "enumerated model lists" — but GPT-5.6 OAuth-support statements live as prose in doc/tui.md, README.md, doc/configuration.md, doc/cli.md that assert bare gpt-5.6 is OAuth-unsupported; those need updating to reflect the newly OAuth/Codex-supported sol/terra/luna variants)
 
 ## Notes for the design-step task
 
