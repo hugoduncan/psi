@@ -223,3 +223,7 @@ happens in the build phase per the concrete file list already in this log.
 ## Task-test-review (2026-07-28, 2nd pass)
 
 - added 1 step: variant OAuth codex resolution asserts only two of three codex facets — `:api` and `:base-url` are proven verbatim, but the codex native structured-output capability (the third facet `with-openai-codex-transport` owns, attached via a second independent mechanism the drift-guard test warns about) is unasserted for variants after runtime codex resolution. Distinct from the prior offer/accept picker steps. Tests otherwise well-formed: nullable oauth (`create-null-context`), injected capturing `emit!`, no mocks/stubs; behaviours covered; focused suites green (267/25 registry, 9/2 picker).
+
+## Task-test-review 2nd-pass follow-up addressed (2026-07-28)
+
+- addressed 1 review step: extended `resolve-runtime-model-openai-oauth-gpt-5-6-variants-codex-test` to assert the third codex facet — the OAuth-codex-resolved variant's `structured-output/effective-capability` equals `normalize-structured-output-capability` of `openai-codex-native-capability` (mirroring the gpt-5.4 capability test and the drift-guard's normalization). `bb test --focus psi.ai.model-registry-test`: 270 assertions / 25 tests pass; `clj-kondo` clean.

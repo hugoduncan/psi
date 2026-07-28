@@ -121,7 +121,18 @@
       (let [model (registry/resolve-runtime-model (oauth-openai-ctx) :openai id)]
         (is (= :openai-codex-responses (:api model)) (str id " api"))
         (is (= "https://chatgpt.com/backend-api" (:base-url model)) (str id " base-url"))
-        (is (= id (:id model)) (str id " id sent verbatim"))))))
+        (is (= id (:id model)) (str id " id sent verbatim"))
+        ;; Third codex facet: with-openai-codex-transport shapes :api,
+        ;; :base-url, AND the codex native structured-output capability. The
+        ;; variants are catalog-authored :openai-completions and only *become*
+        ;; codex at runtime, so the capability facet is the one most likely to
+        ;; silently regress (a variant falling back to its catalog
+        ;; chat-completions capability). Assert the OAuth-codex-resolved variant
+        ;; exposes the codex native capability, mirroring the gpt-5.4 test.
+        (is (= (structured-output/normalize-structured-output-capability
+                structured-output/openai-codex-native-capability)
+               (structured-output/effective-capability model))
+            (str id " codex native structured-output capability"))))))
 
 (deftest resolve-runtime-model-openai-oauth-gpt-5-6-unsupported-test
   (registry/init! {})
