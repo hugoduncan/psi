@@ -99,7 +99,7 @@
 
 ## Second test review follow-up (task-test-review)
 
-- [ ] Add a `model-registry-test` `resolve-runtime-model` regression that passes the provider as a **string** (`"openai"`, matching the session `:model` `:provider` shape) under `oauth-openai-ctx` and asserts `gpt-5.6` resolves to the `:runtime/unsupported?` policy. The string→keyword coercion branch of `resolve-runtime-model`'s `cond` is only exercised transitively via RPC integration tests; no direct unit assertion proves that a stored `{:provider "openai" :id "gpt-5.6"}` model reaches the unsupported OAuth override through the string-provider path, so a regression in that coercion could silently drop OAuth policy for the exact provider shape the runtime persists.
+- [x] Add a `model-registry-test` `resolve-runtime-model` regression that passes the provider as a **string** (`"openai"`, matching the session `:model` `:provider` shape) under `oauth-openai-ctx` and asserts `gpt-5.6` resolves to the `:runtime/unsupported?` policy. The string→keyword coercion branch of `resolve-runtime-model`'s `cond` is only exercised transitively via RPC integration tests; no direct unit assertion proves that a stored `{:provider "openai" :id "gpt-5.6"}` model reaches the unsupported OAuth override through the string-provider path, so a regression in that coercion could silently drop OAuth policy for the exact provider shape the runtime persists.
 
 ## Docs review follow-up
 

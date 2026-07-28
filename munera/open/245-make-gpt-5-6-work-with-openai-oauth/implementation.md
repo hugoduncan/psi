@@ -106,3 +106,4 @@
 - 2026-07-28 task-test-review follow-up: addressed 1 review step. Added `resolve-runtime-model-openai-oauth-routing-test` case proving an unknown OpenAI id (`gpt-does-not-exist`) under OAuth context resolves to nil via the openai-oauth override nil-return + `or` fall-through, guarding the slice-3 nil/unknown-model safety requirement on the OAuth branch. Focused test green (18 assertions), lint clean.
 
 - 2026-07-28 second task-test-review: added 1 step to be addressed.
+- 2026-07-28 second task-test-review follow-up: addressed 1 review step. Added `resolve-runtime-model-openai-oauth-routing-test` case passing provider as string `"openai"` under `oauth-openai-ctx`, asserting `gpt-5.6` resolves to `:runtime/unsupported?` policy — exercising `resolve-runtime-model`'s `(string? provider)` coercion branch directly for the persisted session `:model` provider shape. Focused test green (21 assertions), lint clean.

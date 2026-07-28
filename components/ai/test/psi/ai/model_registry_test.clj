@@ -143,7 +143,19 @@
     ;; exception or a bogus override map.
     (let [model (registry/resolve-runtime-model
                  (oauth-openai-ctx) :openai "gpt-does-not-exist")]
-      (is (nil? model)))))
+      (is (nil? model))))
+
+  (testing "string provider gpt-5.6 resolves to unsupported policy under oauth"
+    ;; string->keyword coercion branch: the session :model :provider is stored
+    ;; as a string ("openai"), so a persisted {:provider "openai" :id "gpt-5.6"}
+    ;; must reach the same OAuth unsupported override as the keyword-provider
+    ;; path. This proves the `(string? provider)` cond branch carries OAuth
+    ;; policy rather than dropping it.
+    (let [model (registry/resolve-runtime-model (oauth-openai-ctx) "openai" "gpt-5.6")]
+      (is (= true (:runtime/unsupported? model)))
+      (is (= :openai-oauth-model-unsupported (:runtime/unsupported-reason model)))
+      (is (str/includes? (:runtime/unsupported-message model)
+                         "not supported for OpenAI OAuth")))))
 
 (deftest built-in-structured-output-capabilities-test
   (registry/init! {})
