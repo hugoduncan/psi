@@ -39,3 +39,24 @@ implementation.
 - architectural review: no architectural review feedback (design reuses the shared `model_registry.clj` codex join point + `with-openai-codex-transport`; additive catalog/policy-set slice mirrors existing `gpt-5.5` pattern; single-source-of-truth honored)
 - ambiguity review: added 1 new design step (under-determined per-variant catalog metadata: same-vs-differ across sol/terra/luna, and 272K vs larger-context/long-context-pricing conflict for Codex-routed entries)
 - inconsistency review: no inconsistency review feedback (design internally consistent and consistent with model_registry.clj codex/unsupported sets + implementation.md probe evidence; metadata 272K-vs-1M/larger-context tension already captured by ambiguity design step, not duplicated)
+
+## Notes for the design-step task
+
+Relevant project files (non-task):
+- `components/ai/src/psi/ai/models.clj` — built-in catalog. Existing `gpt-5.6`
+  entry at ~L594 (context-window 1000000, input 6.0 / output 35.0); `gpt-5.5`
+  at ~L578. New variant keys must also join
+  `openai-chat-completions-native-model-keys` (~L636) for API classification.
+- `components/ai/src/psi/ai/model_registry.clj` — `openai-oauth-codex-model-ids`
+  (L180) and `openai-oauth-unsupported-model-ids` (L186); `openai-oauth-runtime-model`
+  / `resolve-runtime-model` are the single join point. Reuse
+  `structured-output/with-openai-codex-transport`; do not restate codex literals.
+
+Principles to maintain when resolving the metadata design-step:
+- Single source of truth: encode per-variant metadata once in the catalog; all
+  surfaces read through it. No per-surface literals.
+- Resolve the 272K-vs-larger-context/pricing conflict with an explicit chosen
+  value per id; the existing `gpt-5.6` uses 1M/6.0/35.0 as one reference point —
+  decide deliberately whether Codex-routed variants match or differ, don't inherit
+  by accident.
+- Keep the frozen scope: three variants only; bare `gpt-5.6` stays unsupported.
