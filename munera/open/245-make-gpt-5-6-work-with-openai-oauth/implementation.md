@@ -99,3 +99,5 @@
 
 - 2026-07-27 sixth docs review follow-up: addressed 1 review step. Updated the CHANGELOG GPT-5.6 added-model entry so it explicitly scopes `gpt-5.6` selection to non-OAuth/API-key OpenAI use and records the OpenAI OAuth unsupported/rejected boundary plus `gpt-5.5` OAuth/Codex preservation.
 - addressed 1 review step
+
+- 2026-07-28 implementation review: no new feedback; policy, all selection surfaces, cycle paths, turn preflight, tests, and docs are coherent.
