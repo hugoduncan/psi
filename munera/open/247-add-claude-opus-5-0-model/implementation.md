@@ -66,3 +66,6 @@
 
 ## Docs review pass (247 review-task-docs)
 - added 2 docs steps: `doc/extension-api.md` mid-system-message capability list omits Opus 5.0 (convention-breaking gap vs Sonnet 5 precedent); (optional) `doc/tui.md` `/model` example still cites Opus 4.8 as latest.
+
+## Docs review follow-ups executed (247)
+- addressed 2 docs review steps: added "Claude Opus 5.0" to the mid-conversation system-message capability list in `doc/extension-api.md`; refreshed the `doc/tui.md` `/model` example to lead with `claude-opus-5-0` (retaining Opus 4.8 as prior). Docs-only; no code/test change.

@@ -65,9 +65,10 @@ repo-local startup.
 
 ### Model, speed, and effort commands
 
-- `/model anthropic claude-opus-4-8` selects Claude Opus 4.8, an Anthropic
-  adaptive-thinking model with native JSON Schema structured output and
-  mid-conversation system-message support.
+- `/model anthropic claude-opus-5-0` selects Claude Opus 5.0, the latest
+  Anthropic adaptive-thinking model with native JSON Schema structured output
+  and mid-conversation system-message support. (`/model anthropic
+  claude-opus-4-8` selects the prior Opus 4.8 with the same capabilities.)
 - `/model openai gpt-5.5` uses the OpenAI OAuth/ChatGPT Codex runtime path when
   the OpenAI provider is backed by stored OAuth credentials. `/model openai
   gpt-5.6-sol`, `/model openai gpt-5.6-terra`, and `/model openai gpt-5.6-luna`
