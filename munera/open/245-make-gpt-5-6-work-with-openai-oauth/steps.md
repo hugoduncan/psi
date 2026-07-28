@@ -110,6 +110,10 @@
 
 - [x] Update `ramora/rpc-edn/op-mapping.md` and `ramora/rpc-edn/error-codes.md` so the direct RPC `set_model` unsupported-runtime-model behaviour is documented: OAuth-backed `gpt-5.6` can return `request/unsupported-model`, and the canonical error-code taxonomy includes that code.
 
+## Seventh docs review follow-up
+
+- [ ] Document the picker-backed `select-model` unsupported-runtime-model rejection in `ramora/rpc-edn/op-mapping.md` (the `frontend_action_result` row): when an OpenAI OAuth-backed unsupported model such as `gpt-5.6` is submitted via a backend-requested `select-model` frontend action, `handle-model-selection!` (`components/rpc/src/psi/rpc/session/command_pickers.clj`) emits a `command-result` frame with `:type "unsupported_model"` (message from `unsupported-runtime-model-message`) and does **not** persist the model, rather than returning the `request/unsupported-model` error frame that the direct `set_model` op uses. This distinct picker-path wire shape is currently undocumented across all AI-facing RPC docs, so a future session cannot discover from op-mapping that picker-driven selection also enforces the OAuth policy (and via a different, non-error command-result taxonomy). Cross-reference the `set_model` row so the two rejection shapes for the same policy are discoverable together.
+
 ## Third docs review follow-up
 
 - [x] Update `README.md` model-control guidance so the OpenAI catalog-vs-OAuth-runtime boundary is discoverable from the primary user documentation: `gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, OpenAI OAuth-backed `gpt-5.6` is unsupported until an evidenced runtime policy is added, and `gpt-5.5` remains on the OAuth/Codex path.
