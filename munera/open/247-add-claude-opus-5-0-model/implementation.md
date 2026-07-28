@@ -25,6 +25,9 @@
 ## Implementation review
 - added 3 follow-up steps (direct `models-for-provider :anthropic` assertion, pre-release id/pricing confirmation, deferred live `/model` verification)
 
+## Implementation review pass (247)
+- added 1 optional follow-up step: assert `:supports-reasoning true` on `:opus-5.0` (design attribute, currently untested)
+
 ## Review follow-up pass
 - addressed 1 review step: added direct `(models-for-provider :anthropic)` id-set assertion for `claude-opus-5-0` in `model_registry_test.clj` (280 assertions green, was 279); clj-kondo clean.
 - 2 review steps remain blocked and left unchecked:

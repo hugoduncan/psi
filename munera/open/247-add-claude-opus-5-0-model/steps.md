@@ -51,3 +51,9 @@
       entry (`anthropic_catalog.clj`) and the CHANGELOG placeholder note
 - [ ] Complete the deferred manual `/model anthropic claude-opus-5-0`
       live-session selection verification once a live session is available
+
+## Implementation review follow-ups (247 review pass)
+
+- [ ] (optional) Assert `:supports-reasoning true` on the `:opus-5.0` model in
+      `model_registry_test.clj` — the design lists it as a model attribute but no
+      test currently guards it (all other capability flags are asserted)
