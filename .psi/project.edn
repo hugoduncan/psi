@@ -3,45 +3,45 @@
  {:project-nrepl
   {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}
   :session-profiles
-  #_{:designing
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}
-     :fixing-design
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :planning
-     {:model-provider "anthropic"
-      :model-id "claude-fable-5"}
-     :fixing-plan
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :implementing
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :reviewing-implementation
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}
-     :fixing-implementation
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}}
   {:designing
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
    :fixing-design
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
    :planning
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-fable-5"}
    :fixing-plan
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
    :implementing
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
    :reviewing-implementation
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
    :fixing-implementation
-   {:model-provider "openai"
-    :model-id "gpt-5.5"}}}}
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}}
+  #_{:designing
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :fixing-design
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :planning
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :fixing-plan
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :implementing
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :reviewing-implementation
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}
+     :fixing-implementation
+     {:model-provider "openai"
+      :model-id "gpt-5.5"}}}}
