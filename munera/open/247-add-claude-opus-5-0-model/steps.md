@@ -126,7 +126,7 @@
 
 ## Docs review follow-ups (247 review-task-docs pass 2)
 
-- [ ] (optional) Refresh the adaptive-thinking example in `doc/configuration.md`
+- [x] (optional) Refresh the adaptive-thinking example in `doc/configuration.md`
       (~L254), which still cites "Claude Opus 4.8 and Claude Sonnet 5" as the
       illustrative Anthropic adaptive-thinking / `:xhigh`-distinct models. Opus
       5.0 is now the latest adaptive-thinking Opus (same capabilities); for

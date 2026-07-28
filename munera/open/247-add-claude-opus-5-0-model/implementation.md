@@ -72,3 +72,6 @@
 
 ## Docs review pass 2 (247 review-task-docs)
 - added 1 optional docs step: `doc/configuration.md` (~L254) adaptive-thinking example still cites Opus 4.8/Sonnet 5, omitting the now-latest adaptive-thinking Opus 5.0 (parallels the already-refreshed tui.md example).
+
+## Docs review pass 2 follow-ups executed (247)
+- addressed 1 docs review step: refreshed `doc/configuration.md` (~L254) adaptive-thinking `:xhigh` example to lead with Claude Opus 5.0 (was Opus 4.8), consistent with the tui.md `/model` refresh. Docs-only; no code/test change.
