@@ -111,3 +111,5 @@
 - 2026-07-28 third task-test-review: added 1 step to be addressed.
 
 - 2026-07-28 third task-test-review follow-up: addressed 1 review step. Added `unsupported-runtime-model-message-test` directly covering the shared `psi.ai.model-registry/unsupported-runtime-model-message` formatter's both branches: with `:runtime/unsupported-message` producing the `" — <message>"` suffix, and without it producing the plain form with no `" — "` suffix. Focused test green (204 assertions), lint clean.
+
+- 2026-07-28 fourth task-test-review: no new feedback. Task tests are well-formed and cover every design behaviour across all selection surfaces (`/model`, RPC `set_model`, RPC picker, TUI picker, cycle fwd/back, turn preflight) plus nil/unknown/string-provider edges. Infra deps are nullable (`oauth/create-null-context`) with real session contexts; no mocks/stubs/interaction guards in this task's tests. Remaining `with-redefs` in `response_mode_test.clj`/`rpc_test.clj` are pre-existing retry/streaming/footer tests outside this task's scope. Focused `psi.ai.model-registry-test` (204 assertions) and `psi.rpc-model-scope-test` (30 assertions) green.
