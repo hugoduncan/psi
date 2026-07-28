@@ -280,6 +280,7 @@
       (is (= "Claude Opus 5.0" (:name model)))
       (is (= true (:adaptive-thinking model)))
       (is (= true (:supports-mid-conversation-system-messages model)))
+      (is (= true (:supports-reasoning model)))
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native))

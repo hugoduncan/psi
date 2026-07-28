@@ -33,3 +33,6 @@
 - 2 review steps remain blocked and left unchecked:
   - pre-release id/pricing confirmation — blocked on official Anthropic publication (external data unavailable this pass).
   - live `/model anthropic claude-opus-5-0` selection verification — blocked on no live session available this pass.
+
+## Implementation review follow-up pass (247)
+- addressed 1 review step: added `:supports-reasoning true` assertion for `:opus-5.0` in `model_registry_test.clj` (281 assertions green, was 280); clj-kondo clean.
