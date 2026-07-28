@@ -136,3 +136,5 @@
 - 2026-07-28 sixth test-shaper review: added 1 step to be addressed.
 
 - 2026-07-28 sixth test-shaper follow-up: addressed 1 review step. Replaced the verbatim inline OpenAI OAuth credential context in `rpc_test.clj` (`rpc-model-and-thinking-picker-frontend-actions-test`) with shared `psi.agent-session.test-support/oauth-openai-ctx` and dropped the now-unused `psi.provider-auth.oauth.core` require (its only use). Validation passed: `clj-kondo --lint components/rpc/test/psi/rpc_test.clj` (0/0), `bb test --focus psi.rpc-test` (14 tests, 117 assertions).
+
+- 2026-07-28 seventh test-shaper review: added 1 step to be addressed.
