@@ -256,3 +256,7 @@ happens in the build phase per the concrete file list already in this log.
   user-facing selection surfaces (`/model`, RPC `set_model`, RPC/TUI pickers)
   are what the reader selects "via", and turn preflight now reads as a runtime
   routing boundary ("routed at turn preflight") rather than a selection surface.
+
+## Docs review (2026-07-28, 2nd pass)
+
+- no new steps: user-facing docs are accurate, complete, and consistent with the implementation. CHANGELOG `[Unreleased]/Added` variant entry (272K context, per-variant sol>terra>luna pricing tier, verbatim Codex routing at turn preflight, native structured output over the Codex path) matches `models.clj` (context-window 272000, per-variant costs) and `model_registry.clj` (`openai-oauth-codex-model-ids` #{gpt-5.5 sol terra luna}, `openai-oauth-unsupported-model-ids` #{gpt-5.6}). All five reconciled prose docs (`doc/tui.md`, `README.md`, `doc/configuration.md`, `doc/cli.md`, `doc/emacs-ui.md`) correctly preserve the bare-`gpt-5.6`-OAuth-unsupported statement while adding the OAuth/Codex-supported variants; no codex literals restated (single source of truth intact); `rg 'gpt-5\.6' doc/ README.md` confirms no stale user-facing prose remains (ramora/ GPT-5 references are unrelated workflow-ir/rpc-edn examples).
