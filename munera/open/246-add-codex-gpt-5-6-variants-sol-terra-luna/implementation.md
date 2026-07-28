@@ -171,3 +171,16 @@ happens in the build phase per the concrete file list already in this log.
 ## Implementation review (2026-07-28)
 
 - added 1 step: surface-level selectability coverage gap (acceptance criterion names all selection surfaces; tests only cover the shared `resolve-runtime-model` join point + catalog membership).
+
+## Implementation-review follow-up (2026-07-28)
+
+- addressed 1 review step (surface-level selectability coverage gap). Added
+  `components/rpc/test/psi/rpc/session/command_pickers_test.clj` — a `/model`
+  picker surface test that invokes `handle-picker-command!` with a capturing
+  `emit!` and asserts each variant (`gpt-5.6-sol/terra/luna`) is offered as an
+  `["openai" id]` picker item. This proves selectability at a picker boundary
+  (not just the shared `resolve-runtime-model` join + catalog membership) and
+  guards against a future picker filter dropping catalog entries; the picker
+  enumerates `all-models-seq` unconditionally, so this is the tightest
+  surface-level assertion for the acceptance criterion. Focused test: 3/1 pass;
+  `clj-kondo` clean.
