@@ -38,6 +38,7 @@
      :vars
      {"input" {:from :workflow-input, :path [:input]},
       "aspect" {:from :workflow-input, :path [:aspect]}}}]}],
+ :advertise false,
  :name "review-design-turn",
  :description
  "Run one design review pass for a named aspect against a Munera task, record notes, execute follow-up items, and commit"}

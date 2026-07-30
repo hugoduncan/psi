@@ -82,6 +82,7 @@
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
    :on {"DONE" {:goto :done}}}],
+ :advertise false,
  :name "review-task-design-core",
  :description
  "Run the reusable Munera task design review loop without a standalone final summary."}

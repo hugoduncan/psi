@@ -53,6 +53,7 @@
      :skill {:value "code-shaper"}}},
    :context
    [{:type :source, :from :workflow-original}]}],
+ :advertise false,
  :name "review-task-implementation-core",
  :description
  "Run the reusable Munera task implementation review sequence without a standalone final summary."}
