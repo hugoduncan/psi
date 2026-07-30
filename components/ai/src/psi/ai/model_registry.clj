@@ -174,23 +174,74 @@
   [provider-kw model-id]
   (get (ensure-catalog) [provider-kw model-id]))
 
+(def ^:private openai-oauth-codex-model-ids
+  "OpenAI model ids with evidence for ChatGPT/Codex backend execution under
+   OpenAI OAuth."
+  #{"gpt-5.5" "gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"})
+
+(def ^:private openai-oauth-unsupported-model-ids
+  "OpenAI model ids that are explicitly unsupported under OpenAI OAuth until a
+   supported ChatGPT/Codex alias or alternate OAuth-compatible transport is
+   evidenced and encoded as policy."
+  #{"gpt-5.6"})
+
+(defn unsupported-runtime-model-message
+  "Return the shared user-facing message for an explicitly unsupported runtime model."
+  [model]
+  (str "Unsupported model: " (name (:provider model)) " " (:id model)
+       (when-let [message (:runtime/unsupported-message model)]
+         (str " — " message))))
+
+(defn model-set-message
+  "Return the shared user-facing success message for a persisted model
+   selection.
+
+   Takes the persisted `{:provider :id}` model map (as returned by
+   `session/set-model-in!`, e.g. `(:model result)`) and an optional scope
+   keyword. Callers across the text-result selection surfaces (`/model`, RPC
+   picker, TUI picker) use this to avoid re-deriving the success wording and
+   drifting the scope suffix or the echoed provider/id source across surfaces.
+
+   Prefer passing the post-persist `{:provider :id}` so the echoed name matches
+   what was actually stored."
+  ([model] (model-set-message model nil))
+  ([{:keys [provider id]} scope]
+   (str "✓ Model set to " provider " " id
+        (when scope (str " [" (name scope) "]")))))
+
 (defn openai-oauth-runtime-model
   "Return an OpenAI runtime model override for OAuth-backed ChatGPT sessions,
    or nil when the canonical catalog entry should remain unchanged.
 
    Current policy:
-   - `gpt-5.5` uses the ChatGPT/Codex backend under OpenAI OAuth so the same
-     user-visible model id works with ChatGPT credentials, matching Codex-style
-     account capabilities.
-   - all other models keep their catalog-defined transport."
+   - models in `openai-oauth-codex-model-ids` use the ChatGPT/Codex backend
+     under OpenAI OAuth.
+   - `gpt-5.6` is explicitly unavailable under OpenAI OAuth: the observed
+     ChatGPT/Codex backend rejects literal `gpt-5.6`, and no supported OAuth
+     alias or alternate transport is evidenced here.
+   - all other models keep their catalog-defined transport.
+
+   The base entry is read from the merged catalog (`find-model`) so the
+   override shapes a single, catalog-normalized model shape, then composes the
+   shared `structured-output/with-openai-codex-transport` rule rather than
+   re-stating the codex transport/capability literals."
   [provider-kw model-id]
-  (when (and (= :openai provider-kw)
-             (= "gpt-5.5" model-id))
-    (-> (or (find-model :openai "gpt-5.5")
-            (get built-in/all-models :gpt-5.5))
-        (assoc :api :openai-codex-responses
-               :base-url "https://chatgpt.com/backend-api")
-        structured-output/with-openai-codex-native-capability)))
+  (cond
+    (not= :openai provider-kw)
+    nil
+
+    (contains? openai-oauth-unsupported-model-ids model-id)
+    (when-let [model (find-model :openai model-id)]
+      (let [message (str model-id " is not supported for OpenAI OAuth without "
+                         "an evidenced ChatGPT/Codex alias or alternate "
+                         "OAuth-compatible transport")]
+        (assoc model
+               :runtime/unsupported? true
+               :runtime/unsupported-reason :openai-oauth-model-unsupported
+               :runtime/unsupported-message message)))
+
+    (contains? openai-oauth-codex-model-ids model-id)
+    (structured-output/with-openai-codex-transport (find-model :openai model-id))))
 
 (defn resolve-runtime-model
   "Resolve the runtime model map for provider/model-id, optionally considering
@@ -211,6 +262,20 @@
              (when oauth-backed?
                (openai-oauth-runtime-model provider-kw model-id))))
          (find-model provider-kw model-id)))))
+
+(defn persistable-model
+  "Return the canonical persistable model map for a resolved runtime model.
+
+   Shapes the single `{:provider :id :reasoning}` selection map that
+   `session/set-model-in!` persists, with `:reasoning` coerced to a strict
+   boolean to match the catalog/mutation/runtime persistence shape. Callers
+   across selection surfaces (`/model`, RPC `set_model`, RPC picker, TUI
+   picker) use this to avoid re-deriving the persist shape and drifting the
+   `:reasoning` coercion."
+  [resolved]
+  {:provider (name (:provider resolved))
+   :id (:id resolved)
+   :reasoning (boolean (:supports-reasoning resolved))})
 
 (defn get-auth
   "Get auth config for a provider keyword.

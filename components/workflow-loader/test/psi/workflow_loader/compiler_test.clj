@@ -14,6 +14,7 @@
                     :session-profile :planning}
    :body "You are a planner."
    :vars nil
+   :advertise true
    :source-path "/tmp/planner.md"})
 
 (def edn-parsed
@@ -53,12 +54,35 @@
              (first (:steps definition))))
       (is (workflow-definition/target-authored-workflow-definition? definition))))
 
+  (testing "advertise propagates the parser-supplied boolean (true)"
+    ;; The markdown parser always coerces `:advertise` to an explicit boolean
+    ;; (default true), so the compiler propagates it verbatim with no defaulting.
+    (let [{:keys [definition]} (compiler/compile-workflow-file markdown-parsed)]
+      (is (true? (:advertise definition)))))
+
+  (testing "advertise false propagates into the markdown definition"
+    (let [{:keys [definition]} (compiler/compile-workflow-file
+                                (assoc markdown-parsed :advertise false))]
+      (is (false? (:advertise definition)))))
+
   (testing "batch compilation keeps markdown and edn successes together"
     (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
       (is (= 2 (count definitions)))
       (is (empty? errors)))))
 
 (deftest compile-edn-prompt-workflow-test
+  (testing "advertise false in edn config propagates into the compiled definition"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           (assoc-in edn-parsed [:config :advertise] false))]
+      (is (nil? error))
+      (is (false? (:advertise definition)))))
+
+  (testing "advertise absent from edn config leaves advertise absent in the definition"
+    (let [{:keys [definition error]} (compiler/compile-workflow-file edn-parsed)]
+      (is (nil? error))
+      (is (not (contains? definition :advertise)))))
+
   (testing "edn workflows require top-level name and description"
     (let [{missing-name-error :error}
           (compiler/compile-workflow-file

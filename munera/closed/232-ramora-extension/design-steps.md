@@ -1,0 +1,12 @@
+- [x] Use single resource file (lambda form) with engage-prefix for prose mode, matching munera/mementum pattern — design specifies two resource files which diverges from established convention
+- [x] Clarify whether prompt-mode changes at runtime should trigger content update, or if static-at-init (matching munera/mementum) is acceptable
+- [x] Add ramora to extensions/deps.edn (:deps and :test alias :extra-paths) for discoverability
+- [x] Specify source of RAMORA.md and RAMORA-LAMBDA.md content — files don't exist in repo; implementer needs to know where protocol text comes from
+- [x] Specify which engage prefix to use for prose mode — same as munera/mementum or different?
+- [x] Specify prompt contribution ID — not stated; convention suggests "ramora-protocol"
+- [x] Confirm priority 52 — design says "seems right" (hedged); needs definitive value
+- [x] Resolve internal inconsistency: constraints say "Two resource files" but acceptance says "follows the same structural pattern as munera/mementum" which uses a single resource file — resolved by adopting single-file pattern in step 1
+- [x] Resolve internal inconsistency: prose mode acceptance says "engage prefix + RAMORA.md" but munera/mementum pattern uses lambda form as base with engage-prefix prepended — design's two-file approach contradicts stated goal of mirroring the pattern — resolved by adopting single-file pattern in step 1
+- [x] Register psi/ramora in psi.launcher.extensions/psi-owned-extension-catalog (launcher-side) with :psi/init and :source-policies — design only mentions extensions/deps.edn which is the bb test deps file, not the runtime extension discovery mechanism
+- [x] Register psi/ramora in psi.agent-session.extension-installs/psi-owned-extension-catalog (runtime-side) with :psi/init and :source-policies — both catalogs must be updated for extension to load; parity test enforces this
+- [x] Remove `ramora/test` from `:test` alias `:extra-paths` in design constraint — mementum and munera are not in `:extra-paths` (only in `:deps`); design's wiring instruction diverges from the reference pattern it claims to mirror

@@ -9,7 +9,7 @@
                    "components/ai/src" "components/app-runtime/src" "components/engine/src" "components/query/src" "components/history/src"
                    "components/introspection/src" "components/memory/src" "components/recursion/src" "components/tui/src" "components/rpc/src" "components/agent-core/src"
                    "components/agent-session/src" "components/provider-auth/src" "components/turn-statechart/src" "components/turn-runtime/src" "components/tool-runtime/src" "components/tool-registry/src" "components/root-registry/src" "components/skill-registry/src" "components/command-registry/src" "components/state-kernel/src" "components/session-state/src" "components/session-journal/src" "components/session-persistence/src" "components/shared-config/src" "components/session-profile/src" "components/project-nrepl/src" "components/prompt-assets/src" "components/prompt-registry/src" "components/deterministic-operation-registry/src" "components/deterministic-operation-runtime/src" "components/system-bootstrap/src" "components/workflow-registry/src" "components/workflow-judge/src" "components/workflow-runtime/src" "components/workflow-loader/src" "components/workflow-step-materialization/src" "components/workflow-step-session-config/src" "components/extension-test-helpers/src"
-                   "extensions/auto-session-name/src" "extensions/commit-checks/src" "extensions/hello-ext/src"
+                   "extensions/auto-session-name/src" "extensions/commit-checks/src" "extensions/context-manager/src" "extensions/hello-ext/src"
                    "extensions/mcp-tasks-run/src" "extensions/mementum/src" "extensions/mementum/resources" "extensions/munera/src" "extensions/munera/resources" "extensions/plan-state-learning/src"
                    "extensions/work-on/src" "extensions/github/src"
                    "extensions/edit-clj/src"
@@ -23,6 +23,7 @@
    {:id :extensions
     :test-paths ["extensions/auto-session-name/test"
                  "extensions/commit-checks/test"
+                 "extensions/context-manager/test"
                  "extensions/hello-ext/test"
                  "extensions/mcp-tasks-run/test"
                  "extensions/plan-state-learning/test"
@@ -34,6 +35,7 @@
                  "extensions/dev-http/test"]
     :source-paths ["extensions/auto-session-name/src"
                    "extensions/commit-checks/src"
+                   "extensions/context-manager/src"
                    "extensions/hello-ext/src"
                    "extensions/mcp-tasks-run/src"
                    "extensions/mementum/src"
@@ -57,7 +59,7 @@
                  "components/ai/test" "components/app-runtime/test" "components/engine/test" "components/query/test" "components/history/test"
                  "components/introspection/test" "components/memory/test" "components/recursion/test" "components/tui/test" "components/rpc/test" "components/agent-core/test"
                  "components/agent-session/test" "components/provider-auth/test" "components/turn-statechart/test" "components/turn-runtime/test" "components/tool-runtime/test" "components/tool-registry/test" "components/root-registry/test" "components/skill-registry/test" "components/command-registry/test" "components/session-state/test" "components/session-journal/test" "components/session-persistence/test" "components/shared-config/test" "components/project-nrepl/test" "components/prompt-assets/test" "components/prompt-registry/test" "components/deterministic-operation-registry/test" "components/deterministic-operation-runtime/test" "components/state-kernel/test" "components/system-bootstrap/test" "components/workflow-registry/test" "components/workflow-judge/test" "components/workflow-runtime/test" "components/workflow-loader/test" "components/workflow-step-materialization/test" "components/workflow-step-session-config/test" "components/extension-test-helpers/test"
-                 "extensions/auto-session-name/test" "extensions/commit-checks/test"
+                 "extensions/auto-session-name/test" "extensions/commit-checks/test" "extensions/context-manager/test"
                  "extensions/hello-ext/test" "extensions/mcp-tasks-run/test" "extensions/plan-state-learning/test"
                  "extensions/work-on/test" "extensions/github/test"
                  "extensions/edit-clj/test"

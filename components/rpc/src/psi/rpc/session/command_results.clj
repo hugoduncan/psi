@@ -30,55 +30,44 @@
 (defn handle-prompt-command-result!
   "Legacy prompt-path slash command event mapping.
    Keeps existing prompt RPC behavior stable while the new `command` op
-   uses `command-result` and `ui/frontend-action-requested`."
-  [cmd-result emit!]
-  (let [result-type (:type cmd-result)]
+   uses `command-result` and `ui/frontend-action-requested`.
+
+   Stamps `:session-id` on every emitted `assistant/message` so these
+   legacy-path feedback events gate through the focus filter identically to
+   the streaming path (`emit/emit-assistant-message!`), rather than bypassing
+   it because the payload lacks `:session-id`."
+  [session-id cmd-result emit!]
+  (let [result-type (:type cmd-result)
+        text-message (fn [text]
+                       (emit! "assistant/message"
+                              {:session-id session-id
+                               :role       "assistant"
+                               :content    [{:type :text :text text}]}))]
     (case result-type
       (:text :logout :login-error :new-session)
-      (emit! "assistant/message"
-             {:role    "assistant"
-              :content [{:type :text :text (str (:message cmd-result))}]})
+      (text-message (str (:message cmd-result)))
 
       :login-start
-      (emit! "assistant/message"
-             {:role    "assistant"
-              :content [{:type :text
-                         :text (str "Login: " (get-in cmd-result [:provider :name])
-                                    " — open URL: " (:url cmd-result))}]})
+      (text-message (str "Login: " (get-in cmd-result [:provider :name])
+                         " — open URL: " (:url cmd-result)))
 
       :quit
-      (emit! "assistant/message"
-             {:role    "assistant"
-              :content [{:type :text
-                         :text "[/quit is not supported over RPC prompt — use the abort op or close the connection]"}]})
+      (text-message "[/quit is not supported over RPC prompt — use the abort op or close the connection]")
 
       :resume
-      (emit! "assistant/message"
-             {:role    "assistant"
-              :content [{:type :text
-                         :text "[/resume is not supported over RPC prompt — use switch_session op]"}]})
+      (text-message "[/resume is not supported over RPC prompt — use switch_session op]")
 
       :tree-open
-      (emit! "assistant/message"
-             {:role "assistant"
-              :content [{:type :text
-                         :text "[/tree is only available in TUI mode (--tui)]"}]})
+      (text-message "[/tree is only available in TUI mode (--tui)]")
 
       :tree-switch
-      (emit! "assistant/message"
-             {:role "assistant"
-              :content [{:type :text
-                         :text (str "[session switch requested: " (:session-id cmd-result) "]")}]})
+      (text-message (str "[session switch requested: " (:session-id cmd-result) "]"))
 
       :extension-cmd
       (when-let [output (extension-command-output cmd-result)]
-        (emit! "assistant/message"
-               {:role    "assistant"
-                :content [{:type :text :text output}]}))
+        (text-message output))
 
-      (emit! "assistant/message"
-             {:role    "assistant"
-              :content [{:type :text :text (str "[command result: " result-type "]")}]})
+      (text-message (str "[command result: " result-type "]"))
       nil)))
 
 (defn emit-text-command-result!
@@ -120,8 +109,12 @@
                                                       " to " (pr-str (:session-name cmd-result)))})
 
       (:tree-switch :session-switch)
+      ;; Cross-session command-result: carry the switch target under a
+      ;; distinct key (not a bare `:session-id`) so the focus gate's
+      ;; structural session-scoped rule does not suppress this never-gated
+      ;; notification when the target differs from the connection focus.
       (emit/emit-command-result! emit! {:type "session_switch"
-                                        :session-id (:session-id cmd-result)})
+                                        :target-session-id (:session-id cmd-result)})
 
       :frontend-action
       (emit/emit-frontend-action-request! emit! request-id cmd-result)

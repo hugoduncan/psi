@@ -1,4 +1,47 @@
 {:version 1
  :agent-session
  {:project-nrepl
-  {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}}}
+  {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}
+  :session-profiles
+  {:designing
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
+   :fixing-design
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :planning
+   {:model-provider "anthropic"
+    :model-id "claude-fable-5"}
+   :fixing-plan
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :implementing
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :reviewing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
+   :fixing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}}
+  #_{:designing
+     {:model-provider "openai"
+      :model-id "gpt-5.6-sol"}
+     :fixing-design
+     {:model-provider "openai"
+      :model-id "gpt-5.6-terra"}
+     :planning
+     {:model-provider "openai"
+      :model-id "gpt-5.6-sol"}
+     :fixing-plan
+     {:model-provider "openai"
+      :model-id "gpt-5.6-terra"}
+     :implementing
+     {:model-provider "openai"
+      :model-id "gpt-5.6-terra"}
+     :reviewing-implementation
+     {:model-provider "openai"
+      :model-id "gpt-5.6-sol"}
+     :fixing-implementation
+     {:model-provider "openai"
+      :model-id "gpt-5.6-sol"}}}}

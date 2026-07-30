@@ -55,54 +55,75 @@
 (deftest register-mutations-in!-includes-history-mutations-test
   (testing "register-mutations-in! wires history git mutations into isolated query ctx"
     (let [git-ctx     (history-git/create-null-context)
-          [ctx _]     (create-session-context {:cwd (:repo-dir git-ctx) :persist? false})
+          repo-dir    (:repo-dir git-ctx)
+          [ctx _]     (create-session-context {:cwd repo-dir :persist? false})
           qctx        (query/create-query-context)]
-      (session/register-resolvers-in! qctx false)
-      (session/register-mutations-in! qctx mutations/all-mutations true)
-      (let [syms (query/mutation-syms-in qctx)
-            wt-path (str (.getParentFile (File. (:repo-dir git-ctx)))
-                         File/separator
-                         "ext-mutation-worktree-"
-                         (java.util.UUID/randomUUID))
-            result (get (query/query-in qctx
-                                        {:psi/agent-session-ctx ctx
-                                         :git/context (history-git/create-context (:repo-dir git-ctx))}
-                                        [(list 'git.worktree/add!
-                                               {:psi/agent-session-ctx ctx
-                                                :git/context (history-git/create-context (:repo-dir git-ctx))
-                                                :input {:path wt-path
-                                                        :branch "ext-mutation-worktree"}})])
-                        'git.worktree/add!)]
-        (is (contains? syms 'git.worktree/add!))
-        (is (true? (:success result))))))
+      (try
+        (session/register-resolvers-in! qctx false)
+        (session/register-mutations-in! qctx mutations/all-mutations true)
+        (let [syms (query/mutation-syms-in qctx)
+              wt-path (str repo-dir File/separator "worktrees" File/separator
+                           "ext-mutation-worktree-"
+                           (java.util.UUID/randomUUID))]
+          (.mkdirs (File. (str repo-dir File/separator "worktrees")))
+          (let [result (get (query/query-in qctx
+                                            {:psi/agent-session-ctx ctx
+                                             :git/context (history-git/create-context repo-dir)}
+                                            [(list 'git.worktree/add!
+                                                   {:psi/agent-session-ctx ctx
+                                                    :git/context (history-git/create-context repo-dir)
+                                                    :input {:path wt-path
+                                                            :branch "ext-mutation-worktree"}})])
+                            'git.worktree/add!)]
+            (is (contains? syms 'git.worktree/add!))
+            (is (true? (:success result)))))
+        (finally
+          (test-support/delete-recursively! repo-dir)))
+      (testing "cleanup wiring: repo-dir is removed once the try/finally above completes"
+        ;; Guards the try/finally cleanup wiring itself, not the mutation
+        ;; behaviour above: a regression that dropped this try/finally's
+        ;; delete-recursively! call would not otherwise be caught by bb test.
+        (is (not (.exists (File. ^String repo-dir)))
+            "repo-dir should be deleted once the try/finally above completes")))))
 
+(deftest ext-mutation-attach-worktree-to-existing-branch-test
   (testing "isolated extension mutation path can attach a worktree to an existing branch"
     (let [git-ctx       (history-git/create-null-context)
           repo-dir      (:repo-dir git-ctx)
-          parent-dir    (.getParentFile (File. repo-dir))
+          wt-dir        (str repo-dir File/separator "worktrees")
           suffix        (str (java.util.UUID/randomUUID))
           branch-name   (str "fix-repeated-thinking-output-" suffix)
-          source-path   (str parent-dir File/separator "branch-source-" suffix)
-          worktree-path (str parent-dir File/separator branch-name)
-          _             (history-git/worktree-add git-ctx {:path source-path
-                                                           :branch branch-name})
-          _             (history-git/worktree-remove git-ctx {:path source-path})
-          [ctx _]       (create-session-context {:cwd repo-dir :persist? false})
-          qctx          (query/create-query-context)]
-      (session/register-resolvers-in! qctx false)
-      (session/register-mutations-in! qctx mutations/all-mutations true)
-      (let [attach (get (query/query-in qctx
-                                        {:psi/agent-session-ctx ctx
-                                         :git/context (history-git/create-context repo-dir)}
-                                        [(list 'git.worktree/add!
-                                               {:psi/agent-session-ctx ctx
-                                                :git/context (history-git/create-context repo-dir)
-                                                :input {:path worktree-path
-                                                        :branch branch-name
-                                                        :create-branch false}})])
-                        'git.worktree/add!)]
-        (is (true? (:success attach)) (pr-str attach))
-        (is (= branch-name (:branch attach)) (pr-str attach))))))
+          source-path   (str wt-dir File/separator "branch-source-" suffix)
+          worktree-path (str wt-dir File/separator branch-name)]
+      (.mkdirs (File. wt-dir))
+      (try
+        (let [_             (history-git/worktree-add git-ctx {:path source-path
+                                                               :branch branch-name})
+              _             (history-git/worktree-remove git-ctx {:path source-path})
+              [ctx _]       (create-session-context {:cwd repo-dir :persist? false})
+              qctx          (query/create-query-context)]
+          (session/register-resolvers-in! qctx false)
+          (session/register-mutations-in! qctx mutations/all-mutations true)
+          (let [attach (get (query/query-in qctx
+                                            {:psi/agent-session-ctx ctx
+                                             :git/context (history-git/create-context repo-dir)}
+                                            [(list 'git.worktree/add!
+                                                   {:psi/agent-session-ctx ctx
+                                                    :git/context (history-git/create-context repo-dir)
+                                                    :input {:path worktree-path
+                                                            :branch branch-name
+                                                            :create-branch false}})])
+                            'git.worktree/add!)]
+            (is (true? (:success attach)) (pr-str attach))
+            (is (= branch-name (:branch attach)) (pr-str attach))))
+        (finally
+          (test-support/delete-recursively! repo-dir)))
+      (testing "cleanup wiring: repo-dir is removed once the try/finally above completes"
+        ;; Guards the try/finally cleanup wiring itself, not the mutation
+        ;; behaviour above: a regression that dropped this try/finally's
+        ;; delete-recursively! call would not otherwise be caught by bb test.
+        (is (not (.exists (File. ^String repo-dir)))
+            "repo-dir should be deleted once the try/finally above completes")))))
 
 (deftest rpc-trace-mutation-and-resolver-test
   (let [[ctx session-id] (create-session-context {:persist? false})
@@ -419,4 +440,3 @@
         (is (= "slice-1" (:psi.background-job/workflow-id job)))
         (is (true? (:psi.background-job/is-terminal job)))
         (is (contains? #{:completed :failed} (:psi.background-job/status job)))))))
-

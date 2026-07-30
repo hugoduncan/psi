@@ -6,7 +6,7 @@
   (:import
    (java.util.concurrent Future)))
 
-(def llm-stream-idle-timeout-ms 600000)
+(def llm-stream-idle-timeout-ms 1200000)
 (def llm-stream-wait-poll-ms 250)
 
 (defn now-ms []

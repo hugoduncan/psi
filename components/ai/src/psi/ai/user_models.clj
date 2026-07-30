@@ -46,6 +46,7 @@
    [:supports-text {:optional true} [:maybe boolean?]]
    [:context-window {:optional true} [:maybe pos-int?]]
    [:max-tokens {:optional true} [:maybe pos-int?]]
+   [:parallel-tool-calls {:optional true} [:maybe boolean?]]
    [:input-cost {:optional true} [:maybe number?]]
    [:output-cost {:optional true} [:maybe number?]]
    [:cache-read-cost {:optional true} [:maybe number?]]

@@ -1,0 +1,393 @@
+# Implementation notes
+
+- architectural review: no feedback — design fits `ai`-component ownership,
+  single-source-of-truth catalog, and data-shaped extension (no new branching).
+- ambiguity review: no feedback — material ambiguities already captured in the
+  design's "Open questions (resolve before plan.md)" section.
+- inconsistency review: added 1 design step — design's "second nearby set"
+  (open question #4) does not exist; `:gpt-5.5` is in exactly one set
+  (`openai-chat-completions-native-model-keys`, models.clj 610–623). The adjacent
+  set (625–635) is Anthropic-only.
+
+- plan-review ambiguity review: no ambiguity review feedback — no plan.md/steps.md exist yet (design-stage); plan-level ambiguities N/A and design open questions #1–6 already captured.
+- plan-review inconsistency review: no inconsistency review feedback — no plan.md/steps.md exist yet; design/design-steps/implementation mutually consistent (prior native-key-set inconsistency already resolved).
+
+## For the design-step task
+
+- Relevant files: `components/ai/src/psi/ai/models.clj` (catalog + native-key
+  set at 610–623; entries added via `openai-models`), and
+  `components/ai/src/psi/ai/model_registry.clj` (`openai-oauth-runtime-model`,
+  177–212 — the sole OAuth transport override, currently `gpt-5.5`-only).
+- Principle: this design-step is a documentation correction only — fixing the
+  design's false "second set" premise. It must not widen scope or change the
+  frozen scope boundary; keep the single-source-of-truth / data-shaped-extension
+  intent intact.
+
+## Implementation slice (gpt-5.6 catalog entry)
+
+- Added `:gpt-5.6` to `built-in/all-models` in models.clj, mirroring
+  gpt-5.5's shape/transport (`:openai-completions`,
+  `https://api.openai.com/v1`, context-window 1000000, max-tokens 128000,
+  all capability flags `true`).
+- Pricing (`:input-cost` 6.0, `:output-cost` 35.0, `:cache-read-cost` 0.6,
+  `:cache-write-cost` 0.0) is synthetic — derived from the catalog's own
+  established increment-per-version convention since this catalog is a
+  fixture beyond real OpenAI releases and has no external pricing source
+  to cite. Recorded as a resolved decision in design.md rather than left
+  as a placeholder.
+- Added `:gpt-5.6` to `openai-chat-completions-native-model-keys`.
+- Generalized `openai-oauth-runtime-model` (model_registry.clj): replaced
+  the single `(= "gpt-5.5" model-id)` check with an
+  `openai-oauth-codex-model-ids` set `#{"gpt-5.5" "gpt-5.6"}`, and
+  parameterized the catalog lookup/override on `model-id` instead of the
+  hardcoded `"gpt-5.5"`/`:gpt-5.5` literals. Behaviour for gpt-5.5 is
+  unchanged; gpt-5.6 now gets the same ChatGPT/Codex OAuth transport
+  override.
+- Tests added to `model_registry_test.clj`: catalog presence for
+  `"gpt-5.6"`, OAuth-routing test (mirrors the existing gpt-5.5 pair),
+  and a structured-output capability test (chat-completions native JSON
+  Schema, mirrors the gpt-5.5 capability test).
+- Verified: `bb test --focus psi.ai.model-registry-test` (14/14 pass),
+  `bb test --focus psi.ai.core-test` (9/9 pass), `clj-kondo --lint
+  components/ai/src` clean.
+- `session_profiles.clj`'s `"gpt-5.5"` comment/example (line ~278,
+  mentioned in design.md Context) was left unchanged — it's an example
+  reference, not a functional model listing, and design.md scoped it as
+  "likely not required to change."
+- Design's six open questions were resolved directly in design.md
+  ("Resolved decisions") rather than staying open, since answering them
+  was the prerequisite for any plan.md; plan.md/steps.md created in this
+  same slice, already reflecting the completed implementation.
+
+## Design-follow-up (inconsistency step resolved)
+
+- Verified against `components/ai/src/psi/ai/models.clj`: exactly one native-key
+  set contains `:gpt-5.5` — `openai-chat-completions-native-model-keys`
+  (~610–623). The adjacent set (~625–635) is
+  `anthropic-json-schema-native-model-keys` (Anthropic-only). The design's
+  "second nearby set" premise was false.
+- Corrected design.md Context bullet and open question #4 to reference the
+  single native-key set and drop the "second key set" premise. No scope change.
+- For plan/implementation: the only membership decision for `:gpt-5.6` is
+  whether to add it to `openai-chat-completions-native-model-keys`; there is no
+  second OpenAI set to consider.
+
+## Implementation review (task-implementation-review)
+
+- Added 2 test-quality steps: bogus negative-control (gpt-5.4 catalog transport
+  already codex, so the "preserve catalog transport" assertion proves nothing),
+  and missing symmetric no-oauth assertion for gpt-5.6.
+- Code/catalog/OAuth-set changes and structured-output tests otherwise match
+  design + architecture. (Note: the original "no changelog entry required"
+  justification was wrong and is superseded below — see round-2 follow-ups; a new
+  selectable, OAuth-routed model is user_visible(δ) under the AGENTS.md changelog
+  policy, and CHANGELOG.md already has sibling entries for catalog adds and the
+  gpt-5.5 OAuth/Codex routing mechanism.)
+
+## Implementation-review follow-ups addressed
+
+- addressed 2 review steps (test-quality only, no production code change):
+  - replaced bogus negative-control (`gpt-5.4`, catalog transport already
+    `:openai-codex-responses`) with a genuine one (`gpt-5.4-mini`, catalog
+    `:openai-completions`, ∉ `openai-oauth-codex-model-ids`); asserts it stays
+    `:openai-completions` under oauth ctx.
+  - added symmetric no-oauth assertion for `gpt-5.6`
+    (`resolve-runtime-model nil :openai "gpt-5.6"` → `:openai-completions` /
+    `https://api.openai.com/v1`), mirroring the gpt-5.5 case.
+  - `bb test --focus psi.ai.model-registry-test` → 14/14 pass; clj-kondo clean.
+
+## Implementation review (round 2)
+
+- added 2 steps: no field-value test pins the design-decided gpt-5.6
+  pricing/context values (sibling `*-catalog-entry-test` pattern unused); the
+  "no changelog needed" justification is contradicted by CHANGELOG.md precedent
+  (Opus 4.8 catalog add + gpt-5.5 OAuth routing both have entries).
+
+## Implementation-review follow-ups addressed (round 2)
+
+- addressed 2 review steps:
+  - added `gpt-5-6-catalog-entry-test` pinning the decided gpt-5.6 field
+    values (id/name/provider/api/base-url, three capability flags true,
+    context-window 1000000, max-tokens 128000, pricing 6.0/35.0/0.6/0.0),
+    mirroring `fable-5-catalog-entry-test` / `sonnet-5-catalog-entry-test`.
+  - reconciled the changelog: added an `[Unreleased] / Added` CHANGELOG.md
+    entry for gpt-5.6 (catalog availability + OAuth/Codex routing) and
+    corrected the superseded "no changelog entry required" note above.
+  - `bb test --focus psi.ai.model-registry-test` → 15/15 pass; clj-kondo clean.
+
+## Implementation review (round 3)
+
+- no new steps — code/catalog/OAuth-set, tests (15/15), CHANGELOG `[Unreleased]`
+  entry, and docs all verified consistent with design/plan/architecture; prior
+  two rounds' follow-ups confirmed addressed.
+
+## Test review (task-test-review)
+
+- added 1 test step: `resolve-runtime-model` lacks a codex-member
+  (gpt-5.6) case for ctx-present-but-not-oauth-backed; only nil-ctx and
+  live-oauth branches are covered at this seam.
+
+## Test-review follow-ups addressed
+
+- addressed 1 test step: added `resolve-runtime-model` case for codex-member
+  `gpt-5.6` under an api-key (ctx-present-but-not-oauth-backed) context in
+  `resolve-runtime-model-openai-oauth-routing-test`; asserts fallback to
+  catalog `:openai-completions` / `https://api.openai.com/v1` despite membership
+  in `openai-oauth-codex-model-ids`. Closes the `oauth-backed?`-false-with-ctx
+  branch gap at the resolve-runtime-model seam.
+- `bb test --focus psi.ai.model-registry-test` → 15/15 pass (173 assertions);
+  clj-kondo clean.
+
+## Test review (task-test-review, round 2)
+
+- no new steps: tests are well-formed, cover every acceptance criterion
+  (catalog presence + pinned field values, native-capability set membership,
+  all four resolve-runtime-model branches — nil/oauth/api-key-non-oauth/
+  non-member), and use only the real `oauth/create-null-context` nullable
+  (no mocks/stubs; state assertions, not interaction assertions). Prior
+  test-review gap already closed.
+
+## Test-shaper review
+
+- added 3 test-shaper steps (duplicated oauth-ctx setup, wall-clock expiry in
+  fixture, gpt-5.5/gpt-5.6 codex-routing case duplication). Coverage is complete;
+  these are clarity/economy/determinism shaping only, no coverage or production
+  change.
+
+- addressed 3 test-shaper review steps in model_registry_test.clj: extracted
+  `oauth-openai-ctx` helper (removes 3x duplicated oauth-ctx literal), replaced
+  wall-clock `:expires` with fixed `far-future-expiry` constant (deterministic),
+  and collapsed gpt-5.5/gpt-5.6 codex-routing blocks into a data-driven `doseq`
+  with id-specific failure messages. Focused test 173 assertions pass, lint clean.
+
+## Test-shaper review (round 2)
+
+- added 1 test-shaper step: codex-routing `doseq` mixes transport-override and
+  structured-output-capability concerns in one block (capability half redundant
+  with `openai_structured_output_test.clj` + gpt-5.4 codex capability test).
+  Coverage complete; concern-splitting only, no production change.
+
+## Test-shaper follow-ups (round 2) — applied
+
+- addressed 1 review step: reduced codex-routing `doseq` to the transport-override
+  contract only (`:api`/`:base-url`/`:id`); dropped the redundant structured-output
+  capability assertions (already covered by `built-in-structured-output-capabilities-test`
+  and `providers/openai_structured_output_test`). Focused test 169 assertions pass,
+  lint clean.
+
+## Test-shaper review (round 3)
+
+- added 1 step: api-key ctx fixture in
+  `resolve-runtime-model-openai-oauth-routing-test` reintroduces the raw
+  `create-null-context` literal inline, inconsistent with the round-1 extracted
+  `oauth-openai-ctx` helper for the sibling oauth branch. Coverage complete;
+  fixture-consistency shaping only, no production change.
+
+## Test-shaper follow-ups (round 3) — applied
+
+- addressed 1 review step: generalized the ctx fixtures into a single
+  `openai-ctx` builder parameterized on the credential map; `oauth-openai-ctx`
+  and new `api-key-openai-ctx` both delegate to it. Removed the raw inline
+  `create-null-context` literal from the api-key branch so oauth and api-key
+  fixtures share one construction style and only the credential type varies.
+  Focused test 169 assertions pass, lint clean.
+
+## Test-shaper review (round 4)
+
+- added 1 step: the no-oauth member-pair blocks (gpt-5.5/gpt-5.6) in
+  `resolve-runtime-model-openai-oauth-routing-test` remain verbatim copies while
+  the sibling codex-routing pair was collapsed into a `doseq` — the same
+  case-explosion, left inconsistent within one test. Coverage complete;
+  economy/consistency shaping only, no production change.
+
+- addressed 1 test-shaper round-4 review step: collapsed the no-oauth
+  member-pair blocks into a `doseq` over `["gpt-5.5" "gpt-5.6"]` with
+  id-specific failure messages, matching the codex-routing pair's shape;
+  tests pass, lint clean.
+
+## Test-shaper review (round 5)
+
+- no new steps: `model_registry_test.clj` is simple, consistent, robust, and
+  economical after four prior shaping rounds — data-driven member pairs,
+  shared `openai-ctx` fixture, deterministic fixed expiry, real
+  `create-null-context` nullable (no mocks), state assertions, redundant
+  capability half removed from the routing seam, and catalog field-values
+  pinned once. The remaining assertion-message asymmetry (per-iteration
+  messages on `doseq` blocks vs. none on fixed single-model blocks) is
+  justified by the dynamic-vs-static `testing` label and not actionable. 15/15
+  tests, 169 assertions pass.
+
+## Docs review (review-task-docs)
+
+- no new steps: CHANGELOG `[Unreleased]/Added` gpt-5.6 entry verified accurate
+  and consistent with sibling model-add entries; all claims (capabilities, 1M
+  context, `:openai-completions`/`api.openai.com/v1`, chat-completions native
+  JSON Schema, codex OAuth routing to `chatgpt.com/backend-api` with streaming
+  `text.format` JSON Schema, `/model openai gpt-5.6` syntax) match code. No
+  stale refs; doc/ + ramora/ example blocks use single illustrative ids (not
+  enumerations), so no gpt-5.6 addition required there.
+
+## Code-shaper review
+
+- added 2 code-shaper steps on `openai-oauth-runtime-model` production code
+  (dual-lookup data-shape inconsistency between `find-model` and raw
+  `built-in/all-models` fallback; `(keyword model-id)` catalog-keying leak).
+  Prior review rounds were test-focused; these are the first findings on the
+  override's own lookup shape. No coverage or behaviour change requested.
+
+## Code-shaper follow-ups addressed
+
+- addressed 2 code-shaper review steps (single production-code change, no
+  behaviour change): dropped the dead `(or ... (get built-in/all-models
+  (keyword model-id)))` raw-map fallback in `openai-oauth-runtime-model`,
+  keeping only `find-model` so the override always shapes one
+  catalog-normalized model shape. Every id in `openai-oauth-codex-model-ids`
+  (`gpt-5.5`/`gpt-5.6`) has a catalog entry (models.clj 578/594), so the
+  fallback was unreachable; removing it also removes the `(keyword model-id)`
+  catalog-keying leak. Docstring updated to state the single lookup source.
+  `bb test --focus psi.ai.model-registry-test` → 15/15 (169 assertions),
+  `bb test --focus psi.ai.core-test` → 9/9 pass; clj-kondo clean.
+
+## Code-shaper review (round 2)
+
+- added 1 code-shaper step: `openai-oauth-runtime-model` re-derives the codex
+  transport triple (`:api`/`:base-url`/codex capability) imperatively, duplicating
+  the declarative shape the codex catalog entries + `built-in-structured-output-capability`
+  already own; the two definitions drift independently. No behaviour or coverage change.
+
+## Code-shaper round-2 follow-up applied
+
+- addressed 1 review step. Introduced a single owner for the "how a model
+  becomes codex" rule in `structured_output.clj`: `openai-codex-api` +
+  `openai-codex-base-url` constants and `with-openai-codex-transport` (sets the
+  codex transport triple + attaches codex native capability in one place).
+  `openai-oauth-runtime-model` now composes `with-openai-codex-transport` over
+  the catalog entry instead of re-stating the `:api`/`:base-url`/capability
+  literals imperatively, so the override can no longer drift from the codex
+  transport definition. Catalog map-literal `:api`/`:base-url` entries left
+  as-authored (out of this item's scope: the item targets the override's
+  imperative re-derivation). Tests: model-registry 15/15, core 9/9,
+  openai-structured-output + models pass; clj-kondo clean.
+
+## Code-shaper review (round 3)
+
+- added 1 code-shaper step: the codex transport literals
+  (`:api :openai-codex-responses` in 9 entries, `:base-url
+  "https://chatgpt.com/backend-api"` in 8) are still restated inline in the
+  catalog while task-240's round-2 fix made `structured-output` the single owner
+  (`openai-codex-api`/`openai-codex-base-url`/`with-openai-codex-transport`) that
+  the OAuth override composes — so the codex transport identity now lives in two
+  mechanisms that can drift silently. Round-2 explicitly scoped catalog literals
+  out; the shared owner it created makes reconciliation (or a drift-guard test)
+  reachable. Broadens beyond gpt-5.6 to sibling codex entries — noted as a scope
+  caveat on the step. No behaviour or coverage change requested.
+
+## Code-shaper review (round 4)
+
+- added 1 step: the round-3 drift-guard test's `:api` assertion is tautological
+  (filters codex entries by `:api == openai-codex-api`, then asserts the same),
+  so it can never catch `:api` drift; only `:base-url` is actually guarded.
+
+## Code-shaper follow-ups addressed (round 3)
+
+- addressed 1 review step (test-only, no production change). Chose the
+  drift-guard invariant over rewriting the catalog data literals:
+  Option 1 (reference `structured-output/openai-codex-api` /
+  `openai-codex-base-url` inline in every `:openai-codex-responses`
+  entry) would rewrite the authored data-literal form of 8 pre-existing
+  sibling codex entries (gpt-5-codex, gpt-5.1/5.2/5.3/5.4-codex, etc.),
+  exceeding task-240's "add a catalog entry + set membership" scope and
+  the round-2 note's explicit catalog-literal scope-out. Instead added
+  `codex-catalog-transport-matches-shared-constants-test`
+  (`model_registry_test.clj`): iterates `built-in/all-models`, selects
+  every entry whose `:api` equals `structured-output/openai-codex-api`,
+  and asserts its `:api`/`:base-url` equal the shared constants — so the
+  catalog stays authored as data yet drift from the runtime override's
+  shared owner is now caught (`robust → enforceable(invariants)`). Guard
+  covers present and future codex entries. `bb test --focus
+  psi.ai.model-registry-test` → 16/16 (186 assertions); clj-kondo clean.
+
+## Code-shaper review (round 5)
+
+- added 1 step: the codex drift-guard covers only 2 of the 3 facets its single
+  owner (`with-openai-codex-transport`) shapes — `:api`/`:base-url` are guarded,
+  but the codex structured-output capability (attached independently by the
+  catalog's `built-in-structured-output-capability` `case`) is not, so that facet
+  can drift silently between the override and catalog paths.
+
+## Code-shaper follow-ups addressed (round 4)
+
+- addressed 1 review step (test-only, no production change). Fixed the
+  tautological `:api` assertion in
+  `codex-catalog-transport-matches-shared-constants-test`: the drift-guard now
+  selects its population by a codex identity independent of *both* transport
+  fields — an entry is codex iff `(or (= codex-api :api) (= codex-base-url
+  :base-url))` — so neither the `:api` nor the `:base-url` assertion is
+  tautological against its own selector. A codex entry whose `:api` diverged
+  from the constant is still selected (via the `:base-url` disjunct) and then
+  flagged, instead of being filtered out and silently skipped. REPL-verified: a
+  drifted-`:api`/codex-`:base-url` entry is selected and the `:api` assertion
+  fails on it. `bb test --focus psi.ai.model-registry-test` → 16/16 (186
+  assertions); clj-kondo clean.
+
+## Code-shaper review (round 6)
+
+- added 1 step: the catalog capability dispatch `case` (`built-in-structured-output-capability`)
+  dispatches on the bare literal `:openai-codex-responses`, a third unguarded copy
+  of `structured-output/openai-codex-api`'s value; the round-3/4/5 drift-guard
+  cannot catch a `case` that stopped firing since it selects by already-present
+  codex transport fields. Noted the `case` compile-time-literal constraint. No
+  behaviour or coverage change requested.
+
+## Code-shaper follow-ups addressed (round 5)
+
+- addressed 1 review step (test-only, no production change). Chose option (a) —
+  extend the drift-guard to the capability facet — over option (b) rewriting the
+  catalog `case`, consistent with the round-3/4 precedent of guarding data-authored
+  catalog against a shared owner rather than broadening scope into shared codex
+  machinery (the round-5 item's scope caveat). Extended
+  `codex-catalog-transport-matches-shared-constants-test` to also assert every
+  selected codex entry's *effective structured-output capability* equals
+  `openai-codex-native-capability`. The capability is attached only during catalog
+  normalization (not in raw `all-models`), so the assertion reads the normalized
+  entry via `find-model` and compares against
+  `normalize-structured-output-capability` of the codex constant. All three facets
+  of the codex rule (`:api`/`:base-url`/native capability) are now drift-guarded
+  together. REPL-verified meaningful: a codex entry's effective capability matches
+  the codex constant and a *different* capability value fails the assertion.
+  `bb test --focus psi.ai.model-registry-test` → 16/16 (194 assertions, up from
+  186); clj-kondo clean.
+
+## Code-shaper follow-ups addressed (round 6)
+
+- addressed 1 review step. Chose to document the irreducibility rather than
+  broaden scope (option a — `condp`/`cond` — would touch all three provider
+  branches and abandon `case`'s constant-time dispatch, exceeding the
+  round-3/4/5 "guard data, don't broaden into shared codex machinery"
+  precedent). Clojure `case` requires compile-time-literal keys, so the
+  `:openai-codex-responses` branch in `built-in-structured-output-capability`
+  cannot reference `structured-output/openai-codex-api` directly. Added an
+  inline note at that branch stating the literal is a deliberate, reconciled
+  restatement (not a missed reference) and pointing at the drift-guard, and
+  added an assertion to `codex-catalog-transport-matches-shared-constants-test`
+  pinning `openai-codex-api` to that literal so a retarget of the constant fails
+  there and directs a reader to the `case`. `bb test --focus
+  psi.ai.model-registry-test` → 16/16 (195 assertions, up from 194); clj-kondo
+  clean.
+
+## Code-shaper review (round 7)
+
+- no new steps — code (single `find-model` lookup composing the shared
+  `with-openai-codex-transport` owner), tests (16/16, 195 assertions,
+  data-driven fixtures, all three codex facets drift-guarded, field values
+  pinned), CHANGELOG `[Unreleased]/Added`, and lint verified simple, consistent,
+  and robust. Residual observations (catalog `:api`/`:base-url` literals not
+  referencing the shared constants; `with-openai-codex-native-capability` now
+  single-caller) are already captured as deliberately scope-caveated
+  shared-codex-machinery items in rounds 2–6; not re-raised to avoid duplication.
+
+## Close
+
+Closed: completed. All lifecycle gates (design/plan/implement/review/knowledge)
+passed; `:gpt-5.6` shipped in the catalog with OAuth/Codex routing and full test
+coverage. Moved open/ → closed/ per Munera state-transition convention.

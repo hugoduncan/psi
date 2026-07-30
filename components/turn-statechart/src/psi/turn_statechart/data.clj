@@ -16,6 +16,7 @@
      turn state."
   []
   {:text-buffer         ""
+   :text-blocks         (sorted-map)
    :thinking-blocks     (sorted-map)
    :tool-calls          (sorted-map)
    :content-blocks      (sorted-map)

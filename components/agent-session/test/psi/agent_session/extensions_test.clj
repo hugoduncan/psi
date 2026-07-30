@@ -305,6 +305,8 @@
               :flag-names #{}
               :flag-count 0
               :shortcut-count 0
+              :turn-augmenter-count 0
+              :effective-permissions #{}
               :allowed-events (:allowed-events (ext/extension-detail-in reg "/ext/a"))}
              (ext/extension-detail-in reg "/ext/a")))
       (is (= [#{"github/search"} #{"jira/search"}]

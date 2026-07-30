@@ -1,4 +1,4 @@
-(ns psi.ai.providers.openai-integration-test
+(ns ^:integration psi.ai.providers.openai-integration-test
   (:require
    [cheshire.core :as json]
    [clojure.string :as str]

@@ -1,6 +1,6 @@
-{:deps {;; Engine (∅) -> substrate: explicit, queryable state machines
+{:deps {;; Engine (∅) -> substrate​ explicit, queryable state machines
         com.fulcrologic/statecharts                   {:mvn/version "1.2.25"}
-        ;; Query + Graph: EQL interface to everything
+        ;; Query + Graph​ EQL interface to everything
         com.wsscode/pathom3                           {:mvn/version "2025.01.16-alpha"}
         ;; Runtime dependencies required by packaged components in the published library jar
         metosin/malli                                 {:mvn/version "0.16.4"}
@@ -14,7 +14,7 @@
         http-kit/http-kit                             {:mvn/version "2.8.0"}
         hiccup/hiccup                                 {:mvn/version "2.0.0-RC3"}
         integrant/integrant                           {:mvn/version "0.13.1"}
-        ;; API: OpenAPI specs -> callable clients
+        ;; API​ OpenAPI specs -> callable clients
         com.github.oliyh/martian-babashka-http-client {:mvn/version "0.2.1"}
         org.clojure/clojure                           {:mvn/version "1.12.4"}
         ;; Components
@@ -85,6 +85,7 @@
                         "components/rpc/src"
                         "extensions/auto-session-name/src"
                         "extensions/commit-checks/src"
+                        "extensions/context-manager/src"
                         "extensions/hello-ext/src"
                         "extensions/mcp-tasks-run/src"
                         "extensions/mementum/src"
@@ -148,6 +149,7 @@
                         "components/turn-statechart/src"
                         "extensions/auto-session-name/src"
                         "extensions/commit-checks/src"
+                        "extensions/context-manager/src"
                         "extensions/hello-ext/src"
                         "extensions/mcp-tasks-run/src"
                         "extensions/mementum/src"
@@ -191,6 +193,7 @@
                            "components/system-bootstrap/src"
                            "extensions/auto-session-name/src"
                            "extensions/commit-checks/src"
+                           "extensions/context-manager/src"
                            "extensions/hello-ext/src"
                            "extensions/mcp-tasks-run/src"
                            "extensions/mementum/src"
@@ -275,6 +278,7 @@
                              "components/extension-test-helpers/test"
                              "extensions/auto-session-name/test"
                              "extensions/commit-checks/test"
+                             "extensions/context-manager/test"
                              "extensions/hello-ext/test"
                              "extensions/mcp-tasks-run/test"
                              "extensions/mementum/test"
@@ -285,10 +289,30 @@
                              "extensions/logprobs/test"
                              "extensions/metrics/test"
                              "extensions/dev-http/test"
-                             "components/extension-test-helpers/src"]
-               :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
-                             nrepl/nrepl         {:mvn/version "1.5.1"}
-                             org.hugoduncan/scry {:mvn/version "0.1.28"}}
+                             "components/extension-test-helpers/src"
+                             "extensions/auto-session-name/src"
+                             "extensions/commit-checks/src"
+                             "extensions/context-manager/src"
+                             "extensions/hello-ext/src"
+                             "extensions/mcp-tasks-run/src"
+                             "extensions/mementum/src"
+                             "extensions/mementum/resources"
+                             "extensions/munera/src"
+                             "extensions/munera/resources"
+                             "extensions/plan-state-learning/src"
+                             "extensions/work-on/src"
+                             "extensions/github/src"
+                             "extensions/edit-clj/src"
+                             "extensions/logprobs/src"
+                             "extensions/metrics/src"
+                             "extensions/dev-http/src"
+                             "extensions/dev-http/resources"
+                             "extensions/dev-http/dev"]
+               :extra-deps  {lambdaisland/kaocha      {:mvn/version "1.91.1392"}
+                             nrepl/nrepl             {:mvn/version "1.5.1"}
+                             rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}
+                             org.hugoduncan/scry     {:mvn/version "0.1.48"}
+                             org.hugoduncan/scry-kaocha     {:mvn/version "0.1.48"}}
                :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]}
   :test  {:extra-paths ["test-support"
                         "bases/main/test"
@@ -332,6 +356,7 @@
                         "components/extension-test-helpers/test"
                         "extensions/auto-session-name/test"
                         "extensions/commit-checks/test"
+                        "extensions/context-manager/test"
                         "extensions/hello-ext/test"
                         "extensions/mcp-tasks-run/test"
                         "extensions/mementum/test"
@@ -384,6 +409,7 @@
                         "components/system-bootstrap/test"
                         "extensions/auto-session-name/src"
                         "extensions/commit-checks/src"
+                        "extensions/context-manager/src"
                         "extensions/hello-ext/src"
                         "extensions/mcp-tasks-run/src"
                         "extensions/mementum/src"
@@ -402,8 +428,8 @@
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
                         nrepl/nrepl                {:mvn/version "1.5.1"}
-                        org.hugoduncan/scry        {:mvn/version "0.1.28"}
-                        org.hugoduncan/scry-kaocha {:mvn/version "0.1.28"}
+                        org.hugoduncan/scry        {:mvn/version "0.1.48"}
+                        org.hugoduncan/scry-kaocha {:mvn/version "0.1.48"}
                         rewrite-clj/rewrite-clj    {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "kaocha.runner"]}

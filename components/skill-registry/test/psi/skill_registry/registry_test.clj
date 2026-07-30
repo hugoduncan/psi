@@ -12,6 +12,25 @@
   (is (false? (skill-registry/valid-skill-name? "")))
   (is (false? (skill-registry/valid-skill-name? "   "))))
 
+(deftest prompt-hidden?-test
+  (testing "disable-model-invocation hides"
+    (is (true? (skill-registry/prompt-hidden? {:disable-model-invocation true}))))
+  (testing "advertise false hides"
+    (is (true? (skill-registry/prompt-hidden? {:advertise false}))))
+  (testing "advertise absent or true is visible"
+    (is (not (skill-registry/prompt-hidden? {})))
+    (is (not (skill-registry/prompt-hidden? {:advertise true})))))
+
+(deftest visible-hidden-skills-test
+  (let [all-skills [{:name "z" :advertise true}
+                    {:name "h" :disable-model-invocation true}
+                    {:name "u" :advertise false}
+                    {:name "a"}]]
+    (testing "visible-skills excludes hidden in canonical order"
+      (is (= ["a" "z"] (mapv :name (skill-registry/visible-skills all-skills)))))
+    (testing "hidden-skills returns only hidden in canonical order"
+      (is (= ["h" "u"] (mapv :name (skill-registry/hidden-skills all-skills)))))))
+
 (deftest register-skill-test
   (testing "adds new skills by name"
     (let [skill {:name "coding" :description "Use coding guidance"}

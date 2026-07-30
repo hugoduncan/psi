@@ -1,0 +1,3 @@
+🔁 Cleanup fixes need executable guard assertions for the cleanup wiring itself, not just behaviour assertions plus manual `/tmp`/`git worktree list` checks. After adding or relying on `finally`/macro/shutdown-hook cleanup for temp dirs or worktrees, include a test that observes the resource after the protected body exits and asserts it is gone.
+
+If cleanup is hidden behind a public helper that delegates to a private hook/register function, test through the public creation path (or a test-only variant sharing the exact helper) so dropping the delegation would fail. Manual leak checks are useful during diagnosis but are not a regression net.

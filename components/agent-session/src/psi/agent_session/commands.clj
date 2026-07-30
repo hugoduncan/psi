@@ -41,10 +41,6 @@
    [psi.ai.models :as ai-models]
    [psi.ai.model-registry :as model-registry]))
 
-;; ============================================================
-;; Formatting helpers (pure — return strings, no side effects)
-;; ============================================================
-
 (defn format-status
   "Return a status string for the current session."
   [ctx session-id]
@@ -543,20 +539,21 @@
 
               :else
               (let [resolved (resolve-runtime-model ctx provider model-id)]
-                (if-not resolved
+                (cond
+                  (nil? resolved)
                   {:type :text
                    :message (str "Unknown model: " provider " " model-id)}
-                  (let [provider-str (name (:provider resolved))
-                        model {:provider provider-str
-                               :id (:id resolved)
-                               :reasoning (:supports-reasoning resolved)}
+
+                  (:runtime/unsupported? resolved)
+                  {:type :text
+                   :message (model-registry/unsupported-runtime-model-message resolved)}
+
+                  :else
+                  (let [model (model-registry/persistable-model resolved)
                         result (session/set-model-in! ctx session-id model scope)]
                     {:type :text
-                     :message (str "✓ Model set to "
-                                   (get-in result [:model :provider]) " "
-                                   (get-in result [:model :id])
-                                   (when scope
-                                     (str " [" (name scope) "]")))}))))))))))
+                     :message (model-registry/model-set-message
+                               (:model result) scope)}))))))))))
 
 (defn- dispatch-thinking-command
   [ctx session-id trimmed]
@@ -679,7 +676,8 @@
     "/job" (dispatch-job-command ctx session-id trimmed)
     "/cancel-job" (dispatch-cancel-job-command ctx session-id trimmed)
     "/remember" (dispatch-remember-command ctx session-id trimmed)
-    "/model" (dispatch-model-command ctx session-id trimmed)
+    "/model" (dispatch-model-command (cond-> ctx oauth-ctx (assoc :oauth-ctx oauth-ctx))
+                                     session-id trimmed)
     "/thinking" (dispatch-thinking-command ctx session-id trimmed)
     "/speed" (speed-command/dispatch-command ctx session-id trimmed)
     "/effort" (effort-command/dispatch-command ctx session-id trimmed)
@@ -789,4 +787,3 @@
     (when-let [f (:post-command-fn opts)]
       (f ctx session-id result))
     result))
-

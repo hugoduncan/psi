@@ -91,6 +91,24 @@
                        :exit exit})))
     out))
 
+(defn- run-git-untrimmed
+  "Run git `args` in ctx's repo-dir; return stdout with porcelain-significant
+   whitespace preserved or throw."
+  [^GitContext ctx args]
+  (let [pb   (ProcessBuilder. ^java.util.List (into ["git"] args))
+        _    (.directory pb (File. ^String (:repo-dir ctx)))
+        proc (.start pb)
+        out  (slurp (.getInputStream proc))
+        err  (str/trim (slurp (.getErrorStream proc)))
+        exit (.waitFor proc)]
+    (when (pos? exit)
+      (throw (ex-info "git command failed"
+                      {:dir  (:repo-dir ctx)
+                       :args args
+                       :err  err
+                       :exit exit})))
+    out))
+
 (defn- canonical-path
   ^String [p]
   (when (seq (str p))
@@ -680,15 +698,23 @@
      :git.commit/diff    diff
      :git.commit/symbols (extract-symbols (str subject " " body))}))
 
+(defn- staged-porcelain-line?
+  [line]
+  (let [index-status (first line)]
+    (and index-status
+         (not= \space index-status)
+         (not= \? index-status))))
+
 (defn status
   "Return :clean | :modified | :staged | :error for `ctx`."
   [ctx]
   (try
-    (let [out (run-git ctx ["status" "--porcelain"])]
+    (let [out   (run-git-untrimmed ctx ["status" "--porcelain"])
+          lines (remove str/blank? (str/split-lines out))]
       (cond
-        (str/includes? out "M ") :staged
-        (seq out)                :modified
-        :else                    :clean))
+        (some staged-porcelain-line? lines) :staged
+        (seq lines)                         :modified
+        :else                               :clean))
     (catch Exception _ :error)))
 
 (defn current-branch

@@ -203,6 +203,9 @@
   (testing "retry-error? true for chunked stream termination failure"
     (is (session/retry-error? :error "Premature end of chunk coded message body: closing chunk expected")))
 
+  (testing "retry-error? true for canonical OpenAI transient server error"
+    (is (session/retry-error? :error "An error occurred while processing your request. You can retry your request, or contact us through our help center at help.openai.com if the error persists. Please include the request ID abc in your message.")))
+
   (testing "retry-error? false for stop reason"
     (is (not (session/retry-error? :stop nil))))
 
@@ -246,6 +249,14 @@
 
   (testing "provider-error-kind classifies provider unavailable"
     (is (= :provider-unavailable (session/provider-error-kind :error "status 503" 503))))
+
+  (testing "provider-error-kind classifies canonical OpenAI transient server error without http status"
+    (is (= :provider-unavailable
+           (session/provider-error-kind
+            :error
+            "An error occurred while processing your request. You can retry your request, or contact us through our help center at help.openai.com if the error persists. Please include the request ID 76b82c17-3fa8-433f-bfd9-54b4d2eafb7f in your message."
+            nil)))
+    (is (= :provider-unavailable (session/provider-error-kind :error "server_error" nil))))
 
   (testing "provider-error-kind classifies transport"
     (is (= :transport (session/provider-error-kind :error "Premature end of chunk coded message body: closing chunk expected" nil))))

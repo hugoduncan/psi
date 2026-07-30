@@ -147,10 +147,12 @@
           (if-let [reason (workflow-session-stop-signal ctx session-id)]
             (stopped-workflow-result session-id opts reason)
             (let [turn-id (:turn-id submit-result)
-                  _ (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})]
+                  _ (dispatch/dispatch! ctx :session/prompt {:session-id session-id
+                                                             :turn-id turn-id}
+                                        {:origin :core})]
               (if-let [reason (workflow-session-stop-signal ctx session-id)]
                 (stopped-workflow-result session-id opts reason)
-                (let [result (dispatch/dispatch! ctx :session/prompt-prepare-request
+                (let [result (dispatch/dispatch! ctx :session/pre-turn-augment
                                                  (cond-> {:session-id session-id
                                                           :turn-id    turn-id
                                                           :user-msg   user-msg}

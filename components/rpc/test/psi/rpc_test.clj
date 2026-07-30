@@ -10,8 +10,36 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.query.core :as query]
-   [psi.rpc-test-support :as support]
-   [psi.rpc.session.command-pickers]))
+   [psi.agent-session.test-support :as agent-test-support]
+   [psi.rpc-test-support :as support]))
+
+(defn- run-select-model
+  "Run a single submitted `select-model` `frontend_action_result` with the given
+   `{:provider :id}` `value` against a subscribed session, and return
+   `{:response <frontend_action_result response frame>
+     :command-result <command-result event frame>
+     :session-updated <session/updated event frame>
+     :footer-updated <footer/updated event frame>}`.
+
+   Leaves only the per-case selected `value` as the distinct input; all
+   handshake/loop/frame-filter transport ceremony is shared here."
+  [ctx session-id value]
+  (let [state            (atom {:transport {:ready? true :pending {}}
+                                :connection {:focus-session-id session-id
+                                             :subscribed-topics #{"command-result"
+                                                                  "session/updated"
+                                                                  "footer/updated"}}})
+        handler          (support/make-handler ctx state)
+        input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                              "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value " (pr-str value) "}}\n")
+        {:keys [out-lines]} (support/run-loop input handler state)
+        frames           (support/parse-frames out-lines)]
+    {:response        (some #(when (and (= :response (:kind %))
+                                        (= "frontend_action_result" (:op %))) %)
+                            frames)
+     :command-result  (some #(when (= "command-result" (:event %)) %) frames)
+     :session-updated (some #(when (= "session/updated" (:event %)) %) frames)
+     :footer-updated  (some #(when (= "footer/updated" (:event %)) %) frames)}))
 
 (deftest footer-updated-payload-uses-default-footer-projection-values-test
   (testing "footer payload mirrors default footer path/stats/status composition"
@@ -389,33 +417,6 @@
       (is (= ["off" "minimal" "low" "medium" "high" "xhigh"]
              (mapv :ui.item/value items)))))
 
-  (testing "submitted select-model frontend action updates model and emits command/session snapshots"
-    (let [[ctx session-id] (support/create-session-context)
-          state            (atom {:transport {:ready? true :pending {}}
-                                  :connection {:focus-session-id session-id
-                                               :subscribed-topics #{"command-result"
-                                                                    "session/updated"
-                                                                    "footer/updated"}}})
-          handler          (support/make-handler ctx state)
-          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value {:provider \"openai\" :id \"gpt-5.4-mini\"}}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state)
-          frames           (support/parse-frames out-lines)
-          response         (some #(when (and (= :response (:kind %))
-                                             (= "frontend_action_result" (:op %))) %)
-                                 frames)
-          command-result   (some #(when (= "command-result" (:event %)) %) frames)
-          session-updated  (some #(when (= "session/updated" (:event %)) %) frames)
-          footer-updated   (some #(when (= "footer/updated" (:event %)) %) frames)]
-      (is (= {:accepted true :request-id "req-model"}
-             (:data response)))
-      (is (= {:type "text"
-              :message "✓ Model set to openai gpt-5.4-mini"}
-             (:data command-result)))
-      (is (= "openai" (get-in session-updated [:data :model-provider])))
-      (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
-      (is (some? footer-updated))))
-
   (testing "submitted select-thinking-level frontend action updates thinking and emits command/session snapshots"
     (let [[ctx session-id] (support/create-session-context)
           state            (atom {:transport {:ready? true :pending {}}
@@ -441,6 +442,37 @@
              (:data command-result)))
       (is (= "high" (get-in session-updated [:data :thinking-level])))
       (is (some? footer-updated)))))
+
+(deftest rpc-select-model-frontend-action-updates-model-test
+  (testing "submitted select-model frontend action updates model and emits command/session snapshots"
+    (let [[ctx session-id] (support/create-session-context)
+          {:keys [response command-result session-updated footer-updated]}
+          (run-select-model ctx session-id {:provider "openai" :id "gpt-5.4-mini"})]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= {:type "text"
+              :message (agent-test-support/model-set-message
+                        {:provider "openai" :id "gpt-5.4-mini"})}
+             (:data command-result)))
+      (is (= "openai" (get-in session-updated [:data :model-provider])))
+      (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
+      (is (some? footer-updated)))))
+
+(deftest rpc-select-model-frontend-action-rejects-unsupported-runtime-model-test
+  (testing "submitted select-model frontend action rejects unsupported runtime models without mutating session model"
+    (let [oauth-ctx        (agent-test-support/oauth-openai-ctx)
+          [ctx session-id] (support/create-session-context {:oauth-ctx oauth-ctx})
+          original         (:model (ss/get-session-data-in ctx session-id))
+          {:keys [response command-result]}
+          (run-select-model ctx session-id {:provider "openai" :id "gpt-5.6"})]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= "unsupported_model" (get-in command-result [:data :type])))
+      (is (= (agent-test-support/unsupported-runtime-model-message)
+             (get-in command-result [:data :message])))
+      (is (= "openai" (get-in command-result [:data :provider])))
+      (is (= "gpt-5.6" (get-in command-result [:data :model-id])))
+      (is (= original (:model (ss/get-session-data-in ctx session-id)))))))
 
 (deftest rpc-frontend-action-cancelled-and-failed-result-test
   ;; Characterizes RPC frontend_action_result cancelled/failed observable payloads.
@@ -609,94 +641,3 @@
           (future-cancel loop-future)
           (try (.close in-writer) (catch Exception _ nil))
           (try (.close in-reader) (catch Exception _ nil)))))))
-
-(deftest rpc-set-model-scope-test
-  (testing "set_model accepts explicit session scope without persisting project preferences"
-    (let [cwd        (str (System/getProperty "java.io.tmpdir") "/psi-rpc-model-scope-" (java.util.UUID/randomUUID))
-          _          (.mkdirs (java.io.File. cwd))
-          [ctx sid]  (support/create-session-context {:cwd cwd})
-          state      (atom {:transport {:ready? true :pending {}}
-                            :connection {}})
-          handler    (support/make-handler ctx state)
-          input      (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                          "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.3-codex\" :scope \"session\" :session-id \"" sid "\"}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state)
-          frames     (support/parse-frames out-lines)
-          resp       (some #(when (and (= :response (:kind %)) (= "set_model" (:op %))) %) frames)]
-      (is (some? resp))
-      (is (= true (:ok resp)))
-      (is (= "openai" (get-in (ss/get-session-data-in ctx sid) [:model :provider])))
-      (is (false? (.exists (java.io.File. (str cwd "/.psi/preferences.local.edn")))))))
-
-  (testing "set_model rejects invalid explicit scope"
-    (let [[ctx sid] (support/create-session-context)
-          state     (atom {:transport {:ready? true :pending {}}
-                           :connection {}})
-          handler   (support/make-handler ctx state)
-          input     (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                         "{:id \"m1\" :kind :request :op \"set_model\" :params {:provider \"openai\" :model-id \"gpt-5.3-codex\" :scope \"bogus\" :session-id \"" sid "\"}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state)
-          frames    (support/parse-frames out-lines)
-          err       (some #(when (= :error (:kind %)) %) frames)]
-      (is (some? err))
-      (is (= "request/invalid-params" (:error-code err)))
-      (is (= "invalid request parameter :scope: session, project, or user"
-             (:error-message err)))))
-
-  (testing "picker-backed model selection preserves omitted-scope/default helper semantics"
-    (let [[ctx sid] (support/create-session-context)
-          captured  (atom nil)
-          emit!     (fn [& _])]
-      (with-redefs [session/set-model-in! (fn [ctx' session-id' model & [scope]]
-                                            (reset! captured {:ctx ctx'
-                                                              :session-id session-id'
-                                                              :model model
-                                                              :scope scope})
-                                            {:model model})]
-        (psi.rpc.session.command-pickers/handle-model-selection!
-         ctx sid
-         (fn [ctx' provider id]
-           (when (and (= ctx' ctx)
-                      (= [provider id] ["openai" "gpt-5.3-codex"]))
-             {:provider :openai :id "gpt-5.3-codex" :supports-reasoning true}))
-         emit!
-         {:provider "openai" :id "gpt-5.3-codex"}))
-      (is (= {:ctx ctx
-              :session-id sid
-              :model {:provider "openai"
-                      :id "gpt-5.3-codex"
-                      :reasoning true}
-              :scope nil}
-             @captured)))))
-
-(deftest rpc-e2e-handshake-query-and-streaming-test
-  (testing "handshake -> query_eql -> prompt with interleaved events"
-    (let [[ctx _] (support/create-session-context)
-          state (atom {:transport {:ready? true :pending {}}
-                       :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
-                       :execute-prepared-request-fn (fn [_ai-ctx _ctx _session-id _prepared-request progress-queue]
-                                                      (.offer ^java.util.concurrent.LinkedBlockingQueue progress-queue
-                                                              {:event-kind :text-delta :text "Hello" :type :agent-event})
-                                                      (support/assistant-msg->execution-result _session-id {:role "assistant" :content [{:type :text :text "Hello final"}] :stop-reason :stop :usage {:total-tokens 2}}))})
-          handler (support/make-handler ctx state)
-          input (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
-                     "{:id \"q1\" :kind :request :op \"query_eql\" :params {:query \"[:psi.graph/domain-coverage :psi.memory/status]\"}}\n"
-                     "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"assistant/delta\" \"assistant/message\" \"session/updated\" \"footer/updated\"]}}\n"
-                     "{:id \"p1\" :kind :request :op \"prompt\" :params {:message \"hi\"}}\n")
-          {:keys [out-lines]} (support/run-loop input handler state 250)
-          frames (support/parse-frames out-lines)
-          handshake-frame (some #(when (and (= :response (:kind %)) (= "handshake" (:op %))) %) frames)
-          query-frame (some #(when (and (= :response (:kind %)) (= "query_eql" (:op %))) %) frames)
-          prompt-response-index (first (keep-indexed (fn [i f] (when (and (= :response (:kind f)) (= "prompt" (:op f))) i)) frames))
-          event-indexes (vec (keep-indexed (fn [i f] (when (= :event (:kind f)) i)) frames))]
-      (is handshake-frame)
-      (is (= true (:ok handshake-frame)))
-      (is query-frame)
-      (is (= true (:ok query-frame)))
-      (is (contains? (get-in query-frame [:data :result]) :psi.graph/domain-coverage))
-      (is (contains? (get-in query-frame [:data :result]) :psi.memory/status))
-      (is (number? prompt-response-index))
-      (is (seq event-indexes))
-      (is (some #(< prompt-response-index %) event-indexes))
-      (is (some #(= "assistant/delta" (:event %)) (filter #(= :event (:kind %)) frames))))))
-

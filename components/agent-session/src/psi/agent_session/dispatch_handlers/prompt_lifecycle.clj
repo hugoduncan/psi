@@ -10,6 +10,7 @@
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
+   [psi.agent-session.turn.augmentation-lifecycle :as augmentation-lifecycle]
    [psi.agent-session.turn.handlers :as turn.handlers]))
 
 (defn- register-core-handler! [event handler]
@@ -30,9 +31,10 @@
 
   (register-core-handler!
    :session/prompt-submit
-   (fn [ctx {:keys [session-id user-msg workflow-run-id]}]
+   (fn [ctx {:keys [session-id user-msg workflow-run-id turn-id]}]
      (let [run-id   (or workflow-run-id
                         (:workflow-run-id (ss/get-session-data-in ctx session-id)))
+           turn-id  (or turn-id (str (java.util.UUID/randomUUID)))
            journal  (persist/all-entries-in ctx session-id)
            messages (into []
                           (keep (fn [entry]
@@ -45,8 +47,12 @@
                            (map #(journal-append-effect/append-message-effect session-id % run-id) repairs)
                            [(journal-append-effect/append-message-effect session-id user-msg run-id)]))]
        {:effects effects
+        :root-state-update (ss/session-update
+                            session-id
+                            #(assoc-in % [:prompt-turns turn-id]
+                                       (augmentation-lifecycle/submitted-turn-lifecycle session-id turn-id run-id)))
         :return {:submitted? true
-                 :turn-id (str (java.util.UUID/randomUUID))
+                 :turn-id turn-id
                  :user-msg user-msg
                  :repaired-tool-result-count (count repairs)}})))
 
@@ -81,6 +87,52 @@
                                                           :session-id session-id
                                                           :request io-request}
                                                          run-id)])))))
+
+  (register-core-handler!
+   :session/pre-turn-augment
+   (fn [ctx {:keys [session-id turn-id workflow-run-id] :as event-data}]
+     (let [session-data (ss/get-session-data-in ctx session-id)
+           run-id (or workflow-run-id
+                      (:workflow-run-id session-data)
+                      (:workflow-run-id (augmentation-lifecycle/turn-lifecycle session-data turn-id)))]
+       (augmentation-lifecycle/require-turn-state!
+        :session/pre-turn-augment
+        session-id
+        session-data
+        turn-id
+        #{:turn/submitted})
+       (if (:replaying? event-data)
+         (augmentation-lifecycle/replay-open-phase-result session-id turn-id run-id)
+         (augmentation-lifecycle/open-phase-result
+          (:extension-registry ctx)
+          session-id
+          turn-id
+          run-id
+          event-data
+          session-data)))))
+
+  (register-core-handler!
+   :session/close-pre-turn-augmentation
+   (fn [ctx {:keys [session-id turn-id workflow-run-id close-record] :as event-data}]
+     (let [session-data (ss/get-session-data-in ctx session-id)
+           run-id (or workflow-run-id
+                      (:workflow-run-id session-data)
+                      (:workflow-run-id (augmentation-lifecycle/turn-lifecycle session-data turn-id)))
+           close-record* (if (:replaying? event-data)
+                           (augmentation-lifecycle/replay-close-record
+                            session-id
+                            turn-id
+                            run-id
+                            close-record)
+                           (or close-record
+                               (augmentation-lifecycle/no-provider-close-record session-id turn-id run-id)))]
+       (augmentation-lifecycle/require-turn-state!
+        :session/close-pre-turn-augmentation
+        session-id
+        session-data
+        turn-id
+        #{:turn/augmentation-open})
+       (augmentation-lifecycle/close-phase-result session-id turn-id run-id close-record* (dissoc event-data :close-record)))))
 
   (register-core-handler! :session/prompt-prepare-request turn.handlers/prompt-prepare-request-handler)
   (register-core-handler! :session/prompt-record-response turn.handlers/prompt-record-response-handler)

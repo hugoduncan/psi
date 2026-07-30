@@ -12,34 +12,6 @@
   | disagree ⇔ warranted_by(analysis(x))
   | output(honest_assessment(x))
 
-λ intellect(x).
-  mode ∈ {
-    deductive,
-    inductive,
-    abductive,
-    critical,
-    socratic,
-    dialectical,
-    analytical,
-    synthetic,
-    empirical,
-    pragmatic,
-    creative,
-    systems,
-    probabilistic,
-    hermeneutic,
-    ethical,
-    metacognitive,
-    strategic,
-    causal,
-    counterfactual,
-    formal
-  }
-  | select(mode) according_to(task(x), uncertainty(x), evidence(x), goal(x))
-  | apply(mode, x)
-  | output(reasoned_assessment(x))
-
-
 Artifacts ≡ {meta spec tests code doc}
 MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own protocol⟩
   | change_chain ∉ MemoryArtifacts   ⟨change_chain governs {meta spec tests code doc}⟩
@@ -52,17 +24,6 @@ MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own pr
   | mementum governs MemoryArtifacts   ⟨gate-1 ∧ gate-2 ∧ (approval_gate ∨ autonomous_artifact_extraction) ∈ mementum⟩
   | working_memory(state.md) ≡ AI_updates_during_work   ⟨no approval gate⟩
   | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs; except autonomous_artifact_extraction⟩
-
-λ state_md(x).   ⟨project convention; mementum stays external/unchanged⟩
-  | state.md ≡ current_state_snapshot(features ∧ structure ∧ orientation)   ⟨bootloader⟩
-  | update(state.md) ≡ edit_in_place ∧ prune_stale   ⟨¬append_log⟩
-  | ¬contains(state.md, {task_pass_notes ∨ review_pass_log ∨ per_commit_history ∨ progress_entries})
-  | task_progress → munera_task_artifacts({implementation.md ∧ steps.md})   ⟨not state.md⟩
-  | durable_lesson → memories ∨ knowledge   ⟨not state.md⟩
-  | history(state.md) ≡ git   ⟨recover via git log, ¬accreted in-file⟩
-  | delegated_session(review ∨ implement ∨ plan) → ¬obligated(update(state.md))
-      ⟨write task_progress to task artifacts; touch state.md only on real feature/structure shift⟩
-  | size(state.md) → small ∧ scannable(≤ ~30s)   ⟨grows → prune, ¬accrete⟩
 
 role(meta) ≡ {why invariants boundaries ¬how ¬syntax}
 role(spec) ≡ {behaviour surfaces examples acceptance_criteria}
@@ -155,13 +116,6 @@ iterate_to_fix  spec_step matches intention spec0
 
 λ task_creation(x). initial(x) → create_only(design.md) ∧ ¬create(plan.md) ∧ ¬write(plan.md) ∧ ¬create(steps.md) ∧ ¬create(implementation.md)
 
-λ task_design_md(x).
-  describes(x,{intent ∧ scope ∧ overall_functionality})
-  ∧ ¬describes(x,code_changes)
-  ∧ refined_collaboratively_with_user(x)
-  ∧ unambiguous(x)
-  ∧ explicitly_covers_all_relevant_aspects(x)
-
 λ plan.md. MUST ¬exist ∨ ¬write
 | ¬complete(design.md) ∨ ∃ ambiguity(design.md)
 
@@ -181,20 +135,6 @@ if ¬discoverable(x) → halt
   ∧ (∀c ∈ changes(state). goes_through(c, mutations_via(dispatch_pipeline)))
   ∧ (∀e ∈ side_effects(state). goes_through(e, mutations_via(dispatch_pipeline)))
 
-λ high_quality(code). simple(code) ∧ consistent(code) ∧ robust(code)
-λ locally_comprehensible(code). understand(code) ⊢ local_source(code)
-λ simple(code). single_responsibility(code) ∧ xor(computation(code), flow_control(code)) ∧ locally_comprehensible(code)
-λ consistent(code).
-  consistent(argument_order(code))
-  ∧ consistent(data_shapes(code))
-  ∧ consistent(idioms(code))
-  ∧ consistent(naming(code))
-  ∧ consistent(formatting(code))
-λ robust(code).
-  simple(code) ∧ consistent(code)
-  ∧ ∀y.(code(y) ∧ y ≠ code → orthogonal(code, y))
-  ∧ shaped_by(code, formalisms) → enforceable(invariants(code))
-
 λ shape(x).   topology(x) ≡ contract(x) | unreachable > forbidden | invert(topology) → instance
 λ compile(λ). semantic(λ) ∥ structural(λ) | align > conflict | resonate(one_pass) > reduce(multi_step)
 λ create(f).  ∃request(f) ∨ (∃synthesis(f) ∧ knowledge(f)) → create(f) | ask(f)
@@ -212,25 +152,6 @@ if ¬discoverable(x) → halt
 λ search(q).  recall(persisted) > search(history) > search(content) | prior_knowledge_before_exploration
 λ assert(x).  runtime(x) > source(x) > docs(x) > assumption(x) | runtime ≡ truth, file ≡ memory
 λ context(x). sip(input) → dribble(output) | minimal(x) > comprehensive(x)
-
-
-λ bb-tasks(ψ, project).
-  observe(work) →
-  detect(friction ∨ repetition ∨ missing_shortcut) →
-  propose(task → {name doc cmd}) →
-  刀_approves? →
-    write(bb.edn, task) ∧ commit("⚒ bb: add {name}")
-  | ¬approve → drop
-
-λ skills(ψ, project).
-  observe(work) →
-  detect(recurring ∨ hard_won ∨ project_specific) →
-  classify(workflow ∨ pattern ∨ convention ∨ domain_knowledge) →
-  propose(skill → {name λ description}) →
-  刀_approves? →
-    write(.psi/skills/{name}/SKILL.md, skill) ∧
-    commit("⚒ skill: add {name}")
-  | ¬approve → drop
 
 λpost_commit(changed_files).
   if empty(changed_files)
@@ -292,8 +213,9 @@ README.md - primary top-level user documentation
 
 doc/ - user-facing documentation (guides, references, workflows)
 
-META.md - psi meta model (internal)
+ramora/META.md - psi meta model (internal)
 munera/plan.md - active task orchestration (internal)
+
 λ changelog(δ).
   format(keep-a-changelog) ∧ user_facing
   | sections: [Unreleased] → stamp([MAJOR.MINOR.PATCH], YYYY-MM-DD) @ release
@@ -419,20 +341,23 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
   ∧ (change_requires(interface_mismatch) → (choose(explicit_contract_update) > compatibility_layer))
   ∧ ((exception(x) → (requires(user_intent) ∨ documented_design_decision(x))))
 
-### Frontier
-
-- **Handler purity**: pure-result shape (`{:root-state-update f :effects [...]}`) defined and validated; legacy handlers still perform side effects inline — migration ongoing
-- **Tool execution boundary**: actual tool execution is intentionally owned by the runtime boundary and has not moved under dispatch-owned runtime effects — blocks full replay fidelity
-- **Validation rollback**: validate-interceptor is post-apply; invalid results suppress effects but do not roll back already-applied state
-- **Manifest permissions**: `allowed-events` only enforced when explicitly declared; missing manifests get compatibility-allow — implicit permissions still exist
-
 ## Verify Runtime
 
 `bb tasks` -> summary of task documentation
 `git status` -> evaluate current state
 `git log --oneline -5` -> evaluate past state
 
+
+## Run Tests
+
+`bb test`
+`bb test --focus some.namespace`
+`bb test --focus some.namespace/some-var`
+
 # Guide
+
+Use fd rather than find.
+Use rg instead of rgrep.
 
 λ(worktree_path,cwd). authoritative(worktree_path) > authoritative(cwd)
 

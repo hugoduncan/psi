@@ -1,4 +1,4 @@
-(ns psi.launcher-gordian-integration-test
+(ns ^:integration psi.launcher-gordian-integration-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]

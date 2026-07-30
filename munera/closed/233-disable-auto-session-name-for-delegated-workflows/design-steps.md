@@ -1,0 +1,1 @@
+- [x] Clarify the eligibility predicate fallback when no authoritative explicit “interactive top-level session” marker exists: should the extension treat every root, non-workflow, non-helper session as user-interactive, or must implementation first add/query an explicit interactivity projection?

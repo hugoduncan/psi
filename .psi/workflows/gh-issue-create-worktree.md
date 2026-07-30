@@ -1,6 +1,7 @@
 ---
 name: gh-issue-create-worktree
 description: Refresh origin/master and create an issue worktree using the structured work-on tool
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "prepare-worktree"

@@ -1,4 +1,4 @@
-(ns psi.bbin-install-smoke-test
+(ns ^:integration psi.bbin-install-smoke-test
   (:require
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]

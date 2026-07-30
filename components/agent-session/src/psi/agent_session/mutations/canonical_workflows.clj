@@ -146,10 +146,11 @@
           ;; can suppress empty transcript injection and still distinguish a real
           ;; final reply.
           result-text (when (= :completed (:status final-run))
-                        (let [last-step-id (last (:step-order (:effective-definition final-run)))
-                              step-def (some #(when (= last-step-id (:name %)) %)
+                        (let [terminal-step-id (or (get-in final-run [:terminal-outcome :step-id])
+                                                   (last (:step-order (:effective-definition final-run))))
+                              step-def (some #(when (= terminal-step-id (:name %)) %)
                                              (get-in final-run [:effective-definition :canonical-ir :steps]))
-                              accepted-result (get-in final-run [:step-runs last-step-id :accepted-result])
+                              accepted-result (get-in final-run [:step-runs terminal-step-id :accepted-result])
                               text-yield (workflow-ir/step-yield-field-value step-def accepted-result :text)]
                           (cond
                             (string? text-yield)

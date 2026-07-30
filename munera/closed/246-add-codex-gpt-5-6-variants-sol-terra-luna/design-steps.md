@@ -1,0 +1,8 @@
+# Design follow-ups — 246
+
+## Ambiguity review
+
+- [x] Resolve concrete catalog metadata for each variant: (a) state whether `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` share identical metadata (name, pricing, context-window, reasoning/thinking-level map) or differ per variant, and (b) resolve which context-window/pricing the Codex-routed entries carry — the design cites both a "272K short-context tier default" and a "larger context window with long-context pricing" without choosing. Implementation needs unambiguous per-id values.
+  - Resolved in design.md "Catalog metadata (resolved)": variants differ in pricing (sol/terra/luna), share shape; all use 272K short-context tier with flat rates. Source: pi-mono `generate-models.ts` `missingOpenAiModels`.
+- [x] Clarify docs scope for the OAuth-support boundary. Plan Slice 5 triggers only on enumerated "model lists", but the concrete GPT-5.6 references live in *prose policy statements* in `doc/tui.md`, `README.md`, `doc/configuration.md`, and `doc/cli.md` that currently assert "OpenAI OAuth-backed `gpt-5.6` is unsupported." Since this task makes `gpt-5.6-sol/terra/luna` OAuth/Codex-supported, those prose sections must be updated to distinguish the now-supported variants from bare `gpt-5.6` (still unsupported); otherwise the narrow plan trigger leaves them stale/misleading. Plan/steps should make this doc-prose update explicit.
+  - Resolved: plan.md Slice 5 + Slice-order item 5 and steps.md Slice 5 now make the prose OAuth-support reconciliation explicit (concrete files + line ranges + preserve-distinction/single-source-of-truth principles).

@@ -1,6 +1,8 @@
 (ns extensions.commit-checks-test
   (:require
+   [babashka.process :as proc]
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is]]
    [extensions.commit-checks :as sut]
    [psi.extension-test-helpers.nullable-api :as nullable]))
@@ -15,6 +17,168 @@
     (.mkdirs (.getParentFile f))
     (spit f (pr-str cfg))
     (.getCanonicalPath f)))
+
+(defn- write-lines! [path line-count]
+  (.mkdirs (.getParentFile (io/file path)))
+  (spit path (str (str/join "\n" (repeat line-count "x")) "\n"))
+  path)
+
+(def repo-root
+  (.getCanonicalPath (io/file ".")))
+
+(defn- read-bb-init-form []
+  (get-in (read-string (slurp (io/file repo-root "bb.edn"))) [:tasks :init]))
+
+(defn- find-top-level-def [form var-symbol]
+  (some (fn [node]
+          (when (and (seq? node) (= 'def (first node)) (= var-symbol (second node)))
+            (nth node 2)))
+        (tree-seq coll? seq form)))
+
+(defn- file-length-helper-forms []
+  (let [wanted #{'file-length-scan-roots
+                 'file-length-legacy-max-lines
+                 'file-length-find-roots
+                 'file-length-find-args
+                 'file-length-violations}]
+    (->> (tree-seq coll? seq (read-bb-init-form))
+         (filter (fn [node]
+                   (and (seq? node)
+                        (#{'def 'defn} (first node))
+                        (contains? wanted (second node)))))
+         vec)))
+
+(defn- legacy-file-length-limits []
+  (or (find-top-level-def (read-bb-init-form) 'file-length-legacy-max-lines)
+      (throw (ex-info "Unable to find commit-check:file-lengths legacy ratchet map"
+                      {:var 'file-length-legacy-max-lines}))))
+
+(defn- run-file-length-check []
+  (proc/shell {:dir repo-root
+               :continue true
+               :out :string
+               :err :string}
+              "bb" "commit-check:file-lengths"))
+
+(defn- delete-file-if-exists! [path]
+  (let [f (io/file repo-root path)]
+    (when (.exists f)
+      (io/delete-file f))))
+
+(defn- delete-empty-parents! [path stop-path]
+  (let [stop-file (.getCanonicalFile (io/file repo-root stop-path))]
+    (loop [dir (.getParentFile (.getCanonicalFile (io/file repo-root path)))]
+      (when (and dir
+                 (str/starts-with? (.getPath dir) (.getPath stop-file))
+                 (empty? (seq (.list dir))))
+        (io/delete-file dir)
+        (recur (.getParentFile dir))))))
+
+(defn- with-temporary-oversized-file! [path f]
+  (let [file (io/file repo-root path)]
+    (try
+      (write-lines! file 801)
+      (f)
+      (finally
+        (delete-file-if-exists! path)))))
+
+(defn- with-temporary-oversized-file-and-cleanup! [path cleanup-root f]
+  (try
+    (with-temporary-oversized-file! path f)
+    (finally
+      (delete-empty-parents! path cleanup-root))))
+
+(defn- with-temporary-growth! [path f]
+  (let [file     (io/file repo-root path)
+        original (slurp file)]
+    (try
+      (spit file (str original "x\n"))
+      (f)
+      (finally
+        (spit file original)))))
+
+(defn- combined-output [{:keys [out err]}]
+  (str out err))
+
+(deftest file-length-check-helpers-handle-sparse-repo-shapes-test
+  ;; Verifies the shared implementation used by the real bb.edn task skips
+  ;; absent optional scan roots and treats empty/matchless scanned roots as no
+  ;; violations. This protects sparse checkout/subtree shapes without relying
+  ;; on the full current repository layout.
+  (let [forms       (file-length-helper-forms)
+        eval-ns-sym (gensym "psi.commit-checks-test.bb-eval")
+        eval-ns     (create-ns eval-ns-sym)]
+    (binding [*ns* eval-ns]
+      (refer 'clojure.core)
+      (eval '(require '[clojure.java.io :as io]))
+      (eval '(require '[clojure.string :as str]))
+      (doseq [form forms]
+        (eval form))
+      (let [workspace      (io/file (temp-dir))
+            find-roots     (ns-resolve eval-ns-sym 'file-length-find-roots)
+            find-args      (ns-resolve eval-ns-sym 'file-length-find-args)
+            violations     (ns-resolve eval-ns-sym 'file-length-violations)
+            scan-roots-var (ns-resolve eval-ns-sym 'file-length-scan-roots)]
+        (doseq [root ["components" "bases" "extensions"]]
+          (alter-var-root scan-roots-var
+                          (constantly [(.getPath (io/file workspace root))]))
+          (is (= [] (find-roots)) root)
+          (is (= [] (violations "")) root)
+          (.mkdirs (io/file workspace root "docs"))
+          (is (= [(.getPath (io/file workspace root))]
+                 (vec (find-roots))) root)
+          (let [result (apply proc/shell
+                              {:continue true :out :string :err :string}
+                              "find"
+                              (find-args))]
+            (is (zero? (:exit result)) (str root ": " (combined-output result)))
+            (is (= "" (:out result)) root)
+            (is (= [] (violations (:out result))) root)))))))
+
+(deftest file-length-check-scans-extensions-with-real-task-test
+  ;; Verifies the real bb.edn commit-check:file-lengths task scans extensions/
+  ;; and reports a controlled oversized test file with the default 800 limit.
+  (let [offender "extensions/commit-checks/test/extensions/too_long_real_task_probe.clj"]
+    (with-temporary-oversized-file!
+      offender
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)))
+          (is (str/includes? output offender))
+          (is (str/includes? output "800 limit")))))))
+
+(deftest file-length-check-still-scans-components-and-bases-with-real-task-test
+  ;; Verifies the real bb.edn task still scans the original components/ and
+  ;; bases/ src/test roots after the extensions/ widening.
+  (doseq [[root file] {"components" "components/commit_check_file_lengths_probe/src/probe/core.clj"
+                       "bases" "bases/commit_check_file_lengths_probe/test/probe/base_test.clj"}]
+    (with-temporary-oversized-file-and-cleanup!
+      file
+      (str root "/commit_check_file_lengths_probe")
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)) root)
+          (is (str/includes? output file))
+          (is (str/includes? output "800 limit")))))))
+
+(deftest file-length-check-enforces-real-legacy-ratchets-test
+  ;; Verifies every real legacy ratchet path in bb.edn passes at its recorded
+  ;; line count and fails when it grows beyond its path-specific limit.
+  (let [baseline (run-file-length-check)]
+    (is (zero? (:exit baseline)) (combined-output baseline)))
+  (doseq [[path limit] (legacy-file-length-limits)]
+    (with-temporary-growth!
+      path
+      (fn []
+        (let [result (run-file-length-check)
+              output (combined-output result)]
+          (is (pos? (:exit result)) path)
+          (is (str/includes? output path))
+          (is (str/includes? output (str limit " limit")))))))
+  (let [restored (run-file-length-check)]
+    (is (zero? (:exit restored)) (combined-output restored))))
 
 (deftest init-registers-handler-test
   (let [{:keys [api state]} (nullable/create-nullable-extension-api

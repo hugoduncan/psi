@@ -168,8 +168,10 @@
                                      {:session-id session-id :user-msg user-msg}
                                      {:origin :core})
         turn-id  (:turn-id submit-r)
-        _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id} {:origin :core})
-        result   (dispatch/dispatch! ctx :session/prompt-prepare-request
+        _        (dispatch/dispatch! ctx :session/prompt {:session-id session-id
+                                                          :turn-id turn-id}
+                                     {:origin :core})
+        result   (dispatch/dispatch! ctx :session/pre-turn-augment
                                      (cond-> {:session-id session-id
                                               :turn-id    turn-id
                                               :user-msg   user-msg}

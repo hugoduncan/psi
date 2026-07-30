@@ -1,6 +1,7 @@
 ---
 name: gh-bug-reproduce
 description: Attempt reproduction of a selected bug issue inside its issue-specific worktree and emit a structured result
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "reproduce"

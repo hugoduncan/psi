@@ -1,4 +1,0 @@
-- add skill learning, c.f  https://hermes-agent.nousresearch.com/
-- add extension learning
-- improve commit detection - head change isn't reliable (rebase, etc) - maybe use reflog as well
-- Add a lambda that error messages must be detailed and actionable

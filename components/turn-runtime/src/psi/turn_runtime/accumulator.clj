@@ -5,6 +5,7 @@
    Owns all mutable state updates to the turn-data atom during a streaming turn."
   (:require
    [clojure.string :as str]
+   [psi.ai.textual-tool-calls :as textual-tool-calls]
    [psi.turn-runtime.state :as trs]
    [psi.tool-runtime.args :as tool-args]
    [psi.turn-statechart.core :as turn-sc]))
@@ -131,15 +132,68 @@
                  provider  (assoc :provider provider)
                  signature (assoc :signature signature))))))
 
-(defn build-final-content [thinking-blocks text-buffer tool-calls]
+(defn- text-content-blocks
+  ([text-buffer text-content-index]
+   (cond-> []
+     (seq text-buffer)
+     (conj {:type :text :content-index (or text-content-index 0) :text text-buffer})))
+  ([text-buffer text-content-index text-blocks]
+   (let [blocks (->> (or text-blocks {})
+                     (sort-by key)
+                     (keep (fn [[idx {:keys [text]}]]
+                             (when (seq text)
+                               {:type :text :content-index idx :text text})))
+                     vec)]
+     (if (seq blocks)
+       blocks
+       (text-content-blocks text-buffer text-content-index)))))
+
+(defn- error-content-blocks
+  [invalids]
+  (mapv (fn [inv]
+          {:type :error
+           :content-index (get-in inv [:tool-call :content-index])
+           :text (:message inv)})
+        invalids))
+
+(defn- tool-content-blocks
+  [tool-calls]
+  (mapv (fn [tc]
+          {:type :tool-call
+           :content-index (:content-index tc)
+           :id (:id tc)
+           :name (:name tc)
+           :arguments (:arguments tc)
+           :call-summary (:call-summary tc)})
+        tool-calls))
+
+(defn- strip-content-index
+  [block]
+  (dissoc block :content-index))
+
+(defn- build-final-content-indexed
+  [thinking-blocks text-buffer text-content-index text-blocks tool-calls]
   (let [invalids       (keep invalid-tool-call tool-calls)
         valid-calls    (remove invalid-tool-call tool-calls)
         thinking-parts (thinking-blocks-in-order thinking-blocks)
-        text-blocks    (cond-> [] (seq text-buffer) (conj {:type :text :text text-buffer}))
-        error-blocks   (mapv (fn [inv] {:type :error :text (:message inv)}) invalids)
-        tool-blocks    (mapv (fn [tc] {:type :tool-call :id (:id tc) :name (:name tc) :arguments (:arguments tc) :call-summary (:call-summary tc)})
-                             valid-calls)]
-    (-> thinking-parts (into text-blocks) (into error-blocks) (into tool-blocks))))
+        content-parts  (->> (concat (text-content-blocks text-buffer text-content-index text-blocks)
+                                    (error-content-blocks invalids)
+                                    (tool-content-blocks valid-calls))
+                            (sort-by #(or (:content-index %) 0)))]
+    (into thinking-parts content-parts)))
+
+(defn build-final-content
+  ([thinking-blocks text-buffer tool-calls]
+   (build-final-content thinking-blocks text-buffer nil nil tool-calls))
+  ([thinking-blocks text-buffer text-content-index tool-calls]
+   (build-final-content thinking-blocks text-buffer text-content-index nil tool-calls))
+  ([thinking-blocks text-buffer text-content-index text-blocks tool-calls]
+   (mapv strip-content-index
+         (build-final-content-indexed thinking-blocks
+                                      text-buffer
+                                      text-content-index
+                                      text-blocks
+                                      tool-calls))))
 
 (defn- emit-tool-assembly-errors! [progress-queue tool-calls]
   (doseq [invalid (keep invalid-tool-call tool-calls)]
@@ -231,7 +285,14 @@
 
 (defn- handle-text-delta! [td progress-queue data]
   (let [idx    (content-index data)
-        merged (:text-buffer (swap! td update :text-buffer merge-stream-text (:delta data)))]
+        merged (get-in (swap! td (fn [td*]
+                                   (-> td*
+                                       (update-in [:text-blocks idx :text]
+                                                  merge-stream-text (:delta data))
+                                       (assoc-in [:text-blocks idx :content-index] idx)
+                                       (update :text-buffer merge-stream-text (:delta data))
+                                       (update :text-content-index #(or % idx)))))
+                       [:text-blocks idx :text])]
     (note-last-provider-event! td :text-delta data)
     (note-content-delta! td idx :text)
     (emit-progress! progress-queue {:event-kind :text-delta :content-index idx :text merged})))
@@ -315,16 +376,20 @@
   (swap! td assoc :structured-output-result (:structured-output data)))
 
 (defn- handle-done! [td done-p progress-queue data]
-  (let [{:keys [thinking-blocks text-buffer tool-calls logprob-buffer]} @td
+  (let [{:keys [thinking-blocks text-buffer text-content-index text-blocks tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
-        content   (build-final-content thinking-blocks text-buffer completed)
+        content   (build-final-content-indexed thinking-blocks text-buffer text-content-index text-blocks completed)
         usage     (:usage data)
         stop-reason (or (:reason data) :stop)
         logprobs  (when (seq logprob-buffer) (into [] cat logprob-buffer))
-        final     (cond-> {:role        "assistant"
-                           :content     content
-                           :stop-reason stop-reason
-                           :timestamp   (java.time.Instant/now)}
+        final     (cond-> (textual-tool-calls/normalize-assistant-message
+                           (:turn-id @td)
+                           (:ai-model @td)
+                           {:role        "assistant"
+                            :content     content
+                            :stop-reason stop-reason
+                            :timestamp   (java.time.Instant/now)})
+                    true (update :content #(mapv strip-content-index %))
                     (map? usage) (assoc :usage usage))]
     (note-last-provider-event! td :done data)
     (emit-tool-assembly-errors! progress-queue completed)

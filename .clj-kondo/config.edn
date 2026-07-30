@@ -64,7 +64,9 @@
 
   ;; project-nrepl test-support: temp-dir lifecycle macro binds `sym prefix`
   ;; pairs over a body (let-style binding semantics).
-  psi.project-nrepl.test-support/with-temp-dir clojure.core/let}
+  psi.project-nrepl.test-support/with-temp-dir clojure.core/let
+
+  psi.history.git-worktree-test/with-null-context clojure.core/let}
 
  :linters
  {;; Malli

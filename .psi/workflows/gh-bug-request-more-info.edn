@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "run",
    :type :session,
    :tools ["bash"],

@@ -31,6 +31,21 @@
            :ui nil})
   (model-registry/init! {}))
 
+(def root-session-ownership
+  {:psi.agent-session/parent-session-id nil
+   :psi.agent-session/workflow-run-id nil
+   :psi.agent-session/workflow-step-id nil
+   :psi.agent-session/workflow-attempt-id nil
+   :psi.agent-session/workflow-owned? false})
+
+(defn- session-ownership-query? [query]
+  (= [:psi.agent-session/parent-session-id
+      :psi.agent-session/workflow-run-id
+      :psi.agent-session/workflow-step-id
+      :psi.agent-session/workflow-attempt-id
+      :psi.agent-session/workflow-owned?]
+     query))
+
 (deftest helper-model-selection-request-test
   (testing "extension defines its own explicit resolver request"
     (is (= {:mode :resolve
@@ -78,7 +93,10 @@
   (testing "init registers handlers and emits load notification"
     (reset-state!)
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))})]
       (sut/init api)
       (is (= 1 (count (get-in @state [:handlers "session_turn_finished"]))))
       (is (= 1 (count (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))))
@@ -89,7 +107,10 @@
   (testing "every second completed turn schedules a delayed checkpoint event"
     (reset-state!)
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))})]
       (sut/init api)
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "s1" :turn-id "t1"})))
@@ -136,7 +157,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [:mutate op params])
                                              (case op
@@ -234,7 +255,7 @@
                                                   {:psi.agent-session/model-provider "anthropic"
                                                    :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                  :else {}))
+                                                  :else root-session-ownership))
                                     :mutate-fn (fn [op params]
                                                  (swap! calls conj [op params])
                                                  (case op
@@ -291,7 +312,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -318,7 +339,9 @@
     (let [calls (atom [])
           {:keys [api state]} (nullable/create-nullable-extension-api
                                {:path "/test/auto_session_name.clj"
-                                :query-fn (fn [_] {})
+                                :query-fn (fn [{:keys [query]}]
+                                            (when (session-ownership-query? query)
+                                              root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              {})})]
@@ -358,7 +381,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -405,7 +428,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -451,7 +474,7 @@
                                               {:psi.agent-session/model-provider "anthropic"
                                                :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                              :else {}))
+                                              :else root-session-ownership))
                                 :mutate-fn (fn [op params]
                                              (swap! calls conj [op params])
                                              (case op
@@ -504,7 +527,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -564,7 +587,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -615,7 +638,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                {})})]
@@ -661,7 +684,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -717,7 +740,7 @@
                                                 {:psi.agent-session/model-provider "anthropic"
                                                  :psi.agent-session/model-id "claude-sonnet-4-6"}
 
-                                                :else {}))
+                                                :else root-session-ownership))
                                   :mutate-fn (fn [op params]
                                                (swap! calls conj [op params])
                                                (case op
@@ -743,9 +766,209 @@
     (reset-state!)
     (swap! @#'sut/state assoc :helper-session-ids #{"child-1"})
     (let [{:keys [api state]} (nullable/create-nullable-extension-api
-                               {:path "/test/auto_session_name.clj"})]
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "child-1" session-id)
+                                                       (session-ownership-query? query))
+                                              root-session-ownership))})]
       (sut/init api)
       (swap! @#'sut/state assoc :helper-session-ids #{"child-1"})
       (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
         (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
         (is (= [] (:scheduled-events @state)))))))
+
+(deftest delegated-child-turn-finished-is-ignored-test
+  (testing "turn-finished for delegated child sessions does not increment counts or schedule checkpoints"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "child-1" session-id)
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/parent-session-id "root-1")))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "child-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
+(deftest workflow-owned-turn-finished-is-ignored-test
+  (testing "turn-finished for workflow-owned sessions does not increment counts or schedule checkpoints"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "wf-1" session-id)
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/workflow-run-id "run-1"
+                                                     :psi.agent-session/workflow-step-id "step-1"
+                                                     :psi.agent-session/workflow-attempt-id "attempt-1"
+                                                     :psi.agent-session/workflow-owned? true)))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "wf-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
+(deftest workflow-ownership-ids-independently-make-root-session-ineligible-test
+  (testing "each workflow ownership id independently prevents turn-finished scheduling for an otherwise root session"
+    (doseq [[field value] [[:psi.agent-session/workflow-run-id "run-1"]
+                           [:psi.agent-session/workflow-step-id "step-1"]
+                           [:psi.agent-session/workflow-attempt-id "attempt-1"]]]
+      (testing (name field)
+        (reset-state!)
+        (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/auto_session_name.clj"
+                                    :query-fn (fn [{:keys [session-id query]}]
+                                                (when (and (= "wf-1" session-id)
+                                                           (session-ownership-query? query))
+                                                  (assoc root-session-ownership field value)))})]
+          (sut/init api)
+          (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+            (is (nil? (handler {:session-id "wf-1" :turn-id "t1"})))
+            (is (= {} (:turn-counts @@#'sut/state)))
+            (is (= [] (:scheduled-events @state)))))))))
+
+(deftest workflow-owned-flag-independently-makes-root-session-ineligible-test
+  (testing "workflow-owned? true prevents turn-finished scheduling for an otherwise root session"
+    (reset-state!)
+    (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [{:keys [session-id query]}]
+                                            (when (and (= "wf-flag-1" session-id)
+                                                       (session-ownership-query? query))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/workflow-owned? true)))})]
+      (sut/init api)
+      (let [handler (first (get-in @state [:handlers "session_turn_finished"]))]
+        (is (nil? (handler {:session-id "wf-flag-1" :turn-id "t1"})))
+        (is (= {} (:turn-counts @@#'sut/state)))
+        (is (= [] (:scheduled-events @state)))))))
+
+(deftest unresolved-source-session-is-ignored-test
+  (testing "source sessions with unresolved ownership metadata do not count turns or run checkpoints"
+    (doseq [[case-name query-result]
+            {"empty result" {}
+             "not-found nil" nil
+             "query failure" ::throw}]
+      (testing case-name
+        (reset-state!)
+        (let [calls (atom [])
+              {:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/auto_session_name.clj"
+                                    :query-fn (fn [req]
+                                                (swap! calls conj [:query req])
+                                                (when (= query-result ::throw)
+                                                  (throw (ex-info "query failed" {:req req})))
+                                                query-result)
+                                    :mutate-fn (fn [op params]
+                                                 (swap! calls conj [:mutate op params])
+                                                 {})})]
+          (sut/init api)
+          (reset! calls [])
+          (swap! state assoc :notifications [])
+          (let [turn-handler       (first (get-in @state [:handlers "session_turn_finished"]))
+                checkpoint-handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+            (is (nil? (turn-handler {:session-id "missing-1" :turn-id "t1"})))
+            (is (nil? (checkpoint-handler {:session-id "missing-1" :turn-count 2})))
+            (is (= {} (:turn-counts @@#'sut/state)))
+            (is (= [] (:scheduled-events @state)))
+            (is (= [] (:notifications @state)))
+            (is (every? #(= :query (first %)) @calls))))))))
+
+(deftest delegated-checkpoint-is-silent-no-op-test
+  (testing "checkpoint for delegated/workflow-owned sessions does not query history, create helpers, rename, close, or notify"
+    (reset-state!)
+    (let [calls (atom [])
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [req]
+                                            (swap! calls conj [:query req])
+                                            (when (and (= "child-1" (:session-id req))
+                                                       (session-ownership-query? (:query req)))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/parent-session-id "root-1"
+                                                     :psi.agent-session/workflow-run-id "run-1"
+                                                     :psi.agent-session/workflow-step-id "step-1"
+                                                     :psi.agent-session/workflow-attempt-id "attempt-1"
+                                                     :psi.agent-session/workflow-owned? true)))
+                                :mutate-fn (fn [op params]
+                                             (swap! calls conj [:mutate op params])
+                                             {})})]
+      (sut/init api)
+      (reset! calls [])
+      (swap! state assoc :notifications [])
+      (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+        (is (nil? (handler {:session-id "child-1" :turn-count 2})))
+        (is (= [[:query {:session-id "child-1"
+                         :query [:psi.agent-session/parent-session-id
+                                 :psi.agent-session/workflow-run-id
+                                 :psi.agent-session/workflow-step-id
+                                 :psi.agent-session/workflow-attempt-id
+                                 :psi.agent-session/workflow-owned?]}]]
+               @calls))
+        (is (= [] (:notifications @state)))))))
+
+(deftest workflow-owned-flag-checkpoint-is-silent-no-op-test
+  (testing "checkpoint for workflow-owned root sessions does not query history, create helpers, rename, close, or notify"
+    (reset-state!)
+    (let [calls (atom [])
+          {:keys [api state]} (nullable/create-nullable-extension-api
+                               {:path "/test/auto_session_name.clj"
+                                :query-fn (fn [req]
+                                            (swap! calls conj [:query req])
+                                            (when (and (= "wf-flag-1" (:session-id req))
+                                                       (session-ownership-query? (:query req)))
+                                              (assoc root-session-ownership
+                                                     :psi.agent-session/workflow-owned? true)))
+                                :mutate-fn (fn [op params]
+                                             (swap! calls conj [:mutate op params])
+                                             {})})]
+      (sut/init api)
+      (reset! calls [])
+      (swap! state assoc :notifications [])
+      (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+        (is (nil? (handler {:session-id "wf-flag-1" :turn-count 2})))
+        (is (= [[:query {:session-id "wf-flag-1"
+                         :query [:psi.agent-session/parent-session-id
+                                 :psi.agent-session/workflow-run-id
+                                 :psi.agent-session/workflow-step-id
+                                 :psi.agent-session/workflow-attempt-id
+                                 :psi.agent-session/workflow-owned?]}]]
+               @calls))
+        (is (= [] (:notifications @state)))))))
+
+(deftest workflow-ownership-ids-checkpoint-are-silent-no-ops-test
+  (testing "each workflow ownership id independently makes a checkpoint for an otherwise root session a silent no-op"
+    (doseq [[field value] [[:psi.agent-session/workflow-run-id "run-1"]
+                           [:psi.agent-session/workflow-step-id "step-1"]
+                           [:psi.agent-session/workflow-attempt-id "attempt-1"]]]
+      (testing (name field)
+        (reset-state!)
+        (let [calls (atom [])
+              {:keys [api state]} (nullable/create-nullable-extension-api
+                                   {:path "/test/auto_session_name.clj"
+                                    :query-fn (fn [req]
+                                                (swap! calls conj [:query req])
+                                                (when (and (= "wf-id-1" (:session-id req))
+                                                           (session-ownership-query? (:query req)))
+                                                  (assoc root-session-ownership field value)))
+                                    :mutate-fn (fn [op params]
+                                                 (swap! calls conj [:mutate op params])
+                                                 {})})]
+          (sut/init api)
+          (reset! calls [])
+          (swap! state assoc :notifications [])
+          (let [handler (first (get-in @state [:handlers "auto_session_name/rename_checkpoint"]))]
+            (is (nil? (handler {:session-id "wf-id-1" :turn-count 2})))
+            (is (= [[:query {:session-id "wf-id-1"
+                             :query [:psi.agent-session/parent-session-id
+                                     :psi.agent-session/workflow-run-id
+                                     :psi.agent-session/workflow-step-id
+                                     :psi.agent-session/workflow-attempt-id
+                                     :psi.agent-session/workflow-owned?]}]]
+                   @calls))
+            (is (= [] (:notifications @state)))))))))

@@ -184,3 +184,43 @@
               :params {:role "user"
                        :content "Please continue"}}
              ((:append-message api) "user" "Please continue"))))))
+
+(deftest register-turn-augmenter-api-test
+  ;; Turn augmentation registration is a dedicated extension API path, not an
+  ;; event-bus subscription.
+  (let [reg      (ext/create-registry)
+        ext-id   "manifest:psi/context-manager"
+        _        (ext/register-extension-in! reg ext-id)
+        _        (ext/set-effective-permissions-in!
+                  reg ext-id #{ext/turn-augmentation-capability})
+        api      (ext/create-extension-api reg ext-id {})
+        handler  (fn [_]
+                   {:turn-augmentation/status :no-op
+                    :turn-augmentation/operations []})
+        result   ((:register-turn-augmenter api)
+                  {:augmenter-id "project-context"
+                   :handler handler})]
+    (is (= {:extension-id ext-id
+            :augmenter-id "project-context"
+            :registered? true}
+           result))
+    (is (= [[ext-id "project-context"]]
+           (mapv (juxt :extension-id :augmenter-id)
+                 (ext/turn-augmenters-in reg))))))
+
+(deftest register-turn-augmenter-requires-permission-test
+  ;; Missing effective permission fails closed and leaves no callable
+  ;; registration for the stable key.
+  (let [reg    (ext/create-registry)
+        ext-id "manifest:psi/context-manager"
+        _      (ext/register-extension-in! reg ext-id)
+        api    (ext/create-extension-api reg ext-id {})]
+    (try
+      ((:register-turn-augmenter api)
+       {:augmenter-id "project-context"
+        :handler (fn [_] {:turn-augmentation/status :no-op
+                          :turn-augmentation/operations []})})
+      (is false "registration must throw")
+      (catch clojure.lang.ExceptionInfo e
+        (is (= :unauthorized (:reason (ex-data e))))))
+    (is (empty? (ext/turn-augmenters-in reg)))))

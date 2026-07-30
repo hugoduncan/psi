@@ -5,10 +5,22 @@
    resume-missing-initialize, context-closed."
   (:require
    [psi.agent-session.child-session-state :as child-session-state]
+   [psi.agent-session.extensions :as ext]
    [psi.session-state.init :as ss]
    [psi.session-state.state :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-state.model :as session-data]))
+
+(defn- with-live-extension-capabilities
+  [ctx handler-result session-id]
+  (assoc-in handler-result
+            [:root-state-update]
+            (fn [state]
+              (assoc-in ((:root-state-update handler-result) state)
+                        (conj (session/session-data-path session-id)
+                              :available-extension-capabilities
+                              :extensions)
+                        (ext/live-extension-capabilities-in (:extension-registry ctx))))))
 
 (defn register!
   "Register session lifecycle handlers. Called once during context creation."
@@ -27,13 +39,16 @@
                        :scheduled-origin-session-id scheduled-origin-session-id
                        :scheduled-from-schedule-id scheduled-from-schedule-id
                        :scheduled-from-label scheduled-from-label}]
-       {:root-state-update #(ss/initialize-new-session-state % current-sd payload)
-        :return-key        (session/session-data-path new-session-id)
-        :effects [{:effect/type :runtime/agent-reset}
-                  {:effect/type :projection/context-changed
-                   :session-id new-session-id
-                   :active-session-id new-session-id
-                   :reason :session/new-initialize}]})))
+       (with-live-extension-capabilities
+         ctx
+         {:root-state-update #(ss/initialize-new-session-state % current-sd payload)
+          :return-key        (session/session-data-path new-session-id)
+          :effects [{:effect/type :runtime/agent-reset}
+                    {:effect/type :projection/context-changed
+                     :session-id new-session-id
+                     :active-session-id new-session-id
+                     :reason :session/new-initialize}]}
+         new-session-id))))
 
   (kernel/register-handler!
    :session/create-top-level
@@ -49,11 +64,14 @@
                        :scheduled-origin-session-id scheduled-origin-session-id
                        :scheduled-from-schedule-id scheduled-from-schedule-id
                        :scheduled-from-label scheduled-from-label}]
-       {:root-state-update #(ss/initialize-new-session-state % current-sd payload)
-        :return-key        (session/session-data-path new-session-id)
-        :effects [{:effect/type :projection/context-changed
-                   :session-id new-session-id
-                   :reason :session/create-top-level}]})))
+       (with-live-extension-capabilities
+         ctx
+         {:root-state-update #(ss/initialize-new-session-state % current-sd payload)
+          :return-key        (session/session-data-path new-session-id)
+          :effects [{:effect/type :projection/context-changed
+                     :session-id new-session-id
+                     :reason :session/create-top-level}]}
+         new-session-id))))
 
   (kernel/register-handler!
    :session/resume-loaded
@@ -67,17 +85,20 @@
                        :entries           entries
                        :model             model
                        :thinking-level    thinking-level}]
-       {:root-state-update #(ss/initialize-resumed-session-state % current-sd payload)
-        :return-key        (session/session-data-path session-id)
-        :effects (cond-> [{:effect/type :runtime/agent-reset}
-                          {:effect/type :runtime/agent-set-thinking-level
-                           :level       thinking-level}
-                          {:effect/type :projection/context-changed
-                           :session-id session-id
-                           :active-session-id session-id
-                           :reason :session/resume-loaded}]
-                   model    (conj {:effect/type :runtime/agent-set-model :model model})
-                   messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))})))
+       (with-live-extension-capabilities
+         ctx
+         {:root-state-update #(ss/initialize-resumed-session-state % current-sd payload)
+          :return-key        (session/session-data-path session-id)
+          :effects (cond-> [{:effect/type :runtime/agent-reset}
+                            {:effect/type :runtime/agent-set-thinking-level
+                             :level       thinking-level}
+                            {:effect/type :projection/context-changed
+                             :session-id session-id
+                             :active-session-id session-id
+                             :reason :session/resume-loaded}]
+                     model    (conj {:effect/type :runtime/agent-set-model :model model})
+                     messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))}
+         session-id))))
 
   (kernel/register-handler!
    :session/fork-initialize
@@ -98,13 +119,16 @@
                           :parent-session-id parent-session-id
                           :parent-session-path parent-session-path
                           :entries (vec branch-entries)})]
-       (cond-> {:root-state-update #(ss/initialize-forked-session-state % parent-sd payload)
-                :return-key        (session/session-data-path new-session-id)
-                :effects (cond-> [{:effect/type :projection/context-changed
-                                   :session-id new-session-id
-                                   :active-session-id new-session-id
-                                   :reason :session/fork-initialize}]
-                           messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))}
+       (cond-> (with-live-extension-capabilities
+                 ctx
+                 {:root-state-update #(ss/initialize-forked-session-state % parent-sd payload)
+                  :return-key        (session/session-data-path new-session-id)
+                  :effects (cond-> [{:effect/type :projection/context-changed
+                                     :session-id new-session-id
+                                     :active-session-id new-session-id
+                                     :reason :session/fork-initialize}]
+                             messages (conj {:effect/type :runtime/agent-replace-messages :messages messages}))}
+                 new-session-id)
          io-request
          (update :effects conj {:effect/type :persist/session-journal-io
                                 :session-id new-session-id

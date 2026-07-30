@@ -1,6 +1,7 @@
 ---
 name: issue-bug-triage
 description: Triage a GitHub bug issue by attempting reproduction in an issue-specific worktree, then shape either a precise request for more information or a concrete reproduction handoff into bug-fix execution.
+advertise: false
 ---
 
 Use this skill for bug reports, especially GitHub issues labeled for triage where the next important question is whether the bug can be reproduced.

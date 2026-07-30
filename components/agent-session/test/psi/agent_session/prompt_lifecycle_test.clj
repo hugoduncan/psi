@@ -55,6 +55,7 @@
                   :schedule-id "sch-test"
                   :label "wake"}]
     (kernel/clear-event-log!)
+    (kernel/clear-dispatch-trace!)
     (let [result (session/dispatch-in! ctx :session/submit-synthetic-user-prompt
                                        {:session-id session-id
                                         :user-msg user-msg}
@@ -67,7 +68,7 @@
       (is (= true (:submitted? result)))
       (is (= user-msg (:user-msg result)))
       (is (= 3 (count effects)))
-      (is (= [:session/prompt-submit :session/prompt :session/prompt-prepare-request]
+      (is (= [:session/prompt-submit :session/prompt :session/pre-turn-augment]
              (mapv :event-type effects))))))
 
 (deftest prompt-submit-handler-adds-tail-repair-effect-before-user-message-test
@@ -171,6 +172,7 @@
 (deftest prompt-in-end-to-end-updates-prompt-lifecycle-summaries-test
   (let [[ctx session-id] (create-session-context {:persist? false})]
     (kernel/clear-event-log!)
+    (kernel/clear-dispatch-trace!)
     (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                   (fn [_ai-ctx _ctx sid prepared _pq]
                     {:execution-result/turn-id (:prepared-request/id prepared)
@@ -352,6 +354,7 @@
                            :id "c1"
                            :contribution {:content "Hint A" :priority 10 :enabled true}}
                           {:origin :core})
+    (test-support/seed-augmentation-record! ctx session-id "t1")
     (let [prepared (psi.agent-session.prompt-request/build-prepared-request
                     ctx session-id {:turn-id "t1"
                                     :user-message {:role "user"
@@ -363,7 +366,7 @@
       (is (= "dev" (get-in prepared [:prepared-request/prompt-layers 1 :content])))
       (is (= :explicit (get-in prepared [:prepared-request/prompt-layers 1 :source])))
       (is (= "Hint A" (get-in prepared [:prepared-request/prompt-layers 2 :content])))
-      (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c1\" ext_path=\"/ext/a\">\nHint A\n</prompt_contribution>"
+      (is (= "sys\n\ndev\n\n# Extension Prompt Contributions\n\nHint A"
              (:prepared-request/system-prompt prepared)))
       (is (= "dev" (get-in prepared [:prepared-request/session-snapshot :developer-prompt])))
       (is (= :explicit (get-in prepared [:prepared-request/session-snapshot :developer-prompt-source]))))))
@@ -383,11 +386,12 @@
     ;; Simulate stale cached :system-prompt state: request preparation should
     ;; rebuild from canonical base prompt + contribution layers instead.
     (test-support/update-state! ctx :session-data assoc :system-prompt "stale")
+    (test-support/seed-augmentation-record! ctx session-id "t2")
     (let [prepared (psi.agent-session.prompt-request/build-prepared-request
                     ctx session-id {:turn-id "t2"
                                     :user-message {:role "user"
                                                    :content [{:type :text :text "hello"}]}})]
-      (is (= "base\n\n# Extension Prompt Contributions\n\n<prompt_contribution id=\"c2\" ext_path=\"/ext/a\">\nHint B\n</prompt_contribution>"
+      (is (= "base\n\n# Extension Prompt Contributions\n\nHint B"
              (:prepared-request/system-prompt prepared)))
       (is (= (:prepared-request/system-prompt prepared)
              (get-in prepared [:prepared-request/provider-conversation :system-prompt]))))))
@@ -395,6 +399,7 @@
 (deftest build-prepared-request-allows-explicit-runtime-model-override-test
   (let [[ctx session-id] (create-session-context {:persist? false})
         runtime-model    {:provider "stub" :id "override-model" :context-window 1234}
+        _                (test-support/seed-augmentation-record! ctx session-id "t-override")
         prepared         (psi.agent-session.prompt-request/build-prepared-request
                           ctx session-id {:turn-id "t-override"
                                           :user-message {:role "user"
@@ -417,6 +422,7 @@
                         :disable-model-invocation false}
             [ctx session-id] (create-session-context {:persist? false
                                                       :session-defaults {:skills [skill]}})
+            _          (test-support/seed-augmentation-record! ctx session-id "t-skill")
             prepared   (psi.agent-session.prompt-request/build-prepared-request
                         ctx session-id {:turn-id "t-skill"
                                         :commands []
@@ -438,6 +444,7 @@
                                                                   :content "Summarize: $@"
                                                                   :source :path
                                                                   :file-path "/tmp/summarize.md"}]}})
+        _        (test-support/seed-augmentation-record! ctx session-id "t-template")
         prepared (psi.agent-session.prompt-request/build-prepared-request
                   ctx session-id {:turn-id "t-template"
                                   :commands []
@@ -475,6 +482,7 @@
                           {:session-id session-id
                            :text "Please be brief."}
                           {:origin :core})
+    (test-support/seed-augmentation-record! ctx session-id "turn-2")
     (let [prepared            (psi.agent-session.prompt-request/build-prepared-request
                                ctx session-id {:turn-id "turn-2"
                                                :user-message nil})
@@ -564,30 +572,6 @@
                (get-in result [:execution-result/assistant-message :content 0 :text])))
         (is (= "final answer"
                (get-in assistant-msg [:content 0 :text])))))))
-
-(deftest prompt-prepare-request-consumes-queued-steering-test
-  (let [[ctx session-id] (create-session-context {:persist? false})]
-    (session/dispatch-in! ctx :session/enqueue-steering-message
-                          {:session-id session-id
-                           :text "Please be brief."}
-                          {:origin :core})
-    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
-                  (fn [_ai-ctx _ctx sid prepared _pq]
-                    {:execution-result/turn-id (:prepared-request/id prepared)
-                     :execution-result/session-id sid
-                     :execution-result/assistant-message {:role "assistant"
-                                                          :content [{:type :text :text "ok"}]
-                                                          :stop-reason :stop
-                                                          :timestamp (java.time.Instant/now)}
-                     :execution-result/turn-outcome :turn.outcome/stop
-                     :execution-result/tool-calls []
-                     :execution-result/stop-reason :stop})]
-      (session/dispatch-in! ctx :session/prompt-prepare-request
-                            {:session-id session-id
-                             :turn-id "turn-steer"
-                             :user-msg nil}
-                            {:origin :core}))
-    (is (= [] (:steering-messages (ss/get-session-data-in ctx session-id))))))
 
 (deftest prompt-finish-dispatches-extension-turn-finished-event-test
   (let [[ctx session-id] (create-session-context {:persist? false})

@@ -3,7 +3,8 @@
   (:require
    [clojure.string :as str]
    [psi.prompt-assets.system-prompt :as system-prompt]
-   [psi.turn-runtime.conversation :as conv]))
+   [psi.turn-runtime.conversation :as conv]
+   [psi.turn-runtime.augmentation :as turn-augmentation]))
 
 (defn effective-system-prompt
   "Assemble the provider-visible effective system prompt from a fully
@@ -25,12 +26,14 @@
   "Return introspectable prompt layers from a fully normalized lower-boundary
    `normalized-turn` map. Consumes normalized `:turn/*` values only."
   [normalized-turn]
-  (let [base    (:turn/base-system-prompt normalized-turn)
-        dev     (:turn/developer-prompt normalized-turn)
-        contrib (->> (:turn/sorted-prompt-contributions normalized-turn)
-                     (map :content)
-                     (remove str/blank?)
-                     (str/join "\n\n"))]
+  (let [base               (:turn/base-system-prompt normalized-turn)
+        dev                (:turn/developer-prompt normalized-turn)
+        augmentation-layer (some-> (:turn/augmentation-record normalized-turn)
+                                   turn-augmentation/augmentation-prompt-layer)
+        contrib            (->> (:turn/sorted-prompt-contributions normalized-turn)
+                                (map :content)
+                                (remove str/blank?)
+                                (str/join "\n\n"))]
     (cond-> []
       (some? base)
       (conj {:id      :system/base
@@ -49,7 +52,10 @@
       (conj {:id      :system/contributions
              :kind    :contributions
              :stable? true
-             :content contrib}))))
+             :content contrib})
+
+      augmentation-layer
+      (conj augmentation-layer))))
 
 (defn build-provider-conversation
   "Build the provider-facing conversation from a fully normalized lower-boundary
@@ -93,6 +99,12 @@
                                                  :developer-prompt        (:turn/developer-prompt normalized-turn)
                                                  :developer-prompt-source (:turn/developer-prompt-source normalized-turn)}
      :prepared-request/prompt-layers            prompt-layers
+     :prepared-request/augmentation              (when-let [record (:turn/augmentation-record normalized-turn)]
+                                                   (turn-augmentation/prepared-request-summary
+                                                    record
+                                                    (boolean (turn-augmentation/augmentation-context-message
+                                                              (:turn/id normalized-turn)
+                                                              (:operations record)))))
      :prepared-request/system-prompt            (:system-prompt provider-conv)
      :prepared-request/system-prompt-blocks     (:system-prompt-blocks provider-conv)
      :prepared-request/messages                 (:messages provider-conv)

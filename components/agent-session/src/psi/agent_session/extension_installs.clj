@@ -11,7 +11,8 @@
    [clojure.java.io :as io]
    [clojure.set :as set]
    [clojure.string :as str]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.turn-runtime.augmentation :as turn-augmentation]))
 
 (defn user-manifest-file
   []
@@ -102,6 +103,8 @@
                   :source-policies {:installed {:local/root "extensions/mementum"}}}
    'psi/munera {:psi/init 'extensions.munera/init
                 :source-policies {:installed {:local/root "extensions/munera"}}}
+   'psi/ramora {:psi/init 'extensions.ramora/init
+                :source-policies {:installed {:local/root "extensions/ramora"}}}
    'psi/plan-state-learning {:psi/init 'extensions.plan-state-learning/init
                              :source-policies {:installed {:local/root "extensions/plan-state-learning"}}}
    'psi/github {:psi/init 'psi.github.extension/init
@@ -115,7 +118,10 @@
    'psi/metrics {:psi/init 'psi.metrics.extension/init
                  :source-policies {:installed {:local/root "extensions/metrics"}}}
    'psi/dev-http {:psi/init 'extensions.dev-http/init
-                  :source-policies {:installed {:local/root "extensions/dev-http"}}}})
+                  :source-policies {:installed {:local/root "extensions/dev-http"}}}
+   'psi/context-manager {:psi/init 'extensions.context-manager/init
+                         :source-policies {:installed {:local/root "extensions/context-manager"
+                                                       :permissions [turn-augmentation/turn-augmentation-capability]}}}})
 
 (defn- catalog-entry
   [lib]
@@ -239,10 +245,12 @@
 
 (defn- normalize-entry
   [lib scope dep source-manifests overridden? base-dir]
-  (let [dep0 (expand-recognized-psi-owned-entry lib dep)
-        dep* (if (map? dep0)
-               (absolutize-local-root base-dir dep0)
-               dep0)]
+  (let [dep0                (expand-recognized-psi-owned-entry lib dep)
+        dep*                (if (map? dep0)
+                              (absolutize-local-root base-dir dep0)
+                              dep0)
+        permissions         (set (or (:permissions dep*) #{}))
+        unknown-permissions (seq (remove turn-augmentation/known-capabilities permissions))]
     [lib {:dep dep*
           :extension? (extension-dep? dep*)
           :support-dep? (not (extension-dep? dep*))
@@ -253,12 +261,31 @@
           :source-manifests (vec source-manifests)
           :overridden? overridden?
           :effective? true
+          :effective-permissions permissions
           :status (cond
                     (not (extension-dep? dep*)) :not-applicable
                     (false? (get dep* :psi/enabled true)) :disabled
+                    unknown-permissions :failed
                     :else :configured)
-          :load-error nil
+          :load-error (when unknown-permissions
+                        (str "Unknown extension capability: " (first unknown-permissions)))
           :init-var (when (extension-dep? dep*) (:psi/init dep*))}]))
+
+(defn- unknown-capability-diagnostics
+  [entries-by-lib]
+  (->> entries-by-lib
+       (keep (fn [[lib {:keys [extension? effective-permissions scope]}]]
+               (when extension?
+                 (when-let [unknown (seq (remove turn-augmentation/known-capabilities
+                                                 effective-permissions))]
+                   (diagnostic {:severity :error
+                                :category :unknown-capability
+                                :message (str "Unknown extension capability for " lib ": " (first unknown))
+                                :libs [lib]
+                                :scopes [scope]
+                                :source :effective
+                                :data {:capabilities (vec unknown)}})))))
+       vec))
 
 (defn- duplicate-init-diagnostics
   [entries-by-lib]
@@ -318,8 +345,9 @@
                                        entries-by-lib)
         entry-diags (vec (concat (mapcat (fn [[lib dep]] (entry-diagnostics :user lib dep)) user-deps)
                                  (mapcat (fn [[lib dep]] (entry-diagnostics :project lib dep)) project-deps)))
+        unknown-capability-diags (unknown-capability-diagnostics entries-by-lib)
         dup-diags   (duplicate-init-diagnostics entries-by-lib)
-        diagnostics (vec (concat user-diags project-diags entry-diags dup-diags))]
+        diagnostics (vec (concat user-diags project-diags entry-diags unknown-capability-diags dup-diags))]
     {:psi.extensions/user-manifest user-manifest
      :psi.extensions/project-manifest project-manifest
      :psi.extensions/effective {:raw-deps effective-raw-deps
@@ -416,8 +444,8 @@
   ([install-state previous-install-state]
    (let [entries-by-lib      (get-in install-state [:psi.extensions/effective :entries-by-lib])
          enabled-exts        (into {}
-                                   (filter (fn [[_ {:keys [extension? enabled?]}]]
-                                             (and extension? enabled?)))
+                                   (filter (fn [[_ {:keys [extension? enabled? status]}]]
+                                             (and extension? enabled? (not= :failed status))))
                                    entries-by-lib)
          local-entries       (into {}
                                    (filter (fn [[_ {:keys [dep]}]]
@@ -431,7 +459,8 @@
          deps-to-realize     (non-local-effective-raw-deps install-state)
          deps-apply-safe?    (safe-inprocess-deps-apply? previous-install-state install-state)
          resolved            (mapv (fn [[lib entry]]
-                                     (resolve-local-root-entry lib entry))
+                                     (assoc (resolve-local-root-entry lib entry)
+                                            :permissions (:effective-permissions entry)))
                                    local-entries)
          resolved-init-var   (filterv #(= :init-var (:kind %)) resolved)
          resolved-path       (filterv :path resolved)
@@ -445,16 +474,18 @@
                                                   :source :effective}))
                                    resolved-fail)]
      {:local-activation-entries (vec (concat
-                                      (map (fn [{:keys [id init-var lib]}]
+                                      (map (fn [{:keys [id init-var lib permissions]}]
                                              {:type :init-var
                                               :id id
                                               :lib lib
-                                              :init-var init-var})
+                                              :init-var init-var
+                                              :permissions permissions})
                                            resolved-init-var)
-                                      (map (fn [{:keys [id path]}]
+                                      (map (fn [{:keys [id path permissions]}]
                                              {:type :path
                                               :id id
-                                              :path path})
+                                              :path path
+                                              :permissions permissions})
                                            resolved-path)))
       :path->lib (into {} (map (juxt :path :lib)) resolved-path)
       :deps-to-realize deps-to-realize

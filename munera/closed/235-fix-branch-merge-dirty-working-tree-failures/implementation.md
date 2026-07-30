@@ -1,0 +1,49 @@
+- no architectural review feedback
+- ambiguity review added 1 new design step
+- no inconsistency review feedback
+- Design-step handoff: when resolving the dirty-check ambiguity, preserve root-cause-first/no-mocks isolated-temp-repo testing; inspect `components/history/src/psi/history/git.clj` (`status`, `dirty-working-tree?`, `branch-merge`) and `components/history/test/psi/history/git_worktree_test.clj` (`linked-worktree-path`, `branch-merge-*`) before choosing fixture cleanup/configuration vs production status semantics.
+
+- Follow-up resolved: `branch-merge` dirty checks should count untracked target-worktree files/directories as dirty; nested linked worktrees under the repo root are test-fixture artifacts to isolate rather than production status entries to ignore. Local reproduction: after `git worktree add` into `<repo>/worktrees/...`, main `git status --porcelain` reports `?? worktrees/`, while the linked worktree itself is clean.
+
+- no new ambiguity review feedback
+
+- Design-step carry-forward: no open design follow-ups remain; implementation should treat the resolved untracked-file decision as a constraint, not a scope change. If the fix touches the EQL mutation surface, `components/history/src/psi/history/resolvers.clj` only delegates to `git/branch-merge`; keep behaviour owned in `components/history/src/psi/history/git.clj` and proof in `components/history/test/psi/history/git_worktree_test.clj`.
+
+- Plan-review ambiguity turn: no new actionable ambiguity feedback; no design-steps added.
+
+- Plan-review inconsistency turn: no new actionable inconsistency feedback; no design-steps added.
+
+- Design-step handoff addendum: the only design follow-up is already resolved; subsequent implementation should not reopen production dirty semantics unless new root-cause evidence contradicts the `git status --porcelain` observation.
+
+- Implementation slice: Root cause was the test fixture creating linked worktrees inside the main null repo (`<repo>/worktrees/...`), which made the target worktree genuinely dirty via `git status --porcelain` (`?? worktrees/`; `-uall` shows the linked worktree path, `-uno` is empty). Patched `components/history/test/psi/history/git_worktree_test.clj` so linked worktrees are created beside the repo at `<repo>-worktrees/...` and `with-null-context` cleans both roots. Production `git/status` and `branch-merge` semantics were unchanged; added `branch-merge-rejects-untracked-working-tree-path` to prove untracked target paths still reject merges. Verification: focused fast-forward test passes; focused namespace passes (`39 tests, 106 assertions, 0 failures`); `clj-kondo` passes for the edited test; `bb test` with patch has 9 unrelated workflow/session failures, while a stashed clean-tree baseline had those same 9 plus the 4 target branch-merge failures.
+
+- added 1 step to be addressed
+
+- addressed 1 review step: added executable cleanup coverage for external `linked-worktree-root`; verified focused test and full `psi.history.git-worktree-test` namespace pass (`40 tests, 108 assertions, 0 failures`).
+
+- no new implementation review feedback
+
+- added 1 test-review step to be addressed
+
+- addressed 1 test-review step: added executable coverage that an untracked target-worktree directory makes `branch-merge` reject with `"working tree is dirty"`; verified focused test passes (`1 tests, 4 assertions, 0 failures`).
+
+- no new test review feedback
+
+- added 1 test-review step to be addressed
+
+- addressed 1 test-review step: added focused fixture regression proving `git/worktree-add` through `linked-worktree-path` leaves the target null repo `git/status` clean before merge; verified focused test passes (`1 tests, 2 assertions, 0 failures`) and full `psi.history.git-worktree-test` passes (`41 tests, 112 assertions, 0 failures`).
+
+- no new docs review feedback
+
+- added 1 step to be addressed
+
+- addressed 1 code-shaper review step: updated `with-null-context-deletes-linked-worktree-root-in-finally-test` to create an actual external linked worktree via `git/worktree-add` and assert both the worktree path and root are removed after the fixture; verified focused test passes (`1 tests, 5 assertions, 0 failures`), full `psi.history.git-worktree-test` passes (`41 tests, 115 assertions, 0 failures`), and clj-kondo passes for the edited test.
+
+- added 1 step to be addressed
+
+- addressed 1 code-shaper review step: replaced `git/status` substring-based porcelain classification with line/XY-slot parsing; added coverage for path text containing staged markers and real staged index changes; verified focused status test, full `psi.history.git-worktree-test`, and clj-kondo on edited files pass.
+- added 1 code-shaper step to be addressed
+
+- addressed 1 code-shaper review step: preserved Git porcelain XY slots for `git/status` by using untrimmed stdout and added coverage that a worktree-only tracked-file modification reports `:modified`, not `:staged`; verified focused status test, focused git-test namespace, full `psi.history.git-worktree-test`, and clj-kondo on edited files pass.
+
+- no new code-shaper review feedback

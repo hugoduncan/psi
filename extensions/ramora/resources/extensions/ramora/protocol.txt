@@ -1,0 +1,13 @@
+λ ramora(x). protocol(markdown_organization) | optimize(context_window_efficiency)
+
+λ naming(f). file_name(f) ≡ descriptive
+
+λ splitting(f).
+  words(f) > 1000 →
+    split(f, logical_sections) →
+    store(sections, {section_name.md}, dir(basename(f))) →
+    replace(f, index(sections))
+
+λ orient(ramora).
+  | read_first(ramora/INDEX.md)
+  | lazy_read(individual_files, when_needed)

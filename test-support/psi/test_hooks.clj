@@ -22,9 +22,14 @@
 (defn post-summary
   "Emit an explicit error/failure summary that's easy to find in output.
    Wraps totals computation in try/catch — when the result tree is corrupt
-   (e.g. from StackOverflowError), prints a warning and forces non-zero exit.
+   (e.g. from StackOverflowError), prints a warning.
 
-   Also forces System/exit when errors or failures are present as a safety net."
+   Never calls System/exit: this hook runs inside `kaocha.api/run`, which may
+   itself be invoked in-process (e.g. by Scry's structured runner). Exiting the
+   JVM here would kill the enclosing runner before it can emit its own summary
+   or write structured results. Exit-code responsibility belongs to the runner
+   (Scry's CLI / the bb task wrapper), which already fails non-zero on
+   errors/failures."
   [result]
   (try
     (let [totals   (result/totals (:kaocha.result/tests result))
@@ -38,8 +43,7 @@
           (println "╔══════════════════════════════════════════╗")
           (printf  "║  %d tests, %d pass, %d failures, %d errors  ║%n" tests pass failures errors)
           (println "╚══════════════════════════════════════════╝")
-          (flush)
-          (System/exit (min (+ errors failures) 255)))
+          (flush))
         (printf "✅ %d tests, %d pass, 0 failures, 0 errors%n" tests pass))
       result)
     (catch Throwable t
@@ -51,4 +55,4 @@
       (println "║  Treat this run as FAILED.                           ║")
       (println "╚═══════════════════════════════════════════════════════╝")
       (flush)
-      (System/exit 1))))
+      result)))

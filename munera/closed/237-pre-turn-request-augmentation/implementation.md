@@ -1,0 +1,112 @@
+# Implementation notes
+
+- architectural review added 5 new design steps
+
+- ambiguity review added 8 new design steps
+
+- no inconsistency review feedback
+
+- design-step handoff: resolve follow-ups by preserving core-owned dispatch/effects-as-data/replay boundaries; augmentation data should become canonical turn-scoped state before pure request preparation consumes it. Relevant project files: `AGENTS.md`, `ramora/META.md`, `doc/architecture.md`, `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/child_session_state.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`.
+
+- design follow-up completion: latest review batch identified as `597c0accf`..`c6b6a8583` with baseline `597c0accf^`; all 13 current unchecked added design steps resolved. New implementation-critical choices: user-role augmentation context before current user message, atomic per-augmenter acceptance, unsupported ops rejected, replay fails closed.
+
+- no architectural review feedback
+
+- ambiguity review (second pass) added 4 new design steps
+
+- no inconsistency review feedback (second pass)
+
+- second-pass design-step handoff: specify concrete contracts without widening extension authority; keep registration/result/child-session APIs data-shaped, capability-gated, and testable through prepared-request summaries/resolvers rather than extension-local handles. Additional relevant files: `components/agent-session/src/psi/agent_session/dispatch.clj`, `components/agent-session/src/psi/agent_session/dispatch_schema.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/resolvers/session.clj`, `components/agent-session/src/psi/agent_session/resolvers/extensions.clj`.
+
+- second-pass design follow-up completion: latest review batch identified as `fdd602ecf`..`6c0ed17ac` with baseline `6f9a0f16c`; the 4 current unchecked checklist lines added by that batch were resolved. Implementation should add concrete extension API entries for `:register-turn-augmenter` and `:create-turn-augmentation-child-session`, validate explicit result envelopes, and expose the exact `:turn/augmentation-context` prepared-request layer/summary fields.
+
+- no architectural review feedback (design-review architecture turn)
+
+- ambiguity review (design-review turn) added 7 new design steps
+
+- no inconsistency review feedback (design-review turn)
+
+- design-step handoff (design-review batch): resolve the 7 open ambiguity steps as closed core-owned data contracts, not policy expansion; prefer core-normalized provenance/status over extension-supplied authority, make registration gating independent of ambient active-session state unless explicitly modelled, and give history snippets fixed testable bounds. Relevant files: `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/prompt_recording.clj`, `components/agent-session/src/psi/agent_session/message_text.clj`, `components/agent-session/src/psi/agent_session/context.clj`, `components/agent-session/src/psi/agent_session/context_index.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`.
+
+- design follow-up completion (third review batch): latest task-scoped design-review batch identified as `4ae9bea9b`..`1ee9c586f` with baseline `6501d40f9`; the 7 current unchecked checklist lines added by that batch were resolved. Implementation should treat turn-augmenter registration as manifest/effective-permission gated only, with per-session capability gating at invocation; core normalizes append-block provenance, permits duplicate block ids, invalidates bad child-session ids, uses fixed history projection bounds (last 8 prior messages, 200-char normalized snippets), and records suppressed child turns with `:status :suppressed`, no providers, and no inserted request message.
+
+- no new architectural review feedback after resolved design-review follow-ups
+
+- ambiguity review added 1 new design step
+
+- no new inconsistency review feedback after latest ambiguity follow-up
+
+- design-step handoff (invocation-scoped child API): resolve the open ambiguity by keeping augmentation child creation core-owned and invocation-scoped, not ambient-session-scoped; prefer an explicit runtime-held active augmentation invocation/provenance guard around `:create-turn-augmentation-child-session`, with predictable unauthorized/outside-invocation failure and verification that created child ids match the active provider/session/turn before result acceptance. Relevant files: `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/mutations/session.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/session_lifecycle.clj`, `components/agent-session/src/psi/agent_session/child_session_state.clj`, `components/agent-session/src/psi/agent_session/context.clj`.
+
+- design follow-up completion (invocation-scoped child API): latest task-scoped design-review batch identified as `ebd63069a`..`ead94f6f4` with baseline `3b809157c`; the 1 current unchecked checklist line added by that batch was resolved. Implementation should make `:create-turn-augmentation-child-session` a stable guarded API closure whose authority comes only from a runtime-held active provider invocation context, cleared after the handler returns; outside-invocation calls throw `:no-active-turn-augmentation-invocation` and create no session.
+
+- ambiguity review added 5 new design steps
+
+- no new inconsistency review feedback after current ambiguity review
+
+- design-step handoff (current ambiguity batch): resolve the 5 open AMB steps by keeping augmentation a single core-owned pre-prepare barrier: every live non-suppressed turn should either have one canonical augmentation record before request preparation or fail/diagnose explicitly. Model cancellation, extension unload/reload, and child-session option checks through dispatch/session/extension lifecycle state, not ad hoc runtime flags; treat workflow-run-id as provenance only if existing prompt lifecycle already threads it. Relevant files: `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/extensions/loader.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/session_lifecycle.clj`.
+- design follow-up completion (current ambiguity batch): latest task-scoped design-review batch identified as `d6e3975ff`..`3cffacf82` with baseline `482ff803f`; the 5 current unchecked checklist lines added by that batch were resolved. Implementation should treat pre-turn augmentation as a terminal barrier: live prepare requires a closed canonical record, cancellation closes with `:canceled` and no request execution, workflow run id is provenance only, extension reload/unload owns registration cleanup, and augmentation child sessions may only narrow parent tools/model authority.
+
+- no new architectural review feedback after current resolved follow-ups
+
+- ambiguity review added 2 new design steps
+
+- inconsistency review added 1 new design step
+
+- design-step handoff (trust/child-run/stale-status): resolve the latest 3 open steps by keeping authority core-owned: `:trust` should be validated/normalized as request-rendering metadata, not extension-granted privilege; child-session execution should run through existing core session/prompt lifecycle and cancellation/replay boundaries, not hidden extension handles; stale overall status needs one terminal-state rule with tests proving late results cannot rewrite prepared-request input. Relevant files: `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/session_lifecycle.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/prompt_recording.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/child_session_state.clj`.
+
+- design follow-up completion (trust/child-run/stale-status): latest task-scoped design-review batch identified as `0886778a7`..`52302f529` with baseline `79d506e5a`; the 3 current unchecked checklist lines added by that batch were resolved. Implementation should core-normalize append-block `:trust` to `:project-derived`, treat child-session creation as allocation-only with a guarded run API through the canonical child prompt lifecycle, and never use `:stale` as an overall terminal record status.
+
+- design scope update after user clarification: remove the v1 `:trust` model entirely. Implementation should not accept, inject, normalize, validate, or render based on `:trust` for `:append-context-block`. Accepted extension-returned block content is injected as turn augmentation context; provenance remains core-normalized separately.
+
+- design scope update after user clarification: remove the dedicated v1 augmentation child-session API. Do not implement `:create-turn-augmentation-child-session` or a special paired child-run API for this task. Context-manager may create/run helper sessions with the existing extension session APIs, as `auto-session-name` does; recursion avoidance is extension-owned by tracking helper session ids and returning `:no-op` for them. Provider-supplied child/helper ids in augmentation results are provenance only and receive shape validation, not dedicated-origin validation.
+
+- architectural review added 1 new design step: live augmenter invocation must sit on the dispatch effect/runtime boundary, not in a pure handler, because handlers may perform arbitrary extension/helper-session work before recorded operations influence request preparation.
+
+- ambiguity review added 5 new design steps: concrete extension identity/capability schemas, diagnostic reason/query surfaces, and minimal context-manager scaffold behavior remain underspecified.
+
+- inconsistency review added 2 new design steps: prompt-submit ordering conflicts with history/rendering wording, and data-only augmenter rules need reconciliation with allowed helper-session mutations.
+
+- design-step handoff (current design-review batch): resolve the 8 open follow-ups by keeping augmentation as one core-owned pre-prepare barrier: live extension work belongs behind dispatch effects/runtime boundaries, accepted data is recorded canonically before pure request preparation, and helper-session mutations are allowed only as scoped helper work distinct from parent request/session mutation. Pin one extension identity and one capability schema before wiring registration/cleanup/query surfaces. Relevant files: `components/agent-session/src/psi/agent_session/extensions.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/extensions/loader.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/mutations/session.clj`, `extensions/context-manager/src/extensions/context_manager.clj`, `extensions/auto-session-name/src/extensions/auto_session_name.clj`.
+
+- design follow-up completion (current design-review batch): latest task-scoped review batch identified as `52ee30772`..`93e3a9f95` with baseline `9e164f5d8`; the 8 current unchecked checklist lines added by that batch were resolved. Implementation should use canonical extension ids (`manifest:<lib>` or `path:<canonical-absolute-path>`), extension-scoped session capability lookup, dispatch-effect-boundary provider invocation, machine-readable provider `:reasons`, the specified EQL summary attributes, and a minimal context-manager `project-context` block from effective cwd. Current-turn history projection excludes the submitted user and current repair entries; rendering places repair entries before augmentation context and the submitted user last.
+
+- architectural review added 1 new design step: make pre-turn augmentation statechart-visible/enforced so the critical-path barrier remains dispatch/statechart-owned rather than only a request-preparation precondition.
+
+- ambiguity review added 4 new design steps
+
+- inconsistency review added 1 new design step
+
+- design-step handoff (statechart/capability/envelope batch): resolve the 6 open follow-ups by tightening contracts, not changing scope: make augmentation an explicit prompt-lifecycle/statechart barrier before prepare; keep prepare as a fail-closed backstop; choose one effective-permission unknown-capability behavior and one duplicate-registration atomicity rule; define session capability seeding/update as extension-scoped state; make the `child-session-ids` envelope key either truly optional or required consistently. Relevant files: `components/agent-session/src/psi/agent_session/statechart.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/statechart_actions.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/extensions/loader.clj`, `components/agent-session/src/psi/agent_session/extensions.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`.
+
+- design follow-up completion (statechart/capability/envelope batch): latest task-scoped review batch identified as `b4c793495`..`e3fd34b07` with baseline `aa1123a71`; the 6 current unchecked checklist lines added by that batch were resolved. Implementation should model pre-turn augmentation as explicit statechart states/events (`:turn/submitted` → `:turn/augmentation-open` → `:turn/augmentation-closed`) with prepare scheduled only after closure; unknown capability keywords fail extension effective-state construction; session-available extension capabilities are recomputed from live effective permissions ∩ session policy; invalid replacement registrations preserve the previous callable, while unauthorized replacement removes that key; `:turn-augmentation/child-session-ids` is optional and normalized to `[]`.
+
+- no new architectural review feedback after statechart/capability/envelope design updates
+
+- ambiguity review added 5 new design steps
+
+- inconsistency review added 1 new design step
+
+- no new architectural review feedback after current design-review architecture pass
+
+- no new ambiguity review feedback after current design-review ambiguity pass
+
+- no new inconsistency review feedback after current design-review inconsistency pass
+
+- design-step handoff (current review pass): resolve the 6 open follow-ups by preserving one replayable, dispatch-owned pre-prepare barrier: make replay consume an already-replayed/persisted canonical close record rather than live extension state; define one shared augmentation-record well-formedness predicate used by live prepare and replay; keep provider invocation return/wait semantics at the effect boundary; record enough selected-provider generation/activation identity to reject reload/replacement races deterministically; either model session-policy narrowing concretely or state v1 is default allow-declared-live only; route all terminal records through one close/prepared scheduling path unless an explicit immediate-terminal exception is chosen. Relevant files: `components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj`, `components/agent-session/src/psi/agent_session/statechart.clj`, `components/agent-session/src/psi/agent_session/dispatch_handlers/statechart_actions.clj`, `components/agent-session/src/psi/agent_session/dispatch_effects.clj`, `components/agent-session/src/psi/agent_session/prompt_request.clj`, `components/agent-session/src/psi/agent_session/prompt_recording.clj`, `components/agent-session/src/psi/agent_session/extensions.clj`, `components/agent-session/src/psi/agent_session/extensions/api.clj`, `components/agent-session/src/psi/agent_session/extensions/loader.clj`.
+
+- no new ambiguity review feedback in plan-review turn; `plan.md` and `steps.md` were absent, so the pass used current design/design-steps context.
+
+- no new inconsistency review feedback in plan-review turn.
+
+- plan-review handoff for resolving open design-steps: no additional plan-review feedback was added; `plan.md` and `steps.md` are absent, so treat `design-steps.md` as the active follow-up surface and update `design.md` before creating any execution plan. Preserve replay determinism by choosing one persisted replay source, one shared record-validity predicate, one provider return/wait contract, and one terminal-close path. Additional useful code paths: `components/agent-session/src/psi/agent_session/dispatch_schema.clj`, `components/agent-session/src/psi/agent_session/dispatch.clj`, `components/agent-session/src/psi/agent_session/prompt_turn.clj`, `components/agent-session/src/psi/agent_session/resolvers/extensions.clj`, `components/agent-session/src/psi/agent_session/mutations/extensions.clj`.
+
+- implementation slice 2026-07-02: resolved the remaining design follow-ups and added the first compatibility implementation slice. New pure `psi.turn-runtime.augmentation` owns record well-formedness/rendering/summary helpers. Request preparation now consumes canonical `:turn-augmentations` records when present, inserts accepted `:append-context-block` content before the current user, and fails closed for present-but-missing/open/malformed records. `prompt-submit`/continuation currently seed no-op records to preserve existing flows until the explicit pre-turn barrier is wired. Extension registry/API now supports `:register-turn-augmenter` gated by `:psi.capability/turn-augmentation`; extension install manifests fail unknown capabilities closed. Context-manager registers `project-context` and returns working-directory context or no-op, with helper-session id recursion suppression state.
+
+- implementation slice 2026-07-02: added the explicit no-provider pre-turn lifecycle barrier. `prompt-submit`/tool continuations now record `:prompt-turns <turn-id> :turn/submitted` instead of seeding a terminal augmentation record. `:session/pre-turn-augment` opens an accepting canonical augmentation record and dispatches `:session/close-pre-turn-augmentation`; close writes the terminal no-op record and schedules request preparation. `prompt-prepare-request` now rejects any turn-id whose lifecycle is not `:turn/augmentation-closed`. Synthetic prompt, extension runtime, and public prompt entry points route through `:session/pre-turn-augment`. Added prompt-lifecycle tests proving open→close→prepare ordering and direct prepare rejection.
+
+- implementation slice 2026-07-02: completed the live provider invocation path. `:session/pre-turn-augment` now selects authorized providers and emits `:runtime/turn-augmentation-invoke`; the effect executor builds the bounded projection, invokes handlers outside pure dispatch, normalizes/validates returned envelopes, and dispatches `:session/close-pre-turn-augmentation` with the terminal record. Result acceptance rechecks the selected registration token and parent-session capability after handler return: replacement/reload races record provider `:stale`/`:late-stale-result`, and session-unavailable providers record `:unauthorized` without invoking. Session creation now seeds extension-scoped available capability entries from live effective permissions; absence of an extension/capability remains fail-closed. Added focused pre-turn lifecycle tests for live insertion, unauthorized skip, and stale replacement diagnostics. Remaining next-slice work: explicit cancellation close handling and replay close-payload tests.
+
+- implementation slice 2026-07-02: added explicit cancellation closure for open pre-turn augmentation phases. The turn-augmentation effect now rechecks workflow cancellation before/between/after provider invocation, writes a canonical `:canceled` augmentation record with selected providers diagnosed as `:canceled`/`:provider-canceled`, transitions the prompt turn to `:turn/canceled`, and skips request preparation. Guarded stale close effects that wake after workflow cancellation synthesize the canceled close record from the still-open selected-provider snapshot so the barrier is unblocked without reopening ordinary prompt execution.
+
+- implementation slice 2026-07-02: implemented replay close-payload handling for the explicit pre-turn barrier. Dispatch now marks handler event data with `:replaying?`, so replayed `:session/pre-turn-augment` opens the canonical phase without live provider effects. Replayed `:session/close-pre-turn-augmentation` validates the recorded payload with the shared well-formedness predicate, records valid payloads as `:replay-used`, and records missing/wrong-turn failures as `:replay-missing`/`:replay-invalid` without scheduling request preparation. Added focused tests proving no live augmenter invocation on replay and fail-closed missing/wrong-turn replay behavior.

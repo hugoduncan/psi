@@ -361,6 +361,19 @@
         (is (= "claude-sonnet-4-6" (get-in result [:candidate :id])))
         (is (false? (:ambiguous? result)))))
 
+    (testing "Claude Sonnet 5 participates in normal built-in explicit selection"
+      (let [result (sut/resolve-selection
+                    {:catalog catalog
+                     :request {:mode :explicit
+                               :model {:provider :anthropic :id "claude-sonnet-5"}}})]
+        (is (= :ok (:outcome result)))
+        (is (= :anthropic (get-in result [:candidate :provider])))
+        (is (= "claude-sonnet-5" (get-in result [:candidate :id])))
+        (is (= "Claude Sonnet 5" (get-in result [:candidate :name])))
+        (is (= :anthropic-messages (get-in result [:candidate :api])))
+        (is (true? (get-in result [:candidate :reference :configured?])))
+        (is (false? (:ambiguous? result)))))
+
     (testing "explicit missing reference yields no-winner/reference-not-found"
       (let [result (sut/resolve-selection
                     {:catalog catalog

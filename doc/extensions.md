@@ -197,7 +197,8 @@ The example project config in this repo defines these bb tasks:
   - runs `rama-cc components/ --threshold 21 --fail-above 20`
   - then runs `rama-cc bases/ --threshold 21 --fail-above 20`
 - `bb commit-check:file-lengths`
-  - fails if any file under `components/` or `bases/` in a `src/` or `test/` path exceeds 800 lines
+  - fails if any file under `components/`, `bases/`, or `extensions/` in a `src/` or `test/` path exceeds 800 lines
+  - explicitly recorded legacy oversized extension files are ratcheted: they pass at their recorded line counts, but fail if they grow
 - `bb commit-check:dispatch-architecture`
   - fails on dispatch effect parity drift in `agent-session`
   - reports advisory warnings for handler side-effect candidates and direct canonical state writes outside an allowlist
@@ -250,6 +251,79 @@ Purpose: automate munera + mementum working-memory follow-up after non-PSL commi
   - `/psl` lists active PSL workflows by rendering that public display through `psi.agent-session.workflow.display/text-lines`
 - Widget: shows `⊕ PSL` header with workflow display lines for active runs
 
+### `extensions/context-manager/src/extensions/context_manager.clj` (`extensions.context-manager`)
+
+Purpose: subscribes to `session_turn_finished` events and logs session-id and
+turn-id via `(:log api)` (idempotent init for reload safety), and registers two
+pre-turn turn augmenters under the `:psi.capability/turn-augmentation` grant.
+
+- Turn augmenters (via `:register-turn-augmenter`):
+  - `project-context` — emits a minimal `Project context` block reporting the
+    effective working directory when available.
+  - `entity-resolution` — automatic pre-turn entity resolution. For each
+    eligible parent turn it runs a bounded local-model helper session (created
+    with the existing `bash` tool only) that applies the `entity-resolution`
+    skill's method (Method steps 1–5) to the user text plus a rendered
+    conversation-history excerpt, and injects any confidently-resolved
+    `surface → canonical (evidence)` mappings as a `Resolved entities` context
+    block before the current user message.
+    - Local-first: selects a single top-ranked local model (strong
+      `:locality :local`, `:latency-tier :low`, `:cost-tier #{:zero :low}`,
+      inheriting the parent session's model as context); never falls back to a
+      cloud model.
+    - `bash` is granted for read-only evidence gathering only; the helper is
+      instructed not to mutate files or cause side effects. The helper run is
+      bounded (round-cap prompt guidance plus a wall-clock budget); exceeding
+      the bound is treated as a failed run.
+    - Data-only and non-interactive: never mutates the submitted prompt or
+      parent session; omits `:source` (core injects provenance); reports helper
+      child-session ids in `:turn-augmentation/child-session-ids` and tracks
+      them to avoid augmenting its own helper turns.
+    - Returns a well-formed no-op for: tracked helper sessions, blank effective
+      cwd, slash-command-only prompts (pre-filter, before spending a helper
+      run), no confident mapping parsed, no local model available, and
+      failed/empty/timed-out helper runs. Confidence is model self-gated — the
+      model emits a line only for mappings it judges confident; the augmenter
+      accepts every well-formed parsed line and drops the confidence token from
+      the rendered block.
+- Post-turn tooling-friction analyzer (task 239) — from the same
+  `session_turn_finished` handler, after logging session-id/turn-id it spawns
+  a fire-and-forget `future` that analyzes the last 4 turns for friction
+  fixable by tooling/dependency changes (not project bugs or feature work),
+  and automatically opens Munera tasks for newly identified issues.
+  - Scope: every session (top-level, delegated, workflow, helper) except this
+    analyzer's own helper sessions and other known helper/infra sessions
+    (e.g. entity-resolution helper sessions, the auto-session-name
+    extension's `"auto-session-name"` helper sessions, and workflow-runtime
+    step-attempt child sessions named `"workflow <step-id> attempt"`) — a
+    recursion guard.
+  - Fire-and-forget: runs on its own thread outside the turn/dispatch
+    critical path; the handler always returns promptly regardless of
+    analysis outcome.
+  - Single bounded, no-tools local-model helper session (selected the same
+    local-first way as `entity-resolution`) performs both friction detection
+    and duplicate matching (against all open tasks and the 20
+    most-recently-closed tasks) as two phases of the same call.
+  - Non-duplicate issues are capped at 2 created tasks per analysis run
+    (remaining issues recur and are caught on a later turn); each created
+    task is `munera/open/NNN-slug/design.md` only (per munera's
+    design.md-only creation convention), written to the analyzed session's
+    own worktree, and clearly marked as auto-generated with the observed
+    friction, evidence (turn references), and suggested tooling/dependency
+    change.
+  - Every failure path (no local model available, missing worktree, helper
+    failure/timeout, malformed or empty helper output) logs a diagnostic and
+    no-ops — no task is created and the turn is never disrupted. A turn with
+    an empty/blank recent-history excerpt (e.g. a freshly created session's
+    first turn) is also short-circuited before the helper session runs — no
+    local-model work is spent analyzing an empty conversation.
+  - Per-session in-flight guard: a second `session_turn_finished` analysis
+    for the same session is skipped/no-op'd (with a diagnostic) while a
+    prior analysis run for that same session is still in flight, avoiding
+    duplicate-task races that the dedup pass alone can't catch (dedup only
+    checks tasks that existed before the run started).
+- No commands, tools, or prompt contributions besides the augmenters above.
+
 ### `extensions/hello-ext/src/extensions/hello_ext.clj` (`extensions.hello-ext`)
 
 Purpose: minimal example extension used in docs/tests.
@@ -260,6 +334,19 @@ Purpose: minimal example extension used in docs/tests.
 - Tools:
   - `hello-upper`
   - `hello-wrap`
+
+### `extensions/ramora/src/extensions/ramora.clj` (`extensions.ramora`)
+
+Purpose: prompt-contribution-only extension that injects the Ramora protocol
+(lambda-form project knowledge organization) into the system prompt.
+
+- Prompt contribution:
+  - ID: `ramora-protocol`
+  - Section: `Ramora Protocol`
+  - Priority: 52 (after mementum=50, munera=51)
+  - In lambda mode: raw `protocol.txt` content
+  - In prose mode: engage prefix + `protocol.txt` content
+- No commands, tools, operations, or event handlers
 
 ## Install manifests
 
@@ -444,10 +531,12 @@ embedding provider/id fallback chains locally. Extensions do not need a
 core-defined role to do this: they may submit a fully explicit request, or
 construct their own local preset/request builder.
 
-The current `auto-session-name` extension is the reference example: it queries
-the source session model context, builds its own explicit helper-model request,
-and passes the resulting candidate explicitly into
-`psi.extension/run-agent-loop-in-session`.
+The current `auto-session-name` extension is the reference example: it runs only
+for top-level user-interactive source sessions, explicitly excluding delegated
+workflow sessions, workflow-step sessions, nested workflow sessions, and its own
+helper sessions. For eligible source sessions it queries the source session
+model context, builds its own explicit helper-model request, and passes the
+resulting candidate explicitly into `psi.extension/run-agent-loop-in-session`.
 
 Example:
 

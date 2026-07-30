@@ -38,7 +38,8 @@
          :post-tool-processors []
          :services             []
          :service-requests     []
-         :service-notifications []}))
+         :service-notifications []
+         :turn-augmenters      {}}))
 
 (defn- workflow-seq
   [state ext-path]
@@ -320,6 +321,13 @@
    'psi.extension/submit-synthetic-prompt (fn [_state _params]
                                             {:psi.extension/prompt-submitted? true})
    'psi.extension/schedule-event schedule-event!
+   'psi.extension/register-turn-augmenter (fn [state params]
+                                            (let [registration (:registration params)
+                                                  augmenter-id (:augmenter-id registration)]
+                                              (swap! state assoc-in [:turn-augmenters augmenter-id] registration)
+                                              {:extension-id (:ext-path params)
+                                               :augmenter-id augmenter-id
+                                               :registered? true}))
    'psi.extension/register-post-tool-processor register-post-tool-processor!
    'psi.extension/ensure-service ensure-service!
    'psi.extension/stop-service stop-service!
@@ -435,6 +443,9 @@
                                         (mutate* 'psi.extension/append-message
                                                  {:role role
                                                   :content content}))
+                      :register-turn-augmenter (fn [registration]
+                                                 (mutate* 'psi.extension/register-turn-augmenter
+                                                          {:registration registration}))
                       :register-post-tool-processor (fn [{:keys [name match timeout-ms handler]}]
                                                       (mutate* 'psi.extension/register-post-tool-processor
                                                                {:name name

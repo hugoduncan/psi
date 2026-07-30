@@ -198,6 +198,11 @@
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:extensions [:map-of :string extension-schema]]
+   [:available-extension-capabilities {:optional true}
+    [:map
+     [:extensions {:optional true} [:map-of :string [:set :keyword]]]]]
+   [:prompt-turns {:optional true} [:map-of :string :map]]
+   [:turn-augmentations {:optional true} [:map-of :string :map]]
    [:session-entries [:vector session-entry-schema]]
    [:startup-bootstrap {:optional true}
     [:maybe
@@ -241,7 +246,7 @@
    :auto-retry-max-retries         3
    :auto-retry-base-delay-ms       2000
    :auto-retry-max-delay-ms        60000
-   :llm-stream-idle-timeout-ms     600000
+   :llm-stream-idle-timeout-ms     1200000
    :tool-batch-max-parallelism     4
    :default-active-tools           #{"read" "bash" "edit" "write"}})
 
@@ -291,6 +296,9 @@
      :prompt-templates        []
      :prompt-contribution-ids []
      :extensions              {}
+     :available-extension-capabilities {:extensions {}}
+     :prompt-turns            {}
+     :turn-augmentations      {}
      :session-entries         []
      :extension-last-prompt-source nil
      :extension-last-prompt-delivery nil
@@ -386,6 +394,9 @@
    #"(?i)overloaded"
    #"(?i)status[ .:_]429"
    #"(?i)status[ .:_]5\d\d"
+   #"(?i)an error occurred while processing your request"
+   #"(?i)\bserver_error\b"
+   #"(?i)internal server error"
    #"(?i)premature end of chunk coded message body"
    #"(?i)closing chunk expected"])
 
@@ -404,6 +415,14 @@
 
 (def ^:private overloaded-error-patterns
   [#"(?i)overloaded"])
+
+(def ^:private server-error-patterns
+  ;; Canonical OpenAI transient server error delivered as a mid-stream
+  ;; error/response.failed event without an HTTP status. The provider
+  ;; explicitly invites a retry ("You can retry your request").
+  [#"(?i)an error occurred while processing your request"
+   #"(?i)\bserver_error\b"
+   #"(?i)internal server error"])
 
 (def ^:private invalid-request-error-patterns
   [#"(?i)invalid request"
@@ -455,7 +474,8 @@
           (some #(re-find % message) invalid-request-error-patterns))
       :invalid-request
 
-      (contains? #{500 502 503 529} http-status)
+      (or (contains? #{500 502 503 529} http-status)
+          (some #(re-find % message) server-error-patterns))
       :provider-unavailable
 
       (some #(re-find % message) transport-error-patterns)

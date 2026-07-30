@@ -75,11 +75,12 @@
          session-config))
 
 (defn- compile-markdown-workflow-file
-  [{:keys [name description source-path] :as parsed}]
+  [{:keys [name description advertise source-path] :as parsed}]
   {:definition {:definition-id name
                 :name name
                 :summary description
                 :description description
+                :advertise advertise
                 :steps [(markdown-session-step parsed)]
                 :workflow-file-meta (cond-> {:file-kind :md}
                                       source-path (assoc :source-path source-path))}})
@@ -286,6 +287,12 @@
     {:error "Workflow EDN files must define top-level `:description` as a non-blank string"}
 
     :else
+    ;; `:advertise` passes through implicitly from `config`: when authored it is
+    ;; carried verbatim; when absent it stays absent (nil). This is deliberately
+    ;; asymmetric with the markdown path, where the parser coerces `:advertise`
+    ;; to an explicit boolean (default `true`) before compilation. Behaviour is
+    ;; identical because the prompt-contribution filter keys on `false?`, so nil
+    ;; and true both advertise.
     (let [{compiled-steps :ok step-error :error}
           (compile-edn-steps source-path (:steps config))
           workflow-definition (cond-> (-> config

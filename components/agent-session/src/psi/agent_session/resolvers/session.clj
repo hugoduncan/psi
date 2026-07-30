@@ -6,6 +6,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
    [psi.agent-session.model-capabilities :as model-capabilities]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.agent-session.resolvers.support :as support]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
@@ -144,6 +145,8 @@
 
 ;; ── Queues and message counts ───────────────────────────
 
+(declare latest-turn-augmentation-record)
+
 (defn- prompt-summary-fields
   [sd]
   (let [prepared  (:last-prepared-request-summary sd)
@@ -154,6 +157,7 @@
      :psi.agent-session/last-prepared-tool-count      (:tool-count prepared)
      :psi.agent-session/last-prepared-system-prompt-chars (:system-prompt-chars prepared)
      :psi.agent-session/last-prepared-input-expansion (:input-expansion prepared)
+     :psi.agent-session/last-prepared-augmentation (:augmentation prepared)
      :psi.agent-session/last-prepared-at              (:prepared-at prepared)
      :psi.agent-session/last-execution-result-summary executed
      :psi.agent-session/last-execution-turn-id        (:turn-id executed)
@@ -193,13 +197,15 @@
                  :psi.agent-session/last-prepared-tool-count
                  :psi.agent-session/last-prepared-system-prompt-chars
                  :psi.agent-session/last-prepared-input-expansion
+                 :psi.agent-session/last-prepared-augmentation
                  :psi.agent-session/last-prepared-at
                  :psi.agent-session/last-execution-result-summary
                  :psi.agent-session/last-execution-turn-id
                  :psi.agent-session/last-execution-turn-outcome
                  :psi.agent-session/last-execution-stop-reason
                  :psi.agent-session/last-execution-tool-call-count
-                 :psi.agent-session/last-execution-recorded-at]}
+                 :psi.agent-session/last-execution-recorded-at
+                 :psi.agent-session/latest-turn-augmentation-summary]}
   (let [sd         (support/session-data agent-session-ctx session-id)
         base       (:base-system-prompt sd)
         sys        (:system-prompt sd)
@@ -221,7 +227,39 @@
       :psi.agent-session/has-pending-messages    (session/has-pending-messages? sd)
       :psi.agent-session/steering-messages       (:steering-messages sd)
       :psi.agent-session/follow-up-messages      (:follow-up-messages sd)}
-     (prompt-summary-fields sd))))
+     (prompt-summary-fields sd)
+     {:psi.agent-session/latest-turn-augmentation-summary
+      (turn-augmentation/summarize-record (latest-turn-augmentation-record sd))})))
+
+(defn- turn-augmentation-records
+  [sd]
+  (vals (or (:turn-augmentations sd) {})))
+
+(defn- latest-turn-augmentation-record
+  [sd]
+  (last (sort-by (juxt #(or (:closed-at %) (:prepared-at %) #inst "1970-01-01") :turn-id)
+                 (turn-augmentation-records sd))))
+
+(pco/defresolver latest-turn-augmentation-summary
+  "Resolve the latest turn-scoped augmentation summary for a session."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/latest-turn-augmentation-summary]}
+  (let [sd (support/session-data agent-session-ctx session-id)]
+    {:psi.agent-session/latest-turn-augmentation-summary
+     (turn-augmentation/summarize-record (latest-turn-augmentation-record sd))}))
+
+(pco/defresolver addressed-turn-augmentation-summary
+  "Resolve a turn-scoped augmentation summary for the supplied lookup turn id."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.agent-session/lookup-turn-id]}]
+  {::pco/input  [:psi/agent-session-ctx
+                 :psi.agent-session/session-id
+                 :psi.agent-session/lookup-turn-id]
+   ::pco/output [:psi.agent-session/turn-augmentation-summary]}
+  (let [sd     (support/session-data agent-session-ctx session-id)
+        record (get-in sd [:turn-augmentations lookup-turn-id])]
+    {:psi.agent-session/turn-augmentation-summary
+     (turn-augmentation/summarize-record record)}))
 
 ;; ── Retry and compaction config ─────────────────────────
 
@@ -415,17 +453,19 @@
 
 (defn- workflow-session-link-attrs
   [sd]
-  {:psi.agent-session/workflow-run-id     (:workflow-run-id sd)
-   :psi.agent-session/workflow-step-id    (:workflow-step-id sd)
-   :psi.agent-session/workflow-attempt-id (:workflow-attempt-id sd)
-   :psi.agent-session/workflow-owned?     (:workflow-owned? sd false)})
+  {:psi.agent-session/parent-session-id    (:parent-session-id sd)
+   :psi.agent-session/workflow-run-id      (:workflow-run-id sd)
+   :psi.agent-session/workflow-step-id     (:workflow-step-id sd)
+   :psi.agent-session/workflow-attempt-id  (:workflow-attempt-id sd)
+   :psi.agent-session/workflow-owned?      (:workflow-owned? sd false)})
 
 (pco/defresolver agent-session-workflow-linkage
-  "Resolve workflow linkage attrs carried by canonical sessions.
-   Ordinary sessions expose nil linkage attrs and false workflow-owned?."
+  "Resolve parent/workflow linkage attrs carried by canonical sessions.
+   Ordinary root sessions expose nil linkage attrs and false workflow-owned?."
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
-   ::pco/output [:psi.agent-session/workflow-run-id
+   ::pco/output [:psi.agent-session/parent-session-id
+                 :psi.agent-session/workflow-run-id
                  :psi.agent-session/workflow-step-id
                  :psi.agent-session/workflow-attempt-id
                  :psi.agent-session/workflow-owned?]}
@@ -674,6 +714,8 @@
    agent-session-profiles
    agent-session-queues
    agent-session-retry-compact
+   latest-turn-augmentation-summary
+   addressed-turn-augmentation-summary
    agent-session-resources
    agent-session-message-history
    agent-session-extensions

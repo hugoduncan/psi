@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "resolve-current-pr",
    :type :delegate,
    :target "builder",

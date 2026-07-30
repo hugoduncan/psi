@@ -6,8 +6,10 @@
    shaping for one prepared turn."
   (:require
    [psi.ai.core :as ai]
+   [psi.ai.model-registry :as model-registry]
    [psi.ai.models :as models]
    [psi.ai.structured-output :as structured-output]
+   [psi.ai.textual-tool-calls :as textual-tool-calls]
    [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
    [psi.session-state.state :as ss]
@@ -83,7 +85,7 @@
         actions-fn       (accum/make-turn-actions ctx session-id done-p progress-queue
                                                   ai-model thinking-buffers)
         turn-ctx         (turn-sc/create-turn-context actions-fn)
-        _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id)
+        _                (swap! (:turn-data turn-ctx) assoc :turn-id turn-id :ai-model ai-model)
         last-progress-ms (atom (stream/now-ms))
         timed-out?       (atom false)]
     (trs/set-turn-context-in! ctx session-id turn-ctx)
@@ -256,7 +258,8 @@
       {:turn-id turn-id
        :model ai-model
        :ai-options ai-options
-       :assistant-message (:assistant-message result)
+       :assistant-message (textual-tool-calls/normalize-assistant-message
+                           turn-id ai-model (:assistant-message result))
        :logprobs (:logprobs result)
        :structured-output (:structured-output result)})))
 
@@ -301,6 +304,21 @@
     (let [strategy (structured-output/select-strategy ai-model request)]
       (when (unsupported-structured-output? strategy)
         (unsupported-structured-output-result turn-id ai-model strategy)))))
+
+(defn- unsupported-runtime-model-result
+  [turn-id ai-model]
+  (let [message (model-registry/unsupported-runtime-model-message ai-model)]
+    {:turn-id turn-id
+     :model ai-model
+     :ai-options nil
+     :turn-ctx nil
+     :assistant-message {:role "assistant"
+                         :content [{:type :error :text message}]
+                         :stop-reason :error
+                         :error-message message
+                         :timestamp (java.time.Instant/now)}
+     :logprobs nil
+     :runtime/unsupported-reason (:runtime/unsupported-reason ai-model)}))
 
 (defn- provider-id-for
   [ai-model]
@@ -443,7 +461,9 @@
         provider-id      (:provider-id attempt-data)
         model-id         (:model-id attempt-data)
         attempt-id       (attempt-id-for turn-id retry-attempt)
-        preflight-result (unsupported-structured-output-before-generation turn-id ai-model base-ai-options)
+        preflight-result (or (when (:runtime/unsupported? ai-model)
+                               (unsupported-runtime-model-result turn-id ai-model))
+                             (unsupported-structured-output-before-generation turn-id ai-model base-ai-options))
         _                (when-not preflight-result
                            (dispatch-provider-event!
                             ctx
@@ -506,6 +526,7 @@
      :execution-result/stop-reason         (:stop-reason assistant-message)
      :execution-result/logprobs            (:logprobs attempt-result)
      :execution-result/structured-output   (:structured-output attempt-result)
+     :execution-result/runtime-unsupported-reason (:runtime/unsupported-reason attempt-result)
      :execution-result/retry-outcome       retry-outcome*}))
 
 (defn execute-prepared-request!

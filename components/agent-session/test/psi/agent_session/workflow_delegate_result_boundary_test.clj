@@ -163,4 +163,4 @@
           (is (false? (:is-error result))
               "the tool invocation transport remains successful")
           (is (= "Removed run run-remove" (visible-result-text result)))
-          (is (= [{:run-id "run-remove"}] @removed*)))))))
+          (is (= [{:run-id "run-remove" :session-id session-id}] @removed*)))))))

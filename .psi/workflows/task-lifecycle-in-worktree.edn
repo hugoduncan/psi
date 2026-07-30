@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "resolve-worktree",
    :type :session,
    :tools ["read" "bash" "work-on"],

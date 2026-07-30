@@ -1,0 +1,3 @@
+🔁 Repository commit-check tests must exercise the real `bb` task (or the exact shared helpers it uses), not a copied/synthetic task expression. Task 236’s first file-length tests passed against an isolated copied `bb.edn`, but review still found drift risk: the real `commit-check:file-lengths` task could change without coverage failing.
+
+Pattern for future commit-check work: invoke the real task for end-to-end probes; derive expected baselines/ratchets from the authoritative implementation data instead of duplicating maps in tests; and add sparse-shape coverage by evaluating the real shared helper path against absent and present-but-empty scan roots. This locks command behavior, legacy exemptions, and optional-root handling to the production surface.

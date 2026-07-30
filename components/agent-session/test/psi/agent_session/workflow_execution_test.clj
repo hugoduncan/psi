@@ -8,6 +8,7 @@
    [psi.agent-session.turn]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.workflow-execution-test-support :as support]
+   [psi.agent-session.test-support :as core-support]
    [psi.shared-config.project :as project-prefs]
    [psi.shared-config.user :as user-config]
    [psi.skill-registry.root-storage :as skill-storage]
@@ -465,6 +466,7 @@
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-ext-1")
               child-id (get-in run [:step-runs "step-1" :attempts 0 :execution-session-id])
               child-sd (get-in @(:state* ctx) [:agent-session :sessions child-id :data])
+              _ (core-support/seed-augmentation-record! ctx child-id "wf-child-proof")
               prepared (prompt-request/build-prepared-request
                         ctx child-id
                         {:turn-id "wf-child-proof"
@@ -523,6 +525,7 @@
               run      (workflow-runtime/workflow-run-in @(:state* ctx) "run-selection-1")
               child-id (get-in run [:step-runs "step-1" :attempts 0 :execution-session-id])
               child-sd (get-in @(:state* ctx) [:agent-session :sessions child-id :data])
+              _ (core-support/seed-augmentation-record! ctx child-id "wf-selection-proof")
               prepared (prompt-request/build-prepared-request
                         ctx child-id
                         {:turn-id "wf-selection-proof"

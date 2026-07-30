@@ -115,9 +115,15 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 
 ### Model controls
 
-Interactive sessions support `/speed` for provider throughput-tier selection and
-`/effort` for provider reasoning-effort override. Named session profiles bundle
-reusable model/thinking/speed/effort settings for interactive selection
+Interactive sessions support `/model` for model selection, `/speed` for provider
+throughput-tier selection, and `/effort` for provider reasoning-effort override.
+OpenAI catalog exposure and OpenAI OAuth runtime support are distinct: bare
+`gpt-5.6` remains catalog-selectable for non-OAuth/API-key OpenAI use, but
+OpenAI OAuth-backed bare `gpt-5.6` is unsupported until an evidenced
+ChatGPT/Codex alias or alternate OAuth-compatible transport is added; `gpt-5.5`
+and the `gpt-5.6-sol`/`gpt-5.6-terra`/`gpt-5.6-luna` variants remain on the
+OAuth/ChatGPT Codex path. Named session profiles bundle reusable
+model/thinking/speed/effort settings for interactive selection
 (`/session-profile`) and workflow steps (`:session-profile`); see
 [`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
 [`doc/workflows.md`](doc/workflows.md).
@@ -175,9 +181,17 @@ Built-in extensions that ship with this repo (activated via
 `.psi/extensions.edn`):
 
 - **auto-session-name** — derive a session name automatically from early
-  conversation context.
+  conversation context for top-level user-interactive sessions only; delegated
+  workflow, workflow-step, nested workflow, and helper sessions are excluded.
 - **commit-checks** — run project-local checks after a local commit and feed
   failures back into the session.
+- **context-manager** — registers pre-turn turn augmenters:
+  `project-context` and automatic `entity-resolution` (a bash-only local-model
+  helper that injects a `Resolved entities` block); also runs a post-turn
+  tooling-friction analyzer (fire-and-forget: auto-creates capped, deduped
+  `munera/open/NNN-slug/design.md` tooling/dependency-friction tasks in the
+  analyzed session's worktree, excluding known helper/infra sessions). See
+  [`doc/extensions.md`](doc/extensions.md).
 - **dev-http** — dev-time localhost HTTP side channel (`/dev-http`,
   `dev-present`) for presenting markdown/tables/Vega/Mermaid/files/hiccup and
   choice prompts in a browser, with choices flowing back as user input. See
@@ -189,6 +203,8 @@ Built-in extensions that ship with this repo (activated via
 - **metrics** — accumulate persistent per-capability usage counters (`/metrics`).
 - **munera** — git-native Markdown task protocol (design → plan → implement →
   review) under `munera/`.
+- **ramora** — prompt-contribution extension that injects the Ramora protocol
+  (lambda-form project knowledge organization) into the system prompt.
 
 For the extension list, configuration, and authoring details, see:
 - [`doc/extensions.md`](doc/extensions.md)
@@ -219,7 +235,7 @@ Project-local extension/config examples in this repo include:
 - [`.psi/extensions.edn`](.psi/extensions.edn)
 - [`.psi/commit-checks.edn`](.psi/commit-checks.edn)
 - `bb commit-check:rama-cc`
-- `bb commit-check:file-lengths`
+- `bb commit-check:file-lengths` — scans `components/`, `bases/`, and `extensions/` `src/`/`test/` paths; legacy oversized extension files are ratcheted to fail if they grow
 - `bb commit-check:dispatch-architecture`
 
 ### Architecture

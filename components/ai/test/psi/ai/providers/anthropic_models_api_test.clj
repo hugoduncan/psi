@@ -1,11 +1,11 @@
-(ns psi.ai.providers.anthropic-models-api-test
+(ns ^:integration psi.ai.providers.anthropic-models-api-test
   (:require
    [clj-http.client :as http]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]))
 
 (def ^:private models-url "https://api.anthropic.com/v1/models")
-(def ^:private target-model-ids #{"claude-opus-4-8" "claude-fable-5"})
+(def ^:private target-model-ids #{"claude-opus-4-8" "claude-opus-5" "claude-fable-5" "claude-sonnet-5"})
 (def ^:private anthropic-version "2023-06-01")
 
 (defn- enabled?

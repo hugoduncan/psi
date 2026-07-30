@@ -3,6 +3,7 @@
   (:require
    [clojure.java.io :as io]
    [psi.agent-core.core :as agent]
+   [psi.ai.model-registry :as model-registry]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session-core]
@@ -12,8 +13,10 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.agent-session.prompt-recording]
    [psi.agent-session.prompt-request]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.agent-session.services :as services]
    [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.agent-session.turn]
@@ -40,6 +43,49 @@
     :journal :flush-state :turn-ctx
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
     :provider-requests :provider-replies :provider-events})
+
+;; Far-future fixed expiry (year ~5138) keeps the oauth credential fixture
+;; deterministic and time-independent; oauth-backed? only requires a non-expired
+;; credential.
+(def far-future-expiry 99999999999999)
+
+(defn oauth-openai-credentials
+  "Return an OpenAI OAuth credential map with a deterministic far-future expiry,
+   shared across model-selection tests that exercise the OAuth runtime policy."
+  []
+  {:type    :oauth
+   :access  "tok"
+   :refresh "ref"
+   :expires far-future-expiry})
+
+(defn oauth-openai-ctx
+  "Return an oauth null-context carrying an OpenAI OAuth credential, the shared
+   fixture for tests that exercise OpenAI OAuth runtime model policy."
+  []
+  (oauth/create-null-context
+   {:credentials {:openai (oauth-openai-credentials)}}))
+
+(defn unsupported-runtime-model-message
+  "Return the shared unsupported-model message for `provider`/`model-id` under
+   OpenAI OAuth context, derived from the runtime policy owner
+   (`resolve-runtime-model` + `unsupported-runtime-model-message`) rather than a
+   pasted literal. A policy-wording change flips the one formatter test instead
+   of every surface assertion."
+  ([]
+   (unsupported-runtime-model-message :openai "gpt-5.6"))
+  ([provider model-id]
+   (model-registry/unsupported-runtime-model-message
+    (model-registry/resolve-runtime-model
+     {:oauth-ctx (oauth-openai-ctx)} provider model-id))))
+
+(defn model-set-message
+  "Return the shared model-selection success message for a persisted
+   `{:provider :id}` model (and optional scope), derived from the runtime
+   policy owner (`model-registry/model-set-message`) rather than a pasted
+   literal, so a wording change flips the formatter test instead of every
+   surface assertion."
+  ([model] (model-registry/model-set-message model))
+  ([model scope] (model-registry/model-set-message model scope)))
 
 (defn instant
   "Parse an ISO-8601 string into a `java.time.Instant`."
@@ -108,26 +154,80 @@
    :execution-result/tool-calls       []
    :execution-result/stop-reason      :stop})
 
-(defn temp-cwd []
-  (let [p (str (java.nio.file.Files/createTempDirectory
-                "psi-agent-session-test-"
-                (make-array java.nio.file.attribute.FileAttribute 0)))]
-    (.mkdirs (java.io.File. p))
-    p))
-
-(defn temp-session-root []
-  (let [p (str (java.nio.file.Files/createTempDirectory
-                "psi-agent-session-store-"
-                (make-array java.nio.file.attribute.FileAttribute 0)))]
-    (.mkdirs (java.io.File. p))
-    p))
-
 (defn delete-recursively!
   [path]
   (let [f (java.io.File. (str path))]
     (when (.exists f)
       (doseq [child (reverse (file-seq f))]
         (.delete ^java.io.File child)))))
+
+(defn- register-cleanup-shutdown-hook!
+  "Register a JVM shutdown hook that recursively deletes `path`.
+
+  Safety net for callers of `temp-cwd`/`temp-session-root` that have no
+  `finally`-based cleanup of their own: guarantees the directory is removed
+  when the JVM process exits (each `bb test` run is a single short-lived
+  JVM process), without requiring every caller to track and clean up the
+  path itself. Per-caller `finally` cleanup (where present) still runs
+  first and remains the fast path; this hook only matters when that never
+  happens.
+
+  Known limitation: this hook only fires at JVM exit. When tests run via a
+  long-lived REPL/nREPL process (the `.psi/skills/scry/SKILL.md` \"REPL /
+  in-process workflow\", used while iterating), the JVM may stay up for
+  hours or days, so directories created via `temp-cwd`/`temp-session-root`
+  without their own `finally` cleanup accumulate under the OS temp dir
+  until that process eventually exits. This does not affect `bb test`'s
+  CLI invocation (one short-lived JVM per run), only interactive
+  REPL-based iteration. No automated per-invocation sweep exists for that
+  path yet; if it becomes a problem, periodically restart the REPL/nREPL
+  process, or manually sweep `psi-agent-session-test-`/
+  `psi-agent-session-store-` dirs from the OS temp dir.
+
+  Returns the registered `Thread` (untouched by `temp-cwd`/
+  `temp-session-root`, which ignore it) so tests can invoke it directly
+  (`.start` + `.join`, then `removeShutdownHook` to avoid a second run at
+  real JVM exit) to exercise the cleanup behaviour without waiting for
+  actual process exit."
+  [path]
+  (let [hook (Thread. ^Runnable (fn [] (delete-recursively! path)))]
+    (.addShutdownHook (Runtime/getRuntime) hook)
+    hook))
+
+(defn- create-temp-dir-with-cleanup-hook!
+  "Create a temp directory under `prefix`, register a cleanup shutdown hook
+  for it (see `register-cleanup-shutdown-hook!`), and return `[path hook]`.
+
+  Shared by `temp-cwd`/`temp-session-root` and their `-with-hook` test-only
+  variants, so both stay wired to the same hook-registration call — a
+  regression that dropped the hook call here would be caught by any test
+  exercising either variant."
+  [prefix]
+  (let [p (str (java.nio.file.Files/createTempDirectory
+                prefix
+                (make-array java.nio.file.attribute.FileAttribute 0)))]
+    (.mkdirs (java.io.File. p))
+    [p (register-cleanup-shutdown-hook! p)]))
+
+(defn temp-cwd []
+  (first (create-temp-dir-with-cleanup-hook! "psi-agent-session-test-")))
+
+(defn temp-cwd-with-hook
+  "Test-only variant of `temp-cwd` that also returns the registered shutdown
+  hook `Thread` as `[path hook]`, so tests can confirm `temp-cwd` itself
+  registers a cleanup hook (not just that the hook mechanism works in
+  isolation via `register-cleanup-shutdown-hook!` directly)."
+  []
+  (create-temp-dir-with-cleanup-hook! "psi-agent-session-test-"))
+
+(defn temp-session-root []
+  (first (create-temp-dir-with-cleanup-hook! "psi-agent-session-store-")))
+
+(defn temp-session-root-with-hook
+  "Test-only variant of `temp-session-root` that also returns the registered
+  shutdown hook `Thread` as `[path hook]` — see `temp-cwd-with-hook`."
+  []
+  (create-temp-dir-with-cleanup-hook! "psi-agent-session-store-"))
 
 (defn with-temp-session-root
   "Run f with a test-owned temporary session root. Cleans it up in finally.
@@ -492,3 +592,17 @@
   (swap! (:state* ctx)
          (ss/session-update session-id
                             (fn [session] (assoc session :is-streaming streaming?)))))
+
+(defn seed-augmentation-record!
+  "Seed a well-formed no-op terminal pre-turn augmentation record for `turn-id`
+   in `session-id`.
+
+  Request preparation fails closed on a missing augmentation record. Tests that
+  call `build-prepared-request` directly (bypassing the dispatch-level pre-turn
+  augmentation barrier that normally seeds the record) use this helper to
+  simulate the post-barrier state for their turn-id."
+  [ctx session-id turn-id]
+  (ss/assoc-state-value-in!
+   ctx
+   (conj (ss/session-data-path session-id) :turn-augmentations turn-id)
+   (turn-augmentation/terminal-record session-id turn-id nil [])))

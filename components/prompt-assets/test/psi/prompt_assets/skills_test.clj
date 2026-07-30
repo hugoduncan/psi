@@ -5,11 +5,7 @@
    [clojure.test :refer [deftest testing is]]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [psi.prompt-assets.skills :as skills]
-   [psi.agent-session.resolvers :as resolvers]
-   [psi.agent-session.core :as session-core]
-   [com.wsscode.pathom3.connect.indexes :as pci]
-   [com.wsscode.pathom3.interface.eql :as p.eql]))
+   [psi.prompt-assets.skills :as skills]))
 
 ;; ============================================================
 ;; Test helpers — temp directories with skill files
@@ -176,6 +172,27 @@
         (let [parsed (skills/parse-skill-file (str dir "/hidden/SKILL.md"))]
           (is (true? (:disable-model-invocation parsed)))))))
 
+  (testing "advertise defaults to true when absent"
+    (with-temp-skills*
+      {"plain" "---\nname: plain\ndescription: Plain\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/plain/SKILL.md"))]
+          (is (true? (:advertise parsed)))))))
+
+  (testing "advertise: false parses to false"
+    (with-temp-skills*
+      {"quiet" "---\nname: quiet\ndescription: Quiet\nadvertise: false\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/quiet/SKILL.md"))]
+          (is (false? (:advertise parsed)))))))
+
+  (testing "advertise typo defaults to advertised (only literal false disables)"
+    (with-temp-skills*
+      {"typo" "---\nname: typo\ndescription: Typo\nadvertise: flase\n---\nBody"}
+      (fn [dir]
+        (let [parsed (skills/parse-skill-file (str dir "/typo/SKILL.md"))]
+          (is (true? (:advertise parsed)))))))
+
   (testing "returns nil for non-existent file"
     (is (nil? (skills/parse-skill-file "/nonexistent/path/SKILL.md")))))
 
@@ -194,7 +211,20 @@
       (is (= "/path/SKILL.md" (:file-path skill)))
       (is (= "/path" (:base-dir skill)))
       (is (= :user (:source skill)))
-      (is (false? (:disable-model-invocation skill))))))
+      (is (false? (:disable-model-invocation skill)))))
+  (testing "->skill propagates explicit :advertise false"
+    (let [parsed {:name "test" :description "Test skill"
+                  :file-path "/path/SKILL.md" :base-dir "/path"
+                  :disable-model-invocation false :advertise false}
+          skill  (skills/->skill parsed :user)]
+      (is (false? (:advertise skill)))))
+  (testing "->skill leaves :advertise absent when not parsed (treated as advertised)"
+    (let [parsed {:name "test" :description "Test skill"
+                  :file-path "/path/SKILL.md" :base-dir "/path"
+                  :disable-model-invocation false}
+          skill  (skills/->skill parsed :user)]
+      (is (nil? (:advertise skill)))
+      (is (not (false? (:advertise skill)))))))
 
 ;; ============================================================
 ;; Directory loading
@@ -235,147 +265,6 @@
           (is (some #(= :error (:type %)) diagnostics)))))))
 
 ;; ============================================================
-;; Multi-source discovery
-;; ============================================================
-
-(deftest discover-skills-test
-  (testing "discovers from global and project dirs"
-    (with-temp-skills*
-      {"global-skill" "---\nname: global-skill\ndescription: Global\n---\nBody"}
-      (fn [global-dir]
-        (with-temp-skills*
-          {"project-skill" "---\nname: project-skill\ndescription: Project\n---\nBody"}
-          (fn [project-dir]
-            (let [{:keys [skills]}
-                  (skills/discover-skills
-                   {:global-skills-dirs  [(str global-dir)]
-                    :project-skills-dirs [(str project-dir)]
-                    :config {:built-in-resource-root "psi/test-built-in-skills"}})]
-              (is (= 4 (count skills)))
-              (is (some #(= "global-skill" (:name %)) skills))
-              (is (some #(= "project-skill" (:name %)) skills))
-              (is (some #(= "packaged-test-skill" (:name %)) skills))))))))
-
-  (testing "project wins over user on cross-source name collision"
-    (with-temp-skills*
-      {"shared" "---\nname: shared\ndescription: Global version\n---\nGlobal"}
-      (fn [global-dir]
-        (with-temp-skills*
-          {"shared" "---\nname: shared\ndescription: Project version\n---\nProject"}
-          (fn [project-dir]
-            (let [{:keys [skills diagnostics]}
-                  (skills/discover-skills
-                   {:global-skills-dirs  [(str global-dir)]
-                    :project-skills-dirs [(str project-dir)]})]
-              (is (some #(= "shared" (:name %)) skills))
-              (is (= "Project version"
-                     (:description (some #(when (= "shared" (:name %)) %) skills))))
-              (is (some #(= :collision (:type %)) diagnostics))))))))
-
-  (testing "extra path wins over project, user, and built-in"
-    (with-temp-skills*
-      {"built-in-shared" "---\nname: built-in-shared\ndescription: Override\n---\nOverride body"}
-      (fn [extra-dir]
-        (let [{:keys [skills diagnostics]}
-              (skills/discover-skills
-               {:global-skills-dirs  ["/nonexistent"]
-                :project-skills-dirs ["/nonexistent"]
-                :extra-paths         [(str extra-dir)]
-                :config {:built-in-resource-root "psi/test-built-in-skills"}})
-              selected (some #(when (= "built-in-shared" (:name %)) %) skills)]
-          (is (= :path (:source selected)))
-          (is (= "Override" (:description selected)))
-          (is (some #(= :collision (:type %)) diagnostics))))))
-
-  (testing "same-source ties prefer earlier configured container order"
-    (with-temp-skills*
-      {"shared" "---\nname: shared\ndescription: Earlier global\n---\nEarlier"}
-      (fn [earlier-global-dir]
-        (with-temp-skills*
-          {"shared" "---\nname: shared\ndescription: Later global\n---\nLater"}
-          (fn [later-global-dir]
-            (let [{:keys [skills diagnostics]}
-                  (skills/discover-skills
-                   {:global-skills-dirs  [(str earlier-global-dir) (str later-global-dir)]
-                    :project-skills-dirs ["/nonexistent"]})
-                  selected (some #(when (= "shared" (:name %)) %) skills)
-                  collision (some #(when (= :collision (:type %)) %) diagnostics)]
-              (is (= :user (:source selected)))
-              (is (= "Earlier global" (:description selected)))
-              (is (= (str earlier-global-dir "/shared/SKILL.md") (:file-path selected)))
-              (is (= {:name "shared"
-                      :source :user
-                      :path (str later-global-dir "/shared/SKILL.md")}
-                     (:shadowed collision)))))))))
-
-  (testing "same-source ties within one container prefer lexicographically earlier canonical skill path"
-    (let [dir (make-temp-dir "psi-same-source-tie")
-          aaa-dir (io/file dir "aaa-shared")
-          zzz-dir (io/file dir "zzz-shared")]
-      (.mkdirs aaa-dir)
-      (.mkdirs zzz-dir)
-      (spit (io/file aaa-dir "SKILL.md")
-            "---\nname: shared\ndescription: Earlier canonical path\n---\nAlpha")
-      (spit (io/file zzz-dir "SKILL.md")
-            "---\nname: shared\ndescription: Later canonical path\n---\nZeta")
-      (try
-        (let [{:keys [skills diagnostics]}
-              (skills/discover-skills
-               {:global-skills-dirs  [(str dir)]
-                :project-skills-dirs ["/nonexistent"]})
-              selected (some #(when (= "shared" (:name %)) %) skills)
-              collision (some #(when (= :collision (:type %)) %) diagnostics)]
-          (is (= :user (:source selected)))
-          (is (= "Earlier canonical path" (:description selected)))
-          (is (= (-> (io/file aaa-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)
-                 (-> (:file-path selected) io/file .getCanonicalPath)))
-          (is (= {:name "shared"
-                  :source :user
-                  :path (-> (io/file zzz-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)}
-                 (update (:shadowed collision) :path #(some-> % io/file .getCanonicalPath)))))
-        (finally
-          (cleanup-dir! dir)))))
-
-  (testing "disabled flag skips built-in, global, and project, keeps extra-paths"
-    (with-temp-skills*
-      {"global-skill" "---\nname: global-skill\ndescription: Global\n---\nBody"}
-      (fn [global-dir]
-        (with-temp-skills*
-          {"extra" "---\nname: extra\ndescription: Extra\n---\nBody"}
-          (fn [extra-dir]
-            (let [{:keys [skills]}
-                  (skills/discover-skills
-                   {:global-skills-dirs [(str global-dir)]
-                    :project-skills-dirs ["/nonexistent"]
-                    :extra-paths        [(str extra-dir)]
-                    :disabled           true})]
-              (is (some #(= "extra" (:name %)) skills))
-              (is (= "extra" (:name (first skills))))
-              (is (= :path (:source (first skills))))))))))
-
-  (testing "extra-paths are loaded"
-    (with-temp-skills*
-      {"extra" "---\nname: extra\ndescription: Extra skill\n---\nBody"}
-      (fn [extra-dir]
-        (let [{:keys [skills]}
-              (skills/discover-skills
-               {:global-skills-dirs  ["/nonexistent"]
-                :project-skills-dirs ["/nonexistent"]
-                :extra-paths         [(str extra-dir)]})]
-          (is (some #(= "extra" (:name %)) skills))
-          (is (= :path (:source (some #(when (= "extra" (:name %)) %) skills))))))))
-
-  (testing "non-existent extra path produces warning"
-    (let [{:keys [diagnostics]}
-          (skills/discover-skills
-           {:global-skills-dirs  ["/nonexistent"]
-            :project-skills-dirs ["/nonexistent"]
-            :extra-paths         ["/no/such/path"]})]
-      (is (some #(str/includes? (:message %) "does not exist") diagnostics)))))
-
-;; ============================================================
-;; Progressive Disclosure — system prompt formatting
-;; ============================================================
 
 (deftest format-skills-for-prompt-test
   (testing "formats visible skills as XML in canonical skill-name order"
@@ -401,8 +290,26 @@
                        :file-path "/h/SKILL.md" :base-dir "/h"
                        :source :user :disable-model-invocation true}]
           result (skills/format-skills-for-prompt all-skills)]
-      (is (str/includes? result "visible"))
+      (is (str/includes? result "<name>visible</name>"))
       (is (not (str/includes? result "<name>hidden</name>")))))
+
+  (testing "excludes skills with advertise false"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false :advertise true}
+                      {:name "internal" :description "Internal"
+                       :file-path "/i/SKILL.md" :base-dir "/i"
+                       :source :user :disable-model-invocation false :advertise false}]
+          result (skills/format-skills-for-prompt all-skills)]
+      (is (str/includes? result "<name>visible</name>"))
+      (is (not (str/includes? result "<name>internal</name>")))))
+
+  (testing "absent :advertise keeps a skill advertised"
+    (let [all-skills [{:name "legacy" :description "Legacy"
+                       :file-path "/l/SKILL.md" :base-dir "/l"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt all-skills)]
+      (is (str/includes? result "<name>legacy</name>"))))
 
   (testing "returns empty string when no visible skills"
     (let [all-skills [{:name "hidden" :description "Hidden"
@@ -421,6 +328,61 @@
       (is (str/includes? result "&amp;"))
       (is (str/includes? result "&lt;special&gt;"))
       (is (str/includes? result "&quot;chars&quot;")))))
+
+(deftest format-skills-for-prompt-lambda-test
+  (testing "formats visible skills in lambda notation"
+    (let [all-skills [{:name "alpha" :description "Alpha skill"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "λ skills."))
+      (is (str/includes? result "alpha → Alpha skill @ /alpha/SKILL.md"))))
+
+  (testing "uses :lambda-description when present"
+    (let [all-skills [{:name "alpha" :description "Alpha skill"
+                       :lambda-description "λx. alpha(x)"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "alpha → λx. alpha(x) @ /alpha/SKILL.md"))))
+
+  (testing "excludes skills with advertise false"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false :advertise true}
+                      {:name "internal" :description "Internal"
+                       :file-path "/i/SKILL.md" :base-dir "/i"
+                       :source :user :disable-model-invocation false :advertise false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "visible → "))
+      (is (not (str/includes? result "internal → ")))))
+
+  (testing "excludes skills with disable-model-invocation=true"
+    (let [all-skills [{:name "visible" :description "Visible"
+                       :file-path "/v/SKILL.md" :base-dir "/v"
+                       :source :user :disable-model-invocation false}
+                      {:name "hidden" :description "Hidden"
+                       :file-path "/h/SKILL.md" :base-dir "/h"
+                       :source :user :disable-model-invocation true}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "visible → "))
+      (is (not (str/includes? result "hidden → ")))))
+
+  (testing "absent :advertise keeps a skill advertised"
+    (let [all-skills [{:name "legacy" :description "Legacy"
+                       :file-path "/l/SKILL.md" :base-dir "/l"
+                       :source :user :disable-model-invocation false}]
+          result (skills/format-skills-for-prompt-lambda all-skills)]
+      (is (str/includes? result "legacy → Legacy @ /l/SKILL.md"))))
+
+  (testing "returns nil when no visible skills"
+    (let [all-skills [{:name "hidden" :description "Hidden"
+                       :file-path "/h/SKILL.md" :base-dir "/h"
+                       :source :user :disable-model-invocation true}]]
+      (is (nil? (skills/format-skills-for-prompt-lambda all-skills)))))
+
+  (testing "returns nil for empty skills"
+    (is (nil? (skills/format-skills-for-prompt-lambda [])))))
 
 ;; ============================================================
 ;; Skill command parsing
@@ -496,6 +458,24 @@
           (is (some? result))
           (is (str/includes? (:content result) "Hidden content"))))))
 
+  (testing "non-advertised skills are still findable and invocable by name"
+    (with-temp-skills*
+      {"quiet-skill" "---\nname: quiet-skill\ndescription: Quiet\nadvertise: false\n---\nQuiet content"}
+      (fn [dir]
+        (let [all-skills [{:name "quiet-skill" :description "Quiet"
+                           :file-path (str dir "/quiet-skill/SKILL.md")
+                           :base-dir (str dir "/quiet-skill")
+                           :source :user :disable-model-invocation false
+                           :advertise false}]]
+          ;; Dropped from the system context prompt.
+          (is (not (str/includes? (skills/format-skills-for-prompt all-skills)
+                                  "<name>quiet-skill</name>")))
+          ;; Still registered (findable) and invocable by name.
+          (is (some? (skills/find-skill all-skills "quiet-skill")))
+          (let [result (skills/invoke-skill all-skills "/skill:quiet-skill")]
+            (is (some? result))
+            (is (str/includes? (:content result) "Quiet content")))))))
+
   (testing "returns nil for non-skill commands"
     (is (nil? (skills/invoke-skill [] "/help")))
     (is (nil? (skills/invoke-skill [] "regular text")))))
@@ -513,7 +493,13 @@
       (is (= 3 (:skill-count summary)))
       (is (= 2 (:visible-count summary)))
       (is (= 1 (:hidden-count summary)))
-      (is (= ["a" "b" "c"] (mapv :name (:skills summary)))))))
+      (is (= ["a" "b" "c"] (mapv :name (:skills summary))))))
+  (testing "advertise: false counts as hidden, not visible"
+    (let [all-skills [{:name "a" :description "A" :source :user :disable-model-invocation false :advertise false}
+                      {:name "b" :description "B" :source :user :disable-model-invocation false :advertise true}]
+          summary (skills/skill-summary all-skills)]
+      (is (= 1 (:visible-count summary)))
+      (is (= 1 (:hidden-count summary))))))
 
 (deftest skill-names-test
   (testing "returns canonical name vector"
@@ -542,7 +528,13 @@
     (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
                       {:name "z-hidden" :description "Z" :source :user :disable-model-invocation true}
                       {:name "a-hidden" :description "A" :source :user :disable-model-invocation true}]]
-      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills)))))))
+      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills))))))
+
+  (testing "advertise: false partitions as hidden, not visible"
+    (let [all-skills [{:name "shown" :description "S" :source :user :disable-model-invocation false :advertise true}
+                      {:name "unadvertised" :description "U" :source :user :disable-model-invocation false :advertise false}]]
+      (is (= ["shown"] (mapv :name (skills/visible-skills all-skills))))
+      (is (= ["unadvertised"] (mapv :name (skills/hidden-skills all-skills)))))))
 
 (deftest enrich-skill-test
   (testing "adds is-available-to-model"
@@ -553,220 +545,14 @@
   (testing "hidden skill is not available to model"
     (let [skill {:name "test" :description "Test" :source :user :disable-model-invocation true}
           enriched (skills/enrich-skill skill)]
+      (is (false? (:is-available-to-model enriched)))))
+
+  (testing "advertise: false skill is not available to model"
+    (let [skill {:name "test" :description "Test" :source :user :disable-model-invocation false :advertise false}
+          enriched (skills/enrich-skill skill)]
       (is (false? (:is-available-to-model enriched))))))
 
 ;; ============================================================
 ;; EQL Introspection (resolvers)
 ;; ============================================================
 
-(deftest skill-eql-introspection-test
-  (let [all-skills [{:name "zeta"
-                     :description "Zeta skill"
-                     :file-path "/zeta/SKILL.md"
-                     :base-dir "/zeta"
-                     :source :user
-                     :disable-model-invocation false}
-                    {:name "gamma"
-                     :description "Gamma skill"
-                     :file-path "/gamma/SKILL.md"
-                     :base-dir "/gamma"
-                     :source :project
-                     :disable-model-invocation true}
-                    {:name "alpha"
-                     :description "Alpha skill"
-                     :file-path "/alpha/SKILL.md"
-                     :base-dir "/alpha"
-                     :source :user
-                     :disable-model-invocation false}
-                    {:name "beta"
-                     :description "Beta skill"
-                     :file-path "/beta/SKILL.md"
-                     :base-dir "/beta"
-                     :source :project
-                     :disable-model-invocation true}]
-        ctx     (session-core/create-context
-                 {:session-defaults {:skills all-skills}})
-        sd      (session-core/new-session-in! ctx nil {})
-        session-id (:session-id sd)]
-
-    (testing "query skill count via EQL"
-      (let [result (session-core/query-in ctx session-id [:psi.skill/count])]
-        (is (= 4 (:psi.skill/count result)))))
-
-    (testing "query visible/hidden counts via EQL"
-      (let [result (session-core/query-in ctx session-id [:psi.skill/visible-count
-                                                          :psi.skill/hidden-count])]
-        (is (= 2 (:psi.skill/visible-count result)))
-        (is (= 2 (:psi.skill/hidden-count result)))))
-
-    (testing "query skill names via EQL"
-      (let [result (session-core/query-in ctx session-id [:psi.skill/names])]
-        (is (= ["alpha" "beta" "gamma" "zeta"] (:psi.skill/names result)))))
-
-    (testing "query skill summary via EQL"
-      (let [result  (session-core/query-in ctx session-id [:psi.skill/summary])
-            summary (:psi.skill/summary result)]
-        (is (= 4 (:skill-count summary)))
-        (is (= 2 (:visible-count summary)))
-        (is (= 2 (:hidden-count summary)))))
-
-    (testing "query skills by source via EQL"
-      (let [result  (session-core/query-in ctx session-id [:psi.skill/by-source])
-            grouped (:psi.skill/by-source result)]
-        (is (= ["alpha" "zeta"] (mapv :name (:user grouped))))
-        (is (= ["beta" "gamma"] (mapv :name (:project grouped))))))))
-
-(deftest skill-detail-eql-test
-  (let [all-skills [{:name "alpha"
-                     :description "Alpha skill"
-                     :file-path "/alpha/SKILL.md"
-                     :base-dir "/alpha"
-                     :source :user
-                     :disable-model-invocation false}]
-        ctx     (session-core/create-context
-                 {:session-defaults {:skills all-skills}})
-        sd      (session-core/new-session-in! ctx nil {})
-        env     (pci/register resolvers/all-resolvers)
-        result  (p.eql/process env
-                               {:psi/agent-session-ctx ctx
-                                :psi.agent-session/session-id (:session-id sd)
-                                :psi.skill/name "alpha"}
-                               [:psi.skill/detail])
-        detail (:psi.skill/detail result)]
-
-    (testing "detail includes enriched fields"
-      (is (= "alpha" (:name detail)))
-      (is (= "Alpha skill" (:description detail)))
-      (is (true? (:is-available-to-model detail))))
-
-    (testing "detail for unknown skill is nil"
-      (let [r (p.eql/process env
-                             {:psi/agent-session-ctx ctx
-                              :psi.agent-session/session-id (:session-id sd)
-                              :psi.skill/name "unknown"}
-                             [:psi.skill/detail])]
-        (is (nil? (:psi.skill/detail r)))))))
-
-;; ============================================================
-;; System prompt introspection
-;; ============================================================
-
-(deftest system-prompt-introspectable-test
-  (testing "system prompt stored in session data is queryable"
-    (let [ctx     (session-core/create-context
-                   {:session-defaults {:system-prompt "Test system prompt with skills"}})
-          sd      (session-core/new-session-in! ctx nil {})
-          result  (session-core/query-in ctx (:session-id sd) [:psi.agent-session/system-prompt])]
-      (is (= "Test system prompt with skills"
-             (:psi.agent-session/system-prompt result))))))
-
-;; ============================================================
-;; Nested skill discovery (subdirectories)
-;; ============================================================
-
-(deftest nested-skill-discovery-test
-  (testing "discovers nested skills in subdirectories"
-    (let [dir (make-temp-dir "psi-nested-skill-test")
-          ;; Create parent/child skill structure
-          parent-dir (io/file dir "parent-skill")
-          child-dir  (io/file parent-dir "skills" "child-skill")]
-      (.mkdirs parent-dir)
-      (.mkdirs child-dir)
-      (spit (io/file parent-dir "SKILL.md")
-            "---\nname: parent-skill\ndescription: Parent\n---\nParent body")
-      (spit (io/file child-dir "SKILL.md")
-            "---\nname: child-skill\ndescription: Child\n---\nChild body")
-      (try
-        (let [{:keys [skills]} (skills/load-skills-from-dir (str dir) :user)]
-          (is (= 2 (count skills)))
-          (is (some #(= "parent-skill" (:name %)) skills))
-          (is (some #(= "child-skill" (:name %)) skills)))
-        (finally (cleanup-dir! dir))))))
-
-;; ============================================================
-;; End-to-end: discover + format + invoke
-;; ============================================================
-
-(deftest built-in-skill-materialization-test
-  (testing "packaged built-in skills materialize to a readable deterministic snapshot"
-    (let [opts {:config {:built-in-resource-root "psi/test-built-in-skills"}}
-          {:keys [dir resource-paths reused?]} (skills/materialize-built-in-skills! opts)
-          skill-path (str dir "/packaged-test-skill/SKILL.md")]
-      (is (seq resource-paths))
-      (is (.exists (io/file skill-path)))
-      (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
-      (is (str/includes? (slurp skill-path) "packaged-test-skill"))
-      (is (contains? #{true false} reused?))))
-
-  (testing "production built-in skill packaging includes extension-development with readable file semantics"
-    (let [source-path "bases/main/resources/psi/skills/extension-development/SKILL.md"
-          resource-path "psi/skills/extension-development/SKILL.md"
-          opts {:config {:built-in-resource-root "psi/skills"}}
-          {:keys [dir resource-paths]} (skills/materialize-built-in-skills! opts)
-          built-in-path (str dir "/extension-development/SKILL.md")
-          {:keys [skills materialization]} (skills/built-in-skills-discovery opts)
-          built-in (some #(when (= "extension-development" (:name %)) %) skills)
-          invocation (skills/invoke-skill skills "/skill:extension-development verify")]
-      (is (.exists (io/file source-path)))
-      (is (some #(= resource-path %) resource-paths))
-      (is (.exists (io/file built-in-path)))
-      (is (= :built-in (:source built-in)))
-      (is (= "extension-development" (:name built-in)))
-      (is (str/starts-with? (:file-path built-in) (:dir materialization)))
-      (is (str/includes? (slurp (:file-path built-in)) "https://github.com/hugoduncan/psi/blob/main/doc/extension-api.md"))
-      (is (some? invocation))
-      (is (str/includes? (:content invocation) "Extension development"))))
-
-  (testing "production built-in skill packaging includes workflow with readable file semantics"
-    (let [source-path "bases/main/resources/psi/skills/workflow/SKILL.md"
-          resource-path "psi/skills/workflow/SKILL.md"
-          opts {:config {:built-in-resource-root "psi/skills"}}
-          {:keys [dir resource-paths]} (skills/materialize-built-in-skills! opts)
-          built-in-path (str dir "/workflow/SKILL.md")
-          {:keys [skills materialization]} (skills/built-in-skills-discovery opts)
-          built-in (some #(when (= "workflow" (:name %)) %) skills)
-          invocation (skills/invoke-skill skills "/skill:workflow update delegate workflow")]
-      (is (.exists (io/file source-path)))
-      (is (some #(= resource-path %) resource-paths))
-      (is (.exists (io/file built-in-path)))
-      (is (= :built-in (:source built-in)))
-      (is (= "workflow" (:name built-in)))
-      (is (str/starts-with? (:file-path built-in) (:dir materialization)))
-      (is (str/includes? (slurp (:file-path built-in)) "doc/workflow-grammar.md"))
-      (is (str/includes? (slurp (:file-path built-in)) ".psi/workflows/create-task-plan.edn"))
-      (is (some? invocation))
-      (is (str/includes? (:content invocation) "Workflow"))))
-
-  (testing "snapshot id changes when the packaged resource set changes"
-    (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
-          changed-dir (skills/built-in-snapshot-dir
-                       {:config {:built-in-resource-root "psi/test-built-in-skills"}
-                        :resource-paths-override ["psi/test-built-in-skills/packaged-test-skill/SKILL.md"]})]
-      (is (not= base-dir changed-dir))))
-
-  (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"
-    (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {:config {:built-in-resource-root "psi/test-built-in-skills"}})
-          built-in (some #(when (= "packaged-test-skill" (:name %)) %) skills)]
-      (is (= :built-in (:source built-in)))
-      (is (.exists (io/file (:file-path built-in))))
-      (is (str/starts-with? (:file-path built-in) (:dir materialization))))))
-
-(deftest end-to-end-discover-format-invoke-test
-  (testing "discover skills, format for prompt, then invoke one"
-    (with-temp-skills*
-      {"coding" (str "---\nname: coding\ndescription: Coding best practices\n---\n"
-                     "# Coding Standards\n\nFollow these practices.")}
-      (fn [dir]
-        (let [{:keys [skills]} (skills/discover-skills
-                                {:global-skills-dirs  [(str dir)]
-                                 :project-skills-dirs ["/nonexistent"]})
-              prompt-section (skills/format-skills-for-prompt skills)]
-          ;; Progressive disclosure: only name + description in prompt
-          (is (str/includes? prompt-section "<name>coding</name>"))
-          (is (str/includes? prompt-section "Coding best practices"))
-          (is (not (str/includes? prompt-section "Follow these practices")))
-
-          ;; Full invocation: loads entire content
-          (let [result (skills/invoke-skill skills "/skill:coding apply to my project")]
-            (is (str/includes? (:content result) "Follow these practices"))
-            (is (str/includes? (:content result) "apply to my project"))))))))

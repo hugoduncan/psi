@@ -1,4 +1,4 @@
-(ns psi.gordian-launcher-manifest-runtime-boundary-test
+(ns ^:integration psi.gordian-launcher-manifest-runtime-boundary-test
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]

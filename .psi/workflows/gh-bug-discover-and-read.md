@@ -1,6 +1,7 @@
 ---
 name: gh-bug-discover-and-read
 description: Discover and read one GitHub bug-triage issue, then emit a structured handoff brief
+advertise: false
 ---
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name      "discover"

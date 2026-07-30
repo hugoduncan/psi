@@ -1,0 +1,124 @@
+# 239 — Post-turn tooling-friction analysis (context-manager)
+
+## Goal
+
+After every completed turn, in every session, run an asynchronous
+(fire-and-forget) local-model analysis of the recent conversation to detect
+friction the LLM experienced that could be reduced by changes to **tooling or
+dependencies** — and automatically create a Munera task for newly identified
+issues, up to a per-run cap, in the session's worktree.
+
+This is explicitly *not* about project bugs or feature work. The target is
+developer-experience-for-the-agent: making it easier for the LLM to work on
+the project.
+
+## Why
+
+The agent regularly hits recoverable friction (awkward tool contracts,
+missing tools, missing/outdated dependencies, slow or noisy feedback loops,
+discoverability gaps in tooling). These observations evaporate at session
+boundaries unless captured. Automated post-turn extraction turns transient
+friction into durable, actionable tasks — compounding improvement of the
+agent's working environment.
+
+## Decisions (from scoping discussion, 2026-07-02)
+
+- **Scope of sessions:** every session (top-level, delegated, workflow,
+  helper) — no exclusions for v1, except the extension's own helper sessions
+  (guard against recursion) and other extensions'/runtime's known
+  helper/infra sessions (e.g. entity-resolution helper sessions, other
+  workflow helper sessions) — these are also excluded as non-representative
+  analysis inputs, not just this analyzer's own helpers.
+- **Recursion-guard state:** planning must explicitly choose between a
+  ctx-keyed managed service (aligned with `ramora/META.md`'s
+  process-scoped-managed-service model) and a bare extension-local
+  `defonce` atom (the existing `helper-session-ids` pattern) for tracking
+  this analyzer's own helper sessions — this design does not mandate either,
+  but requires the choice to be a deliberate planning-stage decision rather
+  than a default copy-paste of the existing atom pattern.
+- **Trigger:** post-turn, fire-and-forget async. Must never block or delay
+  the turn pipeline; failures are logged and swallowed.
+- **Home:** part of the existing `extensions/context-manager` extension,
+  which already subscribes to `session_turn_finished` and has local-model
+  helper-session machinery (`psi.ai.model-selection`, bounded helper runs).
+- **Analysis input:** the last 4 turns of the session (bounded excerpt,
+  reusing/adapting the existing history-excerpt rendering with char caps).
+- **Issue definition:** friction fixable by tooling or dependency changes.
+  Examples: tool errors/retries, workarounds via bash for a missing tool
+  capability, repeated manual steps, dependency version pain, slow test
+  loops. Excludes: project bugs, feature requests, user mistakes.
+- **Threshold:** any detected issue qualifies — but only after a duplicate
+  check (below). No occurrence-count accumulation in v1.
+- **Task creation:** automatic, no human approval gate. Create
+  `munera/open/NNN-slug/design.md` only (per task-creation convention:
+  design.md only, no plan.md/steps.md). NNN allocated per munera protocol
+  (max over open/ ∪ closed/ + 1).
+- **Task location:** the session's effective worktree, meaning the analyzed
+  session's own worktree (the checkout it is actually running in), even
+  when that session is a delegated or workflow child running in a
+  different checkout than its parent/originating session — v1 does not
+  walk up to an originating/top-level session's worktree.
+- **Dedup:** before creating, check existing open **and closed** tasks for
+  the same issue (slug/content similarity — the helper model can be given
+  the list of existing task ids + titles and asked to match). Dedup matching
+  is a second phase of the *same* bounded helper session that performs
+  friction detection (not a separate helper-session call) — this keeps the
+  recursion-guard/own-helper-session tracking and bounding rules (rounds,
+  wall-clock, output size) single-scoped, with no second call to account
+  for. Duplicate → skip, log diagnostic. "Recently-closed" (also suppressed,
+  to avoid reopening churn) means the N most-recently-closed tasks (N=20)
+  by closure order, not a time window — a fixed count keeps the list passed
+  to the helper model boundable within the single session's output-size
+  limit. The open-tasks side of the dedup list is unbounded in v1 (all
+  open tasks are passed) — open task count is expected to stay small
+  enough in practice to fit the helper session's output-size limit; if
+  open-task volume grows to threaten this, a bound should be added then.
+- **Configurability:** always-on for now. No config flag in v1.
+
+## Constraints
+
+- Fire-and-forget: analysis runs outside the dispatch/turn critical path;
+  local-model unavailability or helper failure → log + no-op.
+- Helper sessions must be bounded (rounds, wall-clock, output size) like the
+  existing entity-resolution helper, and excluded from their own analysis
+  (recursion guard).
+- Generated task design.md must state the observed friction, evidence
+  (which turns / what happened), and the suggested tooling/dependency
+  change — clearly marked as auto-generated by this analyzer.
+- Concurrent NNN allocation may collide across sessions/branches; follow
+  munera convention (rename, never merge). Creation should tolerate a
+  pre-existing directory by re-allocating.
+- Volume control: at most 2 tasks created per turn analysis, even if more
+  issues are detected; remaining issues will recur and be caught later.
+- Respect extension boundary: implementation lives in
+  `extensions/context-manager`, uses declared subscriptions/permissions;
+  align manifest, capabilities, docs, tests (extension-development skill).
+
+## Acceptance criteria
+
+1. After a turn completes in any session, an async analysis of the last 4
+   turns runs via a local-model helper session; the turn itself is not
+   delayed.
+2. When the analysis identifies a tooling/dependency friction issue with no
+   existing open/closed task match, a new `munera/open/NNN-slug/design.md`
+   is created in the session's worktree, containing friction description,
+   evidence, suggested change, and an auto-generated marker.
+3. When a matching existing task is found, no task is created and a
+   diagnostic is logged.
+4. Helper failure, missing local model, or missing worktree → no task, no
+   turn disruption, diagnostic logged.
+5. The analyzer never runs on its own helper sessions, nor on other known
+   helper/infra sessions (e.g. entity-resolution helper sessions, other
+   workflow helper sessions).
+6. Task creation is capped per analysis run.
+7. Tests cover: issue → task created; duplicate → skipped; failure paths →
+   no-op; recursion guard (own-helper and other known helper/infra
+   sessions); per-run cap.
+
+## Open questions
+
+- Whether task creation should also append the new task to `munera/plan.md`
+  (current convention: plan.md curates order; unlisted tasks are simply
+  unordered/open — suggest: do not touch plan.md in v1).
+- Exact duplicate-matching mechanism (model-judged vs. slug similarity) —
+  defer to planning.

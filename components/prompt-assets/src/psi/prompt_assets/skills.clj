@@ -134,8 +134,10 @@
             parent-dir-name        (.getName skill-dir)
             name                   (or (:name frontmatter) parent-dir-name)
             description            (:description frontmatter)
-            disable-model-invocation (= "true"
-                                        (str (get frontmatter :disable-model-invocation)))]
+            disable-model-invocation (pt/frontmatter-flag
+                                      (get frontmatter :disable-model-invocation) false)
+            advertise                (pt/frontmatter-flag
+                                      (get frontmatter :advertise) true)]
         {:name                     name
          :description              description
          :lambda-description       (:lambda frontmatter)
@@ -147,6 +149,7 @@
          :allowed-tools            (when-let [at (:allowed-tools frontmatter)]
                                      (str/split (str/trim at) #"\s+"))
          :disable-model-invocation disable-model-invocation
+         :advertise                advertise
          :body                     body}))))
 
 ;; ============================================================
@@ -162,7 +165,8 @@
            :file-path                (:file-path parsed)
            :base-dir                 (:base-dir parsed)
            :source                   source
-           :disable-model-invocation (:disable-model-invocation parsed)}
+           :disable-model-invocation (:disable-model-invocation parsed)
+           :advertise                (:advertise parsed)}
     (:lambda-description parsed) (assoc :lambda-description (:lambda-description parsed))))
 
 ;; ============================================================
@@ -503,10 +507,11 @@
   "Format skills for inclusion in a system prompt.
    Uses XML format per Agent Skills standard.
 
-   Skills with disable-model-invocation=true are excluded from the prompt
-   (they can only be invoked explicitly via /skill:name commands)."
+   Skills with disable-model-invocation=true or advertise: false are excluded
+   from the prompt (they can only be invoked explicitly via /skill:name
+   commands or read directly by a workflow step)."
   [skills]
-  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
+  (let [visible (skill-registry/visible-skills skills)]
     (if (empty? visible)
       ""
       (let [lines (into
@@ -529,7 +534,7 @@
    Uses compact lambda notation. Skills with a :lambda-description
    frontmatter field use that; otherwise falls back to name → description."
   [skills]
-  (let [visible (remove :disable-model-invocation (skill-registry/all-skills skills))]
+  (let [visible (skill-registry/visible-skills skills)]
     (when (seq visible)
       (str "\n\nλ skills. match(task, description) → read(file) | resolve(relative_path, parent(file))\n"
            (str/join "\n"
@@ -585,13 +590,14 @@
   [skills]
   (let [ordered-skills (skill-registry/all-skills skills)]
     {:skill-count       (count ordered-skills)
-     :visible-count     (count (remove :disable-model-invocation ordered-skills))
-     :hidden-count      (count (filter :disable-model-invocation ordered-skills))
+     :visible-count     (count (skill-registry/visible-skills skills))
+     :hidden-count      (count (skill-registry/hidden-skills skills))
      :skills            (mapv (fn [s]
                                 {:name                     (:name s)
                                  :description              (:description s)
                                  :source                   (:source s)
-                                 :disable-model-invocation (:disable-model-invocation s)})
+                                 :disable-model-invocation (:disable-model-invocation s)
+                                 :advertise                (:advertise s)})
                               ordered-skills)}))
 
 (defn skill-names
@@ -605,17 +611,21 @@
   (group-by :source (skill-registry/all-skills skills)))
 
 (defn visible-skills
-  "Return skills that are available to the model (not disabled)."
+  "Return skills that appear in the model's system context (not `prompt-hidden?`)."
   [skills]
-  (vec (remove :disable-model-invocation (skill-registry/all-skills skills))))
+  (skill-registry/visible-skills skills))
 
 (defn hidden-skills
-  "Return skills with disable-model-invocation=true."
+  "Return skills excluded from the model's system context (those `prompt-hidden?`)."
   [skills]
-  (vec (filter :disable-model-invocation (skill-registry/all-skills skills))))
+  (skill-registry/hidden-skills skills))
 
 (defn enrich-skill
-  "Add derived fields to a Skill map for introspection."
+  "Add derived fields to a Skill map for introspection.
+
+   `:is-available-to-model` reflects system-context visibility: a skill carrying
+   `advertise: false` (or `disable-model-invocation`) is not surfaced to the
+   model and so is reported as unavailable to it."
   [skill]
   (assoc skill
-         :is-available-to-model (not (:disable-model-invocation skill))))
+         :is-available-to-model (not (skill-registry/prompt-hidden? skill))))

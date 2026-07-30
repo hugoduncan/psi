@@ -8,17 +8,27 @@
     ("async" "asynchronous" nil) :async
     ::invalid))
 
+(defn- advertised?
+  "A workflow is advertised unless it explicitly declares `:advertise false`."
+  [defn-map]
+  (not (false? (:advertise defn-map))))
+
 (defn available-workflows-text
-  "Return human-readable list of available workflows."
+  "Return human-readable list of workflows for the user-facing `/delegate list`.
+
+   Unlike `build-prompt-contribution` (the system-context listing), this
+   discovery surface includes `:advertise false` workflows: they are hidden from
+   the model's prompt yet remain user-invocable via `/delegate <name>`."
   [definitions]
-  (if (empty? definitions)
-    "No workflows loaded."
-    (str/join "\n"
-              (for [[name defn-map] (sort-by key definitions)]
-                (let [step-count (count (:step-order defn-map))]
-                  (str "  " name " — " (or (:summary defn-map) "")
-                       (when (> step-count 1)
-                         (str " (" step-count " steps)"))))))))
+  (let [entries (sort-by key definitions)]
+    (if (empty? entries)
+      "No workflows loaded."
+      (str/join "\n"
+                (for [[name defn-map] entries]
+                  (let [step-count (count (:step-order defn-map))]
+                    (str "  " name " — " (or (:summary defn-map) "")
+                         (when (> step-count 1)
+                           (str " (" step-count " steps)")))))))))
 
 (defn active-runs-text
   "Return human-readable list of visible delegate workflow runs."
@@ -91,16 +101,33 @@
     [top-line]))
 
 (defn build-prompt-contribution
-  "Build the prompt contribution text listing available workflows."
+  "Build the prompt contribution text listing advertised workflows.
+
+   Workflows whose definition carries `:advertise false` are omitted from the
+   system-context listing; they remain invocable via `/delegate <name>` and as
+   delegate sub-steps. Absent `:advertise` (or any non-false value) keeps the
+   workflow advertised."
   [definitions]
-  (if (empty? definitions)
-    "tool: delegate\nNo workflows available."
-    (str "tool: delegate\navailable workflows:\n"
-         (str/join "\n"
-                   (for [[name defn-map] (sort-by key definitions)]
-                     (str "- " name ": " (or (:summary defn-map)
-                                             (:description defn-map)
-                                             "")))))))
+  (let [advertised (filter (comp advertised? val) (sort-by key definitions))]
+    (if (empty? advertised)
+      "tool: delegate\nNo workflows available."
+      (str "tool: delegate\navailable workflows:\n"
+           (str/join "\n"
+                     (for [[name defn-map] advertised]
+                       (str "- " name ": " (or (:summary defn-map)
+                                               (:description defn-map)
+                                               ""))))))))
+
+(defn resolve-runnable-definition
+  "Resolve a workflow definition for execution by name.
+
+   Execution resolution is independent of `:advertise`: an `:advertise false`
+   workflow is omitted from the system-context listing (see
+   `build-prompt-contribution`) yet remains runnable via `/delegate <name>` and
+   as a delegate sub-step. Returns the definition map, or nil when no workflow
+   with that name is registered."
+  [definitions workflow-name]
+  (get definitions workflow-name))
 
 (defn parse-delegate-command
   "Parse `/delegate <workflow> [<prompt>]` args. prompt is optional."

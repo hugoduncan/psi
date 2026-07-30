@@ -17,7 +17,8 @@
 
 (defn terminal-step-id
   [workflow-run]
-  (last (:step-order (:effective-definition workflow-run))))
+  (or (get-in workflow-run [:terminal-outcome :step-id])
+      (last (:step-order (:effective-definition workflow-run)))))
 
 (defn terminal-result-envelope
   [workflow-run]

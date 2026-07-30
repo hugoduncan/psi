@@ -1,0 +1,3 @@
+❌ A top-level `(testing ...)` form is not a registered Clojure test. It may execute once when the namespace is loaded, but Kaocha/`bb test` does not count it as a `deftest`, so its assertions and cleanup can look present in source while providing no recurring regression protection.
+
+When reviewing test coverage, verify every claimed test body is inside a `deftest` (or another runner-recognized test form). Cross-check suspicious cases against the reported namespace test count: an unexpected count is evidence that a block is load-time code, not suite-owned proof. Wrap the block in a named `deftest` before treating it as coverage.

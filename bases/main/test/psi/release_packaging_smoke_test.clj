@@ -1,4 +1,4 @@
-(ns psi.release-packaging-smoke-test
+(ns ^:integration psi.release-packaging-smoke-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]

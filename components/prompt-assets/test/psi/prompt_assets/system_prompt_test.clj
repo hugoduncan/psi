@@ -222,11 +222,13 @@
 (deftest build-system-prompt-shared-test
   ;; Behaviour shared between lambda and prose modes.
   (testing "build-system-prompt (mode-independent)"
-    (testing "includes session creation time"
+    (testing "includes session creation date"
       (let [instant (java.time.Instant/parse "2026-01-15T10:30:00Z")
             prompt  (sys-prompt/build-system-prompt {:session-instant instant})]
-        (is (str/includes? prompt "Session start time:"))
-        (is (str/includes? prompt "January 15, 2026"))))
+        (is (str/includes? prompt "Session start date:"))
+        (is (str/includes? prompt "January 15, 2026"))
+        ;; time portion should NOT be present
+        (is (not (re-find #"^Session start.*at.*$" prompt)) prompt)))
 
     (testing "includes context files"
       (let [prompt (sys-prompt/build-system-prompt
@@ -293,14 +295,21 @@
         (is (not (str/includes? prompt "Current working directory:")))
         (is (not (str/includes? prompt "Current worktree directory:")))))
 
-    (testing "runtime metadata follows context files"
-      (let [prompt (sys-prompt/build-system-prompt
-                    {:cwd "/tmp/demo"
-                     :context-files [{:path "/A.md" :content "Ctx"}]})
-            ctx-idx  (.indexOf prompt "# Project Context")
-            time-idx (.indexOf prompt "Session start time:")]
+    (testing "runtime metadata follows prompt contributions which follow context files"
+      (let [instant (java.time.Instant/parse "2026-01-15T10:30:00Z")
+            prompt   (sys-prompt/build-system-prompt
+                      {:cwd "/tmp/demo"
+                       :context-files [{:path "/A.md" :content "Ctx"}]
+                       :append-prompt "# Extension Prompt Contributions"
+                       :session-instant instant})
+            ctx-idx       (.indexOf prompt "# Project Context")
+            contrib-idx   (.indexOf prompt "# Extension Prompt Contributions")
+            date-idx      (.indexOf prompt "Session start date:")]
         (is (pos? ctx-idx))
-        (is (> time-idx ctx-idx))))
+        (is (pos? contrib-idx) prompt)
+        (is (pos? date-idx))
+        (is (> contrib-idx ctx-idx) "contributions after context")
+        (is (> date-idx contrib-idx) "date after contributions")))
 
     (testing "skills appear before context files"
       (let [prompt (sys-prompt/build-system-prompt

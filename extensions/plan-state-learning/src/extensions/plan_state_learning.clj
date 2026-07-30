@@ -201,7 +201,7 @@
      "- Commit message title must summarise the munera/mementum update and finish with [psi:psl-auto].\n"
      "- Do not use git add -A or git add .\n"
      "- Only stage explicit target files for the sync commit.\n"
-     "- Do not edit STATE.md or LEARNING.md; use mementum/state.md instead.\n"
+     "- Do not edit ramora/STATE.md or LEARNING.md; use mementum/state.md instead.\n"
      "- Do not create or edit mementum/memories/* or mementum/knowledge/* without explicit approval; suggest candidates only.\n"
      "- If there are no meaningful changes, skip the commit and explain why in your final response.\n"
      "- do not comment on your compliance with these constraints\n")))

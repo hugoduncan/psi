@@ -1,0 +1,19 @@
+- added 3 steps to be addressed (log-fn robustness and registration call verification)
+- implementation review complete: code matches design, follows architecture, no unnecessary abstractions or performance issues
+- added 2 steps to be addressed (vacuous prompt-contributions assertion, redundant re-find assertions)
+- added 1 step to be addressed (error logging not verified in handler-log-fn-throws-test)
+- implementation review (2026-06-25): no new issues found
+- test review (2026-06-25): no new issues
+- test shaper review (2026-06-25): added 5 steps to be addressed
+- addressed 5 test shaper review (2026-06-25) steps: standardized assertions, removed redundant/implementation-detail assertions
+- test shaper review (2026-06-25, second pass): added 1 step to be addressed
+- addressed 1 test shaper review (2026-06-25, second pass) step: standardized assertion in handler-log-fn-throws-logs-error-test to exact equality
+- test shaper review (2026-06-25, third pass): added 2 steps to be addressed
+- addressed 2 test shaper review (2026-06-25, third pass) steps: removed redundant "missing both keys" sub-case, added second-call nil return assertion to init-return-value-test
+- test shaper review (2026-06-25, fourth pass): added 2 steps to be addressed
+- addressed 2 test shaper review (2026-06-25, fourth pass) steps: extracted recovery-after-missing-on-key into init-recovery-after-missing-on-key-test, extracted missing-log-key into handler-works-without-log-key-test
+- test shaper review (2026-06-25, fourth pass): no issues found
+- test shaper review (2026-06-25, fifth pass): no issues found
+- test shaper review (2026-06-25, sixth pass): no issues found
+- docs review (2026-06-25): fixed README.md extension list alphabetical ordering (context-manager was after metrics, moved to correct position between commit-checks and dev-http)
+- code shaper review (2026-06-25): fixed `def` → `defonce` on `initialized?` to preserve CAS reload safety across namespace reloads

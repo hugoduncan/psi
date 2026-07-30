@@ -13,7 +13,8 @@
    [psi.turn-runtime.request :as turn-request]
    [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-coordination.stop-signal :as stop-signal]
-   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]))
+   [psi.agent-session.workflow-cancellation-guard :as workflow-guard]
+   [psi.agent-session.turn.augmentation-lifecycle :as augmentation-lifecycle]))
 
 (defn- now-inst []
   (java.time.Instant/now))
@@ -55,21 +56,24 @@
   ([session-id user-msg]
    (synthetic-user-prompt-effects session-id user-msg nil))
   ([session-id user-msg workflow-run-id]
-   (let [guard #(with-workflow-guard % workflow-run-id)]
+   (let [guard   #(with-workflow-guard % workflow-run-id)
+         turn-id (str (java.util.UUID/randomUUID))]
      [(guard {:effect/type :runtime/dispatch-event-with-effect-result
               :event-type :session/prompt-submit
               :event-data (cond-> {:session-id session-id
+                                   :turn-id turn-id
                                    :user-msg user-msg}
                             workflow-run-id (assoc :workflow-run-id workflow-run-id))
               :origin :core})
       (guard {:effect/type :runtime/dispatch-event
               :event-type :session/prompt
-              :event-data {:session-id session-id}
+              :event-data {:session-id session-id
+                           :turn-id turn-id}
               :origin :core})
       (guard {:effect/type :runtime/dispatch-event-with-effect-result
-              :event-type :session/prompt-prepare-request
+              :event-type :session/pre-turn-augment
               :event-data {:session-id session-id
-                           :turn-id (str (java.util.UUID/randomUUID))
+                           :turn-id turn-id
                            :user-msg user-msg}
               :origin :core})])))
 
@@ -81,6 +85,7 @@
    :tool-count          (count (:prepared-request/tools prepared-request))
    :cache-breakpoints   (get-in prepared-request [:prepared-request/session-snapshot :cache-breakpoints])
    :input-expansion     (:prepared-request/input-expansion prepared-request)
+   :augmentation       (:prepared-request/augmentation prepared-request)
    :prepared-at         (now-inst)})
 
 (defn prepared-request-query-text
@@ -138,33 +143,42 @@
     (assoc :return (stopped-workflow-execution-result session-id reason))))
 
 (defn prompt-prepare-request-handler
-  [ctx {:keys [session-id turn-id user-msg runtime-opts progress-queue return-execution-result?]}]
+  [ctx {:keys [session-id turn-id user-msg runtime-opts progress-queue return-execution-result?] :as event-data}]
   (let [session-data (session/get-session-data-in ctx session-id)
-        run-id (:workflow-run-id session-data)]
+        run-id (or (:workflow-run-id event-data)
+                   (:workflow-run-id session-data))]
     (cancellation-entry/with-run-read-lock
       ctx
       run-id
       (fn []
         (if-let [reason (workflow-session-stop-signal ctx session-id)]
           (stopped-workflow-prepare-result session-id return-execution-result? reason)
-          (let [prepared-request   ((:build-prepared-request-fn ctx)
-                                    ctx session-id {:turn-id turn-id
-                                                    :user-message user-msg
-                                                    :runtime-opts runtime-opts
-                                                    :commands (command-registry/command-names-in (:extension-registry ctx))})
-                api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
-                steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
-            (cond-> {:root-state-update
-                     (session/session-update
-                      session-id
-                      #(cond-> (assoc % :last-prepared-request-summary
-                                      (prepared-request-state-summary turn-id prepared-request))
-                         api-key            (assoc :runtime-api-key api-key)
-                         steering-consumed? (assoc :steering-messages [])))
-                     :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
-                     :return-effect-result? true}
-              (not return-execution-result?)
-              (assoc :return {:prepared-request prepared-request}))))))))
+          (do
+            (when turn-id
+              (augmentation-lifecycle/require-turn-state!
+               :session/prompt-prepare-request
+               session-id
+               session-data
+               turn-id
+               #{:turn/augmentation-closed}))
+            (let [prepared-request   ((:build-prepared-request-fn ctx)
+                                      ctx session-id {:turn-id turn-id
+                                                      :user-message user-msg
+                                                      :runtime-opts runtime-opts
+                                                      :commands (command-registry/command-names-in (:extension-registry ctx))})
+                  api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
+                  steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
+              (cond-> {:root-state-update
+                       (session/session-update
+                        session-id
+                        #(cond-> (assoc % :last-prepared-request-summary
+                                        (prepared-request-state-summary turn-id prepared-request))
+                           api-key            (assoc :runtime-api-key api-key)
+                           steering-consumed? (assoc :steering-messages [])))
+                       :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
+                       :return-effect-result? true}
+                (not return-execution-result?)
+                (assoc :return {:prepared-request prepared-request})))))))))
 
 (defn execution-usage-tokens
   [execution-result]
@@ -235,11 +249,16 @@
   (let [turn-id (str (java.util.UUID/randomUUID))
         run-id  (:workflow-run-id (session/get-session-data-in ctx session-id))
         guard   #(with-workflow-guard % run-id)]
-    {:effects [(guard {:effect/type :runtime/prompt-continue-chain
+    {:root-state-update
+     (session/session-update
+      session-id
+      #(assoc-in % [:prompt-turns turn-id]
+                 (augmentation-lifecycle/submitted-turn-lifecycle session-id turn-id run-id)))
+     :effects [(guard {:effect/type :runtime/prompt-continue-chain
                        :execution-result execution-result
                        :progress-queue progress-queue})
                (guard {:effect/type :runtime/dispatch-event-with-effect-result
-                       :event-type :session/prompt-prepare-request
+                       :event-type :session/pre-turn-augment
                        :event-data {:session-id session-id
                                     :turn-id turn-id
                                     :user-msg nil

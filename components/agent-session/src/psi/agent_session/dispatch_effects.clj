@@ -5,8 +5,11 @@
    All back-references to core.clj private helpers are routed through ctx
    keys. This avoids a circular ns dependency between dispatch-effects and core."
   (:require
+   [clojure.string :as str]
    [psi.agent-core.core :as agent]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.message-text :as message-text]
+   [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.agent-session.extensions :as ext]
@@ -313,12 +316,208 @@
            (not (contains? event-data :workflow-run-id)))
       (assoc :workflow-run-id (:workflow-run-id effect)))))
 
+(defn- turn-augmentation-close-effect?
+  [effect]
+  (= :session/close-pre-turn-augmentation (:event-type effect)))
+
+(defn- canceled-turn-augmentation-close-event-data
+  [ctx effect]
+  (let [event-data      (workflow-guarded-event-data effect)
+        session-id      (:session-id event-data)
+        turn-id         (:turn-id event-data)
+        workflow-run-id (:workflow-run-id event-data)
+        session-data    (ss/get-session-data-in ctx session-id)
+        selected        (get-in session-data [:turn-augmentations turn-id :selected-providers] [])]
+    (assoc event-data
+           :close-record (turn-augmentation/canceled-record
+                          session-id
+                          turn-id
+                          workflow-run-id
+                          selected))))
+
+(defn- dispatch-turn-augmentation-close-effect!
+  [ctx effect]
+  (dispatch/dispatch! ctx
+                      (:event-type effect)
+                      (canceled-turn-augmentation-close-event-data ctx effect)
+                      {:origin (or (:origin effect) :core)}))
+
+(defn- dispatch-workflow-guarded-effect!
+  [ctx effect]
+  (dispatch/dispatch! ctx
+                      (:event-type effect)
+                      (workflow-guarded-event-data effect)
+                      {:origin (or (:origin effect) :core)}))
+
 (defmethod execute-effect! :runtime/dispatch-event [ctx effect]
-  (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
+  (cond
+    (not (workflow-effect-stop-signal ctx effect))
+    (dispatch-workflow-guarded-effect! ctx effect)
+
+    (turn-augmentation-close-effect? effect)
+    (dispatch-turn-augmentation-close-effect! ctx effect)))
 (defmethod execute-effect! :runtime/dispatch-event-with-effect-result [ctx effect]
-  (when-not (workflow-effect-stop-signal ctx effect)
-    (dispatch/dispatch! ctx (:event-type effect) (workflow-guarded-event-data effect) {:origin (or (:origin effect) :core)})))
+  (cond
+    (not (workflow-effect-stop-signal ctx effect))
+    (dispatch-workflow-guarded-effect! ctx effect)
+
+    (turn-augmentation-close-effect? effect)
+    (dispatch-turn-augmentation-close-effect! ctx effect)))
+
+(defn- normalize-snippet
+  [text]
+  (let [normalized (-> (or text "")
+                       str
+                       (str/replace #"\s+" " ")
+                       str/trim)]
+    (if (> (count normalized) 200)
+      (subs normalized 0 200)
+      normalized)))
+
+(defn- build-augmentation-history-projection
+  [messages]
+  (let [prior (vec (or messages []))]
+    {:message-count (count prior)
+     :tail (->> prior
+                (map-indexed (fn [idx message]
+                               {:index idx
+                                :role (:role message)
+                                :content-types (mapv :type (:content message))
+                                :snippet (normalize-snippet
+                                          (message-text/content-display-text (:content message)))}))
+                (take-last 8)
+                vec)}))
+
+(defn- first-user-text
+  [user-msg]
+  (some->> (:content user-msg)
+           (filter #(= :text (:type %)))
+           first
+           :text))
+
+(defn- turn-augmentation-projection
+  [ctx effect provider]
+  (let [session-id (:session-id effect)
+        session-data (ss/get-session-data-in ctx session-id)
+        journal (persist/all-entries-in ctx session-id)
+        messages (into []
+                       (keep (fn [entry]
+                               (when (= :message (:kind entry))
+                                 (get-in entry [:data :message]))))
+                       journal)]
+    {:turn-augmentation/turn-id (:turn-id effect)
+     :turn-augmentation/session-id session-id
+     :turn-augmentation/workflow-run-id (:workflow-run-id effect)
+     :turn-augmentation/user-message (:user-msg effect)
+     :turn-augmentation/user-text (first-user-text (:user-msg effect))
+     :turn-augmentation/effective-cwd (:worktree-path session-data)
+     :turn-augmentation/session {:session-id session-id
+                                 :session-name (:session-name session-data)
+                                 :worktree-path (:worktree-path session-data)
+                                 :model (:model session-data)
+                                 :prompt-mode (:prompt-mode session-data)
+                                 :response-mode (:response-mode session-data)
+                                 :context-tokens (:context-tokens session-data)
+                                 :context-window (:context-window session-data)}
+     :turn-augmentation/history (build-augmentation-history-projection messages)
+     :turn-augmentation/provider (select-keys provider [:extension-id :augmenter-id])}))
+
+(defn- current-turn-augmenter-by-key
+  [ctx provider]
+  (some (fn [entry]
+          (when (and (= (:extension-id provider) (:extension-id entry))
+                     (= (:augmenter-id provider) (:augmenter-id entry)))
+            entry))
+        (ext/turn-augmenters-in (:extension-registry ctx))))
+
+(defn- current-turn-augmenter
+  [ctx provider]
+  (when-let [entry (current-turn-augmenter-by-key ctx provider)]
+    (when (= (:registration-token provider) (:registration-token entry))
+      entry)))
+
+(defn- extension-session-capability-available?
+  [session-data extension-id capability]
+  (contains? (set (get-in session-data
+                          [:available-extension-capabilities :extensions extension-id]))
+             capability))
+
+(defn- turn-augmentation-authorized?
+  [ctx effect provider]
+  (let [reg (:extension-registry ctx)
+        session-data (ss/get-session-data-in ctx (:session-id effect))]
+    (and (contains? (ext/effective-permissions-in reg (:extension-id provider))
+                    turn-augmentation/turn-augmentation-capability)
+         (extension-session-capability-available?
+          session-data
+          (:extension-id provider)
+          turn-augmentation/turn-augmentation-capability))))
+
+(defn- provider-not-current-result
+  [ctx effect provider]
+  (if (turn-augmentation-authorized? ctx effect provider)
+    (turn-augmentation/provider-stale provider)
+    (turn-augmentation/provider-unauthorized provider)))
+
+(defn- invoke-turn-augmentation-provider
+  [ctx effect provider]
+  (if-let [entry (when (turn-augmentation-authorized? ctx effect provider)
+                   (current-turn-augmenter ctx provider))]
+    (try
+      (let [result ((:handler entry) (turn-augmentation-projection ctx effect provider))
+            envelope (if (instance? clojure.lang.IDeref result) @result result)]
+        (if (and (current-turn-augmenter ctx provider)
+                 (turn-augmentation-authorized? ctx effect provider))
+          (turn-augmentation/provider-result->accepted provider envelope)
+          (provider-not-current-result ctx effect provider)))
+      (catch Throwable _
+        (turn-augmentation/provider-failed provider :handler-exception)))
+    (provider-not-current-result ctx effect provider)))
+
+(defn- turn-augmentation-close-record
+  [ctx effect]
+  (if (workflow-effect-stop-signal ctx effect)
+    (turn-augmentation/canceled-record
+     (:session-id effect)
+     (:turn-id effect)
+     (:workflow-run-id effect)
+     (:selected-providers effect))
+    (let [provider-results (loop [remaining (seq (:selected-providers effect))
+                                  results []]
+                             (if-not remaining
+                               results
+                               (if (workflow-effect-stop-signal ctx effect)
+                                 (into results (map turn-augmentation/provider-canceled) remaining)
+                                 (recur (next remaining)
+                                        (conj results
+                                              (invoke-turn-augmentation-provider
+                                               ctx
+                                               effect
+                                               (first remaining)))))))]
+      (if (workflow-effect-stop-signal ctx effect)
+        (turn-augmentation/canceled-record
+         (:session-id effect)
+         (:turn-id effect)
+         (:workflow-run-id effect)
+         (:selected-providers effect))
+        (turn-augmentation/terminal-record
+         (:session-id effect)
+         (:turn-id effect)
+         (:workflow-run-id effect)
+         provider-results)))))
+
+(defmethod execute-effect! :runtime/turn-augmentation-invoke
+  [ctx effect]
+  (let [close-record (turn-augmentation-close-record ctx effect)]
+    (dispatch/dispatch!
+     ctx
+     :session/close-pre-turn-augmentation
+     (assoc (or (:prepare-event-data effect) {})
+            :session-id (:session-id effect)
+            :turn-id (:turn-id effect)
+            :workflow-run-id (:workflow-run-id effect)
+            :close-record close-record)
+     {:origin :core})))
 
 (defmethod execute-effect! :runtime/mark-workflow-jobs-terminal [ctx effect]
   (when-not (workflow-effect-stop-signal ctx effect)

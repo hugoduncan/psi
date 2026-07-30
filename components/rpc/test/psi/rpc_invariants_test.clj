@@ -21,6 +21,7 @@
       (is (contains? @state :workers))
       (is (= err (rpc.state/err-writer state)))
       (is (= "s1" (rpc.state/focus-session-id state)))
+      (is (= "s1" (rpc.state/default-session-id state)))
       (is (= #{} (rpc.state/subscribed-topics state)))
       (is (= {} (rpc.state/pending state)))
       (is (= 3 (rpc.state/max-pending-requests state)))
@@ -65,6 +66,16 @@
       (is (= {"dup" "existing-op"} (get-in @state [:transport :pending])))
       (is (= "nested-session" (get-in @state [:connection :focus-session-id])))
       (is (= [worker] (get-in @state [:workers :inflight-futures]))))))
+
+(deftest rpc-state-default-session-id-preserved-across-initialize-test
+  (testing "make-rpc-state seeds :default-session-id; initialize-transport-state! does not clobber it"
+    (let [err   (java.io.StringWriter.)
+          state (rpc.state/make-rpc-state {:session-id "s1" :err err})]
+      (is (= "s1" (rpc.state/default-session-id state)))
+      (rpc.state/set-focus-session-id! state "s2")
+      (rpc.state/initialize-transport-state! state err)
+      (is (= "s1" (rpc.state/default-session-id state)))
+      (is (= "s2" (rpc.state/focus-session-id state))))))
 
 (deftest rpc-handshake-uses-explicit-transport-deps-invariant-test
   (testing "handshake server-info comes from explicit transport deps, not mutable state magic"

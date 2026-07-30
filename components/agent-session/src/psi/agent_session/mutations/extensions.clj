@@ -69,6 +69,20 @@
     {:psi.extension/path           ext-path
      :psi.extension/allowed-events (vec (sort allowed-set))}))
 
+(pco/defmutation register-turn-augmenter
+  "Register an extension-owned turn augmenter into the extension registry."
+  [_ {:keys [psi/agent-session-ctx ext-path registration]}]
+  {::pco/op-name 'psi.extension/register-turn-augmenter
+   ::pco/params  [:psi/agent-session-ctx :ext-path :registration]
+   ::pco/output  [:psi.extension/path
+                  :psi.extension.turn-augmentation/registered?
+                  :psi.extension.turn-augmentation/augmenter-id]}
+  (let [reg    (:extension-registry agent-session-ctx)
+        result (ext/register-turn-augmenter-in! reg ext-path registration)]
+    {:psi.extension/path ext-path
+     :psi.extension.turn-augmentation/registered? (:registered? result)
+     :psi.extension.turn-augmentation/augmenter-id (:augmenter-id result)}))
+
 (pco/defmutation register-shortcut
   "Register an extension-owned keyboard shortcut into the extension registry."
   [_ {:keys [psi/agent-session-ctx ext-path key opts]}]
@@ -178,6 +192,7 @@
    register-handler
    register-flag
    set-allowed-events
+   register-turn-augmenter
    register-shortcut
    add-extension
    notify

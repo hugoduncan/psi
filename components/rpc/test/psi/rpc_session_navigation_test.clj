@@ -185,6 +185,79 @@
              (get-in (some #(when (= "session/rehydrated" (:event %)) %) events)
                      [:data :messages])))))
 
+  (testing "command /resume <path> emits the trailing snapshot stamped with the newly-focused session"
+    ;; Pins the load-bearing handle-command! trailing-snapshot fix
+    ;; (commands.clj: (or (focus-session-id state) session-id)) for the /resume
+    ;; focus-switch path. Subscribing to session/updated + footer/updated forces
+    ;; the trailing snapshot to pass the focus gate only if it is stamped with
+    ;; the POST-command focus (the resumed session). A regression to the bare
+    ;; pre-command session-id would gate the snapshot out and fail these asserts.
+    (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-resume-snap-" (java.util.UUID/randomUUID))
+          _                   (.mkdirs (java.io.File. cwd))
+          [ctx _]             (support/create-session-context {:cwd cwd :persist? true :session-root cwd})
+          sd1                 (session/new-session-in! ctx nil {})
+          resumed-sid         (:session-id sd1)
+          path1               (:session-file sd1)
+          _                   (journal-store/flush-journal! (java.io.File. path1)
+                                                            resumed-sid
+                                                            cwd
+                                                            nil
+                                                            nil
+                                                            [(persist/message-entry {:role "assistant" :content [{:type :text :text "resumed"}]})])
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:subscribed-topics #{"session/resumed" "session/rehydrated"
+                                                                       "session/updated" "footer/updated"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/resume " path1 "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          events              (filter #(= :event (:kind %)) frames)
+          session-updated     (some #(when (= "session/updated" (:event %)) %) events)
+          footer-updated      (some #(when (= "footer/updated" (:event %)) %) events)]
+      (is (some? session-updated)
+          "trailing session/updated snapshot must be emitted after /resume focus switch")
+      (is (= resumed-sid (get-in session-updated [:data :session-id]))
+          "trailing session/updated snapshot must be stamped with the newly-focused (resumed) session")
+      (is (some? footer-updated)
+          "trailing footer/updated snapshot must be emitted after /resume focus switch")
+      (is (= resumed-sid (get-in footer-updated [:data :session-id]))
+          "trailing footer/updated snapshot must be stamped with the newly-focused (resumed) session")))
+
+  (testing "command /tree <prefix> emits the trailing snapshot stamped with the newly-focused session"
+    ;; Companion to the /resume case: pins the same L160 fix for the /tree
+    ;; focus-switch path. The pre-existing /tree <prefix> test does not
+    ;; subscribe to session/updated or footer/updated, so a regression of the
+    ;; trailing snapshot to the stale pre-command session-id would go
+    ;; undetected there. Here the snapshot must be stamped with the switched-to
+    ;; child session to pass the focus gate.
+    (let [[ctx session-id]    (support/create-session-context {:persist? false})
+          child-id            (:session-id (session/new-session-in! ctx session-id {}))
+          prefix              (subs child-id 0 8)
+          _                   (ss/append-journal-entry-in! ctx child-id
+                                                           (persist/message-entry {:role "assistant"
+                                                                                   :content [{:type :text :text "child"}]}))
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"session/resumed" "session/rehydrated"
+                                                                       "session/updated" "footer/updated"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/tree " prefix "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          events              (filter #(= :event (:kind %)) frames)
+          session-updated     (some #(when (= "session/updated" (:event %)) %) events)
+          footer-updated      (some #(when (= "footer/updated" (:event %)) %) events)]
+      (is (some? session-updated)
+          "trailing session/updated snapshot must be emitted after /tree focus switch")
+      (is (= child-id (get-in session-updated [:data :session-id]))
+          "trailing session/updated snapshot must be stamped with the newly-focused (child) session")
+      (is (some? footer-updated)
+          "trailing footer/updated snapshot must be emitted after /tree focus switch")
+      (is (= child-id (get-in footer-updated [:data :session-id]))
+          "trailing footer/updated snapshot must be stamped with the newly-focused (child) session")))
+
   (testing "command /tree <session-id> emits session/resumed and session/rehydrated canonical events"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-tree-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))

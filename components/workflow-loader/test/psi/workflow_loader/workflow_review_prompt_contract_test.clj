@@ -28,7 +28,7 @@
       (doseq [needle ["first turn of the shared `design-review` multi-prompt session"
                       "Read the task's design.md"
                       "AGENTS.md"
-                      "META.md"
+                      "ramora/META.md"
                       "doc/architecture.md"
                       "loads the task design and architecture context"]]
         (is (.contains architecture needle) needle))

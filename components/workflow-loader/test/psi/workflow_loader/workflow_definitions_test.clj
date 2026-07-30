@@ -88,10 +88,10 @@
 (defn- assert-design-core-shape
   [definitions workflow-name]
   (let [steps (get-in definitions [workflow-name :steps])]
-    (is (= 3 (count steps)))
-    (is (= ["design-review" "design-follow-up" "status-not-converged"]
+    (is (= 4 (count steps)))
+    (is (= ["design-review" "design-follow-up" "status-converged" "status-not-converged"]
            (mapv :name steps)))
-    (is (= [:session :session :session]
+    (is (= [:session :session :session :session]
            (mapv :type steps)))
     (let [step-by-name (into {} (map (juxt :name identity) steps))
           design-review (get step-by-name "design-review")
@@ -99,7 +99,7 @@
       (is (= ["read" "bash" "edit" "write"] (:tools design-review)))
       (is (= ["work-independently" "review-task-architecture" "task-design"]
              (:skills design-review)))
-      (is (= ["architecture" "ambiguity" "inconsistency"]
+      (is (= ["architecture" "ambiguity" "inconsistency" "record-notes"]
              (mapv :name (:prompts design-review))))
       (is (= {:type :invoke
               :operation "workflow/pass-feedback-routing"
@@ -114,7 +114,7 @@
                                                  :output :final-llm-reply}}}}
              (:judge design-review)))
       (is (= {"REPEAT" {:goto "design-follow-up"}
-              "DONE" {:goto :done}}
+              "DONE" {:goto "status-converged"}}
              (:on design-review)))
       (is (= (constant-routing-judge "DONE") (:judge design-follow-up)))
       (is (= {"DONE" {:goto "design-review"
@@ -132,6 +132,7 @@
    ["review-task-design-architecture-review.md"
     "review-task-design-ambiguity-review.md"
     "review-task-design-inconsistency-review.md"
+    "review-task-note-info.md"
     "review-follow-up-design.md"]
    (fn [{:keys [definitions errors]}]
      (is (empty? errors))
@@ -147,26 +148,30 @@
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
-           core-step (get step-by-name "review-task-design-core")
+           core-step (get step-by-name "run-review-task-design-core")
+           status-step (get step-by-name "check-review-task-design-core-status")
            final-step (get step-by-name "final-summary")
            not-converged-step (get step-by-name "final-summary-not-converged")]
-       (is (= ["review-task-design-core" "final-summary-not-converged" "final-summary"]
+       (is (= ["run-review-task-design-core"
+               "check-review-task-design-core-status"
+               "final-summary-not-converged"
+               "final-summary"]
               (mapv :name steps)))
-       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= [:delegate :invoke :session :session] (mapv :type steps)))
        (is (= "review-task-design-core" (:target core-step)))
        (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
               (:prompt-string core-step)))
        (is (= {:type :invoke
                :operation "workflow/pass-status-routing"
-               :args {:text {:from {:step "review-task-design-core" :yield :text}}
+               :args {:text {:from {:step "run-review-task-design-core" :yield :text}}
                       :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-              (:judge core-step)))
+              (:judge status-step)))
        (is (= {"DONE" {:goto "final-summary"}
                "REPEAT" {:goto "final-summary-not-converged"}}
-              (:on core-step)))
+              (:on status-step)))
        (assert-review-summary-handback
         final-step not-converged-step
-        [{:step "review-task-design-core" :yield :text}])))))
+        [{:step "run-review-task-design-core" :yield :text}])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
@@ -177,13 +182,13 @@
         step-by-name (into {} (map (juxt :name identity) steps))
         plan-review (get step-by-name "plan-review")
         plan-follow-up (get step-by-name "plan-follow-up")]
-    (is (= ["plan-review" "plan-follow-up" "status-not-converged"]
+    (is (= ["plan-review" "plan-follow-up" "status-converged" "status-not-converged"]
            (mapv :name steps)))
-    (is (= [:session :session :session]
+    (is (= [:session :session :session :session]
            (mapv :type steps)))
     (is (= ["read" "bash" "edit" "write"] (:tools plan-review)))
     (is (= ["work-independently" "task-design"] (:skills plan-review)))
-    (is (= ["ambiguity" "inconsistency"] (mapv :name (:prompts plan-review))))
+    (is (= ["ambiguity" "inconsistency" "record-notes"] (mapv :name (:prompts plan-review))))
     (is (= {:type :invoke
             :operation "workflow/pass-feedback-routing"
             :args {:ambiguity-text {:from {:step "plan-review"
@@ -194,7 +199,7 @@
                                                :output :final-llm-reply}}}}
            (:judge plan-review)))
     (is (= {"REPEAT" {:goto "plan-follow-up"}
-            "DONE" {:goto :done}}
+            "DONE" {:goto "status-converged"}}
            (:on plan-review)))
     (is (= (constant-routing-judge "DONE") (:judge plan-follow-up)))
     (is (= {"DONE" {:goto "plan-review"
@@ -202,7 +207,7 @@
                     :on-max-iterations "status-not-converged"}}
            (:on plan-follow-up)))
     (let [text (step-template-text plan-follow-up)]
-      (is (.contains text "design-steps.md"))
+      (is (not (.contains text "design-steps.md")))
       (is (.contains text "plan.md"))
       (is (.contains text "steps.md")))))
 
@@ -211,6 +216,7 @@
    "review-task-plan-core.edn"
    ["review-task-plan-ambiguity-review.md"
     "review-task-plan-inconsistency-review.md"
+    "review-task-note-info.md"
     "review-follow-up-plan.md"]
    (fn [{:keys [definitions errors]}]
      (is (empty? errors))
@@ -226,26 +232,30 @@
        (is (contains? definitions "review-task-plan")))
      (let [steps (get-in definitions ["review-task-plan" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
-           core-step (get step-by-name "review-task-plan-core")
+           core-step (get step-by-name "run-review-task-plan-core")
+           status-step (get step-by-name "check-review-task-plan-core-status")
            final-step (get step-by-name "final-summary")
            not-converged-step (get step-by-name "final-summary-not-converged")]
-       (is (= ["review-task-plan-core" "final-summary-not-converged" "final-summary"]
+       (is (= ["run-review-task-plan-core"
+               "check-review-task-plan-core-status"
+               "final-summary-not-converged"
+               "final-summary"]
               (mapv :name steps)))
-       (is (= [:delegate :session :session] (mapv :type steps)))
+       (is (= [:delegate :invoke :session :session] (mapv :type steps)))
        (is (= "review-task-plan-core" (:target core-step)))
        (is (= {:type :map :fields {:input {:from :workflow-input :path [:input]}}}
               (:prompt-string core-step)))
        (is (= {:type :invoke
                :operation "workflow/pass-status-routing"
-               :args {:text {:from {:step "review-task-plan-core" :yield :text}}
+               :args {:text {:from {:step "run-review-task-plan-core" :yield :text}}
                       :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-              (:judge core-step)))
+              (:judge status-step)))
        (is (= {"DONE" {:goto "final-summary"}
                "REPEAT" {:goto "final-summary-not-converged"}}
-              (:on core-step)))
+              (:on status-step)))
        (assert-review-summary-handback
         final-step not-converged-step
-        [{:step "review-task-plan-core" :yield :text}])))))
+        [{:step "run-review-task-plan-core" :yield :text}])))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets
@@ -260,12 +270,26 @@
                       "review-follow-up-design.md"]]
       (let [content (slurp-workflow-file filename)]
         (is (.contains content "design-steps.md") filename))))
-  (testing "plan review prompts also target the shared design-steps.md (#177)"
+  (testing "plan review prompts target design-steps.md while plan follow-up owns steps.md"
     (doseq [filename ["review-task-plan-ambiguity-review.md"
-                      "review-task-plan-inconsistency-review.md"
-                      "review-follow-up-plan.md"]]
+                      "review-task-plan-inconsistency-review.md"]]
       (let [content (slurp-workflow-file filename)]
-        (is (.contains content "design-steps.md") filename))))
+        (is (.contains content "design-steps.md") filename)))
+    (let [content (slurp-workflow-file "review-follow-up-plan.md")]
+      (is (.contains content "steps.md") "review-follow-up-plan.md")
+      (is (not (.contains content "design-steps.md"))
+          "review-follow-up-plan.md must not target design-steps.md")))
+  (testing "design and plan review prompts capture useful future-step implementation notes"
+    (doseq [filename ["review-task-design-architecture-review.md"
+                      "review-task-design-ambiguity-review.md"
+                      "review-task-design-inconsistency-review.md"
+                      "review-task-plan-ambiguity-review.md"
+                      "review-task-plan-inconsistency-review.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "Implementation notes for future task steps") filename)
+        (is (.contains content "What would the next task-lifecycle step, implementation slice, or review need to know") filename)
+        (is (.contains content "Append useful discoveries to `implementation.md`") filename)
+        (is (.contains content "avoid duplicating information already obvious") filename))))
   (testing "the shared steps follow-up profile still owns steps.md"
     (let [content (slurp-workflow-file "review-follow-up-steps.md")]
       (is (re-find #"(^|[^-])steps\.md" content))
@@ -388,6 +412,9 @@
          (is (= 2 (count steps)))
          (is (= ["review" "follow-up"] (mapv :name steps)))
          (is (= [:session :session] (mapv :type steps))))
+       (testing "review-step actor sessions disable thinking so PASS_STATUS is not starved"
+         (is (= :off (:thinking-level review-step)))
+         (is (= :off (:thinking-level follow-up-step))))
        (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
@@ -529,6 +556,82 @@
               (is (contains? definitions "review-task-plan"))
               (is (contains? definitions "review-task-implementation"))
               (is (contains? definitions "review-implementation-in-worktree"))))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; entity-resolution
+
+(deftest entity-resolution-test
+  (load-edn-only
+   "entity-resolution.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone resolver workflow without error"
+       (is (empty? errors))
+       (is (contains? definitions "entity-resolution")))
+     (let [steps (get-in definitions ["entity-resolution" :steps])
+           step (first steps)
+           text (step-template-text step)]
+       (testing "is one session step using the entity-resolution skill"
+         (is (= 1 (count steps)))
+         (is (= [:session] (mapv :type steps)))
+         (is (= "resolve-entities" (:name step)))
+         (is (= ["read" "bash"] (:tools step)))
+         (is (= ["entity-resolution"] (:skills step))))
+       (testing "wires the caller input into the prompt"
+         (is (some (fn [contribution]
+                     (and (= :template (:type contribution))
+                          (= {:from :workflow-input}
+                             (get-in contribution [:vars "input"]))))
+                   (:contributions step))))
+       (testing "locks the evidence-backed resolution contract"
+         (doseq [needle ["Use the entity-resolution skill"
+                         "do not silently guess paths or entities"
+                         "Surface, Canonical, Type, Evidence, Confidence"
+                         "ask the smallest focused clarification question"]]
+           (is (.contains text needle) needle)))))))
+
+;;; ---------------------------------------------------------------------------
+;;; resolve-task-design-entities
+
+(deftest resolve-task-design-entities-test
+  (load-edn-with-md-refs
+   "resolve-task-design-entities.edn"
+   ["resolve-task-design-entities-resolve.md"]
+   (fn [{:keys [definitions errors]}]
+     (testing "loads standalone task-design entity resolver workflow without error"
+       (is (empty? errors))
+       (is (contains? definitions "resolve-task-design-entities")))
+     (let [steps (get-in definitions ["resolve-task-design-entities" :steps])
+           step (first steps)
+           text (step-template-text step)]
+       (testing "is one lifecycle-ready session step using entity-resolution"
+         (is (= 1 (count steps)))
+         (is (= [:session] (mapv :type steps)))
+         (is (= "resolve-design-entities" (:name step)))
+         (is (= ["read" "bash" "edit" "write"] (:tools step)))
+         (is (= ["entity-resolution"] (:skills step))))
+       (testing "wires task input from the extracted prompt workflow"
+         (is (step-has-input-var-wired? step)))
+       (testing "locks task-reference normalization and design-only update boundary"
+         (doseq [needle ["Accept exactly one of: `NNN-slug`, `munera/open/NNN-slug`, or `munera/closed/NNN-slug`"
+                         "Read task artifacts"
+                         "Always read the resolved task's `design.md`"
+                         "Update `design.md` only when the mapping is unambiguous"
+                         "redesign the task"
+                         "Do not silently guess project paths or entities"]]
+           (is (.contains text needle) needle)))
+       (testing "locks future-step implementation notes and lifecycle-compatible outcomes"
+         (doseq [needle ["Update `implementation.md` with useful discoveries for future task steps"
+                         "What would the next task-lifecycle step"
+                         "Append a minimalist entry to `implementation.md`"
+                         "Avoid duplicating information already obvious"]]
+           (is (.contains text needle) needle)))
+       (testing "locks isolated commit behavior"
+         (doseq [needle ["PASS_STATUS: REVIEW_COMPLETE"
+                         "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                         "Stage only the resolved task's `design.md`, `implementation.md`"
+                         "Never use `git add .` or `git add -A`"
+                         "task-lifecycle step"]]
+           (is (.contains text needle) needle)))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; extract-task-knowledge

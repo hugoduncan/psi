@@ -1,0 +1,9 @@
+{:steps
+ [{:name "run",
+   :type :session,
+   :contributions
+   [{:type :template,
+     :text "{{input}}",
+     :vars {"input" {:from :workflow-input}}}]}],
+ :name "sub-agent",
+ :description "Use the workflow input directly as the delegated prompt"}

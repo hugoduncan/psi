@@ -8,6 +8,9 @@
   {:id "file-lengths"
    :cmd ["bb" "commit-check:file-lengths"]
    :timeout-ms 20000}
+  {:id "ramora-word-limit"
+   :cmd ["bb" "commit-check:ramora-word-limit"]
+   :timeout-ms 20000}
   {:id "dispatch-architecture"
    :cmd ["bb" "commit-check:dispatch-architecture"]
    :timeout-ms 20000}]}

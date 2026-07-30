@@ -1,0 +1,506 @@
+# Design steps — architectural fit follow-ups
+
+## Current scope override — user requirement change
+
+User changed task 238's requirements after the prior design-review loop:
+remove any need for new read-only tools and grant the helper session access to
+the existing `bash` tool instead. The current authoritative design is
+`design.md` after this change: no directory-list/content-grep/read-only toolset
+is added, no git-aware search tool is added, and no model-selection
+tool-calling fact/criterion is added. Earlier checked review items remain as
+historical context for the old read/list/grep-only design and are superseded
+where they conflict with this scope override.
+
+- [x] `psi.ai.model-selection` / the model registry (`components/ai/src/psi/ai/model_selection.clj`,
+  `psi.ai.models` / `psi.ai.user_models`) exposes only `:supports-text`,
+  `:supports-images`, `:supports-reasoning`, `:locality`, `:context-window`,
+  `:max-tokens`, and cost/latency-tier facts — there is no tool-calling /
+  function-calling capability fact or selection criterion. This design's
+  helper session is fundamentally **tool-using** (it must call the read-only
+  search toolset to gather filesystem/git evidence), unlike
+  `auto-session-name`'s toolless single-shot completion, which is the pattern
+  the design cites for model selection ("exactly like `auto-session-name`").
+  Reusing that pattern verbatim does not guarantee the selected local model
+  can actually invoke tools, so the augmenter could silently select a
+  non-tool-calling local model and always fall through to a confidence-gated
+  `:no-op` without any diagnostic distinguishing "no local model available"
+  from "local model available but cannot use tools." Add a tool-calling
+  capability fact/criterion to `psi.ai.model-selection`/the model registry (or
+  otherwise ensure helper-model selection filters on tool-calling support)
+  before or as part of implementing this task.
+
+- [x] Ambiguous: the design does not specify (a) how the `entity-resolution`
+  skill's method is delivered to the helper session's prompt, or (b) the
+  output contract the helper model must produce and how the augmenter derives
+  `:success`/`:no-op` and the rendered `:content` from it. On (a): psi's
+  existing skill-invocation path (`psi.prompt-assets.skills/invoke-skill`,
+  wired through `prompt_request.clj`) expands a skill only on
+  matching/explicit invocation text in the *user's own message* — it is not
+  "the model reads `SKILL.md` because it judged it relevant," and the
+  original user text driving this turn was never authored to invoke
+  `entity-resolution`. So `create-child-session`'s `:skill-names` option
+  cannot be relied on to deterministically apply the skill's method to the
+  helper session; the augmenter's own constructed helper system/user prompt
+  must carry the method directly (verbatim skill content, a generated
+  excerpt, or a hand-written paraphrase — undecided). This choice affects
+  drift risk (a hand-written paraphrase can silently diverge from
+  `.psi/skills/entity-resolution/SKILL.md`) and is exactly the kind of
+  per-turn skill-application problem this task's Why section says it exists
+  to remove, so it should not be left to implementation-time improvisation.
+  On (b): the design says the helper model produces a `surface → canonical →
+  evidence → confidence` mapping "restricted to sufficiently-unambiguous
+  entries," and that the augmenter returns `:success` "when at least one
+  confident mapping exists" — but not whether the model must emit a
+  structured/parseable format the augmenter validates, or whether the
+  model's raw text response becomes `:append-context-block`'s `:content`
+  verbatim whenever non-empty/non-sentinel. Pin down the prompt-delivery
+  mechanism and the expected helper-model output contract before/while
+  implementing, since both affect testability of the confident-mapping vs.
+  ambiguous-dropped vs. no-referring-expression acceptance-criteria cases.
+
+- [x] Inconsistent: the Goal section frames both reused mechanisms as
+  "already-shipped," specifically citing "the local-model helper-session
+  pattern from `extensions/auto-session-name` (model selection ...,
+  `create-child-session` + `run-agent-loop-in-session`, and
+  `helper-session-ids` recursion avoidance)." But the pattern this task
+  actually needs — a helper session that calls a read-only search toolset to
+  gather evidence — is not what's shipped: `auto-session-name`'s helper
+  session runs with `:tool-ids []` (no tools at all; a toolless single-shot
+  title-inference completion). The "minimal read-only search toolset (file
+  read + directory list + content grep)" required by Required behaviour
+  item 3 / Resolved decision 2 / Constraints is new work — today only a
+  single-file `read` tool exists without `bash`
+  (`make-read-only-tools-with-cwd` in
+  `components/agent-session/src/psi/agent_session/tools.clj`), with no
+  directory-list or grep tool. Reconcile the Goal's "already-shipped" framing
+  with the fact that the tool-enabled evidence-gathering half of the pattern
+  is new, so a later reader/implementer doesn't under-scope the toolset work
+  based on the Goal section alone.
+
+- [x] Inconsistent: the "no-op" requirement list and the "Tests" list in
+  Acceptance criteria don't match. The no-op requirement says: "The augmenter
+  returns a well-formed `:no-op` (no operations) for: tracked helper
+  sessions, blank effective-cwd, prompts with no detectable referring
+  expression, no confident mapping, and **failed/empty helper runs**." The verbatim
+  "Tests (Scry-first) cover" list immediately below enumerates: confident
+  single mapping → success block; no referring expression → no-op;
+  helper-session recursion no-op; blank cwd no-op; no-local-model → no-op;
+  ambiguous reference dropped; and replay reuse — with **no test for
+  failed/empty helper runs → no-op**, even though that scenario is a
+  distinct code path (helper-session-run failure/empty result handling, not
+  mapping-confidence filtering) called out one paragraph earlier. Add a
+  failed/empty-helper-run → no-op test to the Tests list, or state why it's
+  not needed.
+
+- [x] Ambiguous: "embeds the `entity-resolution` skill's method directly ...
+  (verbatim `.psi/skills/entity-resolution/SKILL.md` content, included as
+  part of the helper system/user prompt the augmenter builds)" (Resolved
+  decision 6) does not say whether the *whole file* is embedded verbatim or
+  only its "Method" steps (1–5). This matters because the skill file's own
+  "Output Shape" section prescribes a markdown table plus prose "final
+  response" framing ("Interpreting 'that workflow' as ... because..."), and
+  its "Act or ask" step (6) explicitly instructs: "If multiple candidates
+  remain plausible, ask a focused clarification question... If no candidate
+  is evidenced, say what was searched and ask for the missing identifier" —
+  both directly conflicting with the augmenter's required non-interactive,
+  parse-only-a-fixed-line-format output contract (also decision 6), and with
+  237's "no interactive pre-turn prompts" exclusion. Two different
+  interpretations of "embeds ... directly" lead to different prompt
+  construction: (a) embed the full file verbatim and rely on the model
+  reconciling the conflicting output instructions unaided (any "question" or
+  table output the model produces is silently discarded as
+  non-matching-format commentary, per decision 6's "discards everything
+  else"), or (b) embed only the reasoning-method portion and have the
+  augmenter's own prompt separately state the required output contract,
+  omitting/overriding the skill's own Output Shape and Act-or-ask framing.
+  Pin down which is intended (or state that (a) is acceptable because
+  mismatched output is already a no-op via decision 6's zero-parsed-lines
+  rule) so the helper-prompt-construction step isn't improvised.
+
+- [x] Ambiguous: "Remaining v1 policies" says the eligibility pre-filter
+  should "skip slash-command-only prompts, mirroring `auto-session-name`'s
+  guards, before spending a helper run." `auto-session-name`'s actual guard
+  (`slash-command-text?` in `extensions/auto_session_name.clj`) only filters
+  individual conversation *lines* out of its rename-inference excerpt; it
+  does not skip its own checkpoint/helper run when the *current* turn is a
+  slash command (checkpoint firing is gated only by `checkpoint-due?`,
+  independent of message content). So "mirroring auto-session-name's guards"
+  does not name an existing whole-run-skip mechanism to copy, leaving the
+  exact detection rule for a *turn-level* slash-command-only skip
+  unspecified (e.g., is it "trimmed user text starts with `/`", matching
+  `slash-command-text?`'s definition, applied at a different granularity than
+  its current use?). This eligibility condition is also absent from Required
+  behaviour item 5's no-op enumeration, the Acceptance criteria no-op list,
+  and the Tests list, so it's unclear whether it needs its own diagnosable
+  no-op reason/test or is expected to collapse into an existing one. Specify
+  the exact slash-command-only detection rule and where it fits among the
+  enumerated no-op reasons/tests.
+
+- [x] Inconsistent: design.md states the composition of the final rendered
+  `:append-context-block` `:content` differently in three places, and these
+  were not reconciled when Resolved decision 6 was added. Acceptance
+  criteria says the block carries "the `surface → canonical` mapping" (2
+  fields: no evidence, no confidence). "Remaining v1 policies" ("Confidence
+  gate & output shape") says rendered `:content` "is a compact `surface →
+  canonical` list with brief evidence" (3 fields: adds evidence, still no
+  confidence). Resolved decision 6 defines the *parsed per-line* format as
+  `surface → canonical (evidence; confidence)` (4 fields, including
+  confidence) and says `:content` "is re-rendered from the parsed confident
+  mappings" — without stating whether the rendered output keeps all 4
+  parsed fields or drops confidence (since confidence's only stated role
+  elsewhere is as the accept/reject gate, not display). A reader cannot tell
+  from design.md alone whether the shipped `:content` shows 2, 3, or 4
+  fields per mapping. Pick one composition and align Acceptance criteria,
+  "Remaining v1 policies," and Resolved decision 6 to state it the same way.
+
+- [x] Ambiguous: Resolved decision 6 embeds the `entity-resolution` skill's
+  Method section (steps 1–5) **verbatim** into the helper prompt, but those
+  verbatim steps explicitly instruct evidence-gathering via commands/capabilities
+  that the helper's toolset (Resolved decision 4) does not provide. Step 1
+  says to check "current git status"; step 3 says to "Search authoritative
+  project surfaces when not obvious: `git ls-files` / `find` for paths.
+  `git grep` for terms, vars, namespaces, workflow ids, commands, and docs.
+  Psi graph introspection for runtime/session entities when applicable."
+  The helper session's actual toolset per decision 4 is only file read +
+  directory list + content grep — no bash/git-command execution tool and no
+  EQL/psi-graph introspection tool. Design.md does not say whether (a) the
+  Method text is embedded exactly as written, leaving the model to figure
+  out on its own that it must substitute its available read/list/grep tools
+  for the named git/find/graph-introspection commands (risking failed
+  tool-call attempts against nonexistent tools, burning part of the
+  blocking, no-deadline pre-turn budget from Resolved decision 3), or (b)
+  the augmenter's prompt-construction step must adapt/annotate the embedded
+  Method text so its evidence-gathering instructions name only the tools
+  actually available to the helper session. This affects both correct
+  prompt construction and the testability of the "confident mapping via
+  gathered evidence" acceptance scenario. Pin down whether the embedded
+  Method text is used exactly as authored in `SKILL.md` or is adapted to
+  reference only the helper's actually-available read-only tool names.
+
+- [x] Ambiguous: Resolved decision 6's adaptation policy says the
+  augmenter's prompt-construction step "rewords those references to name
+  only the helper's actually-available read-only capabilities (read a file,
+  list a directory, grep file contents)" for every Method sub-step that
+  names a tool the helper toolset lacks. That rewording works cleanly for
+  two of the four flagged references — `git ls-files`/`find` (step 3) has a
+  natural directory-list substitute, and `git grep` (step 3) has a natural
+  content-grep substitute — but not for the other two: step 1's "current
+  git status" and step 3's "Psi graph introspection for runtime/session
+  entities" name capabilities with **no** read/list/grep equivalent at all
+  (working-tree change state and runtime/session-graph queries are not
+  obtainable by reading a file, listing a directory, or grepping content,
+  no matter how the instruction is worded). Design.md doesn't say what
+  "adapted" means for this unmappable subset: (a) drop that specific
+  sub-instruction from the embedded text entirely (since no available tool
+  can fulfill it), (b) reword it anyway to point at read/list/grep even
+  though doing so cannot actually satisfy the original instruction's intent
+  (e.g., telling the model to "list the directory" in place of "check git
+  status" doesn't tell it anything about uncommitted changes), or (c) leave
+  it worded as a capability gap the model should treat as unavailable
+  evidence and reason around. This matters because step 1's git-status
+  reference is explicitly tied to "path or task references," which are
+  squarely within this augmenter's in-scope entity types (per the Goal
+  section's "paths, tasks, ..." list) — so the gap isn't hypothetical, it's
+  a real evidence source the Method text currently implies is available
+  when it structurally is not, given decision 4's frozen toolset. Pin down
+  which of (a)/(b)/(c) the adaptation intends for the git-status and
+  graph-introspection sub-references specifically, not just for the two
+  substitutable ones.
+
+- [x] Ambiguous: Resolved decision 6's capability-gap statement (added by
+  `b37363b71` to resolve the previous unmappable-sub-reference item) tells
+  the model it "must reason about path/task/**session** references using
+  only file contents it can read, list, or grep" — but "session" does not
+  appear anywhere else in design.md as a resolvable entity type. The Goal
+  section's explicit entity-type list is "paths, tasks, workflows, skills,
+  extensions, namespaces, vars, commands, docs, vocabulary symbols" — no
+  sessions — and Required behaviour, Constraints, and Acceptance criteria
+  never mention sessions as something this augmenter maps or emits mappings
+  for. The word appears to be carried over from the `entity-resolution`
+  skill's own step 3 wording ("Psi graph introspection for runtime/session
+  entities") without checking whether "session" belongs in this augmenter's
+  narrower, tool-constrained entity-type scope. This leaves it unclear
+  whether (a) sessions are actually an in-scope entity type this augmenter
+  should attempt to resolve via file-based evidence when a user references
+  one (in which case the Goal section's entity-type list is incomplete), or
+  (b) "session" should not appear in the capability-gap prompt text at all
+  since this augmenter never resolves session references (in which case the
+  capability-gap wording overclaims what the model is being asked to
+  attempt). Pin down whether sessions are in or out of this augmenter's
+  entity-type scope and align the Goal section's entity-type list and
+  Resolved decision 6's capability-gap wording to agree.
+
+- [x] Inconsistent: the Goal section and Required behaviour item 3 both
+  describe the Method-text adaptation as uniformly "naming only the
+  helper's actually-available read-only tools" in place of the skill's
+  original git/graph-introspection references — Goal: "adapted so
+  evidence-gathering wording names only the helper's actually-available
+  read-only tools rather than the skill's original git/find/graph-
+  introspection references"; Required behaviour item 3: "embeds the
+  `entity-resolution` method, adapted to name only that toolset." Both
+  passages were written by `d1db1d86e` when Resolved decision 6's
+  adaptation policy was a single uniform reword-to-available-tool-name
+  rule, and neither was updated when `b37363b71` later split that policy
+  into two cases: the two *substitutable* references (`git ls-files`/`find`,
+  `git grep`) are reworded to name the available tool directly, matching
+  Goal/item 3's description, but the two *unmappable* references ("current
+  git status," "Psi graph introspection") are explicitly **not** reworded
+  to name an available tool — decision 6 says doing so "would misleadingly
+  imply those tools can answer a question they can't," and instead
+  substitutes a qualitatively different capability-gap disclosure
+  ("the prompt tells the model it cannot check git status ... or query the
+  runtime/session graph, and must reason ... using only file contents").
+  A reader who reads only the Goal section or Required behaviour item 3
+  (without cross-checking decision 6's amended detail) would form the
+  inaccurate model that every original tool reference is 1:1 substituted
+  with an available-tool name, missing that two of the four references
+  instead get an explicit "you cannot do this" disclosure. Update Goal and
+  Required behaviour item 3's summary wording to reflect decision 6's
+  two-case split (or explicitly note the summary is intentionally
+  simplified and defer full detail to decision 6), so the three passages
+  agree on what "adapted" means.
+
+- [x] Ambiguous: Required behaviour item 1 says the augmenter "reads the
+  bounded turn projection (user text + history tail + effective-cwd)," and
+  the Context section confirms `:turn-augmentation/history` (a bounded
+  tail) is part of the 237 input contract the augmenter receives. But
+  Required behaviour item 3 — the step that actually builds the helper
+  session's prompt — says only that the prompt "embeds the
+  `entity-resolution` method ... and applies it to **the user text**,"
+  with no mention of the history tail being included in what the helper
+  model sees. Grepping design.md for "history" turns up only these two
+  passages; no other passage says whether the read history tail is ever
+  incorporated into the constructed helper prompt content, or is read but
+  unused. This is not a cosmetic gap: the embedded `entity-resolution`
+  skill method's own step 1 ("Collect local context") lists "Current user
+  turn and immediately relevant conversation history" as context to
+  collect, and the skill's stated referring-expression types explicitly
+  include anaphora ("it", "this", "that", "those", "the former/latter")
+  that are frequently only resolvable by looking at prior turns — the
+  Goal section's own opening sentence describes resolving "ambiguous/
+  underspecified references," which for pronouns/deixis structurally
+  requires prior-turn context. If the helper prompt the augmenter
+  constructs carries only the bare current-turn user text with no history
+  excerpt, the helper model has no way to resolve anaphoric references at
+  all, undercutting a class of reference the design otherwise claims to
+  handle. Pin down whether the constructed helper prompt includes a
+  rendered history-tail excerpt (and if so, in what form — similar to
+  `auto-session-name`'s `build-rename-prompt`/`sanitize-session-entries`
+  conversation-excerpt pattern) or whether the design intentionally scopes
+  this augmenter's resolution to current-turn text only despite reading
+  the history tail for some other stated or unstated reason.
+
+- [x] Inconsistent: Resolved decision 2 says "the local model searches the
+  **worktree/git** for evidence itself, following the `entity-resolution`
+  skill method," and Required behaviour item 3 says the toolset lets "the
+  local model ... gather **filesystem/git** evidence." Both claims survive
+  unedited (design.md lines ~99, ~137-138) through every later resolution
+  slice, including the two that specifically settled the toolset's git
+  reach: Resolved decision 4/6's closed toolset is file read + directory
+  list + content grep **only** — no git-command tool exists — and Resolved
+  decision 6's capability-gap statement (landed by `b37363b71`, wording
+  confirmed unchanged by `f92192104`) explicitly tells the model it
+  "**cannot** check git status, run git commands, or query the
+  runtime/session graph, and must reason about path/task references using
+  only file contents it can read, list, or grep." A model with no git tool,
+  explicitly told it cannot run git commands, cannot "search... git" or
+  "gather git evidence" by any reading stronger than "evidence that happens
+  to live in a git-tracked worktree" — and decision 2's own wording
+  ("following the `entity-resolution` skill method," whose Method section
+  names `git ls-files`/`find`/`git grep`/git-status as the literal
+  search technique) reads as claiming exactly the git-command-based search
+  capability decision 6 says does not exist. This is not a duplicate of the
+  already-resolved "adaptation-summary lag" inconsistency (which was about
+  Goal/item-3 describing the *adaptation mechanism* — uniform reword vs.
+  two-case split — and was fixed by `f92192104`'s "adapted per Resolved
+  decision 6's two-case split" wording): that fix touched the *adaptation*
+  clause in item 3 but left the separate, earlier "gather filesystem/git
+  evidence" clause in the same sentence untouched, and never touched
+  decision 2 at all. A prior pass (fourth-pass inconsistency review, post
+  `d1db1d86e`) flagged this same "git" phrasing but deferred it as
+  "the same root cause" as the then-still-open git-status/graph-
+  introspection adaptation ambiguity; the fourth design-steps-resolution
+  slice that closed that ambiguity explicitly recorded "no other section
+  needed a matching edit," leaving decision 2's and item 3's git-evidence
+  claims unreconciled with the capability-gap disclosure it introduced.
+  Reword decision 2's "searches the worktree/git for evidence itself" and
+  item 3's "gather filesystem/git evidence" to describe only the closed
+  read/list/grep toolset's actual reach (e.g. "searches the worktree's
+  files for evidence," dropping the "git" claim, or explicitly scoping any
+  git-adjacent evidence to "git-tracked file contents visible via read/
+  list/grep," never git commands), consistent with decision 6's settled
+  capability-gap statement.
+
+- [x] Ambiguous: Required behaviour item 2 says the augmenter "selects a
+  local helper model via `model-selection`" (singular), and Acceptance
+  criteria describes "a helper session driven by a **local** model selected
+  via `psi.ai.model-selection`" — both read as selecting one candidate.
+  Design.md is silent on what happens if that single selected model's
+  helper run fails or returns an unusable result while `resolve-selection`
+  had *other* tool-calling-capable local candidates ranked below it. The
+  design explicitly frames the local-model helper-session mechanism it
+  reuses as `auto-session-name`'s pattern (Goal section, References), and
+  that mechanism's actual behavior (`select-helper-models` /
+  `infer-session-title` in
+  `extensions/auto-session-name/src/extensions/auto_session_name.clj`) is
+  not "pick the top-ranked candidate and stop" — it takes the *entire*
+  ranked candidate list from `resolve-selection` and loops through it,
+  retrying the next-ranked model whenever an attempt fails or returns an
+  invalid result, only giving up once every ranked candidate has been
+  tried. Required behaviour item 5 and Acceptance criteria both list
+  "failed/empty helper runs" as an unconditional `:no-op` trigger without
+  saying whether that means "the single attempted model failed" or "every
+  ranked tool-calling-capable local candidate was tried and failed." This
+  changes both the shipped no-op rate under transient single-model failures
+  and the shape of the "failed/empty helper run → no-op" test (one
+  synthetic failing model vs. an exhausted ranked list of failing models),
+  and interacts with Resolved decision 3's "blocking, no-deadline" latency
+  posture (retrying across multiple local models on the critical path costs
+  more latency than one attempt). Pin down whether this augmenter retries
+  across `resolve-selection`'s ranked candidate list like
+  `auto-session-name` does, or deliberately simplifies to a single
+  top-ranked attempt with immediate `:no-op` on failure — and if the latter,
+  note that as a deliberate departure from the cited precedent rather than
+  leaving it implicit.
+
+- [x] Ambiguous: Resolved decision 2 now says the helper has no git-command
+  execution, but that "searching the worktree" means
+  "reading/listing/grepping **git-tracked file contents**." Required
+  behaviour item 3 describes the helper toolset as read / list / grep over
+  "the worktree's files" with no git-command execution, and Resolved
+  decision 4 says the new toolset is file read + directory list + content
+  grep. The design does not say whether these new list/grep tools are
+  expected to be **git-aware** (filtering to tracked files via some
+  non-command git integration or precomputed tracked-file set) or ordinary
+  filesystem-scoped read-only tools constrained only by `effective-cwd`.
+  Those two interpretations change what evidence the model can see: a
+  git-aware corpus excludes untracked/generated/ignored files and requires
+  implementation machinery not otherwise described, while a filesystem
+  corpus makes "git-tracked" inaccurate and may expose files that are not
+  project source of truth. Pin down whether the v1 evidence corpus is
+  git-tracked files only or all readable files under the effective cwd, and
+  align Resolved decision 2 / Required behaviour item 3 / toolset wording
+  accordingly without changing the frozen read/list/grep-only scope.
+
+- [x] Inconsistent: Resolved decision 6 explicitly says the helper prompt
+  embeds only `.psi/skills/entity-resolution/SKILL.md`'s Method section
+  (steps 1–5), excludes the skill's own "Output Shape" section, and states
+  that the augmenter's own prompt supplies the structured line output
+  contract instead. But the References section still describes
+  `.psi/skills/entity-resolution/SKILL.md` as "resolution method and output
+  shape." That reference now contradicts the settled skill-delivery/output
+  contract and can mislead implementers into reusing the skill file's
+  markdown-table/prose output shape that decision 6 deliberately excludes.
+  Update the References entry to describe only the method source (or say
+  explicitly that the skill's Output Shape is not used) so it agrees with
+  Resolved decision 6.
+
+
+## User requirement change resolution — bash-only helper tool access
+
+Resolved by editing `design.md` to make the helper use the existing `bash` tool
+instead of requiring any new read-only search tools:
+
+- Removed the required new file-read/directory-list/content-grep helper toolset.
+- Removed the required additive tool/function-calling capability fact/criterion
+  in `psi.ai.model-selection`.
+- Reframed evidence gathering as `bash`-based shell evidence gathering under the
+  effective cwd, with prompt constraints forbidding intentional mutation,
+  dependency installation, long-running processes, or unrelated side effects.
+- Updated Required behaviour, Resolved decisions 2/4/5/6, constraints,
+  acceptance criteria, tests, and references to align with that scope.
+- The prior open git-tracked-vs-filesystem corpus question is obsolete because
+  there is no new read/list/grep corpus/toolset to specify.
+- The prior open SKILL.md reference inconsistency is closed: the References
+  entry now says the skill file supplies the method source and that its Output
+  Shape section is explicitly not used.
+
+## Ambiguity review (design-review turn 2, eighth pass — bash-only design)
+
+- [x] Ambiguous: the bash-only change turns the helper session into a
+  multi-round, tool-using agent loop, but the design does not bound how many
+  agent-loop rounds / `bash` commands the helper may run before the augmenter
+  takes its result, nor any wall-clock ceiling for the whole helper run.
+  Resolved decision 3 ("blocking, no-deadline barrier ... keeps the
+  local-model call there") was written when the helper was conceptually a
+  single toolless model call (the `auto-session-name` precedent it cites runs
+  with `:tool-ids []`, so its `run-agent-loop-in-session` is effectively
+  single-shot). With `bash` granted, `run-agent-loop-in-session`
+  (`components/agent-session/src/psi/agent_session/mutations/session.clj`)
+  runs the full prompt lifecycle until the model stops issuing tool calls —
+  each `bash` command is capped (30s default in
+  `components/agent-session/src/psi/agent_session/tools.clj`), but the number
+  of rounds is unbounded, so worst-case blocking latency is
+  rounds × up-to-30s on the critical path of *every* eligible turn. This
+  directly affects the cost/latency posture the Why section and Resolved
+  decision 3 rely on, the "single-attempt model selection" framing (one
+  *model* attempt, but that attempt is itself an unbounded loop), and the
+  testability of the failed/empty-helper-run and confident-mapping cases.
+  Pin down whether the helper agent loop has a design-intended bound
+  (max rounds/commands and/or total wall-clock budget) or is deliberately
+  left unbounded under decision 3's "no-deadline" posture — and if bounded,
+  at what granularity (policy-level, deferring exact numbers to
+  plan/implementation, matching Resolved decisions 4–6). This is within
+  frozen scope (bounding the in-scope helper's own behavior), not a scope
+  change.
+
+## Inconsistency review (design-review turn 3, eighth pass — bash-only design)
+
+- [x] Inconsistent: the Goal section contradicts itself about what Resolved
+  decisions 4 and 5 are. The opening (design.md ~lines 11–12) says the task
+  reuses two shipped mechanisms "extended with small additive wiring this
+  task must add (**see Resolved decisions 4–6**)," citing decisions 4–6 as
+  the additions the task makes. But after the bash-only change, decision 4 is
+  "No new read-only tools" and decision 5 is "No new model-selection
+  tool-calling fact/criterion" — both explicit *non-additions* — and the same
+  Goal paragraph (~lines 24–26) states the task "deliberately does **not**
+  add new read-only tools, and it does **not** add a new model-selection
+  tool-calling fact/criterion." So decisions 4 and 5 are simultaneously
+  cited as additive wiring the task must add and as deliberate non-additions.
+  This is stale cross-reference wording carried over from the old
+  read/list/grep design (where decision 4 = a new toolset and decision 5 = a
+  new capability fact genuinely were additions); the bash edit flipped 4 and
+  5 to non-additions without updating the "(see Resolved decisions 4–6)"
+  additive-wiring citation. Under the bash design the actual additive wiring
+  is the second augmenter registration + helper-prompt construction
+  (decision 6) + the existing-`bash`-tool grant via `create-child-session`
+  (decision 2), not decisions 4/5. Reconcile the Goal's additive-wiring
+  cross-reference (e.g. point it at the decisions that describe actual
+  additions, or reword so it doesn't label the deliberate non-additions as
+  "wiring this task must add"). Within frozen scope — cross-reference wording
+  fix, not a scope change.
+
+## Ambiguity review (design-review turn 2, ninth pass — post eighth-slice resolution)
+
+- [x] Ambiguous: the confidence-gate mechanism is underspecified. Resolved
+  decision 6 fixes the helper output line format as `surface → canonical
+  (evidence; confidence)` — a **required** confidence field — and states
+  "Confidence's only role is the accept/reject gate on which lines are parsed
+  as 'confident' in the first place; it is not displayed in the rendered
+  block." But design.md never defines what a confidence value looks like (a
+  categorical vocabulary like high/medium/low, a 0–1 score, a percentage,
+  free text) nor any threshold separating "confident" from "not confident."
+  This leaves two materially different mechanisms unresolved: (a) the
+  augmenter parses the confidence token's *value* and rejects lines below a
+  defined threshold (requiring a fixed scale + threshold the parse validates,
+  neither of which design.md provides), or (b) the model self-gates via the
+  "never guess: only confident, evidence-backed mappings" constraint and the
+  augmenter accepts every well-formed line, treating the confidence token as
+  a required-but-value-unconstrained field it drops at render (in which case
+  the confidence field is effectively decorative and "confidence's only role
+  is the accept/reject gate" overstates the augmenter's use of it). This is
+  not the already-resolved content-composition (2/3/4 display fields) item
+  nor the already-resolved output-contract-format item: those settled what is
+  *displayed* and that the model emits parseable lines, not *how* a parsed
+  line is judged confident enough to keep. It directly affects the shape of
+  the "ambiguous reference dropped" acceptance test (Tests list): under (a)
+  the helper emits a low-confidence line the augmenter drops (needs a defined
+  scale + threshold to assert against); under (b) the model simply omits the
+  ambiguous mapping and no augmenter-side confidence filtering is exercised.
+  Pin down whether the augmenter value-thresholds the confidence field (and
+  if so, the fixed scale/vocabulary and threshold, at least at
+  "e.g."/policy-level granularity) or relies on model self-gating with the
+  augmenter accepting any well-formed line — and align decision 6's
+  "accept/reject gate" wording and the "ambiguous reference dropped" test
+  framing accordingly. Within frozen scope (clarifying the in-scope confident
+  filter, not changing what entity types or operations are in scope).

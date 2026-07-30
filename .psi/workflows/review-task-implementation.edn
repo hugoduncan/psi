@@ -2,6 +2,7 @@
  [{:name "review-task-implementation-core",
    :type :delegate,
    :target "review-task-implementation-core",
+   :session-profile :reviewing-implementation,
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},

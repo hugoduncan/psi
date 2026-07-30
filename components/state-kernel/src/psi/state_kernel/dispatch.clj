@@ -215,7 +215,10 @@
 
                                (and (dispatch-id-of ictx)
                                     (not (:dispatch-id raw-data)))
-                               (assoc :dispatch-id (dispatch-id-of ictx)))
+                               (assoc :dispatch-id (dispatch-id-of ictx))
+
+                               (:replaying? ictx)
+                               (assoc :replaying? true))
                 result (try
                          (handler-fn env handler-data)
                          (catch Exception e

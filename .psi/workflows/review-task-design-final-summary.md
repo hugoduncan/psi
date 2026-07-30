@@ -4,6 +4,7 @@ description: Produce the user-facing final result for a Munera task design revie
 tools:
   - read
   - bash
+advertise: false
 ---
 Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.
 

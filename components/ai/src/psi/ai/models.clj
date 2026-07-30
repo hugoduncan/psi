@@ -1,208 +1,9 @@
 (ns psi.ai.models
   "Model definitions and capabilities"
-  (:require [psi.ai.structured-output :as structured-output]))
+  (:require [psi.ai.models.anthropic-catalog :as anthropic-catalog]
+            [psi.ai.structured-output :as structured-output]))
 
 ;; Model definitions following allium spec
-
-(def anthropic-models
-  {:claude-3-5-sonnet
-   {:id "claude-3-5-sonnet-20241022"
-    :name "Claude 3.5 Sonnet"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 8192
-    :input-cost 3.0
-    :output-cost 15.0
-    :cache-read-cost 0.3
-    :cache-write-cost 3.75}
-
-   :claude-3-5-haiku
-   {:id "claude-3-5-haiku-20241022"
-    :name "Claude 3.5 Haiku"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning false
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 8192
-    :input-cost 1.0
-    :output-cost 5.0
-    :cache-read-cost 0.1
-    :cache-write-cost 1.25}
-
-   :sonnet-4
-   {:id "claude-sonnet-4-20250514"
-    :name "Claude Sonnet 4"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 16384
-    :input-cost 3.0
-    :output-cost 15.0
-    :cache-read-cost 0.3
-    :cache-write-cost 3.75}
-
-   :opus-4
-   {:id "claude-opus-4-20250514"
-    :name "Claude Opus 4"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 32768
-    :input-cost 15.0
-    :output-cost 75.0
-    :cache-read-cost 1.5
-    :cache-write-cost 18.75}
-
-   :sonnet-4.5
-   {:id "claude-sonnet-4-5"
-    :name "Claude Sonnet 4.5"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 16384
-    :input-cost 3.0
-    :output-cost 15.0
-    :cache-read-cost 0.3
-    :cache-write-cost 3.75}
-
-   :opus-4.5
-   {:id "claude-opus-4-5"
-    :name "Claude Opus 4.5"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 32768
-    :input-cost 15.0
-    :output-cost 75.0
-    :cache-read-cost 1.5
-    :cache-write-cost 18.75}
-
-   :sonnet-4.6
-   {:id "claude-sonnet-4-6"
-    :name "Claude Sonnet 4.6"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 16384
-    :input-cost 3.0
-    :output-cost 15.0
-    :cache-read-cost 0.3
-    :cache-write-cost 3.75}
-
-   :opus-4.6
-   {:id "claude-opus-4-6"
-    :name "Claude Opus 4.6"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 32768
-    :input-cost 15.0
-    :output-cost 75.0
-    :cache-read-cost 1.5
-    :cache-write-cost 18.75}
-
-   :haiku-4.5
-   {:id "claude-haiku-4-5"
-    :name "Claude Haiku 4.5"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning false
-    :supports-images true
-    :supports-text true
-    :context-window 200000
-    :max-tokens 8192
-    :input-cost 1.0
-    :output-cost 5.0
-    :cache-read-cost 0.1
-    :cache-write-cost 1.25}
-
-   :opus-4.7
-   {:id "claude-opus-4-7"
-    :name "Claude Opus 4.7"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    ;; Opus 4.7+ uses adaptive thinking — a different API protocol from
-    ;; extended thinking (budget_tokens). See providers/anthropic.clj.
-    :adaptive-thinking true
-    :supports-images true
-    :supports-text true
-    :context-window 1000000
-    :max-tokens 128000
-    :input-cost 5.0
-    :output-cost 25.0
-    :cache-read-cost 0.5
-    :cache-write-cost 6.25}
-
-   :opus-4.8
-   {:id "claude-opus-4-8"
-    :name "Claude Opus 4.8"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :adaptive-thinking true
-    :supports-mid-conversation-system-messages true
-    :supports-images true
-    :supports-text true
-    :context-window 1000000
-    :max-tokens 128000
-    :input-cost 5.0
-    :output-cost 25.0
-    :cache-read-cost 0.5
-    :cache-write-cost 6.25}
-
-   :fable-5
-   {:id "claude-fable-5"
-    :name "Claude Fable 5"
-    :provider :anthropic
-    :api :anthropic-messages
-    :base-url "https://api.anthropic.com"
-    :supports-reasoning true
-    :adaptive-thinking true
-    :supports-mid-conversation-system-messages true
-    :supports-images true
-    :supports-text true
-    :context-window 1000000
-    :max-tokens 128000
-    :input-cost 10.0
-    :output-cost 50.0
-    :cache-read-cost 1.0
-    :cache-write-cost 12.5}})
 
 (def openai-models
   {:gpt-4o
@@ -571,7 +372,71 @@
     :input-cost 5.0
     :output-cost 30.0
     :cache-read-cost 0.5
-    :cache-write-cost 0.0}})
+    :cache-write-cost 0.0}
+
+   :gpt-5.6
+   {:id "gpt-5.6"
+    :name "GPT-5.6"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 6.0
+    :output-cost 35.0
+    :cache-read-cost 0.6
+    :cache-write-cost 0.0}
+
+   :gpt-5.6-sol
+   {:id "gpt-5.6-sol"
+    :name "GPT-5.6 Sol"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 5.0
+    :output-cost 30.0
+    :cache-read-cost 0.5
+    :cache-write-cost 6.25}
+
+   :gpt-5.6-terra
+   {:id "gpt-5.6-terra"
+    :name "GPT-5.6 Terra"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 2.5
+    :output-cost 15.0
+    :cache-read-cost 0.25
+    :cache-write-cost 3.125}
+
+   :gpt-5.6-luna
+   {:id "gpt-5.6-luna"
+    :name "GPT-5.6 Luna"
+    :provider :openai
+    :api :openai-completions
+    :base-url "https://api.openai.com/v1"
+    :supports-reasoning true
+    :supports-images true
+    :supports-text true
+    :context-window 272000
+    :max-tokens 128000
+    :input-cost 1.0
+    :output-cost 6.0
+    :cache-read-cost 0.1
+    :cache-write-cost 1.25}})
 
 (def ^:private provider-defaults
   {:anthropic {:locality :cloud
@@ -602,7 +467,11 @@
     :gpt-5.2-chat-latest
     :gpt-5.2-pro
     :gpt-5.4-mini
-    :gpt-5.5})
+    :gpt-5.5
+    :gpt-5.6
+    :gpt-5.6-sol
+    :gpt-5.6-terra
+    :gpt-5.6-luna})
 
 (def ^:private anthropic-json-schema-native-model-keys
   #{:sonnet-4.5
@@ -612,7 +481,9 @@
     :haiku-4.5
     :opus-4.7
     :opus-4.8
-    :fable-5})
+    :opus-5
+    :fable-5
+    :sonnet-5})
 
 (defn- built-in-structured-output-capability
   [model-key model]
@@ -622,6 +493,15 @@
       structured-output/anthropic-json-schema-output-native-capability
       structured-output/anthropic-forced-tool-native-capability)
 
+    ;; The test key here is the literal value of
+    ;; `structured-output/openai-codex-api`, deliberately restated rather than
+    ;; referenced: Clojure `case` requires compile-time-literal test constants,
+    ;; so the shared constant cannot be used as a `case` key. This is the single
+    ;; irreducible re-statement of that value; it is reconciled with the constant
+    ;; (not a missed reference) by `codex-catalog-transport-matches-shared-constants-test`,
+    ;; which asserts every codex catalog entry's effective structured-output
+    ;; capability equals `openai-codex-native-capability` — so a divergence
+    ;; between this branch and the shared codex owner is drift-guarded.
     :openai-codex-responses
     structured-output/openai-codex-native-capability
 
@@ -647,7 +527,7 @@
             {:cost-tier (cost-tier model)}))))
 
 (def all-models
-  (->> (merge anthropic-models openai-models)
+  (->> (merge anthropic-catalog/anthropic-models openai-models)
        (map (fn [[k model]] [k (annotate-model k model)]))
        (into {})))
 

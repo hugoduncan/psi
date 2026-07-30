@@ -3,6 +3,7 @@
  [{:name "implement-pass",
    :type :session,
    :prompt-workflow "implement-task-implement-pass.md",
+   :session-profile :implementing,
    :judge
    {:type :invoke,
     :operation "workflow/pass-status-routing",

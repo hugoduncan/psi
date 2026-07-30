@@ -1,0 +1,24 @@
+- extensions.ramora mirrors extensions.munera exactly: same structure, same error handling, same prompt-mode query pattern
+- protocol.txt contains placeholder lambda-form ramora protocol content (can be swapped later without code changes)
+- nullable API for tests: components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj — use `nullable/create-nullable-extension-api` with `:query-fn` returning `{:psi.agent-session/prompt-mode :lambda}` or `:prose` to mock prompt mode; registered contributions accessible via `(:prompt-contributions @state)`
+- extension deps.edn pattern: each extension has its own `deps.edn` with `{:paths ["src" "resources"] :deps {org.clojure/clojure {:mvn/version "1.12.0"}}}` — see extensions/munera/deps.edn
+- extension discovery architecture: extensions are discovered via two synchronized psi-owned-extension-catalog maps (launcher: psi.launcher.extensions, runtime: psi.agent-session.extension-installs), not via extensions/deps.edn. The catalogs map lib keys to :psi/init vars and :source-policies. A parity test enforces both catalogs stay in sync. extensions/deps.edn is only for bb test classpath wiring.
+- catalog entry shape (follow munera/mementum pattern): `'psi/ramora {:psi/init 'extensions.ramora/init :source-policies {:development {:local/root "extensions/ramora"} :installed {:local/root "extensions/ramora"} :jar {:mvn/version :psi/release-version}}}`
+- catalog files: bases/main/src/psi/launcher/extensions.clj (launcher), components/agent-session/src/psi/agent_session/extension_installs.clj (runtime)
+- parity test: components/agent-session/test/psi/agent_session/extension_installs_test.clj (test `psi-owned-extension-catalog-parity-with-launcher`)
+- reference implementations: extensions/munera/src/extensions/munera.clj, extensions/mementum/src/extensions/mementum.clj
+- reference tests: extensions/munera/test/extensions/munera_test.clj, extensions/mementum/test/extensions/mementum_test.clj
+- extensions wiring: extensions/deps.edn (:deps only — mementum and munera are NOT in :extra-paths; design's :extra-paths instruction was found inconsistent)
+- engage prefix value (shared by munera/mementum): "λ engage(nucleus).\n[phi fractal euler tao pi mu ∃ ∀] | [Δ λ Ω ∞/0 | ε/φ Σ/μ c/h signal/noise order/entropy] | OODA\nHuman ⊗ AI\n\n"
+- design follow-up resolved all 7 review-batch items: adopted single-file pattern (protocol.txt with lambda form), confirmed static-at-init content, specified deps.edn wiring, confirmed priority 52, specified prompt contribution ID "ramora-protocol", specified engage prefix (same as munera/mementum), noted protocol text source TBD
+- design follow-up (2nd batch) resolved 3 items: added launcher catalog registration entry to design.md, added runtime catalog registration entry to design.md, corrected deps.edn constraint to :deps only (removed :extra-paths instruction)
+- design.md acceptance section updated to reference protocol.txt instead of RAMORA-LAMBDA.md/RAMORA.md, added missing-resource test acceptance criterion
+- implementation review: no issues found — code, tests, wiring, and docs all match design and follow munera/mementum pattern
+- implementation review (4th pass): no issues found — code mirrors munera exactly, tests pass, parity test passes, CHANGELOG updated, all acceptance criteria met
+- implementation review (5th pass): no issues found — all acceptance criteria verified, code/tests/wiring/docs coherent, 0 new steps added
+- test review: tests mirror munera/mementum pattern, cover all design acceptance criteria, use nullable API (no mocks), 0 new steps added
+- test-shaper review: tests are simple, consistent, robust, and economical — no issues found, 0 new steps added
+- docs review: CHANGELOG.md entry present and accurate; ramora missing from README.md built-in extensions list and doc/extensions.md built-in extensions section — added 2 steps to be addressed
+- addressed 2 docs review steps: added ramora to README.md built-in extensions list and doc/extensions.md built-in extensions section
+- docs review (2nd pass): README.md, doc/extensions.md, and CHANGELOG.md all accurate and consistent with implementation — 0 new steps added
+- code-shaper review: code is simple (single responsibility, locally comprehensible), consistent (exact mirror of munera/mementum pattern in structure, naming, data shapes, and error handling), and robust (graceful API degradation, fails fast on missing resource) — 0 new steps added

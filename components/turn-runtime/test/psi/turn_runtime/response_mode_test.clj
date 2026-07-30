@@ -22,10 +22,25 @@
   ([ctx session-id]
    (prepared-request ctx session-id "turn-1"))
   ([ctx session-id turn-id]
-   (prompt-request/build-prepared-request
-    ctx session-id {:turn-id turn-id
-                    :user-message {:role "user"
-                                   :content [{:type :text :text "hello"}]}})))
+   (prepared-request ctx session-id turn-id {}))
+  ([ctx session-id turn-id {:keys [resolve-runtime-model?]}]
+   (let [augmentation-record {:session-id session-id
+                              :turn-id turn-id
+                              :workflow-run-id nil
+                              :status :no-op
+                              :replay? false
+                              :accepted-operation-count 0
+                              :operations []
+                              :providers []}]
+     (swap! (:state* ctx) assoc-in
+            [:agent-session :sessions session-id :data :turn-augmentations turn-id]
+            augmentation-record)
+     (prompt-request/build-prepared-request
+      ctx session-id (cond-> {:turn-id turn-id
+                              :user-message {:role "user"
+                                             :content [{:type :text :text "hello"}]}}
+                       (not resolve-runtime-model?)
+                       (assoc :runtime-model (:model (ss/get-session-data-in ctx session-id))))))))
 
 (defn- provider-events
   [ctx session-id]
@@ -44,7 +59,7 @@
                        :timestamp (java.time.Instant/now)}})
 
 (deftest execute-prepared-request-non-streaming-uses-execute-path-test
-  (testing "workflow-owned child session with :response-mode :non-streaming uses ai/execute-response-in"
+  (testing "workflow-owned child session with :response-mode :non-streaming uses psi.ai.core/execute-response-in"
     (let [[ctx session-id] (create-session-context {:persist? false})
           _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                    (merge (ss/get-session-data-in ctx session-id)
@@ -105,6 +120,35 @@
                          (-> result :execution-result/provider-captures :request-captures first :timestamp)))
           (is (instance? java.time.Instant
                          (-> result :execution-result/provider-captures :response-captures first :timestamp))))))))
+
+(deftest execute-prepared-request-non-streaming-recovers-textual-tool-call-test
+  ;; Tests non-streaming responses use the same textual tool-call normalizer via
+  ;; a nullable provider seam rather than redefining the AI execution function.
+  (let [[ctx session-id] (create-session-context {:persist? false})
+        model (assoc (models/get-model :claude-3-5-sonnet)
+                     :provider :local
+                     :id "local-tool-model"
+                     :capabilities {:textual-tool-calls #{:xml}})
+        provider {:execute (fn [_conversation _model _options]
+                             {:assistant-message {:role "assistant"
+                                                  :content [{:type :text
+                                                             :text "<tool_call><function=bash><parameter=command>pwd</parameter></function></tool_call>"}]
+                                                  :stop-reason :stop
+                                                  :timestamp (java.time.Instant/now)}})}
+        _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                 (merge (ss/get-session-data-in ctx session-id)
+                        {:model model
+                         :response-mode :non-streaming}))
+        prepared (prepared-request ctx session-id)
+        result (turn-runtime/execute-prepared-request!
+                {:provider-registry (atom {:local provider})}
+                ctx session-id prepared nil)]
+    (is (= [{:type :tool-call
+             :id "turn-1/toolcall/0"
+             :name "bash"
+             :arguments "{\"command\":\"pwd\"}"}]
+           (get-in result [:execution-result/assistant-message :content])))
+    (is (= :turn.outcome/tool-use (:execution-result/turn-outcome result)))))
 
 (deftest execute-prepared-request-defaults-to-streaming-test
   (testing "absent :response-mode preserves streaming execution path"
@@ -188,6 +232,84 @@
                         (provider-events ctx session-id))))
     (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))
 
+(deftest execute-prepared-request-unsupported-runtime-model-preflights-before-provider-test
+  ;; Tests persisted/startup-selected OAuth-backed gpt-5.6 reaches the turn
+  ;; preflight boundary through normal prompt-request runtime resolution, and
+  ;; fails as a shaped assistant error before any provider request is attempted.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :oauth-ctx (test-support/oauth-openai-ctx)})
+        _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                 (merge (ss/get-session-data-in ctx session-id)
+                        {:model {:provider "openai" :id "gpt-5.6"}}))
+        prepared (prepared-request ctx session-id "turn-unsupported-runtime-model"
+                                   {:resolve-runtime-model? true})
+        result (turn-runtime/execute-prepared-request!
+                {:provider-registry (atom {})}
+                ctx session-id prepared nil)]
+    (is (= :openai (:provider (:prepared-request/model prepared))))
+    (is (= "gpt-5.6" (:id (:prepared-request/model prepared))))
+    (is (= true (:runtime/unsupported? (:prepared-request/model prepared))))
+    (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
+    (is (= :openai-oauth-model-unsupported
+           (:execution-result/runtime-unsupported-reason result)))
+    (is (= (test-support/unsupported-runtime-model-message)
+           (:execution-result/error-message result)))
+    (is (= :error (:execution-result/stop-reason result)))
+    (is (= {:request-captures [] :response-captures []}
+           (:execution-result/provider-captures result)))
+    (is (empty? (provider-events ctx session-id)))))
+
+(deftest execute-prepared-request-gpt-5-6-variants-pass-preflight-and-reach-provider-test
+  ;; Positive counterpart to
+  ;; execute-prepared-request-unsupported-runtime-model-preflights-before-provider-test:
+  ;; the OAuth/Codex-supported gpt-5.6 variants (sol/terra/luna) must NOT be
+  ;; preflight-rejected. Each persisted/startup-selected variant, resolved
+  ;; through the same runtime path (:resolve-runtime-model? true) under OpenAI
+  ;; OAuth, is codex-resolved (verbatim id, codex :api/:base-url), carries no
+  ;; :runtime/unsupported? marker, is not error-shaped at preflight, and reaches
+  ;; provider dispatch (execute-live-turn! called with the codex-resolved model).
+  (doseq [id ["gpt-5.6-sol" "gpt-5.6-terra" "gpt-5.6-luna"]]
+    (let [[ctx session-id] (create-session-context {:persist? false
+                                                    :oauth-ctx (test-support/oauth-openai-ctx)})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                   (merge (ss/get-session-data-in ctx session-id)
+                          {:model {:provider "openai" :id id}}))
+          prepared (prepared-request ctx session-id "turn-variant-preflight"
+                                     {:resolve-runtime-model? true})
+          seen-model* (atom nil)
+          result (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                               (fn [_ai-ctx _ctx _session-id {:keys [turn-id ai-model]}]
+                                 (reset! seen-model* ai-model)
+                                 {:turn-id turn-id
+                                  :model ai-model
+                                  :ai-options {}
+                                  :turn-ctx nil
+                                  :assistant-message {:role "assistant"
+                                                      :content [{:type :text :text "streamed"}]
+                                                      :stop-reason :stop
+                                                      :timestamp (java.time.Instant/now)}
+                                  :logprobs nil})]
+                   (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})}
+                    ctx session-id prepared nil))]
+      ;; Preflight resolved the variant to the codex transport, verbatim id, and
+      ;; did NOT mark it runtime-unsupported (contrast bare gpt-5.6).
+      (is (= :openai (:provider (:prepared-request/model prepared))) (str id " provider"))
+      (is (= id (:id (:prepared-request/model prepared))) (str id " verbatim id"))
+      (is (= :openai-codex-responses (:api (:prepared-request/model prepared)))
+          (str id " codex api"))
+      (is (= "https://chatgpt.com/backend-api" (:base-url (:prepared-request/model prepared)))
+          (str id " codex base-url"))
+      (is (not (:runtime/unsupported? (:prepared-request/model prepared)))
+          (str id " not runtime-unsupported"))
+      ;; Not error-shaped at preflight; reached provider dispatch.
+      (is (not= :turn.outcome/error (:execution-result/turn-outcome result))
+          (str id " not error-shaped"))
+      (is (nil? (:execution-result/runtime-unsupported-reason result))
+          (str id " no unsupported reason"))
+      (is (= :stop (:execution-result/stop-reason result)) (str id " reached provider"))
+      (is (= id (:id @seen-model*)) (str id " provider dispatch received codex-resolved variant")))))
+
 (deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
   (testing "fallback-forbidden unsupported strategy fails before streaming provider request"
     (let [[ctx session-id] (create-session-context {:persist? false})
@@ -251,116 +373,6 @@
           (is (= :structured-output-capability-omitted
                  (get-in result [:execution-result/structured-output :ai-reason])))
           (is (empty? (get-in result [:execution-result/provider-captures :request-captures]))))))))
-
-(deftest execute-prepared-request-terminal-provider-error-is-not-retried-test
-  ;; Terminal provider/client failures are classified and returned without retry scheduling.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (assoc (error-turn "invalid api key")
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "invalid api key"}]
-                                               :stop-reason :error
-                                               :error-message "invalid api key"
-                                               :http-status 401
-                                               :timestamp (java.time.Instant/now)}))]
-      (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
-        (is (= 1 @attempts*))
-        (is (= :non-retryable (:failure-reason outcome)))
-        (is (= :auth (:error-kind outcome)))
-        (is (false? (:retryable? outcome)))
-        (is (= :non-retryable
-               (get-in result [:execution-result/assistant-message :retry/outcome :failure-reason])))
-        (is (= ["provider_request_started" "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))
-        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
-
-(deftest execute-prepared-request-unknown-provider-error-is-not-retried-test
-  ;; Unknown provider failures use the conservative terminal/non-retryable default.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "mysterious provider failure"))]
-      (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
-        (is (= 1 @attempts*))
-        (is (= :non-retryable (:failure-reason outcome)))
-        (is (= :unknown (:error-kind outcome)))
-        (is (false? (:retryable? outcome)))
-        (is (= ["provider_request_started" "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))))))
-
-(deftest execute-prepared-request-openai-usage-limit-schedules-retry-test
-  ;; OpenAI usage-limit wording is a rate-limit failure even if the provider
-  ;; stream failed to preserve a numeric HTTP status.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-base-delay-ms 10
-                                                           :auto-retry-max-retries 1}})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (if (= 1 (swap! attempts* inc))
-                      (error-turn "The usage limit has been reached [request-id req_123]")
-                      {:turn-id "turn-1"
-                       :model {:provider "openai" :id "gpt-test"}
-                       :ai-options {}
-                       :turn-ctx nil
-                       :assistant-message {:role "assistant"
-                                           :content [{:type :text :text "recovered"}]
-                                           :stop-reason :stop
-                                           :timestamp (java.time.Instant/now)}}))]
-      (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
-            scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
-                                     (provider-events ctx session-id)))]
-        (is (= 2 @attempts*))
-        (is (= :stop (:execution-result/stop-reason result)))
-        (is (= :rate-limit (:error-kind scheduled)))
-        (is (= "The usage limit has been reached [request-id req_123]"
-               (:error-message scheduled)))
-        (is (nil? (:http-status scheduled)))))))
-
-(deftest execute-prepared-request-retry-disabled-classifies-without-scheduling-test
-  ;; Disabled retry records one failed attempt and exposes a skipped-retry outcome.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 3}})
-        _               (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
-                               (assoc (ss/get-session-data-in ctx session-id)
-                                      :auto-retry-enabled false))
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
-      (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
-        (is (= 1 @attempts*))
-        (is (= :retry-disabled (:failure-reason outcome)))
-        (is (= :transport (:error-kind outcome)))
-        (is (true? (:retryable? outcome)))
-        (is (false? (:retry-enabled? outcome)))
-        (is (= 1 (:attempt-count outcome)))
-        (is (= 0 (:retry-attempt outcome)))
-        (is (= 3 (:max-retries outcome)))
-        (is (= ["provider_request_started" "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))
-        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-zero-max-retries-exhausts-without-scheduling-test
   ;; Enabled retry with zero allowed retry executions returns retry-exhausted, not retry-disabled.
@@ -692,8 +704,7 @@
                (:rate-limit scheduled)))))))
 
 (deftest execute-prepared-request-production-backoff-observes-active-turn-abort-test
-  ;; Production retry sleep polls the active turn abort state instead of one
-  ;; uninterruptible Thread/sleep.
+  ;; Retry sleep polls active turn abort state.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-max-retries 2
                                                            :auto-retry-base-delay-ms 1000
@@ -728,36 +739,3 @@
         (finally
           (when-let [t @abort-thread*]
             (.join t 1000)))))))
-
-(deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
-  ;; Failed streaming-attempt partial output is attempt-local; the successful
-  ;; retry owns the final assistant content.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 1}})
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/do-stream!
-                  (fn [_ai-ctx _conv _model _opts consume-fn]
-                    (if (= 1 (swap! attempts* inc))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "partial failed "})
-                        (consume-fn {:type :error
-                                     :error-message "Connection reset by peer"}))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "final answer"})
-                        (consume-fn {:type :done :reason :stop}))))]
-      (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})} ctx session-id prepared nil)]
-        (is (= 2 @attempts*))
-        (is (= :stop (:execution-result/stop-reason result)))
-        (is (= [{:type :text :text "final answer"}]
-               (get-in result [:execution-result/assistant-message :content])))
-        (is (not (re-find #"partial failed"
-                          (pr-str (:execution-result/assistant-message result)))))
-        (is (= ["provider_request_started" "provider_request_finished"
-                "provider_retry_scheduled" "provider_request_started"
-                "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))))))

@@ -50,7 +50,7 @@ Custom model definitions may opt into structured-output requests with a model-le
 
 Omitting `:capabilities :structured-output` is valid and normalizes to unsupported. Psi will not inject prompted-JSON fallback instructions for omitted legacy/custom models; add `:strategies [:prompted-json]` when that behavior is wanted.
 
-Native capability declarations should only be used when the configured transport is known to support the provider mechanism:
+Native structured-output capability declarations should only be used when the configured transport is known to support the provider mechanism:
 
 - `:openai-completions` may use `:native-mechanism :openai/chat-completions-json-schema-response-format` when the compatible API supports Chat Completions `response_format` JSON Schema.
 - `:anthropic-messages` may use `:native-mechanism :anthropic/json-schema-output` when the compatible API supports Anthropic Messages `output_format` JSON Schema plus the `structured-outputs-2025-11-13` beta/header. This is the preferred Anthropic native mechanism for supported models.
@@ -58,6 +58,44 @@ Native capability declarations should only be used when the configured transport
 - `:openai-codex-responses` may use `:native-mechanism :openai/responses-text-format-json-schema` for the ChatGPT/Codex OAuth transport when the backend supports streaming Responses-style `text.format` JSON Schema. This mechanism is distinct from Chat Completions `response_format`; non-streaming Codex structured output is not established by Psi's current contract.
 
 Structured-output requests must supply an explicit `:json-schema`; Psi does not convert Malli/domain schemas in the AI adapter. Prompted JSON remains fallback only. Local workflow/runtime validation remains mandatory after provider generation, and OAuth/API tokens must not be written into docs, task files, fixtures, logs, or commits.
+
+## Textual tool-call compatibility
+
+Some local model runners emit tool-call markup as assistant text instead of returning provider-native tool-call events. A custom/local model can opt into Psi's narrow recovery parser with:
+
+```clojure
+{:capabilities
+ {:textual-tool-calls #{:xml}}}
+```
+
+The `:xml` format recognizes only the strict compatibility form:
+
+```xml
+<tool_call>
+<function=bash>
+<parameter=command>
+pwd
+</parameter>
+</function>
+</tool_call>
+```
+
+When enabled on the active runtime model, well-formed blocks are removed from assistant prose, converted into ordinary canonical tool calls, and then pass through the existing tool availability, authorization, execution, journaling, and result-recording path. Frontier/provider-native models should not enable this compatibility flag; leave the capability omitted unless the configured local runner is known to leak this textual markup.
+
+The parser contract is deliberately strict:
+
+- tag names are exact and lowercase: `<tool_call>`, `<function=...>`, and `<parameter=...>` only;
+- tool and parameter identifiers must match `[A-Za-z0-9_-]+`; names with whitespace, quotes, colons/namespaces, dots, slashes, attributes, or entity encoding are not accepted;
+- each `<tool_call>...</tool_call>` block must contain exactly one function block;
+- all parameters must be inside that function block;
+- each function must contain one or more parameters;
+- duplicate parameter names and misnested/out-of-function parameter blocks make the candidate malformed;
+- parameter text is trimmed at tag boundaries but otherwise preserved, including internal newlines and shell metacharacters;
+- tag-looking textual-tool-call markup inside parameter text is unsupported and makes the candidate malformed, including `<tool_call>`, `</tool_call>`, `<function=...>`, `</function>`, `<parameter=...>`, and `</parameter>`;
+- nested textual tool-call recovery is intentionally unsupported; a well-formed-looking block inside another candidate remains ordinary text and is not executed;
+- malformed, partial, unsupported, or oversized markup remains ordinary assistant text and does not execute a tool;
+- later independent well-formed blocks in the same assistant response are still recovered; and
+- a single textual tool-call candidate block is supported up to 65,536 characters; longer blocks are intentionally left as text to keep malformed many-marker output bounded.
 
 ## OpenAI-compatible example: MiniMax
 
@@ -146,6 +184,11 @@ set to `off`: the request body includes
 `{:chat_template_kwargs {:enable_thinking false}}`. This helps local
 OpenAI-compatible servers that expose hidden reasoning via a nonstandard
 `chat_template_kwargs.enable_thinking` flag.
+
+Models may also declare `:parallel-tool-calls false`. When tools are available,
+psi sends this as OpenAI-compatible `parallel_tool_calls: false` for that model.
+This is useful for local OpenAI-compatible servers whose streaming tool-call
+support is more reliable when the model emits at most one tool call per turn.
 
 ## Reload after editing
 

@@ -70,6 +70,13 @@
      :installed   {:local/root "extensions/munera"}
      :jar         {:mvn/version :psi/release-version}}}
 
+   'psi/ramora
+   {:psi/init 'extensions.ramora/init
+    :source-policies
+    {:development {:local/root "extensions/ramora"}
+     :installed   {:local/root "extensions/ramora"}
+     :jar         {:mvn/version :psi/release-version}}}
+
    'psi/plan-state-learning
    {:psi/init 'extensions.plan-state-learning/init
     :source-policies
@@ -117,6 +124,13 @@
     :source-policies
     {:development {:local/root "extensions/dev-http"}
      :installed   {:local/root "extensions/dev-http"}
+     :jar         {:mvn/version :psi/release-version}}}
+
+   'psi/context-manager
+   {:psi/init 'extensions.context-manager/init
+    :source-policies
+    {:development {:local/root "extensions/context-manager"}
+     :installed   {:local/root "extensions/context-manager"}
      :jar         {:mvn/version :psi/release-version}}}
 
    'psi/workflow-loader

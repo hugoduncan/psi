@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "prep",
    :type :delegate,
    :target "builder",

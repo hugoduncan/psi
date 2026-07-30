@@ -1,4 +1,5 @@
-{:steps
+{:advertise false
+ :steps
  [{:name "discover",
    :type :invoke,
    :operation "github/find-issue",

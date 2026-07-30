@@ -393,7 +393,8 @@
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex" cmd-opts)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "✓ Model set to"))
+    (is (= (model-registry/model-set-message {:provider "openai" :id "gpt-5.3-codex"})
+           (:message result)))
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
 
@@ -401,9 +402,31 @@
   (let [[ctx session-id] (make-test-ctx)
         result     (commands/dispatch-in ctx session-id "/model openai gpt-5.3-codex session" cmd-opts)]
     (is (= :text (:type result)))
-    (is (str/includes? (:message result) "[session]"))
+    (is (= (model-registry/model-set-message {:provider "openai" :id "gpt-5.3-codex"} :session)
+           (:message result)))
     (is (= "openai" (get-in (ss/get-session-data-in ctx session-id) [:model :provider])))
     (is (= "gpt-5.3-codex" (get-in (ss/get-session-data-in ctx session-id) [:model :id])))))
+
+(deftest dispatch-model-set-claude-sonnet-5-test
+  (let [[ctx session-id] (make-test-ctx)
+        result     (commands/dispatch-in ctx session-id "/model anthropic claude-sonnet-5" cmd-opts)
+        session    (ss/get-session-data-in ctx session-id)]
+    (is (= :text (:type result)))
+    (is (= (model-registry/model-set-message {:provider "anthropic" :id "claude-sonnet-5"})
+           (:message result)))
+    (is (= "anthropic" (get-in session [:model :provider])))
+    (is (= "claude-sonnet-5" (get-in session [:model :id])))))
+
+(deftest dispatch-model-openai-oauth-unsupported-test
+  ;; Tests OAuth-backed unsupported model selection reports a command error
+  ;; instead of throwing or falling back to catalog chat-completions.
+  (let [[ctx session-id] (make-test-ctx)
+        result (commands/dispatch-in ctx session-id "/model openai gpt-5.6"
+                                     (assoc cmd-opts :oauth-ctx (test-support/oauth-openai-ctx)))]
+    (is (= :text (:type result)))
+    (is (= (test-support/unsupported-runtime-model-message) (:message result)))
+    (is (= {:provider "anthropic" :id "test-model" :reasoning false}
+           (:model (ss/get-session-data-in ctx session-id))))))
 
 (deftest dispatch-model-invalid-arity-test
   (let [[ctx session-id] (make-test-ctx)

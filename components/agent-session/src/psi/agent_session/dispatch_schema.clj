@@ -122,11 +122,20 @@
      [:event-data [:maybe :map]]
      [:origin {:optional true} :keyword]
      [:workflow-run-id {:optional true} :string]]]
+   [:runtime/turn-augmentation-invoke
+    [:map [:effect/type [:= :runtime/turn-augmentation-invoke]]
+     [:session-id :string]
+     [:turn-id :string]
+     [:workflow-run-id {:optional true} [:maybe :string]]
+     [:user-msg {:optional true} [:maybe :map]]
+     [:selected-providers [:vector :map]]
+     [:prepare-event-data [:maybe :map]]]]
    [:runtime/event-queue-offer
     [:map [:effect/type [:= :runtime/event-queue-offer]] [:event :any]]]
    [:statechart/send-event
     [:map [:effect/type [:= :statechart/send-event]]
      [:event :any]
+     [:session-id {:optional true} :string]
      [:workflow-run-id {:optional true} :string]]]
    [:runtime/schedule-thread-sleep-send-event
     [:map [:effect/type [:= :runtime/schedule-thread-sleep-send-event]]

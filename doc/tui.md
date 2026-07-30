@@ -65,9 +65,27 @@ repo-local startup.
 
 ### Model, speed, and effort commands
 
-- `/model anthropic claude-opus-4-8` selects Claude Opus 4.8, an Anthropic
-  adaptive-thinking model with native JSON Schema structured output and
-  mid-conversation system-message support.
+- `/model anthropic claude-opus-5` selects Claude Opus 5, the latest
+  Anthropic adaptive-thinking model with native JSON Schema structured output
+  and mid-conversation system-message support. (`/model anthropic
+  claude-opus-4-8` selects the prior Opus 4.8 with the same capabilities.)
+- `/model openai gpt-5.5` uses the OpenAI OAuth/ChatGPT Codex runtime path when
+  the OpenAI provider is backed by stored OAuth credentials. `/model openai
+  gpt-5.6-sol`, `/model openai gpt-5.6-terra`, and `/model openai gpt-5.6-luna`
+  are also OAuth/Codex-supported and use the same runtime path. `/model openai
+  gpt-5.6` (the bare id) remains a catalog-selectable OpenAI model for
+  non-OAuth/API-key use, but OpenAI OAuth-backed `gpt-5.6` is explicitly
+  unsupported until a supported ChatGPT/Codex alias or alternate
+  OAuth-compatible transport is evidenced and encoded as runtime policy.
+- Bare `/model` opens the interactive model picker. Selecting an unsupported
+  runtime model from the picker — such as OpenAI OAuth-backed `gpt-5.6` when the
+  OpenAI provider is backed by stored OAuth credentials — is rejected the same
+  way as the `/model openai gpt-5.6` direct-args command above: the picker
+  selection returns an unsupported-model message and the model is **not**
+  persisted, rather than switching the session model. This is the TUI analogue
+  of the Emacs/RPC picker rejection (see [`emacs-ui.md`](emacs-ui.md)); the
+  interactive picker and the direct `/model <provider> <model-id>` command both
+  enforce the same OpenAI OAuth runtime policy.
 - `/speed` prints the effective speed mode. `/speed fast` selects the provider's
   alternate throughput tier for the current session. Add `project` or `user` to
   persist the setting; `/speed normal session` clears the session override.

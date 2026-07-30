@@ -9,6 +9,7 @@ tools:
 skills:
   - work-independently
   - task-design
+advertise: false
 ---
 For the Munera task identified by {{input}}, create or update plan.md and steps.md from the stable design.md. Work independently.
 

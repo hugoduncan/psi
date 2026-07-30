@@ -1,0 +1,8 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        psi/ai            {:local/root "../../components/ai"}}
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}
+                      psi/extension-test-helpers {:local/root "../../components/extension-test-helpers"}
+                      psi/agent-session {:local/root "../../components/agent-session"}}}}}

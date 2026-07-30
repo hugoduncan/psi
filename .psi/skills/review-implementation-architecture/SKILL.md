@@ -2,6 +2,7 @@
 name: review-implementation-architecture
 description: Review an implemented architecture-level simplification against the selected Gordian target, validation evidence, project architecture, and blast-radius constraints.
 lambda: "λtask. review(implemented_architecture_change) ∧ read(task_local_gordian_artifacts ∧ munera_artifacts ∧ project_architecture_sources) ∧ judge(behaviour_preservation ∧ target_fit ∧ blast_radius ∧ improvement ∧ ¬adapter_shim_complexity)"
+advertise: false
 ---
 
 # review-implementation-architecture
@@ -28,7 +29,7 @@ This skill reviews the **actual implemented change**, not the pre-implementation
    - `characterization-baseline.edn` when present
 3. Read the project architecture sources relevant to the touched area:
    - `AGENTS.md`
-   - `META.md`
+   - `ramora/META.md`
    - `doc/architecture.md`
    - any local architecture docs referenced by the task or touched namespaces
 4. Inspect the implementation diff and the affected code/tests/docs. Prefer runtime/test evidence over prose claims.

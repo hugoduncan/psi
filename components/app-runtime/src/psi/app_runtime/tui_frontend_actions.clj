@@ -18,13 +18,13 @@
         :submitted
         (if-let [resolved (and (map? value)
                                (resolve-model-by-provider+id ctx (:provider value) (:id value)))]
-          (let [provider-str (name (:provider resolved))
-                model {:provider provider-str
-                       :id (:id resolved)
-                       :reasoning (boolean (:supports-reasoning resolved))}]
-            (session/set-model-in! ctx sid model)
+          (if (:runtime/unsupported? resolved)
             {:type :text
-             :message (str "✓ Model set to " provider-str " " (:id resolved))})
+             :message (model-registry/unsupported-runtime-model-message resolved)}
+            (let [model  (model-registry/persistable-model resolved)
+                  result (session/set-model-in! ctx sid model)]
+              {:type :text
+               :message (model-registry/model-set-message (:model result))}))
           {:type :text
            :message (or message
                         (str "Unknown model: " (:provider value) " " (:id value)))})

@@ -1,4 +1,4 @@
-(ns psi.rpc-smoke-test
+(ns ^:integration psi.rpc-smoke-test
   "Subprocess smoke test: launch psi --rpc-edn, perform a handshake, assert
    a valid server-info response, then close stdin and wait for clean exit.
 

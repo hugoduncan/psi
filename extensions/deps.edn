@@ -14,14 +14,17 @@
         psi/mcp-tasks-run           {:local/root "mcp-tasks-run"}
         psi/mementum                {:local/root "mementum"}
         psi/munera                  {:local/root "munera"}
+        psi/ramora                  {:local/root "ramora"}
         psi/plan-state-learning     {:local/root "plan-state-learning"}
         psi/work-on                 {:local/root "work-on"}
         psi/metrics                 {:local/root "metrics"}
-        psi/dev-http                {:local/root "dev-http"}}
+        psi/dev-http                {:local/root "dev-http"}
+        psi/context-manager         {:local/root "context-manager"}}
 
  :aliases
  {:test {:extra-paths ["auto-session-name/test"
                        "commit-checks/test"
+                       "context-manager/test"
                        "hello-ext/test"
                        "mcp-tasks-run/test"
                        "metrics/test"

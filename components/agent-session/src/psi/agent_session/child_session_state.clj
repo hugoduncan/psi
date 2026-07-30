@@ -49,6 +49,10 @@
 ;;;     :context-tokens         — runtime-derived, starts nil
 ;;;     :context-window         — runtime-derived, starts nil
 ;;;
+;;;   Separately, :available-extension-capabilities is not inherited by child
+;;;   sessions; extension-scoped capability inheritance is parent-turn policy,
+;;;   not child helper-session authority.
+;;;
 ;;; prompt-state-fields (4 keys in init.clj):
 ;;;   All 4 are derived (not carried as-is from parent):
 ;;;     :base-system-prompt         — derived via derive-child-prompt-state
@@ -149,19 +153,20 @@
         ;; prompt-mode and relies on live parent inheritance) keep the parent-sd
         ;; fallback. Non-workflow children also keep the live parent-sd fallback.
         defaults (session-data/initial-session)
-        inherited-default (fn [present? supplied parent-value default-value]
+        ;; A non-nil supplied value is authoritative. A nil supplied value
+        ;; (whether the key is absent or explicitly nil-at-invoke) is NOT an
+        ;; authoritative override: snapshot-governed children then use the fresh
+        ;; initial-session default (no live-parent leak, task 207 R4), while
+        ;; non-snapshot children fall back to the live parent session value.
+        inherited-default (fn [supplied parent-value default-value]
                             (cond
-                              present? supplied
+                              (some? supplied) supplied
                               inherited-snapshot?' default-value
                               :else parent-value))
-        child-model (inherited-default (contains? child-opts :model)
-                                       model (:model parent-sd) (:model defaults))
-        child-prompt-mode (inherited-default (contains? child-opts :prompt-mode)
-                                             prompt-mode (:prompt-mode parent-sd) (:prompt-mode defaults))
-        child-speed-mode (inherited-default (contains? child-opts :speed-mode)
-                                            speed-mode (:speed-mode parent-sd) (:speed-mode defaults))
-        child-effort-override (inherited-default (contains? child-opts :effort-override)
-                                                 effort-override (:effort-override parent-sd) (:effort-override defaults))
+        child-model (inherited-default model (:model parent-sd) (:model defaults))
+        child-prompt-mode (inherited-default prompt-mode (:prompt-mode parent-sd) (:prompt-mode defaults))
+        child-speed-mode (inherited-default speed-mode (:speed-mode parent-sd) (:speed-mode defaults))
+        child-effort-override (inherited-default effort-override (:effort-override parent-sd) (:effort-override defaults))
         ts (java.time.Instant/now)
         session-data
         (merge (session-data/initial-session

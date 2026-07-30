@@ -1,4 +1,4 @@
-(ns psi.build-jar-smoke-test
+(ns ^:integration psi.build-jar-smoke-test
   (:require
    [clojure.edn :as edn]
    [clojure.java.shell :as shell]

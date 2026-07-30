@@ -86,6 +86,20 @@ current input begins so earlier transcript text is not resent by accident:
 - Normal editing keeps the anchor at the start of the current draft tail, so transcript text above the anchor is not resent unless you explicitly select it as a region.
 - Reconnect clear (`C-c C-r` after confirmation) resets the buffer and repositions the draft anchor at the new buffer end; after reconnect, sends come only from text typed after that reset point.
 
+## Model selection
+
+Use `C-c m m` (`M-x psi-emacs-set-model`) to select a model through the RPC
+`set_model` path, or `C-c m n` / `C-c m p` to cycle through available models.
+If the OpenAI provider is backed by stored OAuth credentials, selecting `openai`
+`gpt-5.6` directly is rejected with the RPC `request/unsupported-model` error
+and is not persisted; `gpt-5.6` remains catalog-selectable for non-OAuth/API-key
+OpenAI use. Model cycling also skips OAuth-unsupported or unresolvable scoped
+candidates, so OpenAI OAuth-backed `gpt-5.6` is not selected or persisted by
+cycle commands. OpenAI OAuth-backed `gpt-5.5`, `gpt-5.6-sol`, `gpt-5.6-terra`,
+and `gpt-5.6-luna` are OAuth/Codex-supported and remain on the OAuth/ChatGPT
+Codex runtime path — they are selectable via `C-c m m` and are not skipped by
+the cycle commands.
+
 ## Customizing `psi-emacs-command`
 
 `psi-emacs-command` controls the exact subprocess command used by the frontend.

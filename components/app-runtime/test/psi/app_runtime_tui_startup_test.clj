@@ -5,6 +5,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.ui-capabilities :as ui-capabilities]
+   [psi.ai.model-registry :as model-registry]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.nrepl-runtime :as nrepl-runtime]
    [psi.app-runtime.test-support :as app-test-support]
@@ -317,7 +318,8 @@
                                                    :id "gpt-5.3-codex"}}
                   result        ((:frontend-action-handler-fn! opts) action-result)]
               (is (= {:type :text
-                      :message "✓ Model set to openai gpt-5.3-codex"}
+                      :message (model-registry/model-set-message
+                                {:provider "openai" :id "gpt-5.3-codex"})}
                      result))
               (is (= {:provider "openai"
                       :id "gpt-5.3-codex"
