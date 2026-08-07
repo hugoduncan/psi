@@ -22,6 +22,16 @@
   [k]
   (System/getenv k))
 
+(def openai-api-key-config
+  "Shared OpenAI api-key resolution config for the :openai-completions and
+   :openai-codex-responses transports. Defined once here (previously two
+   byte-identical per-transport copies in chat_completions.clj /
+   codex_responses.clj, review 16) so the env-var name and built-in
+   missing-key message cannot drift between the transports."
+  {:builtin-provider    :openai
+   :env-var             "OPENAI_API_KEY"
+   :builtin-missing-msg "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."})
+
 (defn auth-header?
   "True when a header name is a recognized auth header (case-insensitive)."
   [header]

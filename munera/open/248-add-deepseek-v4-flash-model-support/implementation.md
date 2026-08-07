@@ -873,3 +873,9 @@
   clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
 
 - Review 16 (2026-08-07): added 2 steps to be addressed.
+- addressed 2 review-16 steps (steps.md `^- [x]` checklist artifacts fixed on
+  all 6 lines; openai/codex api-key config deduplicated into shared
+  `request-support/openai-api-key-config`). Review-1 optional live smoke test
+  remains BLOCKED: `DEEPSEEK_API_KEY` not set in env. Targeted namespaces
+  green (openai-completions 16/70, openai-codex 8/27, openai 16/84,
+  openai-request-headers 6/28, openai-codex-retry 1/5); clj-kondo clean.

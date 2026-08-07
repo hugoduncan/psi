@@ -133,11 +133,6 @@
                acc))
            [])))))
 
-(def ^:private openai-api-key-config
-  {:builtin-provider    :openai
-   :env-var             "OPENAI_API_KEY"
-   :builtin-missing-msg "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."})
-
 (defn build-request
   "Build OpenAI Chat Completions API request map."
   [conversation model options]
@@ -154,7 +149,8 @@
         ;; :anthropic-messages transport.
         no-auth?           (request-support/no-auth? options)
         api-key            (when-not no-auth?
-                             (request-support/resolve-api-key model options openai-api-key-config))
+                             (request-support/resolve-api-key
+                              model options request-support/openai-api-key-config))
         fallback-request   (when (= :prompted-json (:strategy strategy))
                              structured-request)
         base-messages      (transform-messages conversation fallback-request)

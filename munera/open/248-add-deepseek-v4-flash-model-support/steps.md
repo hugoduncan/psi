@@ -1068,7 +1068,7 @@
 
 ## Follow-ups (implementation review 14, 2026-08-07)
 
-^- [x] Full-`bb test` flake inventory is incomplete: a fresh full-suite run
+- [x] Full-`bb test` flake inventory is incomplete: a fresh full-suite run
       (seed 1741154775) failed `psi.agent-session.scheduler-lifecycle-test/
       scheduled-deliver-runs-canonical-prompt-lifecycle-test` (8 pass / 5
       fail: session phase `:streaming` instead of `:idle`, no assistant
@@ -1101,7 +1101,7 @@
       the implementation.md flake inventory (alongside the two retry-loop
       flakes) — full-suite `bb test` is not deterministically green on any
       single run, independent of this task.
-^- [x] Configured-key + recognized-auth-header interplay is untested and
+- [x] Configured-key + recognized-auth-header interplay is untested and
       unnamed for the `:openai-codex-responses` transport:
       `configured-key-plus-recognized-auth-header-interplay-test` (review 11)
       locks the behavior for `:anthropic-messages` and `:openai-completions`
@@ -1129,7 +1129,7 @@
 
 ## Follow-ups (implementation review 14, 2026-08-07)
 
-^- [x] Built-in detection is by provider NAME, so a custom models.edn provider
+- [x] Built-in detection is by provider NAME, so a custom models.edn provider
       literally named `"anthropic"` or `"openai"` is classified as built-in
       and defeats the provider-scoped guarantees reviews 3/10/13 claim to
       close. `builtin-anthropic?` (providers/anthropic.clj) and the inline
@@ -1172,7 +1172,7 @@
       OPENAI_API_KEY fallback). All three allium specs model the tag
       (`ResolvedCustomModel.custom = true`, `Model.custom: Boolean = false`,
       `not model.custom` built-in conditions).
-^- [x] design.md "Revision note (implementation reviews)" is incomplete: it
+- [x] design.md "Revision note (implementation reviews)" is incomplete: it
       claims its four bullets are "the *only* provider-transport changes",
       but the review-11 OAuth content-sniff gating (`oauth?` now
       `(and (builtin-anthropic? model) (oauth-api-key? api-key))` in
@@ -1191,7 +1191,7 @@
       (review 14) and the shared request-support namespace (review 14, pure
       refactor) as provider-transport changes; the AC exception wording now
       names all of them.
-^- [x] The "don't mix" doc guidance is case-dependent and the exact-case
+- [x] The "don't mix" doc guidance is case-dependent and the exact-case
       variants are untested on both transports: doc/custom-providers.md
       "Local servers and custom headers" says the custom auth header
       "duplicates the configured key (X-API-Key beside the lowercase
@@ -1216,7 +1216,7 @@
       beside the base `Authorization` — different casing, distinct keys).
       `doc/custom-providers.md` "Local servers and custom headers" merge
       sentence tightened to name the case-dependence explicitly.
-^- [x] Provider-scoped key resolution is triplicated across the three
+- [x] Provider-scoped key resolution is triplicated across the three
       transports: `getenv`/`auth-header?`/`resolve-api-key` and the `no-auth?`
       computation are near-identical private copies in providers/anthropic
       .clj, providers/openai/chat_completions.clj and providers/openai/
@@ -1332,13 +1332,15 @@
 
 ## Follow-ups (implementation review 16, 2026-08-07)
 
-- [ ] Fix the 6 `^- [x]` markdown checklist artifacts in the two
+- [x] Fix the 6 `^- [x]` markdown checklist artifacts in the two
       "Follow-ups (implementation review 14, 2026-08-07)" sections: each
       item's checkbox marker carries a stray `^` prefix (`^- [x]` instead of
       `- [x]`), breaking the checklist-marker convention and hiding the items
       from `grep "^- \["` (found 2026-08-07; lines ~1071, 1104, 1132, 1175,
       1194, 1219). Replace `^- [x]` → `- [x]` on those six lines.
-- [ ] Deduplicate the byte-identical `openai-api-key-config` /
+      → Resolved: `^- [x]` → `- [x]` on all six lines (1071, 1104, 1132,
+      1175, 1194, 1219); `grep "^- \["` now finds them.
+- [x] Deduplicate the byte-identical `openai-api-key-config` /
       `codex-api-key-config` maps (`components/ai/src/psi/ai/providers/
       openai/chat_completions.clj` and `openai/codex_responses.clj`): the
       review-14 `request-support` namespace deduplicated the key-resolution
@@ -1350,3 +1352,10 @@
       class reviews 9/10/13 kept reconciling. Define the openai config once
       (shared constant in `request_support.clj`, or one openai ns required by
       the other) and reference it from both transports.
+      → Resolved: `request-support/openai-api-key-config` defined once in
+      `request_support.clj`; both `chat_completions.clj` and
+      `codex_responses.clj` reference it directly (private per-transport
+      copies removed). Env-var name and built-in missing-key message can no
+      longer drift. clj-kondo clean; openai-completions (16/70),
+      openai-codex (8/27), openai (16/84), openai-request-headers (6/28),
+      openai-codex-retry (1/5) namespaces green.

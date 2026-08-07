@@ -19,11 +19,6 @@
       (str/ends-with? normalized "/codex")           (str normalized "/responses")
       :else                                           (str normalized "/codex/responses"))))
 
-(def ^:private codex-api-key-config
-  {:builtin-provider    :openai
-   :env-var             "OPENAI_API_KEY"
-   :builtin-missing-msg "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."})
-
 (defn- assistant-content->codex-items
   [msg]
   (if (= :structured (get-in msg [:content :kind]))
@@ -123,7 +118,8 @@
         ;; :anthropic-messages and :openai-completions transports (review 13).
         no-auth?   (request-support/no-auth? options)
         api-key    (when-not no-auth?
-                     (request-support/resolve-api-key model options codex-api-key-config))
+                     (request-support/resolve-api-key
+                      model options request-support/openai-api-key-config))
         ;; Codex's ChatGPT/Codex backend requires an OAuth access token to
         ;; derive chatgpt_account_id. A keyless custom codex-compatible
         ;; endpoint (local proxy, custom-header auth) legitimately has no key
