@@ -200,3 +200,30 @@
       (`resolve-api-key` + `getenv`) and changed custom-provider
       key-fallback behavior. Update design.md scope/AC (or add a revision
       note) so the design reflects the provider-scoped api-key resolution.
+
+## Follow-ups (implementation review 4, 2026-08-07)
+
+- [ ] `build-request`'s unconditional `resolve-api-key` call now throws for
+      custom `:anthropic-messages` providers that intentionally send no auth:
+      both `:auth-header? false` (the docs' own "Local servers and custom
+      headers" pattern, `{:api-key "env:..." :auth-header? false :headers ...}`)
+      and custom-`:headers`-only auth reach `build-request` with no `:api-key`
+      in options (`provider-auth/provider-api-key` returns nil whenever
+      `:auth-header?` is false), and `resolve-api-key` throws before the
+      `:no-auth-header` header-stripping in `build-request` can apply. This is
+      a regression from the review-3 provider-scoped key change: pre-change,
+      the `ANTHROPIC_API_KEY` env fallback let such requests through (header
+      then stripped). It is also inconsistent with the OpenAI transport, which
+      skips the Authorization header when `:no-auth-header` is set without
+      requiring a key. Verified: `build-request` with `{:no-auth-header true}`
+      and with `{:headers {"X-API-Key" ...}}` (no api-key) both throw "Missing
+      API key for provider <name>". Fix direction: skip key resolution (or
+      tolerate a nil key) when `:no-auth-header` is set in options, and/or
+      when custom `:headers` provide auth; add a test proving a no-auth /
+      header-auth custom `:anthropic-messages` request builds without a key.
+- [ ] `resolve-api-key`'s custom-provider error suggests "or login via /login
+      <provider>", but `/login` only supports OAuth providers (anthropic,
+      openai); `/login deepseek` fails with "Unknown OAuth provider". Drop the
+      `/login` hint from the custom-provider branch (or restrict it to
+      OAuth-capable providers) — the correct remedy is configuring the
+      provider's `:auth {:api-key ...}` in models.edn.
