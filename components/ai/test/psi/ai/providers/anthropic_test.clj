@@ -494,6 +494,28 @@
       (is (nil? (:temperature body))
           "temperature must be absent even with thinking off on adaptive models"))))
 
+(deftest build-request-classic-thinking-custom-provider-test
+  ;; Docs advise DeepSeek users who need temperature to fall back to
+  ;; :adaptive-thinking false / omitted, "relying on the classic
+  ;; extended-thinking shape DeepSeek accepts". Lock that path for a
+  ;; NON-catalog custom-provider model map (all existing budget_tokens shape
+  ;; tests use built-in catalog models).
+  (testing "non-catalog custom-provider model without :adaptive-thinking emits the classic extended-thinking shape"
+    (let [convo   (conv/create "sys")
+          model   (dissoc deepseek-custom-provider-model :adaptive-thinking)
+          req     (#'anthropic/build-request convo model {:thinking-level :medium
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= {:type "enabled" :budget_tokens 8000} (:thinking body))
+          "classic extended-thinking shape for medium: type enabled + budget_tokens 8000")
+      (is (nil? (:output_config body))
+          "no output_config for the classic extended-thinking shape")
+      (is (nil? (:temperature body))
+          "temperature must be absent with extended thinking")
+      (is (some? (re-find #"interleaved-thinking" (get headers "anthropic-beta")))
+          "interleaved-thinking beta header required for the classic shape"))))
+
 (deftest build-request-normalizes-legacy-string-tool-parameters-test
   (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"
     (let [model        (models/get-model :opus-4.7)

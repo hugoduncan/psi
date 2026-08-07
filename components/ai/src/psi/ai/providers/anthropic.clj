@@ -331,16 +331,25 @@
     (str "Bearer "
          (redact-secret (str/replace value #"^Bearer\s+" "")))))
 
+(defn- find-header
+  "Find a header entry whose name matches header-name case-insensitively.
+   Returns a [key value] pair, or nil."
+  [headers header-name]
+  (let [target (str/lower-case header-name)]
+    (some (fn [[k v]]
+            (when (= target (str/lower-case (name k)))
+              [k v]))
+          headers)))
+
 (defn- redact-request-headers
   [headers]
-  (cond-> headers
-    (contains? headers "Authorization")
-    (assoc "Authorization"
-           (redact-authorization (get headers "Authorization")))
-
-    (contains? headers "x-api-key")
-    (assoc "x-api-key"
-           (redact-secret (get headers "x-api-key")))))
+  (letfn [(redact [hdr name redactor]
+            (if-let [[k v] (find-header hdr name)]
+              (assoc hdr k (redactor v))
+              hdr))]
+    (-> headers
+        (redact "Authorization" redact-authorization)
+        (redact "x-api-key" redact-secret))))
 
 (defn- capture-provider-id
   [model]

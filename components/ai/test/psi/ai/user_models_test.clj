@@ -295,3 +295,63 @@
       (is (nil? (:error result)))
       (is (not (contains? model :adaptive-thinking)))
       (is (false? (boolean (:adaptive-thinking model)))))))
+
+(deftest parse-documented-deepseek-example-test
+  ;; Parse-lock: the EXACT models.edn example documented in
+  ;; doc/custom-providers.md ("DeepSeek-compatible example"). Guards the closed
+  ;; ModelDef/AuthConfig schemas against docs/code drift — e.g. a future field
+  ;; typo silently making the documented example invalid.
+  (testing "the exact documented DeepSeek example parses and carries through every resolved field"
+    (let [result (user-models/parse-models-config
+                  {:version 1
+                   :providers
+                   {"deepseek"
+                    {:base-url "https://api.deepseek.com/anthropic"
+                     :api      :anthropic-messages
+                     :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+                     :models   [{:id                 "deepseek-v4-flash"
+                                 :name               "DeepSeek V4 Flash"
+                                 :supports-reasoning true
+                                 :adaptive-thinking  true
+                                 :supports-images    false
+                                 :supports-text      true
+                                 :context-window     1000000
+                                 :max-tokens         384000
+                                 :input-cost         0.14
+                                 :output-cost        0.28
+                                 :cache-read-cost    0.0028
+                                 :cache-write-cost   0.14}]}}})
+          model (first (:models result))]
+      (is (nil? (:error result)))
+      (is (= 1 (count (:models result))))
+      (is (= "deepseek-v4-flash" (:id model)))
+      (is (= "DeepSeek V4 Flash" (:name model)))
+      (is (= :deepseek (:provider model)))
+      (is (= :anthropic-messages (:api model)))
+      (is (= "https://api.deepseek.com/anthropic" (:base-url model)))
+      (is (true? (:supports-reasoning model)))
+      (is (true? (:adaptive-thinking model)))
+      (is (false? (:supports-images model)))
+      (is (true? (:supports-text model)))
+      (is (= 1000000 (:context-window model)))
+      (is (= 384000 (:max-tokens model)))
+      (is (= 0.14 (:input-cost model)))
+      (is (= 0.28 (:output-cost model)))
+      (is (= 0.0028 (:cache-read-cost model)))
+      (is (= 0.14 (:cache-write-cost model))))
+
+    (testing "auth resolves provider-scoped from env:DEEPSEEK_API_KEY"
+      (let [auth (get-in (user-models/parse-models-config
+                          {:version 1
+                           :providers
+                           {"deepseek"
+                            {:base-url "https://api.deepseek.com/anthropic"
+                             :api      :anthropic-messages
+                             :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+                             :models   [{:id "deepseek-v4-flash"}]}}})
+                         [:auth :deepseek])]
+        (is (= :deepseek (:provider auth)))
+        (is (= (user-models/resolve-api-key-spec "env:DEEPSEEK_API_KEY")
+               (:api-key auth))
+            "env:DEEPSEEK_API_KEY resolved via resolve-api-key-spec (env-dependent)")
+        (is (true? (:auth-header? auth)))))))

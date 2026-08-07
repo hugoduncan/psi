@@ -156,6 +156,41 @@
       (is (= "***REDACTED***"
              (get-in @request-capture [:request :headers "x-api-key"])))))
 
+  (testing "mixed-case auth header (X-API-Key) is redacted case-insensitively in captures"
+    ;; Redaction must match build-request's auth-header? recognition
+    ;; (case-insensitive): the keyless custom-headers pattern
+    ;; (:headers {"X-API-Key" "local-key"} without :api-key) would otherwise
+    ;; leak the secret verbatim into the :on-provider-request capture.
+    (let [model           {:id "local-proxy"
+                           :name "Local Proxy"
+                           :provider :local-proxy
+                           :api :anthropic-messages
+                           :base-url "http://localhost:8080"
+                           :supports-reasoning false
+                           :supports-images false
+                           :supports-text true
+                           :context-window 128000
+                           :max-tokens 16384
+                           :input-cost 0.0
+                           :output-cost 0.0
+                           :cache-read-cost 0.0
+                           :cache-write-cost 0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          sse             (str (sse-line "message_start" {:type "message_start"})
+                               (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic
+         convo model {:headers {"X-API-Key" "local-key"}
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_] nil)))
+
+      (is (= "***REDACTED***"
+             (get-in @request-capture [:request :headers "X-API-Key"]))
+          "mixed-case X-API-Key must be redacted in the :on-provider-request payload")))
+
   (testing "Anthropic error replies capture raw body and headers"
     (let [model           (models/get-model :sonnet-4.6)
           convo           (-> (conv/create "sys")

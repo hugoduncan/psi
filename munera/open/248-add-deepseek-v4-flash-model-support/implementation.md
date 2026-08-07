@@ -166,3 +166,36 @@
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design. Recorded in
   steps.md as the sole remaining unchecked item.
+
+## Follow-ups review 7 addressed (2026-08-07)
+
+- addressed 3 review steps (review-7; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `thinking.type "adaptive"` caveat documented in DeepSeek example notes
+  (doc/custom-providers.md): `output_config.effort` is confirmed supported
+  (compat table), but `thinking.type "adaptive"` is NOT among DeepSeek's
+  documented honored values (`enabled`/`disabled` only; "adaptive" absent
+  from DeepSeek's Anthropic API docs, verified 2026-08-07) — strict endpoint
+  may 400, lenient may ignore leaving thinking ON; fall back to
+  `:adaptive-thinking false` (classic `type: "enabled"` IS honored). Live
+  verification blocked (no key).
+- Capture redaction is now case-insensitive: `providers/anthropic.clj`
+  `redact-request-headers` uses a new `find-header` helper matching auth
+  header names case-insensitively (reuses the same recognition set as
+  `auth-header?`) and redacts under the original key casing. New capture-path
+  test in `anthropic_stream_test.clj`: keyless custom-provider request with
+  `:headers {"X-API-Key" "local-key"}` → `***REDACTED***` in the
+  `:on-provider-request` payload (mirrors the lowercase `x-api-key`
+  assertion). Previously a mixed-case auth header leaked verbatim into stored
+  captures.
+- Docs keyless-overbreadth aligned: "Local servers and custom headers" now
+  names the recognized-auth-header requirement (`x-api-key`/`Authorization`
+  case-insensitive, no configured key) and states incidental headers (e.g.
+  `X-Client`) do NOT imply keyless (fast-fail); DeepSeek example api-key note
+  aligned to the same exemption.
+- Verification: `psi.ai.providers.anthropic-stream-test` 9 tests / 84
+  assertions green (was 9/83; +1 new assertion, stable across 3 runs);
+  `psi.ai.providers.anthropic-test` 17/115; `psi.ai.user-models-test` 14/97;
+  clj-kondo clean (0 errors, 0 warnings) on changed source + tests.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.

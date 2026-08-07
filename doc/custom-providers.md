@@ -231,6 +231,21 @@ Notes:
   need temperature control, set `:adaptive-thinking false` (or omit it) and
   rely on the classic extended-thinking shape DeepSeek accepts (it honours
   `type: "enabled"` and ignores `budget_tokens`)
+- `output_config.effort` is confirmed supported (DeepSeek's compat table:
+  "output_config: Only effort is supported"; the Thinking Mode guide
+  documents the Anthropic-format effort control as
+  `{"output_config": {"effort": "low/high/max"}}`), but the `thinking.type
+  "adaptive"` value psi pairs it with is NOT among DeepSeek's documented
+  honored values — the Thinking Mode guide documents the Anthropic-format
+  thinking toggle as `{"thinking": {"type": "enabled/disabled"}}` only, and
+  "adaptive" appears nowhere in DeepSeek's Anthropic API docs (verified
+  2026-08-07). What DeepSeek does with `type: "adaptive"` is unverified: a
+  strict endpoint may reject it (400); a lenient one may ignore it, leaving
+  thinking ON (DeepSeek's default) with the effort applied. Verify against a
+  live turn (blocked: no `DEEPSEEK_API_KEY` in env) before relying on the
+  adaptive shape; if DeepSeek rejects it, fall back to
+  `:adaptive-thinking false` — the classic shape's `type: "enabled"` IS a
+  documented honored value (`budget_tokens` is ignored).
 - thinking-off is not honoured through the omitted-field path: psi never sends
   an explicit thinking-disabled signal — when `/thinking off` is active it
   simply omits the `thinking` field. On Anthropic's own API omission means
@@ -244,12 +259,14 @@ Notes:
 - API keys are provider-scoped: a custom `:anthropic-messages` provider never
   falls back to the `ANTHROPIC_API_KEY` env var. If the provider's configured
   `:api-key` (e.g. `env:DEEPSEEK_API_KEY`) resolves nil and the provider does
-  not declare `:auth-header? false`, the request fails fast with a
-  provider-scoped "Missing API key" error — your Anthropic key can never be
-  sent to `https://api.deepseek.com/anthropic/v1/messages`. Only built-in
-  Anthropic models fall back to `ANTHROPIC_API_KEY`. (A provider with
-  `:auth-header? false` sends no auth header and needs no key at all — see
-  "Local servers and custom headers".)
+  not declare `:auth-header? false` (or carry a recognized
+  `x-api-key`/`Authorization` header in custom `:headers`), the request
+  fails fast with a provider-scoped "Missing API key" error — your Anthropic
+  key can never be sent to `https://api.deepseek.com/anthropic/v1/messages`.
+  Only built-in Anthropic models fall back to `ANTHROPIC_API_KEY`. (Keyless
+  exemptions: `:auth-header? false`, or a recognized auth header among
+  custom `:headers` with no configured key — see "Local servers and custom
+  headers".)
 - cache-cost fields are illustrative: psi bills cache usage from
   Anthropic-shaped `usage.cache_read_input_tokens` (at `:cache-read-cost`)
   and `usage.cache_creation_input_tokens` (at `:cache-write-cost`). DeepSeek
@@ -266,6 +283,13 @@ Notes:
   `:strategies [:prompted-json]` if you want prompted-JSON fallback
 - image, document, and search-result content blocks are not supported by
   DeepSeek's Anthropic-compatible endpoint
+- psi's fast speed mode (`/fast` on) is unverified on `deepseek-v4-flash`:
+  psi sends `"speed": "fast"` in the request body (plus the
+  `fast-mode-2026-02-01` beta header), but DeepSeek's compat table does not
+  list `speed`, and Anthropic-compatible endpoints typically reject unknown
+  body fields (400). Not verified against a live turn — blocked on the same
+  missing `DEEPSEEK_API_KEY` as the optional live smoke test; assume fast
+  mode is unsupported on DeepSeek until verified.
 
 Custom providers do not define their own proxy fields. When a custom provider
 uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it
@@ -290,9 +314,16 @@ Use cases:
 A common use for `:auth-header? false` is an OpenAI-compatible local server that
 accepts requests without a bearer token and rejects unexpected auth headers.
 The same keyless pattern works for `:anthropic-messages` custom providers:
-with `:auth-header? false` (or auth carried entirely by custom `:headers`),
-psi does not require an API key and sends no `x-api-key`/`Authorization`
-header — the configured `:headers` (if any) are merged in as-is.
+with `:auth-header? false`, psi does not require an API key and sends no
+`x-api-key`/`Authorization` header — the configured `:headers` (if any) are
+merged in as-is. Without `:auth-header? false`, a custom `:headers` map still
+exempts the key requirement when it carries a *recognized* auth header —
+`x-api-key` or `Authorization`, matched case-insensitively — with no
+`:api-key` configured: psi treats that header as the auth and sends no auth
+header of its own. Incidental headers (e.g. `X-Client` in the example above)
+do NOT imply keyless: with no `:api-key` configured, the request fails fast
+with a provider-scoped "Missing API key" error rather than silently sending a
+keyless request.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is

@@ -379,7 +379,7 @@
 
 ## Follow-ups (implementation review 7, 2026-08-07)
 
-- [ ] DeepSeek `thinking.type "adaptive"` is unverified against DeepSeek's
+- [x] DeepSeek `thinking.type "adaptive"` is unverified against DeepSeek's
       documented honored values: the compat table (per design.md) lists
       `thinking.type` honored as `"enabled"`/`"disabled"` only, but psi's
       adaptive request shape sends `thinking: {:type "adaptive" :display
@@ -395,7 +395,16 @@
       example notes or adjust the example (e.g. note that only
       `output_config.effort` is confirmed supported and `thinking.type
       "adaptive"` behavior is unknown).
-- [ ] Provider-request capture redaction is case-sensitive while auth-header
+      → Resolved (documented, per the item's doc option; live verification
+      blocked on missing `DEEPSEEK_API_KEY`): DeepSeek example notes now
+      state `output_config.effort` is confirmed supported while
+      `thinking.type "adaptive"` is NOT among DeepSeek's documented honored
+      values (`type: "enabled"/"disabled"` only; "adaptive" appears nowhere
+      in DeepSeek's Anthropic API docs, verified 2026-08-07); a strict
+      endpoint may 400, a lenient one may ignore it leaving thinking ON;
+      fall back to `:adaptive-thinking false` whose classic `type: "enabled"`
+      IS a documented honored value.
+- [x] Provider-request capture redaction is case-sensitive while auth-header
       recognition is not: `redact-request-headers` redacts only exact
       `"Authorization"`/`"x-api-key"` keys, but `build-request`'s
       `auth-header?` treats auth headers case-insensitively and the
@@ -409,7 +418,13 @@
       custom `X-API-Key` header is `***REDACTED***` in the
       `:on-provider-request` payload, mirroring the existing lowercase
       `x-api-key` assertion in `anthropic_stream_test.clj`.
-- [ ] `doc/custom-providers.md` "Local servers and custom headers" overstates
+      → Resolved: `redact-request-headers` in `providers/anthropic.clj` is
+      now case-insensitive via a new `find-header` helper (matches header
+      names case-insensitively, redacts under the original key casing);
+      `anthropic_stream_test.clj` gains a capture-path test proving a keyless
+      custom-provider request with `:headers {"X-API-Key" "local-key"}` is
+      redacted to `***REDACTED***` in the `:on-provider-request` payload.
+- [x] `doc/custom-providers.md` "Local servers and custom headers" overstates
       the keyless inference: "or auth carried entirely by custom `:headers`"
       implies any custom headers make a request keyless, but `build-request`
       only infers keyless from custom headers when a RECOGNIZED auth header
@@ -420,3 +435,10 @@
       name the recognized-auth-header requirement, and align the DeepSeek
       example note's "fails fast ... unless `:auth-header? false`" wording,
       which omits the same recognized-auth-header exemption.
+      → Resolved: "Local servers and custom headers" now states the keyless
+      inference requires `:auth-header? false` OR a recognized auth header
+      (`x-api-key`/`Authorization`, case-insensitive) among custom `:headers`
+      with no configured key, and that incidental headers (e.g. `X-Client`)
+      do NOT imply keyless — they fast-fail with the provider-scoped
+      "Missing API key" error. DeepSeek example api-key note aligned to name
+      the same recognized-auth-header exemption.
