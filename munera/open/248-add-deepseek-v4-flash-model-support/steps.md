@@ -47,3 +47,33 @@
 - [x] Re-read `doc/custom-providers.md` end to end — existing examples
       unaffected, DeepSeek subsection follows established pattern.
 - [x] Committed.
+
+## Follow-ups (implementation review, 2026-08-07)
+
+- [ ] `anthropic_test.clj` `build-request-adaptive-thinking-custom-provider-test`:
+      assert headers and temperature for the DeepSeek-shaped map, not just
+      body — `x-api-key` from the configured key (no `Authorization`/OAuth
+      path), `anthropic-version` present, no forced `anthropic-beta`
+      (no `interleaved-thinking`), and `:temperature` absent (adaptive
+      models never send it, even thinking off — mirror the sibling
+      `build-request-adaptive-thinking-test` assertions). Design AC requires
+      "headers, URL, body"; body alone is currently proven.
+- [ ] Cover the base-url-derived request URL: `build-request` does not build
+      the URL (it is `(str (:base-url model) "/v1/messages")` in
+      `stream-anthropic`/`execute-anthropic`), so no test proves
+      `https://api.deepseek.com/anthropic/v1/messages` is derived. Either
+      assert at the stream/execute seam or extract a small `request-url` fn
+      and test it.
+- [ ] `doc/custom-providers.md` `:adaptive-thinking` section: note that
+      adaptive-thinking models never send `temperature` (even with thinking
+      off), so `:adaptive-thinking true` forfeits temperature control —
+      DeepSeek's compat table lists temperature as fully supported, so this
+      trade-off belongs in the DeepSeek example notes so users can choose.
+- [ ] Full `bb test` (unit + extension suites) to satisfy the design AC
+      "`bb test` green" — implementation verified only the two targeted
+      namespaces plus `clj-kondo`; full-suite run not demonstrated.
+- [ ] Optional manual smoke test before close: configure DeepSeek in a real
+      `models.edn`, select `deepseek-v4-flash`, run one live turn to confirm
+      DeepSeek accepts the request (x-api-key auth, `/v1/messages` path,
+      adaptive `output_config.effort`). Automated tests are request-shaping
+      only by design; needs a `DEEPSEEK_API_KEY`.

@@ -19,3 +19,5 @@
 - `clj-kondo --lint components/ai/src` clean (0 errors, 0 warnings).
 - Targeted test namespaces green.
 - No existing built-in Anthropic model or custom-provider behaviour changed.
+
+- Review (2026-08-07): added 5 follow-up steps to be addressed.
