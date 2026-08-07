@@ -256,3 +256,32 @@
       → Resolved: `/login` hint dropped from the custom-provider missing-key
       error; error names the `models.edn` `:auth` remedy. Test asserts the
       error mentions `models.edn` and contains no `/login`.
+
+## Follow-ups (implementation review 5, 2026-08-07)
+
+- [ ] `spec/custom-providers.allium` (the formal spec `user_models.clj`'s ns
+      docstring points to) was not updated for this task's behaviour changes:
+      `CustomModelDef`/`ResolvedCustomModel` carry no `adaptive_thinking`
+      field, and the auth rules do not reflect the provider-scoped api-key
+      resolution (custom `:anthropic-messages` providers never fall back to
+      `ANTHROPIC_API_KEY`) or the keyless `:no-auth-header`/headers-auth
+      behavior introduced by reviews 3/4. AGENTS.md change chain requires
+      `update(spec, δ|behaviour)` — add the field (and `ResolvedCustomModel`
+      carry-through) plus the provider-scoped key-resolution/keyless rules,
+      then run the allium-check workflow.
+- [ ] `build-request`'s headers-implies-auth inference is too broad: with a
+      blank configured key, ANY custom `:headers` makes `no-auth?` true, so a
+      provider with incidental headers (e.g. `X-Client`) and an unset
+      `env:DEEPSEEK_API_KEY` silently sends a keyless request (provider-side
+      401) instead of fast-failing with the clear "Missing API key for
+      provider <name>" error. The OpenAI transport only exempts on explicit
+      `:no-auth-header`, so the two transports now disagree. Refine: treat
+      custom headers as auth only when `:no-auth-header`/`:auth-header? false`
+      is set OR a recognized auth header (`x-api-key`/`authorization`) is
+      among them; add a test for the incidental-headers + blank-key case.
+- [ ] Reconcile the full-suite verification counts in implementation.md:
+      "Final verification pass" records 2550 tests / 19134 assertions while
+      "Follow-ups review 4 addressed" records 2551 tests / 18440 assertions
+      ("was 2550/19134") — the test count rose but the assertion count fell
+      by 694, which is either a transcription error or unstable suite
+      counts. Re-run `bb test` and record exact, consistent numbers.
