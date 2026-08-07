@@ -42,6 +42,7 @@
    [:id string?]
    [:name {:optional true} [:maybe string?]]
    [:supports-reasoning {:optional true} [:maybe boolean?]]
+   [:adaptive-thinking {:optional true} [:maybe boolean?]]
    [:supports-images {:optional true} [:maybe boolean?]]
    [:supports-text {:optional true} [:maybe boolean?]]
    [:context-window {:optional true} [:maybe pos-int?]]

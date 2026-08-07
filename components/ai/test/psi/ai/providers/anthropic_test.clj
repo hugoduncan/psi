@@ -235,6 +235,47 @@
           body    (json/parse-string (:body req) true)]
       (is (= 128000 (:max_tokens body))))))
 
+(def ^:private deepseek-custom-provider-model
+  "A custom-provider (non-catalog) Anthropic-compatible model map, shaped the
+   way `psi.ai.user-models/expand-model` produces one from a `models.edn`
+   DeepSeek entry with `:adaptive-thinking true`."
+  {:id "deepseek-v4-flash"
+   :name "DeepSeek V4 Flash"
+   :provider :deepseek
+   :api :anthropic-messages
+   :base-url "https://api.deepseek.com/anthropic"
+   :supports-reasoning true
+   :adaptive-thinking true
+   :supports-images false
+   :supports-text true
+   :context-window 1000000
+   :max-tokens 384000
+   :input-cost 0.14
+   :output-cost 0.28
+   :cache-read-cost 0.0028
+   :cache-write-cost 0.14})
+
+(deftest build-request-adaptive-thinking-custom-provider-test
+  (testing "a non-catalog custom-provider model map with :adaptive-thinking true emits the adaptive shape"
+    (let [convo (conv/create "sys")
+          req   (#'anthropic/build-request convo deepseek-custom-provider-model
+                                           {:thinking-level :high
+                                            :api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (= "adaptive" (get-in body [:thinking :type])))
+      (is (nil? (get-in body [:thinking :budget_tokens]))
+          "budget_tokens must be absent for adaptive thinking")
+      (is (= "high" (get-in body [:output_config :effort])))))
+
+  (testing "thinking off — no thinking param, no output_config"
+    (let [convo (conv/create "sys")
+          req   (#'anthropic/build-request convo deepseek-custom-provider-model
+                                           {:thinking-level :off
+                                            :api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (nil? (:thinking body)))
+      (is (nil? (:output_config body))))))
+
 (deftest build-request-normalizes-legacy-string-tool-parameters-test
   (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"
     (let [model        (models/get-model :opus-4.7)

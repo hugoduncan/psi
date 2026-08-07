@@ -155,6 +155,65 @@ same way but set `:api` to `:anthropic-messages`.
 For Anthropic-compatible providers, psi uses the Anthropic transport and will
 send the configured key through the compatible auth path.
 
+### Adaptive thinking
+
+Anthropic-compatible models may declare `:adaptive-thinking true` to opt into
+Anthropic's adaptive-thinking request shape (the same one used by Claude Opus
+4.7 and later): psi sends `output_config.effort` (derived from
+`/thinking`/`/effort`) instead of the older `thinking.budget_tokens` shape.
+Only set this when the compatible provider actually honours
+`output_config.effort` — check its own compatibility docs first. Omitting the
+field (or setting it `false`) keeps the classic extended-thinking shape, which
+remains the correct default for most Anthropic-compatible providers.
+
+## DeepSeek-compatible example
+
+DeepSeek exposes an Anthropic Messages-compatible endpoint at
+`https://api.deepseek.com/anthropic` (see
+[DeepSeek's Anthropic API guide](https://api-docs.deepseek.com/guides/anthropic_api/)),
+so it configures like any other Anthropic-compatible provider. DeepSeek's
+`deepseek-v4-flash` model supports Anthropic's adaptive-thinking
+`output_config.effort` field (its `thinking.budget_tokens` is accepted but
+ignored), so this example sets `:adaptive-thinking true`:
+
+```clojure
+{:version 1
+ :providers
+ {"deepseek"
+  {:base-url "https://api.deepseek.com/anthropic"
+   :api      :anthropic-messages
+   :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+   :models   [{:id                 "deepseek-v4-flash"
+               :name               "DeepSeek V4 Flash"
+               :supports-reasoning true
+               :adaptive-thinking  true
+               :supports-images    false
+               :supports-text      true
+               :context-window     1000000
+               :max-tokens         384000
+               :input-cost         0.14
+               :output-cost        0.28
+               :cache-read-cost    0.0028
+               :cache-write-cost   0.14}]}}}
+```
+
+Then export your key:
+
+```bash
+export DEEPSEEK_API_KEY=...
+```
+
+Notes:
+- pricing/context-window figures above are from DeepSeek's published pricing
+  page as of this writing; confirm current figures in DeepSeek's own docs
+  before relying on them for cost tracking
+- DeepSeek's Anthropic-compatible endpoint does not document a
+  JSON-Schema-native structured-output mechanism, so this example omits
+  `:capabilities :structured-output` (defaults to unsupported); add
+  `:strategies [:prompted-json]` if you want prompted-JSON fallback
+- image, document, and search-result content blocks are not supported by
+  DeepSeek's Anthropic-compatible endpoint
+
 Custom providers do not define their own proxy fields. When a custom provider
 uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it
 inherits the same environment-driven outbound proxy behavior documented in

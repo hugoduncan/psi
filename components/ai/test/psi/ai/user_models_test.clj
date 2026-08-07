@@ -262,3 +262,36 @@
                                 :models   [{:id "claude-local"}]}}})]
       (is (nil? (:error result)))
       (is (= :anthropic-messages (:api (first (:models result))))))))
+
+;; ── Adaptive thinking (custom providers) ─────────────────────────────────────
+
+(deftest adaptive-thinking-field-test
+  (testing "explicit :adaptive-thinking true is accepted and flows through"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :supports-reasoning true
+                                            :adaptive-thinking true}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (true? (:adaptive-thinking model)))))
+
+  (testing "explicit :adaptive-thinking false is accepted and flows through"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :adaptive-thinking false}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (false? (:adaptive-thinking model)))))
+
+  (testing "omitted :adaptive-thinking remains valid and stays absent/falsy"
+    (let [result (user-models/parse-models-config minimal-config)
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (not (contains? model :adaptive-thinking)))
+      (is (false? (boolean (:adaptive-thinking model)))))))
