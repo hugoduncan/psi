@@ -27,7 +27,6 @@
 - Review 4 (2026-08-07): added 3 steps to be addressed.
 - Review 5 (2026-08-07): added 3 steps to be addressed.
 ## Follow-ups addressed (2026-08-07)
-
 - addressed 4 review steps
 - `anthropic_test.clj` custom-provider test now also asserts headers (`x-api-key` from configured key, no `Authorization`, `anthropic-version` present, no `anthropic-beta`) and `:temperature` absent (both thinking on and off) — mirrors the sibling catalog test.
 - `anthropic_stream_test.clj` adds a DeepSeek stream-seam test proving `https://api.deepseek.com/anthropic/v1/messages` is derived from `:base-url` (posted URL captured via `http/post` redef, mirroring the MiniMax pattern). Chose the stream-seam approach over extracting a `request-url` fn — zero production code change.
@@ -85,3 +84,36 @@
   set in environment (not attempted with the user-local key without explicit
   direction); request-shaping coverage only by design.
 - addressed 5 review steps (verified committed resolution a48d288ce end-to-end: full `bb test` green 2551 tests / 0 failures, clj-kondo clean, steps.md items closed; optional live smoke test still blocked on `DEEPSEEK_API_KEY`).
+
+## Follow-ups review 5 addressed (2026-08-07)
+
+- addressed 3 review steps
+- `spec/custom-providers.allium` updated: `CustomModelDef`/`ResolvedCustomModel`
+  now carry `adaptive_thinking` (carried through in `ParseModelsConfig`); new
+  `ResolveRequestApiKey` rule models provider-scoped key resolution (built-in
+  Anthropic env fallback; custom-provider fast-fail naming the models.edn
+  `:auth` remedy; keyless exemptions via `:no-auth-header` or a recognized
+  auth header among custom `:headers`), plus an `ExistsAuthHeader` rule
+  (x-api-key / authorization only — incidental headers do not imply keyless);
+  `InjectCustomProviderAuth`/`NoAuthHeaderWhenDisabled` updated for keyless
+  configs. `anthropic-provider.allium` `ApiKeyResolved` updated to match
+  (was unconditional `ANTHROPIC_API_KEY` fallback). allium-check run manually
+  (no automated allium checker in repo): spec now matches implementation in
+  all three behaviour areas.
+- `build-request` headers-implies-auth inference narrowed: custom `:headers`
+  only imply keyless auth when a recognized auth header (x-api-key /
+  authorization, case-insensitive, new `auth-header?` helper) is among them
+  and no `:api-key` is configured; incidental headers (e.g. `X-Client`) with
+  a blank key now fast-fail with the clear "Missing API key for provider
+  <name>" error instead of silently sending a keyless request. Tests added:
+  incidental-headers + blank-key throws (with and without explicit `:api-key
+  ""`); `Authorization`-header-only auth (no `:no-auth-header`) builds a
+  keyless request. Namespace green (16 tests / 111 assertions); clj-kondo
+  clean (0 errors / 0 warnings) on changed source/tests.
+- Full `bb test` re-run twice, stable both times: 2551 tests / 19153
+  assertions, 0 failures — replaces the inconsistent recorded figures
+  (2550/19134 vs 2551/18440); the 18440 figure was an anomalous run /
+  transcription error (assertions cannot fall 694 while the namespace grew by
+  15 assertions).
+- Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.

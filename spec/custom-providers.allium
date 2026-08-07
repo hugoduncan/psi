@@ -17,7 +17,10 @@ value ApiKeySpec {
     -- Resolution order:
     --   1. "env:VAR_NAME"  → System/getenv("VAR_NAME")
     --   2. literal string  → used as-is
-    -- nil / absent → no auth
+    -- nil / absent → no key; whether that is an error depends on the
+    --   provider: built-in Anthropic models fall back to ANTHROPIC_API_KEY;
+    --   custom providers fail fast with a provider-scoped missing-key error
+    --   unless the request is explicitly keyless (see ResolveRequestApiKey).
     raw: String?
 }
 
@@ -35,6 +38,12 @@ value CustomModelDef {
     supports_reasoning: Boolean = false
     supports_images: Boolean = false
     supports_text: Boolean = true
+    adaptive_thinking: Boolean = false
+    -- adaptive_thinking true → transport sends the adaptive request shape
+    -- (thinking type "adaptive" + output_config.effort) instead of the classic
+    -- extended-thinking shape (budget_tokens). Only meaningful for
+    -- :api anthropic_messages custom providers (and built-in Anthropic
+    -- catalog models); ignored for OpenAI-compatible providers.
     context_window: PositiveInt = 128000
     max_tokens: PositiveInt = 16384
     input_cost: Number = 0.0
@@ -66,6 +75,7 @@ value ResolvedCustomModel {
     supports_reasoning: Boolean
     supports_images: Boolean
     supports_text: Boolean
+    adaptive_thinking: Boolean
     context_window: PositiveInt
     max_tokens: PositiveInt
     input_cost: Number
@@ -125,6 +135,7 @@ rule ParseModelsConfig {
                 supports_reasoning: model_def.supports_reasoning,
                 supports_images: model_def.supports_images,
                 supports_text: model_def.supports_text,
+                adaptive_thinking: model_def.adaptive_thinking,
                 context_window: model_def.context_window,
                 max_tokens: model_def.max_tokens,
                 input_cost: model_def.input_cost,
@@ -136,12 +147,53 @@ rule ParseModelsConfig {
 
 rule ResolveApiKey {
     -- Resolve raw api-key spec to concrete string or nil.
+    -- This is the mechanical resolution only; provider-scoped fallback and
+    -- keyless exemptions are applied by ResolveRequestApiKey below.
 
     when: ApiKeySpec(raw)
 
     ensures: raw == null implies resolved = null
     ensures: StartsWith(raw, "env:") implies resolved = SystemGetenv(Substring(raw, 4))
     ensures: not StartsWith(raw, "env:") implies resolved = raw
+}
+
+rule ResolveRequestApiKey {
+    -- Provider-scoped API-key resolution for a request, matching the Anthropic
+    -- transport's resolve-api-key:
+    --   * built-in Anthropic models (provider nil or "anthropic") fall back to
+    --     the ANTHROPIC_API_KEY env var when no key is configured;
+    --   * custom :anthropic-messages providers NEVER fall back to
+    --     ANTHROPIC_API_KEY — a nil/blank configured key is an error naming
+    --     the provider and the models.edn :auth remedy, so an Anthropic key
+    --     can never be silently sent to a third-party endpoint;
+    --   * keyless requests (explicit no_auth_header, or a recognized auth
+    --     header — x-api-key / authorization — among custom :headers with no
+    --     configured key) require no key at all.
+
+    when: BuildPreparedRequest(session, model) and LookupProviderAuth(model.provider) != null
+
+    let keyless = options.no_auth_header
+                  or (non-empty(options.headers)
+                      and BlankOrNil(options.api_key)
+                      and ExistsAuthHeader(options.headers))
+
+    ensures: keyless implies resolved_key = null
+    ensures: not keyless and (model.provider == null or model.provider == "anthropic")
+        implies resolved_key = options.api_key ?? SystemGetenv("ANTHROPIC_API_KEY")
+    ensures: not keyless and model.provider != null and model.provider != "anthropic"
+        and BlankOrNil(options.api_key)
+        implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn")
+}
+
+rule ExistsAuthHeader {
+    -- A header is a recognized auth header when its lower-cased name is
+    -- "x-api-key" or "authorization". Incidental headers (e.g. X-Client) are
+    -- NOT auth headers and do not make a request keyless.
+
+    when: HeaderNamed(header, name)
+
+    ensures: ExistsAuthHeader(headers) iff
+        ∃ header ∈ headers. LowerCase(name(header)) ∈ {"x-api-key", "authorization"}
 }
 
 -- ── Precedence ───────────────────────────────────────────────────────────────
@@ -192,30 +244,42 @@ rule ProviderDispatchByApi {
 rule InjectCustomProviderAuth {
     -- During request preparation, if the model's provider has a custom auth
     -- config, inject the resolved api-key and headers into stream options.
+    -- Keyless configs (auth_header false / no_auth_header, or a recognized
+    -- auth header among custom :headers with no configured key) carry no key.
 
     when: BuildPreparedRequest(session, model)
 
     let auth = LookupProviderAuth(model.provider)
+    let keyless = auth != null and (
+        not auth.auth_header
+        or (non-empty(auth.headers) and BlankOrNil(auth.api_key) and ExistsAuthHeader(auth.headers)))
 
     ensures: auth == null implies ai_options unchanged
-    ensures: auth != null and auth.api_key != null and auth.auth_header implies
+    ensures: auth != null and not keyless and auth.api_key != null and auth.auth_header implies
         ai_options.api_key = auth.api_key
-    ensures: auth != null and auth.api_key != null and not auth.auth_header implies
+    ensures: auth != null and not keyless and auth.api_key != null and not auth.auth_header implies
         ai_options.api_key = null
         -- Provider transport will not send Authorization header
+    ensures: auth != null and keyless implies
+        ai_options.api_key = null
+        -- Keyless request: no key resolved; transport strips auth headers
     ensures: auth != null and auth.headers != null implies
         ai_options.headers = Merge(ai_options.headers or {}, auth.headers)
 }
 
 rule NoAuthHeaderWhenDisabled {
     -- When auth_header is false, the transport must not send Authorization.
-    -- This supports local servers that reject auth headers.
+    -- This supports local servers that reject auth headers. The same applies
+    -- to any keyless custom-provider request: the Anthropic transport strips
+    -- both x-api-key and Authorization when no key is resolved.
 
     when: BuildProviderRequest(model, options)
 
     requires: LookupProviderAuth(model.provider).auth_header == false
+              or ResolveRequestApiKey(model, options).keyless
 
     ensures: request.headers does not contain "Authorization"
+    ensures: keyless implies request.headers does not contain "x-api-key"
 }
 
 -- ── Validation errors ────────────────────────────────────────────────────────

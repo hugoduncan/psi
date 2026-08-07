@@ -259,17 +259,29 @@
 
 ## Follow-ups (implementation review 5, 2026-08-07)
 
-- [ ] `spec/custom-providers.allium` (the formal spec `user_models.clj`'s ns
+- [x] `spec/custom-providers.allium` (the formal spec `user_models.clj`'s ns
       docstring points to) was not updated for this task's behaviour changes:
-      `CustomModelDef`/`ResolvedCustomModel` carry no `adaptive_thinking`
-      field, and the auth rules do not reflect the provider-scoped api-key
-      resolution (custom `:anthropic-messages` providers never fall back to
+      `CustomModelDef`/`ResolvedCustomModel` carry no `adaptive_thinking` field,
+      and the auth rules do not reflect the provider-scoped api-key resolution
+      (custom `:anthropic-messages` providers never fall back to
       `ANTHROPIC_API_KEY`) or the keyless `:no-auth-header`/headers-auth
       behavior introduced by reviews 3/4. AGENTS.md change chain requires
       `update(spec, δ|behaviour)` — add the field (and `ResolvedCustomModel`
       carry-through) plus the provider-scoped key-resolution/keyless rules,
       then run the allium-check workflow.
-- [ ] `build-request`'s headers-implies-auth inference is too broad: with a
+      → Resolved: `CustomModelDef` and `ResolvedCustomModel` now carry
+      `adaptive_thinking` (carried through in `ParseModelsConfig`); new
+      `ResolveRequestApiKey` rule models provider-scoped resolution (built-in
+      Anthropic env fallback, custom-provider fast-fail naming the models.edn
+      `:auth` remedy, keyless exemptions via `:no-auth-header` or a recognized
+      auth header among custom `:headers`), with an `ExistsAuthHeader` rule
+      (x-api-key / authorization only — incidental headers do not imply
+      keyless); `InjectCustomProviderAuth`/`NoAuthHeaderWhenDisabled` updated
+      for keyless configs. `anthropic-provider.allium`'s `ApiKeyResolved` rule
+      updated to match (was unconditional `ANTHROPIC_API_KEY` fallback).
+      allium-check performed manually (no automated allium checker in repo):
+      spec now matches the implementation in all three behaviour areas.
+- [x] `build-request`'s headers-implies-auth inference is too broad: with a
       blank configured key, ANY custom `:headers` makes `no-auth?` true, so a
       provider with incidental headers (e.g. `X-Client`) and an unset
       `env:DEEPSEEK_API_KEY` silently sends a keyless request (provider-side
@@ -279,9 +291,23 @@
       custom headers as auth only when `:no-auth-header`/`:auth-header? false`
       is set OR a recognized auth header (`x-api-key`/`authorization`) is
       among them; add a test for the incidental-headers + blank-key case.
-- [ ] Reconcile the full-suite verification counts in implementation.md:
+      → Resolved: `build-request` now only treats custom `:headers` as
+      keyless-auth when a recognized auth header (`x-api-key` /
+      `authorization`, case-insensitive, via new `auth-header?` helper) is
+      among them and no `:api-key` is configured; incidental headers with a
+      blank key now fast-fail with "Missing API key for provider <name>".
+      Tests added: incidental `X-Client` + blank key throws (both with
+      explicit `:api-key ""` and no key), and `Authorization`-header-only auth
+      (no `:no-auth-header`) builds a keyless request. Namespace green (16
+      tests / 111 assertions); clj-kondo clean.
+- [x] Reconcile the full-suite verification counts in implementation.md:
       "Final verification pass" records 2550 tests / 19134 assertions while
       "Follow-ups review 4 addressed" records 2551 tests / 18440 assertions
       ("was 2550/19134") — the test count rose but the assertion count fell
       by 694, which is either a transcription error or unstable suite
       counts. Re-run `bb test` and record exact, consistent numbers.
+      → Resolved: full `bb test` re-run twice, stable both times: 2551 tests /
+      19153 assertions, 0 failures. The 18440 figure was an anomalous run /
+      transcription error (assertions cannot fall 694 while the namespace grew
+      by 15 assertions); the current exact, reproducible count is
+      2551 / 19153.

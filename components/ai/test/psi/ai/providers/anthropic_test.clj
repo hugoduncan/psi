@@ -215,7 +215,53 @@
           convo   (conv/create "sys")
           headers (:headers (#'anthropic/build-request convo model {:no-auth-header true}))]
       (is (nil? (get headers "x-api-key")))
-      (is (nil? (get headers "Authorization"))))))
+      (is (nil? (get headers "Authorization")))))
+
+  (testing "incidental custom headers with a blank key fast-fail with the missing-key error"
+    (let [model {:id "deepseek-v4-flash"
+                 :name "DeepSeek V4 Flash"
+                 :provider :deepseek
+                 :api :anthropic-messages
+                 :base-url "https://api.deepseek.com/anthropic"
+                 :supports-reasoning true
+                 :supports-text true
+                 :context-window 1000000
+                 :max-tokens 384000}
+          convo (conv/create "sys")]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Missing API key for provider deepseek"
+           (#'anthropic/build-request convo model {:api-key ""
+                                                   :headers {"X-Client" "psi"}}))
+          "incidental headers must not imply keyless auth — a blank configured key still fast-fails")
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Missing API key for provider deepseek"
+           (#'anthropic/build-request convo model {:headers {"X-Client" "psi"}}))
+          "incidental headers with no configured key still fast-fail")))
+
+  (testing "recognized auth header among custom headers (case-insensitive) implies keyless auth"
+    (let [model {:id "local-proxy"
+                 :name "Local Proxy"
+                 :provider :local-proxy
+                 :api :anthropic-messages
+                 :base-url "http://localhost:8080"
+                 :supports-reasoning false
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:headers {"Authorization" "Bearer token"}})
+          headers (:headers req)]
+      (is (= "Bearer token" (get headers "Authorization"))
+          "authorization header auth is preserved")
+      (is (nil? (get headers "x-api-key"))
+          "no x-api-key when auth comes from an authorization header"))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"

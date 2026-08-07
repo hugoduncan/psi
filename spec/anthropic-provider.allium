@@ -275,7 +275,20 @@ rule ConsecutiveToolResultsMergedIntoSingleUserMessage {
 rule ApiKeyResolved {
     when: AnthropicStreamRequested(stream)
 
-    ensures: stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
+    -- Provider-scoped resolution (see spec/custom-providers.allium
+    -- ResolveRequestApiKey): built-in Anthropic models (provider nil or
+    -- "anthropic") fall back to ANTHROPIC_API_KEY; custom providers never do
+    -- (a nil/blank configured key is a provider-scoped missing-key error);
+    -- keyless requests (no_auth_header, or a recognized auth header among
+    -- custom :headers with no configured key) resolve to nil and the
+    -- transport strips x-api-key / Authorization.
+
+    ensures: BuiltinAnthropic(stream.model)
+        implies stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
+    ensures: CustomProvider(stream.model) and not stream.keyless
+        implies stream.resolved_api_key = stream.options.api_key
+              and not BlankOrNil(stream.resolved_api_key)
+    ensures: stream.keyless implies stream.resolved_api_key = null
 }
 
 rule OAuthDetectedFromApiKey {

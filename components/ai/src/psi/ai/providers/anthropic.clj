@@ -197,9 +197,11 @@
    custom provider's request can never silently send the user's Anthropic key
    to a third-party endpoint.
 
-   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers or
-   custom `:headers`-only auth), no key is required: the caller strips the auth
-   headers anyway, so this returns nil instead of failing."
+   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
+   no key is required: the caller strips the auth headers anyway, so this
+   returns nil instead of failing. (Headers-only auth without
+   `:no-auth-header` is handled by `build-request` — it skips this function
+   entirely when a recognized auth header is present among custom `:headers`.)"
   [model options]
   (when-not (:no-auth-header options)
     (let [provider    (:provider model)
@@ -221,6 +223,12 @@
                           {:error-code "auth/missing-api-key"
                            :provider provider}))))
       api-key)))
+
+(defn- auth-header?
+  "True when a header name is a recognized auth header (case-insensitive)."
+  [header]
+  (contains? #{"x-api-key" "authorization"}
+             (str/lower-case (name header))))
 
 (defn- request-body
   [conversation model options stream? oauth?]
@@ -270,12 +278,17 @@
          adaptive?          (adaptive-thinking? model)
          ;; No auth key is required when the request is explicitly keyless
          ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
-         ;; custom :headers supply the auth (e.g. header-only auth) without a
-         ;; configured :api-key. Skipping resolution here keeps those configs
-         ;; working; a resolved nil key must not reach request-headers.
+         ;; custom :headers supply a recognized auth header (x-api-key /
+         ;; authorization) without a configured :api-key. Incidental custom
+         ;; headers (e.g. X-Client) do NOT imply keyless: with a blank
+         ;; configured key such a request fast-fails with the clear
+         ;; "Missing API key" error instead of silently sending a keyless
+         ;; request (provider-side 401) — consistent with the OpenAI
+         ;; transport, which only exempts on explicit :no-auth-header.
          no-auth?           (or (:no-auth-header options)
                                 (and (seq (:headers options))
-                                     (str/blank? (:api-key options))))
+                                     (str/blank? (:api-key options))
+                                     (some auth-header? (keys (:headers options)))))
          api-key            (when-not no-auth?
                               (resolve-api-key model options))
          oauth?             (oauth-api-key? api-key)
