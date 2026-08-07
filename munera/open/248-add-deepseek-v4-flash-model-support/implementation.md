@@ -84,3 +84,4 @@
 - Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not
   set in environment (not attempted with the user-local key without explicit
   direction); request-shaping coverage only by design.
+- addressed 5 review steps (verified committed resolution a48d288ce end-to-end: full `bb test` green 2551 tests / 0 failures, clj-kondo clean, steps.md items closed; optional live smoke test still blocked on `DEEPSEEK_API_KEY`).
