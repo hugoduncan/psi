@@ -112,3 +112,25 @@
       shape (and that `cache-write-cost` mirroring the miss rate does not
       double-count) or adjust the example costs; consider documenting the
       mirroring rationale in the docs example notes.
+
+## Follow-ups (implementation review 3, 2026-08-07)
+
+- [ ] API-key resolution for custom `:anthropic-messages` providers:
+      `anthropic/resolve-api-key` falls back to the `ANTHROPIC_API_KEY` env
+      var when `:api-key` is nil and errors with an Anthropic-specific
+      message ("Set ANTHROPIC_API_KEY or login via /login anthropic"). With
+      the new DeepSeek docs example (`env:DEEPSEEK_API_KEY`), an unset
+      `DEEPSEEK_API_KEY` (with `ANTHROPIC_API_KEY` set, common for psi
+      users) would silently send the user's Anthropic key to
+      `https://api.deepseek.com/anthropic/v1/messages` — cross-provider
+      credential disclosure and a misleading error. Decide: (a) error when
+      a custom provider's configured key resolves nil instead of falling
+      back to the Anthropic env var (provider-scoped resolution), and/or
+      (b) document the fallback in `doc/custom-providers.md` + add a test
+      proving the fallback does not leak the Anthropic key to a non-
+      anthropic provider.
+- [ ] `doc/custom-providers.md` `:adaptive-thinking` section: explicitly
+      state the field is only meaningful for `:api :anthropic-messages`
+      custom providers (and built-in Anthropic catalog models) — design
+      acceptance criteria call this out; the current text only implies it
+      via section placement ("Anthropic-compatible models may declare...").
