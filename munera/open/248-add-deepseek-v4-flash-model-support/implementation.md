@@ -129,3 +129,4 @@
   suite red) + kaocha per-run seed randomization. Unrelated to this task's
   changed files. Stable task-relevant deltas: 2550→2551 tests (added
   deftest), namespace 92→111 assertions.
+ - Review 6 (2026-08-07): added 3 steps to be addressed.

@@ -321,3 +321,37 @@
       deftest) and namespace growth 92→111 assertions (added tests). Exact
       record: latest fresh `bb test` = 2551 tests / 19153 assertions /
       0 failures.
+
+## Follow-ups (implementation review 6, 2026-08-07)
+
+- [ ] Parse-lock the exact documented DeepSeek `models.edn` example:
+      `user_models_test.clj` covers only minimal deepseek model defs (id +
+      supports-reasoning + adaptive-thinking), never the full documented
+      example (pricing/context-window 1000000/max-tokens 384000 +
+      `:adaptive-thinking true` + `:auth {:api-key "env:DEEPSEEK_API_KEY"}`)
+      from `doc/custom-providers.md`. A parse test of the exact example
+      would guard the closed `ModelDef`/`AuthConfig` schemas against
+      docs/code drift (e.g. a future field typo silently making the
+      documented example invalid).
+- [ ] No request-shaping test proves the classic extended-thinking shape for
+      a NON-catalog custom-provider model map: all `budget_tokens` shape
+      tests use built-in catalog models (`build-request-with-thinking-test`,
+      cache-control test), while custom-provider maps are only tested for
+      missing-auth and the adaptive shape. The docs advise DeepSeek users
+      who need temperature to fall back to `:adaptive-thinking false`/omitted
+      ("relies on the classic extended-thinking shape DeepSeek accepts") —
+      prove that path: a `build-request` test with a custom map
+      (e.g. `deepseek-custom-provider-model` minus `:adaptive-thinking`) +
+      thinking `:medium` asserting `{:type "enabled" :budget_tokens 8000}`
+      and no `output_config`. Locks the AC "no custom-provider behaviour
+      changes" for the classic path.
+- [ ] `speed` fast-mode is unverified against DeepSeek: psi sends
+      `"speed": "fast"` in the request body when fast mode is on
+      (`request-body` `:speed-mode`), but DeepSeek's Anthropic compat table
+      does not list `speed` and Anthropic-compatible endpoints typically
+      reject unknown body fields (400). The DeepSeek example notes enumerate
+      unsupported features (images, structured output, temperature trade-off,
+      thinking-off) but not this. Verify against a live turn or add a note
+      documenting that fast mode is unsupported/unverified on
+      `deepseek-v4-flash` (alongside the existing blocked live-smoke-test
+      caveat).
