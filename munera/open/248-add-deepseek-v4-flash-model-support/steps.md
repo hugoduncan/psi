@@ -1238,3 +1238,61 @@
       `request-support` alias; `openai/transport.clj` redaction delegates to
       shared `redact-headers`. Behavior-preserving — full `bb test` green,
       clj-kondo clean.
+
+## Follow-ups (implementation review 15, 2026-08-07)
+
+- [ ] `:adaptive-thinking` "ignored for `:openai-codex-responses`" is
+      untested: doc/custom-providers.md says the field "is ignored for
+      OpenAI-compatible (`:openai-completions` / `:openai-codex-responses`)
+      custom providers" and `expand-model` carries it into every custom model
+      map, but the only no-op lock is
+      `openai-completions-adaptive-thinking-ignored-for-custom-providers-test`
+      (review 10, completions only). The codex transport never reads
+      `:adaptive-thinking` (`openai/reasoning.clj` `reasoning-effort` maps
+      `:thinking-level` → classic `reasoning_effort`), so the claim holds —
+      but no codex test proves it. Add a `build-codex-request` deftest
+      mirroring the completions lock: a custom `:openai-codex-responses`
+      model with and without `:adaptive-thinking true` (+ `:thinking-level
+      :high`) yields byte-identical bodies, no `output_config`/adaptive
+      leakage, classic `reasoning_effort "high"` unchanged. Codex was added
+      to the docs claim in review 13 without the lock that review 10 closed
+      for completions.
+- [ ] Custom-provider test fixtures no longer match the expand-model shape
+      they claim to represent: `deepseek-custom-provider-model`
+      (anthropic_test.clj) and the literal model map in
+      `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`
+      (anthropic_stream_test.clj) are documented as shaped "the way
+      `psi.ai.user-models/expand-model` produces" the map, but review 14's
+      `expand-model` now tags every custom models.edn model `:custom? true`
+      — both fixtures omit the tag. Behavior-neutral today (`:provider
+      :deepseek` is never classified built-in regardless), but the fixtures'
+      stated purpose (proving the transport path for an expand-model-shaped
+      map) has silently drifted; a future `builtin?`/`:custom?` semantics
+      change would not be caught. Add `:custom? true` to both fixtures (one
+      line each) and re-run `psi.ai.providers.anthropic-test` +
+      `psi.ai.providers.anthropic-stream-test`.
+- [ ] `getenv` indirection duplicated across layers: `user_models.clj`'s
+      private `getenv` (review 10) and `request_support/getenv` (review 14)
+      are the identical 3-line `System/getenv` testability wrapper, and
+      `parse-documented-deepseek-example-test` redefs `user-models/getenv`
+      while the transport tests redef `request-support/getenv`. The review-14
+      dedup ("future fixes land once") covered the three transports but left
+      the config-parse layer's copy in place. Consider delegating
+      `user_models/resolve-api-key-spec`'s `env:` lookup to the shared
+      `request-support/getenv` (update the parse-lock test's redef target
+      accordingly) so env-lookup testability lives in one place, or document
+      why the config-parse layer intentionally keeps its own indirection.
+- [ ] Committed tree fails the repo file-length commit gate:
+      HEAD's `components/ai/test/psi/ai/providers/anthropic_test.clj` is 943
+      lines (> the 800-line `commit-check:file-lengths` limit; no legacy
+      ratchet covers it — bb.edn lists only extension files), so
+      `bb commit-check:file-lengths` and the extensions commit-checks suite
+      (`file-length-check-enforces-real-legacy-ratchets-test`) fail
+      deterministically on the committed state. A fix exists in the working
+      tree (verified 2026-08-07): the cohesive anthropic auth cluster was
+      split into `anthropic_auth_test.clj` (389 lines) leaving
+      `anthropic_test.clj` at 575 lines — behavior-preserving (20 tests /
+      140 assertions across the two namespaces, unchanged) — but the split
+      is UNCOMMITTED. Commit the split (or an equivalent reduction) before
+      close so the committed task state satisfies the repo gate; add the
+      file-length gate to the verification checklist for this task.

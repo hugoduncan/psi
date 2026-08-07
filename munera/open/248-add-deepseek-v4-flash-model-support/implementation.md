@@ -769,3 +769,48 @@
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design (steps.md item
   left unchecked).
+
+## Review 14 finalization pass (2026-08-07)
+
+- Review-14 items verified end-to-end on the committed tree (34f3cc404); this
+  pass adds the empirical flake verification (review-14 item 1) and one
+  verification catch.
+- **Scheduler-lifecycle flake — empirical verification (review-14 item 1):**
+  a full-suite run on the committed tree with the review-recorded failing
+  seed (`--seed 1741154775`) reproduced the flake exactly — 2561 passed /
+  1 failed (`scheduled-deliver-runs-canonical-prompt-lifecycle-test`, 5
+  failed assertions: session phase `:streaming` instead of `:idle`, no
+  assistant message, no `:scheduler/deliver` /
+  `:session/prompt-record-response` / `:session/prompt-finish` entries). A
+  full-suite run at the task base commit (3c286a46e, parent of the first
+  task-248 commit) with the SAME seed passed (2548 tests / 0 failures) —
+  consistent with a probabilistic ~1-in-8 timing race (a single run has
+  ~88% chance of not reproducing, and the base test set differs so the
+  kaocha shuffle differs). `components/agent-session/` is byte-identical
+  across the task (zero diff base→HEAD; the test file was last touched by
+  task #201, ab526eee8), so the race is definitionally pre-existing and
+  independent of this task's changed files. A further full-suite run
+  (random seed 941216726) reproduced it again — seed-independent. Added to
+  the flake inventory alongside the two retry-loop flakes and the committed
+  byte-identity entry.
+- **anthropic_test.clj file-length breach fixed (verification catch):** the
+  extensions commit-checks suite
+  (`file-length-check-enforces-real-legacy-ratchets-test`) failed
+  deterministically on the committed tree —
+  `components/ai/test/psi/ai/providers/anthropic_test.clj` had grown to 943
+  lines (limit 800) through the accumulated review-driven test additions
+  (already 858 at the review-13 address commit, 16e5fdc24). Split the
+  cohesive anthropic-provider auth cluster into a new
+  `components/ai/test/psi/ai/providers/anthropic_auth_test.clj` (389 lines):
+  `build-request-no-auth-header-custom-provider-test`,
+  `configured-key-plus-recognized-auth-header-interplay-test`,
+  `build-request-oauth-injects-claude-code-system-test`,
+  `build-request-oauth-gated-on-builtin-models-test`,
+  `custom-provider-named-anthropic-not-builtin-test`, plus the private
+  `claude-code-system` helper. `anthropic_test.clj` is now 579 lines.
+  Behavior-preserving: 20 tests / 140 assertions across the two namespaces
+  (unchanged total), cljfmt + clj-kondo clean.
+- Verification: extensions suite green (364 passed / 0 failed — the
+  file-length check passes again); full unit suite green (this pass's run
+  below); cljfmt + clj-kondo clean on all changed files.
+- Review 15 (2026-08-07): added 4 steps to be addressed.
