@@ -730,6 +730,35 @@
       stream tests mirroring `anthropic_stream_test.clj` (mixed-case
       `X-API-Key` → `***REDACTED***`, lowercase `authorization` → `Bearer
       ***REDACTED***`).
+
+## Follow-ups (implementation review 12, 2026-08-07)
+
+- [ ] CHANGELOG has no entry for this task's user-visible custom-provider
+      behavior changes: `[Unreleased]` documents only the DeepSeek example +
+      `:adaptive-thinking` field (Added). The review-driven provider-scoped
+      API-key resolution (custom `:anthropic-messages` and
+      `:openai-completions` providers no longer silently fall back to
+      `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` — they fail fast with a
+      provider-scoped missing-key error), the keyless exemptions
+      (`:no-auth-header`/`:auth-header? false`, recognized auth header among
+      custom `:headers`), the OAuth content-sniff gating to built-in
+      Anthropic models (review 11), and the case-insensitive auth-header
+      capture redaction are all user-visible `δ` per AGENTS.md changelog
+      policy (a custom-provider user relying on the old env-var fallback now
+      gets a hard error instead of silent forwarding). Add a `[Unreleased]`
+      → `Changed` (or `Fixed`) entry summarizing these provider-transport
+      behavior changes.
+- [ ] Custom-provider missing-key error suggests an env var name derived from
+      the raw provider key with hyphens preserved — both transports:
+      `anthropic/resolve-api-key` and
+      `openai/chat-completions/resolve-api-key` build
+      `"env:" (str/upper-case (name provider)) "_API_KEY"`, so a kebab-case
+      provider key (e.g. the docs' own `my-anthropic-proxy` example) yields
+      `env:MY-ANTHROPIC-PROXY_API_KEY` — not a usable shell env var name
+      (bash identifiers cannot contain `-`) and inconsistent with the docs'
+      underscore convention (`MY_PROXY_API_KEY`, `MINIMAX_API_KEY`).
+      Normalize `-` → `_` when deriving the suggested name (both transports)
+      and add a test asserting the suggestion for a kebab-case provider key.
 - [ ] `oauth-api-key?` content-sniffs the resolved key with no provider gate:
       a custom `:anthropic-messages` provider whose configured key contains
       `sk-ant-oat` is treated as an OAuth request — `Authorization: Bearer` +
