@@ -548,3 +548,64 @@
       no schema error, no warning. Document the dependency in the
       `:adaptive-thinking` field section (and/or the DeepSeek example notes)
       so both flags are known to be required together.
+
+## Follow-ups (implementation review 10, 2026-08-07)
+
+- [ ] `spec/custom-providers.allium`'s review-5 rules carry the same
+      undefined-reference problem review 9 flagged for
+      `anthropic-provider.allium`'s `ApiKeyResolved` — the review-5 "spec now
+      matches the implementation" claim holds for `custom-providers.allium`
+      only in the same uncheckable sense. `ResolveRequestApiKey`,
+      `ExistsAuthHeader`, `InjectCustomProviderAuth` and
+      `NoAuthHeaderWhenDisabled` reference predicates/entities/functions never
+      defined anywhere in the spec suite: `BuildPreparedRequest`,
+      `LookupProviderAuth`, an `options` entity with
+      `no_auth_header`/`headers`/`api_key` fields, `SystemGetenv`,
+      `BlankOrNil`, `HeaderNamed`, `LowerCase`. `ExistsAuthHeader` is a rule
+      whose own `ensures` uses `ExistsAuthHeader(headers)` as a predicate
+      (self-referential), and `NoAuthHeaderWhenDisabled` invokes
+      `ResolveRequestApiKey(model, options).keyless` as a value expression (a
+      rule, not a function). Fold this into the review-9 item-1 fix so both
+      specs are left checkable.
+- [ ] OpenAI `chat_completions` transport still leaks the user's OpenAI key to
+      custom `:openai-completions` providers: `build-request`'s Authorization
+      header is `(or (:api-key options) (System/getenv "OPENAI_API_KEY"))`
+      for every provider, so a custom OpenAI-compatible provider with an
+      unset/blank configured key silently sends the global `OPENAI_API_KEY`
+      to the third-party endpoint — the exact cross-provider credential
+      disclosure class review 3 eliminated for the anthropic transport
+      (provider-scoped `resolve-api-key`). The new `doc/custom-providers.md`
+      "API-key resolution is provider-scoped" text is anthropic-only, so it
+      does not contradict, but the asymmetry is undocumented and untested:
+      either make custom `:openai-completions` key resolution provider-scoped
+      like the anthropic transport, or explicitly document that the OpenAI
+      transport still falls back to `OPENAI_API_KEY`; add a no-leak test
+      mirroring the anthropic `anthropic_test.clj` one (custom provider with
+      redef'd `getenv`/env → throws or refuses rather than sending the key).
+- [ ] `parse-documented-deepseek-example-test`'s env-auth assertion is
+      tautological: `(= (user-models/resolve-api-key-spec
+      "env:DEEPSEEK_API_KEY") (:api-key auth))` — `extract-provider-auth`
+      already resolved `:api-key` via the same `resolve-api-key-spec` call, so
+      this is `(= X X)` and passes whether `DEEPSEEK_API_KEY` is set, unset,
+      or env resolution is broken. It proves nothing about provider-scoped env
+      auth. Assert against the actual env value (e.g.
+      `(System/getenv "DEEPSEEK_API_KEY")`, with the env-dependency
+      documented) or redef the env lookup to a known sentinel so the
+      resolution path is genuinely exercised. (Distinct from the review-9
+      item-3 doc-copy concern — this remains a tautology even if the test
+      reads the doc file.)
+- [ ] No test locks the docs claim that `:adaptive-thinking` "is ignored for
+      OpenAI-compatible custom providers": `expand-model` carries the field
+      into every custom model map (`:openai-completions` included), and the
+      OpenAI transport never reads it — but no request-shaping test proves an
+      `:openai-completions` custom model with `:adaptive-thinking true`
+      produces an unchanged OpenAI body (no `output_config`/effort/adaptive
+      leakage). Add one mirroring the anthropic classic-shape locking tests.
+- [ ] Mixed-case `Authorization` capture redaction is untested: the review-7
+      case-insensitive redaction tests cover lowercase `x-api-key` (existing)
+      and mixed-case `X-API-Key` (new), but not a mixed-case
+      `Authorization`/`authorization` header — the `redact-authorization`
+      path through the same `find-header` helper has no capture-path lock
+      (existing tests use exact-case `"Authorization"` only). Add a capture
+      assertion in `anthropic_stream_test.clj` for a mixed-case
+      `Authorization` header.
