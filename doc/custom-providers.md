@@ -243,10 +243,13 @@ Notes:
   on it.
 - API keys are provider-scoped: a custom `:anthropic-messages` provider never
   falls back to the `ANTHROPIC_API_KEY` env var. If the provider's configured
-  `:api-key` (e.g. `env:DEEPSEEK_API_KEY`) resolves nil, the request fails
-  fast with a provider-scoped "Missing API key" error — your Anthropic key can
-  never be sent to `https://api.deepseek.com/anthropic/v1/messages`. Only
-  built-in Anthropic models fall back to `ANTHROPIC_API_KEY`.
+  `:api-key` (e.g. `env:DEEPSEEK_API_KEY`) resolves nil and the provider does
+  not declare `:auth-header? false`, the request fails fast with a
+  provider-scoped "Missing API key" error — your Anthropic key can never be
+  sent to `https://api.deepseek.com/anthropic/v1/messages`. Only built-in
+  Anthropic models fall back to `ANTHROPIC_API_KEY`. (A provider with
+  `:auth-header? false` sends no auth header and needs no key at all — see
+  "Local servers and custom headers".)
 - cache-cost fields are illustrative: psi bills cache usage from
   Anthropic-shaped `usage.cache_read_input_tokens` (at `:cache-read-cost`)
   and `usage.cache_creation_input_tokens` (at `:cache-write-cost`). DeepSeek
@@ -286,6 +289,10 @@ Use cases:
 
 A common use for `:auth-header? false` is an OpenAI-compatible local server that
 accepts requests without a bearer token and rejects unexpected auth headers.
+The same keyless pattern works for `:anthropic-messages` custom providers:
+with `:auth-header? false` (or auth carried entirely by custom `:headers`),
+psi does not require an API key and sends no `x-api-key`/`Authorization`
+header — the configured `:headers` (if any) are merged in as-is.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is

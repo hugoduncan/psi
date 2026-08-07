@@ -58,6 +58,31 @@
            #"Missing API key for provider minimax"
            (#'anthropic/build-request convo model {})))))
 
+  (testing "custom-provider missing-auth error points at models.edn :auth and never hints at /login"
+    (let [model {:id "MiniMax-M2.7"
+                 :name "MiniMax M2.7"
+                 :provider :minimax
+                 :api :anthropic-messages
+                 :base-url "https://api.minimax.io/anthropic"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'anthropic/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"models.edn" (ex-message e))
+              "error must name the models.edn :auth remedy")
+          (is (nil? (re-find #"/login" (ex-message e)))
+              "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
+
   (testing "custom provider never falls back to ANTHROPIC_API_KEY env var (no cross-provider leak)"
     (let [model {:id "deepseek-v4-flash"
                  :name "DeepSeek V4 Flash"
@@ -83,6 +108,114 @@
         (let [req (#'anthropic/build-request convo model {})]
           (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
               "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY"))))))
+
+(deftest build-request-no-auth-header-custom-provider-test
+  (testing "keyless custom provider with :no-auth-header true builds a request without auth headers"
+    (let [model {:id "local-proxy"
+                 :name "Local Proxy"
+                 :provider :local-proxy
+                 :api :anthropic-messages
+                 :base-url "http://localhost:8080"
+                 :supports-reasoning false
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:no-auth-header true})
+          headers (:headers req)]
+      (is (nil? (get headers "x-api-key"))
+          "no x-api-key when :no-auth-header is set")
+      (is (nil? (get headers "Authorization"))
+          "no Authorization when :no-auth-header is set")
+      (is (some? (get headers "anthropic-version"))
+          "anthropic-version header still present")))
+
+  (testing "keyless custom provider with custom-header auth builds a request without a key"
+    (let [model {:id "local-proxy"
+                 :name "Local Proxy"
+                 :provider :local-proxy
+                 :api :anthropic-messages
+                 :base-url "http://localhost:8080"
+                 :supports-reasoning false
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:no-auth-header true
+                                                          :headers {"X-API-Key" "local-key"}})
+          headers (:headers req)]
+      (is (= "local-key" (get headers "X-API-Key"))
+          "custom header auth is preserved")
+      (is (nil? (get headers "x-api-key"))
+          "no x-api-key when auth comes from custom headers")
+      (is (nil? (get headers "Authorization"))
+          "no Authorization when auth comes from custom headers")))
+
+  (testing "headers-only auth (no :no-auth-header) builds a request without a key"
+    (let [model {:id "local-proxy"
+                 :name "Local Proxy"
+                 :provider :local-proxy
+                 :api :anthropic-messages
+                 :base-url "http://localhost:8080"
+                 :supports-reasoning false
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:headers {"X-API-Key" "header-key"}})
+          headers (:headers req)]
+      (is (= "header-key" (get headers "X-API-Key"))
+          "custom header auth is preserved")
+      (is (nil? (get headers "x-api-key"))
+          "no x-api-key when auth comes entirely from custom headers")
+      (is (nil? (get headers "Authorization"))
+          "no Authorization when auth comes entirely from custom headers")))
+
+  (testing "configured key plus custom headers still sends both"
+    (let [model {:id "local-proxy"
+                 :name "Local Proxy"
+                 :provider :local-proxy
+                 :api :anthropic-messages
+                 :base-url "http://localhost:8080"
+                 :supports-reasoning false
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:api-key "test-key"
+                                                          :headers {"X-Client" "psi"}})
+          headers (:headers req)]
+      (is (= "test-key" (get headers "x-api-key"))
+          "configured api-key still sent alongside custom headers")
+      (is (= "psi" (get headers "X-Client"))
+          "custom headers merged in")))
+
+  (testing "no-auth-header is honoured for built-in models too"
+    (let [model   (models/get-model :sonnet-4.6)
+          convo   (conv/create "sys")
+          headers (:headers (#'anthropic/build-request convo model {:no-auth-header true}))]
+      (is (nil? (get headers "x-api-key")))
+      (is (nil? (get headers "Authorization"))))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"

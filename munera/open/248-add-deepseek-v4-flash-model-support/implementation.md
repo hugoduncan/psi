@@ -55,3 +55,31 @@
   changed source/tests.
 - Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not set
   in environment; request-shaping coverage only by design.
+
+## Follow-ups review 4 addressed (2026-08-07)
+
+- addressed 5 review steps (2 duplicate /login-hint items resolved once)
+- `resolve-api-key`: returns nil instead of failing when `:no-auth-header` is
+  set (keyless local-proxy configs); custom-provider missing-key error no
+  longer hints at `/login <provider>` (OAuth login is built-in-only) — it
+  names the `models.edn` `:auth {:api-key ...}` remedy. (Code + tests from a
+  concurrent review-step pass in the working tree.)
+- `build-request`: skips `resolve-api-key` when `:no-auth-header` is set OR
+  custom `:headers` provide the auth (headers present, no configured key) and
+  strips `x-api-key`/`Authorization` in that case — restores pre-review-3
+  behavior for keyless/header-auth custom `:anthropic-messages` providers.
+  Added tests: keyless `:no-auth-header`, headers-only auth (no
+  `:no-auth-header`), key-plus-headers (both sent, no regression).
+- design.md: added "Revision note (implementation reviews)" documenting the
+  two review-driven `providers/anthropic.clj` changes (provider-scoped api-key
+  resolution; `:no-auth-header` key tolerance) as the only provider-transport
+  changes; scope/AC wording updated to match.
+- doc/custom-providers.md: provider-scoped key note updated to mention
+  `:auth-header? false` keyless exemption; "Local servers and custom headers"
+  section documents the keyless `:anthropic-messages` pattern.
+- `bb test` full suite green: 2551 tests / 18440 assertions, 0 failures
+  (was 2550/19134). Namespace green: 16 tests / 107 assertions. clj-kondo
+  clean (0 errors, 0 warnings) on changed source/tests.
+- Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not
+  set in environment (not attempted with the user-local key without explicit
+  direction); request-shaping coverage only by design.

@@ -25,9 +25,33 @@ vendor-agnostic `:anthropic-messages` custom-provider transport — the same
 protocol documented for MiniMax/arbitrary Anthropic-compatible proxies in
 `doc/custom-providers.md`. This is a strictly simpler, lower-risk path to the
 same outcome (DeepSeek's `deepseek-v4-flash` selectable in psi) and needs
-**no core provider/transport code changes**. This design supersedes the
-Responses API approach; the new-transport work is dropped, not deferred — it
-is unnecessary for this goal.
+**no new transport protocol** (the original Responses API transport is
+dropped, not deferred — it is unnecessary for this goal). This design
+supersedes the Responses API approach.
+
+## Revision note (implementation reviews)
+
+The implementation reviews added two small, deliberate changes to
+`providers/anthropic.clj` beyond the original "no provider code changes"
+scope. They are the *only* provider-transport changes in this task; the
+request-shaping logic itself (thinking/adaptive/temperature/tools/headers)
+is otherwise unchanged.
+
+- **Provider-scoped API-key resolution (review 3):** `anthropic/resolve-api-key`
+  falls back to the `ANTHROPIC_API_KEY` env var only for built-in Anthropic
+  models (`:provider` nil or `:anthropic`); custom `:anthropic-messages`
+  providers fail fast with a provider-scoped "Missing API key for provider
+  <name>" error when their configured key is nil/blank. This is an intended
+  behavior change to custom-provider key resolution: it prevents a user's
+  Anthropic key from being silently sent to a third-party endpoint. A
+  `getenv` indirection makes the env fallback testable.
+- **No-auth-header key tolerance (review 4):** custom `:anthropic-messages`
+  providers with `:no-auth-header` set (`:auth-header? false`, the documented
+  local-server/custom-headers pattern) no longer require an API key —
+  `resolve-api-key` returns nil and `build-request` strips the auth headers,
+  restoring the pre-review-3 behavior for keyless local-proxy configs.
+  Custom-provider missing-key errors no longer hint at `/login` (OAuth login
+  exists only for built-in providers).
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -174,11 +198,16 @@ independently confirms native JSON-Schema support can add
 - A unit test proves the `:anthropic-messages` transport builds a correct
   request (headers, URL, body) for a DeepSeek-shaped custom-provider model
   map, including the adaptive `output_config.effort` shape when
-  `:adaptive-thinking true` — no code change to
-  `providers/anthropic.clj`'s request-shaping logic itself, only the schema
-  gate in `user_models.clj`.
-- No existing built-in Anthropic model or custom-provider behaviour changes;
-  `gpt-5.5`/`gpt-5.6-*`/Opus 4.7/4.8/5 request shaping is unaffected.
+  `:adaptive-thinking true`. No change to
+  `providers/anthropic.clj`'s request-shaping logic itself (thinking/
+  adaptive/temperature/tools/headers) — only the schema gate in
+  `user_models.clj` plus the review-driven API-key resolution changes
+  documented in the revision note.
+- No existing built-in Anthropic model request shaping changes, and no
+  custom-provider behaviour changes except the review-driven provider-scoped
+  API-key resolution and `:no-auth-header` key tolerance documented in the
+  revision note; `gpt-5.5`/`gpt-5.6-*`/Opus 4.7/4.8/5 request shaping is
+  unaffected.
 - `bb test` green; `clj-kondo` clean.
 - CHANGELOG `[Unreleased]` → `Added` entry.
 

@@ -173,7 +173,7 @@
 
 ## Follow-ups (implementation review 4, 2026-08-07)
 
-- [ ] Keyless `:auth-header? false`/`:no-auth-header` custom
+- [x] Keyless `:auth-header? false`/`:no-auth-header` custom
       `:anthropic-messages` providers now hard-fail: `anthropic/resolve-api-key`
       throws "Missing API key for provider <name>" for any blank key before
       `:no-auth-header` stripping can apply, even for local-proxy configs that
@@ -187,12 +187,24 @@
       requirement when `:no-auth-header` is set, and add a test proving a
       keyless custom provider with `:no-auth-header true` builds a request
       with no `x-api-key`/`Authorization`.
-- [ ] New custom-provider "Missing API key" error suggests "or login via
+      → Resolved: `anthropic/resolve-api-key` returns nil instead of failing
+      when `:no-auth-header` is set; `build-request` skips key resolution
+      whenever `:no-auth-header` is set OR custom `:headers` provide the auth
+      (headers present with no configured key) and strips
+      `x-api-key`/`Authorization` in that case. Tests prove a keyless
+      `:no-auth-header` provider, a headers-only-auth provider (no
+      `:no-auth-header`), and a configured-key-plus-headers provider all
+      build correct requests.
+- [x] New custom-provider "Missing API key" error suggests "or login via
       /login <provider>", but OAuth login only exists for built-in
       `:anthropic`/`:openai` providers — `/login deepseek` is not a real
       flow. Drop the login hint for custom providers or gate it on OAuth
       provider registration.
-- [ ] design.md drift: it still claims "no core provider/transport code
+      → Resolved: custom-provider missing-key error no longer hints at
+      `/login` — it names the `models.edn` `:auth {:api-key ...}` remedy only
+      (OAuth login exists only for built-in providers). Test asserts no
+      `/login` text in the custom-provider error.
+- [x] design.md drift: it still claims "no core provider/transport code
       changes" and AC "no existing custom-provider behaviour changes" /
       "no code change to `providers/anthropic.clj`'s request-shaping logic
       itself, only the schema gate in `user_models.clj`", but the merged
@@ -200,10 +212,15 @@
       (`resolve-api-key` + `getenv`) and changed custom-provider
       key-fallback behavior. Update design.md scope/AC (or add a revision
       note) so the design reflects the provider-scoped api-key resolution.
+      → Resolved: design.md now has a "Revision note (implementation
+      reviews)" section documenting the two review-driven
+      `providers/anthropic.clj` changes (provider-scoped api-key resolution;
+      `:no-auth-header` key tolerance) as the only provider-transport changes,
+      and the scope/AC wording was updated to match.
 
 ## Follow-ups (implementation review 4, 2026-08-07)
 
-- [ ] `build-request`'s unconditional `resolve-api-key` call now throws for
+- [x] `build-request`'s unconditional `resolve-api-key` call now throws for
       custom `:anthropic-messages` providers that intentionally send no auth:
       both `:auth-header? false` (the docs' own "Local servers and custom
       headers" pattern, `{:api-key "env:..." :auth-header? false :headers ...}`)
@@ -221,9 +238,21 @@
       tolerate a nil key) when `:no-auth-header` is set in options, and/or
       when custom `:headers` provide auth; add a test proving a no-auth /
       header-auth custom `:anthropic-messages` request builds without a key.
-- [ ] `resolve-api-key`'s custom-provider error suggests "or login via /login
+      → Resolved: `build-request` now computes `no-auth?` =
+      `:no-auth-header` OR (custom `:headers` present with no configured
+      `:api-key`) and skips `resolve-api-key` in that case, stripping
+      `x-api-key`/`Authorization` from the base headers; `resolve-api-key`
+      also returns nil for `:no-auth-header`. Tests cover keyless
+      `:no-auth-header`, headers-only auth (no `:no-auth-header`), and
+      key-plus-headers (both sent). `bb test` full suite green (2551 tests /
+      18440 assertions); namespace green (16 tests / 107 assertions);
+      clj-kondo clean.
+- [x] `resolve-api-key`'s custom-provider error suggests "or login via /login
       <provider>", but `/login` only supports OAuth providers (anthropic,
       openai); `/login deepseek` fails with "Unknown OAuth provider". Drop the
       `/login` hint from the custom-provider branch (or restrict it to
       OAuth-capable providers) — the correct remedy is configuring the
       provider's `:auth {:api-key ...}` in models.edn.
+      → Resolved: `/login` hint dropped from the custom-provider missing-key
+      error; error names the `models.edn` `:auth` remedy. Test asserts the
+      error mentions `models.edn` and contains no `/login`.

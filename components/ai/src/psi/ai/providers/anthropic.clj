@@ -195,26 +195,32 @@
    `ANTHROPIC_API_KEY` env var. Custom `:anthropic-messages` providers never
    fall back to that env var: a nil/blank configured key is an error, so a
    custom provider's request can never silently send the user's Anthropic key
-   to a third-party endpoint."
+   to a third-party endpoint.
+
+   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers or
+   custom `:headers`-only auth), no key is required: the caller strips the auth
+   headers anyway, so this returns nil instead of failing."
   [model options]
-  (let [provider    (:provider model)
-        anthropic?  (or (nil? provider) (= :anthropic provider))
-        api-key     (:api-key options)
-        api-key     (if (and anthropic? (str/blank? api-key))
-                      (getenv "ANTHROPIC_API_KEY")
-                      api-key)]
-    (when (str/blank? api-key)
-      (if anthropic?
-        (throw (ex-info "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."
-                        {:error-code "auth/missing-api-key"
-                         :provider :anthropic}))
-        (throw (ex-info (str "Missing API key for provider " (name provider)
-                             ". Configure the provider's :auth {:api-key ...} in models.edn"
-                             " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\")"
-                             " or login via /login " (name provider) ".")
-                        {:error-code "auth/missing-api-key"
-                         :provider provider}))))
-    api-key))
+  (when-not (:no-auth-header options)
+    (let [provider    (:provider model)
+          anthropic?  (or (nil? provider) (= :anthropic provider))
+          api-key     (:api-key options)
+          api-key     (if (and anthropic? (str/blank? api-key))
+                        (getenv "ANTHROPIC_API_KEY")
+                        api-key)]
+      (when (str/blank? api-key)
+        (if anthropic?
+          (throw (ex-info "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."
+                          {:error-code "auth/missing-api-key"
+                           :provider :anthropic}))
+          ;; OAuth /login only exists for built-in providers, so custom
+          ;; providers must not hint at it — the remedy is models.edn :auth.
+          (throw (ex-info (str "Missing API key for provider " (name provider)
+                               ". Configure the provider's :auth {:api-key ...} in models.edn"
+                               " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\").")
+                          {:error-code "auth/missing-api-key"
+                           :provider provider}))))
+      api-key)))
 
 (defn- request-body
   [conversation model options stream? oauth?]
@@ -262,27 +268,29 @@
          strategy           (structured-output/select-strategy model structured-request)
          thinking           (thinking-param model options)
          adaptive?          (adaptive-thinking? model)
-         api-key            (resolve-api-key model options)
+         ;; No auth key is required when the request is explicitly keyless
+         ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
+         ;; custom :headers supply the auth (e.g. header-only auth) without a
+         ;; configured :api-key. Skipping resolution here keeps those configs
+         ;; working; a resolved nil key must not reach request-headers.
+         no-auth?           (or (:no-auth-header options)
+                                (and (seq (:headers options))
+                                     (str/blank? (:api-key options))))
+         api-key            (when-not no-auth?
+                              (resolve-api-key model options))
          oauth?             (oauth-api-key? api-key)
          prompt-caching?    (prompt-caching? conversation)
          json-schema-output? (anthropic-structured-output/json-schema-output-mechanism? strategy)
          body               (request-body conversation model options stream? oauth?)
          body*              (request-schema/validate-request-body! body)
-         base-hdrs          (if (:no-auth-header options)
-                              ;; Strip auth headers when explicitly disabled
-                              (dissoc (request-headers api-key
-                                                       thinking
-                                                       adaptive?
-                                                       prompt-caching?
-                                                       json-schema-output?
-                                                       (:speed-mode options))
-                                      "Authorization" "x-api-key")
-                              (request-headers api-key
-                                               thinking
-                                               adaptive?
-                                               prompt-caching?
-                                               json-schema-output?
-                                               (:speed-mode options)))
+         base-hdrs          (cond-> (request-headers api-key
+                                                     thinking
+                                                     adaptive?
+                                                     prompt-caching?
+                                                     json-schema-output?
+                                                     (:speed-mode options))
+                              ;; Strip auth headers when no key is used
+                              no-auth? (dissoc "Authorization" "x-api-key"))
          headers            (if-let [custom (:headers options)]
                               (merge base-hdrs custom)
                               base-hdrs)]
