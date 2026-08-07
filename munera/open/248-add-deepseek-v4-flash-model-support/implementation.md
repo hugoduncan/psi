@@ -117,3 +117,15 @@
   15 assertions).
 - Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design.
+- Correction to the review-5 count reconciliation (verified independently,
+  2026-08-07): the assertion count is run-to-run UNSTABLE, not stable.
+  Fresh `bb test` runs of the identical committed code (8a513cb95) gave
+  18444, 19153, 19153 assertions (2551 tests, 0 failures each on the default
+  seed); pre-commit runs gave 18435/19148/19149. The 18440-vs-19134 delta in
+  earlier entries is the same variance — not a transcription error. Root
+  cause: pre-existing flaky test `psi.turn-runtime.response-mode-retry-test/
+  execute-prepared-request-streaming-retry-discards-failed-partial-output-test`
+  (retry attempt count 2 vs 53; FAILS under `--seed 424242`, turning the
+  suite red) + kaocha per-run seed randomization. Unrelated to this task's
+  changed files. Stable task-relevant deltas: 2550→2551 tests (added
+  deftest), namespace 92→111 assertions.

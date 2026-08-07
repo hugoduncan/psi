@@ -306,8 +306,18 @@
       ("was 2550/19134") — the test count rose but the assertion count fell
       by 694, which is either a transcription error or unstable suite
       counts. Re-run `bb test` and record exact, consistent numbers.
-      → Resolved: full `bb test` re-run twice, stable both times: 2551 tests /
-      19153 assertions, 0 failures. The 18440 figure was an anomalous run /
-      transcription error (assertions cannot fall 694 while the namespace grew
-      by 15 assertions); the current exact, reproducible count is
-      2551 / 19153.
+      → Resolved (corrected): the assertion count is NOT stable run-to-run —
+      fresh runs of identical code give 18435, 18444, 19148, 19149, 19153
+      assertions (all 2551 tests / 0 failures on the default seed). The
+      18440-vs-19134 delta is the same variance, not a transcription error.
+      Root cause: a pre-existing flaky, timing-sensitive test
+      (`psi.turn-runtime.response-mode-retry-test/execute-prepared-request-
+      streaming-retry-discards-failed-partial-output-test`) whose retry-loop
+      attempt count varies (2 vs 53 observed) — with `--seed 424242` it
+      FAILS, turning the whole suite red, entirely outside this task's
+      changed files; kaocha's per-run seed randomization then makes totals
+      vary. The only stable, task-relevant deltas: test count 2550→2551
+      (the added `build-request-no-auth-header-custom-provider-test`
+      deftest) and namespace growth 92→111 assertions (added tests). Exact
+      record: latest fresh `bb test` = 2551 tests / 19153 assertions /
+      0 failures.
