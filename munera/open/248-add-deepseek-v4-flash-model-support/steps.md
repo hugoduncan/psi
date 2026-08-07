@@ -1062,3 +1062,43 @@
       `openai/chat-completions` `resolve-api-key`'s `(or (nil? provider)
       (= :openai provider))` built-in condition. Manual allium-check (no
       automated checker in repo).
+
+## Follow-ups (implementation review 14, 2026-08-07)
+
+- [ ] Full-`bb test` flake inventory is incomplete: a fresh full-suite run
+      (seed 1741154775) failed `psi.agent-session.scheduler-lifecycle-test/
+      scheduled-deliver-runs-canonical-prompt-lifecycle-test` (8 pass / 5
+      fail: session phase `:streaming` instead of `:idle`, no assistant
+      message, and no `:scheduler/deliver` / `:session/prompt-record-response`
+      / `:session/prompt-finish` entries). It passes in isolation (4 tests /
+      26 assertions). The `:scheduler/fired only pending schedules can fire`
+      dispatch warning fires even on passing isolated runs — a race between
+      the schedule statechart and the session turn lifecycle. The test file
+      is in the agent-session component, untouched by this task's diff, and
+      its own comment documents a ~1-in-8 full-suite flake class (mitigated
+      but not eliminated by the session-id event-log filter). implementation.md
+      records only the two retry-loop flakes (`response-mode-retry-test`,
+      `prompt-provider-retry-after-tool-result...`) — this third,
+      timing-sensitive flake is undocumented, so the design AC "`bb test`
+      green" is not reliably reproducible on any given run.
+      → Verify it is pre-existing on the task base commit (mirroring the
+      review-2/review-5 approach), then add it to the implementation.md
+      flake inventory (and/or harden the test — e.g. settle the lifecycle or
+      assert phase after the deliver effect completes rather than immediately
+      after `:scheduler/fired` returns).
+- [ ] Configured-key + recognized-auth-header interplay is untested and
+      unnamed for the `:openai-codex-responses` transport:
+      `configured-key-plus-recognized-auth-header-interplay-test` (review 11)
+      locks the behavior for `:anthropic-messages` and `:openai-completions`
+      only (custom `Authorization` replaces the resolved key; custom
+      `X-API-Key` coexists with the configured bearer key), and
+      doc/custom-providers.md "Local servers and custom headers" names only
+      "the openai transport" in its merge sentence. `build-codex-request`
+      performs the identical `(merge base-hdrs custom)` (codex_responses.clj),
+      so a custom `Authorization` header on a `:openai-codex-responses`
+      provider silently replaces the resolved codex key too — same
+      behavior, no test lock and no explicit doc naming.
+      → Add a codex block to the interplay deftest (or a dedicated codex
+      test) mirroring the review-11 assertions, and name
+      `:openai-codex-responses` in the doc's merge sentence alongside the
+      other two transports.
