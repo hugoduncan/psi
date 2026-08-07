@@ -46,6 +46,9 @@
 - [x] `clj-kondo --lint components/ai/src` clean (0 errors, 0 warnings).
 - [x] Re-read `doc/custom-providers.md` end to end — existing examples
       unaffected, DeepSeek subsection follows established pattern.
+- [x] `bb commit-check:file-lengths` passes on the committed tree —
+      `anthropic_test.clj` split into `anthropic_auth_test.clj` (review 15;
+      both files under the 800-line gate).
 - [x] Committed.
 
 ## Follow-ups (implementation review, 2026-08-07)
@@ -1241,7 +1244,7 @@
 
 ## Follow-ups (implementation review 15, 2026-08-07)
 
-- [ ] `:adaptive-thinking` "ignored for `:openai-codex-responses`" is
+- [x] `:adaptive-thinking` "ignored for `:openai-codex-responses`" is
       untested: doc/custom-providers.md says the field "is ignored for
       OpenAI-compatible (`:openai-completions` / `:openai-codex-responses`)
       custom providers" and `expand-model` carries it into every custom model
@@ -1257,7 +1260,16 @@
       leakage, classic `reasoning_effort "high"` unchanged. Codex was added
       to the docs claim in review 13 without the lock that review 10 closed
       for completions.
-- [ ] Custom-provider test fixtures no longer match the expand-model shape
+      → Resolved: `openai_test.clj` gains
+      `codex-adaptive-thinking-ignored-for-custom-providers-test` — a custom
+      `:openai-codex-responses` model (`:custom? true`, mirroring
+      expand-model's origin tag) built with and without
+      `:adaptive-thinking true` (+ `:thinking-level :high`) via
+      `build-codex-request` yields byte-identical bodies, no
+      `:output_config`/adaptive leakage, and the unchanged classic
+      `reasoning {:effort "high" :summary "auto"}` shape. Mirrors the
+      review-10 completions lock.
+- [x] Custom-provider test fixtures no longer match the expand-model shape
       they claim to represent: `deepseek-custom-provider-model`
       (anthropic_test.clj) and the literal model map in
       `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`
@@ -1271,7 +1283,15 @@
       change would not be caught. Add `:custom? true` to both fixtures (one
       line each) and re-run `psi.ai.providers.anthropic-test` +
       `psi.ai.providers.anthropic-stream-test`.
-- [ ] `getenv` indirection duplicated across layers: `user_models.clj`'s
+      → Resolved: `:custom? true` added to both fixtures —
+      `deepseek-custom-provider-model` (anthropic_test.clj) and the literal
+      model map in
+      `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`
+      (anthropic_stream_test.clj) — so they match the review-14
+      expand-model shape (every custom models.edn model is origin-tagged).
+      `psi.ai.providers.anthropic-test` + `psi.ai.providers.anthropic-auth-test`
+      + `psi.ai.providers.anthropic-stream-test` green.
+- [x] `getenv` indirection duplicated across layers: `user_models.clj`'s
       private `getenv` (review 10) and `request_support/getenv` (review 14)
       are the identical 3-line `System/getenv` testability wrapper, and
       `parse-documented-deepseek-example-test` redefs `user-models/getenv`
@@ -1282,7 +1302,13 @@
       `request-support/getenv` (update the parse-lock test's redef target
       accordingly) so env-lookup testability lives in one place, or document
       why the config-parse layer intentionally keeps its own indirection.
-- [ ] Committed tree fails the repo file-length commit gate:
+      → Resolved: `user_models.clj` no longer defines its own private
+      `getenv` — `resolve-api-key-spec`'s `env:` lookup now delegates to the
+      shared `request-support/getenv` (the config-parse layer keeps no
+      separate indirection); `parse-documented-deepseek-example-test` now
+      redefs `psi.ai.providers.request-support/getenv` to the sentinel.
+      Env-lookup testability lives in one place.
+- [x] Committed tree fails the repo file-length commit gate:
       HEAD's `components/ai/test/psi/ai/providers/anthropic_test.clj` is 943
       lines (> the 800-line `commit-check:file-lengths` limit; no legacy
       ratchet covers it — bb.edn lists only extension files), so
@@ -1296,3 +1322,10 @@
       is UNCOMMITTED. Commit the split (or an equivalent reduction) before
       close so the committed task state satisfies the repo gate; add the
       file-length gate to the verification checklist for this task.
+      → Resolved: the split is committed — `anthropic_auth_test.clj` (389
+      lines) extracted the cohesive anthropic auth cluster, leaving
+      `anthropic_test.clj` at 579 lines; `bb commit-check:file-lengths` and
+      the extensions commit-checks suite
+      (`file-length-check-enforces-real-legacy-ratchets-test`) pass on the
+      committed tree (364 passed / 0 failed). File-length gate recorded in
+      implementation.md verification.

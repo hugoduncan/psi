@@ -815,3 +815,59 @@
   (2566 tests / 19264 assertions / 0 failures); cljfmt + clj-kondo clean on
   all changed files.
 - Review 15 (2026-08-07): added 4 steps to be addressed.
+
+## Follow-ups review 15 addressed (2026-08-07)
+
+- addressed 4 review steps (review-15; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Codex adaptive-thinking no-op lock (review-15 item 1):
+  `openai_test.clj` gains
+  `codex-adaptive-thinking-ignored-for-custom-providers-test` — a custom
+  `:openai-codex-responses` model (`:custom? true`, mirroring expand-model's
+  origin tag) built with and without `:adaptive-thinking true` (+
+  `:thinking-level :high`) via `build-codex-request` yields byte-identical
+  bodies, no `:output_config`/adaptive leakage, and the unchanged classic
+  `reasoning {:effort "high" :summary "auto"}` shape — mirroring the
+  review-10 completions lock for the codex transport added to the docs claim
+  in review 13.
+- Fixture origin-tag drift closed (review-15 item 2): `:custom? true` added
+  to `deepseek-custom-provider-model` (anthropic_test.clj) and the literal
+  model map in `stream-anthropic-retries-adaptive-shape-without-thinking-
+  on-400-test` (anthropic_stream_test.clj) so both match the review-14
+  expand-model shape (every custom models.edn model is origin-tagged).
+- getenv indirection deduplicated (review-15 item 3): `user_models.clj`'s
+  private `getenv` removed — `resolve-api-key-spec`'s `env:` lookup now
+  delegates to the shared `request-support/getenv`; the config-parse layer
+  keeps no separate indirection. `parse-documented-deepseek-example-test`
+  now redefs `psi.ai.providers.request-support/getenv` to the sentinel.
+  Env-lookup testability lives in one place (user_models_test.clj gains the
+  request-support require).
+- File-length gate (review-15 item 4): resolved by the committed split
+  (b9571cfac) — `anthropic_auth_test.clj` (389 lines) + `anthropic_test.clj`
+  (579 lines); `bb commit-check:file-lengths` and the extensions
+  commit-checks suite pass on the committed tree (364 passed / 0 failed).
+- Verification: full unit suite green (2566 tests / 19264 assertions /
+  0 failures); extensions suite green (364 passed / 0 failed); affected
+  namespaces green on a focused run (77 tests / 493 assertions across
+  user-models, anthropic, anthropic-auth, anthropic-stream, openai and
+  openai-completions; +1 test = the new codex adaptive-thinking deftest);
+  cljfmt + clj-kondo clean (0 errors, 0 warnings) on all changed files.
+
+## Follow-ups review 15 — final verification pass (2026-08-07)
+
+- addressed 4 review steps (verified end-to-end on the converged tree;
+  review-1 optional live smoke test remains BLOCKED on missing
+  DEEPSEEK_API_KEY)
+- Full `bb test` re-run on the converged tree: 2567 tests / 18558 assertions
+  / 0 failures. Count reconciliation: 2567 = 2566 (committed b9571cfac) + 1
+  (the new `codex-adaptive-thinking-ignored-for-custom-providers-test`
+  deftest — the review-15 entry above records the pre-deftest 2566);
+  assertion count varies run-to-run per the review-5 flake analysis (18558
+  in the observed band).
+- Affected namespaces green on the final tree: 77 tests / 493 assertions —
+  user-models 15/105, anthropic 15/98 + anthropic-auth 5/42 (the review-14
+  split), anthropic-stream 10/94, openai 16/84 (incl. the codex
+  adaptive-thinking no-op lock), openai-completions 16/70.
+- `bb commit-check:file-lengths` green (anthropic_test.clj 576 lines /
+  anthropic_auth_test.clj 386 lines, both under the 800-line gate);
+  clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.

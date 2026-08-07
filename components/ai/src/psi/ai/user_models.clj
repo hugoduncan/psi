@@ -13,6 +13,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [malli.core :as m]
+   [psi.ai.providers.request-support :as request-support]
    [psi.ai.schemas :as schemas]
    [psi.ai.structured-output :as structured-output]
    [taoensso.timbre :as log]))
@@ -72,16 +73,16 @@
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
-(defn- getenv
-  [k]
-  (System/getenv k))
-
 (defn resolve-api-key-spec
   "Resolve an api-key spec string to a concrete value.
 
    - nil / blank → nil
    - \"env:VAR\" → (System/getenv \"VAR\"), nil if unset
-   - anything else → literal string"
+   - anything else → literal string
+
+   The env lookup goes through the shared `request-support/getenv`
+   indirection (review 14) so env-lookup testability lives in one place —
+   `parse-documented-deepseek-example-test` redefs that var (review 15)."
   [raw]
   (cond
     (or (nil? raw) (str/blank? raw))
@@ -89,7 +90,7 @@
 
     (str/starts-with? raw "env:")
     (let [var-name (subs raw 4)]
-      (getenv var-name))
+      (request-support/getenv var-name))
 
     :else
     raw))

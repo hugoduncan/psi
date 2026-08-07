@@ -4,6 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
+   [psi.ai.providers.request-support :as request-support]
    [psi.ai.structured-output :as structured-output]
    [psi.ai.user-models :as user-models]))
 
@@ -411,7 +412,7 @@
       ;; Redefs the env lookup (getenv) to a sentinel so the resolution path
       ;; is genuinely exercised — env:VAR → getenv → :api-key — instead of a
       ;; tautological resolve-api-key-spec-vs-itself comparison.
-      (with-redefs [user-models/getenv (fn [_] "sk-deepseek-sentinel")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-sentinel")]
         (let [auth (get-in (user-models/parse-models-config
                             {:version 1
                              :providers

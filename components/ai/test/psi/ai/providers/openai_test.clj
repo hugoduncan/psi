@@ -479,6 +479,49 @@
           "chatgpt-account-id derived from the configured key")
       (is (= "other-key" (get-in req [:headers "X-API-Key"]))
           "custom X-API-Key header merged in as-is — duplicate auth header on the wire"))))
+(deftest codex-adaptive-thinking-ignored-for-custom-providers-test
+  ;; Review 15: the doc/custom-providers.md claim that :adaptive-thinking "is
+  ;; ignored for OpenAI-compatible custom providers" now names
+  ;; :openai-codex-responses too (review 13), but the only no-op lock is the
+  ;; completions one (review 10). The codex transport never reads
+  ;; :adaptive-thinking — expand-model carries it into every custom model
+  ;; map, but openai/reasoning.clj reasoning-effort maps :thinking-level →
+  ;; classic reasoning effort — so a custom :openai-codex-responses model
+  ;; with :adaptive-thinking true must produce an unchanged codex body (no
+  ;; output_config/adaptive leakage), mirroring the completions lock.
+  (testing "adaptive-thinking on a custom :openai-codex-responses model does not leak into the request body"
+    (let [base-model {:id                 "custom-codex-model"
+                      :name               "Custom Codex Model"
+                      :provider           :custom-codex
+                      :custom?            true
+                      :api                :openai-codex-responses
+                      :base-url           "https://example.com/v1"
+                      :supports-reasoning true
+                      :supports-images    false
+                      :supports-text      true
+                      :context-window     128000
+                      :max-tokens         16384
+                      :input-cost         0.0
+                      :output-cost        0.0
+                      :cache-read-cost    0.0
+                      :cache-write-cost   0.0}
+          convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
+          plain   (json/parse-string
+                   (:body (openai/build-codex-request convo base-model
+                                                      {:api-key (jwt-with-account-id "acc_plain")
+                                                       :thinking-level :high}))
+                   true)
+          adaptive (json/parse-string
+                    (:body (openai/build-codex-request convo (assoc base-model :adaptive-thinking true)
+                                                       {:api-key (jwt-with-account-id "acc_adaptive")
+                                                        :thinking-level :high}))
+                    true)]
+      (is (= plain adaptive)
+          ":adaptive-thinking must not change the codex-compatible request body")
+      (is (nil? (get adaptive :output_config))
+          "no output_config/adaptive effort leakage into the codex body")
+      (is (= "high" (get-in adaptive [:reasoning :effort]))
+          "classic codex reasoning shape is unchanged"))))
 (deftest codex-reasoning-text-delta-maps-to-thinking-delta-test
   (testing "response.reasoning_text.delta is bridged as :thinking-delta"
     (let [model    (models/get-model :gpt-5.3-codex)
