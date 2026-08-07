@@ -811,6 +811,7 @@
   Behavior-preserving: 20 tests / 140 assertions across the two namespaces
   (unchanged total), cljfmt + clj-kondo clean.
 - Verification: extensions suite green (364 passed / 0 failed — the
-  file-length check passes again); full unit suite green (this pass's run
-  below); cljfmt + clj-kondo clean on all changed files.
+  file-length check passes again); full unit suite green on the split tree
+  (2566 tests / 19264 assertions / 0 failures); cljfmt + clj-kondo clean on
+  all changed files.
 - Review 15 (2026-08-07): added 4 steps to be addressed.
