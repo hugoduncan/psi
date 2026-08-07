@@ -879,3 +879,5 @@
   remains BLOCKED: `DEEPSEEK_API_KEY` not set in env. Targeted namespaces
   green (openai-completions 16/70, openai-codex 8/27, openai 16/84,
   openai-request-headers 6/28, openai-codex-retry 1/5); clj-kondo clean.
+
+- Review 17 (2026-08-07): added 3 steps to be addressed.

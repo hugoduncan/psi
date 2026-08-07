@@ -1359,3 +1359,51 @@
       longer drift. clj-kondo clean; openai-completions (16/70),
       openai-codex (8/27), openai (16/84), openai-request-headers (6/28),
       openai-codex-retry (1/5) namespaces green.
+
+## Follow-ups (implementation review 17, 2026-08-07)
+
+- [ ] Stale cross-transport comment in `providers/anthropic.clj`
+      `build-request` (lines ~257-258): the keyless-logic comment claims the
+      behavior is "consistent with the OpenAI transport, which only exempts
+      on explicit :no-auth-header" — inaccurate since review 10: the
+      `:openai-completions` transport (and `:openai-codex-responses` since
+      review 13) uses the shared `request-support/no-auth?`, which also
+      exempts a recognized auth header (`x-api-key`/`Authorization`,
+      case-insensitive) among custom `:headers`. A reader would conclude the
+      OpenAI transport still hard-requires a key unless `:no-auth-header` —
+      the exact behavior review 10 closed. Fix: drop the stale parenthetical
+      (or say both transports share `request-support/no-auth?` semantics);
+      optionally collapse the duplicated 6-line keyless explanation to a
+      one-line pointer to `request-support/no-auth?` (the same
+      triplicated-comment class review 14 removed from the code).
+- [ ] Remaining custom-provider test fixtures omit the `:custom?` origin tag
+      (review-15 item 2 fixed only `deepseek-custom-provider-model` and the
+      400-retry fixture): the same expand-model-shape drift remains in other
+      custom-provider fixtures in the touched test files —
+      `anthropic_stream_test.clj` `stream-anthropic-captures-provider-
+      request-and-response-test` (MiniMax `:provider :minimax`, DeepSeek
+      `:provider :deepseek`, and the two `:provider :local-proxy` fixtures)
+      and `anthropic_test.clj` (the "custom provider never falls back to
+      ANTHROPIC_API_KEY env var" deepseek fixture and the
+      `:my-anthropic-proxy` kebab-case env-var-suggestion fixture).
+      Behavior-neutral today (none of these provider names are built-in
+      names), but a future `builtin?`/`:custom?` semantics change would not
+      be caught — the same gap review 15 closed for the named two. Fix: add
+      `:custom? true` to these fixtures (or extract a shared custom-provider
+      fixture helper that always carries the tag), or explicitly document
+      why literal transport fixtures are exempt from the origin tag.
+- [ ] `psi.agent-session.model-dispatch-test/model-thinking-dispatch-test`
+      full-suite flake is not in the flake inventory: a full `bb test` run
+      at review time (seed 1846209693; 2566 passed / 1 failed) failed this
+      test — the dispatch log showed `:scheduler/drain-queue` instead of
+      `:session/set-system-prompt` in `set-system-prompt-in! routes through
+      dispatch log` (2 failed assertions). Verified pre-existing: passes in
+      isolation (12 tests / 153 assertions green); `components/agent-session/`
+      has zero diff across the task commit range (base 3c286a46e → HEAD) and
+      the test file was last touched by 5c910d5d4 (pre-task) — the same
+      scheduler-timing race class as the documented
+      `scheduler-lifecycle-test` flake, but not named in the
+      implementation.md flake inventory (which lists response-mode-retry,
+      prompt-provider-retry, scheduler-lifecycle). Fix: add this test to the
+      inventory entry (or note the observed run in the verification section)
+      so the "full-suite green" claim names all known races.
