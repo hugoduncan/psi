@@ -492,3 +492,59 @@
       optional separate `:speed`-stripping code change because the design AC
       forbids changing provider request-shaping/transport logic in this
       task.
+
+## Follow-ups (implementation review 9, 2026-08-07)
+
+- [ ] `spec/anthropic-provider.allium` `ApiKeyResolved` (updated in the
+      review-5 resolution) references predicates/attributes the spec never
+      defines: `BuiltinAnthropic(stream.model)`, `CustomProvider(stream.model)`
+      and `stream.keyless` — the `AnthropicStream` entity has no `keyless`
+      field, `StreamOptions` lacks `no_auth_header`/`headers`, and `Model`
+      lacks `provider` (which the two predicates need). The rule is
+      uncheckable as written, so the review-5 "spec now matches the
+      implementation" claim holds only for `custom-providers.allium`.
+      Complete the model: add `keyless: Boolean = false` to
+      `AnthropicStream`, `no_auth_header` and `headers` to `StreamOptions`,
+      `provider`/`adaptive_thinking` to `Model`, and define the
+      `BuiltinAnthropic`/`CustomProvider` predicates (or inline the
+      provider-nil/"anthropic" conditions) so `ApiKeyResolved` is
+      self-contained.
+- [ ] `spec/anthropic-provider.allium` does not model two behaviors this
+      task now documents/changes for the Anthropic transport: (a) adaptive
+      thinking — `ThinkingParamPresentForActiveLevel` unconditionally maps
+      active levels to `{:type "enabled" :budget_tokens ...}`, but
+      `thinking-param` emits `{:type "adaptive" :display "summarized"}`
+      (paired with body `output_config.effort`, which is never modeled) for
+      `:adaptive-thinking` models — the exact shape this task's DeepSeek
+      example and `:adaptive-thinking` field teach; and
+      `AnthropicRequestBodyBuilt`/`TemperatureExcludedWhenThinkingActive`
+      require `temperature` whenever thinking is null, but adaptive models
+      omit it even with thinking off (the trade-off
+      `doc/custom-providers.md` documents); (b) capture redaction —
+      `openai-provider.allium` models
+      `ProviderRequestCaptureEmittedWithRedaction`/`RedactRequestHeaders`,
+      but anthropic-provider.allium has no capture/redaction rules, so the
+      review-7 case-insensitive `find-header` redaction change has no spec
+      counterpart. Add adaptive-thinking rules (thinking param shape,
+      `output_config.effort`, temperature exclusion whenever adaptive
+      regardless of thinking) and a capture-redaction rule to
+      anthropic-provider.allium.
+- [ ] `parse-documented-deepseek-example-test` (user_models_test.clj,
+      review-6 resolution) embeds a hardcoded copy of the documented
+      `models.edn` example instead of reading `doc/custom-providers.md`, so
+      its stated purpose — "guards the closed ModelDef/AuthConfig schemas
+      against docs/code drift" — is only half met: a change to the documented
+      example (typo, new field, pricing edit) never fails the test; it locks
+      a snapshot. Extract/parse the EDN block from the doc file itself (read
+      `doc/custom-providers.md`, take the ```clojure block under the
+      "DeepSeek-compatible example" heading) or assert the embedded map
+      equals the doc's block, so doc↔schema drift is actually caught.
+- [ ] `doc/custom-providers.md` "Adaptive thinking" section never states
+      that `:adaptive-thinking true` is a silent no-op without
+      `:supports-reasoning true`: `thinking-param` gates on
+      `(:supports-reasoning model)`, so a custom provider declaring
+      adaptive-thinking without supports-reasoning gets no `thinking` field
+      and no `output_config.effort` at all (plain non-thinking requests) —
+      no schema error, no warning. Document the dependency in the
+      `:adaptive-thinking` field section (and/or the DeepSeek example notes)
+      so both flags are known to be required together.

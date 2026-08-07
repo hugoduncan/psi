@@ -247,3 +247,5 @@
   psi.ai.user-models-test 14/97 green, psi.ai.providers.anthropic-test
   17/115 green, psi.ai.providers.anthropic-stream-test 9/84 green (the
   documented example code block was untouched — notes bullets only).
+
+- Review 9 (2026-08-07): added 4 steps to be addressed.
