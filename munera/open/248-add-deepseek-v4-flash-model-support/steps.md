@@ -77,3 +77,38 @@
       DeepSeek accepts the request (x-api-key auth, `/v1/messages` path,
       adaptive `output_config.effort`). Automated tests are request-shaping
       only by design; needs a `DEEPSEEK_API_KEY`.
+
+## Follow-ups (implementation review 2, 2026-08-07)
+
+- [ ] Full `bb test` is currently RED — `delegate-review-task-
+      implementation-completes-with-nullable-local-model-test` fails because
+      committed `.psi/project.edn` (f0c818cc1) points every workflow session
+      profile at `deepseek/deepseek-v4-flash`, which is resolvable only via
+      the user-local `~/.psi/agent/models.edn` (never committed, absent in
+      test/CI) → "unknown model deepseek/deepseek-v4-flash" → all profiles
+      invalid → delegation fails. Design AC "`bb test` green" is violated.
+      Verified: passes at 3c286a46e (base, anthropic catalog profiles);
+      fails identically at f0c818cc1 (whose only change is the project.edn
+      deepseek wiring) — so the af7e05b46 note claiming this failure is
+      "pre-existing (fails on base commit too)" is inaccurate; the
+      regression is introduced by the committed deepseek workflow config.
+      Fix options: point committed profiles back at catalog models (or make
+      them conditional on the custom provider existing), add a committed
+      test fixture `models.edn`, or make the live workflow test tolerate
+      unresolvable profiles.
+- [ ] `:adaptive-thinking true` forfeits thinking-off control on DeepSeek:
+      psi's adaptive path omits the `thinking` param entirely when thinking
+      is off (`thinking-param` never emits `{:type "disabled"}`), and
+      DeepSeek's Anthropic endpoint defaults to thinking ON — so `/thinking
+      off` on `deepseek-v4-flash` silently leaves thinking enabled (the
+      design's "on/off control works" claim holds only for the on side).
+      Verify live; then either document the caveat in the DeepSeek example
+      or add an explicit `{:type "disabled"}` emission for adaptive models
+      that need it, with a test.
+- [ ] Cache-cost accounting is unverified: `:cache-read-cost 0.0028` and
+      `:cache-write-cost 0.14` assume DeepSeek's usage JSON matches psi's
+      `cache_read_input_tokens`/`cache_creation_input_tokens` mapping, but
+      no live probe has captured a real usage payload. Confirm the usage
+      shape (and that `cache-write-cost` mirroring the miss rate does not
+      double-count) or adjust the example costs; consider documenting the
+      mirroring rationale in the docs example notes.
