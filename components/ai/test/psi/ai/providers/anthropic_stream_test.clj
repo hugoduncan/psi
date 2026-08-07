@@ -117,6 +117,45 @@
       (is (= "***REDACTED***"
              (get-in @request-capture [:request :headers "x-api-key"])))))
 
+  (testing "DeepSeek custom-provider model derives its Anthropic-compatible endpoint URL"
+    (let [model           {:id "deepseek-v4-flash"
+                           :name "DeepSeek V4 Flash"
+                           :provider :deepseek
+                           :api :anthropic-messages
+                           :base-url "https://api.deepseek.com/anthropic"
+                           :supports-reasoning true
+                           :adaptive-thinking true
+                           :supports-images false
+                           :supports-text true
+                           :context-window 1000000
+                           :max-tokens 384000
+                           :input-cost 0.14
+                           :output-cost 0.28
+                           :cache-read-cost 0.0028
+                           :cache-write-cost 0.14}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          posted-url      (atom nil)
+          sse             (str (sse-line "message_start" {:type "message_start"})
+                               (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [url _req]
+                                (reset! posted-url url)
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic
+         convo model {:api-key "deepseek-inline-key"
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_] nil)))
+
+      (is (= "https://api.deepseek.com/anthropic/v1/messages" @posted-url)
+          "request URL must be derived from the configured base-url")
+      (is (= :deepseek (:provider @request-capture)))
+      (is (= :anthropic-messages (:api @request-capture)))
+      (is (= "deepseek-v4-flash"
+             (get-in @request-capture [:request :body :model])))
+      (is (= "***REDACTED***"
+             (get-in @request-capture [:request :headers "x-api-key"])))))
+
   (testing "Anthropic error replies capture raw body and headers"
     (let [model           (models/get-model :sonnet-4.6)
           convo           (-> (conv/create "sys")

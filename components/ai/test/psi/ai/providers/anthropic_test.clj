@@ -257,24 +257,37 @@
 
 (deftest build-request-adaptive-thinking-custom-provider-test
   (testing "a non-catalog custom-provider model map with :adaptive-thinking true emits the adaptive shape"
-    (let [convo (conv/create "sys")
-          req   (#'anthropic/build-request convo deepseek-custom-provider-model
-                                           {:thinking-level :high
-                                            :api-key "test-key"})
-          body  (json/parse-string (:body req) true)]
+    (let [convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo deepseek-custom-provider-model
+                                             {:thinking-level :high
+                                              :api-key "test-key"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
       (is (= "adaptive" (get-in body [:thinking :type])))
       (is (nil? (get-in body [:thinking :budget_tokens]))
           "budget_tokens must be absent for adaptive thinking")
-      (is (= "high" (get-in body [:output_config :effort])))))
+      (is (= "high" (get-in body [:output_config :effort])))
+      (is (nil? (:temperature body))
+          "temperature must be absent for adaptive thinking models")
+      (is (= "test-key" (get headers "x-api-key"))
+          "api-key auth must use x-api-key from the configured key")
+      (is (nil? (get headers "Authorization"))
+          "no OAuth Authorization header for api-key auth")
+      (is (some? (get headers "anthropic-version"))
+          "anthropic-version header must be present")
+      (is (nil? (get headers "anthropic-beta"))
+          "no anthropic-beta header — adaptive thinking must not force interleaved-thinking beta")))
 
-  (testing "thinking off — no thinking param, no output_config"
+  (testing "thinking off — no thinking param, no output_config, no temperature"
     (let [convo (conv/create "sys")
           req   (#'anthropic/build-request convo deepseek-custom-provider-model
                                            {:thinking-level :off
                                             :api-key "test-key"})
           body  (json/parse-string (:body req) true)]
       (is (nil? (:thinking body)))
-      (is (nil? (:output_config body))))))
+      (is (nil? (:output_config body)))
+      (is (nil? (:temperature body))
+          "temperature must be absent even with thinking off on adaptive models"))))
 
 (deftest build-request-normalizes-legacy-string-tool-parameters-test
   (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"

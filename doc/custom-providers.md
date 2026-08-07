@@ -166,6 +166,13 @@ Only set this when the compatible provider actually honours
 field (or setting it `false`) keeps the classic extended-thinking shape, which
 remains the correct default for most Anthropic-compatible providers.
 
+Trade-off: adaptive-thinking models never send `temperature` — psi omits it
+from the request body even when thinking is off, because Anthropic rejects
+`temperature` on adaptive-thinking models. Declaring `:adaptive-thinking true`
+therefore forfeits temperature control for that model; only set it when the
+provider honours `output_config.effort` and you do not need per-request
+temperature.
+
 ## DeepSeek-compatible example
 
 DeepSeek exposes an Anthropic Messages-compatible endpoint at
@@ -207,6 +214,12 @@ Notes:
 - pricing/context-window figures above are from DeepSeek's published pricing
   page as of this writing; confirm current figures in DeepSeek's own docs
   before relying on them for cost tracking
+- DeepSeek's compat table lists `temperature` as fully supported, but
+  `:adaptive-thinking true` forfeits temperature control — psi never sends
+  `temperature` for adaptive-thinking models (even with thinking off). If you
+  need temperature control, set `:adaptive-thinking false` (or omit it) and
+  rely on the classic extended-thinking shape DeepSeek accepts (it honours
+  `type: "enabled"` and ignores `budget_tokens`)
 - DeepSeek's Anthropic-compatible endpoint does not document a
   JSON-Schema-native structured-output mechanism, so this example omits
   `:capabilities :structured-output` (defaults to unsupported); add
