@@ -1329,3 +1329,24 @@
       (`file-length-check-enforces-real-legacy-ratchets-test`) pass on the
       committed tree (364 passed / 0 failed). File-length gate recorded in
       implementation.md verification.
+
+## Follow-ups (implementation review 16, 2026-08-07)
+
+- [ ] Fix the 6 `^- [x]` markdown checklist artifacts in the two
+      "Follow-ups (implementation review 14, 2026-08-07)" sections: each
+      item's checkbox marker carries a stray `^` prefix (`^- [x]` instead of
+      `- [x]`), breaking the checklist-marker convention and hiding the items
+      from `grep "^- \["` (found 2026-08-07; lines ~1071, 1104, 1132, 1175,
+      1194, 1219). Replace `^- [x]` → `- [x]` on those six lines.
+- [ ] Deduplicate the byte-identical `openai-api-key-config` /
+      `codex-api-key-config` maps (`components/ai/src/psi/ai/providers/
+      openai/chat_completions.clj` and `openai/codex_responses.clj`): the
+      review-14 `request-support` namespace deduplicated the key-resolution
+      *logic* across the three transports but left two identical per-transport
+      config maps (`{:builtin-provider :openai :env-var "OPENAI_API_KEY"
+      :builtin-missing-msg "Missing OpenAI API key..."}`) in sibling
+      namespaces. If the env-var name or built-in missing-key message ever
+      changes, the two copies can drift — the exact cross-transport drift
+      class reviews 9/10/13 kept reconciling. Define the openai config once
+      (shared constant in `request_support.clj`, or one openai ns required by
+      the other) and reference it from both transports.

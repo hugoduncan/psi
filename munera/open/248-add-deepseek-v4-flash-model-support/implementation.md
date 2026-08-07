@@ -871,3 +871,5 @@
 - `bb commit-check:file-lengths` green (anthropic_test.clj 576 lines /
   anthropic_auth_test.clj 386 lines, both under the 800-line gate);
   clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
+
+- Review 16 (2026-08-07): added 2 steps to be addressed.
