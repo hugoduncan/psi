@@ -5,7 +5,8 @@
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.openai :as openai])
+   [psi.ai.providers.openai :as openai]
+   [psi.ai.providers.openai.chat-completions :as chat-completions])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -197,6 +198,176 @@
         (is (nil? (:reasoning_effort body)))
         (is (nil? (:chat_template_kwargs body)))))))
 
+(deftest openai-completions-adaptive-thinking-ignored-for-custom-providers-test
+  ;; Locks the doc/custom-providers.md claim that :adaptive-thinking "is
+  ;; ignored for OpenAI-compatible custom providers": expand-model carries the
+  ;; field into every custom model map, but the chat-completions transport
+  ;; never reads it — so an :openai-completions custom model with
+  ;; :adaptive-thinking true must produce an unchanged OpenAI body (no
+  ;; output_config/effort/adaptive leakage).
+  (testing "adaptive-thinking on a custom :openai-completions model does not leak into the request body"
+    (let [base-model {:id                 "custom-chat-model"
+                      :name               "Custom Chat Model"
+                      :provider           :custom-chat
+                      :api                :openai-completions
+                      :base-url           "https://example.com/v1"
+                      :supports-reasoning true
+                      :supports-images    false
+                      :supports-text      true
+                      :context-window     128000
+                      :max-tokens         16384
+                      :input-cost         0.0
+                      :output-cost        0.0
+                      :cache-read-cost    0.0
+                      :cache-write-cost   0.0}
+          convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
+          plain   (json/parse-string
+                   (:body (#'openai/build-request convo base-model
+                                                  {:api-key "sk-test" :thinking-level :high}))
+                   true)
+          adaptive (json/parse-string
+                    (:body (#'openai/build-request convo (assoc base-model :adaptive-thinking true)
+                                                   {:api-key "sk-test" :thinking-level :high}))
+                    true)]
+      (is (= plain adaptive)
+          ":adaptive-thinking must not change the OpenAI-compatible request body")
+      (is (nil? (:output_config adaptive)))
+      (is (nil? (:thinking adaptive)))
+      (is (= "high" (:reasoning_effort adaptive))
+          "classic chat-completions reasoning shape is unchanged"))))
+
+(deftest openai-provider-scoped-api-key-resolution-test
+  ;; Mirrors the anthropic transport's provider-scoped resolve-api-key (review
+  ;; 3): a custom :openai-completions provider must never silently receive the
+  ;; global OPENAI_API_KEY — the exact cross-provider credential disclosure
+  ;; class review 3 eliminated for :anthropic-messages. Custom providers fail
+  ;; fast (or go keyless via :no-auth-header / recognized auth header among
+  ;; custom :headers); only built-in OpenAI models fall back to the env var.
+  (testing "custom provider never falls back to OPENAI_API_KEY env var (no cross-provider leak)"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-chat"
+             (#'openai/build-request convo model {}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider's request"))))
+
+  (testing "custom-provider missing-auth error points at models.edn :auth and never hints at /login"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'openai/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"models.edn" (ex-message e))
+              "error must name the models.edn :auth remedy")
+          (is (nil? (re-find #"/login" (ex-message e)))
+              "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
+
+  (testing "built-in openai model falls back to OPENAI_API_KEY env var"
+    (let [model (models/get-model :gpt-5)
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-env-fallback-key")]
+        (let [req (#'openai/build-request convo model {})]
+          (is (= "Bearer sk-env-fallback-key" (get-in req [:headers "Authorization"]))
+              "built-in OpenAI requests without an explicit key use OPENAI_API_KEY")))))
+
+  (testing "keyless custom provider with :no-auth-header true builds a request without Authorization"
+    (let [model {:id "local-chat-model"
+                 :name "Local Chat Model"
+                 :provider :local-chat
+                 :api :openai-completions
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:no-auth-header true})]
+      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+        (is (nil? (get-in req [:headers "Authorization"]))
+            "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
+        (is (= "application/json" (get-in req [:headers "Content-Type"]))))))
+
+  (testing "recognized auth header among custom headers (case-insensitive) implies keyless auth"
+    (let [model {:id "local-chat-model"
+                 :name "Local Chat Model"
+                 :provider :local-chat
+                 :api :openai-completions
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:headers {"Authorization" "Bearer local-token"}})
+          headers (:headers req)]
+      (is (= "Bearer local-token" (get headers "Authorization"))
+          "custom authorization header auth is preserved")
+      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+        (is (= "Bearer local-token" (get headers "Authorization"))
+            "env key must not replace the custom auth header"))))
+
+  (testing "incidental custom headers with a blank key fast-fail (no env fallback)"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-chat"
+             (#'openai/build-request convo model {:headers {"X-Client" "psi"}}))
+            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
+
 (deftest openai-completions-parallel-tool-calls-uses-model-setting-test
   (let [convo (-> (conv/create "sys")
                   (conv/add-user-message "hi")
@@ -241,14 +412,16 @@
                :cache-write-cost   0.0}
         convo (-> (conv/create "sys") (conv/add-user-message "hi"))]
     (testing "thinking off adds chat_template_kwargs enable_thinking false for local models"
-      (let [req  (#'openai/build-request convo model {:thinking-level :off})
+      (let [req  (#'openai/build-request convo model {:thinking-level :off
+                                                      :no-auth-header true})
             body (json/parse-string (:body req) true)]
         (is (nil? (:reasoning_effort body)))
         (is (= {:enable_thinking false}
                (:chat_template_kwargs body)))))
 
     (testing "thinking on leaves chat_template_kwargs unset for local models"
-      (let [req  (#'openai/build-request convo model {:thinking-level :medium})
+      (let [req  (#'openai/build-request convo model {:thinking-level :medium
+                                                      :no-auth-header true})
             body (json/parse-string (:body req) true)]
         (is (= "medium" (:reasoning_effort body)))
         (is (nil? (:chat_template_kwargs body)))))))

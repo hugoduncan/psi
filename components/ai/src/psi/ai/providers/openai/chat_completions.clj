@@ -1,5 +1,6 @@
 (ns psi.ai.providers.openai.chat-completions
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [cheshire.core :as json]
             [psi.ai.models :as models]
             [psi.ai.providers.openai.content :as content]
@@ -132,11 +133,74 @@
                acc))
            [])))))
 
+(defn- getenv
+  [k]
+  (System/getenv k))
+
+(defn- auth-header?
+  "True when a header name is a recognized auth header (case-insensitive)."
+  [header]
+  (contains? #{"x-api-key" "authorization"}
+             (str/lower-case (name header))))
+
+(defn- resolve-api-key
+  "Resolve the API key for a request, scoped to the request's provider.
+
+   Built-in OpenAI models (`:provider` nil or `:openai`) fall back to the
+   `OPENAI_API_KEY` env var. Custom `:openai-completions` providers never fall
+   back to that env var: a nil/blank configured key is an error, so a custom
+   provider's request can never silently send the user's OpenAI key to a
+   third-party endpoint (the same provider-scoped resolution the
+   `:anthropic-messages` transport applies — see anthropic/resolve-api-key).
+
+   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
+   no key is required: the caller omits the Authorization header anyway, so
+   this returns nil instead of failing. (Headers-only auth without
+   `:no-auth-header` is handled by `build-request` — it skips this function
+   entirely when a recognized auth header is present among custom
+   `:headers`.)"
+  [model options]
+  (when-not (:no-auth-header options)
+    (let [provider (:provider model)
+          openai?  (or (nil? provider) (= :openai provider))
+          api-key  (:api-key options)
+          api-key  (if (and openai? (str/blank? api-key))
+                     (getenv "OPENAI_API_KEY")
+                     api-key)]
+      (when (str/blank? api-key)
+        (if openai?
+          (throw (ex-info "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."
+                          {:error-code "auth/missing-api-key"
+                           :provider :openai}))
+          ;; OAuth /login only exists for built-in providers, so custom
+          ;; providers must not hint at it — the remedy is models.edn :auth.
+          (throw (ex-info (str "Missing API key for provider " (name provider)
+                               ". Configure the provider's :auth {:api-key ...} in models.edn"
+                               " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\").")
+                          {:error-code "auth/missing-api-key"
+                           :provider provider}))))
+      api-key)))
+
 (defn build-request
   "Build OpenAI Chat Completions API request map."
   [conversation model options]
   (let [structured-request (structured-output/structured-output-request options)
         strategy           (structured-output/select-strategy model structured-request)
+        ;; No auth key is required when the request is explicitly keyless
+        ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
+        ;; custom :headers supply a recognized auth header (x-api-key /
+        ;; authorization) without a configured :api-key. Incidental custom
+        ;; headers (e.g. X-Client) do NOT imply keyless: with a blank
+        ;; configured key such a request fast-fails with the clear
+        ;; "Missing API key" error instead of silently sending the global
+        ;; OPENAI_API_KEY to a custom endpoint — consistent with the
+        ;; :anthropic-messages transport.
+        no-auth?           (or (:no-auth-header options)
+                               (and (seq (:headers options))
+                                    (str/blank? (:api-key options))
+                                    (some auth-header? (keys (:headers options)))))
+        api-key            (when-not no-auth?
+                             (resolve-api-key model options))
         fallback-request   (when (= :prompted-json (:strategy strategy))
                              structured-request)
         base-messages      (transform-messages conversation fallback-request)
@@ -180,12 +244,11 @@
                                  :strict (not (false? (:strict? structured-request)))
                                  :schema (:json-schema structured-request)}}))]
     {:headers (cond-> {"Content-Type" "application/json"}
-                ;; Skip Authorization when :no-auth-header is set
-                ;; (e.g. local servers that reject auth headers)
-                (not (:no-auth-header options))
-                (assoc "Authorization"
-                       (str "Bearer " (or (:api-key options)
-                                          (System/getenv "OPENAI_API_KEY"))))
+                ;; Skip Authorization when no key is resolved: explicit
+                ;; :no-auth-header (e.g. local servers that reject auth
+                ;; headers) or keyless custom-header auth.
+                (not no-auth?)
+                (assoc "Authorization" (str "Bearer " api-key))
                 (:headers options)
                 (merge (:headers options)))
      :body    (json/generate-string body)}))

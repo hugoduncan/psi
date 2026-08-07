@@ -31,11 +31,10 @@ supersedes the Responses API approach.
 
 ## Revision note (implementation reviews)
 
-The implementation reviews added two small, deliberate changes to
-`providers/anthropic.clj` beyond the original "no provider code changes"
-scope. They are the *only* provider-transport changes in this task; the
-request-shaping logic itself (thinking/adaptive/temperature/tools/headers)
-is otherwise unchanged.
+The implementation reviews added small, deliberate changes to the provider
+transports beyond the original "no provider code changes" scope. They are the
+*only* provider-transport changes in this task; the request-shaping logic
+itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
 
 - **Provider-scoped API-key resolution (review 3):** `anthropic/resolve-api-key`
   falls back to the `ANTHROPIC_API_KEY` env var only for built-in Anthropic
@@ -52,6 +51,18 @@ is otherwise unchanged.
   restoring the pre-review-3 behavior for keyless local-proxy configs.
   Custom-provider missing-key errors no longer hint at `/login` (OAuth login
   exists only for built-in providers).
+- **Provider-scoped API-key resolution for OpenAI chat completions (review
+  10):** the `:openai-completions` transport received the same
+  provider-scoped key resolution the anthropic transport got in review 3 —
+  `openai/chat_completions` `resolve-api-key` falls back to
+  `OPENAI_API_KEY` only for built-in OpenAI models (`:provider` nil or
+  `:openai`); custom `:openai-completions` providers fail fast with a
+  provider-scoped "Missing API key" error (no cross-provider credential
+  disclosure, no `/login` hint), and the same keyless exemptions apply
+  (`:no-auth-header`, or a recognized `x-api-key`/`Authorization` header
+  among custom `:headers` with no configured key). This closes the
+  review-10-flagged asymmetry where a custom OpenAI-compatible provider with
+  an unset key silently received the global `OPENAI_API_KEY`.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

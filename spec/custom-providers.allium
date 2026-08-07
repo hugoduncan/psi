@@ -91,6 +91,33 @@ value ProviderAuth {
     headers: Map<String, String>?
 }
 
+-- ── Primitives ──────────────────────────────────────────────────────────────
+
+-- SystemGetenv(name) / Environment(name): read an environment variable by
+--   name (System/getenv); nil when unset. The two names are synonyms; specs
+--   use SystemGetenv for the mechanical env:VAR resolution in ApiKeySpec and
+--   Environment for the provider fallback reads.
+-- BlankOrNil(x): x is nil or a blank/whitespace-only string
+--   (clojure.string/blank? semantics; nil counts as blank).
+-- HeaderName(header): the header's name as a string. A header is a
+--   [name value] pair or map entry; keyword and string names are accepted
+--   (name of the header key).
+-- LowerCase(s): lower-case a string (clojure.string/lower-case).
+
+-- ── External interface ───────────────────────────────────────────────────────
+
+-- BuildPreparedRequest(session, model, options): the request-preparation step
+--   at which the session, resolved model, and assembled request options
+--   (RequestOptions) are available (cf. providers/*/build-request). A
+--   runtime-supplied event; declared on the CustomProviderApi surface below.
+-- LookupProviderAuth(provider): read the provider's :auth config
+--   (extract-provider-auth in user_models.clj) → ProviderAuth, or null when
+--   the provider has no auth block. A runtime-supplied function.
+-- RequestUnderConstruction(model, options): the narrower request-shaping step
+--   at which a prepared request's model and options are being finalized
+--   (same model/options pair BuildPreparedRequest carries). A runtime-supplied
+--   event; declared on the CustomProviderApi surface below.
+
 -- ── Config files ─────────────────────────────────────────────────────────────
 
 config {
@@ -157,6 +184,13 @@ rule ResolveApiKey {
     ensures: not StartsWith(raw, "env:") implies resolved = raw
 }
 
+value RequestOptions {
+    api_key: String?
+    no_auth_header: Boolean = false
+    headers: Map<String, String>?
+    thinking_level: off | minimal | low | medium | high | xhigh | null
+}
+
 rule ResolveRequestApiKey {
     -- Provider-scoped API-key resolution for a request, matching the Anthropic
     -- transport's resolve-api-key:
@@ -166,34 +200,37 @@ rule ResolveRequestApiKey {
     --     ANTHROPIC_API_KEY — a nil/blank configured key is an error naming
     --     the provider and the models.edn :auth remedy, so an Anthropic key
     --     can never be silently sent to a third-party endpoint;
-    --   * keyless requests (explicit no_auth_header, or a recognized auth
-    --     header — x-api-key / authorization — among custom :headers with no
-    --     configured key) require no key at all.
+    --   * keyless requests (see KeylessRequestDefined: explicit
+    --     no_auth_header, or a recognized auth header among custom :headers
+    --     with no configured key) require no key at all.
 
-    when: BuildPreparedRequest(session, model) and LookupProviderAuth(model.provider) != null
+    when: BuildPreparedRequest(session, model, options)
+    requires: LookupProviderAuth(model.provider) != null
 
-    let keyless = options.no_auth_header
-                  or (non-empty(options.headers)
-                      and BlankOrNil(options.api_key)
-                      and ExistsAuthHeader(options.headers))
-
-    ensures: keyless implies resolved_key = null
-    ensures: not keyless and (model.provider == null or model.provider == "anthropic")
+    ensures: KeylessRequest(model, options) implies resolved_key = null
+    ensures: not KeylessRequest(model, options) and (model.provider == null or model.provider == "anthropic")
         implies resolved_key = options.api_key ?? SystemGetenv("ANTHROPIC_API_KEY")
-    ensures: not keyless and model.provider != null and model.provider != "anthropic"
+    ensures: not KeylessRequest(model, options) and model.provider != null and model.provider != "anthropic"
         and BlankOrNil(options.api_key)
         implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn")
 }
 
-rule ExistsAuthHeader {
-    -- A header is a recognized auth header when its lower-cased name is
-    -- "x-api-key" or "authorization". Incidental headers (e.g. X-Client) are
-    -- NOT auth headers and do not make a request keyless.
+rule KeylessRequestDefined {
+    -- Defines the KeylessRequest predicate (not a rule invocation — see
+    -- NoAuthHeaderWhenDisabled, which references it as a value): a request is
+    -- keyless when no_auth_header is set, or when custom :headers carry a
+    -- recognized auth header (x-api-key / authorization, case-insensitive)
+    -- with no configured key. Incidental headers (e.g. X-Client) do NOT imply
+    -- keyless — with a blank configured key such a request fast-fails with
+    -- the provider-scoped "Missing API key" error.
 
-    when: HeaderNamed(header, name)
+    when: RequestUnderConstruction(model, options)
 
-    ensures: ExistsAuthHeader(headers) iff
-        ∃ header ∈ headers. LowerCase(name(header)) ∈ {"x-api-key", "authorization"}
+    ensures: KeylessRequest(model, options) iff
+        options.no_auth_header
+        or (non-empty(options.headers)
+            and BlankOrNil(options.api_key)
+            and ∃ header ∈ options.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"})
 }
 
 -- ── Precedence ───────────────────────────────────────────────────────────────
@@ -246,13 +283,19 @@ rule InjectCustomProviderAuth {
     -- config, inject the resolved api-key and headers into stream options.
     -- Keyless configs (auth_header false / no_auth_header, or a recognized
     -- auth header among custom :headers with no configured key) carry no key.
+    -- This is the auth-config-level keyless determination (mirrors
+    -- extract-provider-auth); the request-level KeylessRequest predicate
+    -- (KeylessRequestDefined) applies the same rule to prepared request
+    -- options.
 
-    when: BuildPreparedRequest(session, model)
+    when: BuildPreparedRequest(session, model, options)
 
     let auth = LookupProviderAuth(model.provider)
     let keyless = auth != null and (
         not auth.auth_header
-        or (non-empty(auth.headers) and BlankOrNil(auth.api_key) and ExistsAuthHeader(auth.headers)))
+        or (non-empty(auth.headers)
+            and BlankOrNil(auth.api_key)
+            and ∃ header ∈ auth.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"}))
 
     ensures: auth == null implies ai_options unchanged
     ensures: auth != null and not keyless and auth.api_key != null and auth.auth_header implies
@@ -270,16 +313,17 @@ rule InjectCustomProviderAuth {
 rule NoAuthHeaderWhenDisabled {
     -- When auth_header is false, the transport must not send Authorization.
     -- This supports local servers that reject auth headers. The same applies
-    -- to any keyless custom-provider request: the Anthropic transport strips
-    -- both x-api-key and Authorization when no key is resolved.
+    -- to any keyless custom-provider request (see KeylessRequestDefined): the
+    -- Anthropic transport strips both x-api-key and Authorization when no key
+    -- is resolved.
 
     when: BuildProviderRequest(model, options)
 
     requires: LookupProviderAuth(model.provider).auth_header == false
-              or ResolveRequestApiKey(model, options).keyless
+              or KeylessRequest(model, options)
 
     ensures: request.headers does not contain "Authorization"
-    ensures: keyless implies request.headers does not contain "x-api-key"
+    ensures: KeylessRequest(model, options) implies request.headers does not contain "x-api-key"
 }
 
 -- ── Validation errors ────────────────────────────────────────────────────────
@@ -304,4 +348,17 @@ rule CustomModelsVisibleInGraph {
     when: QueryAllModels or QueryProviderModels(provider)
 
     ensures: result includes custom models from merged catalog
+}
+
+surface CustomProviderApi {
+    facing executor: AgentExecutor
+
+    provides:
+        BuildPreparedRequest(session, model, options)
+        RequestUnderConstruction(model, options)
+
+    exposes:
+        RequestOptions
+        ProviderAuth
+        ResolvedCustomModel
 }

@@ -16,7 +16,11 @@
 --     and prompt cache directives
 --   - OAuth vs API-key auth dispatch
 --   - Extended thinking level to budget_tokens mapping
+--   - Adaptive thinking request shaping (thinking type "adaptive" +
+--     output_config.effort) and temperature exclusion for adaptive models
+--   - Provider-scoped api-key resolution and keyless request detection
 --   - Temperature exclusion when extended thinking is active
+--   - Provider request/response capture callbacks with header redaction
 --   - SSE streaming and event normalization to executor-facing event types
 --   - Usage accumulation across message_start and message_delta events
 --   - HTTP error handling and API error extraction
@@ -51,8 +55,10 @@ external entity Conversation {
 
 external entity Model {
     id: String
+    provider: String?
     base_url: String
     supports_reasoning: Boolean
+    adaptive_thinking: Boolean = false
     max_tokens: Integer?
 }
 
@@ -60,11 +66,21 @@ external entity Model {
 -- Value Types
 ------------------------------------------------------------
 
+value ProviderCallbackHandle {
+    id: String
+}
+
 value StreamOptions {
     api_key: String?
     thinking_level: off | minimal | low | medium | high | xhigh | null
     temperature: Number?
     max_tokens: Integer?
+    no_auth_header: Boolean = false
+    headers: Map<String, String>?
+    effort_override: low | medium | high | xhigh | null
+
+    on_provider_request: ProviderCallbackHandle?
+    on_provider_response: ProviderCallbackHandle?
 }
 
 value StreamUsage {
@@ -114,6 +130,7 @@ entity AnthropicStream {
     usage_acc: StreamUsage
     block_types: Map<Integer, String>
     done: Boolean = false
+    keyless: Boolean = false
 }
 
 ------------------------------------------------------------
@@ -272,6 +289,15 @@ rule ConsecutiveToolResultsMergedIntoSingleUserMessage {
 -- Authentication
 ------------------------------------------------------------
 
+-- Primitives used below (shared vocabulary with spec/custom-providers.allium):
+--   Environment(name) — read an env var by name (System/getenv); nil when
+--     unset. Used for the built-in ANTHROPIC_API_KEY fallback.
+--   BlankOrNil(x) — x is nil or a blank/whitespace-only string
+--     (clojure.string/blank? semantics; nil counts as blank).
+--   HeaderName(header) — the header's name as a string (keyword/string names
+--     accepted).
+--   LowerCase(s) — lower-case a string (clojure.string/lower-case).
+
 rule ApiKeyResolved {
     when: AnthropicStreamRequested(stream)
 
@@ -283,12 +309,33 @@ rule ApiKeyResolved {
     -- custom :headers with no configured key) resolve to nil and the
     -- transport strips x-api-key / Authorization.
 
-    ensures: BuiltinAnthropic(stream.model)
+    ensures: (stream.model.provider == null or stream.model.provider == "anthropic")
         implies stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
-    ensures: CustomProvider(stream.model) and not stream.keyless
+    ensures: stream.model.provider != null and stream.model.provider != "anthropic"
+        and not stream.keyless
         implies stream.resolved_api_key = stream.options.api_key
               and not BlankOrNil(stream.resolved_api_key)
     ensures: stream.keyless implies stream.resolved_api_key = null
+}
+
+rule KeylessRequestDetermined {
+    -- Mirrors build-request's no-auth? computation in
+    -- providers/anthropic.clj: a request is keyless when :no-auth-header is
+    -- set (e.g. :auth-header? false local servers), or when custom :headers
+    -- carry a recognized auth header (x-api-key / authorization,
+    -- case-insensitive) with no configured key. Incidental custom headers
+    -- (e.g. X-Client) do NOT make a request keyless — with a blank configured
+    -- key such a request fast-fails with the provider-scoped "Missing API
+    -- key" error (consistent with the OpenAI transport, which only exempts on
+    -- explicit :no-auth-header).
+
+    when: AnthropicStreamRequested(stream)
+
+    ensures: stream.keyless iff
+        stream.options.no_auth_header
+        or (non-empty(stream.options.headers)
+            and BlankOrNil(stream.options.api_key)
+            and ∃ header ∈ stream.options.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"})
 }
 
 rule OAuthDetectedFromApiKey {
@@ -322,7 +369,52 @@ rule ThinkingParamPresentForActiveLevel {
     requires: model.supports_reasoning = true
     requires: options.thinking_level ∈ {minimal, low, medium, high, xhigh}
 
-    ensures: ThinkingParam({type: "enabled", budget_tokens: BudgetForLevel(options.thinking_level)})
+    ensures: ThinkingParam(
+        if model.adaptive_thinking:
+            {type: "adaptive", display: "summarized"}
+        else:
+            {type: "enabled", budget_tokens: BudgetForLevel(options.thinking_level)})
+
+    @guidance
+        -- Adaptive thinking (built-in Opus 4.7+ and :adaptive-thinking custom
+        -- models, e.g. the documented deepseek-v4-flash example) uses the
+        -- adaptive shape ({:type "adaptive" :display "summarized"}) paired
+        -- with body output_config.effort, never the classic
+        -- thinking.budget_tokens shape.
+}
+
+rule OutputConfigEffortForAdaptiveThinking {
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.supports_reasoning = true
+    requires: stream.model.adaptive_thinking = true
+    requires: ThinkingParam(stream) != null
+
+    ensures: RequestBodyContains("output_config", {effort: EffortValue(stream.options)})
+
+    @guidance
+        -- Adaptive thinking sends output_config.effort (derived from the
+        -- thinking level — minimal/low → "low", medium → "medium", high →
+        -- "high", xhigh → "highest" — or an explicit effort override) instead
+        -- of the classic thinking.budget_tokens, which DeepSeek's
+        -- Anthropic-compatible endpoint accepts but ignores.
+}
+
+rule NoOutputConfigForClassicThinking {
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.adaptive_thinking = false
+
+    ensures: RequestBodyDoesNotContain("output_config")
+}
+
+rule TemperatureExcludedForAdaptiveModels {
+    -- Adaptive-thinking models never send temperature — even with thinking
+    -- off — because Anthropic rejects temperature on adaptive-thinking models
+    -- (the trade-off doc/custom-providers.md documents). This holds for
+    -- built-in Opus 4.7+ models and :adaptive-thinking custom providers.
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.adaptive_thinking = true
+
+    ensures: RequestBodyDoesNotContain("temperature")
 }
 
 rule LastAssistantThinkingBlocksMustRoundTripDuringToolContinuation {
@@ -368,7 +460,53 @@ rule AnthropicRequestBodyBuilt {
     ensures: RequestBodyContains("stream", true)
     ensures: RequestBodyContains("tools", ToolDefs(stream.conversation)) when stream.conversation.tools non-empty
     ensures: RequestBodyContains("thinking", ThinkingParam(stream)) when ThinkingParam(stream) != null
-    ensures: RequestBodyContains("temperature", stream.options.temperature ?? config.default_temperature) when ThinkingParam(stream) = null
+    ensures: RequestBodyContains("temperature", stream.options.temperature ?? config.default_temperature) when ThinkingParam(stream) = null and not stream.model.adaptive_thinking
+}
+
+------------------------------------------------------------
+-- Capture Callbacks
+------------------------------------------------------------
+
+rule ProviderRequestCaptureEmittedWithRedaction {
+    when: ProviderRequestBuilt(stream, request)
+    requires: stream.options.on_provider_request != null
+
+    ensures: ProviderCallbackInvoked(stream.options.on_provider_request, {
+        provider: stream.model.provider ?? "anthropic",
+        api: "anthropic-messages",
+        url: RequestUrl(stream),
+        request: {
+            headers: RedactRequestHeaders(request.headers),
+            body: ParseJsonOrString(request.body)
+        }
+    })
+}
+
+rule ProviderResponseCaptureEmitted {
+    when: ProviderResponseObserved(stream, event)
+    requires: stream.options.on_provider_response != null
+
+    ensures: ProviderCallbackInvoked(stream.options.on_provider_response, {
+        provider: stream.model.provider ?? "anthropic",
+        api: "anthropic-messages",
+        url: RequestUrl(stream),
+        event: event
+    })
+}
+
+rule RedactRequestHeaders {
+    -- Auth header names are matched case-insensitively (find-header in
+    -- providers/anthropic.clj, review 7); the redacted value is written back
+    -- under the original header key casing. Non-auth headers pass through
+    -- unmodified.
+
+    when: RequestHeadersAvailable(headers)
+
+    ensures: ∀ header ∈ headers:
+        if LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"}:
+            RedactedHeaderValue(header) = RedactSecret(header.value)
+        else:
+            header unchanged
 }
 
 ------------------------------------------------------------

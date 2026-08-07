@@ -54,6 +54,8 @@ value StreamOptions {
     thinking_level: off | minimal | low | medium | high | xhigh
     temperature: Number?
     max_tokens: Integer?
+    no_auth_header: Boolean = false
+    headers: Map<String, String>?
     id: String?
 
     on_provider_request: ProviderCallbackHandle?
@@ -138,6 +140,7 @@ entity OpenAIStream {
 
     resolved_api_key: String?
     chatgpt_account_id: String?
+    keyless: Boolean = false
 
     -- Buffered raw tool-call fragments keyed by provider index (or arrival order fallback).
     buffered_tool_calls: Map<Integer, String>
@@ -159,9 +162,46 @@ rule OpenAIProviderDispatchesByModelApi {
 }
 
 rule OpenAIApiKeyResolved {
+    -- Provider-scoped resolution, mirroring the Anthropic transport's
+    -- resolve-api-key (review 3) and the review-10 fix for the OpenAI
+    -- chat-completions transport: built-in OpenAI models (provider "openai")
+    -- fall back to the OPENAI_API_KEY env var; custom :openai-completions
+    -- providers NEVER do (a nil/blank configured key is a provider-scoped
+    -- missing-key error, so a custom provider's request can never silently
+    -- send the user's OpenAI key to a third-party endpoint); keyless requests
+    -- (no_auth_header, or a recognized auth header among custom :headers with
+    -- no configured key) resolve to nil and the transport omits the
+    -- Authorization header.
+
     when: OpenAIStreamRequested(stream)
 
-    ensures: stream.resolved_api_key = stream.options.api_key ?? Environment("OPENAI_API_KEY")
+    ensures: stream.model.provider = "openai"
+        implies stream.resolved_api_key = stream.options.api_key ?? Environment("OPENAI_API_KEY")
+    ensures: stream.model.provider != "openai"
+        and not stream.keyless
+        implies stream.resolved_api_key = stream.options.api_key
+              and not IsBlank(stream.resolved_api_key)
+    ensures: stream.keyless implies stream.resolved_api_key = null
+}
+
+rule KeylessRequestDetermined {
+    -- Mirrors build-request's no-auth? computation in
+    -- providers/openai/chat_completions.clj: a request is keyless when
+    -- :no-auth-header is set (e.g. :auth-header? false local servers), or
+    -- when custom :headers carry a recognized auth header (x-api-key /
+    -- authorization, case-insensitive) with no configured key. Incidental
+    -- custom headers (e.g. X-Client) do NOT make a request keyless — with a
+    -- blank configured key such a request fast-fails with the provider-scoped
+    -- "Missing API key" error (consistent with the :anthropic-messages
+    -- transport).
+
+    when: OpenAIStreamRequested(stream)
+
+    ensures: stream.keyless iff
+        stream.options.no_auth_header
+        or (non-empty(stream.options.headers)
+            and IsBlank(stream.options.api_key)
+            and ∃ header ∈ stream.options.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"})
 }
 
 rule CompletionsUrlResolved {

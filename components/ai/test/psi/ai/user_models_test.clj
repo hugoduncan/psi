@@ -1,8 +1,44 @@
 (ns psi.ai.user-models-test
   (:require
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [psi.ai.structured-output :as structured-output]
    [psi.ai.user-models :as user-models]))
+
+(defn- repo-root
+  "Repo root: walk up from the process cwd until doc/custom-providers.md
+  exists. Tests run from the repo root via bb, but this also tolerates a
+  component-local cwd."
+  []
+  (loop [dir (.getCanonicalFile (io/file "."))]
+    (if (or (.exists (io/file dir "doc" "custom-providers.md"))
+            (= dir (.getParentFile dir)))
+      dir
+      (recur (.getParentFile dir)))))
+
+(defn- deepseek-example-edn
+  "Parse the ```clojure models.edn block under the '## DeepSeek-compatible
+  example' heading in doc/custom-providers.md."
+  []
+  (let [lines   (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md")))
+        heading (first (keep-indexed (fn [i l]
+                                       (when (str/starts-with? l "## DeepSeek-compatible example") i))
+                                     lines))]
+    (when (nil? heading)
+      (throw (ex-info "doc/custom-providers.md: '## DeepSeek-compatible example' heading not found" {})))
+    (let [start (first (keep-indexed (fn [i l]
+                                       (when (and (> i heading) (str/starts-with? l "```clojure")) i))
+                                     lines))]
+      (when (nil? start)
+        (throw (ex-info "doc/custom-providers.md: no ```clojure block after the DeepSeek example heading" {})))
+      (let [end (first (keep-indexed (fn [i l]
+                                       (when (and (> i start) (str/starts-with? l "```")) i))
+                                     lines))]
+        (when (nil? end)
+          (throw (ex-info "doc/custom-providers.md: unterminated ```clojure block" {})))
+        (edn/read-string (str/join "\n" (subvec (vec lines) (inc start) end)))))))
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
@@ -297,31 +333,16 @@
       (is (false? (boolean (:adaptive-thinking model)))))))
 
 (deftest parse-documented-deepseek-example-test
-  ;; Parse-lock: the EXACT models.edn example documented in
-  ;; doc/custom-providers.md ("DeepSeek-compatible example"). Guards the closed
-  ;; ModelDef/AuthConfig schemas against docs/code drift — e.g. a future field
-  ;; typo silently making the documented example invalid.
+  ;; Parse-lock: parses the EXACT models.edn example documented in
+  ;; doc/custom-providers.md ("DeepSeek-compatible example") directly from the
+  ;; doc file, so a change to the documented example (typo, new field, pricing
+  ;; edit, removed field) fails this test — guarding the closed
+  ;; ModelDef/AuthConfig schemas against docs/code drift in both directions
+  ;; (a doc edit that breaks the example, or a schema change that rejects the
+  ;; documented example).
   (testing "the exact documented DeepSeek example parses and carries through every resolved field"
-    (let [result (user-models/parse-models-config
-                  {:version 1
-                   :providers
-                   {"deepseek"
-                    {:base-url "https://api.deepseek.com/anthropic"
-                     :api      :anthropic-messages
-                     :auth     {:api-key "env:DEEPSEEK_API_KEY"}
-                     :models   [{:id                 "deepseek-v4-flash"
-                                 :name               "DeepSeek V4 Flash"
-                                 :supports-reasoning true
-                                 :adaptive-thinking  true
-                                 :supports-images    false
-                                 :supports-text      true
-                                 :context-window     1000000
-                                 :max-tokens         384000
-                                 :input-cost         0.14
-                                 :output-cost        0.28
-                                 :cache-read-cost    0.0028
-                                 :cache-write-cost   0.14}]}}})
-          model (first (:models result))]
+    (let [result (user-models/parse-models-config (deepseek-example-edn))
+          model  (first (:models result))]
       (is (nil? (:error result)))
       (is (= 1 (count (:models result))))
       (is (= "deepseek-v4-flash" (:id model)))
@@ -341,17 +362,20 @@
       (is (= 0.14 (:cache-write-cost model))))
 
     (testing "auth resolves provider-scoped from env:DEEPSEEK_API_KEY"
-      (let [auth (get-in (user-models/parse-models-config
-                          {:version 1
-                           :providers
-                           {"deepseek"
-                            {:base-url "https://api.deepseek.com/anthropic"
-                             :api      :anthropic-messages
-                             :auth     {:api-key "env:DEEPSEEK_API_KEY"}
-                             :models   [{:id "deepseek-v4-flash"}]}}})
-                         [:auth :deepseek])]
-        (is (= :deepseek (:provider auth)))
-        (is (= (user-models/resolve-api-key-spec "env:DEEPSEEK_API_KEY")
-               (:api-key auth))
-            "env:DEEPSEEK_API_KEY resolved via resolve-api-key-spec (env-dependent)")
-        (is (true? (:auth-header? auth)))))))
+      ;; Redefs the env lookup (getenv) to a sentinel so the resolution path
+      ;; is genuinely exercised — env:VAR → getenv → :api-key — instead of a
+      ;; tautological resolve-api-key-spec-vs-itself comparison.
+      (with-redefs [user-models/getenv (fn [_] "sk-deepseek-sentinel")]
+        (let [auth (get-in (user-models/parse-models-config
+                            {:version 1
+                             :providers
+                             {"deepseek"
+                              {:base-url "https://api.deepseek.com/anthropic"
+                               :api      :anthropic-messages
+                               :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+                               :models   [{:id "deepseek-v4-flash"}]}}})
+                           [:auth :deepseek])]
+          (is (= :deepseek (:provider auth)))
+          (is (= "sk-deepseek-sentinel" (:api-key auth))
+              "env:DEEPSEEK_API_KEY resolved through the env lookup")
+          (is (true? (:auth-header? auth))))))))

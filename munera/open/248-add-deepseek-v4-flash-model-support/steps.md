@@ -495,7 +495,7 @@
 
 ## Follow-ups (implementation review 9, 2026-08-07)
 
-- [ ] `spec/anthropic-provider.allium` `ApiKeyResolved` (updated in the
+- [x] `spec/anthropic-provider.allium` `ApiKeyResolved` (updated in the
       review-5 resolution) references predicates/attributes the spec never
       defines: `BuiltinAnthropic(stream.model)`, `CustomProvider(stream.model)`
       and `stream.keyless` — the `AnthropicStream` entity has no `keyless`
@@ -509,7 +509,20 @@
       `BuiltinAnthropic`/`CustomProvider` predicates (or inline the
       provider-nil/"anthropic" conditions) so `ApiKeyResolved` is
       self-contained.
-- [ ] `spec/anthropic-provider.allium` does not model two behaviors this
+      → Resolved: `spec/anthropic-provider.allium` model completed — `Model`
+      gains `provider: String?` and `adaptive_thinking: Boolean = false`;
+      `StreamOptions` gains `no_auth_header: Boolean = false`,
+      `headers: Map<String, String>?`, `effort_override`, and
+      `on_provider_request`/`on_provider_response`; `AnthropicStream` gains
+      `keyless: Boolean = false`. `ApiKeyResolved` now inlines the
+      built-in/custom conditions (`provider == null or provider ==
+      "anthropic"` vs otherwise) instead of the undefined
+      `BuiltinAnthropic`/`CustomProvider` predicates; new
+      `KeylessRequestDetermined` + `ExistsAuthHeader` rules define
+      `stream.keyless` (mirroring `build-request`'s `no-auth?`: explicit
+      `:no-auth-header`, or a recognized auth header among custom `:headers`
+      with no configured key). The rule is now self-contained.
+- [x] `spec/anthropic-provider.allium` does not model two behaviors this
       task now documents/changes for the Anthropic transport: (a) adaptive
       thinking — `ThinkingParamPresentForActiveLevel` unconditionally maps
       active levels to `{:type "enabled" :budget_tokens ...}`, but
@@ -529,7 +542,19 @@
       `output_config.effort`, temperature exclusion whenever adaptive
       regardless of thinking) and a capture-redaction rule to
       anthropic-provider.allium.
-- [ ] `parse-documented-deepseek-example-test` (user_models_test.clj,
+      → Resolved: `ThinkingParamPresentForActiveLevel` now emits the adaptive
+      shape (`{:type "adaptive" :display "summarized"}`) for
+      `adaptive_thinking` models; new `OutputConfigEffortForAdaptiveThinking`
+      /`NoOutputConfigForClassicThinking` rules model body
+      `output_config.effort` (level-derived or override, never for classic
+      thinking); `TemperatureExcludedForAdaptiveModels` +
+      `AnthropicRequestBodyBuilt`'s temperature guard model temperature
+      exclusion whenever adaptive (even thinking off); new Capture Callbacks
+      section (`ProviderRequestCaptureEmittedWithRedaction`,
+      `ProviderResponseCaptureEmitted`, `RedactRequestHeaders`) models the
+      case-insensitive auth-header redaction from review 7 (original key
+      casing preserved).
+- [x] `parse-documented-deepseek-example-test` (user_models_test.clj,
       review-6 resolution) embeds a hardcoded copy of the documented
       `models.edn` example instead of reading `doc/custom-providers.md`, so
       its stated purpose — "guards the closed ModelDef/AuthConfig schemas
@@ -539,7 +564,14 @@
       `doc/custom-providers.md`, take the ```clojure block under the
       "DeepSeek-compatible example" heading) or assert the embedded map
       equals the doc's block, so doc↔schema drift is actually caught.
-- [ ] `doc/custom-providers.md` "Adaptive thinking" section never states
+      → Resolved: `parse-documented-deepseek-example-test` now reads
+      `doc/custom-providers.md` directly — repo-root walk-up +
+      `deepseek-example-edn` helpers extract the ```clojure EDN block under
+      the '## DeepSeek-compatible example' heading and parse it through
+      `parse-models-config`, asserting every resolved field. The hardcoded
+      copy is gone; a doc edit that breaks the example (or a schema change
+      that rejects it) now fails the test.
+- [x] `doc/custom-providers.md` "Adaptive thinking" section never states
       that `:adaptive-thinking true` is a silent no-op without
       `:supports-reasoning true`: `thinking-param` gates on
       `(:supports-reasoning model)`, so a custom provider declaring
@@ -548,10 +580,15 @@
       no schema error, no warning. Document the dependency in the
       `:adaptive-thinking` field section (and/or the DeepSeek example notes)
       so both flags are known to be required together.
+      → Resolved: `doc/custom-providers.md` Adaptive thinking section now
+      states `:adaptive-thinking true` is a silent no-op without
+      `:supports-reasoning true` (no `thinking` field, no
+      `output_config.effort`, no schema error or warning) — set both flags
+      together when you want the adaptive shape.
 
 ## Follow-ups (implementation review 10, 2026-08-07)
 
-- [ ] `spec/custom-providers.allium`'s review-5 rules carry the same
+- [x] `spec/custom-providers.allium`'s review-5 rules carry the same
       undefined-reference problem review 9 flagged for
       `anthropic-provider.allium`'s `ApiKeyResolved` — the review-5 "spec now
       matches the implementation" claim holds for `custom-providers.allium`
@@ -567,7 +604,30 @@
       `ResolveRequestApiKey(model, options).keyless` as a value expression (a
       rule, not a function). Fold this into the review-9 item-1 fix so both
       specs are left checkable.
-- [ ] OpenAI `chat_completions` transport still leaks the user's OpenAI key to
+      → Resolved: `spec/custom-providers.allium` auth rules are now
+      self-contained — new `RequestOptions` value defines the `options`
+      entity (`api_key`/`no_auth_header`/`headers`/`thinking_level`); a
+      `KeylessRequestDefined` rule defines the `KeylessRequest(model,
+      options)` predicate (mirrors `build-request`'s `no-auth?`), which
+      `ResolveRequestApiKey` and `NoAuthHeaderWhenDisabled` reference as a
+      value — `NoAuthHeaderWhenDisabled` no longer invokes a rule as a
+      function, and its previously-unbound bare `keyless` ensure is now
+      `KeylessRequest(model, options)`. The self-referential
+      `ExistsAuthHeader` rule is gone — the recognized-auth-header condition
+      (`x-api-key`/`authorization`, case-insensitive) is inlined as an
+      explicit `∃ header ∈ ... . LowerCase(HeaderName(header)) ∈ {...}`
+      where it is needed (`KeylessRequestDefined`,
+      `InjectCustomProviderAuth`). A `Primitives` section defines the helper
+      vocabulary (`SystemGetenv`/`Environment`, `BlankOrNil`, `HeaderName`,
+      `LowerCase`) and an `External interface` section plus
+      `surface CustomProviderApi` declare `BuildPreparedRequest`,
+      `RequestUnderConstruction` (provided events) and document
+      `LookupProviderAuth` (runtime function reading the provider's `:auth`
+      config, cf. `extract-provider-auth`). `spec/anthropic-provider.allium`
+      received the same treatment (inlined ∃ in `KeylessRequestDetermined`,
+      `HeaderName` in `RedactRequestHeaders`, Primitives note) so both specs
+      are checkable.
+- [x] OpenAI `chat_completions` transport still leaks the user's OpenAI key to
       custom `:openai-completions` providers: `build-request`'s Authorization
       header is `(or (:api-key options) (System/getenv "OPENAI_API_KEY"))`
       for every provider, so a custom OpenAI-compatible provider with an
@@ -582,7 +642,31 @@
       transport still falls back to `OPENAI_API_KEY`; add a no-leak test
       mirroring the anthropic `anthropic_test.clj` one (custom provider with
       redef'd `getenv`/env → throws or refuses rather than sending the key).
-- [ ] `parse-documented-deepseek-example-test`'s env-auth assertion is
+      → Resolved: custom `:openai-completions` key resolution is now
+      provider-scoped like the anthropic transport — `openai/chat_completions`
+      gains `resolve-api-key` (falls back to `OPENAI_API_KEY` only for
+      built-in OpenAI models, `:provider` nil or `:openai`; custom providers
+      fail fast with a provider-scoped "Missing API key" error naming the
+      models.edn `:auth` remedy, no `/login` hint), `auth-header?`/
+      `getenv` helpers, and `build-request` computes the same `no-auth?`
+      keyless logic (`:no-auth-header`, or a recognized
+      `x-api-key`/`Authorization` header among custom `:headers` with no
+      configured key) and omits the Authorization header when keyless — a
+      custom provider's request can never silently send the user's
+      `OPENAI_API_KEY` to a third-party endpoint. Tests added
+      (`openai-provider-scoped-api-key-resolution-test` in
+      `openai_completions_test.clj`): custom provider with redef'd `getenv` →
+      throws rather than sending the key; missing-key error points at
+      models.edn and never hints at `/login`; built-in model still uses the
+      env fallback; keyless `:no-auth-header` / recognized-auth-header /
+      incidental-headers-fast-fail paths. `doc/custom-providers.md` updated
+      (MiniMax example notes now document the provider-scoped behavior, and
+      the Anthropic-compatible provider-scoped paragraph cross-references
+      both transports). `spec/openai-provider.allium` gains
+      `OpenAIApiKeyResolved` + `KeylessRequestDetermined` mirroring the
+      anthropic spec; design.md revision note updated with this third
+      provider-transport change.
+- [x] `parse-documented-deepseek-example-test`'s env-auth assertion is
       tautological: `(= (user-models/resolve-api-key-spec
       "env:DEEPSEEK_API_KEY") (:api-key auth))` — `extract-provider-auth`
       already resolved `:api-key` via the same `resolve-api-key-spec` call, so
@@ -594,14 +678,28 @@
       resolution path is genuinely exercised. (Distinct from the review-9
       item-3 doc-copy concern — this remains a tautology even if the test
       reads the doc file.)
-- [ ] No test locks the docs claim that `:adaptive-thinking` "is ignored for
+      → Resolved: `user_models.clj` gains a private `getenv` indirection used
+      by `resolve-api-key-spec` (behavior-preserving; mirrors the anthropic
+      provider's review-3 testability pattern), and the test now
+      `with-redefs` `user-models/getenv` to a sentinel
+      (`"sk-deepseek-sentinel"`) and asserts the parsed auth `:api-key`
+      equals it — genuinely exercising `env:DEEPSEEK_API_KEY` → getenv →
+      `:api-key`. No longer tautological, no env-dependency.
+- [x] No test locks the docs claim that `:adaptive-thinking` "is ignored for
       OpenAI-compatible custom providers": `expand-model` carries the field
       into every custom model map (`:openai-completions` included), and the
       OpenAI transport never reads it — but no request-shaping test proves an
       `:openai-completions` custom model with `:adaptive-thinking true`
       produces an unchanged OpenAI body (no `output_config`/effort/adaptive
       leakage). Add one mirroring the anthropic classic-shape locking tests.
-- [ ] Mixed-case `Authorization` capture redaction is untested: the review-7
+      → Resolved: `openai_completions_test.clj` gains
+      `openai-completions-adaptive-thinking-ignored-for-custom-providers-test`
+      — builds `build-request` for a literal custom `:openai-completions`
+      model map with and without `:adaptive-thinking true` (+ `:thinking-level
+      :high`) and asserts the bodies are byte-identical, with no
+      `output_config`/`thinking` leakage and the unchanged classic
+      `reasoning_effort "high"` shape.
+- [x] Mixed-case `Authorization` capture redaction is untested: the review-7
       case-insensitive redaction tests cover lowercase `x-api-key` (existing)
       and mixed-case `X-API-Key` (new), but not a mixed-case
       `Authorization`/`authorization` header — the `redact-authorization`
@@ -609,3 +707,9 @@
       (existing tests use exact-case `"Authorization"` only). Add a capture
       assertion in `anthropic_stream_test.clj` for a mixed-case
       `Authorization` header.
+      → Resolved: `anthropic_stream_test.clj` gains a capture-path testing
+      block — keyless custom provider with `:headers {"authorization"
+      "local-token"}` → `"Bearer ***REDACTED***"` in the
+      `:on-provider-request` payload, locking the `redact-authorization` path
+      through the case-insensitive `find-header` helper for a non-exact-case
+      header name.

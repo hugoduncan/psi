@@ -131,6 +131,17 @@ Notes:
 - psi will route requests through its OpenAI-compatible transport because `:api`
   is `:openai-completions`
 - you can define multiple models under the same provider
+- API-key resolution is provider-scoped on the OpenAI-compatible transport
+  too (matching the `:anthropic-messages` transport): a custom
+  `:openai-completions` provider's key comes from its own `:auth`
+  configuration (literal or `env:VAR`) — it never falls back to the global
+  `OPENAI_API_KEY`. If the configured key is unset/blank, the request fails
+  with a provider-specific "Missing API key" error instead of silently
+  sending your OpenAI key to the third-party endpoint. Only built-in OpenAI
+  catalog models fall back to the `OPENAI_API_KEY` environment variable.
+  Keyless requests (`:auth-header? false`/`:no-auth-header`, or a recognized
+  `x-api-key`/`Authorization` header among custom `:headers` with no
+  configured key) send no auth header at all.
 
 ## Anthropic-compatible example
 
@@ -161,7 +172,10 @@ back to `ANTHROPIC_API_KEY`. If the configured key is unset/blank, the request
 fails with a provider-specific "Missing API key" error instead of silently
 sending your Anthropic key to the custom provider's endpoint. Only built-in
 Anthropic catalog models fall back to the `ANTHROPIC_API_KEY` environment
-variable.
+variable. (The same provider-scoped resolution applies to the
+OpenAI-compatible transport — custom `:openai-completions` providers never
+fall back to `OPENAI_API_KEY`; see the OpenAI-compatible MiniMax example
+notes.)
 
 ### Adaptive thinking
 
@@ -176,6 +190,13 @@ it when the compatible provider actually honours `output_config.effort` —
 check its own compatibility docs first. Omitting the field (or setting it
 `false`) keeps the classic extended-thinking shape, which remains the correct
 default for most Anthropic-compatible providers.
+
+`:adaptive-thinking true` is a silent no-op without `:supports-reasoning
+true`: psi gates the thinking parameter on `:supports-reasoning`, so a model
+declaring adaptive-thinking without supports-reasoning sends a plain
+non-thinking request — no `thinking` field and no `output_config.effort`, with
+no schema error or warning. Set both flags together when you want the adaptive
+shape.
 
 Trade-off: adaptive-thinking models never send `temperature` — psi omits it
 from the request body even when thinking is off, because Anthropic rejects

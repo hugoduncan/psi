@@ -18,7 +18,7 @@
 (deftest build-request-without-logprobs-test
   (testing "logprob fields absent when :logprobs-enabled not set"
     (let [convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
-          request (cc/build-request convo stub-model {})
+          request (cc/build-request convo stub-model {:api-key "sk-test"})
           body    (parse-body request)]
       (is (not (contains? body :logprobs)))
       (is (not (contains? body :top_logprobs))))))
@@ -26,7 +26,9 @@
 (deftest build-request-with-logprobs-enabled-test
   (testing "logprob fields present when :logprobs-enabled is true"
     (let [convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
-          request (cc/build-request convo stub-model {:logprobs-enabled true :top-logprobs 5})
+          request (cc/build-request convo stub-model {:api-key "sk-test"
+                                                      :logprobs-enabled true
+                                                      :top-logprobs 5})
           body    (parse-body request)]
       (is (true? (:logprobs body)))
       (is (= 5 (:top_logprobs body))))))
@@ -34,7 +36,8 @@
 (deftest build-request-logprobs-default-top-n-test
   (testing "top_logprobs defaults to 3 when :logprobs-enabled true and :top-logprobs absent"
     (let [convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
-          request (cc/build-request convo stub-model {:logprobs-enabled true})
+          request (cc/build-request convo stub-model {:api-key "sk-test"
+                                                      :logprobs-enabled true})
           body    (parse-body request)]
       (is (true? (:logprobs body)))
       (is (= 3 (:top_logprobs body))))))

@@ -72,6 +72,10 @@
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
+(defn- getenv
+  [k]
+  (System/getenv k))
+
 (defn resolve-api-key-spec
   "Resolve an api-key spec string to a concrete value.
 
@@ -85,7 +89,7 @@
 
     (str/starts-with? raw "env:")
     (let [var-name (subs raw 4)]
-      (System/getenv var-name))
+      (getenv var-name))
 
     :else
     raw))

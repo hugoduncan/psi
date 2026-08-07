@@ -191,6 +191,43 @@
              (get-in @request-capture [:request :headers "X-API-Key"]))
           "mixed-case X-API-Key must be redacted in the :on-provider-request payload")))
 
+  (testing "mixed-case Authorization header is redacted case-insensitively in captures"
+    ;; The review-7 case-insensitive find-header redaction covers lowercase
+    ;; x-api-key and mixed-case X-API-Key, but not the redact-authorization
+    ;; path for a non-exact-case Authorization header (existing tests use
+    ;; exact-case "Authorization" only). A keyless custom provider carrying
+    ;; :headers {"authorization" "local-token"} must capture
+    ;; "Bearer ***REDACTED***", not the token verbatim.
+    (let [model           {:id "local-proxy"
+                           :name "Local Proxy"
+                           :provider :local-proxy
+                           :api :anthropic-messages
+                           :base-url "http://localhost:8080"
+                           :supports-reasoning false
+                           :supports-images false
+                           :supports-text true
+                           :context-window 128000
+                           :max-tokens 16384
+                           :input-cost 0.0
+                           :output-cost 0.0
+                           :cache-read-cost 0.0
+                           :cache-write-cost 0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          sse             (str (sse-line "message_start" {:type "message_start"})
+                               (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic
+         convo model {:headers {"authorization" "local-token"}
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_] nil)))
+
+      (is (= "Bearer ***REDACTED***"
+             (get-in @request-capture [:request :headers "authorization"]))
+          "mixed-case authorization header must be redacted via redact-authorization")))
+
   (testing "Anthropic error replies capture raw body and headers"
     (let [model           (models/get-model :sonnet-4.6)
           convo           (-> (conv/create "sys")
