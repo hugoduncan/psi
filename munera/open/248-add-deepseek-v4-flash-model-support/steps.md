@@ -897,3 +897,46 @@
       starting with {:version ...}" error instead of silently locking an
       incidental block. The docs↔schema drift guard (review 6/9) now survives
       a curl/request-shape sample added to the section prose.
+
+## Follow-ups (implementation review 13, 2026-08-07)
+
+- [ ] HTTP-400 compatibility retry silently absorbs a DeepSeek 400 on the
+      unverified adaptive `thinking.type "adaptive"` shape: for an adaptive
+      request, `fallback-request-steps-for-400` yields `[:without-thinking]`,
+      which strips BOTH `:thinking` and `:output_config` from the retried
+      body (verified 2026-08-07 against `request_support.clj`). On DeepSeek
+      an omitted `thinking` field leaves thinking ON (server default), so a
+      strict endpoint that rejects `type: "adaptive"` (the review-7 caveat's
+      "may reject it (400)") does NOT hard-fail on the streaming path — the
+      retry succeeds with thinking silently ON at default effort and the
+      user's effort setting dropped. The non-streaming `execute-anthropic`
+      path has NO 400 fallback, so the same request hard-fails there —
+      streaming/non-streaming asymmetry. No test locks the fallback on an
+      adaptive-shape request (`stream-anthropic-retries-without-thinking-on-
+      400-test` uses a built-in OAuth extended-thinking request,
+      `type: "enabled"`). Document in the DeepSeek example notes (streaming
+      retry strips the adaptive shape and degrades to thinking-ON; non-
+      streaming hard-fails) and/or add a fallback test with an adaptive-shape
+      request asserting `:without-thinking` strips `:thinking` +
+      `:output_config`.
+- [ ] `spec/anthropic-provider.allium` has no rules for the HTTP-400
+      compatibility retry (`fallback-request-for-400` / `handle-400-response!`
+      / `:without-thinking` / `:without-all-betas` / `:without-prompt-
+      caching`), even though the review-8 fast-mode note and the review-13
+      adaptive-shape finding (item 1 above) document retry behavior for this
+      task's DeepSeek example, and the review-5/9 "spec now matches the
+      implementation" claims cover adaptive/temperature/keyless/redaction but
+      not the retry path. Add rules modeling the fallback step selection and
+      the retried request/body (thinking + output_config stripped;
+      all-betas + output_format stripped but `:speed` retained) so the
+      documented DeepSeek retry behavior has a spec counterpart.
+- [ ] `openai/transport.clj` `redact-authorization` does not strip a leading
+      `Bearer ` before computing the redacted length suffix, unlike the
+      anthropic transport's `redact-authorization` (which strips `^Bearer\s+`
+      first): an openai capture of `"Bearer abc…"` records
+      `"Bearer ***REDACTED*** (len=N)"` with N counting the whole value
+      including the 7-char `Bearer ` prefix, while the anthropic transport
+      records N excluding it. The review-11 redaction mirror is therefore
+      inconsistent between transports in the length metadata (the secret
+      itself is redacted either way). Align the openai redactor with the
+      anthropic one (strip the prefix before `count`).
