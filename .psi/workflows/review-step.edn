@@ -4,7 +4,7 @@
    :type   :session,
    :thinking-level :off,
    :tools  ["read" "bash" "edit" "write"],
-   :skills ["work-independently"],
+   :skills ["work-independently" "clojure-coding-standards" "testing-without-mocks"],
    :contributions
    [{:type :source, :from :workflow-original}
     {:type :template,
@@ -22,6 +22,7 @@
    :type            :session,
    :thinking-level  :off,
    :prompt-workflow "review-follow-up-steps.md",
+   :skills ["work-independently" "clojure-coding-standards" "testing-without-mocks"],
    :judge           {:type      :invoke
                      :operation "workflow/constant-routing"
                      :args      {:route "REPEAT"}},
