@@ -199,3 +199,24 @@
   clj-kondo clean (0 errors, 0 warnings) on changed source + tests.
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design.
+
+## Review 7 verification pass (2026-08-07)
+
+- addressed 3 review steps (verified end-to-end on committed 8827ae209)
+- Found + fixed a real defect in the review-7 redaction change before it
+  landed: `find-header`'s parameter was named `name`, shadowing
+  `clojure.core/name`, so `(name k)` invoked the string parameter as a
+  function → "String cannot be cast to IFn" on EVERY captured request (all
+  9 anthropic-stream tests red). Renamed the param to `header-name`;
+  stream namespace back to green (9 tests / 84 assertions).
+- Full `bb test` re-run: first run 2552 tests / 1 failure —
+  `prompt-lifecycle-test/prompt-provider-retry-after-tool-result-does-not-
+  rerun-tool-test` (provider-attempts 54 vs 3) — same documented
+  timing-sensitive retry-loop flake class as the review-5
+  `response-mode-retry-test` finding; passes 3/3 in isolation. Re-run
+  green: 2553 tests / 18469 assertions / 0 failures (assertion count
+  varies run-to-run per the review-5 analysis). clj-kondo clean.
+- Working tree clean at end: all review-6 + review-7 work (incl. this
+  verification) committed in 8827ae209.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.
