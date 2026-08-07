@@ -6,7 +6,8 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
-   [psi.ai.providers.openai :as openai])
+   [psi.ai.providers.openai :as openai]
+   [psi.ai.providers.openai.codex-responses :as codex])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -244,6 +245,151 @@
       (is (= :error (:type (first @events))))
       (is (re-find #"chatgpt_account_id"
                    (:error-message (first @events)))))))
+(deftest codex-provider-scoped-api-key-resolution-test
+  ;; Review 13: the :openai-codex-responses transport is the third custom
+  ;; ModelDef ApiProtocol — it never received the provider-scoped key
+  ;; resolution reviews 3/10 gave :anthropic-messages/:openai-completions, so
+  ;; a custom codex provider with no configured key silently sent the global
+  ;; OPENAI_API_KEY to the third-party :base-url (or hard-failed confusingly
+  ;; on a regular sk- env key). Mirrors
+  ;; openai-provider-scoped-api-key-resolution-test: custom codex providers
+  ;; fail fast (or go keyless via :no-auth-header / recognized auth header
+  ;; among custom :headers); only built-in OpenAI models fall back to the
+  ;; env var.
+  (testing "custom codex provider never falls back to OPENAI_API_KEY env var (no cross-provider leak)"
+    (let [model {:id "custom-codex-model"
+                 :name "Custom Codex Model"
+                 :provider :custom-codex
+                 :api :openai-codex-responses
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-codex"
+             (openai/build-codex-request convo model {}))
+            "OPENAI_API_KEY must not be used to satisfy a custom codex provider's request"))))
+
+  (testing "custom codex missing-auth error points at models.edn :auth, never hints at /login, normalizes kebab-case env suggestion"
+    (let [model {:id "my-proxy-codex"
+                 :name "My Proxy Codex"
+                 :provider :my-codex-proxy
+                 :api :openai-codex-responses
+                 :base-url "https://my-proxy.example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (openai/build-codex-request convo model {})
+        (is false "expected build-codex-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"models.edn" (ex-message e))
+              "error must name the models.edn :auth remedy")
+          (is (re-find #"env:MY_CODEX_PROXY_API_KEY" (ex-message e))
+              "env var suggestion must normalize kebab-case provider keys to underscores")
+          (is (nil? (re-find #"/login" (ex-message e)))
+              "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
+
+  (testing "built-in codex model falls back to OPENAI_API_KEY env var"
+    (let [model (models/get-model :gpt-5.3-codex)
+          convo (conv/create "sys")
+          token (jwt-with-account-id "acc_env")]
+      (with-redefs [codex/getenv (fn [_] token)]
+        (let [req (openai/build-codex-request convo model {})]
+          (is (= (str "Bearer " token)
+                 (get-in req [:headers "Authorization"]))
+              "built-in codex requests without an explicit key use OPENAI_API_KEY")
+          (is (= "acc_env" (get-in req [:headers "chatgpt-account-id"]))
+              "chatgpt-account-id is derived from the env fallback key")))))
+
+  (testing "keyless custom codex provider with :no-auth-header true builds a request without Authorization or chatgpt-account-id"
+    (let [model {:id "local-codex"
+                 :name "Local Codex"
+                 :provider :local-codex
+                 :api :openai-codex-responses
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request convo model {:no-auth-header true})]
+      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+        (is (nil? (get-in req [:headers "Authorization"]))
+            "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
+        (is (nil? (get-in req [:headers "chatgpt-account-id"]))
+            "no chatgpt-account-id for a keyless request")
+        (is (= "application/json" (get-in req [:headers "Content-Type"]))))))
+
+  (testing "recognized auth header among custom headers (case-insensitive) implies keyless codex auth"
+    (let [model {:id "local-codex"
+                 :name "Local Codex"
+                 :provider :local-codex
+                 :api :openai-codex-responses
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request convo model {:headers {"X-API-Key" "local-key"}})
+          headers (:headers req)]
+      (is (= "local-key" (get headers "X-API-Key"))
+          "custom auth header is preserved")
+      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+        (is (nil? (get headers "Authorization"))
+            "env key must not replace/add a Bearer for a headers-auth keyless request")
+        (is (nil? (get headers "chatgpt-account-id"))
+            "no chatgpt-account-id for a headers-auth keyless request"))))
+
+  (testing "incidental custom headers with a blank key fast-fail (no env fallback)"
+    (let [model {:id "custom-codex-model"
+                 :name "Custom Codex Model"
+                 :provider :custom-codex
+                 :api :openai-codex-responses
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-codex"
+             (openai/build-codex-request convo model {:headers {"X-Client" "psi"}}))
+            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
 (deftest codex-reasoning-text-delta-maps-to-thinking-delta-test
   (testing "response.reasoning_text.delta is bridged as :thinking-delta"
     (let [model    (models/get-model :gpt-5.3-codex)

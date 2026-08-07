@@ -63,6 +63,21 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   among custom `:headers` with no configured key). This closes the
   review-10-flagged asymmetry where a custom OpenAI-compatible provider with
   an unset key silently received the global `OPENAI_API_KEY`.
+- **Provider-scoped API-key resolution for OpenAI Codex responses (review
+  13):** the `:openai-codex-responses` transport — the third custom
+  `ModelDef` `ApiProtocol` — received the same provider-scoped key
+  resolution (reviews 3/10 left it falling back to the global
+  `OPENAI_API_KEY` unconditionally, so a custom codex provider with no
+  configured key silently sent the user's OpenAI credential to the
+  third-party `:base-url`). `codex_responses/build-codex-request` now
+  resolves the key provider-scoped (built-in `:provider` nil/`:openai` keep
+  the env fallback; custom codex providers fail fast with the provider-scoped
+  "Missing API key" error naming the models.edn `:auth` remedy, no `/login`
+  hint), and the keyless exemptions apply: `:no-auth-header` or a recognized
+  auth header among custom `:headers` with no configured key builds a request
+  without `Authorization` or `chatgpt-account-id` (the account-id requirement
+  is waived for keyless requests). This closes the last remaining
+  cross-provider credential disclosure class on the custom-provider schema.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

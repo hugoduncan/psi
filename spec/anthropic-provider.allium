@@ -21,6 +21,8 @@
 --   - Provider-scoped api-key resolution and keyless request detection
 --   - Temperature exclusion when extended thinking is active
 --   - Provider request/response capture callbacks with header redaction
+--   - HTTP-400 compatibility retry (fallback step selection and the retried
+--     request/body transforms, including the adaptive-shape interaction)
 --   - SSE streaming and event normalization to executor-facing event types
 --   - Usage accumulation across message_start and message_delta events
 --   - HTTP error handling and API error extraction
@@ -513,6 +515,113 @@ rule RedactRequestHeaders {
             RedactedHeaderValue(header) = RedactSecret(header.value)
         else:
             header unchanged
+}
+
+------------------------------------------------------------
+-- HTTP-400 Compatibility Retry
+------------------------------------------------------------
+
+-- Models fallback-request-steps-for-400 / fallback-request-for-400 /
+-- handle-400-response! (providers/anthropic/request_support.clj and
+-- providers/anthropic.clj; review 13). On an HTTP 400 the STREAMING path
+-- retries ONCE with cumulative compatibility transforms derived from the
+-- request's beta headers/body:
+--   :without-prompt-caching — the prompt-caching beta header
+--                             ("prompt-caching-2024-07-31") is present
+--   :without-thinking       — the interleaved-thinking beta
+--                             ("interleaved-thinking-2025-05-14") OR a
+--                             :thinking body key is present (extended OR
+--                             adaptive thinking)
+--   :without-all-betas      — any beta header value is present and the
+--                             request does NOT carry a Bearer Authorization
+--                             header (oauth-auth-request? in
+--                             providers/anthropic/error.clj)
+-- If no step applies the request is unchanged and the 400 is surfaced
+-- without a retry. The non-streaming execute-anthropic path has no 400
+-- fallback at all (the review-13 streaming/non-streaming asymmetry).
+--
+-- Vocabulary used below (rule-defined triggers/predicates; cf. the
+-- Primitives note — no undefined entity attributes are referenced):
+--   Http400Observed(stream, request)   — the streaming request received HTTP 400
+--   FallbackSteps(stream)              — ordered list of selected step names
+--   FallbackStepApplied(stream, name, request) — a step's transform applied
+--   RetriedRequest(stream)             — the request after applying all steps
+--   RetryPerformedExactlyOnce(stream)  — the retried request is posted once
+--   RetryStatus(stream)                — HTTP status of the retried post
+--   StreamContinues(stream)            — retry succeeded; streaming proceeds
+--   ErrorEmitted(stream)               — a :error StreamEvent is surfaced
+--   PromptCachingBetaPresent(request)  — request headers carry the prompt-caching beta
+--   ThinkingRequest(request)           — interleaved-thinking beta OR :thinking body key
+--   AnyBetaHeaderPresent(request)      — request headers carry a non-empty anthropic-beta
+--   BearerAuthRequest(request)         — request has a "Bearer " Authorization header
+--   RemoveBetaValue(headers, beta)     — drop one beta value from anthropic-beta
+--   ClearBetaHeader(headers)           — drop the anthropic-beta header entirely
+--   RemovePromptCachingBetas(headers)  — drop prompt-caching beta values
+
+rule FallbackStepsSelectedFor400 {
+    when: Http400Observed(stream, request)
+
+    ensures: PromptCachingBetaPresent(request)
+        implies FallbackStep("without-prompt-caching") ∈ FallbackSteps(stream)
+    ensures: ThinkingRequest(request)
+        implies FallbackStep("without-thinking") ∈ FallbackSteps(stream)
+    ensures: AnyBetaHeaderPresent(request) and not BearerAuthRequest(request)
+        implies FallbackStep("without-all-betas") ∈ FallbackSteps(stream)
+}
+
+rule FallbackRetriedOnceOrErrorSurfaced {
+    when: Http400Observed(stream, request)
+
+    ensures:
+        if FallbackSteps(stream) non-empty:
+            RetriedRequest(stream) != request
+            and RetryPerformedExactlyOnce(stream)
+            and (RetryStatus(stream) < 400 implies StreamContinues(stream))
+            and (RetryStatus(stream) >= 400 implies ErrorEmitted(stream))
+        else:
+            ErrorEmitted(stream)
+}
+
+rule WithoutThinkingStepStripsThinkingAndOutputConfig {
+    when: FallbackStepApplied(stream, "without-thinking", request)
+
+    ensures: RetriedRequestBody(stream) = request.body minus {thinking, output_config}
+    ensures: RetriedRequestHeaders(stream) = RemoveBetaValue(request.headers, "interleaved-thinking-2025-05-14")
+
+    @guidance
+        -- :without-thinking strips BOTH the classic extended-thinking
+        -- (thinking.budget_tokens) and the adaptive-thinking
+        -- (thinking.type "adaptive" + output_config.effort) params. For an
+        -- adaptive-shape DeepSeek request this degrades the retry to
+        -- thinking silently ON (DeepSeek's server default for an omitted
+        -- thinking field) at default effort, dropping the user's effort
+        -- setting — the review-13 adaptive-shape finding, documented in
+        -- doc/custom-providers.md and locked by
+        -- stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test.
+}
+
+rule WithoutAllBetasStepClearsBetasAndOutputFormat {
+    when: FallbackStepApplied(stream, "without-all-betas", request)
+
+    ensures: RetriedRequestHeaders(stream) = ClearBetaHeader(request.headers)
+    ensures: RetriedRequestBody(stream) = request.body minus {output_format}
+    ensures: "speed" ∈ RetriedRequestBody(stream) whenever "speed" ∈ request.body
+
+    @guidance
+        -- The Anthropic JSON-Schema output_format is gated by the
+        -- structured-output beta; a compatibility retry with all betas
+        -- removed must also drop the native output field rather than send an
+        -- invalid body/header combination. :speed (fast mode) is deliberately
+        -- retained, so a speed-field 400 retries once with the same field and
+        -- hard-fails — the review-8 fast-mode note.
+}
+
+rule WithoutPromptCachingStepStripsCacheDirectives {
+    when: FallbackStepApplied(stream, "without-prompt-caching", request)
+
+    ensures: RetriedRequestHeaders(stream) = RemovePromptCachingBetas(request.headers)
+    ensures: RetriedRequestBody(stream) = request.body minus cache-control fields
+    ensures: RetriedRequestBody(stream) = CollapsePlainTextSystemBlocks(request.body)
 }
 
 ------------------------------------------------------------

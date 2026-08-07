@@ -900,7 +900,7 @@
 
 ## Follow-ups (implementation review 13, 2026-08-07)
 
-- [ ] HTTP-400 compatibility retry silently absorbs a DeepSeek 400 on the
+- [x] HTTP-400 compatibility retry silently absorbs a DeepSeek 400 on the
       unverified adaptive `thinking.type "adaptive"` shape: for an adaptive
       request, `fallback-request-steps-for-400` yields `[:without-thinking]`,
       which strips BOTH `:thinking` and `:output_config` from the retried
@@ -919,7 +919,24 @@
       streaming hard-fails) and/or add a fallback test with an adaptive-shape
       request asserting `:without-thinking` strips `:thinking` +
       `:output_config`.
-- [ ] `spec/anthropic-provider.allium` has no rules for the HTTP-400
+      → Resolved (both options): `anthropic_stream_test.clj` gains
+      `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`
+      — a literal deepseek-v4-flash custom model map (`:adaptive-thinking
+      true`) + `:thinking-level :high` → first post 400, retry 200; asserts
+      the first body carries `thinking.type "adaptive"` +
+      `output_config.effort "high"`, the retried body strips BOTH `:thinking`
+      and `:output_config`, the response capture records
+      `:retry-fallback-steps [:without-thinking]`, and the stream completes
+      with no `:error` (the 400 is absorbed, thinking silently ON on
+      DeepSeek). `doc/custom-providers.md` DeepSeek example notes gain an
+      "HTTP-400 compatibility retry and the adaptive shape" bullet: streaming
+      retry strips the adaptive shape and degrades to thinking-ON at default
+      effort (effort silently dropped); the non-streaming `execute` path has
+      no 400 fallback and hard-fails on the same request; to fail fast
+      instead of silently degrading use `:adaptive-thinking false` (classic
+      `type: "enabled"` is a documented honored value). Live verification
+      remains blocked (no `DEEPSEEK_API_KEY`).
+- [x] `spec/anthropic-provider.allium` has no rules for the HTTP-400
       compatibility retry (`fallback-request-for-400` / `handle-400-response!`
       / `:without-thinking` / `:without-all-betas` / `:without-prompt-
       caching`), even though the review-8 fast-mode note and the review-13
@@ -930,7 +947,25 @@
       the retried request/body (thinking + output_config stripped;
       all-betas + output_format stripped but `:speed` retained) so the
       documented DeepSeek retry behavior has a spec counterpart.
-- [ ] `openai/transport.clj` `redact-authorization` does not strip a leading
+      → Resolved: new "HTTP-400 Compatibility Retry" section in
+      `spec/anthropic-provider.allium` — `FallbackStepsSelectedFor400`
+      (cumulative step selection: prompt-caching beta → `:without-prompt-
+      caching`; interleaved-thinking beta or `:thinking` body key →
+      `:without-thinking`; any beta + no Bearer Authorization →
+      `:without-all-betas`), `FallbackRetriedOnceOrErrorSurfaced` (retry
+      exactly once; retry ≥400 → error, <400 → stream continues; no steps →
+      error without retry; execute path has no fallback), and one rule per
+      transform: `WithoutThinkingStepStripsThinkingAndOutputConfig`
+      (strips `:thinking` + `:output_config`, removes the
+      interleaved-thinking beta — the review-13 adaptive-shape interaction),
+      `WithoutAllBetasStepClearsBetasAndOutputFormat` (clears beta header,
+      strips `:output_format`, RETAINS `:speed` — the review-8 fast-mode
+      note), `WithoutPromptCachingStepStripsCacheDirectives`. Section
+      documents its rule-defined vocabulary (Http400Observed,
+      FallbackStepApplied, RetriedRequest, etc.) per the review-9/10
+      self-containedness pattern; no undefined entity attributes referenced.
+      Manual allium-check (no automated checker in repo).
+- [x] `openai/transport.clj` `redact-authorization` does not strip a leading
       `Bearer ` before computing the redacted length suffix, unlike the
       anthropic transport's `redact-authorization` (which strips `^Bearer\s+`
       first): an openai capture of `"Bearer abc…"` records
@@ -940,7 +975,16 @@
       inconsistent between transports in the length metadata (the secret
       itself is redacted either way). Align the openai redactor with the
       anthropic one (strip the prefix before `count`).
-- [ ] `:openai-codex-responses` custom providers still fall back to the global
+      → Resolved: `openai/transport.clj` `redact-authorization` now strips
+      `^Bearer\s+` before delegating to the shared `redact-secret` (moved
+      above it), mirroring the anthropic transport exactly —
+      `"Bearer ***REDACTED***"` with `(len=N)` measuring the secret only,
+      excluding the prefix. `openai_request_headers_test.clj` gains
+      `redact-authorization-length-excludes-bearer-prefix-test` — a keyless
+      custom-provider capture of `"authorization" (str "Bearer " token)` with
+      a 30-char token asserts `"Bearer ***REDACTED*** (len=30)"` in the
+      `:on-provider-request` payload.
+- [x] `:openai-codex-responses` custom providers still fall back to the global
       `OPENAI_API_KEY` env var — the third transport in the custom `ModelDef`
       `ApiProtocol` enum never received the provider-scoped key resolution
       reviews 3/10 gave `:anthropic-messages`/`:openai-completions`.
@@ -973,7 +1017,31 @@
       the transport is hard-coupled to the ChatGPT/Codex backend), or (c)
       explicitly document the exception. Add a no-leak test mirroring
       `openai-provider-scoped-api-key-resolution-test`.
-- [ ] `spec/openai-provider.allium` `OpenAIApiKeyResolved` built-in condition
+      → Resolved (option (a), concurrent review-pass working-tree changes
+      verified end-to-end here): `codex_responses/build-codex-request` now
+      resolves the key provider-scoped via new `getenv`/`auth-header?`/
+      `resolve-api-key` helpers — built-in `:provider` nil/`:openai` keep the
+      `OPENAI_API_KEY` env fallback; custom codex providers fail fast with
+      the provider-scoped "Missing API key for provider <name>" error naming
+      the models.edn `:auth` remedy (no `/login` hint; kebab-case provider
+      keys normalized `-` → `_` in the suggested env var name). The same
+      `no-auth?` keyless computation as the other two transports applies
+      (`:no-auth-header`, or a recognized `x-api-key`/`Authorization` header
+      among custom `:headers` with no configured key; incidental headers
+      fast-fail), and keyless requests omit BOTH `Authorization` and
+      `chatgpt-account-id` — the account-id requirement is waived for
+      keyless configs (was an unconditional throw). `openai_test.clj` gains
+      `codex-provider-scoped-api-key-resolution-test` (no-leak with redef'd
+      `getenv`; models.edn remedy, no `/login`; kebab-case env suggestion;
+      built-in env fallback; `:no-auth-header` keyless; recognized-auth-header
+      keyless; incidental-headers fast-fail). CHANGELOG `Changed` entry +
+      doc/custom-providers.md now name all three transports;
+      `spec/openai-provider.allium` updated (`OpenAIApiKeyResolved` covers
+      codex, `CodexRequestRequiresApiKey`/`CodexRequiresChatGptAccountId`
+      gain the keyless exemption, and `OpenAIProviderDispatchesByModelApi`
+      dispatches on `model.api` instead of the built-in-only `provider =
+      "openai"` assumption); design.md revision note added.
+- [x] `spec/openai-provider.allium` `OpenAIApiKeyResolved` built-in condition
       omits the nil-provider case: the rule uses `stream.model.provider =
       "openai"` / `!= "openai"`, but the implementation
       (`openai/chat-completions` `resolve-api-key`) treats `:provider` nil as
@@ -985,3 +1053,12 @@
       converse for the custom-provider fast-fail ensure) so a nil-provider
       model on the openai transport is modeled as built-in, matching the
       code.
+      → Resolved: `spec/openai-provider.allium` `OpenAIApiKeyResolved` now
+      mirrors the anthropic spec's nil-provider modeling —
+      `(stream.model.provider == null or stream.model.provider == "openai")`
+      for the env-fallback ensure and `(stream.model.provider != null and
+      stream.model.provider != "openai")` (with `not stream.keyless`) for the
+      custom-provider fast-fail ensure — matching
+      `openai/chat-completions` `resolve-api-key`'s `(or (nil? provider)
+      (= :openai provider))` built-in condition. Manual allium-check (no
+      automated checker in repo).

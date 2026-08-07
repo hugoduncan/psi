@@ -167,7 +167,7 @@ entity OpenAIStream {
 
 rule OpenAIProviderDispatchesByModelApi {
     when: OpenAIStreamRequested(stream)
-    requires: stream.model.provider = "openai"
+    requires: stream.model.api = "openai-completions" or stream.model.api = "openai-codex-responses"
 
     ensures:
         if stream.model.api = "openai-codex-responses":
@@ -179,20 +179,21 @@ rule OpenAIProviderDispatchesByModelApi {
 rule OpenAIApiKeyResolved {
     -- Provider-scoped resolution, mirroring the Anthropic transport's
     -- resolve-api-key (review 3) and the review-10 fix for the OpenAI
-    -- chat-completions transport: built-in OpenAI models (provider "openai")
-    -- fall back to the OPENAI_API_KEY env var; custom :openai-completions
-    -- providers NEVER do (a nil/blank configured key is a provider-scoped
-    -- missing-key error, so a custom provider's request can never silently
-    -- send the user's OpenAI key to a third-party endpoint); keyless requests
-    -- (no_auth_header, or a recognized auth header among custom :headers with
-    -- no configured key) resolve to nil and the transport omits the
-    -- Authorization header.
+    -- chat-completions transport: built-in OpenAI models (provider nil or
+    -- "openai") fall back to the OPENAI_API_KEY env var; custom providers
+    -- (any other provider, including custom :openai-codex-responses
+    -- providers — review 13 closed the codex gap) NEVER do (a nil/blank
+    -- configured key is a provider-scoped missing-key error, so a custom
+    -- provider's request can never silently send the user's OpenAI key to a
+    -- third-party endpoint); keyless requests (no_auth_header, or a
+    -- recognized auth header among custom :headers with no configured key)
+    -- resolve to nil and the transport omits the Authorization header.
 
     when: OpenAIStreamRequested(stream)
 
-    ensures: stream.model.provider = "openai"
+    ensures: (stream.model.provider == null or stream.model.provider == "openai")
         implies stream.resolved_api_key = stream.options.api_key ?? Environment("OPENAI_API_KEY")
-    ensures: stream.model.provider != "openai"
+    ensures: (stream.model.provider != null and stream.model.provider != "openai")
         and not stream.keyless
         implies stream.resolved_api_key = stream.options.api_key
               and not IsBlank(stream.resolved_api_key)
@@ -245,6 +246,13 @@ rule CodexRequestRequiresApiKey {
     when: OpenAIStreamRequested(stream)
     requires: stream.request_api = openai_codex_responses
     requires: IsBlank(stream.resolved_api_key)
+    requires: not stream.keyless
+
+    -- Review 13: keyless codex requests (:no-auth-header, or a recognized
+    -- auth header among custom :headers with no configured key) are exempt —
+    -- the transport builds the request without Authorization or
+    -- chatgpt-account-id instead of failing (mirrors the completions
+    -- transport's keyless path).
 
     ensures: ApiKeyUnavailable("openai")
     ensures: Emit(StreamEvent{event_type: error, error_message: "OpenAI API key is required"})
@@ -263,6 +271,11 @@ rule CodexRequiresChatGptAccountId {
     requires: stream.request_api = openai_codex_responses
     requires: not IsBlank(stream.resolved_api_key)
     requires: IsBlank(stream.chatgpt_account_id)
+
+    -- Keyless requests never reach this rule (blank resolved key) — the
+    -- chatgpt-account-id requirement is waived, matching build-codex-request
+    -- (review 13): a keyless custom codex-compatible endpoint has no key to
+    -- derive the account id from.
 
     ensures: Emit(StreamEvent{event_type: error, error_message: "OpenAI Codex requires ChatGPT OAuth access token (missing chatgpt_account_id)"})
 }

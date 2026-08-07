@@ -33,7 +33,16 @@ Supported custom-provider API protocols are:
 - `:anthropic-messages`
 - `:openai-codex-responses`
 
-In practice, most custom hosted providers fit the first two.
+In practice, most custom hosted providers fit the first two. `:openai-codex-responses`
+is hard-coupled to the ChatGPT/Codex backend contract (OAuth
+`chatgpt_account_id` extraction, `/codex/responses` URL suffix, ChatGPT-only
+headers): psi routes a custom provider through it only if your endpoint
+speaks that exact protocol, and an explicit OAuth-shaped access token (or a
+keyless `:auth-header? false`/custom-header setup) is required — a regular
+API key cannot satisfy the `chatgpt_account_id` check. Custom
+`:openai-codex-responses` providers are provider-scoped like the other two
+protocols: their key comes from their own `:auth` configuration and never
+falls back to `OPENAI_API_KEY`.
 
 ## Structured output capability
 
@@ -133,12 +142,13 @@ Notes:
 - you can define multiple models under the same provider
 - API-key resolution is provider-scoped on the OpenAI-compatible transport
   too (matching the `:anthropic-messages` transport): a custom
-  `:openai-completions` provider's key comes from its own `:auth`
-  configuration (literal or `env:VAR`) — it never falls back to the global
-  `OPENAI_API_KEY`. If the configured key is unset/blank, the request fails
-  with a provider-specific "Missing API key" error instead of silently
-  sending your OpenAI key to the third-party endpoint. Only built-in OpenAI
-  catalog models fall back to the `OPENAI_API_KEY` environment variable.
+  `:openai-completions` (or `:openai-codex-responses`) provider's key comes
+  from its own `:auth` configuration (literal or `env:VAR`) — it never falls
+  back to the global `OPENAI_API_KEY`. If the configured key is unset/blank,
+  the request fails with a provider-specific "Missing API key" error instead
+  of silently sending your OpenAI key to the third-party endpoint. Only
+  built-in OpenAI catalog models fall back to the `OPENAI_API_KEY`
+  environment variable.
   Keyless requests (`:auth-header? false`/`:no-auth-header`, or a recognized
   `x-api-key`/`Authorization` header among custom `:headers` with no
   configured key) send no auth header at all.
@@ -173,9 +183,9 @@ fails with a provider-specific "Missing API key" error instead of silently
 sending your Anthropic key to the custom provider's endpoint. Only built-in
 Anthropic catalog models fall back to the `ANTHROPIC_API_KEY` environment
 variable. (The same provider-scoped resolution applies to the
-OpenAI-compatible transport — custom `:openai-completions` providers never
-fall back to `OPENAI_API_KEY`; see the OpenAI-compatible MiniMax example
-notes.)
+OpenAI-compatible transport — custom `:openai-completions` and
+`:openai-codex-responses` providers never fall back to `OPENAI_API_KEY`; see
+the OpenAI-compatible MiniMax example notes.)
 
 ### Adaptive thinking
 
@@ -291,6 +301,21 @@ Notes:
   `output_config` — while DeepSeek defaults thinking ON server-side, so an
   effort setting without an active `/thinking` level is silently dropped.
   Turn `/thinking` on first, then set the effort.
+- HTTP-400 compatibility retry and the adaptive shape: psi's streaming path
+  retries an HTTP 400 once with compatibility fallbacks; for an
+  adaptive-shape request the `:without-thinking` step strips BOTH `thinking`
+  and `output_config` from the retried body (locked by a stream test,
+  `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`).
+  So if a strict DeepSeek endpoint rejects the unverified
+  `thinking.type "adaptive"` value with a 400, the streaming path does NOT
+  hard-fail — it retries with the `thinking` field omitted, which DeepSeek
+  treats as thinking ON (server default) at default effort, silently dropping
+  your effort setting. The non-streaming (`execute`) path has no 400 fallback
+  and hard-fails on the same request (streaming/non-streaming asymmetry).
+  Verify the adaptive shape against a live turn (blocked: no
+  `DEEPSEEK_API_KEY` in env) before relying on it; to fail fast instead of
+  silently degrading to thinking-ON, use `:adaptive-thinking false` — the
+  classic shape's `type: "enabled"` is a documented honored value.
 - thinking-off is not honoured through the omitted-field path: psi never sends
   an explicit thinking-disabled signal — when `/thinking off` is active it
   simply omits the `thinking` field. On Anthropic's own API omission means

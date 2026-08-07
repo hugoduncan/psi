@@ -549,3 +549,116 @@
   set in environment; request-shaping coverage only by design.
 - Review 13 (2026-08-07): added 3 steps to be addressed.
 - Review 13 (2026-08-07): added 2 further steps to be addressed.
+
+## Follow-ups review 13 addressed (2026-08-07)
+
+- addressed 3 review steps (review-13; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Adaptive-shape 400-fallback locked + documented: `anthropic_stream_test.clj`
+  gains `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`
+  — literal deepseek-v4-flash custom model (`:adaptive-thinking true`) +
+  `:thinking-level :high`; first post 400, retry 200. Asserts first body has
+  `thinking.type "adaptive"` + `output_config.effort "high"`, retried body
+  strips BOTH `:thinking` and `:output_config`, response capture records
+  `:retry-fallback-steps [:without-thinking]`, stream completes with no
+  `:error` (400 absorbed → thinking silently ON at default effort on
+  DeepSeek; the non-streaming execute path hard-fails — asymmetry noted).
+  `doc/custom-providers.md` DeepSeek notes gain an "HTTP-400 compatibility
+  retry and the adaptive shape" bullet documenting the degradation and the
+  `:adaptive-thinking false` fail-fast alternative.
+- `spec/anthropic-provider.allium` gains a self-contained "HTTP-400
+  Compatibility Retry" section: `FallbackStepsSelectedFor400` (cumulative
+  step selection: prompt-caching beta / thinking request / any-beta-not-Bearer),
+  `FallbackRetriedOnceOrErrorSurfaced` (retry once; retry ≥400 → error,
+  <400 → stream continues; no steps → error without retry), and per-step
+  transform rules — `:without-thinking` strips `:thinking` + `:output_config`
+  (the review-13 adaptive interaction), `:without-all-betas` clears betas +
+  strips `:output_format` but RETAINS `:speed` (the review-8 fast-mode note),
+  `:without-prompt-caching` strips cache directives. Section documents its
+  rule-defined vocabulary (review-9/10 self-containedness pattern); manual
+  allium-check (no automated checker in repo).
+- OpenAI `redact-authorization` aligned with the anthropic transport:
+  `openai/transport.clj` now strips `^Bearer\s+` before counting
+  (delegating to `redact-secret`, moved above it) so `(len=N)` measures the
+  secret only, not the 7-char prefix. `openai_request_headers_test.clj`
+  gains `redact-authorization-length-excludes-bearer-prefix-test` — capture
+  of a keyless custom-provider `"authorization" (str "Bearer " token)` with
+  a 30-char token asserts `"Bearer ***REDACTED*** (len=30)"`.
+- Verification: full `bb test` green (2561 tests / 19226 assertions /
+  0 failures; +2 tests = the two new deftests; assertion count varies
+  run-to-run per the review-5 flake analysis);
+  `psi.ai.providers.anthropic-stream-test` 10/94 (was 9/85),
+  `psi.ai.providers.openai-request-headers-test` 6/28 (was 5/27),
+  `psi.ai.providers.anthropic-test` 19/132, `psi.ai.providers.
+  openai-completions-test` 15/67, `psi.ai.user-models-test` 14/97 green
+  (doc parse-lock unaffected by the new notes bullet); clj-kondo clean (0
+  errors, 0 warnings) on all changed source + test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.
+
+## Follow-ups review 13 addressed (codex + openai spec, 2026-08-07)
+
+- addressed 2 further review steps (concurrent review-pass working-tree
+  changes verified end-to-end; review-1 optional live smoke test remains
+  BLOCKED on missing DEEPSEEK_API_KEY)
+- Codex custom-provider key fallback closed: `codex_responses/
+  build-codex-request` now resolves the key provider-scoped (new
+  `getenv`/`auth-header?`/`resolve-api-key` helpers) — built-in
+  `:provider` nil/`:openai` keep the `OPENAI_API_KEY` env fallback; custom
+  `:openai-codex-responses` providers fail fast with the provider-scoped
+  "Missing API key" error naming the models.edn `:auth` remedy (no `/login`
+  hint; kebab-case env-var suggestion normalized `-` → `_`), matching the
+  review-3/10 treatment of the other two transports. Keyless exemptions
+  apply (`:no-auth-header`, or a recognized auth header among custom
+  `:headers` with no configured key; incidental headers fast-fail) and
+  keyless requests omit BOTH `Authorization` and `chatgpt-account-id` — the
+  account-id requirement is waived for keyless configs (was an unconditional
+  `extract-chatgpt-account-id` throw). `openai_test.clj` gains
+  `codex-provider-scoped-api-key-resolution-test` (no-leak redef'd-getenv,
+  models.edn remedy/no-/login, kebab-case suggestion, built-in fallback,
+  `:no-auth-header` keyless, recognized-auth-header keyless, incidental-
+  headers fast-fail). CHANGELOG `Changed` entry + doc/custom-providers.md
+  now name all three transports; design.md revision note added.
+- `spec/openai-provider.allium` nil-provider condition fixed:
+  `OpenAIApiKeyResolved` now uses `(provider == null or provider ==
+  "openai")` / `(provider != null and provider != "openai")`, mirroring the
+  anthropic spec and `chat-completions` `resolve-api-key`'s `(or (nil?
+  provider) (= :openai provider))`. Also updated for codex:
+  `OpenAIProviderDispatchesByModelApi` dispatches on `model.api` (completions
+  vs codex-responses) instead of the built-in-only `provider = "openai"`
+  assumption, and `CodexRequestRequiresApiKey`/`CodexRequiresChatGptAccountId`
+  gain the keyless exemption. Manual allium-check (no automated checker in
+  repo).
+- Verification: full `bb test` green (2561 tests / 0 failures; assertion
+  count varies run-to-run per the review-5 flake analysis);
+  `psi.ai.providers.openai-test` 14/75 (was 13/62; +1 codex deftest),
+  `psi.ai.providers.openai-completions-test` 15/67,
+  `psi.ai.providers.openai-request-headers-test` 6/28,
+  `psi.ai.providers.anthropic-stream-test` 10/94,
+  `psi.ai.providers.anthropic-test` 19/132,
+  `psi.ai.user-models-test` 14/97 green; clj-kondo clean (0 errors, 0
+  warnings) on all changed source + test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.
+
+## Follow-ups review 13 — final verification pass (2026-08-07)
+
+- addressed 5 review steps (all review-13 items; verified end-to-end on the
+  converged working tree — review-1 optional live smoke test remains BLOCKED
+  on missing DEEPSEEK_API_KEY)
+- Full `bb test` re-run on the complete converged tree: 2562 tests / 19239
+  assertions / 0 failures. Count reconciliation: the review-13 entry above
+  records 2561 tests — that run predated the codex deftest landing; with all
+  three review-13 deftests present the suite is 2559 (committed) + 3 =
+  2562 (adaptive-shape 400-retry, openai redactor Bearer-prefix length,
+  codex-provider-scoped key resolution). Assertion count varies run-to-run
+  per the review-5 flake analysis (19239 in the observed band).
+- Targeted namespaces green on the final tree: `psi.ai.providers.openai-test`
+  14/75, `psi.ai.providers.openai-completions-test` 15/67,
+  `psi.ai.providers.openai-request-headers-test` 6/28,
+  `psi.ai.providers.anthropic-stream-test` 10/94,
+  `psi.ai.providers.anthropic-test` 19/132, `psi.ai.user-models-test` 14/97.
+  clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design (steps.md item
+  left unchecked).

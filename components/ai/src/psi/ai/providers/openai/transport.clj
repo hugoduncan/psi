@@ -24,24 +24,29 @@
                         (proxy/request-proxy-options url)
                         {:as :text :cookie-policy :none :throw-exceptions false})))
 
-(defn redact-authorization
-  [value]
-  (when (string? value)
-    (str "Bearer ***REDACTED***"
-         (when (> (count value) 20)
-           (str " (len=" (count value) ")")))))
-
-(defn mask-chatgpt-account-id
-  [value]
-  (when (string? value)
-    (str (subs value 0 (min 6 (count value))) "...")))
-
 (defn- redact-secret
   [value]
   (when (string? value)
     (str "***REDACTED***"
          (when (> (count value) 20)
            (str " (len=" (count value) ")")))))
+
+(defn redact-authorization
+  [value]
+  (when (string? value)
+    (str "Bearer "
+         ;; Strip a leading "Bearer " prefix before counting so the (len=N)
+         ;; metadata measures the secret itself, not the 7-char prefix —
+         ;; mirroring the anthropic transport's redact-authorization
+         ;; (review 13: the openai redactor previously counted the whole
+         ;; value including the prefix, making the length metadata
+         ;; inconsistent between transports).
+         (redact-secret (str/replace value #"^Bearer\s+" "")))))
+
+(defn mask-chatgpt-account-id
+  [value]
+  (when (string? value)
+    (str (subs value 0 (min 6 (count value))) "...")))
 
 (defn- find-header
   "Find a header entry whose name matches header-name case-insensitively.

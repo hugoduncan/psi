@@ -404,6 +404,77 @@
       (is (some #(= :done (:type %)) @events))
       (is (not-any? #(= :error (:type %)) @events)))))
 
+(deftest stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test
+  ;; Review 13: the HTTP-400 compatibility retry's :without-thinking step
+  ;; strips BOTH :thinking and :output_config from the retried body (verified
+  ;; against request_support.clj request-transform). For an adaptive-shape
+  ;; DeepSeek request (thinking.type "adaptive" + output_config.effort) a
+  ;; strict endpoint that rejects the unverified "adaptive" type does NOT
+  ;; hard-fail on the streaming path — the retry succeeds with thinking
+  ;; omitted, which DeepSeek treats as thinking ON (server default) at default
+  ;; effort, silently dropping the user's effort setting. The non-streaming
+  ;; execute-anthropic path has no 400 fallback and hard-fails on the same
+  ;; request (streaming/non-streaming asymmetry).
+  (testing "adaptive-shape request retries once on 400 with :thinking and :output_config stripped"
+    (let [model    {:id                 "deepseek-v4-flash"
+                    :name               "DeepSeek V4 Flash"
+                    :provider           :deepseek
+                    :api                :anthropic-messages
+                    :base-url           "https://api.deepseek.com/anthropic"
+                    :supports-reasoning true
+                    :adaptive-thinking  true
+                    :supports-images    false
+                    :supports-text      true
+                    :context-window     1000000
+                    :max-tokens         384000
+                    :input-cost         0.14
+                    :output-cost        0.28
+                    :cache-read-cost    0.0028
+                    :cache-write-cost   0.14}
+          convo    (-> (conv/create "sys")
+                       (conv/add-user-message "hello"))
+          calls    (atom [])
+          captures (atom [])
+          events   (atom [])
+          sse      (str (sse-line "message_start" {:type "message_start"})
+                        (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url req]
+                                (swap! calls conj req)
+                                (if (= 1 (count @calls))
+                                  {:status 400
+                                   :headers {"request-id" "req_ant_first"}
+                                   :body (stream-body
+                                          (json/generate-string
+                                           {:error {:message "Anthropic rejected the request"}}))}
+                                  {:status 200
+                                   :headers {}
+                                   :body (stream-body sse)}))]
+        (anthropic/stream-anthropic
+         convo model {:api-key "test-key"
+                      :thinking-level :high
+                      :on-provider-response #(swap! captures conj %)}
+         (fn [e] (swap! events conj e))))
+      (is (= 2 (count @calls))
+          "adaptive-shape 400 must retry once")
+      (let [first-body  (json/parse-string (:body (first @calls)) true)
+            second-body (json/parse-string (:body (second @calls)) true)]
+        (is (= "adaptive" (get-in first-body [:thinking :type]))
+            "first request carries the adaptive thinking shape")
+        (is (= "high" (get-in first-body [:output_config :effort]))
+            "first request carries output_config.effort")
+        (is (nil? (:thinking second-body))
+            ":without-thinking must strip :thinking from the retried body")
+        (is (nil? (:output_config second-body))
+            ":without-thinking must strip :output_config from the retried body"))
+      (is (some #(and (:retrying-with-compatibility-fallback (:event %))
+                      (= [:without-thinking] (:retry-fallback-steps (:event %))))
+                @captures)
+          "response capture records the :without-thinking fallback step")
+      (is (some #(= :start (:type %)) @events))
+      (is (some #(= :done (:type %)) @events))
+      (is (not-any? #(= :error (:type %)) @events)
+          "retry succeeds — the 400 is absorbed, thinking silently ON on DeepSeek"))))
+
 ;; ── SSE parser — thinking block routing ─────────────────────────────────────
 
 (defn- run-stream [sse-str model options]

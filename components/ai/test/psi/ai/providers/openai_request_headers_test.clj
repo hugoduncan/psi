@@ -164,6 +164,45 @@
              (get-in @request-capture [:request :headers "authorization"]))
           "lowercase authorization header must be redacted via redact-authorization"))))
 
+(deftest redact-authorization-length-excludes-bearer-prefix-test
+  ;; Review 13: openai/transport's redact-authorization counted the WHOLE
+  ;; Authorization value including the "Bearer " prefix in the (len=N)
+  ;; metadata, unlike the anthropic transport which strips ^Bearer\s+ first —
+  ;; a capture of "Bearer abc…" recorded (len=N) with N = 7 + token length.
+  ;; The redactor now mirrors the anthropic one: strip the prefix, then count.
+  (testing "capture of a Bearer-prefixed authorization header reports length excluding the prefix"
+    (let [model           {:id                 "local-completions"
+                           :name               "Local Completions"
+                           :provider           :local
+                           :api                :openai-completions
+                           :base-url           "http://localhost:8080/v1"
+                           :supports-reasoning true
+                           :supports-images    false
+                           :supports-text      true
+                           :context-window     128000
+                           :max-tokens         16384
+                           :input-cost         0.0
+                           :output-cost        0.0
+                           :cache-read-cost    0.0
+                           :cache-write-cost   0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          token           (apply str (repeat 30 "x"))
+          sse             (str
+                           "data: " (json/generate-string
+                                     {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                           "data: [DONE]\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:headers {"authorization" (str "Bearer " token)}
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_ev] nil)))
+      (is (= (str "Bearer ***REDACTED*** (len=" (count token) ")")
+             (get-in @request-capture [:request :headers "authorization"]))
+          "len metadata must count the token only, excluding the Bearer prefix"))))
+
 (deftest no-auth-header-skips-authorization-test
   (let [convo (-> (conv/create "sys") (conv/add-user-message "hi"))
         model (models/get-model :gpt-4o)]
