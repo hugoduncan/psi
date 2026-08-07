@@ -1102,3 +1102,71 @@
       test) mirroring the review-11 assertions, and name
       `:openai-codex-responses` in the doc's merge sentence alongside the
       other two transports.
+
+## Follow-ups (implementation review 14, 2026-08-07)
+
+- [ ] Built-in detection is by provider NAME, so a custom models.edn provider
+      literally named `"anthropic"` or `"openai"` is classified as built-in
+      and defeats the provider-scoped guarantees reviews 3/10/13 claim to
+      close. `builtin-anthropic?` (providers/anthropic.clj) and the inline
+      `(or (nil? provider) (= :openai provider))` in openai/chat_completions
+      .clj + codex_responses.clj match on the `:provider` keyword, and
+      `expand-model` (user_models.clj) sets `:provider` from the models.edn
+      provider key with no custom/built-in source marker. Verified
+      (2026-08-07): a models.edn `{"anthropic" {:base-url
+      "https://third-party.example" ...}}` provider with a non-colliding
+      model id yields `:provider :anthropic`, so an unset configured key
+      silently falls back to `ANTHROPIC_API_KEY` (sent to the third-party
+      endpoint) and an `sk-ant-oat…` key triggers the Claude Code OAuth
+      headers/system prompt — the exact cross-provider credential-disclosure
+      class reviews 3/10/13 eliminated for every OTHER custom provider name.
+      Fix direction: tag custom-provider models at parse time (e.g.
+      `:custom? true` in `expand-model`) and gate built-in treatment on that
+      flag, or validate/reject `anthropic`/`openai` as custom provider names;
+      add a test proving a custom provider named "anthropic"/"openai" with an
+      unset key does NOT fall back to the env var and does NOT get OAuth
+      treatment. Note the specs model the built-in condition the same way
+      (`provider == null or provider == "anthropic"` in all three allium
+      files) — they inherit the same gap.
+- [ ] design.md "Revision note (implementation reviews)" is incomplete: it
+      claims its four bullets are "the *only* provider-transport changes",
+      but the review-11 OAuth content-sniff gating (`oauth?` now
+      `(and (builtin-anthropic? model) (oauth-api-key? api-key))` in
+      `build-request`/`request-headers` — a custom-provider header behavior
+      change) and the review-7/11/13 case-insensitive capture redaction
+      (`find-header` in both transports, `redact-authorization` Bearer-prefix
+      alignment) are provider-transport changes not listed; the AC clause
+      "no existing custom-provider behaviour changes except the review-driven
+      provider-scoped API-key resolution and `:no-auth-header` key tolerance"
+      is therefore inaccurate (the OAuth gating IS a custom-provider behavior
+      change, and the redaction changes the capture payload). Extend the
+      revision note bullets + the AC exception wording to name them.
+- [ ] The "don't mix" doc guidance is case-dependent and the exact-case
+      variants are untested on both transports: doc/custom-providers.md
+      "Local servers and custom headers" says the custom auth header
+      "duplicates the configured key (X-API-Key beside the lowercase
+      x-api-key on the anthropic transport) or silently replaces it (a
+      custom Authorization header on the openai transport)", but on the
+      anthropic transport an EXACT-case `x-api-key` custom header REPLACES
+      the configured key (`(merge base-hdrs custom)` on equal string keys —
+      the configured credential is silently dropped), and on the openai
+      transport a lowercase `authorization` custom header DUPLICATES beside
+      the base `Authorization` instead of replacing. The review-11/12
+      interplay tests lock only mixed-case `X-API-Key` and exact-case
+      `Authorization`. Add exact-case (`x-api-key` on anthropic,
+      `authorization` on openai) interplay assertions and tighten the doc
+      sentence to name the case-dependence. (Distinct from the review-14
+      codex-interplay item, which is about the codex transport not being
+      covered at all.)
+- [ ] Provider-scoped key resolution is triplicated across the three
+      transports: `getenv`/`auth-header?`/`resolve-api-key` and the `no-auth?`
+      computation are near-identical private copies in providers/anthropic
+      .clj, providers/openai/chat_completions.clj and providers/openai/
+      codex_responses.clj (introduced by reviews 3/4/10/13), and
+      `find-header`/`redact-secret`/`redact-authorization` are duplicated in
+      anthropic.clj + providers/openai/transport.clj. The copies already
+      drifted — reviews 9/10/13 repeatedly reconciled spec/behavior
+      mismatches between them, and each allium spec had to model the same
+      rules separately. Extract a shared provider-request-support helper
+      namespace (parameterized by the built-in provider keyword + env var
+      name) and have all three transports use it, so future fixes land once.
