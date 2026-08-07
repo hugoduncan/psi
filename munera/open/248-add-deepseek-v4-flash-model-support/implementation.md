@@ -221,3 +221,29 @@
   verification) committed in 8827ae209.
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design.
+
+## Follow-ups review 8 addressed (2026-08-07)
+
+- addressed 2 review steps (review-8; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Effort-value set documented (doc/custom-providers.md DeepSeek example
+  notes): psi's adaptive path emits "low"/"medium"/"high"/"highest" (from
+  thinking-level->effort and effort-override->effort in
+  providers/anthropic.clj) and never "max"; only "low"/"high" are within
+  DeepSeek's documented "low/high/max" set, "medium"/"highest" are
+  undocumented (strict endpoint may 400, lenient may map unpredictably),
+  "highest" does not correspond to DeepSeek's "max"; recommended
+  documented-safe levels: /thinking minimal|low → "low", /thinking high →
+  "high". Live verification blocked (no key); chose documentation over an
+  effort-value mapping (design AC forbids request-shaping changes).
+- Fast-mode 400 non-recoverability documented (doc/custom-providers.md):
+  the HTTP-400 compatibility retry strips the fast-mode-2026-02-01 beta
+  header (`:without-all-betas` in anthropic/request_support.clj) but leaves
+  `"speed": "fast"` in the retried body — a speed-field 400 retries once
+  with the same field and hard-fails; users must /fast off. Chose
+  documentation over the optional `:speed`-stripping code change (design AC
+  forbids transport/request-shaping changes in this task).
+- Verification: doc-only change; parse-lock namespace
+  psi.ai.user-models-test 14/97 green, psi.ai.providers.anthropic-test
+  17/115 green, psi.ai.providers.anthropic-stream-test 9/84 green (the
+  documented example code block was untouched — notes bullets only).

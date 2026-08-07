@@ -246,6 +246,17 @@ Notes:
   adaptive shape; if DeepSeek rejects it, fall back to
   `:adaptive-thinking false` — the classic shape's `type: "enabled"` IS a
   documented honored value (`budget_tokens` is ignored).
+  Also note psi's effort values vs DeepSeek's documented set: the Thinking
+  Mode guide documents Anthropic-format effort as `"low/high/max"`, but
+  psi's adaptive path emits `"low"` (`/thinking minimal` or `/thinking
+  low`), `"medium"` (`/thinking medium`), `"high"` (`/thinking high`) and
+  `"highest"` (`/thinking xhigh`, and `effort-override :xhigh`) — it never
+  emits `"max"`. `"low"` and `"high"` are within DeepSeek's documented set;
+  `"medium"` and `"highest"` are undocumented (a strict endpoint may 400, a
+  lenient one may map them unpredictably), and `"highest"` does not
+  correspond to DeepSeek's `"max"`. Unverified live (blocked: no
+  `DEEPSEEK_API_KEY` in env); until verified, prefer `/thinking minimal` /
+  `/thinking low` or `/thinking high` for documented-safe effort values.
 - thinking-off is not honoured through the omitted-field path: psi never sends
   an explicit thinking-disabled signal — when `/thinking off` is active it
   simply omits the `thinking` field. On Anthropic's own API omission means
@@ -290,6 +301,12 @@ Notes:
   body fields (400). Not verified against a live turn — blocked on the same
   missing `DEEPSEEK_API_KEY` as the optional live smoke test; assume fast
   mode is unsupported on DeepSeek until verified.
+  And a `speed`-field 400 is not auto-recoverable: psi's compatibility
+  retry for HTTP 400 strips the `fast-mode-2026-02-01` beta header
+  (`:without-all-betas` step) but leaves `"speed": "fast"` in the retried
+  body, so a 400 caused by the unverified `speed` field retries once with
+  the same field and hard-fails. Turn fast mode off (`/fast off`) to avoid
+  it; do not rely on the auto-retry to degrade gracefully.
 
 Custom providers do not define their own proxy fields. When a custom provider
 uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it

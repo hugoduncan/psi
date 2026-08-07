@@ -445,7 +445,7 @@
 
 ## Follow-ups (implementation review 8, 2026-08-07)
 
-- [ ] Adaptive `output_config.effort` values "medium" and "highest" are
+- [x] Adaptive `output_config.effort` values "medium" and "highest" are
       outside DeepSeek's documented effort set: the DeepSeek example notes
       quote the Thinking Mode guide's Anthropic-format effort control as
       `{"output_config": {"effort": "low/high/max"}}`, but psi sends "medium"
@@ -457,7 +457,21 @@
       turn (blocked: no `DEEPSEEK_API_KEY`) and/or document in the DeepSeek
       example notes which `/thinking` levels are documented-safe, plus the
       "highest"-vs-"max" mismatch; or add a DeepSeek effort-value mapping.
-- [ ] A fast-mode 400 on DeepSeek is not auto-recoverable by psi's
+      → Resolved (documented, per the item's doc option; live verification
+      blocked on missing `DEEPSEEK_API_KEY`): DeepSeek example notes now
+      state psi's adaptive path emits effort `"low"` (`/thinking minimal` or
+      `/thinking low`), `"medium"` (`/thinking medium`), `"high"` (`/thinking
+      high`) and `"highest"` (`/thinking xhigh`, and `effort-override
+      :xhigh`) and never `"max"`; only `"low"`/`"high"` are within DeepSeek's
+      documented `"low/high/max"` set, `"medium"`/`"highest"` are
+      undocumented (strict endpoint may 400, lenient may map unpredictably),
+      and `"highest"` does not correspond to DeepSeek's `"max"`; until
+      live-verified, prefer `/thinking minimal`/`/thinking low` or
+      `/thinking high` for documented-safe effort values. Chose documentation
+      over a DeepSeek effort-value mapping because live verification is
+      blocked (no `DEEPSEEK_API_KEY` in env) and the design AC forbids
+      changing `providers/anthropic.clj` request-shaping logic in this task.
+- [x] A fast-mode 400 on DeepSeek is not auto-recoverable by psi's
       compatibility retry: `fallback-request-for-400`'s `:without-all-betas`
       step strips the `fast-mode-2026-02-01` beta header but leaves
       `"speed": "fast"` in the retried body, so a DeepSeek 400 on the
@@ -467,3 +481,14 @@
       turn fast mode off (`/fast off`) because the auto-retry cannot recover
       it; optionally (separate change) add `:speed` stripping to the
       400-fallback transforms.
+      → Resolved (documented, per the item's doc option; live verification
+      blocked on missing `DEEPSEEK_API_KEY`): review-6 fast-mode note in
+      `doc/custom-providers.md` extended — psi's HTTP-400 compatibility retry
+      strips the `fast-mode-2026-02-01` beta header (`:without-all-betas`
+      step in `anthropic/request_support.clj`) but leaves `"speed": "fast"`
+      in the retried body, so a `speed`-field 400 retries once with the same
+      field and hard-fails; turn fast mode off (`/fast off`) — do not rely on
+      the auto-retry to degrade gracefully. Chose documentation over the
+      optional separate `:speed`-stripping code change because the design AC
+      forbids changing provider request-shaping/transport logic in this
+      task.
