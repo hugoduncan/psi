@@ -52,22 +52,29 @@
   ;; models so `bb test` (which snapshots these profiles) stays green.
   #_{:designing
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
      :fixing-design
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
      :planning
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
      :fixing-plan
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
      :implementing
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
      :reviewing-implementation
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
      :fixing-implementation
      {:model-provider "deepseek"
-      :model-id "deepseek-v4-flash"}}}}
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}}}}
