@@ -42,6 +42,7 @@
     (let [model {:id "MiniMax-M2.7"
                  :name "MiniMax M2.7"
                  :provider :minimax
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://api.minimax.io/anthropic"
                  :supports-reasoning true
@@ -63,6 +64,7 @@
     (let [model {:id "MiniMax-M2.7"
                  :name "MiniMax M2.7"
                  :provider :minimax
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://api.minimax.io/anthropic"
                  :supports-reasoning true
@@ -88,6 +90,7 @@
     (let [model {:id "my-proxy-model"
                  :name "My Proxy Model"
                  :provider :my-anthropic-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://my-proxy.example.com"
                  :supports-reasoning true
@@ -113,6 +116,7 @@
     (let [model {:id "deepseek-v4-flash"
                  :name "DeepSeek V4 Flash"
                  :provider :deepseek
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://api.deepseek.com/anthropic"
                  :supports-reasoning true

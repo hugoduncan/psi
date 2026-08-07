@@ -21,6 +21,7 @@
     (let [model {:id "local-proxy"
                  :name "Local Proxy"
                  :provider :local-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "http://localhost:8080"
                  :supports-reasoning false
@@ -46,6 +47,7 @@
     (let [model {:id "local-proxy"
                  :name "Local Proxy"
                  :provider :local-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "http://localhost:8080"
                  :supports-reasoning false
@@ -72,6 +74,7 @@
     (let [model {:id "local-proxy"
                  :name "Local Proxy"
                  :provider :local-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "http://localhost:8080"
                  :supports-reasoning false
@@ -97,6 +100,7 @@
     (let [model {:id "local-proxy"
                  :name "Local Proxy"
                  :provider :local-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "http://localhost:8080"
                  :supports-reasoning false
@@ -128,6 +132,7 @@
     (let [model {:id "deepseek-v4-flash"
                  :name "DeepSeek V4 Flash"
                  :provider :deepseek
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://api.deepseek.com/anthropic"
                  :supports-reasoning true
@@ -151,6 +156,7 @@
     (let [model {:id "local-proxy"
                  :name "Local Proxy"
                  :provider :local-proxy
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "http://localhost:8080"
                  :supports-reasoning false
@@ -182,6 +188,7 @@
     (let [model   {:id "local-proxy"
                    :name "Local Proxy"
                    :provider :local-proxy
+                   :custom? true
                    :api :anthropic-messages
                    :base-url "http://localhost:8080"
                    :supports-reasoning false
@@ -206,6 +213,7 @@
     (let [model   {:id "local-proxy"
                    :name "Local Proxy"
                    :provider :local-proxy
+                   :custom? true
                    :api :anthropic-messages
                    :base-url "http://localhost:8080"
                    :supports-reasoning false
@@ -235,6 +243,7 @@
     (let [model   {:id "local-proxy"
                    :name "Local Proxy"
                    :provider :local-proxy
+                   :custom? true
                    :api :anthropic-messages
                    :base-url "http://localhost:8080"
                    :supports-reasoning false
@@ -289,6 +298,7 @@
     (let [model   {:id "deepseek-v4-flash"
                    :name "DeepSeek V4 Flash"
                    :provider :deepseek
+                   :custom? true
                    :api :anthropic-messages
                    :base-url "https://api.deepseek.com/anthropic"
                    :supports-reasoning true

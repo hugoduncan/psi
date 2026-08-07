@@ -1362,7 +1362,7 @@
 
 ## Follow-ups (implementation review 17, 2026-08-07)
 
-- [ ] Stale cross-transport comment in `providers/anthropic.clj`
+- [x] Stale cross-transport comment in `providers/anthropic.clj`
       `build-request` (lines ~257-258): the keyless-logic comment claims the
       behavior is "consistent with the OpenAI transport, which only exempts
       on explicit :no-auth-header" — inaccurate since review 10: the
@@ -1376,7 +1376,13 @@
       optionally collapse the duplicated 6-line keyless explanation to a
       one-line pointer to `request-support/no-auth?` (the same
       triplicated-comment class review 14 removed from the code).
-- [ ] Remaining custom-provider test fixtures omit the `:custom?` origin tag
+      → Resolved: the comment now states the keyless logic is shared with
+      the OpenAI transports via `request-support/no-auth?` (explicit
+      `:no-auth-header` OR a recognized auth header among custom `:headers`
+      with no configured key; incidental headers do NOT imply keyless) —
+      the stale "only exempts on explicit :no-auth-header" claim is gone.
+      Comment-only change; no behavior delta.
+- [x] Remaining custom-provider test fixtures omit the `:custom?` origin tag
       (review-15 item 2 fixed only `deepseek-custom-provider-model` and the
       400-retry fixture): the same expand-model-shape drift remains in other
       custom-provider fixtures in the touched test files —
@@ -1392,7 +1398,21 @@
       `:custom? true` to these fixtures (or extract a shared custom-provider
       fixture helper that always carries the tag), or explicitly document
       why literal transport fixtures are exempt from the origin tag.
-- [ ] `psi.agent-session.model-dispatch-test/model-thinking-dispatch-test`
+      → Resolved: `:custom? true` added to every remaining custom-provider
+      fixture in the touched anthropic test files —
+      `anthropic_stream_test.clj` (MiniMax, DeepSeek, both `:local-proxy`
+      fixtures) and `anthropic_test.clj` (deepseek no-leak fixture,
+      `:my-anthropic-proxy` fixture, plus the two MiniMax missing-auth
+      fixtures in the same file) — and, same drift class in the touched
+      review-15 split-out file, all custom fixtures in
+      `anthropic_auth_test.clj` (local-proxy keyless/interplay fixtures,
+      deepseek incidental-headers and sk-ant-oat fixtures). Behavior-neutral
+      (all non-built-in provider names); fixtures now match the review-14
+      expand-model shape. Built-in `:provider :anthropic` fixtures
+      (`models/get-model :sonnet-4.6`) correctly left untagged. Openai test
+      files were outside this item's named scope (boundary noted in
+      implementation.md).
+- [x] `psi.agent-session.model-dispatch-test/model-thinking-dispatch-test`
       full-suite flake is not in the flake inventory: a full `bb test` run
       at review time (seed 1846209693; 2566 passed / 1 failed) failed this
       test — the dispatch log showed `:scheduler/drain-queue` instead of
@@ -1407,3 +1427,13 @@
       prompt-provider-retry, scheduler-lifecycle). Fix: add this test to the
       inventory entry (or note the observed run in the verification section)
       so the "full-suite green" claim names all known races.
+      → Resolved: `model-thinking-dispatch-test` added to the
+      implementation.md flake inventory — observed run (seed 1846209693,
+      2566 passed / 1 failed, `:scheduler/drain-queue` instead of
+      `:session/set-system-prompt`), passes in isolation (12 tests / 153
+      assertions, re-verified 2026-08-07), `components/agent-session/` zero
+      diff across the task commit range (3c286a46e → HEAD), test file last
+      touched pre-task (5c910d5d4) — same scheduler-timing race class as
+      `scheduler-lifecycle-test`. The inventory now names all four known
+      races (response-mode-retry, prompt-provider-retry, scheduler-lifecycle,
+      model-dispatch).

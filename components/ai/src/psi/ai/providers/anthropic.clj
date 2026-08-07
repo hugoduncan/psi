@@ -247,15 +247,14 @@
          strategy           (structured-output/select-strategy model structured-request)
          thinking           (thinking-param model options)
          adaptive?          (adaptive-thinking? model)
-         ;; No auth key is required when the request is explicitly keyless
-         ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
-         ;; custom :headers supply a recognized auth header (x-api-key /
-         ;; authorization) without a configured :api-key. Incidental custom
-         ;; headers (e.g. X-Client) do NOT imply keyless: with a blank
-         ;; configured key such a request fast-fails with the clear
-         ;; "Missing API key" error instead of silently sending a keyless
-         ;; request (provider-side 401) — consistent with the OpenAI
-         ;; transport, which only exempts on explicit :no-auth-header.
+         ;; Keyless logic is shared with the OpenAI transports via
+         ;; request-support/no-auth?: keyless on explicit :no-auth-header
+         ;; (e.g. :auth-header? false local servers) or a recognized auth
+         ;; header (x-api-key / authorization) among custom :headers with no
+         ;; configured :api-key. Incidental custom headers (e.g. X-Client) do
+         ;; NOT imply keyless: with a blank configured key such a request
+         ;; fast-fails with the clear "Missing API key" error instead of
+         ;; silently sending a keyless request (provider-side 401).
          no-auth?           (request-support/no-auth? options)
          api-key            (when-not no-auth?
                               (request-support/resolve-api-key model options anthropic-api-key-config))

@@ -881,3 +881,63 @@
   openai-request-headers 6/28, openai-codex-retry 1/5); clj-kondo clean.
 
 - Review 17 (2026-08-07): added 3 steps to be addressed.
+
+## Follow-ups review 17 addressed (2026-08-07)
+
+- addressed 3 review steps (review-17; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Stale cross-transport comment fixed (review-17 item 1):
+  `providers/anthropic.clj` `build-request`'s keyless-logic comment no longer
+  claims the OpenAI transport "only exempts on explicit :no-auth-header" —
+  inaccurate since review 10 (both `:openai-completions` and
+  `:openai-codex-responses` use the shared `request-support/no-auth?`, which
+  also exempts a recognized auth header among custom `:headers`). The comment
+  now states the keyless logic is shared with the OpenAI transports via
+  `request-support/no-auth?` and describes the actual keyless conditions.
+  Comment-only change; no behavior delta.
+- Fixture origin-tag drift closed (review-17 item 2): `:custom? true` added
+  to every remaining custom-provider fixture in the touched anthropic test
+  files — `anthropic_stream_test.clj`
+  (`stream-anthropic-captures-provider-request-and-response-test`: MiniMax,
+  DeepSeek, and both `:provider :local-proxy` fixtures) and
+  `anthropic_test.clj` (the "custom provider never falls back to
+  ANTHROPIC_API_KEY" deepseek fixture, the `:my-anthropic-proxy` kebab-case
+  env-suggestion fixture, plus the two MiniMax missing-auth fixtures in the
+  same file), and — same drift class in a touched file — every custom
+  fixture in `anthropic_auth_test.clj` (the review-15 split-out file:
+  local-proxy keyless/interplay fixtures, deepseek incidental-headers and
+  sk-ant-oat fixtures). All are non-built-in provider names, so the tag is
+  behavior-neutral; fixtures now match the review-14 expand-model shape
+  (every custom models.edn model is origin-tagged). The built-in
+  `:provider :anthropic` fixtures in `build-request-oauth-*` tests
+  (`models/get-model :sonnet-4.6`) are NOT tagged — they represent catalog
+  models. Boundary note: the openai test files
+  (`openai_completions_test.clj` / `openai_test.clj` /
+  `openai_request_headers_test.clj`) were NOT in this item's named scope;
+  their synthetic transport-mechanics fixtures (`:custom-chat`, `:local`,
+  `:local3`, `:custom-codex`, `:my-codex-proxy`, …) remain untagged per
+  those files' established pattern (tag only where semantically relevant —
+  the custom-provider-named-"openai"/adaptive-thinking no-op tests carry the
+  tag). If reviewers want the openai literal fixtures tagged too, that is a
+  separate follow-up.
+- Model-dispatch full-suite flake inventoried (review-17 item 3):
+  `psi.agent-session.model-dispatch-test/model-thinking-dispatch-test`
+  observed failing on a full-suite run at review time (seed 1846209693;
+  2566 passed / 1 failed: dispatch log showed `:scheduler/drain-queue`
+  instead of `:session/set-system-prompt`, 2 failed assertions). Verified
+  pre-existing: passes in isolation (12 tests / 153 assertions green,
+  re-verified 2026-08-07); `components/agent-session/` has zero diff across
+  the task commit range (3c286a46e → HEAD, `git diff --stat` empty); the
+  test file was last touched by 5c910d5d4 ("Add Opus 4.8 model support"),
+  pre-task. Same scheduler-timing race class as the documented
+  `scheduler-lifecycle-test` flake. Added to the flake inventory — full-suite
+  `bb test` is not deterministically green on any single run, independent of
+  this task: known races are now (1) `response-mode-retry-test`, (2)
+  `prompt-provider-retry-after-tool-result...`, (3)
+  `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-
+  lifecycle-test`, (4) `model-dispatch-test/model-thinking-dispatch-test`.
+- Verification: `psi.ai.providers.anthropic-test` 15/98,
+  `psi.ai.providers.anthropic-auth-test` 5/42,
+  `psi.ai.providers.anthropic-stream-test` 10/94 green (unchanged counts —
+  the `:custom?` fixture tags are behavior-neutral);
+  clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
