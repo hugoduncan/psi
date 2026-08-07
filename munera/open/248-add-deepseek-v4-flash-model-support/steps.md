@@ -442,3 +442,28 @@
       do NOT imply keyless — they fast-fail with the provider-scoped
       "Missing API key" error. DeepSeek example api-key note aligned to name
       the same recognized-auth-header exemption.
+
+## Follow-ups (implementation review 8, 2026-08-07)
+
+- [ ] Adaptive `output_config.effort` values "medium" and "highest" are
+      outside DeepSeek's documented effort set: the DeepSeek example notes
+      quote the Thinking Mode guide's Anthropic-format effort control as
+      `{"output_config": {"effort": "low/high/max"}}`, but psi sends "medium"
+      (`/thinking medium` → `thinking-level->effort`) and "highest"
+      (`/thinking xhigh`; also `effort-override :xhigh`) and never emits
+      DeepSeek's "max". "low" (minimal/low) and "high" overlap the documented
+      set, but "medium"/"highest" are undocumented — a strict endpoint may
+      400, a lenient one may map them unpredictably. Verify against a live
+      turn (blocked: no `DEEPSEEK_API_KEY`) and/or document in the DeepSeek
+      example notes which `/thinking` levels are documented-safe, plus the
+      "highest"-vs-"max" mismatch; or add a DeepSeek effort-value mapping.
+- [ ] A fast-mode 400 on DeepSeek is not auto-recoverable by psi's
+      compatibility retry: `fallback-request-for-400`'s `:without-all-betas`
+      step strips the `fast-mode-2026-02-01` beta header but leaves
+      `"speed": "fast"` in the retried body, so a DeepSeek 400 on the
+      unverified `speed` field (the review-6 fast-mode note's exact concern)
+      retries once and hard-fails instead of degrading. The review-6
+      fast-mode note does not mention this — extend it to state users must
+      turn fast mode off (`/fast off`) because the auto-retry cannot recover
+      it; optionally (separate change) add `:speed` stripping to the
+      400-fallback transforms.

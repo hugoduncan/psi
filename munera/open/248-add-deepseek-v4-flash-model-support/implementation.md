@@ -131,6 +131,7 @@
   deftest), namespace 92→111 assertions.
  - Review 6 (2026-08-07): added 3 steps to be addressed.
  - Review 7 (2026-08-07): added 3 steps to be addressed.
+ - Review 8 (2026-08-07): added 2 steps to be addressed.
 
 ## Follow-ups review 6 addressed (2026-08-07)
 
