@@ -90,6 +90,21 @@ value ProviderRequest {
 }
 
 ------------------------------------------------------------
+-- Primitives (shared vocabulary with spec/custom-providers.allium)
+------------------------------------------------------------
+
+-- Environment(name): read an env var by name (System/getenv); nil when unset.
+--   Used for the built-in OPENAI_API_KEY fallback.
+-- BlankOrNil(x) / IsBlank(x): x is nil or a blank/whitespace-only string
+--   (clojure.string/blank? semantics; nil counts as blank). The two names are
+--   synonyms; both appear below.
+-- HeaderName(header): the header's name as a string (keyword/string names
+--   accepted).
+-- LowerCase(s): lower-case a string (clojure.string/lower-case).
+-- RedactSecret(value) / MaskAccountId(value): capture redaction helpers —
+--   see the RedactRequestHeaders rule in the Capture Callbacks section.
+
+------------------------------------------------------------
 -- Config
 ------------------------------------------------------------
 
@@ -525,6 +540,29 @@ rule ProviderRequestCaptureEmittedWithRedaction {
             body: ParseJsonOrString(request.body)
         }
     })
+}
+
+rule RedactRequestHeaders {
+    -- Mirrors redact-request-headers in
+    -- providers/openai/transport.clj (review 11): auth header names are
+    -- matched case-insensitively (find-header helper) — "Authorization"
+    -- (redacted to "Bearer ***REDACTED***", with a length suffix for values
+    -- longer than 20 chars), "x-api-key" (redacted to "***REDACTED***"), and
+    -- "chatgpt-account-id" (masked to its first 6 chars + "..."). Redacted
+    -- values are written back under the original header key casing. Non-auth
+    -- headers pass through unmodified.
+
+    when: RequestHeadersAvailable(headers)
+
+    ensures: ∀ header ∈ headers:
+        if LowerCase(HeaderName(header)) = "authorization":
+            RedactedHeaderValue(header) = RedactBearer(header.value)
+        else if LowerCase(HeaderName(header)) = "x-api-key":
+            RedactedHeaderValue(header) = RedactSecret(header.value)
+        else if LowerCase(HeaderName(header)) = "chatgpt-account-id":
+            RedactedHeaderValue(header) = MaskAccountId(header.value)
+        else:
+            header unchanged
 }
 
 rule ProviderResponseCaptureEmitted {

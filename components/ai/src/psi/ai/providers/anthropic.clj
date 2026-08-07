@@ -80,6 +80,16 @@
   [api-key]
   (and api-key (str/includes? api-key "sk-ant-oat")))
 
+(defn- builtin-anthropic?
+  "True for built-in Anthropic catalog models (`:provider` nil or
+   `:anthropic`). OAuth content-sniffing (`sk-ant-oat` keys) applies only to
+   these: a custom `:anthropic-messages` provider whose configured key merely
+   resembles an OAuth token must still use plain x-api-key auth, and must
+   never receive the Claude Code OAuth headers/system prompt (review 11)."
+  [model]
+  (let [provider (:provider model)]
+    (or (nil? provider) (= :anthropic provider))))
+
 (defn- cache-control-present?
   [x]
   (cond
@@ -118,9 +128,8 @@
            (str/join ",")))))
 
 (defn- request-headers
-  [api-key thinking adaptive? prompt-caching? structured-output? speed-mode]
-  (let [oauth?       (oauth-api-key? api-key)
-        base-headers {"Content-Type"      "application/json"
+  [api-key oauth? thinking adaptive? prompt-caching? structured-output? speed-mode]
+  (let [base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
                        (assoc base-headers
@@ -205,7 +214,7 @@
   [model options]
   (when-not (:no-auth-header options)
     (let [provider    (:provider model)
-          anthropic?  (or (nil? provider) (= :anthropic provider))
+          anthropic?  (builtin-anthropic? model)
           api-key     (:api-key options)
           api-key     (if (and anthropic? (str/blank? api-key))
                         (getenv "ANTHROPIC_API_KEY")
@@ -217,9 +226,16 @@
                            :provider :anthropic}))
           ;; OAuth /login only exists for built-in providers, so custom
           ;; providers must not hint at it — the remedy is models.edn :auth.
+          ;; The suggested env var name normalizes kebab-case provider keys
+          ;; (- → _): :my-anthropic-proxy must suggest MY_ANTHROPIC_PROXY_API_KEY
+          ;; (bash identifiers cannot contain hyphens), not
+          ;; MY-ANTHROPIC-PROXY_API_KEY (review 12).
           (throw (ex-info (str "Missing API key for provider " (name provider)
                                ". Configure the provider's :auth {:api-key ...} in models.edn"
-                               " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\").")
+                               " (e.g. \"env:" (-> (name provider)
+                                                   (str/replace "-" "_")
+                                                   str/upper-case)
+                               "_API_KEY\").")
                           {:error-code "auth/missing-api-key"
                            :provider provider}))))
       api-key)))
@@ -291,12 +307,14 @@
                                      (some auth-header? (keys (:headers options)))))
          api-key            (when-not no-auth?
                               (resolve-api-key model options))
-         oauth?             (oauth-api-key? api-key)
+         oauth?             (and (builtin-anthropic? model)
+                                 (oauth-api-key? api-key))
          prompt-caching?    (prompt-caching? conversation)
          json-schema-output? (anthropic-structured-output/json-schema-output-mechanism? strategy)
          body               (request-body conversation model options stream? oauth?)
          body*              (request-schema/validate-request-body! body)
          base-hdrs          (cond-> (request-headers api-key
+                                                     oauth?
                                                      thinking
                                                      adaptive?
                                                      prompt-caching?

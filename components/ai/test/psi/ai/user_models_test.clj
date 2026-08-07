@@ -19,26 +19,35 @@
       (recur (.getParentFile dir)))))
 
 (defn- deepseek-example-edn
-  "Parse the ```clojure models.edn block under the '## DeepSeek-compatible
-  example' heading in doc/custom-providers.md."
+  "Parse the models.edn EDN block under the '## DeepSeek-compatible example'
+  heading in doc/custom-providers.md. Picks the first ```clojure block whose
+  content starts with the models.edn root map (`{:version ...`) so an
+  incidental code block (curl / request-shape sample) added to the section
+  prose before the example cannot silently move the parse-lock target
+  (review 11)."
   []
-  (let [lines   (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md")))
-        heading (first (keep-indexed (fn [i l]
-                                       (when (str/starts-with? l "## DeepSeek-compatible example") i))
-                                     lines))]
+  (let [lines    (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md")))
+        heading  (first (keep-indexed (fn [i l]
+                                        (when (str/starts-with? l "## DeepSeek-compatible example") i))
+                                      lines))]
     (when (nil? heading)
       (throw (ex-info "doc/custom-providers.md: '## DeepSeek-compatible example' heading not found" {})))
-    (let [start (first (keep-indexed (fn [i l]
-                                       (when (and (> i heading) (str/starts-with? l "```clojure")) i))
-                                     lines))]
-      (when (nil? start)
-        (throw (ex-info "doc/custom-providers.md: no ```clojure block after the DeepSeek example heading" {})))
-      (let [end (first (keep-indexed (fn [i l]
-                                       (when (and (> i start) (str/starts-with? l "```")) i))
-                                     lines))]
-        (when (nil? end)
-          (throw (ex-info "doc/custom-providers.md: unterminated ```clojure block" {})))
-        (edn/read-string (str/join "\n" (subvec (vec lines) (inc start) end)))))))
+    (let [blocks    (keep (fn [start]
+                            (let [end (first (keep-indexed (fn [i l]
+                                                             (when (and (> i start) (str/starts-with? l "```")) i))
+                                                           lines))]
+                              (when end
+                                {:start start
+                                 :lines (subvec (vec lines) (inc start) end)})))
+                          (keep-indexed (fn [i l]
+                                          (when (and (> i heading) (str/starts-with? l "```clojure")) i))
+                                        lines))
+          edn-block (first (filter (fn [{:keys [lines]}]
+                                     (str/starts-with? (str/trim (first lines)) "{:version"))
+                                   blocks))]
+      (when (nil? edn-block)
+        (throw (ex-info "doc/custom-providers.md: no ```clojure EDN block starting with {:version ...} found after the DeepSeek example heading" {})))
+      (edn/read-string (str/join "\n" (:lines edn-block))))))
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 

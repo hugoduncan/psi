@@ -291,6 +291,31 @@
           (is (nil? (re-find #"/login" (ex-message e)))
               "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
 
+  (testing "custom-provider missing-auth error suggests an env var name with hyphens normalized to underscores"
+    (let [model {:id "my-proxy-model"
+                 :name "My Proxy Model"
+                 :provider :my-openai-proxy
+                 :api :openai-completions
+                 :base-url "https://my-proxy.example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'openai/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"env:MY_OPENAI_PROXY_API_KEY" (ex-message e))
+              "env var suggestion must normalize kebab-case provider keys to underscores — bash identifiers cannot contain hyphens")
+          (is (nil? (re-find #"MY-OPENAI-PROXY_API_KEY" (ex-message e)))
+              "suggestion must not preserve hyphens from a kebab-case provider key")))))
+
   (testing "built-in openai model falls back to OPENAI_API_KEY env var"
     (let [model (models/get-model :gpt-5)
           convo (conv/create "sys")]
@@ -367,6 +392,58 @@
              #"Missing API key for provider custom-chat"
              (#'openai/build-request convo model {:headers {"X-Client" "psi"}}))
             "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
+
+(deftest configured-key-plus-recognized-auth-header-interplay-test
+  ;; Review 11: a custom :headers map carrying a recognized auth header name
+  ;; silently replaces/duplicates the configured :api-key — untested for both
+  ;; transports. OpenAI build-request merges custom headers LAST, so a custom
+  ;; Authorization header silently REPLACES the resolved bearer key; a custom
+  ;; X-API-Key header coexists with the configured bearer key (server picks by
+  ;; case-insensitive header merge). Documented in doc/custom-providers.md —
+  ;; don't mix them.
+  (testing "custom Authorization header replaces the resolved bearer key"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"Authorization" "Bearer custom"}})]
+      (is (= "Bearer custom" (get-in req [:headers "Authorization"]))
+          "custom Authorization header replaces the resolved bearer key — the configured key is not sent")))
+
+  (testing "configured key + custom X-API-Key header sends both auth headers"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"X-API-Key" "other-key"}})]
+      (is (= "Bearer configured-key" (get-in req [:headers "Authorization"]))
+          "configured api-key still sent as the bearer Authorization header")
+      (is (= "other-key" (get-in req [:headers "X-API-Key"]))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire"))))
 
 (deftest openai-completions-parallel-tool-calls-uses-model-setting-test
   (let [convo (-> (conv/create "sys")

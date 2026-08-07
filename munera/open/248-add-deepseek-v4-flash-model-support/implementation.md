@@ -444,3 +444,106 @@
 - Review 10 (2026-08-07): added 5 steps to be addressed.
 - Review 11 (2026-08-07): added 6 steps to be addressed.
 - Review 12 (2026-08-07): added 2 steps to be addressed.
+
+## Follow-ups review 11 + 12 addressed (2026-08-07)
+
+- addressed 6 review-11 steps + 7 review-12 steps (review-1 optional live
+  smoke test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- OpenAI capture redaction made case-insensitive + x-api-key aware:
+  `providers/openai/transport.clj` `redact-request-headers` now uses a
+  `find-header` helper (mirrors the anthropic transport's review-7 fix),
+  redacting `Authorization` (`Bearer ***REDACTED***`), `x-api-key`
+  (`***REDACTED***`) and `chatgpt-account-id` (masked) under the original
+  key casing. `openai_request_headers_test.clj` gains
+  `custom-header-auth-redacted-in-captures-test` (mixed-case `X-API-Key` →
+  `***REDACTED***`; lowercase `authorization` → `Bearer ***REDACTED***`).
+- OAuth content-sniff gated to built-in Anthropic models:
+  `oauth?` in `build-request`/`request-headers` is now
+  `(and (builtin-anthropic? model) (oauth-api-key? api-key))` — custom
+  `:anthropic-messages` providers with an `sk-ant-oat…` key always use
+  `x-api-key` auth and never receive the Claude Code headers/system prompt.
+  `resolve-api-key` reuses `builtin-anthropic?`. New
+  `build-request-oauth-gated-on-builtin-models-test`; spec
+  `OAuthDetectedFromApiKey` gated; DeepSeek docs notes updated.
+- `spec/openai-provider.allium` now self-contained: Primitives section
+  (Environment/BlankOrNil/IsBlank/HeaderName/LowerCase, shared vocabulary
+  with custom-providers.allium) + `RedactRequestHeaders` rule defining the
+  previously-undefined reference (case-insensitive auth-header redaction
+  mirroring the transport fix). Manual allium-check (no automated checker).
+- `:effort-override` no-op without a thinking level documented (Adaptive
+  thinking section + DeepSeek notes: effort applies only with `/thinking`
+  on) and locked with a build-request test block (no `:thinking`, no
+  `:output_config`).
+- Configured-key + recognized-auth-header interplay locked on both
+  transports (`configured-key-plus-recognized-auth-header-interplay-test`):
+  anthropic sends both `x-api-key` (configured) + custom `X-API-Key`
+  (duplicate on the wire); openai custom `Authorization` replaces the
+  resolved bearer key. Docs "Local servers and custom headers" now state the
+  merge behavior and advise one auth mechanism per provider.
+- `deepseek-example-edn` (user_models_test.clj) now targets the specific EDN
+  block: scans ```clojure blocks after the heading and picks the first
+  starting with `{:version`, throwing a clear error if none matches —
+  incidental code blocks can no longer move the parse-lock target.
+- Review-12 CHANGELOG entry added (`[Unreleased]` → `Changed`: provider-scoped
+  API-key resolution for both transports + keyless exemptions; OAuth
+  content-sniff gating; case-insensitive capture redaction).
+- Review-12 env-var suggestion fix: both transports' custom-provider
+  missing-key errors now normalize kebab-case provider keys
+  (`-` → `_`, e.g. `:my-anthropic-proxy` → `env:MY_ANTHROPIC_PROXY_API_KEY`);
+  tests added on both transports.
+- Verification: full `bb test` green (2559 tests / 19212 assertions /
+  0 failures); `psi.ai.providers.anthropic-test` 19/130,
+  `psi.ai.providers.anthropic-stream-test` 9/85,
+  `psi.ai.providers.openai-completions-test` 15/65,
+  `psi.ai.providers.openai-request-headers-test` 5/27,
+  `psi.ai.user-models-test` 14/97 green; clj-kondo clean (0 errors, 0
+  warnings) on all changed source + test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.
+
+## Follow-ups review 11 + 12 addressed (2026-08-07)
+
+- addressed 7 review steps (review-11: 1; review-12: 6; review-1 optional
+  live smoke test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- This pass completed the two remaining code/doc items whose working-tree
+  changes were still pending, and verified the rest end-to-end:
+  - Env-var suggestion normalization (review-12 item): both
+    `anthropic/resolve-api-key` and `openai/chat-completions/resolve-api-key`
+    now `(str/replace "-" "_")` the provider key before `str/upper-case` in
+    the suggested env var name — `:my-anthropic-proxy` →
+    `env:MY_ANTHROPIC_PROXY_API_KEY` (bash identifiers cannot contain
+    hyphens), not `MY-ANTHROPIC-PROXY_API_KEY`. Tests added on both
+    transports asserting the underscore suggestion and absence of the
+    hyphenated form for kebab-case provider keys.
+  - CHANGELOG (review-12 item): `[Unreleased]` → `Changed` now carries three
+    bullets — provider-scoped API-key resolution for both transports
+    (fail-fast instead of silent `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`
+    fallback; built-ins keep the fallback; keyless exemptions named),
+    custom-provider OAuth content-sniffing closed (`sk-ant-oat` keys on
+    custom providers always use `x-api-key`; Claude Code headers/system
+    prompt never sent to third parties), and case-insensitive auth-header
+    capture redaction on both transports.
+- Verified (working-tree changes from the concurrent review-11/12 pass):
+  OpenAI transport capture redaction now case-insensitive + `x-api-key`
+  (`providers/openai/transport.clj` `find-header` helper) with capture-path
+  tests (`custom-header-auth-redacted-in-captures-test`); `oauth?` gated on
+  built-in Anthropic models via new `builtin-anthropic?` helper in
+  anthropic.clj (`build-request-oauth-gated-on-builtin-models-test`);
+  `spec/openai-provider.allium` gains Primitives section +
+  `RedactRequestHeaders` rule; `spec/anthropic-provider.allium`
+  `OAuthDetectedFromApiKey` requires the built-in-provider condition;
+  effort-override-without-thinking no-op documented + tested
+  (no `output_config`); configured-key + recognized-auth-header interplay
+  tested on both transports + documented ("don't mix them");
+  `deepseek-example-edn` now targets the `{:version` EDN block (incidental
+  code blocks cannot move the parse-lock target).
+- Verification: full `bb test` green (2559 tests / 19216 assertions /
+  0 failures; assertion count varies run-to-run per the review-5 flake
+  analysis); `psi.ai.providers.anthropic-test` 19/132,
+  `psi.ai.providers.openai-completions-test` 15/67,
+  `psi.ai.providers.openai-request-headers-test` 5/27,
+  `psi.ai.providers.anthropic-stream-test` 9/85,
+  `psi.ai.user-models-test` 14/97 green; clj-kondo clean (0 errors,
+  0 warnings) on all changed source + test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.

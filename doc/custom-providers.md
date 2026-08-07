@@ -198,6 +198,13 @@ non-thinking request — no `thinking` field and no `output_config.effort`, with
 no schema error or warning. Set both flags together when you want the adaptive
 shape.
 
+Effort also applies only when a thinking level is active: `output_config.effort`
+is derived from `/thinking`/`/effort`, but psi emits it only when `thinking` is
+on (an active `/thinking` level). `:effort-override` / `/effort` alone — with
+`/thinking` unset or off (the session default is off) — emits neither
+`thinking` nor `output_config.effort`: a silent no-op, no schema error or
+warning. Turn `/thinking` on first, then set the effort.
+
 Trade-off: adaptive-thinking models never send `temperature` — psi omits it
 from the request body even when thinking is off, because Anthropic rejects
 `temperature` on adaptive-thinking models. Declaring `:adaptive-thinking true`
@@ -278,6 +285,12 @@ Notes:
   correspond to DeepSeek's `"max"`. Unverified live (blocked: no
   `DEEPSEEK_API_KEY` in env); until verified, prefer `/thinking minimal` /
   `/thinking low` or `/thinking high` for documented-safe effort values.
+  And `output_config.effort` is only emitted when a thinking level is active:
+  psi gates effort on `thinking` being on, so `/effort` (or
+  `:effort-override`) with `/thinking` unset/off emits neither `thinking` nor
+  `output_config` — while DeepSeek defaults thinking ON server-side, so an
+  effort setting without an active `/thinking` level is silently dropped.
+  Turn `/thinking` on first, then set the effort.
 - thinking-off is not honoured through the omitted-field path: psi never sends
   an explicit thinking-disabled signal — when `/thinking off` is active it
   simply omits the `thinking` field. On Anthropic's own API omission means
@@ -299,6 +312,12 @@ Notes:
   exemptions: `:auth-header? false`, or a recognized auth header among
   custom `:headers` with no configured key — see "Local servers and custom
   headers".)
+  OAuth content-sniffing is also provider-scoped: psi treats a key containing
+  `sk-ant-oat` as an Anthropic OAuth token (sending the Claude Code CLI
+  headers and system prompt) only for built-in Anthropic models. A custom
+  provider like DeepSeek always uses plain `x-api-key` auth, even if its
+  configured key merely resembles an OAuth token — the Claude Code OAuth
+  headers/system prompt are never sent to a third-party endpoint.
 - cache-cost fields are illustrative: psi bills cache usage from
   Anthropic-shaped `usage.cache_read_input_tokens` (at `:cache-read-cost`)
   and `usage.cache_creation_input_tokens` (at `:cache-write-cost`). DeepSeek
@@ -361,7 +380,12 @@ exempts the key requirement when it carries a *recognized* auth header —
 header of its own. Incidental headers (e.g. `X-Client` in the example above)
 do NOT imply keyless: with no `:api-key` configured, the request fails fast
 with a provider-scoped "Missing API key" error rather than silently sending a
-keyless request.
+keyless request. Don't mix a configured `:api-key` with a recognized auth
+header among custom `:headers`: psi merges custom headers over its own, so the
+custom auth header either duplicates the configured key (`X-API-Key` beside
+the lowercase `x-api-key` on the anthropic transport) or silently replaces it
+(a custom `Authorization` header on the openai transport) — the server's
+case-insensitive header merge decides. Pick one auth mechanism per provider.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is

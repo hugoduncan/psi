@@ -339,7 +339,13 @@ rule KeylessRequestDetermined {
 }
 
 rule OAuthDetectedFromApiKey {
+    -- Review 11: OAuth content-sniffing (sk-ant-oat keys) applies only to
+    -- built-in Anthropic models (provider nil or "anthropic"). A custom
+    -- :anthropic-messages provider whose configured key merely resembles an
+    -- OAuth token must still use x-api-key auth and must never receive the
+    -- Claude Code OAuth headers/system prompt.
     when: AnthropicStreamRequested(stream)
+    requires: (stream.model.provider == null or stream.model.provider == "anthropic")
     requires: Contains(stream.resolved_api_key, "sk-ant-oat")
 
     ensures: stream.oauth = true

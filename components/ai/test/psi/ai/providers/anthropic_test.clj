@@ -83,6 +83,31 @@
           (is (nil? (re-find #"/login" (ex-message e)))
               "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
 
+  (testing "custom-provider missing-auth error suggests an env var name with hyphens normalized to underscores"
+    (let [model {:id "my-proxy-model"
+                 :name "My Proxy Model"
+                 :provider :my-anthropic-proxy
+                 :api :anthropic-messages
+                 :base-url "https://my-proxy.example.com"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'anthropic/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"env:MY_ANTHROPIC_PROXY_API_KEY" (ex-message e))
+              "env var suggestion must normalize kebab-case provider keys to underscores — bash identifiers cannot contain hyphens")
+          (is (nil? (re-find #"MY-ANTHROPIC-PROXY_API_KEY" (ex-message e)))
+              "suggestion must not preserve hyphens from a kebab-case provider key")))))
+
   (testing "custom provider never falls back to ANTHROPIC_API_KEY env var (no cross-provider leak)"
     (let [model {:id "deepseek-v4-flash"
                  :name "DeepSeek V4 Flash"
@@ -263,6 +288,62 @@
       (is (nil? (get headers "x-api-key"))
           "no x-api-key when auth comes from an authorization header"))))
 
+(deftest configured-key-plus-recognized-auth-header-interplay-test
+  ;; Review 11: a custom :headers map carrying a recognized auth header name
+  ;; silently replaces/duplicates the configured :api-key — untested for both
+  ;; transports. Anthropic build-request merges custom headers OVER the base
+  ;; headers, so :headers {"X-API-Key" "other"} with a configured key sends
+  ;; BOTH the lowercase x-api-key (configured) and X-API-Key (custom) on the
+  ;; wire; the server picks by case-insensitive header merge. Documented in
+  ;; doc/custom-providers.md — don't mix them.
+  (testing "configured key + custom X-API-Key header sends both (case-insensitive duplicate)"
+    (let [model   {:id "local-proxy"
+                   :name "Local Proxy"
+                   :provider :local-proxy
+                   :api :anthropic-messages
+                   :base-url "http://localhost:8080"
+                   :supports-reasoning false
+                   :supports-images false
+                   :supports-text true
+                   :context-window 128000
+                   :max-tokens 16384
+                   :input-cost 0.0
+                   :output-cost 0.0
+                   :cache-read-cost 0.0
+                   :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:api-key "configured-key"
+                                                          :headers {"X-API-Key" "other-key"}})
+          headers (:headers req)]
+      (is (= "configured-key" (get headers "x-api-key"))
+          "configured api-key still sent as the lowercase x-api-key header")
+      (is (= "other-key" (get headers "X-API-Key"))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
+
+  (testing "configured key + custom Authorization header sends both auth headers"
+    (let [model   {:id "local-proxy"
+                   :name "Local Proxy"
+                   :provider :local-proxy
+                   :api :anthropic-messages
+                   :base-url "http://localhost:8080"
+                   :supports-reasoning false
+                   :supports-images false
+                   :supports-text true
+                   :context-window 128000
+                   :max-tokens 16384
+                   :input-cost 0.0
+                   :output-cost 0.0
+                   :cache-read-cost 0.0
+                   :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:api-key "configured-key"
+                                                          :headers {"Authorization" "Bearer custom"}})
+          headers (:headers req)]
+      (is (= "configured-key" (get headers "x-api-key"))
+          "configured api-key still sent as x-api-key")
+      (is (= "Bearer custom" (get headers "Authorization"))
+          "custom Authorization header merged in as-is"))))
+
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"
     (let [model (models/get-model :sonnet-4.6)
@@ -366,6 +447,55 @@
           system (:system (json/parse-string (:body req) true))]
       (is (= "Custom Psi system prompt." system)
           "api-key system prompt is sent as-is, without the Claude Code identity"))))
+
+(deftest build-request-oauth-gated-on-builtin-models-test
+  ;; Review 11: oauth-api-key? content-sniffs the resolved key with no
+  ;; provider gate, so a custom :anthropic-messages provider whose key merely
+  ;; contains "sk-ant-oat" was treated as an OAuth request — Authorization:
+  ;; Bearer + claude-cli user-agent + x-app headers, the claude-code/oauth/
+  ;; prompt-caching-scope betas, AND the Claude Code system prompt — all sent
+  ;; to the third-party endpoint. OAuth applies only to built-in Anthropic
+  ;; models (:provider nil or :anthropic); custom providers always use
+  ;; x-api-key auth.
+  (testing "custom provider with an sk-ant-oat… key is NOT treated as OAuth"
+    (let [model   {:id "deepseek-v4-flash"
+                   :name "DeepSeek V4 Flash"
+                   :provider :deepseek
+                   :api :anthropic-messages
+                   :base-url "https://api.deepseek.com/anthropic"
+                   :supports-reasoning true
+                   :supports-text true
+                   :context-window 1000000
+                   :max-tokens 384000}
+          convo   (conv/create "Custom Psi system prompt.")
+          req     (#'anthropic/build-request convo model {:api-key "sk-ant-oat-custom-provider-token"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= "sk-ant-oat-custom-provider-token" (get headers "x-api-key"))
+          "custom providers always use x-api-key auth")
+      (is (nil? (get headers "Authorization"))
+          "no OAuth Authorization: Bearer header for a custom provider")
+      (is (nil? (get headers "user-agent"))
+          "no claude-cli user-agent spoofing for a custom provider")
+      (is (nil? (get headers "x-app"))
+          "no x-app cli header for a custom provider")
+      (is (nil? (get headers "anthropic-beta"))
+          "no OAuth betas (claude-code/oauth/prompt-caching-scope) for a custom provider")
+      (is (= "Custom Psi system prompt." (:system body))
+          "custom provider system prompt is sent as-is — no Claude Code identity prepended")))
+
+  (testing "built-in models still get OAuth treatment for sk-ant-oat keys"
+    (let [model   (models/get-model :sonnet-4.6)
+          convo   (conv/create "Custom Psi system prompt.")
+          req     (#'anthropic/build-request convo model {:api-key "sk-ant-oat-test-token"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= "Bearer sk-ant-oat-test-token" (get headers "Authorization"))
+          "built-in models with an OAuth token still use the OAuth auth path")
+      (is (= "claude-cli/2.1.75" (get headers "user-agent"))
+          "built-in OAuth requests still present as the Claude Code CLI")
+      (is (= claude-code-system (:text (first (:system body))))
+          "built-in OAuth requests still prepend the Claude Code identity"))))
 
 ;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
 
@@ -492,7 +622,23 @@
       (is (nil? (:thinking body)))
       (is (nil? (:output_config body)))
       (is (nil? (:temperature body))
-          "temperature must be absent even with thinking off on adaptive models"))))
+          "temperature must be absent even with thinking off on adaptive models")))
+
+  (testing "effort override alone (no active thinking level) emits no output_config"
+    ;; request-body's effort is gated on (and thinking adaptive?), and
+    ;; thinking-param requires an active :thinking-level (session default
+    ;; :off), so /effort on an adaptive model with /thinking unset/off emits
+    ;; neither :thinking nor :output_config — a silent no-op, documented in
+    ;; doc/custom-providers.md (review 11).
+    (let [convo (conv/create "sys")
+          req   (#'anthropic/build-request convo deepseek-custom-provider-model
+                                           {:effort-override :xhigh
+                                            :api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (nil? (:thinking body))
+          "no thinking param when no thinking level is active")
+      (is (nil? (:output_config body))
+          "no output_config when no thinking level is active — effort applies only with /thinking on"))))
 
 (deftest build-request-classic-thinking-custom-provider-test
   ;; Docs advise DeepSeek users who need temperature to fall back to

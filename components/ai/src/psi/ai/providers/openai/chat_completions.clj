@@ -174,9 +174,16 @@
                            :provider :openai}))
           ;; OAuth /login only exists for built-in providers, so custom
           ;; providers must not hint at it — the remedy is models.edn :auth.
+          ;; The suggested env var name normalizes kebab-case provider keys
+          ;; (- → _): :my-openai-proxy must suggest MY_OPENAI_PROXY_API_KEY
+          ;; (bash identifiers cannot contain hyphens), not
+          ;; MY-OPENAI-PROXY_API_KEY (review 12).
           (throw (ex-info (str "Missing API key for provider " (name provider)
                                ". Configure the provider's :auth {:api-key ...} in models.edn"
-                               " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\").")
+                               " (e.g. \"env:" (-> (name provider)
+                                                   (str/replace "-" "_")
+                                                   str/upper-case)
+                               "_API_KEY\").")
                           {:error-code "auth/missing-api-key"
                            :provider provider}))))
       api-key)))
