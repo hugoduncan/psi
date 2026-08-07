@@ -130,3 +130,39 @@
   changed files. Stable task-relevant deltas: 2550→2551 tests (added
   deftest), namespace 92→111 assertions.
  - Review 6 (2026-08-07): added 3 steps to be addressed.
+ - Review 7 (2026-08-07): added 3 steps to be addressed.
+
+## Follow-ups review 6 addressed (2026-08-07)
+
+- addressed 3 review steps (all actionable review-6 items; review-1 optional
+  live smoke test remains BLOCKED)
+- Parse-lock test: `user_models_test.clj` gains
+  `parse-documented-deepseek-example-test` — parses the exact documented
+  DeepSeek `models.edn` example from `doc/custom-providers.md` (version 1,
+  deepseek provider, anthropic-messages, `env:DEEPSEEK_API_KEY` auth, all
+  resolved model fields incl. pricing/context-window 1000000/max-tokens
+  384000/adaptive-thinking true) and asserts every resolved model field plus
+  provider-scoped env auth resolution (via `resolve-api-key-spec`,
+  `:auth-header? true`). Guards closed ModelDef/AuthConfig schemas against
+  docs/code drift.
+- Classic-shape custom test: `anthropic_test.clj` gains
+  `build-request-classic-thinking-custom-provider-test` — non-catalog
+  custom-provider map (`deepseek-custom-provider-model` minus
+  `:adaptive-thinking`) + thinking `:medium` emits
+  `{:type "enabled" :budget_tokens 8000}`, no `output_config`, no
+  `temperature`, `interleaved-thinking` beta present. Locks the
+  "no custom-provider behaviour changes" AC for the classic path the docs
+  recommend for temperature control on DeepSeek.
+- Fast-mode note: `doc/custom-providers.md` DeepSeek example notes now
+  document that fast mode is unverified/assumed-unsupported on
+  `deepseek-v4-flash` — psi sends `"speed": "fast"` + `fast-mode-2026-02-01`
+  beta header; DeepSeek compat table does not list `speed`; Anthropic-
+  compatible endpoints typically 400 unknown body fields; blocked on the
+  same missing `DEEPSEEK_API_KEY` as the live smoke test.
+- Verification: `psi.ai.user-models-test` 14 tests / 97 assertions green
+  (was 13/77); `psi.ai.providers.anthropic-test` 17 tests / 115 assertions
+  green (was 16/111); clj-kondo clean (0 errors, 0 warnings) on changed
+  test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design. Recorded in
+  steps.md as the sole remaining unchecked item.

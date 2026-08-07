@@ -76,7 +76,8 @@
       `models.edn`, select `deepseek-v4-flash`, run one live turn to confirm
       DeepSeek accepts the request (x-api-key auth, `/v1/messages` path,
       adaptive `output_config.effort`). Automated tests are request-shaping
-      only by design; needs a `DEEPSEEK_API_KEY`.
+      only by design; needs a `DEEPSEEK_API_KEY`. BLOCKED: `DEEPSEEK_API_KEY`
+      not set in env (recorded in implementation.md).
 
 ## Follow-ups (implementation review 2, 2026-08-07)
 
@@ -324,7 +325,7 @@
 
 ## Follow-ups (implementation review 6, 2026-08-07)
 
-- [ ] Parse-lock the exact documented DeepSeek `models.edn` example:
+- [x] Parse-lock the exact documented DeepSeek `models.edn` example:
       `user_models_test.clj` covers only minimal deepseek model defs (id +
       supports-reasoning + adaptive-thinking), never the full documented
       example (pricing/context-window 1000000/max-tokens 384000 +
@@ -333,7 +334,15 @@
       would guard the closed `ModelDef`/`AuthConfig` schemas against
       docs/code drift (e.g. a future field typo silently making the
       documented example invalid).
-- [ ] No request-shaping test proves the classic extended-thinking shape for
+      → Resolved: added
+      `parse-documented-deepseek-example-test` in `user_models_test.clj`
+      parsing the exact documented example and asserting every resolved
+      field (id/name/provider/api/base-url, reasoning/adaptive-thinking/
+      images/text flags, context-window 1000000, max-tokens 384000, all four
+      costs) plus provider-scoped env auth resolution
+      (`env:DEEPSEEK_API_KEY` via `resolve-api-key-spec`,
+      `:auth-header? true`).
+- [x] No request-shaping test proves the classic extended-thinking shape for
       a NON-catalog custom-provider model map: all `budget_tokens` shape
       tests use built-in catalog models (`build-request-with-thinking-test`,
       cache-control test), while custom-provider maps are only tested for
@@ -345,7 +354,13 @@
       thinking `:medium` asserting `{:type "enabled" :budget_tokens 8000}`
       and no `output_config`. Locks the AC "no custom-provider behaviour
       changes" for the classic path.
-- [ ] `speed` fast-mode is unverified against DeepSeek: psi sends
+      → Resolved: added
+      `build-request-classic-thinking-custom-provider-test` in
+      `anthropic_test.clj` — `(dissoc deepseek-custom-provider-model
+      :adaptive-thinking)` + `:medium` asserts
+      `{:type "enabled" :budget_tokens 8000}`, no `output_config`, no
+      `temperature`, and the `interleaved-thinking` beta header.
+- [x] `speed` fast-mode is unverified against DeepSeek: psi sends
       `"speed": "fast"` in the request body when fast mode is on
       (`request-body` `:speed-mode`), but DeepSeek's Anthropic compat table
       does not list `speed` and Anthropic-compatible endpoints typically
@@ -355,3 +370,53 @@
       documenting that fast mode is unsupported/unverified on
       `deepseek-v4-flash` (alongside the existing blocked live-smoke-test
       caveat).
+      → Resolved: documented in the DeepSeek example notes
+      (`doc/custom-providers.md`) — fast mode sends `"speed": "fast"` +
+      `fast-mode-2026-02-01` beta header, not listed in DeepSeek's compat
+      table, typical Anthropic-compatible 400 on unknown body fields,
+      unverified live (blocked on missing `DEEPSEEK_API_KEY`); assume
+      unsupported until verified.
+
+## Follow-ups (implementation review 7, 2026-08-07)
+
+- [ ] DeepSeek `thinking.type "adaptive"` is unverified against DeepSeek's
+      documented honored values: the compat table (per design.md) lists
+      `thinking.type` honored as `"enabled"`/`"disabled"` only, but psi's
+      adaptive request shape sends `thinking: {:type "adaptive" :display
+      "summarized"}` (paired with `output_config.effort`). The DeepSeek
+      example and the "output_config.effort reachable via adaptive shape"
+      claim therefore rest on an unverified type value — if DeepSeek rejects
+      or ignores `"adaptive"`, the documented example fails or silently
+      degrades (thinking then defaults ON per DeepSeek behavior, compounding
+      the already-documented thinking-off caveat). Verify against DeepSeek
+      docs/live whether `type: "adaptive"` is accepted (the existing
+      smoke-test step checks "adaptive output_config.effort" but not the
+      `thinking.type` value), then either document the caveat in the DeepSeek
+      example notes or adjust the example (e.g. note that only
+      `output_config.effort` is confirmed supported and `thinking.type
+      "adaptive"` behavior is unknown).
+- [ ] Provider-request capture redaction is case-sensitive while auth-header
+      recognition is not: `redact-request-headers` redacts only exact
+      `"Authorization"`/`"x-api-key"` keys, but `build-request`'s
+      `auth-header?` treats auth headers case-insensitively and the
+      headers-auth keyless pattern (e.g. `:headers {"X-API-Key" "local-key"}`
+      — the exact map `anthropic_test.clj` proves keyless) would persist the
+      secret unredacted. turn-runtime appends `:on-provider-request` captures
+      to the session capture store, so a capitalized/mixed-case auth header
+      (X-API-Key, X-Api-Key, lower-case authorization) leaks verbatim into
+      stored captures. Make redaction case-insensitive (reuse `auth-header?`
+      or normalize header names) and add a capture-path test asserting a
+      custom `X-API-Key` header is `***REDACTED***` in the
+      `:on-provider-request` payload, mirroring the existing lowercase
+      `x-api-key` assertion in `anthropic_stream_test.clj`.
+- [ ] `doc/custom-providers.md` "Local servers and custom headers" overstates
+      the keyless inference: "or auth carried entirely by custom `:headers`"
+      implies any custom headers make a request keyless, but `build-request`
+      only infers keyless from custom headers when a RECOGNIZED auth header
+      name (`x-api-key`/`authorization`, case-insensitive) is among them and
+      no key is configured — a provider with only incidental headers (e.g.
+      `X-Client`, the section's own example) and an unset key fast-fails
+      with "Missing API key for provider <name>". Tighten the sentence to
+      name the recognized-auth-header requirement, and align the DeepSeek
+      example note's "fails fast ... unless `:auth-header? false`" wording,
+      which omits the same recognized-auth-header exemption.
