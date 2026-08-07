@@ -170,3 +170,33 @@
       states the field is only meaningful for `:api :anthropic-messages`
       custom providers (and built-in Anthropic catalog models) and is
       ignored for OpenAI-compatible custom providers.
+
+## Follow-ups (implementation review 4, 2026-08-07)
+
+- [ ] Keyless `:auth-header? false`/`:no-auth-header` custom
+      `:anthropic-messages` providers now hard-fail: `anthropic/resolve-api-key`
+      throws "Missing API key for provider <name>" for any blank key before
+      `:no-auth-header` stripping can apply, even for local-proxy configs that
+      legitimately send no auth (cf. workflow-step-session-config test with
+      `:auth {:auth-header? false}` and no key). Regression vs. prior
+      behavior: with `ANTHROPIC_API_KEY` set these configs previously
+      succeeded (env key resolved, then stripped by `:no-auth-header`); the
+      OpenAI `chat_completions` transport still handles this case (no throw,
+      header simply omitted). This is a behavior change to existing
+      custom-provider configs the design AC rules out. Fix: skip the key
+      requirement when `:no-auth-header` is set, and add a test proving a
+      keyless custom provider with `:no-auth-header true` builds a request
+      with no `x-api-key`/`Authorization`.
+- [ ] New custom-provider "Missing API key" error suggests "or login via
+      /login <provider>", but OAuth login only exists for built-in
+      `:anthropic`/`:openai` providers — `/login deepseek` is not a real
+      flow. Drop the login hint for custom providers or gate it on OAuth
+      provider registration.
+- [ ] design.md drift: it still claims "no core provider/transport code
+      changes" and AC "no existing custom-provider behaviour changes" /
+      "no code change to `providers/anthropic.clj`'s request-shaping logic
+      itself, only the schema gate in `user_models.clj`", but the merged
+      review-3 resolution modified `providers/anthropic.clj`
+      (`resolve-api-key` + `getenv`) and changed custom-provider
+      key-fallback behavior. Update design.md scope/AC (or add a revision
+      note) so the design reflects the provider-scoped api-key resolution.
