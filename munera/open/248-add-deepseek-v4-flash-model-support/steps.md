@@ -940,3 +940,48 @@
       inconsistent between transports in the length metadata (the secret
       itself is redacted either way). Align the openai redactor with the
       anthropic one (strip the prefix before `count`).
+- [ ] `:openai-codex-responses` custom providers still fall back to the global
+      `OPENAI_API_KEY` env var — the third transport in the custom `ModelDef`
+      `ApiProtocol` enum never received the provider-scoped key resolution
+      reviews 3/10 gave `:anthropic-messages`/`:openai-completions`.
+      `build-codex-request` (providers/openai/codex_responses.clj) resolves
+      `(or (:api-key options) (System/getenv "OPENAI_API_KEY"))`
+      unconditionally, then `extract-chatgpt-account-id` throws "OpenAI Codex
+      requires ChatGPT OAuth access token" for any non-OAuth key. A custom
+      `models.edn` provider with `:api :openai-codex-responses` and no
+      configured key therefore either hard-fails confusingly (regular `sk-`
+      env key, request never sent) or silently sends the user's OpenAI
+      credential to the third-party `:base-url` (OAuth-shaped env key;
+      `resolve-codex-url` honors custom base-urls) — the exact cross-provider
+      disclosure class this task closed on the other two transports, left
+      open here. `:auth-header? false`/`:no-auth-header` keyless codex
+      configs don't work either (the account-id check still requires a key),
+      unlike the keyless exemptions now documented for both scoped
+      transports. The review-12 CHANGELOG `Changed` entry and
+      doc/custom-providers.md claim provider-scoped resolution for "both
+      transports" — codex is an undocumented exception reachable from the
+      same custom-provider schema. Note `spec/openai-provider.allium`
+      `OpenAIProviderDispatchesByModelApi` already `requires
+      stream.model.provider = "openai"` for codex routing — the spec assumes
+      codex is built-in-only while the code permits custom codex providers.
+      Fix direction: (a) provider-scope codex key resolution mirroring review
+      10 (built-in `:provider :openai` keeps the env fallback; custom codex
+      providers fail fast with a provider-scoped missing-key error, no
+      `/login` hint; keyless `:no-auth-header`/headers-auth exemptions), (b)
+      restrict `:openai-codex-responses` to built-in models (drop it from the
+      custom `ModelDef` `ApiProtocol` enum — per design.md's revision note
+      the transport is hard-coupled to the ChatGPT/Codex backend), or (c)
+      explicitly document the exception. Add a no-leak test mirroring
+      `openai-provider-scoped-api-key-resolution-test`.
+- [ ] `spec/openai-provider.allium` `OpenAIApiKeyResolved` built-in condition
+      omits the nil-provider case: the rule uses `stream.model.provider =
+      "openai"` / `!= "openai"`, but the implementation
+      (`openai/chat-completions` `resolve-api-key`) treats `:provider` nil as
+      built-in — `(or (nil? provider) (= :openai provider))` — with the
+      `OPENAI_API_KEY` env fallback. `spec/anthropic-provider.allium`
+      `ApiKeyResolved` models the nil case explicitly (`provider == null or
+      provider == "anthropic"`); the openai rule should mirror it (`provider
+      == null or provider == "openai"` for the env-fallback ensure, and the
+      converse for the custom-provider fast-fail ensure) so a nil-provider
+      model on the openai transport is modeled as built-in, matching the
+      code.
