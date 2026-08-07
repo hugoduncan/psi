@@ -6,7 +6,7 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.openai.chat-completions :as chat-completions])
+   [psi.ai.providers.request-support :as request-support])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -259,7 +259,7 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-chat"
@@ -319,7 +319,7 @@
   (testing "built-in openai model falls back to OPENAI_API_KEY env var"
     (let [model (models/get-model :gpt-5)
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-env-fallback-key")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-env-fallback-key")]
         (let [req (#'openai/build-request convo model {})]
           (is (= "Bearer sk-env-fallback-key" (get-in req [:headers "Authorization"]))
               "built-in OpenAI requests without an explicit key use OPENAI_API_KEY")))))
@@ -341,7 +341,7 @@
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
           req   (#'openai/build-request convo model {:no-auth-header true})]
-      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
         (is (nil? (get-in req [:headers "Authorization"]))
             "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
         (is (= "application/json" (get-in req [:headers "Content-Type"]))))))
@@ -366,7 +366,7 @@
           headers (:headers req)]
       (is (= "Bearer local-token" (get headers "Authorization"))
           "custom authorization header auth is preserved")
-      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
         (is (= "Bearer local-token" (get headers "Authorization"))
             "env key must not replace the custom auth header"))))
 
@@ -386,12 +386,44 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.openai.chat-completions/getenv (fn [_] "sk-should-never-leak")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-chat"
              (#'openai/build-request convo model {:headers {"X-Client" "psi"}}))
             "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
+
+(deftest custom-provider-named-openai-not-builtin-test
+  ;; Review 14: built-in detection is by provider NAME, so a custom models.edn
+  ;; provider literally named "openai" was classified built-in and defeated
+  ;; the provider-scoped guarantee — an unset configured key silently fell
+  ;; back to OPENAI_API_KEY (sent to the third-party endpoint). Custom models
+  ;; now carry `:custom? true` (set by expand-model at parse time); the shared
+  ;; resolve-api-key refuses them, so a custom provider named "openai" gets
+  ;; the same provider-scoped treatment as any other custom name.
+  (testing "custom provider named \"openai\" never falls back to OPENAI_API_KEY"
+    (let [model {:id "not-a-builtin"
+                 :name "Custom OpenAI-Named Provider"
+                 :provider :openai
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://third-party.example/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider openai"
+             (#'openai/build-request convo model {}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider named \"openai\"")))))
 
 (deftest configured-key-plus-recognized-auth-header-interplay-test
   ;; Review 11: a custom :headers map carrying a recognized auth header name
@@ -443,7 +475,36 @@
       (is (= "Bearer configured-key" (get-in req [:headers "Authorization"]))
           "configured api-key still sent as the bearer Authorization header")
       (is (= "other-key" (get-in req [:headers "X-API-Key"]))
-          "custom X-API-Key header merged in as-is — duplicate auth header on the wire"))))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
+
+  (testing "configured key + lowercase authorization custom header sends BOTH authorization headers"
+    ;; Review 14: the merge is on equal string keys — a custom header whose
+    ;; name is the exact lowercase "authorization" does NOT collide with the
+    ;; base "Authorization" (capital A), so it DUPLICATES beside the resolved
+    ;; bearer key (the reverse of the anthropic transport's exact-case
+    ;; x-api-key replace). The doc guidance is case-dependent: exact-case
+    ;; replaces on anthropic, duplicates on openai.
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"authorization" "Bearer custom"}})]
+      (is (= "Bearer configured-key" (get-in req [:headers "Authorization"]))
+          "resolved bearer key still sent as the base Authorization header")
+      (is (= "Bearer custom" (get-in req [:headers "authorization"]))
+          "lowercase authorization custom header merged in as-is — duplicate authorization header on the wire"))))
 
 (deftest openai-completions-parallel-tool-calls-uses-model-setting-test
   (let [convo (-> (conv/create "sys")

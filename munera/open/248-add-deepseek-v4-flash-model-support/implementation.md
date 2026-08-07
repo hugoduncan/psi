@@ -665,3 +665,107 @@
 - Review 14 (2026-08-07): added 2 steps to be addressed.
 
 - Review 14 (2026-08-07): added 4 steps to be addressed.
+
+## Follow-ups review 14 addressed (2026-08-07)
+
+- addressed 6 review steps (all review-14 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- **Shared provider request-support namespace (review-14 item 6):** new
+  `components/ai/src/psi/ai/providers/request_support.clj`
+  (`psi.ai.providers.request-support`) now owns the provider-scoped key
+  resolution, keyless-auth detection, auth-header recognition and
+  capture-redaction primitives that were triplicated across the three
+  transports — `getenv`/`auth-header?`/`no-auth?`/`builtin?`/`resolve-api-key`
+  (parameterized by `{:builtin-provider :env-var :builtin-missing-msg}`) and
+  `find-header`/`redact-secret`/`redact-authorization`/
+  `mask-chatgpt-account-id`/`redact-headers`. All three transports
+  (`anthropic.clj`, `openai/chat_completions.clj`,
+  `openai/codex_responses.clj`) call the shared `no-auth?` + `resolve-api-key`
+  with a transport config map; `anthropic.clj`'s 400-fallback alias renamed
+  to `anthropic-request-support` to free the `request-support` alias;
+  `openai/transport.clj` redaction delegates to shared `redact-headers`.
+  Behavior-preserving (verified by the full transport test namespaces +
+  clj-kondo clean). Test getenv redefs moved to
+  `psi.ai.providers.request-support/getenv` across the three provider test
+  files.
+- **Custom-provider origin tagging (review-14 item 3):** `expand-model`
+  (user_models.clj) now tags every custom models.edn model `:custom? true`,
+  and `builtin?`/`builtin-anthropic?` require the tag in addition to the
+  provider name — a custom provider literally named "anthropic"/"openai" can
+  no longer fall back to `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` or receive
+  Claude Code OAuth treatment. Tests: `user_models_test.clj`
+  `custom-provider-models-tagged-custom-test` (every custom model tagged;
+  providers named "anthropic"/"openai" parse with `:custom? true`);
+  `anthropic_test.clj` `custom-provider-named-anthropic-not-builtin-test`
+  (unset key + redef'd getenv → throws "Missing API key for provider
+  anthropic"; sk-ant-oat key → x-api-key auth, no OAuth headers/system
+  prompt); `openai_completions_test.clj`
+  `custom-provider-named-openai-not-builtin-test` (unset key + redef'd getenv
+  → throws, no OPENAI_API_KEY fallback). Specs updated to model the tag:
+  `ResolvedCustomModel.custom = true` + `not model.custom` built-in
+  conditions in all three allium files (custom-providers, anthropic-provider,
+  openai-provider; `Model.custom: Boolean = false` added to the two provider
+  specs).
+- **Exact-case auth-header interplay (review-14 item 5):** added the
+  exact-case variants to the interplay deftests — `anthropic_test.clj`
+  `configured-key-plus-recognized-auth-header-interplay-test` gains
+  exact-case `x-api-key` custom header → REPLACES the configured key (equal
+  string-key merge); `openai_completions_test.clj` gains lowercase
+  `authorization` custom header → DUPLICATES beside the base `Authorization`
+  (different casing = distinct keys). `doc/custom-providers.md` "Local
+  servers and custom headers" merge sentence tightened to name the
+  case-dependence (mixed-case X-API-Key duplicates beside lowercase
+  x-api-key on anthropic; exact-case x-api-key replaces it; exact-case
+  Authorization replaces on openai transports; lowercase authorization
+  duplicates beside it).
+- **Codex interplay lock + doc naming (review-14 item 2):**
+  `openai_test.clj` `codex-configured-key-plus-recognized-auth-header-interplay-test`
+  (added by a concurrent review pass in the shared tree; verified here) locks
+  the codex transport's identical merge behavior — custom `Authorization`
+  replaces the resolved codex bearer key (chatgpt-account-id still derived
+  from the configured key), custom `X-API-Key` coexists with the bearer
+  header. `doc/custom-providers.md` merge sentence now names all three
+  transports (`:anthropic-messages`, `:openai-completions`,
+  `:openai-codex-responses`).
+- **design.md revision note completed (review-14 item 4):** added the missing
+  provider-transport bullets — OAuth content-sniff gating (review 11),
+  case-insensitive capture redaction (reviews 7/11/13), custom-provider
+  origin tagging (`:custom?`, review 14), and the shared request-support
+  namespace (review 14, pure refactor) — and updated the AC exception wording
+  to name all of them.
+- **Scheduler-lifecycle full-suite flake verified pre-existing + inventoried
+  (review-14 item 1):** `psi.agent-session.scheduler-lifecycle-test/
+  scheduled-deliver-runs-canonical-prompt-lifecycle-test` (documented
+  ~1-in-8 full-suite flake in its own comment: session phase `:streaming`
+  instead of `:idle`, no assistant message, no lifecycle entries) is
+  byte-identical between the task base commit (71d4821bf, the first task-248
+  commit) and HEAD, and the whole `components/agent-session/` directory has
+  zero diff across the task's commit range — the flake is pre-existing and
+  unrelated to this task's changed files. Passes in isolation (4 tests / 26
+  assertions; the "only pending schedules can fire" dispatch warning fires
+  even on passing runs). Added to the flake inventory alongside the two
+  retry-loop flakes (`response-mode-retry-test`,
+  `prompt-provider-retry-after-tool-result...`): full-suite `bb test` is not
+  deterministically green on any single run, independent of this task.
+- Verification: full `bb test` green (2566 tests / 19264 assertions /
+  0 failures; +4 tests vs the committed 2562 = the three new review-14
+  deftests + the concurrent codex interplay deftest; assertion count varies
+  run-to-run per the review-5 flake analysis).
+  `psi.ai.providers.anthropic-test` 20/140,
+  `psi.ai.providers.openai-completions-test` 16/70,
+  `psi.ai.providers.openai-test` 15/81 (incl. the concurrent codex interplay
+  test and the custom-codex-provider-named-"openai" block),
+  `psi.ai.providers.anthropic-stream-test` 10/94,
+  `psi.ai.providers.openai-request-headers-test` 6/28,
+  `psi.ai.user-models-test` 15/105 green (14→15 tests = the new
+  custom-tagging deftest; 97→105 assertions); clj-kondo clean (0 errors, 0
+  warnings) on all changed source + test files.
+- `schemas/Model` (schemas.clj) gained `[:custom? {:optional true}
+  [:maybe boolean?]]` — the canonical (closed-map) Model schema must accept
+  the new origin tag, or custom-model parse tests that validate against it
+  fail (caught by `psi.ai.textual-tool-calls-test/
+  textual-tool-call-capability-schema-test` on the first full-suite run;
+  fixed and re-run green).
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design (steps.md item
+  left unchecked).

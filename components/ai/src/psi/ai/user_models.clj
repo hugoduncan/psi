@@ -111,7 +111,14 @@
    :cost-tier          :zero})
 
 (defn- expand-model
-  "Expand a model definition into a fully-formed model map."
+  "Expand a model definition into a fully-formed model map.
+
+   Every custom models.edn model is tagged `:custom? true`. Built-in
+   detection in the provider transports (`builtin?` /
+   `builtin-anthropic?`) keys off this flag in addition to the provider
+   name, so a custom provider literally named \"anthropic\"/\"openai\" can
+   never be classified built-in and receive built-in-only treatment (env-var
+   key fallback, Claude Code OAuth headers) — review 14."
   [provider-key base-url api model-def]
   (let [provider-kw (if (keyword? provider-key)
                       provider-key
@@ -119,7 +126,8 @@
     (-> (merge model-defaults
                {:provider provider-kw
                 :api      api
-                :base-url base-url}
+                :base-url base-url
+                :custom?  true}
                (dissoc model-def :name)
                {:name (or (:name model-def) (:id model-def))})
         structured-output/normalize-model)))

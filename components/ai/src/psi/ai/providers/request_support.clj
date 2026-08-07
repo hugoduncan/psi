@@ -1,0 +1,160 @@
+(ns psi.ai.providers.request-support
+  "Shared provider request-support helpers used by all three provider
+   transports (:anthropic-messages, :openai-completions,
+   :openai-codex-responses) and their capture-redaction paths.
+
+   Provider-scoped API-key resolution, keyless-auth detection, auth-header
+   recognition and the capture-redaction primitives were triplicated across
+   providers/anthropic.clj, providers/openai/chat_completions.clj,
+   providers/openai/codex_responses.clj and providers/openai/transport.clj
+   (reviews 3/4/7/10/11/13 introduced and hardened them, and the copies
+   repeatedly drifted — reviews 9/10/13 reconciled spec/behavior mismatches
+   between them). They live here once, parameterized by the transport's
+   built-in provider keyword and env var name, so future fixes land once
+   (review 14)."
+  (:require [clojure.string :as str]))
+
+(defn getenv
+  "Environment lookup indirection, redef-testable (review 3 pattern).
+   The three transports' `resolve-api-key` call this instead of
+   System/getenv directly so tests can stub the env without forking
+   processes."
+  [k]
+  (System/getenv k))
+
+(defn auth-header?
+  "True when a header name is a recognized auth header (case-insensitive)."
+  [header]
+  (contains? #{"x-api-key" "authorization"}
+             (str/lower-case (name header))))
+
+(defn no-auth?
+  "True when a request should be built without resolving an API key:
+   explicit `:no-auth-header` (e.g. `:auth-header? false` local servers), or
+   custom `:headers` carrying a recognized auth header (x-api-key /
+   authorization, case-insensitive) with no configured `:api-key`.
+   Incidental custom headers (e.g. X-Client) do NOT imply keyless — with a
+   blank configured key such a request fast-fails with the clear
+   \"Missing API key\" error instead of silently sending a keyless request
+   (review 5)."
+  [options]
+  (or (:no-auth-header options)
+      (and (seq (:headers options))
+           (str/blank? (:api-key options))
+           (some auth-header? (keys (:headers options))))))
+
+(defn builtin?
+  "True when a model is a built-in catalog model of the transport: the model
+   is not tagged `:custom?` (custom models.edn models are tagged at parse
+   time by `expand-model`) and its provider is nil or `builtin-provider-kw`.
+
+   The `:custom?` guard closes the review-14 gap where a custom models.edn
+   provider literally named \"anthropic\"/\"openai\" was classified built-in
+   by provider name alone, defeating the provider-scoped guarantees: such a
+   provider must never fall back to the user's built-in env key or receive
+   built-in-only treatment (e.g. Claude Code OAuth headers)."
+  [model builtin-provider-kw]
+  (and (not (:custom? model))
+       (let [provider (:provider model)]
+         (or (nil? provider) (= builtin-provider-kw provider)))))
+
+(defn resolve-api-key
+  "Resolve the API key for a request, scoped to the request's provider.
+
+   `config` is a map with:
+   - `:builtin-provider` — the keyword identifying built-in models (e.g.
+     `:anthropic` or `:openai`);
+   - `:env-var` — the env var built-in models fall back to (e.g.
+     \"ANTHROPIC_API_KEY\");
+   - `:builtin-missing-msg` — the error message for built-in models with no
+     configured key and no env var.
+
+   Built-in models (`builtin?`) fall back to the env var. Custom providers
+   never fall back to that env var: a nil/blank configured key is an error,
+   so a custom provider's request can never silently send the user's
+   built-in provider key to a third-party endpoint (the provider-scoped
+   resolution introduced in review 3 for :anthropic-messages and extended to
+   :openai-completions (review 10) and :openai-codex-responses (review 13)).
+
+   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
+   no key is required: the caller strips the auth headers anyway, so this
+   returns nil instead of failing. (Headers-only auth without
+   `:no-auth-header` is handled by the request builders — they skip this
+   function entirely when `no-auth?` holds.)"
+  [model options config]
+  (when-not (:no-auth-header options)
+    (let [{:keys [builtin-provider env-var builtin-missing-msg]} config
+          provider   (:provider model)
+          builtin?   (builtin? model builtin-provider)
+          api-key    (:api-key options)
+          api-key    (if (and builtin? (str/blank? api-key))
+                       (getenv env-var)
+                       api-key)]
+      (when (str/blank? api-key)
+        (if builtin?
+          (throw (ex-info builtin-missing-msg
+                          {:error-code "auth/missing-api-key"
+                           :provider builtin-provider}))
+          ;; OAuth /login only exists for built-in providers, so custom
+          ;; providers must not hint at it — the remedy is models.edn :auth.
+          ;; The suggested env var name normalizes kebab-case provider keys
+          ;; (- → _): :my-anthropic-proxy must suggest MY_ANTHROPIC_PROXY_API_KEY
+          ;; (bash identifiers cannot contain hyphens), not
+          ;; MY-ANTHROPIC-PROXY_API_KEY (review 12).
+          (throw (ex-info (str "Missing API key for provider " (name provider)
+                               ". Configure the provider's :auth {:api-key ...} in models.edn"
+                               " (e.g. \"env:" (-> (name provider)
+                                                   (str/replace "-" "_")
+                                                   str/upper-case)
+                               "_API_KEY\").")
+                          {:error-code "auth/missing-api-key"
+                           :provider provider}))))
+      api-key)))
+
+;; ── Capture redaction ────────────────────────────────────────────────────────
+
+(defn find-header
+  "Find a header entry whose name matches header-name case-insensitively.
+   Returns a [key value] pair, or nil. Auth-header recognition is
+   case-insensitive, so a mixed-case X-API-Key / authorization header must
+   be redacted too (review 7)."
+  [headers header-name]
+  (let [target (str/lower-case header-name)]
+    (some (fn [[k v]]
+            (when (= target (str/lower-case (name k)))
+              [k v]))
+          headers)))
+
+(defn redact-secret
+  [value]
+  (when (string? value)
+    (str "***REDACTED***"
+         (when (> (count value) 20)
+           (str " (len=" (count value) ")")))))
+
+(defn redact-authorization
+  [value]
+  (when (string? value)
+    (str "Bearer "
+         ;; Strip a leading "Bearer " prefix before counting so the (len=N)
+         ;; metadata measures the secret itself, not the 7-char prefix
+         ;; (review 13 aligned the openai redactor with the anthropic one).
+         (redact-secret (str/replace value #"^Bearer\s+" "")))))
+
+(defn mask-chatgpt-account-id
+  [value]
+  (when (string? value)
+    (str (subs value 0 (min 6 (count value))) "...")))
+
+(defn redact-headers
+  "Redact auth headers from a request header map. `redactors` is a seq of
+   [header-name redactor-fn] pairs; header names are matched
+   case-insensitively and the redacted value is written back under the
+   original key casing. Non-auth headers pass through unchanged."
+  [headers redactors]
+  (reduce (fn [hdr [name redactor]]
+            (if-let [[k v] (find-header hdr name)]
+              (assoc hdr k (redactor v))
+              hdr))
+          headers
+          redactors))

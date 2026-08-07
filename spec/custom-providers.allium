@@ -72,6 +72,7 @@ value ResolvedCustomModel {
     provider: String                           -- the custom provider key, e.g. "local"
     api: ApiProtocol
     base_url: String
+    custom: Boolean = true                     -- review 14: origin tag — custom models are never classified built-in
     supports_reasoning: Boolean
     supports_images: Boolean
     supports_text: Boolean
@@ -159,6 +160,7 @@ rule ParseModelsConfig {
                 provider: provider_key,
                 api: provider_def.api,
                 base_url: provider_def.base_url,
+                custom: true,                        -- review 14: every models.edn model is tagged custom
                 supports_reasoning: model_def.supports_reasoning,
                 supports_images: model_def.supports_images,
                 supports_text: model_def.supports_text,
@@ -194,12 +196,16 @@ value RequestOptions {
 rule ResolveRequestApiKey {
     -- Provider-scoped API-key resolution for a request, matching the Anthropic
     -- transport's resolve-api-key:
-    --   * built-in Anthropic models (provider nil or "anthropic") fall back to
-    --     the ANTHROPIC_API_KEY env var when no key is configured;
+    --   * built-in Anthropic models (not tagged custom, and provider nil or
+    --     "anthropic") fall back to the ANTHROPIC_API_KEY env var when no
+    --     key is configured;
     --   * custom :anthropic-messages providers NEVER fall back to
     --     ANTHROPIC_API_KEY — a nil/blank configured key is an error naming
     --     the provider and the models.edn :auth remedy, so an Anthropic key
-    --     can never be silently sent to a third-party endpoint;
+    --     can never be silently sent to a third-party endpoint (review 14:
+    --     the custom tag closes the provider-NAME gap — a custom provider
+    --     literally named "anthropic" is tagged custom and never classified
+    --     built-in);
     --   * keyless requests (see KeylessRequestDefined: explicit
     --     no_auth_header, or a recognized auth header among custom :headers
     --     with no configured key) require no key at all.
@@ -208,9 +214,11 @@ rule ResolveRequestApiKey {
     requires: LookupProviderAuth(model.provider) != null
 
     ensures: KeylessRequest(model, options) implies resolved_key = null
-    ensures: not KeylessRequest(model, options) and (model.provider == null or model.provider == "anthropic")
+    ensures: not KeylessRequest(model, options)
+        and not model.custom and (model.provider == null or model.provider == "anthropic")
         implies resolved_key = options.api_key ?? SystemGetenv("ANTHROPIC_API_KEY")
-    ensures: not KeylessRequest(model, options) and model.provider != null and model.provider != "anthropic"
+    ensures: not KeylessRequest(model, options)
+        and (model.custom or (model.provider != null and model.provider != "anthropic"))
         and BlankOrNil(options.api_key)
         implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn")
 }

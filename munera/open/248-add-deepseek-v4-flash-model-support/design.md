@@ -78,6 +78,38 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   without `Authorization` or `chatgpt-account-id` (the account-id requirement
   is waived for keyless requests). This closes the last remaining
   cross-provider credential disclosure class on the custom-provider schema.
+- **OAuth content-sniff gating (review 11):** `oauth?` in
+  `providers/anthropic.clj` is now `(and (builtin-anthropic? model)
+  (oauth-api-key? api-key))` — a custom `:anthropic-messages` provider whose
+  configured key merely contains `sk-ant-oat` always uses `x-api-key` auth
+  and never receives the Claude Code OAuth headers (`Authorization: Bearer`,
+  `user-agent: claude-cli/…`, `x-app`) or the `claude-code-system-prompt`
+  prepended as the first system block. This is a custom-provider header
+  behavior change: pre-review-11, an OAuth-shaped key on a custom provider
+  leaked the Claude Code identity headers/system prompt to the third-party
+  endpoint.
+- **Case-insensitive capture redaction (reviews 7/11/13):** provider request
+  captures now redact auth headers case-insensitively via a shared
+  `find-header` helper on both transports — mixed-case `X-API-Key`,
+  lowercase `authorization`, and `chatgpt-account-id` are redacted instead of
+  leaking verbatim into the `:on-provider-request` capture payload — and the
+  OpenAI transport's `redact-authorization` strips a leading `Bearer `
+  before counting (length metadata consistent with the anthropic transport).
+  This changes the capture payload (redaction is a security improvement, not
+  a request-shaping change).
+- **Custom-provider origin tagging (review 14):** `expand-model` tags every
+  custom models.edn model `:custom? true`, and built-in detection
+  (`builtin?`/`builtin-anthropic?`) requires the tag in addition to the
+  provider name — a custom provider literally named `"anthropic"`/`"openai"`
+  can no longer be classified built-in, so it never falls back to the
+  user's `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` and never receives
+  built-in-only treatment (e.g. Claude Code OAuth headers).
+- **Shared provider request-support namespace (review 14):** the
+  provider-scoped key resolution, keyless-auth detection, auth-header
+  recognition and capture-redaction primitives (previously triplicated
+  across the three transports) now live in
+  `providers/request_support.clj`, parameterized by the built-in provider
+  keyword + env var name. Pure refactor — no behavior change.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -230,10 +262,12 @@ independently confirms native JSON-Schema support can add
   `user_models.clj` plus the review-driven API-key resolution changes
   documented in the revision note.
 - No existing built-in Anthropic model request shaping changes, and no
-  custom-provider behaviour changes except the review-driven provider-scoped
-  API-key resolution and `:no-auth-header` key tolerance documented in the
-  revision note; `gpt-5.5`/`gpt-5.6-*`/Opus 4.7/4.8/5 request shaping is
-  unaffected.
+  custom-provider behaviour changes except the review-driven changes
+  documented in the revision note (provider-scoped API-key resolution,
+  `:no-auth-header` key tolerance, OAuth content-sniff gating to built-in
+  models, case-insensitive capture redaction, and the `:custom?` origin tag
+  closing provider-name-based built-in detection); `gpt-5.5`/`gpt-5.6-*`/
+  Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.
 - CHANGELOG `[Unreleased]` → `Added` entry.
 

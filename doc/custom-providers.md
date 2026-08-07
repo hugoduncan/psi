@@ -406,10 +406,14 @@ header of its own. Incidental headers (e.g. `X-Client` in the example above)
 do NOT imply keyless: with no `:api-key` configured, the request fails fast
 with a provider-scoped "Missing API key" error rather than silently sending a
 keyless request. Don't mix a configured `:api-key` with a recognized auth
-header among custom `:headers`: psi merges custom headers over its own, so the
-custom auth header either duplicates the configured key (`X-API-Key` beside
-the lowercase `x-api-key` on the anthropic transport) or silently replaces it
-(a custom `Authorization` header on the openai transport) — the server's
+header among custom `:headers`: psi merges custom headers over its own, so
+whether the custom auth header duplicates or replaces the configured key is
+case-dependent — a mixed-case `X-API-Key` duplicates the lowercase
+`x-api-key` beside it on the `:anthropic-messages` transport, while an
+exact-case `x-api-key` collides with it and silently replaces the configured
+key; on the `:openai-completions` and `:openai-codex-responses` transports a
+custom `Authorization` (exact-case) replaces the resolved bearer key, while
+a lowercase `authorization` duplicates beside it — the server's
 case-insensitive header merge decides. Pick one auth mechanism per provider.
 
 For local `:openai-completions` models, psi also projects the normal session

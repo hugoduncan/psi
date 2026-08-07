@@ -39,6 +39,7 @@ external entity Model {
     api: String
     base_url: String?
     supports_reasoning: Boolean
+    custom: Boolean = false                  -- review 14: true for custom models.edn models (expand-model tag)
 }
 
 ------------------------------------------------------------
@@ -179,8 +180,10 @@ rule OpenAIProviderDispatchesByModelApi {
 rule OpenAIApiKeyResolved {
     -- Provider-scoped resolution, mirroring the Anthropic transport's
     -- resolve-api-key (review 3) and the review-10 fix for the OpenAI
-    -- chat-completions transport: built-in OpenAI models (provider nil or
-    -- "openai") fall back to the OPENAI_API_KEY env var; custom providers
+    -- chat-completions transport: built-in OpenAI models (not tagged custom,
+    -- provider nil or "openai" — review 14 closed the provider-NAME gap
+    -- where a custom provider literally named "openai" was classified
+    -- built-in) fall back to the OPENAI_API_KEY env var; custom providers
     -- (any other provider, including custom :openai-codex-responses
     -- providers — review 13 closed the codex gap) NEVER do (a nil/blank
     -- configured key is a provider-scoped missing-key error, so a custom
@@ -191,9 +194,11 @@ rule OpenAIApiKeyResolved {
 
     when: OpenAIStreamRequested(stream)
 
-    ensures: (stream.model.provider == null or stream.model.provider == "openai")
+    ensures: not stream.model.custom
+        and (stream.model.provider == null or stream.model.provider == "openai")
         implies stream.resolved_api_key = stream.options.api_key ?? Environment("OPENAI_API_KEY")
-    ensures: (stream.model.provider != null and stream.model.provider != "openai")
+    ensures: (stream.model.custom
+              or (stream.model.provider != null and stream.model.provider != "openai"))
         and not stream.keyless
         implies stream.resolved_api_key = stream.options.api_key
               and not IsBlank(stream.resolved_api_key)

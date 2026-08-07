@@ -7,6 +7,7 @@
             [psi.ai.providers.openai.reasoning :as reasoning]
             [psi.ai.providers.openai.codex-structured-output :as codex-structured-output]
             [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.structured-output :as structured-output]))
 
 (defn- resolve-codex-url
@@ -18,60 +19,10 @@
       (str/ends-with? normalized "/codex")           (str normalized "/responses")
       :else                                           (str normalized "/codex/responses"))))
 
-(defn- getenv
-  [k]
-  (System/getenv k))
-
-(defn- auth-header?
-  "True when a header name is a recognized auth header (case-insensitive)."
-  [header]
-  (contains? #{"x-api-key" "authorization"}
-             (str/lower-case (name header))))
-
-(defn- resolve-api-key
-  "Resolve the API key for a Codex request, scoped to the request's provider.
-
-   Built-in OpenAI models (`:provider` nil or `:openai`) fall back to the
-   `OPENAI_API_KEY` env var. Custom `:openai-codex-responses` providers never
-   fall back to that env var: a nil/blank configured key is an error, so a
-   custom provider's request can never silently send the user's OpenAI key to
-   a third-party endpoint (the same provider-scoped resolution the
-   `:anthropic-messages` and `:openai-completions` transports apply — see
-   anthropic/resolve-api-key and chat_completions/resolve-api-key; review 13
-   closed the codex gap left open by reviews 3/10).
-
-   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
-   no key is required: the caller omits the Authorization header anyway, so
-   this returns nil instead of failing. (Headers-only auth without
-   `:no-auth-header` is handled by `build-codex-request` — it skips this
-   function entirely when a recognized auth header is present among custom
-   `:headers`.)"
-  [model options]
-  (when-not (:no-auth-header options)
-    (let [provider (:provider model)
-          openai?  (or (nil? provider) (= :openai provider))
-          api-key  (:api-key options)
-          api-key  (if (and openai? (str/blank? api-key))
-                     (getenv "OPENAI_API_KEY")
-                     api-key)]
-      (when (str/blank? api-key)
-        (if openai?
-          (throw (ex-info "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."
-                          {:error-code "auth/missing-api-key"
-                           :provider :openai}))
-          ;; OAuth /login only exists for built-in providers, so custom
-          ;; providers must not hint at it — the remedy is models.edn :auth.
-          ;; The suggested env var name normalizes kebab-case provider keys
-          ;; (- → _) so the suggestion is a usable shell env var name.
-          (throw (ex-info (str "Missing API key for provider " (name provider)
-                               ". Configure the provider's :auth {:api-key ...} in models.edn"
-                               " (e.g. \"env:" (-> (name provider)
-                                                   (str/replace "-" "_")
-                                                   str/upper-case)
-                               "_API_KEY\").")
-                          {:error-code "auth/missing-api-key"
-                           :provider provider}))))
-      api-key)))
+(def ^:private codex-api-key-config
+  {:builtin-provider    :openai
+   :env-var             "OPENAI_API_KEY"
+   :builtin-missing-msg "Missing OpenAI API key. Set OPENAI_API_KEY or login via /login openai."})
 
 (defn- assistant-content->codex-items
   [msg]
@@ -170,12 +121,9 @@
         ;; "Missing API key" error instead of silently sending the global
         ;; OPENAI_API_KEY to a custom endpoint — consistent with the
         ;; :anthropic-messages and :openai-completions transports (review 13).
-        no-auth?   (or (:no-auth-header options)
-                       (and (seq (:headers options))
-                            (str/blank? (:api-key options))
-                            (some auth-header? (keys (:headers options)))))
+        no-auth?   (request-support/no-auth? options)
         api-key    (when-not no-auth?
-                     (resolve-api-key model options))
+                     (request-support/resolve-api-key model options codex-api-key-config))
         ;; Codex's ChatGPT/Codex backend requires an OAuth access token to
         ;; derive chatgpt_account_id. A keyless custom codex-compatible
         ;; endpoint (local proxy, custom-header auth) legitimately has no key

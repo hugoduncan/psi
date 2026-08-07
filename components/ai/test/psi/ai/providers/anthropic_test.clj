@@ -5,7 +5,8 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
-   [psi.ai.providers.anthropic.request-schema :as request-schema]))
+   [psi.ai.providers.anthropic.request-schema :as request-schema]
+   [psi.ai.providers.request-support :as request-support]))
 
 ;; ── build-request ───────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@
                  :context-window 1000000
                  :max-tokens 384000}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.anthropic/getenv (fn [_] "sk-ant-should-never-leak")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-should-never-leak")]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider deepseek"
@@ -129,7 +130,7 @@
   (testing "built-in anthropic model falls back to ANTHROPIC_API_KEY env var"
     (let [model (models/get-model :sonnet-4.6)
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.anthropic/getenv (fn [_] "sk-ant-env-fallback-key")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-env-fallback-key")]
         (let [req (#'anthropic/build-request convo model {})]
           (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
               "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY"))))))
@@ -342,7 +343,34 @@
       (is (= "configured-key" (get headers "x-api-key"))
           "configured api-key still sent as x-api-key")
       (is (= "Bearer custom" (get headers "Authorization"))
-          "custom Authorization header merged in as-is"))))
+          "custom Authorization header merged in as-is")))
+
+  (testing "configured key + EXACT-case x-api-key custom header REPLACES the configured key"
+    ;; Review 14: the merge is on equal string keys — a custom header whose
+    ;; name is the exact lowercase "x-api-key" collides with the base header,
+    ;; so the configured credential is silently DROPPED (not duplicated, as
+    ;; with the mixed-case X-API-Key variant). The doc guidance is
+    ;; case-dependent: exact-case replaces, mixed-case duplicates.
+    (let [model   {:id "local-proxy"
+                   :name "Local Proxy"
+                   :provider :local-proxy
+                   :api :anthropic-messages
+                   :base-url "http://localhost:8080"
+                   :supports-reasoning false
+                   :supports-images false
+                   :supports-text true
+                   :context-window 128000
+                   :max-tokens 16384
+                   :input-cost 0.0
+                   :output-cost 0.0
+                   :cache-read-cost 0.0
+                   :cache-write-cost 0.0}
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:api-key "configured-key"
+                                                          :headers {"x-api-key" "other-key"}})
+          headers (:headers req)]
+      (is (= "other-key" (get headers "x-api-key"))
+          "exact-case x-api-key custom header wins the merge — the configured key is silently dropped"))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"
@@ -496,6 +524,63 @@
           "built-in OAuth requests still present as the Claude Code CLI")
       (is (= claude-code-system (:text (first (:system body))))
           "built-in OAuth requests still prepend the Claude Code identity"))))
+
+(deftest custom-provider-named-anthropic-not-builtin-test
+  ;; Review 14: built-in detection is by provider NAME, so a custom models.edn
+  ;; provider literally named "anthropic" was classified built-in and defeated
+  ;; the provider-scoped guarantees — an unset configured key silently fell
+  ;; back to ANTHROPIC_API_KEY (sent to the third-party endpoint) and an
+  ;; sk-ant-oat key triggered the Claude Code OAuth headers/system prompt.
+  ;; Custom models now carry `:custom? true` (set by expand-model at parse
+  ;; time); builtin-anthropic? refuses them, so a custom provider named
+  ;; "anthropic" gets the same provider-scoped treatment as any other custom
+  ;; name.
+  (testing "custom provider named \"anthropic\" never falls back to ANTHROPIC_API_KEY"
+    (let [model {:id "not-a-builtin"
+                 :name "Custom Anthropic-Named Provider"
+                 :provider :anthropic
+                 :custom? true
+                 :api :anthropic-messages
+                 :base-url "https://third-party.example"
+                 :supports-reasoning true
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384}
+          convo (conv/create "sys")]
+      (with-redefs [request-support/getenv (fn [_] "sk-ant-should-never-leak")]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider anthropic"
+             (#'anthropic/build-request convo model {}))
+            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider named \"anthropic\""))))
+
+  (testing "custom provider named \"anthropic\" with an sk-ant-oat key is NOT treated as OAuth"
+    (let [model {:id "not-a-builtin"
+                 :name "Custom Anthropic-Named Provider"
+                 :provider :anthropic
+                 :custom? true
+                 :api :anthropic-messages
+                 :base-url "https://third-party.example"
+                 :supports-reasoning true
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384}
+          convo   (conv/create "Custom Psi system prompt.")
+          req     (#'anthropic/build-request convo model {:api-key "sk-ant-oat-custom-provider-token"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= "sk-ant-oat-custom-provider-token" (get headers "x-api-key"))
+          "custom providers named \"anthropic\" still use x-api-key auth")
+      (is (nil? (get headers "Authorization"))
+          "no OAuth Authorization: Bearer header")
+      (is (nil? (get headers "user-agent"))
+          "no claude-cli user-agent spoofing")
+      (is (nil? (get headers "x-app"))
+          "no x-app cli header")
+      (is (nil? (get headers "anthropic-beta"))
+          "no OAuth betas")
+      (is (= "Custom Psi system prompt." (:system body))
+          "no Claude Code identity prepended for a custom provider named \"anthropic\""))))
 
 ;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
 

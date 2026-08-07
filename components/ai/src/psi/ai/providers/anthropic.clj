@@ -8,8 +8,9 @@
             [psi.ai.providers.anthropic.error :as anthropic-error]
             [psi.ai.providers.anthropic.message-transform :as message-transform]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
-            [psi.ai.providers.anthropic.request-support :as request-support]
+            [psi.ai.providers.anthropic.request-support :as anthropic-request-support]
             [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.structured-output :as structured-output]))
 
 (def ^:private anthropic-version "2023-06-01")
@@ -81,14 +82,16 @@
   (and api-key (str/includes? api-key "sk-ant-oat")))
 
 (defn- builtin-anthropic?
-  "True for built-in Anthropic catalog models (`:provider` nil or
-   `:anthropic`). OAuth content-sniffing (`sk-ant-oat` keys) applies only to
-   these: a custom `:anthropic-messages` provider whose configured key merely
-   resembles an OAuth token must still use plain x-api-key auth, and must
-   never receive the Claude Code OAuth headers/system prompt (review 11)."
+  "True for built-in Anthropic catalog models: not tagged `:custom?` (custom
+   models.edn models carry `:custom? true` from `expand-model`) and provider
+   nil or `:anthropic`. OAuth content-sniffing (`sk-ant-oat` keys) and the
+   `ANTHROPIC_API_KEY` env fallback apply only to these: a custom
+   `:anthropic-messages` provider — even one literally named \"anthropic\"
+   — whose configured key merely resembles an OAuth token must still use
+   plain x-api-key auth, and must never receive the Claude Code OAuth
+   headers/system prompt (reviews 11/14)."
   [model]
-  (let [provider (:provider model)]
-    (or (nil? provider) (= :anthropic provider))))
+  (request-support/builtin? model :anthropic))
 
 (defn- cache-control-present?
   [x]
@@ -193,58 +196,10 @@
         (sequential? system-body) (into [head] system-body)
         :else                     [head]))))
 
-(defn- getenv
-  [k]
-  (System/getenv k))
-
-(defn- resolve-api-key
-  "Resolve the API key for a request, scoped to the request's provider.
-
-   Built-in Anthropic models (`:provider` nil or `:anthropic`) fall back to the
-   `ANTHROPIC_API_KEY` env var. Custom `:anthropic-messages` providers never
-   fall back to that env var: a nil/blank configured key is an error, so a
-   custom provider's request can never silently send the user's Anthropic key
-   to a third-party endpoint.
-
-   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
-   no key is required: the caller strips the auth headers anyway, so this
-   returns nil instead of failing. (Headers-only auth without
-   `:no-auth-header` is handled by `build-request` — it skips this function
-   entirely when a recognized auth header is present among custom `:headers`.)"
-  [model options]
-  (when-not (:no-auth-header options)
-    (let [provider    (:provider model)
-          anthropic?  (builtin-anthropic? model)
-          api-key     (:api-key options)
-          api-key     (if (and anthropic? (str/blank? api-key))
-                        (getenv "ANTHROPIC_API_KEY")
-                        api-key)]
-      (when (str/blank? api-key)
-        (if anthropic?
-          (throw (ex-info "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."
-                          {:error-code "auth/missing-api-key"
-                           :provider :anthropic}))
-          ;; OAuth /login only exists for built-in providers, so custom
-          ;; providers must not hint at it — the remedy is models.edn :auth.
-          ;; The suggested env var name normalizes kebab-case provider keys
-          ;; (- → _): :my-anthropic-proxy must suggest MY_ANTHROPIC_PROXY_API_KEY
-          ;; (bash identifiers cannot contain hyphens), not
-          ;; MY-ANTHROPIC-PROXY_API_KEY (review 12).
-          (throw (ex-info (str "Missing API key for provider " (name provider)
-                               ". Configure the provider's :auth {:api-key ...} in models.edn"
-                               " (e.g. \"env:" (-> (name provider)
-                                                   (str/replace "-" "_")
-                                                   str/upper-case)
-                               "_API_KEY\").")
-                          {:error-code "auth/missing-api-key"
-                           :provider provider}))))
-      api-key)))
-
-(defn- auth-header?
-  "True when a header name is a recognized auth header (case-insensitive)."
-  [header]
-  (contains? #{"x-api-key" "authorization"}
-             (str/lower-case (name header))))
+(def ^:private anthropic-api-key-config
+  {:builtin-provider    :anthropic
+   :env-var             "ANTHROPIC_API_KEY"
+   :builtin-missing-msg "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."})
 
 (defn- request-body
   [conversation model options stream? oauth?]
@@ -301,12 +256,9 @@
          ;; "Missing API key" error instead of silently sending a keyless
          ;; request (provider-side 401) — consistent with the OpenAI
          ;; transport, which only exempts on explicit :no-auth-header.
-         no-auth?           (or (:no-auth-header options)
-                                (and (seq (:headers options))
-                                     (str/blank? (:api-key options))
-                                     (some auth-header? (keys (:headers options)))))
+         no-auth?           (request-support/no-auth? options)
          api-key            (when-not no-auth?
-                              (resolve-api-key model options))
+                              (request-support/resolve-api-key model options anthropic-api-key-config))
          oauth?             (and (builtin-anthropic? model)
                                  (oauth-api-key? api-key))
          prompt-caching?    (prompt-caching? conversation)
@@ -336,38 +288,12 @@
       (catch Exception _
         nil))))
 
-(defn- redact-secret
-  [value]
-  (when (string? value)
-    (str "***REDACTED***"
-         (when (> (count value) 20)
-           (str " (len=" (count value) ")")))))
-
-(defn- redact-authorization
-  [value]
-  (when (string? value)
-    (str "Bearer "
-         (redact-secret (str/replace value #"^Bearer\s+" "")))))
-
-(defn- find-header
-  "Find a header entry whose name matches header-name case-insensitively.
-   Returns a [key value] pair, or nil."
-  [headers header-name]
-  (let [target (str/lower-case header-name)]
-    (some (fn [[k v]]
-            (when (= target (str/lower-case (name k)))
-              [k v]))
-          headers)))
-
 (defn- redact-request-headers
   [headers]
-  (letfn [(redact [hdr name redactor]
-            (if-let [[k v] (find-header hdr name)]
-              (assoc hdr k (redactor v))
-              hdr))]
-    (-> headers
-        (redact "Authorization" redact-authorization)
-        (redact "x-api-key" redact-secret))))
+  (request-support/redact-headers
+   headers
+   [["Authorization" request-support/redact-authorization]
+    ["x-api-key" request-support/redact-secret]]))
 
 (defn- capture-provider-id
   [model]
@@ -380,7 +306,7 @@
                :api :anthropic-messages
                :url url
                :request {:headers (redact-request-headers (:headers request))
-                         :body (request-support/parse-json-body-safe (:body request))}}))
+                         :body (anthropic-request-support/parse-json-body-safe (:body request))}}))
 
 (defn- capture-response!
   [model options url event]
@@ -518,7 +444,7 @@
 
 (defn- handle-400-response!
   [model options url request response consume-fn consume-stream-response!]
-  (if-let [fallback (request-support/fallback-request-for-400
+  (if-let [fallback (anthropic-request-support/fallback-request-for-400
                      request
                      {:prompt-caching-beta prompt-caching-beta
                       :interleaved-thinking-beta interleaved-thinking-beta
@@ -542,7 +468,7 @@
         structured-request (structured-output/structured-output-request options)
         strategy           (structured-output/select-strategy model structured-request)
         request            (build-request conversation model options)
-        request-body       (request-support/parse-json-body-safe (:body request))
+        request-body       (anthropic-request-support/parse-json-body-safe (:body request))
         structured-tool-name (anthropic-structured-output/structured-tool-name-from-request
                               strategy
                               request-body)

@@ -1065,7 +1065,7 @@
 
 ## Follow-ups (implementation review 14, 2026-08-07)
 
-- [ ] Full-`bb test` flake inventory is incomplete: a fresh full-suite run
+^- [x] Full-`bb test` flake inventory is incomplete: a fresh full-suite run
       (seed 1741154775) failed `psi.agent-session.scheduler-lifecycle-test/
       scheduled-deliver-runs-canonical-prompt-lifecycle-test` (8 pass / 5
       fail: session phase `:streaming` instead of `:idle`, no assistant
@@ -1086,7 +1086,19 @@
       flake inventory (and/or harden the test — e.g. settle the lifecycle or
       assert phase after the deliver effect completes rather than immediately
       after `:scheduler/fired` returns).
-- [ ] Configured-key + recognized-auth-header interplay is untested and
+      → Resolved (verified pre-existing + inventoried; chose not to harden
+      the test — it lives in the agent-session component this task must not
+      change, and the design AC forbids touching request-shaping/transport
+      code): `scheduler_lifecycle_test.clj` is byte-identical between the
+      task base commit (71d4821bf, the first task-248 commit) and HEAD, and
+      the whole `components/agent-session/` directory has zero diff across
+      the task's commit range — the flake predates this task. Passes in
+      isolation (4 tests / 26 assertions; the "only pending schedules can
+      fire" warning fires even on passing runs). Added as the third entry in
+      the implementation.md flake inventory (alongside the two retry-loop
+      flakes) — full-suite `bb test` is not deterministically green on any
+      single run, independent of this task.
+^- [x] Configured-key + recognized-auth-header interplay is untested and
       unnamed for the `:openai-codex-responses` transport:
       `configured-key-plus-recognized-auth-header-interplay-test` (review 11)
       locks the behavior for `:anthropic-messages` and `:openai-completions`
@@ -1102,10 +1114,19 @@
       test) mirroring the review-11 assertions, and name
       `:openai-codex-responses` in the doc's merge sentence alongside the
       other two transports.
+      → Resolved: `openai_test.clj` gains
+      `codex-configured-key-plus-recognized-auth-header-interplay-test`
+      (added by a concurrent review pass in the shared tree; verified
+      end-to-end here) — custom `Authorization` replaces the resolved codex
+      bearer key (chatgpt-account-id still derived from the configured key),
+      custom `X-API-Key` coexists with the configured bearer key.
+      `doc/custom-providers.md` "Local servers and custom headers" merge
+      sentence now names all three transports (`:anthropic-messages`,
+      `:openai-completions`, `:openai-codex-responses`).
 
 ## Follow-ups (implementation review 14, 2026-08-07)
 
-- [ ] Built-in detection is by provider NAME, so a custom models.edn provider
+^- [x] Built-in detection is by provider NAME, so a custom models.edn provider
       literally named `"anthropic"` or `"openai"` is classified as built-in
       and defeats the provider-scoped guarantees reviews 3/10/13 claim to
       close. `builtin-anthropic?` (providers/anthropic.clj) and the inline
@@ -1128,7 +1149,27 @@
       treatment. Note the specs model the built-in condition the same way
       (`provider == null or provider == "anthropic"` in all three allium
       files) — they inherit the same gap.
-- [ ] design.md "Revision note (implementation reviews)" is incomplete: it
+      → Resolved (origin-tag approach): `expand-model` now tags every custom
+      models.edn model `:custom? true`, and the shared `builtin?` helper
+      (providers/request_support.clj, used by all three transports via
+      `builtin-anthropic?` / `resolve-api-key`) requires the tag in addition
+      to the provider name — a custom provider literally named
+      "anthropic"/"openai" never falls back to
+      `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` and never gets Claude Code OAuth
+      treatment. `schemas/Model` gained the optional `:custom?` field (the
+      closed canonical schema must accept the tag). Tests:
+      `user_models_test.clj` `custom-provider-models-tagged-custom-test`
+      (every custom model tagged; providers named "anthropic"/"openai" parse
+      with `:custom? true`), `anthropic_test.clj`
+      `custom-provider-named-anthropic-not-builtin-test` (unset key → throws
+      "Missing API key for provider anthropic" with redef'd getenv; sk-ant-oat
+      key → x-api-key auth, no OAuth headers/system prompt),
+      `openai_completions_test.clj`
+      `custom-provider-named-openai-not-builtin-test` (unset key → throws, no
+      OPENAI_API_KEY fallback). All three allium specs model the tag
+      (`ResolvedCustomModel.custom = true`, `Model.custom: Boolean = false`,
+      `not model.custom` built-in conditions).
+^- [x] design.md "Revision note (implementation reviews)" is incomplete: it
       claims its four bullets are "the *only* provider-transport changes",
       but the review-11 OAuth content-sniff gating (`oauth?` now
       `(and (builtin-anthropic? model) (oauth-api-key? api-key))` in
@@ -1141,7 +1182,13 @@
       is therefore inaccurate (the OAuth gating IS a custom-provider behavior
       change, and the redaction changes the capture payload). Extend the
       revision note bullets + the AC exception wording to name them.
-- [ ] The "don't mix" doc guidance is case-dependent and the exact-case
+      → Resolved: design.md "Revision note (implementation reviews)" now
+      lists the OAuth content-sniff gating (review 11), the case-insensitive
+      capture redaction (reviews 7/11/13), the `:custom?` origin tag
+      (review 14) and the shared request-support namespace (review 14, pure
+      refactor) as provider-transport changes; the AC exception wording now
+      names all of them.
+^- [x] The "don't mix" doc guidance is case-dependent and the exact-case
       variants are untested on both transports: doc/custom-providers.md
       "Local servers and custom headers" says the custom auth header
       "duplicates the configured key (X-API-Key beside the lowercase
@@ -1158,7 +1205,15 @@
       sentence to name the case-dependence. (Distinct from the review-14
       codex-interplay item, which is about the codex transport not being
       covered at all.)
-- [ ] Provider-scoped key resolution is triplicated across the three
+      → Resolved: exact-case interplay assertions added —
+      `anthropic_test.clj` `configured-key-plus-recognized-auth-header-interplay-test`
+      gains an exact-case `x-api-key` custom-header block (REPLACES the
+      configured key — equal string-key merge), `openai_completions_test.clj`
+      gains a lowercase `authorization` custom-header block (DUPLICATES
+      beside the base `Authorization` — different casing, distinct keys).
+      `doc/custom-providers.md` "Local servers and custom headers" merge
+      sentence tightened to name the case-dependence explicitly.
+^- [x] Provider-scoped key resolution is triplicated across the three
       transports: `getenv`/`auth-header?`/`resolve-api-key` and the `no-auth?`
       computation are near-identical private copies in providers/anthropic
       .clj, providers/openai/chat_completions.clj and providers/openai/
@@ -1170,3 +1225,16 @@
       rules separately. Extract a shared provider-request-support helper
       namespace (parameterized by the built-in provider keyword + env var
       name) and have all three transports use it, so future fixes land once.
+      → Resolved: new `components/ai/src/psi/ai/providers/request_support.clj`
+      (`psi.ai.providers.request-support`) owns the shared primitives —
+      `getenv`/`auth-header?`/`no-auth?`/`builtin?`/`resolve-api-key`
+      (parameterized by `{:builtin-provider :env-var :builtin-missing-msg}`)
+      and `find-header`/`redact-secret`/`redact-authorization`/
+      `mask-chatgpt-account-id`/`redact-headers`. All three transports
+      (`anthropic.clj`, `openai/chat_completions.clj`,
+      `openai/codex_responses.clj`) call the shared `no-auth?` +
+      `resolve-api-key` with a transport config map; `anthropic.clj`'s
+      400-fallback alias renamed to `anthropic-request-support` to free the
+      `request-support` alias; `openai/transport.clj` redaction delegates to
+      shared `redact-headers`. Behavior-preserving — full `bb test` green,
+      clj-kondo clean.

@@ -7,7 +7,7 @@
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
    [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.openai.codex-responses :as codex])
+   [psi.ai.providers.request-support :as request-support])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -272,7 +272,7 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-codex"
@@ -310,7 +310,7 @@
     (let [model (models/get-model :gpt-5.3-codex)
           convo (conv/create "sys")
           token (jwt-with-account-id "acc_env")]
-      (with-redefs [codex/getenv (fn [_] token)]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] token)]
         (let [req (openai/build-codex-request convo model {})]
           (is (= (str "Bearer " token)
                  (get-in req [:headers "Authorization"]))
@@ -335,7 +335,7 @@
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
           req   (openai/build-codex-request convo model {:no-auth-header true})]
-      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
         (is (nil? (get-in req [:headers "Authorization"]))
             "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
         (is (nil? (get-in req [:headers "chatgpt-account-id"]))
@@ -362,7 +362,7 @@
           headers (:headers req)]
       (is (= "local-key" (get headers "X-API-Key"))
           "custom auth header is preserved")
-      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
         (is (nil? (get headers "Authorization"))
             "env key must not replace/add a Bearer for a headers-auth keyless request")
         (is (nil? (get headers "chatgpt-account-id"))
@@ -384,12 +384,101 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [codex/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-codex"
              (openai/build-codex-request convo model {:headers {"X-Client" "psi"}}))
-            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
+            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key"))))
+
+  (testing "custom codex provider named \"openai\" never falls back to OPENAI_API_KEY"
+    ;; Review 14: built-in detection must not key off the provider NAME — a
+    ;; custom provider literally named "openai" is tagged :custom? true at
+    ;; parse time and the shared resolve-api-key treats it as custom on the
+    ;; codex transport too.
+    (let [model {:id "not-a-builtin"
+                 :name "Custom OpenAI-Named Codex Provider"
+                 :provider :openai
+                 :custom? true
+                 :api :openai-codex-responses
+                 :base-url "https://third-party.example/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider openai"
+             (openai/build-codex-request convo model {}))
+            "OPENAI_API_KEY must not be used to satisfy a custom codex provider named \"openai\"")))))
+(deftest codex-configured-key-plus-recognized-auth-header-interplay-test
+  ;; Review 14: the review-11 interplay lock covers :anthropic-messages and
+  ;; :openai-completions only, but build-codex-request performs the identical
+  ;; (merge base-hdrs custom) (codex_responses.clj) — a custom Authorization
+  ;; header on a :openai-codex-responses provider silently replaces the
+  ;; resolved codex bearer key too (chatgpt-account-id is still derived from
+  ;; the configured key), and a custom X-API-Key header coexists with the
+  ;; configured bearer key (server picks by case-insensitive header merge).
+  ;; Documented in doc/custom-providers.md — don't mix them.
+  (testing "custom Authorization header replaces the resolved codex bearer key"
+    (let [model {:id "custom-codex-model"
+                 :name "Custom Codex Model"
+                 :provider :custom-codex
+                 :api :openai-codex-responses
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request
+                 convo model
+                 {:api-key (jwt-with-account-id "acc_configured")
+                  :headers {"Authorization" "Bearer custom"}})]
+      (is (= "Bearer custom" (get-in req [:headers "Authorization"]))
+          "custom Authorization header replaces the resolved bearer key — the configured key is not sent")
+      (is (= "acc_configured" (get-in req [:headers "chatgpt-account-id"]))
+          "chatgpt-account-id is still derived from the configured key")))
+
+  (testing "configured codex key + custom X-API-Key header sends both auth headers"
+    (let [model {:id "custom-codex-model"
+                 :name "Custom Codex Model"
+                 :provider :custom-codex
+                 :api :openai-codex-responses
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request
+                 convo model
+                 {:api-key (jwt-with-account-id "acc_configured")
+                  :headers {"X-API-Key" "other-key"}})]
+      (is (= (str "Bearer " (jwt-with-account-id "acc_configured"))
+             (get-in req [:headers "Authorization"]))
+          "configured api-key still sent as the bearer Authorization header")
+      (is (= "acc_configured" (get-in req [:headers "chatgpt-account-id"]))
+          "chatgpt-account-id derived from the configured key")
+      (is (= "other-key" (get-in req [:headers "X-API-Key"]))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire"))))
 (deftest codex-reasoning-text-delta-maps-to-thinking-delta-test
   (testing "response.reasoning_text.delta is bridged as :thinking-delta"
     (let [model    (models/get-model :gpt-5.3-codex)

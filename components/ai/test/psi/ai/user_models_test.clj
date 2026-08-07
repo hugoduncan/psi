@@ -308,6 +308,43 @@
       (is (nil? (:error result)))
       (is (= :anthropic-messages (:api (first (:models result))))))))
 
+(deftest custom-provider-models-tagged-custom-test
+  ;; Review 14: built-in detection must not key off the provider NAME alone —
+  ;; a custom models.edn provider literally named "anthropic"/"openai" is
+  ;; classified built-in by provider name, defeating the provider-scoped
+  ;; guarantees (env-var key fallback, Claude Code OAuth headers). Every
+  ;; custom models.edn model is tagged `:custom? true` at expand time so the
+  ;; transports' `builtin?` / `builtin-anthropic?` helpers can distinguish
+  ;; custom models from catalog built-ins.
+  (testing "every custom models.edn model carries :custom? true"
+    (let [result (user-models/parse-models-config minimal-config)
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (true? (:custom? model)))))
+
+  (testing "a custom provider literally named \"anthropic\" is tagged :custom? true"
+    (let [result (user-models/parse-models-config
+                  {:providers {"anthropic"
+                               {:base-url "https://third-party.example"
+                                :api      :anthropic-messages
+                                :models   [{:id "not-a-builtin"}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (= :anthropic (:provider model)))
+      (is (true? (:custom? model))
+          "the provider name alone must not make a custom model look built-in")))
+
+  (testing "a custom provider literally named \"openai\" is tagged :custom? true"
+    (let [result (user-models/parse-models-config
+                  {:providers {"openai"
+                               {:base-url "https://third-party.example"
+                                :api      :openai-completions
+                                :models   [{:id "not-a-builtin"}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (= :openai (:provider model)))
+      (is (true? (:custom? model))))))
+
 ;; ── Adaptive thinking (custom providers) ─────────────────────────────────────
 
 (deftest adaptive-thinking-field-test

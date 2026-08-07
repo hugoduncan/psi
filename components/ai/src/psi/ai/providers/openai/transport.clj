@@ -2,6 +2,7 @@
   (:require [clojure.string :as str]
             [clj-http.client :as http]
             [cheshire.core :as json]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.proxy :as proxy]))
 
 (defn safe-call!
@@ -24,53 +25,13 @@
                         (proxy/request-proxy-options url)
                         {:as :text :cookie-policy :none :throw-exceptions false})))
 
-(defn- redact-secret
-  [value]
-  (when (string? value)
-    (str "***REDACTED***"
-         (when (> (count value) 20)
-           (str " (len=" (count value) ")")))))
-
-(defn redact-authorization
-  [value]
-  (when (string? value)
-    (str "Bearer "
-         ;; Strip a leading "Bearer " prefix before counting so the (len=N)
-         ;; metadata measures the secret itself, not the 7-char prefix —
-         ;; mirroring the anthropic transport's redact-authorization
-         ;; (review 13: the openai redactor previously counted the whole
-         ;; value including the prefix, making the length metadata
-         ;; inconsistent between transports).
-         (redact-secret (str/replace value #"^Bearer\s+" "")))))
-
-(defn mask-chatgpt-account-id
-  [value]
-  (when (string? value)
-    (str (subs value 0 (min 6 (count value))) "...")))
-
-(defn- find-header
-  "Find a header entry whose name matches header-name case-insensitively.
-   Returns a [key value] pair, or nil. Mirrors the anthropic transport's
-   find-header helper (review 7): auth header recognition is
-   case-insensitive, so a mixed-case X-API-Key / authorization header must
-   be redacted too (review 11)."
-  [headers header-name]
-  (let [target (str/lower-case header-name)]
-    (some (fn [[k v]]
-            (when (= target (str/lower-case (name k)))
-              [k v]))
-          headers)))
-
 (defn redact-request-headers
   [headers]
-  (letfn [(redact [hdr name redactor]
-            (if-let [[k v] (find-header hdr name)]
-              (assoc hdr k (redactor v))
-              hdr))]
-    (-> headers
-        (redact "Authorization" redact-authorization)
-        (redact "chatgpt-account-id" mask-chatgpt-account-id)
-        (redact "x-api-key" redact-secret))))
+  (request-support/redact-headers
+   headers
+   [["Authorization" request-support/redact-authorization]
+    ["chatgpt-account-id" request-support/mask-chatgpt-account-id]
+    ["x-api-key" request-support/redact-secret]]))
 
 (defn parse-json-body-safe
   [body]

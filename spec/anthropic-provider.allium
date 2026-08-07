@@ -61,6 +61,7 @@ external entity Model {
     base_url: String
     supports_reasoning: Boolean
     adaptive_thinking: Boolean = false
+    custom: Boolean = false                  -- review 14: true for custom models.edn models (expand-model tag)
     max_tokens: Integer?
 }
 
@@ -304,16 +305,20 @@ rule ApiKeyResolved {
     when: AnthropicStreamRequested(stream)
 
     -- Provider-scoped resolution (see spec/custom-providers.allium
-    -- ResolveRequestApiKey): built-in Anthropic models (provider nil or
-    -- "anthropic") fall back to ANTHROPIC_API_KEY; custom providers never do
+    -- ResolveRequestApiKey): built-in Anthropic models (not tagged custom,
+    -- provider nil or "anthropic" — review 14 closed the provider-NAME gap
+    -- where a custom provider literally named "anthropic" was classified
+    -- built-in) fall back to ANTHROPIC_API_KEY; custom providers never do
     -- (a nil/blank configured key is a provider-scoped missing-key error);
     -- keyless requests (no_auth_header, or a recognized auth header among
     -- custom :headers with no configured key) resolve to nil and the
     -- transport strips x-api-key / Authorization.
 
-    ensures: (stream.model.provider == null or stream.model.provider == "anthropic")
+    ensures: not stream.model.custom
+        and (stream.model.provider == null or stream.model.provider == "anthropic")
         implies stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
-    ensures: stream.model.provider != null and stream.model.provider != "anthropic"
+    ensures: (stream.model.custom
+              or (stream.model.provider != null and stream.model.provider != "anthropic"))
         and not stream.keyless
         implies stream.resolved_api_key = stream.options.api_key
               and not BlankOrNil(stream.resolved_api_key)
@@ -342,11 +347,14 @@ rule KeylessRequestDetermined {
 
 rule OAuthDetectedFromApiKey {
     -- Review 11: OAuth content-sniffing (sk-ant-oat keys) applies only to
-    -- built-in Anthropic models (provider nil or "anthropic"). A custom
+    -- built-in Anthropic models (not tagged custom, provider nil or
+    -- "anthropic" — review 14: a custom provider literally named "anthropic"
+    -- is tagged custom and is never OAuth-treated). A custom
     -- :anthropic-messages provider whose configured key merely resembles an
     -- OAuth token must still use x-api-key auth and must never receive the
     -- Claude Code OAuth headers/system prompt.
     when: AnthropicStreamRequested(stream)
+    requires: not stream.model.custom
     requires: (stream.model.provider == null or stream.model.provider == "anthropic")
     requires: Contains(stream.resolved_api_key, "sk-ant-oat")
 
