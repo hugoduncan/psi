@@ -55,8 +55,34 @@
           convo (conv/create "sys")]
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
-           #"Missing Anthropic API key"
-           (#'anthropic/build-request convo model {}))))))
+           #"Missing API key for provider minimax"
+           (#'anthropic/build-request convo model {})))))
+
+  (testing "custom provider never falls back to ANTHROPIC_API_KEY env var (no cross-provider leak)"
+    (let [model {:id "deepseek-v4-flash"
+                 :name "DeepSeek V4 Flash"
+                 :provider :deepseek
+                 :api :anthropic-messages
+                 :base-url "https://api.deepseek.com/anthropic"
+                 :supports-reasoning true
+                 :supports-text true
+                 :context-window 1000000
+                 :max-tokens 384000}
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.anthropic/getenv (fn [_] "sk-ant-should-never-leak")]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider deepseek"
+             (#'anthropic/build-request convo model {}))
+            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider's request"))))
+
+  (testing "built-in anthropic model falls back to ANTHROPIC_API_KEY env var"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "sys")]
+      (with-redefs [psi.ai.providers.anthropic/getenv (fn [_] "sk-ant-env-fallback-key")]
+        (let [req (#'anthropic/build-request convo model {})]
+          (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
+              "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY"))))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"

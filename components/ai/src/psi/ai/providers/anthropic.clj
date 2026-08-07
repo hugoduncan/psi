@@ -184,13 +184,36 @@
         (sequential? system-body) (into [head] system-body)
         :else                     [head]))))
 
+(defn- getenv
+  [k]
+  (System/getenv k))
+
 (defn- resolve-api-key
-  [options]
-  (let [api-key (or (:api-key options) (System/getenv "ANTHROPIC_API_KEY"))]
+  "Resolve the API key for a request, scoped to the request's provider.
+
+   Built-in Anthropic models (`:provider` nil or `:anthropic`) fall back to the
+   `ANTHROPIC_API_KEY` env var. Custom `:anthropic-messages` providers never
+   fall back to that env var: a nil/blank configured key is an error, so a
+   custom provider's request can never silently send the user's Anthropic key
+   to a third-party endpoint."
+  [model options]
+  (let [provider    (:provider model)
+        anthropic?  (or (nil? provider) (= :anthropic provider))
+        api-key     (:api-key options)
+        api-key     (if (and anthropic? (str/blank? api-key))
+                      (getenv "ANTHROPIC_API_KEY")
+                      api-key)]
     (when (str/blank? api-key)
-      (throw (ex-info "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."
-                      {:error-code "auth/missing-api-key"
-                       :provider :anthropic})))
+      (if anthropic?
+        (throw (ex-info "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."
+                        {:error-code "auth/missing-api-key"
+                         :provider :anthropic}))
+        (throw (ex-info (str "Missing API key for provider " (name provider)
+                             ". Configure the provider's :auth {:api-key ...} in models.edn"
+                             " (e.g. \"env:" (str/upper-case (name provider)) "_API_KEY\")"
+                             " or login via /login " (name provider) ".")
+                        {:error-code "auth/missing-api-key"
+                         :provider provider}))))
     api-key))
 
 (defn- request-body
@@ -239,7 +262,7 @@
          strategy           (structured-output/select-strategy model structured-request)
          thinking           (thinking-param model options)
          adaptive?          (adaptive-thinking? model)
-         api-key            (resolve-api-key options)
+         api-key            (resolve-api-key model options)
          oauth?             (oauth-api-key? api-key)
          prompt-caching?    (prompt-caching? conversation)
          json-schema-output? (anthropic-structured-output/json-schema-output-mechanism? strategy)

@@ -23,7 +23,6 @@
 - Review (2026-08-07): added 5 follow-up steps to be addressed.
 - Review 2 (2026-08-07): added 3 further follow-up steps to be addressed.
 - Review 3 (2026-08-07): added 2 further follow-up steps to be addressed.
-
 ## Follow-ups addressed (2026-08-07)
 
 - addressed 4 review steps
@@ -32,3 +31,25 @@
 - `doc/custom-providers.md` `:adaptive-thinking` section now documents the temperature trade-off (adaptive models never send `temperature`, even thinking off); DeepSeek example notes call out that this forfeits DeepSeek's fully-supported `temperature` and how to opt back out (`:adaptive-thinking false`).
 - Full `bb test` executed: unit + extension suites 2549 tests / 18420 assertions green EXCEPT `psi.agent-session.workflow-delegate-review-step-live-test/delegate-review-task-implementation-completes-with-nullable-local-model-test` (1 failure) — proven pre-existing on base commit 8f0d8258c via stash-revert run; root cause is developer-machine session-profile config (user-config/read-config) referencing `deepseek/deepseek-v4-flash`, which the live test's temp model registry (only `local/test-model`) cannot resolve. Unrelated to this task's scope. `emacs:check` green (343 tests). `clj-kondo` clean on changed test files.
 - Blocker for remaining step (live smoke test): `DEEPSEEK_API_KEY` not set in environment; request-shaping only by design, needs a real key.
+
+## Follow-ups review 2 addressed (2026-08-07)
+
+- addressed 3 review steps
+- `bb test` RED regression fixed: restored `.psi/project.edn` committed workflow session profiles to the built-in anthropic catalog models (claude-opus-4-8 / claude-sonnet-5 / claude-fable-5), which are always resolvable in CI; the deepseek profile map is kept commented out with a note that it requires the user-global `~/.psi/agent/models.edn` custom provider. The f0c818cc1 "use deepseek for workflows" activation made the committed project config depend on an uncommitted user-local models file, breaking `delegate-review-task-implementation-completes-with-nullable-local-model-test` and the `bb test` AC. Full `bb test` now green: 2550 tests / 19132 assertions, 0 failures (was 1 failure). Targeted live test green (3 tests / 21 assertions).
+- Thinking-off caveat documented in `doc/custom-providers.md` DeepSeek example notes: psi never emits an explicit `thinking: {:type "disabled"}` — it omits the field when off, and DeepSeek's endpoint defaults thinking ON, so `/thinking off` on `deepseek-v4-flash` is silently ignored (with or without `:adaptive-thinking`). Chose documentation over adding a `{:type "disabled"}` emission: live verification blocked (no `DEEPSEEK_API_KEY` in env) and the design AC forbids changing `providers/anthropic.clj` request-shaping logic in this task.
+- Cache-cost rationale documented in `doc/custom-providers.md` DeepSeek example notes: psi bills `cache_read_input_tokens` at `:cache-read-cost` and `cache_creation_input_tokens` at `:cache-write-cost`; DeepSeek publishes no separate write price so `:cache-write-cost 0.14` mirrors the miss/input rate; Anthropic-style accounting reports the miss portion separately from `input_tokens` (no double-count); Anthropic field-name assumption unverified against a live payload — adjust the example if DeepSeek's usage shape differs.
+- Still blocked: optional live smoke test (needs `DEEPSEEK_API_KEY`; not set in env — not attempted with the key embedded in the user-local models.edn without explicit direction).
+
+## Follow-ups review 3 addressed (2026-08-07)
+
+- addressed 2 review steps
+- Provider-scoped API-key resolution: already implemented and tested at HEAD — `anthropic/resolve-api-key` falls back to `ANTHROPIC_API_KEY` only for built-in Anthropic models (`:provider` nil or `:anthropic`); custom `:anthropic-messages` providers fail fast with "Missing API key for provider <name>" when their configured key is nil/blank, so an Anthropic key can never be sent to a third-party endpoint. Existing tests in `anthropic_test.clj` cover the no-leak path (redef'd `getenv`, deepseek request throws) and the built-in env-fallback path. Completed the item by documenting the scoped behavior in the DeepSeek example notes (`doc/custom-providers.md`) and verifying the namespace green (15 tests / 92 assertions).
+- `doc/custom-providers.md` Adaptive thinking section now explicitly states `:adaptive-thinking` is only meaningful for `:api :anthropic-messages` custom providers (and built-in Anthropic catalog models), and is ignored for OpenAI-compatible custom providers — satisfying the design AC wording.
+
+## Final verification pass (2026-08-07)
+
+- Full `bb test` re-run after the provider-scoped api-key change: 2550 tests /
+  19134 assertions, 0 failures. `clj-kondo` clean (0 errors, 0 warnings) on
+  changed source/tests.
+- Review-1 optional live smoke test remains blocked: `DEEPSEEK_API_KEY` not set
+  in environment; request-shaping coverage only by design.

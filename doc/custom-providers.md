@@ -155,16 +155,27 @@ same way but set `:api` to `:anthropic-messages`.
 For Anthropic-compatible providers, psi uses the Anthropic transport and will
 send the configured key through the compatible auth path.
 
+API-key resolution is provider-scoped: psi resolves a custom provider's key
+from its own `:auth` configuration (literal or `env:VAR`) — it never falls
+back to `ANTHROPIC_API_KEY`. If the configured key is unset/blank, the request
+fails with a provider-specific "Missing API key" error instead of silently
+sending your Anthropic key to the custom provider's endpoint. Only built-in
+Anthropic catalog models fall back to the `ANTHROPIC_API_KEY` environment
+variable.
+
 ### Adaptive thinking
 
 Anthropic-compatible models may declare `:adaptive-thinking true` to opt into
 Anthropic's adaptive-thinking request shape (the same one used by Claude Opus
 4.7 and later): psi sends `output_config.effort` (derived from
 `/thinking`/`/effort`) instead of the older `thinking.budget_tokens` shape.
-Only set this when the compatible provider actually honours
-`output_config.effort` — check its own compatibility docs first. Omitting the
-field (or setting it `false`) keeps the classic extended-thinking shape, which
-remains the correct default for most Anthropic-compatible providers.
+This field is only meaningful for `:api :anthropic-messages` custom providers
+(and built-in Anthropic catalog models) — it is ignored for OpenAI-compatible
+(`:openai-completions` / `:openai-codex-responses`) custom providers. Only set
+it when the compatible provider actually honours `output_config.effort` —
+check its own compatibility docs first. Omitting the field (or setting it
+`false`) keeps the classic extended-thinking shape, which remains the correct
+default for most Anthropic-compatible providers.
 
 Trade-off: adaptive-thinking models never send `temperature` — psi omits it
 from the request body even when thinking is off, because Anthropic rejects
@@ -220,6 +231,32 @@ Notes:
   need temperature control, set `:adaptive-thinking false` (or omit it) and
   rely on the classic extended-thinking shape DeepSeek accepts (it honours
   `type: "enabled"` and ignores `budget_tokens`)
+- thinking-off is not honoured through the omitted-field path: psi never sends
+  an explicit thinking-disabled signal — when `/thinking off` is active it
+  simply omits the `thinking` field. On Anthropic's own API omission means
+  thinking disabled, but DeepSeek's Anthropic-compatible endpoint defaults to
+  thinking ON, so an omitted `thinking` field leaves thinking enabled and
+  `/thinking off` on `deepseek-v4-flash` is silently ignored (with or without
+  `:adaptive-thinking`). If you need thinking-off control on DeepSeek, verify
+  against a live turn whether the endpoint honours an explicit
+  `thinking: {:type "disabled"}` (psi does not emit it today) before relying
+  on it.
+- API keys are provider-scoped: a custom `:anthropic-messages` provider never
+  falls back to the `ANTHROPIC_API_KEY` env var. If the provider's configured
+  `:api-key` (e.g. `env:DEEPSEEK_API_KEY`) resolves nil, the request fails
+  fast with a provider-scoped "Missing API key" error — your Anthropic key can
+  never be sent to `https://api.deepseek.com/anthropic/v1/messages`. Only
+  built-in Anthropic models fall back to `ANTHROPIC_API_KEY`.
+- cache-cost fields are illustrative: psi bills cache usage from
+  Anthropic-shaped `usage.cache_read_input_tokens` (at `:cache-read-cost`)
+  and `usage.cache_creation_input_tokens` (at `:cache-write-cost`). DeepSeek
+  publishes no separate cache-write price, so `:cache-write-cost 0.14` mirrors
+  the cache-miss/input rate as the effective write-path cost (Anthropic-style
+  accounting reports the write/miss portion separately from `input_tokens`, so
+  this does not double-count the miss). This assumes DeepSeek's usage payload
+  uses those Anthropic field names — not yet verified against a live payload;
+  if DeepSeek reports usage in its native OpenAI-style shape, cache costs may
+  not be captured and the example costs should be adjusted.
 - DeepSeek's Anthropic-compatible endpoint does not document a
   JSON-Schema-native structured-output mechanism, so this example omits
   `:capabilities :structured-output` (defaults to unsupported); add

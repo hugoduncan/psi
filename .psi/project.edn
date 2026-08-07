@@ -3,27 +3,27 @@
  {:project-nrepl
   {:start-command ["clojure" "-M:run:dev:test-paths" "--nrepl"]}
   :session-profiles
-  #_{:designing
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}
-     :fixing-design
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :planning
-     {:model-provider "anthropic"
-      :model-id "claude-fable-5"}
-     :fixing-plan
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :implementing
-     {:model-provider "anthropic"
-      :model-id "claude-sonnet-5"}
-     :reviewing-implementation
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}
-     :fixing-implementation
-     {:model-provider "anthropic"
-      :model-id "claude-opus-4-8"}}
+  {:designing
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
+   :fixing-design
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :planning
+   {:model-provider "anthropic"
+    :model-id "claude-fable-5"}
+   :fixing-plan
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :implementing
+   {:model-provider "anthropic"
+    :model-id "claude-sonnet-5"}
+   :reviewing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}
+   :fixing-implementation
+   {:model-provider "anthropic"
+    :model-id "claude-opus-4-8"}}
   #_{:designing
      {:model-provider "openai"
       :model-id "gpt-5.6-sol"}
@@ -45,24 +45,29 @@
      :fixing-implementation
      {:model-provider "openai"
       :model-id "gpt-5.6-sol"}}
-  {:designing
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :fixing-design
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :planning
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :fixing-plan
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :implementing
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :reviewing-implementation
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}
-   :fixing-implementation
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"}}}}
+  ;; The deepseek alternative requires the deepseek custom provider from a
+  ;; user-global models.edn (e.g. ~/.psi/agent/models.edn) — not committed, so
+  ;; not resolvable on a fresh checkout or in CI. Flip this map in when the
+  ;; provider is configured locally; keep the committed default on catalog
+  ;; models so `bb test` (which snapshots these profiles) stays green.
+  #_{:designing
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :fixing-design
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :planning
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :fixing-plan
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :implementing
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :reviewing-implementation
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}
+     :fixing-implementation
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"}}}}

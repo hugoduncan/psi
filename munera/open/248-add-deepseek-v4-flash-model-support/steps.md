@@ -80,7 +80,7 @@
 
 ## Follow-ups (implementation review 2, 2026-08-07)
 
-- [ ] Full `bb test` is currently RED — `delegate-review-task-
+- [x] Full `bb test` is currently RED — `delegate-review-task-
       implementation-completes-with-nullable-local-model-test` fails because
       committed `.psi/project.edn` (f0c818cc1) points every workflow session
       profile at `deepseek/deepseek-v4-flash`, which is resolvable only via
@@ -96,7 +96,13 @@
       them conditional on the custom provider existing), add a committed
       test fixture `models.edn`, or make the live workflow test tolerate
       unresolvable profiles.
-- [ ] `:adaptive-thinking true` forfeits thinking-off control on DeepSeek:
+      → Resolved: restored `.psi/project.edn` committed profiles to the
+      built-in anthropic catalog models (always resolvable in CI); kept the
+      deepseek profile map commented out with a note that it requires the
+      user-global custom provider. Full `bb test` green (2550 tests / 19132
+      assertions, 0 failures); targeted live test green (3 tests / 21
+      assertions).
+- [x] `:adaptive-thinking true` forfeits thinking-off control on DeepSeek:
       psi's adaptive path omits the `thinking` param entirely when thinking
       is off (`thinking-param` never emits `{:type "disabled"}`), and
       DeepSeek's Anthropic endpoint defaults to thinking ON — so `/thinking
@@ -105,17 +111,32 @@
       Verify live; then either document the caveat in the DeepSeek example
       or add an explicit `{:type "disabled"}` emission for adaptive models
       that need it, with a test.
-- [ ] Cache-cost accounting is unverified: `:cache-read-cost 0.0028` and
+      → Resolved: documented the caveat in the DeepSeek example notes
+      (omission ≠ disabled on DeepSeek; endpoint defaults thinking ON; holds
+      with or without `:adaptive-thinking`; explicit `{:type "disabled"}`
+      is not emitted today). Chose documentation over the code change
+      because live verification is blocked (no `DEEPSEEK_API_KEY` in env)
+      and the design AC explicitly forbids changing
+      `providers/anthropic.clj` request-shaping logic in this task.
+- [x] Cache-cost accounting is unverified: `:cache-read-cost 0.0028` and
       `:cache-write-cost 0.14` assume DeepSeek's usage JSON matches psi's
       `cache_read_input_tokens`/`cache_creation_input_tokens` mapping, but
       no live probe has captured a real usage payload. Confirm the usage
       shape (and that `cache-write-cost` mirroring the miss rate does not
       double-count) or adjust the example costs; consider documenting the
       mirroring rationale in the docs example notes.
+      → Resolved: documented in the DeepSeek example notes — psi bills
+      cache usage from Anthropic-shaped
+      `usage.cache_read_input_tokens`/`usage.cache_creation_input_tokens`;
+      DeepSeek publishes no separate write price so `:cache-write-cost 0.14`
+      mirrors the miss/input rate (Anthropic-style accounting reports the
+      miss portion separately from `input_tokens`, so no double-count);
+      the Anthropic field-name assumption is unverified against a live
+      payload — adjust the example if DeepSeek's usage shape differs.
 
 ## Follow-ups (implementation review 3, 2026-08-07)
 
-- [ ] API-key resolution for custom `:anthropic-messages` providers:
+- [x] API-key resolution for custom `:anthropic-messages` providers:
       `anthropic/resolve-api-key` falls back to the `ANTHROPIC_API_KEY` env
       var when `:api-key` is nil and errors with an Anthropic-specific
       message ("Set ANTHROPIC_API_KEY or login via /login anthropic"). With
@@ -129,8 +150,23 @@
       (b) document the fallback in `doc/custom-providers.md` + add a test
       proving the fallback does not leak the Anthropic key to a non-
       anthropic provider.
-- [ ] `doc/custom-providers.md` `:adaptive-thinking` section: explicitly
+      → Resolved: provider-scoped resolution is already implemented and
+      tested at HEAD — `resolve-api-key` only falls back to
+      `ANTHROPIC_API_KEY` for built-in Anthropic models (`:provider` nil or
+      `:anthropic`); custom providers fail fast with a provider-scoped
+      "Missing API key for provider <name>" error. Tests in
+      `anthropic_test.clj` prove a custom provider never leaks the
+      Anthropic key (redef'd `getenv` → deepseek request still throws) and
+      built-in models still use the env fallback. Completed the review item
+      by documenting the scoped behavior in the DeepSeek example notes
+      (`doc/custom-providers.md`); verified the namespace green (15 tests /
+      92 assertions).
+- [x] `doc/custom-providers.md` `:adaptive-thinking` section: explicitly
       state the field is only meaningful for `:api :anthropic-messages`
       custom providers (and built-in Anthropic catalog models) — design
       acceptance criteria call this out; the current text only implies it
       via section placement ("Anthropic-compatible models may declare...").
+      → Resolved: `doc/custom-providers.md` Adaptive thinking section now
+      states the field is only meaningful for `:api :anthropic-messages`
+      custom providers (and built-in Anthropic catalog models) and is
+      ignored for OpenAI-compatible custom providers.
