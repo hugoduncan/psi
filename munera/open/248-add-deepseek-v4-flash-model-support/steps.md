@@ -150,17 +150,17 @@
       (b) document the fallback in `doc/custom-providers.md` + add a test
       proving the fallback does not leak the Anthropic key to a non-
       anthropic provider.
-      → Resolved: provider-scoped resolution is already implemented and
-      tested at HEAD — `resolve-api-key` only falls back to
-      `ANTHROPIC_API_KEY` for built-in Anthropic models (`:provider` nil or
-      `:anthropic`); custom providers fail fast with a provider-scoped
-      "Missing API key for provider <name>" error. Tests in
-      `anthropic_test.clj` prove a custom provider never leaks the
-      Anthropic key (redef'd `getenv` → deepseek request still throws) and
-      built-in models still use the env fallback. Completed the review item
-      by documenting the scoped behavior in the DeepSeek example notes
-      (`doc/custom-providers.md`); verified the namespace green (15 tests /
-      92 assertions).
+      → Resolved: provider-scoped resolution implemented (in this change
+      set): `resolve-api-key` now only falls back to `ANTHROPIC_API_KEY`
+      for built-in Anthropic models (`:provider` nil or `:anthropic`);
+      custom providers fail fast with a provider-scoped "Missing API key
+      for provider <name>" error. Tests in `anthropic_test.clj` prove a
+      custom provider never leaks the Anthropic key (redef'd `getenv` →
+      deepseek request still throws) and built-in models still use the env
+      fallback. Also documented the scoped behavior in the DeepSeek example
+      notes (`doc/custom-providers.md`). `bb test` full suite green (2550
+      tests / 19134 assertions); namespace green (15 tests / 92
+      assertions).
 - [x] `doc/custom-providers.md` `:adaptive-thinking` section: explicitly
       state the field is only meaningful for `:api :anthropic-messages`
       custom providers (and built-in Anthropic catalog models) — design
