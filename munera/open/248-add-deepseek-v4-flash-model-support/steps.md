@@ -713,3 +713,78 @@
       `:on-provider-request` payload, locking the `redact-authorization` path
       through the case-insensitive `find-header` helper for a non-exact-case
       header name.
+
+## Follow-ups (implementation review 11, 2026-08-07)
+
+- [ ] OpenAI transport capture redaction is case-sensitive and does not redact
+      `x-api-key`: `transport/redact-request-headers` (`providers/openai/
+      transport.clj`) redacts only exact-case `"Authorization"` and
+      `"chatgpt-account-id"`, so the review-10 keyless custom-header auth
+      patterns on `:openai-completions` (`:headers {"X-API-Key" "local-key"}`
+      or mixed-case `authorization`) leak the secret verbatim into the
+      `:on-provider-request` capture payload — the exact leak review 7 fixed
+      for the anthropic transport via the case-insensitive `find-header`
+      helper. Make the openai redaction case-insensitive and redact
+      `x-api-key` (mirror `auth-header?` recognition / the anthropic
+      `redact-request-headers`), and add capture-path tests in the openai
+      stream tests mirroring `anthropic_stream_test.clj` (mixed-case
+      `X-API-Key` → `***REDACTED***`, lowercase `authorization` → `Bearer
+      ***REDACTED***`).
+- [ ] `oauth-api-key?` content-sniffs the resolved key with no provider gate:
+      a custom `:anthropic-messages` provider whose configured key contains
+      `sk-ant-oat` is treated as an OAuth request — `Authorization: Bearer` +
+      `user-agent: claude-cli/…` + `x-app: cli` headers, the
+      `claude-code-*`/`oauth-*`/`prompt-caching-scope-*` beta headers, AND
+      the `claude-code-system-prompt` ("You are Claude Code…") prepended as
+      the first system block — all sent to the third-party endpoint. Reviews
+      3/4/10 hardened env-var fallback but left this content-based OAuth
+      detection unguarded; it is undocumented and untested for custom
+      providers. Fix: gate `oauth?` on built-in Anthropic models (`:provider`
+      nil or `:anthropic`) so custom providers always use `x-api-key` auth,
+      and add a test proving a custom provider with an `sk-ant-oat…` key does
+      NOT get OAuth headers or the Claude-Code system prompt.
+- [ ] `spec/openai-provider.allium` has the same undefined-reference class
+      reviews 9/10 just fixed in custom-providers.allium +
+      anthropic-provider.allium: this task's new `OpenAIApiKeyResolved`/
+      `KeylessRequestDetermined` rules use `Environment`, `IsBlank`,
+      `LowerCase`, `HeaderName` with no Primitives/shared-vocabulary section
+      (anthropic-provider.allium carries the shared-vocabulary note;
+      openai-provider.allium has none), and
+      `ProviderRequestCaptureEmittedWithRedaction` still references an
+      undefined `RedactRequestHeaders`. Fold into the review-9/10 treatment:
+      add the shared-vocabulary/Primitives note (or reference
+      custom-providers.allium) and define/import `RedactRequestHeaders` so
+      openai-provider.allium is checkable too.
+- [ ] `doc/custom-providers.md` teaches `output_config.effort` "derived from
+      /thinking//effort" and (review-8 note) `effort-override :xhigh`, but
+      `:effort-override` alone is a silent no-op: `request-body`'s effort is
+      gated on `(and thinking adaptive?)` and `thinking-param` requires an
+      active `:thinking-level` (session default `:off`), so `/effort` on a
+      `:adaptive-thinking true` model with `/thinking` unset/off emits neither
+      `thinking` nor `output_config` — while DeepSeek defaults thinking ON
+      server-side, so the user's effort setting is silently dropped.
+      Document in the Adaptive-thinking section (and/or DeepSeek notes) that
+      effort applies only when a thinking level is active (`/thinking` on),
+      and add a `build-request` test proving `:effort-override` without a
+      thinking level emits no `output_config`.
+- [ ] Custom `:headers` carrying a recognized auth header name silently
+      replace/duplicate the configured `:api-key` — untested and
+      undocumented for both transports: anthropic `build-request` merges
+      custom headers over the base headers, so `:headers {"X-API-Key"
+      "other"}` with a configured key sends BOTH the lowercase `x-api-key`
+      (configured) and `X-API-Key` (custom) on the wire (server picks by
+      case-insensitive header merge); openai `build-request`'s
+      `(merge … (:headers options))` lets a custom `Authorization` header
+      silently replace the resolved bearer key. Add a test for the
+      configured-key + recognized-auth-header interplay on both transports
+      and a docs sentence (a recognized auth header among custom `:headers`
+      overrides the configured `:api-key`; don't mix them) — the keyless
+      inference is documented, the override case is not.
+- [ ] `deepseek-example-edn` (user_models_test.clj) picks the FIRST ```clojure
+      block after the "## DeepSeek-compatible example" heading; if the
+      section's prose gains a code block before the models.edn example (e.g. a
+      curl or request-shape sample), the parse-lock silently locks the wrong
+      block and the docs↔schema drift guard (review 6/9) is defeated. Make the
+      extraction target the specific EDN block (e.g. require the block to
+      start with `{:version`), so incidental ```clojure blocks in the section
+      cannot move the parse-lock target.
