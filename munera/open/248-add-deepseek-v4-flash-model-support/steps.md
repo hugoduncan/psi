@@ -1667,3 +1667,61 @@
       Doc-parse-lock test still green (the ```clojure EDN block is
       untouched; notes prose only): `psi.ai.user-models-test` green
       (15 tests / 105 assertions).
+
+## Follow-ups (implementation review 21, 2026-08-08)
+
+- [ ] The documented DeepSeek example misclassifies a cloud model as local/free:
+      `doc/custom-providers.md`'s `deepseek-v4-flash` model map sets none of
+      `:locality`, `:latency-tier`, `:cost-tier`, so `expand-model`'s
+      `model-defaults` apply — `:locality :local`, `:latency-tier :low`,
+      `:cost-tier :zero`. The entity-resolution and tooling-friction helper
+      sessions (context-manager, pre-turn blocking path) select their "local"
+      helper via required `:latency-tier :low` + `:cost-tier #{:zero :low}`,
+      strong `:locality :local`, and the `default-select-model` guard
+      `(= :local (:facts :locality))` — all of which a DeepSeek model with
+      the defaulted fields PASSES, so a user who follows the documented
+      example can get cloud DeepSeek calls (with conversation excerpts) on
+      the local-only helper path, plus zero-cost pricing estimates. Fix:
+      add `:locality :cloud` (and explicit `:latency-tier`/`:cost-tier`) to
+      the DeepSeek example model map; note the locality/tier defaults for
+      custom models in `doc/custom-providers.md` (the fields are currently
+      undocumented there); extend `parse-documented-deepseek-example-test`
+      (user_models_test.clj) to assert `:locality :cloud` so the guard locks;
+      and align `deepseek-custom-provider-model` (anthropic_test.clj) with
+      the example. (The pre-existing MiniMax example has the same
+      latency/cost omission but predates this task; scope this item to the
+      DeepSeek example this task documents.)
+- [ ] `spec/openai-provider.allium` does not model the keyless request
+      construction path: `CompletionsRequestBuilt` requires
+      `not IsBlank(stream.resolved_api_key)` and `CodexRequestBuilt`
+      requires `not IsBlank(stream.resolved_api_key)` AND
+      `not IsBlank(stream.chatgpt_account_id)` — these are the ONLY rules
+      producing `ProviderRequestBuilt` for the openai transport. A keyless
+      `:openai-completions`/`:openai-codex-responses` request
+      (`:no-auth-header` or a recognized auth header among custom `:headers`
+      with no configured key — the documented "Local servers and custom
+      headers" pattern, tested by this task's keyless blocks and review 13's
+      keyless codex tests) therefore has no request-construction rule; the
+      keyless flags are modeled (`KeylessRequestDetermined`,
+      `OpenAIApiKeyResolved` → nil key) but the resulting keyless request
+      build (no `Authorization`; codex also omits `chatgpt-account-id`) is
+      unmodeled. The anthropic spec covers this (`ApiKeyResolved` ensures
+      keyless → nil key, and `AnthropicRequestBodyBuilt` has no key
+      `requires`); the openai spec should mirror it — e.g. gate the keyless
+      build separately (`KeylessCompletionsRequestBuilt` /
+      `KeylessCodexRequestBuilt`) or relax the `requires` clauses and model
+      the omitted auth headers. Manual allium-check (no automated checker in
+      repo) per the established pattern.
+- [ ] `chatgpt-account-id` capture masking has no test lock: the shared
+      `request-support/mask-chatgpt-account-id` (first 6 chars + "...",
+      review 11) is wired into `openai/transport.clj`
+      `redact-request-headers`, but no capture-path test asserts the masked
+      output — `codex-request-and-reply-capture-callbacks-test`
+      (openai_test.clj) asserts only `Authorization` redaction, and
+      `custom-header-auth-redacted-in-captures-test`
+      (openai_request_headers_test.clj) covers `X-API-Key`/`authorization`
+      only. Add a codex capture-path assertion that a wire
+      `chatgpt-account-id` header (and a mixed-case duplicate, mirroring the
+      review-19 dual-casing locks) is masked to its first-6-chars form in
+      the `:on-provider-request` payload, so the mask cannot silently regress
+      to verbatim.
