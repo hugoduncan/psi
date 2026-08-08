@@ -2275,3 +2275,71 @@
       matches the transports' `builtin?` semantics). Full `bb test` green
       (2586 tests / 18697 assertions / 0 failures); clj-kondo + file-lengths
       clean.
+
+## Follow-ups (implementation review 27, 2026-08-08)
+
+- [ ] `doc/custom-providers.md` mid-conversation system-message inference
+      claim is stale after the review-25/26 built-in gating: "What a provider
+      definition contains" says "only OpenAI chat-completions models
+      (`:openai`/`:openai-completions`) get the capability inferred from the
+      runtime API shape", and the DeepSeek example note repeats it
+      ("only `:openai`/`:openai-completions` models get the capability
+      inferred") — but `supports-mid-system-messages?` now gates the
+      inference on the `:custom?` origin tag via
+      `request-support/builtin-openai-chat-completions?` (review 26), so a
+      custom models.edn provider named "openai" (api :openai-completions,
+      tagged `:custom? true`) does NOT get the inference and must declare
+      `:supports-mid-conversation-system-messages` explicitly. The same
+      section's "Note on `:custom?`" already states the inference is
+      built-in-only — the two paragraphs contradict each other, and the
+      review-26 resolution updated the code + design.md but not these doc
+      claims. Fix: qualify the inference as built-in-only in both places
+      (custom OpenAI-compatible providers must declare the field; a custom
+      provider named "openai" is tagged `:custom? true` and does not get it).
+- [ ] CHANGELOG `[Unreleased]` carries the same stale inference claim AND
+      has no entry for the review-25/26 behavior change: the review-22
+      `Added` entry for `:supports-mid-conversation-system-messages` says
+      "(only `:openai`/`:openai-completions` models get the capability
+      inferred)" — written before the origin-tag gating. The gating itself is
+      a user-visible custom-provider behavior change per AGENTS.md changelog
+      policy (a custom models.edn provider literally named "openai" with api
+      :openai-completions previously received the inferred mid-conversation
+      system-message capability by name; it now requires the explicit field,
+      and `:session/inject-mid-system-message` returns
+      `:capability-not-supported` otherwise — the same provider-name-
+      collision class the task's `:custom?` work closed for env-key fallback
+      and OAuth). Fix: correct the `Added` entry's parenthetical to
+      "built-in" and add a `Changed` entry documenting the built-in gating
+      of the inference.
+- [ ] `resolve-key-spec` (request_support.clj) recognizes only the lowercase
+      `"env:"` prefix: `"ENV:DEEPSEEK_API_KEY"` or `"Env:..."` (or `" env:..."`)
+      falls through to the literal branch and is sent as the API key verbatim
+      — a silently bogus key (provider-side 401) instead of the clear
+      "environment variable ... is unset" error review 26 added for env:
+      specs, and no schema or parse-time warning. The docs and the
+      missing-key error suggestion use lowercase `env:` consistently, so this
+      is a documentation/UX gap, not a leak (the literal text is not a
+      secret). Fix (docs option, in scope): add a one-line note to
+      doc/custom-providers.md's `:api-key` bullet ("the `env:` prefix is
+      case-sensitive — lowercase `env:` only") and/or the
+      `resolve-key-spec` docstring; or handle the prefix case-insensitively
+      with a test in request_support_test.clj.
+- [ ] Pre-existing codex deftest duplication in `openai_test.clj` (flagged
+      in review 21's resolution as "outside review-21 scope; flagged here for
+      a future dedup", never opened as a follow-up): the seven codex deftests
+      `codex-requires-chatgpt-token-test`,
+      `codex-reasoning-text-delta-maps-to-thinking-delta-test`,
+      `codex-reasoning-map-delta-normalized-to-string-test`,
+      `codex-reasoning-output-item-done-emits-thinking-boundary-test`,
+      `codex-thinking-level-maps-to-reasoning-effort-test`,
+      `codex-tool-call-id-roundtrip-test` and
+      `codex-function-call-done-includes-final-arguments-test` are
+      byte-identical to copies in `openai_codex_test.clj` (pre-dates this
+      task, commit 008b1e094). It is task-relevant now because
+      `openai_test.clj` sits at the committed 775-line mark (the exact reason
+      review 21 moved new codex tests to `openai_codex_test.clj`), so the
+      duplicates consume the remaining file-length headroom and any future
+      openai-transport test addition needs the same workaround. Fix: delete
+      the seven duplicates from `openai_test.clj` (or make them delegate to
+      the codex file) and re-verify `psi.ai.providers.openai-test` +
+      `psi.ai.providers.openai-codex-test` + `bb commit-check:file-lengths`.
