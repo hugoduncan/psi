@@ -2092,3 +2092,64 @@
       verbatim secret, original key casing preserved, non-auth headers pass
       through). A shared-namespace regression now fails without needing the
       transport files. Namespace green (9 tests / 57 assertions, was 2/18).
+
+## Follow-ups (implementation review 25, 2026-08-08)
+
+- [ ] `supports-mid-system-messages?` (components/agent-session/src/psi/
+      agent_session/model_capabilities.clj) infers the mid-conversation
+      system-message capability from provider NAME + api —
+      `(and (= :openai (:provider model)) (= :openai-completions (:api model)))`
+      — without the review-14 `:custom?` origin-tag guard. Review 22 added
+      the explicit `:supports-mid-conversation-system-messages` ModelDef
+      field and documented "only :openai/:openai-completions models get the
+      capability inferred" (meaning built-in catalog models; custom providers
+      must declare it). But a custom models.edn provider literally named
+      "openai" (api :openai-completions) is tagged `:custom? true` by
+      `expand-model` and still receives the built-in-only inference BY NAME —
+      the exact provider-name-collision class review 14 closed for env-key
+      fallback and OAuth treatment, and a contradiction of the design's
+      review-14 claim ("a custom provider literally named 'anthropic'/'openai'
+      can no longer be classified built-in … never receives built-in-only
+      treatment"). Verified live (2026-08-08): `supports-mid-system-messages?`
+      on `{:provider :openai :api :openai-completions :custom? true}` → true,
+      while `{:provider :deepseek :api :openai-completions :custom? true}` →
+      false. Consequence: a custom provider named "openai" silently gets
+      `:session/inject-mid-system-message` enabled without declaring the
+      field, while every other custom provider must declare it explicitly.
+      Fix: add `(not (:custom? model))` to the inference branch
+      (behavior-preserving — built-in catalog models never carry the tag),
+      and add a test locking a custom provider named "openai" (`:custom? true`)
+      does NOT get the inference — fits beside
+      `mid-system-capability-dispatch-test` in model_dispatch_test.clj or as
+      a direct model-capabilities unit test.
+- [ ] `:custom?` is undocumented in doc/custom-providers.md: `expand-model`
+      tags every custom models.edn model `:custom? true` (review 14 — the
+      origin tag that gates built-in classification, env-key fallback and
+      OAuth treatment), but the docs never mention it, and the closed
+      `ModelDef` schema in user_models.clj REJECTS a user-declared `:custom?`
+      key with a generic "Invalid models.edn schema" error (no hint that it
+      is an internal/reserved tag). A user who sees `:custom? true` in an
+      introspected model map (resolvers/EQL) or copies a model map into
+      models.edn gets a confusing validation failure. Fix: add a note in
+      "What a provider definition contains" that `:custom?` is an internal
+      origin tag set by psi for custom models (never declare it in models.edn
+      — the closed ModelDef schema rejects it); optionally mirror the note in
+      spec/custom-providers.allium, where `ResolvedCustomModel.custom = true`
+      is currently the only place the tag is described and nothing says it is
+      not settable from models.edn.
+- [ ] `parse-documented-deepseek-example-test` (user_models_test.clj) asserts
+      every resolved field of the documented DeepSeek example — id, name,
+      provider, api, base-url, supports-reasoning, adaptive-thinking,
+      supports-images, supports-text, context-window, max-tokens, all four
+      cost fields, locality/latency-tier/cost-tier — but NOT the review-14
+      origin tag `:custom? true`, the task's central security property (it
+      gates built-in classification: env-key fallback and OAuth treatment).
+      The general `custom-provider-models-tagged-custom-test` covers
+      expand-model tagging, but the doc-parse-lock's stated purpose ("doc↔
+      schema drift fails the test in both directions") is the natural home to
+      also pin the origin tag on the exact shipped example — a future
+      expand-model change that stops tagging custom models (e.g. a
+      merge-order regression moving `:custom? true` before the model-def
+      merge) would then fail the doc lock too. Fix: add
+      `(is (true? (:custom? model)))` to the parse-lock's first testing
+      block.
