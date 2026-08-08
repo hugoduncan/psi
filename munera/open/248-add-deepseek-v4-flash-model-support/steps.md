@@ -1616,7 +1616,7 @@
 
 ## Follow-ups (implementation review 20, 2026-08-08)
 
-- [ ] `openai_request_headers_test.clj`'s custom `:provider :local` fixtures
+- [x] `openai_request_headers_test.clj`'s custom `:provider :local` fixtures
       still omit the `:custom?` origin tag — the exact drift class reviews
       15/17/18 closed in every other touched test file (all anthropic test
       fixtures, openai_test.clj, openai_completions_test.clj tagged), and the
@@ -1631,7 +1631,15 @@
       these fixtures (or extract a shared custom-provider fixture helper that
       always carries the tag) and re-run
       `psi.ai.providers.openai-request-headers-test`.
-- [ ] Trailing-slash `:base-url` handling is inconsistent across the three
+      → Resolved: `:custom? true` added to all five `:provider :local`
+      fixtures in `openai_request_headers_test.clj` (the two identity-capture
+      fixtures, the three redaction-capture fixtures) — the last untagged
+      custom-provider fixtures in the touched test files. Behavior-neutral
+      (`:local` is never a built-in name; `builtin?` requires `:custom?`
+      false). `psi.ai.providers.openai-request-headers-test` green (6 tests /
+      30 assertions); clj-kondo clean (0 errors, 0 warnings); file-length
+      gate passes (294 lines < 800).
+- [x] Trailing-slash `:base-url` handling is inconsistent across the three
       transports: `:openai-codex-responses` normalizes (`resolve-codex-url`
       strips a trailing `/+$`), but `:anthropic-messages`
       (`(str (:base-url model) "/v1/messages")`) and `:openai-completions`
@@ -1647,3 +1655,15 @@
       DeepSeek example notes; or normalize the join in shared
       `request-support` as a separate transport change (design AC forbids
       transport changes in this task).
+      → Resolved (docs option, per the item's in-scope option; transport
+      normalization deliberately not done — design AC forbids transport
+      changes): `doc/custom-providers.md` `:base-url` bullet now states the
+      API root must have no trailing slash — psi concatenates the protocol
+      path suffix verbatim (`/v1/messages`, `/chat/completions`,
+      `/codex/responses`; only the codex transport normalizes a trailing
+      slash away), so a trailing `/` silently yields a double-slash URL.
+      DeepSeek example notes gain a matching bullet using the concrete
+      `https://api.deepseek.com/anthropic/` → `//v1/messages` example.
+      Doc-parse-lock test still green (the ```clojure EDN block is
+      untouched; notes prose only): `psi.ai.user-models-test` green
+      (15 tests / 105 assertions).

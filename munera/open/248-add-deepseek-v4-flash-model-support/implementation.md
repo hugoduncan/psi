@@ -1073,3 +1073,29 @@
   set in environment (verified again 2026-08-08); request-shaping coverage
   only by design (steps.md item left unchecked).
 - Review 20 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 20 addressed (2026-08-08)
+
+- addressed 2 review steps (review-20; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `:custom?` origin tag added to the last untagged custom-provider fixtures:
+  all five `:provider :local` fixtures in `openai_request_headers_test.clj`
+  (two identity-capture fixtures, three redaction-capture fixtures) now carry
+  `:custom? true`, closing the review-18-deferred boundary in the touched
+  test files. Behavior-neutral (`:local` never collides with built-in names;
+  `builtin?` requires the tag absent). `psi.ai.providers.openai-request-
+  headers-test` green (6 tests / 30 assertions); clj-kondo clean; file-length
+  gate passes (294 lines < 800).
+- Trailing-slash `:base-url` inconsistency documented (docs option, in scope;
+  transport normalization deliberately not done — design AC forbids transport
+  changes): `doc/custom-providers.md` `:base-url` bullet now states the API
+  root must have no trailing slash (psi concatenates the protocol path suffix
+  verbatim — `/v1/messages`, `/chat/completions`, `/codex/responses`; only
+  codex normalizes a trailing slash away, so a trailing `/` silently yields a
+  double-slash URL), and the DeepSeek example notes gain a matching bullet
+  with the concrete `https://api.deepseek.com/anthropic/` → `//v1/messages`
+  example. Doc-parse-lock test unaffected (EDN block untouched; notes prose
+  only): `psi.ai.user-models-test` green (15 tests / 105 assertions).
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design (steps.md item
+  left unchecked).

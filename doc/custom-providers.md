@@ -22,7 +22,13 @@ Built-in models remain available alongside custom ones.
 Each provider entry defines:
 
 - a provider id, such as `"minimax"` or `"ollama"`
-- `:base-url` — the API root for that provider
+- `:base-url` — the API root for that provider, without a trailing slash.
+  Psi concatenates the protocol's path suffix onto it verbatim
+  (`/v1/messages` for `:anthropic-messages`, `/chat/completions` for
+  `:openai-completions`, `/codex/responses` for `:openai-codex-responses`;
+  only the codex transport normalizes a trailing slash away), so a base URL
+  ending in `/` (e.g. `https://api.deepseek.com/anthropic/`) silently
+  produces a double-slash URL (`//v1/messages`)
 - `:api` — which wire protocol psi should use
 - optional `:auth` settings
 - one or more `:models`
@@ -260,6 +266,11 @@ export DEEPSEEK_API_KEY=...
 ```
 
 Notes:
+- `:base-url` must not end in a trailing slash: psi concatenates
+  `/v1/messages` onto it verbatim, so
+  `https://api.deepseek.com/anthropic/` would silently produce
+  `https://api.deepseek.com/anthropic//v1/messages` (double slash). Use
+  `https://api.deepseek.com/anthropic` exactly as shown.
 - pricing/context-window figures above are from DeepSeek's published pricing
   page as of this writing; confirm current figures in DeepSeek's own docs
   before relying on them for cost tracking

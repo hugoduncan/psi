@@ -50,6 +50,7 @@
       (let [model           {:id                 "local-completions"
                              :name               "Local Completions"
                              :provider           :local
+                             :custom?            true
                              :api                :openai-completions
                              :base-url           "http://localhost:8080/v1"
                              :supports-reasoning true
@@ -104,6 +105,7 @@
     (let [model           {:id                 "local-completions"
                            :name               "Local Completions"
                            :provider           :local
+                           :custom?            true
                            :api                :openai-completions
                            :base-url           "http://localhost:8080/v1"
                            :supports-reasoning true
@@ -136,6 +138,7 @@
     (let [model           {:id                 "local-completions"
                            :name               "Local Completions"
                            :provider           :local
+                           :custom?            true
                            :api                :openai-completions
                            :base-url           "http://localhost:8080/v1"
                            :supports-reasoning true
@@ -174,6 +177,7 @@
     (let [model           {:id                 "local-completions"
                            :name               "Local Completions"
                            :provider           :local
+                           :custom?            true
                            :api                :openai-completions
                            :base-url           "http://localhost:8080/v1"
                            :supports-reasoning true
@@ -216,6 +220,7 @@
     (let [model           {:id                 "local-completions"
                            :name               "Local Completions"
                            :provider           :local
+                           :custom?            true
                            :api                :openai-completions
                            :base-url           "http://localhost:8080/v1"
                            :supports-reasoning true
