@@ -7,6 +7,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.ai.models :as models]
+   [psi.ai.providers.request-support :as request-support]
    [psi.agent-session.core :as session]
    [psi.agent-session.model-capabilities :as model-capabilities]
    [psi.state-kernel.dispatch :as kernel]
@@ -164,6 +165,17 @@
   (testing "a custom provider named \"openai\" (:custom? true) does NOT get the built-in inference"
     (is (false? (model-capabilities/supports-mid-system-messages?
                  {:provider :openai :api :openai-completions :custom? true}))))
+
+  (testing "the inference routes through the shared request-support predicate (review 26)"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-completions :custom? true}))
+        "custom provider named openai is excluded by the shared predicate")
+    (is (true? (request-support/builtin-openai-chat-completions?
+                {:provider :openai :api :openai-completions}))
+        "built-in OpenAI chat shape matches the shared predicate")
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-codex-responses}))
+        "codex-routed built-ins never match the shared predicate"))
 
   (testing "a custom provider named \"deepseek\" (:custom? true) does NOT get the inference"
     (is (false? (model-capabilities/supports-mid-system-messages?

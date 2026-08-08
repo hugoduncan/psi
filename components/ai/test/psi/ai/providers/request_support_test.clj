@@ -107,6 +107,90 @@
     (is (false? (request-support/builtin? {:provider :deepseek :custom? true}
                                           :anthropic)))))
 
+(deftest resolve-key-spec-test
+  ;; Review 26: the shared env: spec resolution — used by
+  ;; user-models/resolve-api-key-spec (delegation) AND by resolve-api-key at
+  ;; request time. Custom models.edn `env:` keys are stored RAW in the
+  ;; registry and re-resolved per request.
+  (testing "nil/blank → nil"
+    (is (nil? (request-support/resolve-key-spec nil)))
+    (is (nil? (request-support/resolve-key-spec "")))
+    (is (nil? (request-support/resolve-key-spec "  "))))
+  (testing "env: prefix reads the environment at request time"
+    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-live-env-key")]
+      (is (= "sk-live-env-key" (request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))))
+    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
+      (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ")))))
+  (testing "literal string returned as-is"
+    (is (= "sk-literal" (request-support/resolve-key-spec "sk-literal")))))
+
+(deftest resolve-api-key-request-time-env-resolution-test
+  ;; Review 26: resolve-api-key re-resolves env: specs through getenv PER
+  ;; REQUEST (custom registry auth stores the raw spec), so exporting the
+  ;; var after psi loaded models.edn works without a reload — and an unset
+  ;; var fails fast with an error naming the variable instead of the generic
+  ;; "configure :auth in models.edn" (the config is already there).
+  (testing "custom provider with env: spec resolves live at request time"
+    (let [model {:provider :deepseek :custom? true}]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-live")]
+        (is (= "sk-deepseek-live"
+               (request-support/resolve-api-key model
+                                                {:api-key "env:DEEPSEEK_API_KEY"}
+                                                anthropic-config))
+            "env: key is re-read per request, not snapshotted at parse time"))))
+
+  (testing "custom provider with unset env: spec fails fast naming the variable"
+    (let [model {:provider :deepseek :custom? true}]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
+        (let [e (try
+                  (request-support/resolve-api-key model
+                                                   {:api-key "env:DEEPSEEK_API_KEY"}
+                                                   anthropic-config)
+                  nil
+                  (catch clojure.lang.ExceptionInfo e e))]
+          (is (some? e))
+          (is (re-find #"environment variable DEEPSEEK_API_KEY is unset" (ex-message e)))
+          (is (re-find #"re-read per request" (ex-message e)))
+          (is (nil? (re-find #"/login" (ex-message e))))))))
+
+  (testing "literal configured key passes through unchanged (not env:)"
+    (is (= "sk-deepseek-configured"
+           (request-support/resolve-api-key {:provider :deepseek :custom? true}
+                                            {:api-key "sk-deepseek-configured"}
+                                            anthropic-config))))
+
+  (testing "built-in env fallback still applies when no key is configured"
+    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-env-fallback")]
+      (is (= "sk-ant-env-fallback"
+             (request-support/resolve-api-key {:provider :anthropic} {} anthropic-config))))))
+
+(deftest builtin-openai-chat-completions?-test
+  ;; Review 26: the shared built-in-openai-chat-completions predicate used
+  ;; by agent-session's mid-conversation system-message inference — origin
+  ;; tag + provider built-in classification must live here once (alongside
+  ;; builtin?), not as an inline copy in model_capabilities that could drift.
+  (testing "built-in OpenAI chat-completions shape → true"
+    (is (true? (request-support/builtin-openai-chat-completions?
+                {:provider :openai :api :openai-completions})))
+    (is (true? (request-support/builtin-openai-chat-completions?
+                {:provider nil :api :openai-completions}))
+        "nil provider is built-in (matches builtin? semantics)"))
+  (testing "custom provider named openai (:custom? true) → false — origin tag wins over name"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-completions :custom? true}))))
+  (testing "custom provider named deepseek → false"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :deepseek :api :openai-completions :custom? true}))))
+  (testing "api constraint preserved — codex-routed built-ins never match"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-codex-responses})))
+    (is (true? (request-support/builtin-openai-chat-completions?
+                {:provider :openai :api :openai-completions :custom? false}))
+        "explicit :custom? false is built-in"))
+  (testing "non-openai built-in provider → false"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :anthropic :api :openai-completions})))))
+
 (deftest find-headers-case-insensitive-all-matches-test
   ;; Review 19: redaction must find EVERY case-insensitive match per
   ;; auth-header name — a differently-cased duplicate on the wire would

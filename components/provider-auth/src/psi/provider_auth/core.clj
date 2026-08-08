@@ -28,7 +28,12 @@
 (defn provider-api-key
   "Resolve a provider-scoped API key using shared precedence:
    1. OAuth/runtime credential for the selected provider
-   2. model-registry auth for the selected provider when auth headers are enabled"
+   2. model-registry auth for the selected provider when auth headers are enabled
+
+   For custom models.edn providers the registry stores the RAW `:api-key`
+   spec (literal or \"env:VAR\", review 26) — the transports'
+   `request-support/resolve-api-key` re-resolves `env:` keys per request.
+   Callers that need a concrete key must route through that shared helper."
   [ctx provider]
   (let [provider-id (normalize-provider-id provider)]
     (or (when (and provider-id (:oauth-ctx ctx))

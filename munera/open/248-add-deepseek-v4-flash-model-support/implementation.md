@@ -1368,3 +1368,36 @@
   assertion (user_models_test.clj). Namespaces green (user-models 16/115,
   model-dispatch 13/158); clj-kondo + file-lengths clean.
 - Review 26 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 26 addressed (2026-08-08)
+
+- addressed 2 review steps (review-26; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Request-time `env:` key resolution (option (a), the behavior fix):
+  `extract-provider-auth` (user_models.clj) now stores the RAW `:api-key`
+  spec (literal or "env:VAR") in the registry auth — no parse-time
+  resolution/snapshot; the shared `request-support/resolve-api-key`
+  re-resolves `env:` keys through `getenv` per request via the new
+  `request-support/resolve-key-spec` helper (and `user_models/resolve-api-key-spec`
+  delegates to it, so env resolution lives in one place). Exporting
+  DEEPSEEK_API_KEY after psi loaded models.edn now works without a reload,
+  matching the built-in env fallback's live semantics. Custom-provider
+  missing-key error now names the unset variable ("environment variable
+  DEEPSEEK_API_KEY is unset — env: keys are re-read per request") when the
+  configured spec is an env: string. Tests: `request_support_test.clj`
+  `resolve-key-spec-test` + `resolve-api-key-request-time-env-resolution-test`;
+  `parse-documented-deepseek-example-test` updated (raw spec stored +
+  request-time resolution); all three allium specs model request-time
+  `ResolveApiKey`; doc/custom-providers.md + CHANGELOG + design.md updated.
+- Shared built-in OpenAI chat-completions predicate: new
+  `request-support/builtin-openai-chat-completions?` owns the origin-tag +
+  api-constraint classification; `model_capabilities.clj`
+  `supports-mid-system-messages?` calls it (inline copy removed, review-25
+  `:custom?` guard preserved). Direct tests in request_support_test.clj +
+  model_dispatch_test.clj. Behavior-preserving.
+- Verification: full `bb test` green (2586 tests / 18697 assertions /
+  0 failures); clj-kondo clean (0 errors, 0 warnings) on all changed
+  source + test files; `bb commit-check:file-lengths` passes on the working
+  tree.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design.

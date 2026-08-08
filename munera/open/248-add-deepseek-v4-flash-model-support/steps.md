@@ -2176,7 +2176,7 @@
 
 ## Follow-ups (implementation review 26, 2026-08-08)
 
-- [ ] `env:VAR` custom-provider API keys are snapshotted at models.edn parse
+- [x] `env:VAR` custom-provider API keys are snapshotted at models.edn parse
       time, not re-read per request: `extract-provider-auth` (user_models.clj)
       resolves `"env:DEEPSEEK_API_KEY"` via `resolve-api-key-spec` once when
       the model registry loads, and the resolved value (or nil) is stored in
@@ -2209,7 +2209,30 @@
       configured spec is an `env:` string — so the error stops looking like a
       config mistake. Option (a) is the behavior fix; (b) is the
       doc/UX-only fallback.
-- [ ] `supports-mid-system-messages?` (components/agent-session/src/psi/
+      → Resolved (option (a), the behavior fix): the registry now stores the
+      RAW `:api-key` spec (literal or "env:VAR") — `extract-provider-auth`
+      no longer resolves at parse — and the shared
+      `request-support/resolve-api-key` re-resolves `env:` keys through
+      `getenv` per request (new `request-support/resolve-key-spec` helper;
+      `user_models/resolve-api-key-spec` delegates to it, so env-lookup
+      testability lives in one place). Exporting `DEEPSEEK_API_KEY` after psi
+      loaded models.edn now works without a reload, matching the built-in env
+      fallback's live semantics. The custom-provider missing-key error now
+      names the unset variable ("environment variable DEEPSEEK_API_KEY is
+      unset — env: keys are re-read per request") when the configured spec is
+      an `env:` string, instead of pointing back at the models.edn `:auth`
+      block the user already configured. Tests: `request_support_test.clj`
+      gains `resolve-key-spec-test` + `resolve-api-key-request-time-env-
+      resolution-test` (live re-read, unset-var error naming the variable,
+      literal pass-through, built-in fallback preserved);
+      `parse-documented-deepseek-example-test` updated to assert the raw spec
+      is stored and resolves through the shared request-time lookup; all
+      three allium specs model request-time `ResolveApiKey`; docs updated
+      (env: keys re-read per request — no reload needed); CHANGELOG `Changed`
+      entry added; design.md revision note updated. Full `bb test` green
+      (2586 tests / 18697 assertions / 0 failures); clj-kondo + file-lengths
+      clean.
+- [x] `supports-mid-system-messages?` (components/agent-session/src/psi/
       agent_session/model_capabilities.clj) re-implements built-in
       classification inline — `(and (= :openai (:provider model))
       (= :openai-completions (:api model)) (not (:custom? model)))` — instead
@@ -2236,3 +2259,19 @@
       (`psi.ai.model-registry`), so the require is available. Add/extend a
       direct model-capabilities test locking the custom-provider-named-openai
       (`:custom? true`) exclusion through the shared predicate.
+      → Resolved: new `request-support/builtin-openai-chat-completions?`
+      predicate owns the built-in-openai-chat-completions classification
+      (`builtin?` origin-tag gate + api :openai-completions constraint);
+      `model_capabilities.clj` `supports-mid-system-messages?` calls it
+      instead of the inline copy. The api constraint is preserved (codex-
+      routed built-ins, api :openai-codex-responses, never match). Tests:
+      `request_support_test.clj` `builtin-openai-chat-completions?-test`
+      (built-in shape → true, nil provider → true, custom "openai"
+      `:custom? true` → false, custom "deepseek" → false, codex api → false,
+      explicit `:custom? false` → true); `model_dispatch_test.clj`
+      `mid-system-capability-custom-origin-test` extended to assert the
+      exclusion through the shared predicate directly. Behavior-preserving
+      (no built-in catalog model carries the tag; the nil-provider case now
+      matches the transports' `builtin?` semantics). Full `bb test` green
+      (2586 tests / 18697 assertions / 0 failures); clj-kondo + file-lengths
+      clean.

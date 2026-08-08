@@ -11,7 +11,6 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]
    [malli.core :as m]
    [psi.ai.providers.request-support :as request-support]
    [psi.ai.schemas :as schemas]
@@ -81,20 +80,13 @@
    - \"env:VAR\" → (System/getenv \"VAR\"), nil if unset
    - anything else → literal string
 
-   The env lookup goes through the shared `request-support/getenv`
-   indirection (review 14) so env-lookup testability lives in one place —
-   `parse-documented-deepseek-example-test` redefs that var (review 15)."
+   Delegates to the shared `request-support/resolve-key-spec` (review 26) —
+   the config-parse layer keeps no separate env resolution, so env-lookup
+   testability lives in one place (review 15). Note the registry stores the
+   RAW spec (see extract-provider-auth); the transports re-resolve `env:`
+   keys per request through the same shared helper."
   [raw]
-  (cond
-    (or (nil? raw) (str/blank? raw))
-    nil
-
-    (str/starts-with? raw "env:")
-    (let [var-name (subs raw 4)]
-      (request-support/getenv var-name))
-
-    :else
-    raw))
+  (request-support/resolve-key-spec raw))
 
 ;; ── Model expansion ─────────────────────────────────────────────────────────
 
@@ -137,10 +129,17 @@
 ;; ── Provider auth ────────────────────────────────────────────────────────────
 
 (defn- extract-provider-auth
-  "Extract resolved auth config for a provider."
+  "Extract auth config for a provider. The `:api-key` is stored as the RAW
+   spec (literal or \"env:VAR\") — it is NOT resolved at parse time (review
+   26): the registry snapshots the spec, and the transports' shared
+   `request-support/resolve-api-key` re-resolves `env:` keys through getenv
+   per request, matching the built-in env fallback's live semantics (a var
+   exported after psi loaded models.edn is picked up without a reload).
+   Blank/nil specs normalize to nil (unchanged from the pre-review-26
+   `resolve-api-key-spec` behavior)."
   [provider-key provider-def]
   (let [auth     (:auth provider-def)
-        api-key  (resolve-api-key-spec (:api-key auth))
+        api-key  (not-empty (:api-key auth))
         auth-hdr (if (contains? auth :auth-header?)
                    (:auth-header? auth)
                    true)

@@ -22,6 +22,24 @@
   [k]
   (System/getenv k))
 
+(defn resolve-key-spec
+  "Resolve an api-key spec at REQUEST time:
+   - nil / blank → nil
+   - \"env:VAR\" → (getenv \"VAR\"), nil if unset
+   - anything else → the literal string
+
+   Custom-provider `env:` keys are stored RAW in the registry (not resolved
+   at models.edn parse time, review 26) and re-resolved here per request —
+   matching the built-in env fallback's live semantics, so exporting the var
+   after psi has loaded models.edn works without a reload. The config-parse
+   layer (`user_models/resolve-api-key-spec`) delegates here so env-lookup
+   testability lives in one place."
+  [raw]
+  (cond
+    (or (nil? raw) (str/blank? raw)) nil
+    (str/starts-with? raw "env:") (getenv (subs raw 4))
+    :else raw))
+
 (def openai-api-key-config
   "Shared OpenAI api-key resolution config for the :openai-completions and
    :openai-codex-responses transports. Defined once here (previously two
@@ -68,6 +86,22 @@
        (let [provider (:provider model)]
          (or (nil? provider) (= builtin-provider-kw provider)))))
 
+(defn builtin-openai-chat-completions?
+  "True when a model is a built-in OpenAI chat-completions model: built-in
+   classification via `builtin?` (provider nil or :openai, not tagged
+   `:custom?`) AND api :openai-completions.
+
+   This is the shared built-in-classification predicate for agent-session's
+   mid-conversation system-message inference (model_capabilities.clj,
+   review 26): the origin-tag + provider built-in semantics live here once,
+   alongside the provider transports' `builtin?`, instead of an inline copy
+   that could drift. The api constraint preserves the inference's
+   chat-completions-only intent — codex-routed built-ins (gpt-5.5/gpt-5.6-*
+   under OAuth) have api :openai-codex-responses and never match."
+  [model]
+  (and (builtin? model :openai)
+       (= :openai-completions (:api model))))
+
 (defn resolve-api-key
   "Resolve the API key for a request, scoped to the request's provider.
 
@@ -92,13 +126,20 @@
    caller strips the auth headers anyway, so this returns nil instead of
    failing. The keyless contract lives in one predicate (`no-auth?`, review
    22) so a direct caller cannot drift from what the request builders gate
-   on."
+   on.
+
+   The configured `:api-key` may be an `env:` spec (custom models.edn keys
+   are stored RAW in the registry, review 26): it is re-resolved through
+   `getenv` per request, matching the built-in env fallback's live
+   semantics. A custom provider whose `env:VAR` is unset at request time
+   fails fast with an error naming the variable (not a generic \"configure
+   :auth in models.edn\" — the config is already there)."
   [model options config]
   (when-not (no-auth? options)
     (let [{:keys [builtin-provider env-var builtin-missing-msg]} config
           provider   (:provider model)
           builtin?   (builtin? model builtin-provider)
-          api-key    (:api-key options)
+          api-key    (resolve-key-spec (:api-key options))
           api-key    (if (and builtin? (str/blank? api-key))
                        (getenv env-var)
                        api-key)]
@@ -109,18 +150,33 @@
                            :provider builtin-provider}))
           ;; OAuth /login only exists for built-in providers, so custom
           ;; providers must not hint at it — the remedy is models.edn :auth.
-          ;; The suggested env var name normalizes kebab-case provider keys
-          ;; (- → _): :my-anthropic-proxy must suggest MY_ANTHROPIC_PROXY_API_KEY
-          ;; (bash identifiers cannot contain hyphens), not
-          ;; MY-ANTHROPIC-PROXY_API_KEY (review 12).
-          (throw (ex-info (str "Missing API key for provider " (name provider)
-                               ". Configure the provider's :auth {:api-key ...} in models.edn"
-                               " (e.g. \"env:" (-> (name provider)
-                                                   (str/replace "-" "_")
-                                                   str/upper-case)
-                               "_API_KEY\").")
-                          {:error-code "auth/missing-api-key"
-                           :provider provider}))))
+          ;; When the configured spec is an env: string, name the unset var
+          ;; instead of pointing back at models.edn (the user already
+          ;; configured it there; review 26).
+          (let [spec (some-> (:api-key options) str)
+                env-var (when (and (string? spec)
+                                   (str/starts-with? spec "env:"))
+                          (subs spec 4))]
+            (if env-var
+              (throw (ex-info (str "Missing API key for provider " (name provider)
+                                   ": environment variable " env-var
+                                   " is unset (env: keys are re-read per request"
+                                   " — export it and retry).")
+                              {:error-code "auth/missing-api-key"
+                               :provider provider}))
+              (throw (ex-info (str "Missing API key for provider " (name provider)
+                                   ". Configure the provider's :auth {:api-key ...} in models.edn"
+                                   ;; The suggested env var name normalizes kebab-case
+                                   ;; provider keys (- → _): :my-anthropic-proxy must
+                                   ;; suggest MY_ANTHROPIC_PROXY_API_KEY (bash
+                                   ;; identifiers cannot contain hyphens), not
+                                   ;; MY-ANTHROPIC-PROXY_API_KEY (review 12).
+                                   " (e.g. \"env:" (-> (name provider)
+                                                       (str/replace "-" "_")
+                                                       str/upper-case)
+                                   "_API_KEY\").")
+                              {:error-code "auth/missing-api-key"
+                               :provider provider}))))))
       api-key)))
 
 ;; ── Capture redaction ────────────────────────────────────────────────────────

@@ -296,6 +296,11 @@ rule ConsecutiveToolResultsMergedIntoSingleUserMessage {
 -- Primitives used below (shared vocabulary with spec/custom-providers.allium):
 --   Environment(name) — read an env var by name (System/getenv); nil when
 --     unset. Used for the built-in ANTHROPIC_API_KEY fallback.
+--   ResolveApiKey(spec) — the mechanical api-key spec resolution from
+--     spec/custom-providers.allium (ResolveApiKey rule): nil/blank → nil,
+--     "env:VAR" → Environment("VAR"), literal → as-is. Applied at REQUEST
+--     time (review 26): the registry stores the raw spec and the transports
+--     re-resolve env: keys per request.
 --   BlankOrNil(x) — x is nil or a blank/whitespace-only string
 --     (clojure.string/blank? semantics; nil counts as blank).
 --   HeaderName(header) — the header's name as a string (keyword/string names
@@ -324,11 +329,11 @@ rule ApiKeyResolved {
 
     ensures: not stream.model.custom
         and (stream.model.provider == null or stream.model.provider == "anthropic")
-        implies stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key) ?? Environment("ANTHROPIC_API_KEY")
     ensures: (stream.model.custom
               or (stream.model.provider != null and stream.model.provider != "anthropic"))
         and not stream.keyless
-        implies stream.resolved_api_key = stream.options.api_key
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key)
               and not BlankOrNil(stream.resolved_api_key)
     ensures: stream.keyless implies stream.resolved_api_key = null
 }

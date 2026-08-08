@@ -145,6 +145,9 @@ value ResolvedCustomModel {
 value ProviderAuth {
     provider: String
     api_key: String?
+    -- Review 26: the RAW api-key spec (literal or "env:VAR") — NOT resolved
+    -- at parse time. The transports' ResolveRequestApiKey applies the
+    -- mechanical ResolveApiKey resolution per request.
     auth_header: Boolean
     headers: Map<String, String>?
 }
@@ -241,6 +244,13 @@ rule ResolveApiKey {
     -- Resolve raw api-key spec to concrete string or nil.
     -- This is the mechanical resolution only; provider-scoped fallback and
     -- keyless exemptions are applied by ResolveRequestApiKey below.
+    --
+    -- Review 26: applied at REQUEST time, not models.edn parse time. The
+    -- registry stores the raw spec (extract-provider-auth), and the
+    -- transports' shared request-support/resolve-key-spec re-resolves
+    -- "env:VAR" through getenv per request — matching the built-in env
+    -- fallback's live semantics (a var exported after psi loaded models.edn
+    -- is picked up without a reload).
 
     when: ApiKeySpec(raw)
 
@@ -265,21 +275,27 @@ value RequestOptions {
 }
 
 rule ResolveRequestApiKey {
-    -- Provider-scoped API-key resolution for a request, matching the Anthropic
-    -- transport's resolve-api-key:
-    --   * built-in Anthropic models (not tagged custom, and provider nil or
-    --     "anthropic") fall back to the ANTHROPIC_API_KEY env var when no
+    -- Provider-scoped API-key resolution for a request, matching the shared
+    -- request-support/resolve-api-key used by all three transports:
+    --   * built-in models (not tagged custom, and provider nil or the
+    --     built-in provider kw) fall back to the built-in env var when no
     --     key is configured;
-    --   * custom :anthropic-messages providers NEVER fall back to
-    --     ANTHROPIC_API_KEY — a nil/blank configured key is an error naming
-    --     the provider and the models.edn :auth remedy, so an Anthropic key
-    --     can never be silently sent to a third-party endpoint (review 14:
-    --     the custom tag closes the provider-NAME gap — a custom provider
-    --     literally named "anthropic" is tagged custom and never classified
+    --   * custom providers NEVER fall back to the built-in env var — a
+    --     nil/blank configured key is an error naming the provider and the
+    --     models.edn :auth remedy, so the built-in key can never be silently
+    --     sent to a third-party endpoint (review 14: the custom tag closes
+    --     the provider-NAME gap — a custom provider literally named
+    --     "anthropic"/"openai" is tagged custom and never classified
     --     built-in);
     --   * keyless requests (see KeylessRequestDefined: explicit
     --     no_auth_header, or a recognized auth header among custom :headers
     --     with no configured key) require no key at all.
+    --
+    -- Review 26: options.api_key may be a RAW "env:VAR" spec (the registry
+    -- stores the spec, not a parse-time snapshot); ResolveApiKey re-resolves
+    -- it per request. A custom provider whose env:VAR is unset at request
+    -- time errors naming the variable ("environment variable VAR is unset —
+    -- env: keys are re-read per request").
 
     when: BuildPreparedRequest(session, model, options)
     requires: LookupProviderAuth(model.provider) != null
@@ -287,11 +303,14 @@ rule ResolveRequestApiKey {
     ensures: KeylessRequest(model, options) implies resolved_key = null
     ensures: not KeylessRequest(model, options)
         and not model.custom and (model.provider == null or model.provider == "anthropic")
-        implies resolved_key = options.api_key ?? SystemGetenv("ANTHROPIC_API_KEY")
+        implies resolved_key = ResolveApiKey(options.api_key) ?? SystemGetenv("ANTHROPIC_API_KEY")
     ensures: not KeylessRequest(model, options)
         and (model.custom or (model.provider != null and model.provider != "anthropic"))
-        and BlankOrNil(options.api_key)
-        implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn")
+        and BlankOrNil(ResolveApiKey(options.api_key))
+        implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn"
+                      + (if StartsWith(options.api_key, "env:")
+                          then " (environment variable " + Substring(options.api_key, 4) + " is unset — env: keys are re-read per request)"
+                          else ""))
 }
 
 rule KeylessRequestDefined {
@@ -366,6 +385,12 @@ rule InjectCustomProviderAuth {
     -- extract-provider-auth); the request-level KeylessRequest predicate
     -- (KeylessRequestDefined) applies the same rule to prepared request
     -- options.
+    --
+    -- Review 26: auth.api_key is the RAW spec (literal or "env:VAR") —
+    -- extract-provider-auth stores the spec verbatim; the request-level
+    -- ResolveRequestApiKey applies the mechanical ResolveApiKey resolution
+    -- per request (so ai_options.api_key = auth.api_key carries the raw spec
+    -- into options, resolved at request time).
 
     when: BuildPreparedRequest(session, model, options)
 

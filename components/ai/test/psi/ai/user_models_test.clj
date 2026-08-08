@@ -461,21 +461,29 @@
       (is (= :low (:latency-tier model)))
       (is (= :low (:cost-tier model))))
 
-    (testing "auth resolves provider-scoped from env:DEEPSEEK_API_KEY"
-      ;; Redefs the env lookup (getenv) to a sentinel so the resolution path
-      ;; is genuinely exercised — env:VAR → getenv → :api-key — instead of a
-      ;; tautological resolve-api-key-spec-vs-itself comparison.
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-sentinel")]
-        (let [auth (get-in (user-models/parse-models-config
-                            {:version 1
-                             :providers
-                             {"deepseek"
-                              {:base-url "https://api.deepseek.com/anthropic"
-                               :api      :anthropic-messages
-                               :auth     {:api-key "env:DEEPSEEK_API_KEY"}
-                               :models   [{:id "deepseek-v4-flash"}]}}})
-                           [:auth :deepseek])]
-          (is (= :deepseek (:provider auth)))
-          (is (= "sk-deepseek-sentinel" (:api-key auth))
-              "env:DEEPSEEK_API_KEY resolved through the env lookup")
-          (is (true? (:auth-header? auth))))))))
+    (testing "auth stores the raw env: spec; resolution happens per request"
+      ;; Review 26: the registry snapshots the RAW spec (not the resolved
+      ;; value) — extract-provider-auth stores "env:DEEPSEEK_API_KEY"
+      ;; verbatim, and the transports' shared
+      ;; request-support/resolve-key-spec re-resolves env: keys through
+      ;; getenv per request (matching the built-in env fallback's live
+      ;; semantics). The redef exercises the genuine resolution path —
+      ;; env:VAR → getenv → concrete key — instead of a tautological
+      ;; resolve-api-key-spec-vs-itself comparison.
+      (let [auth (get-in (user-models/parse-models-config
+                          {:version 1
+                           :providers
+                           {"deepseek"
+                            {:base-url "https://api.deepseek.com/anthropic"
+                             :api      :anthropic-messages
+                             :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+                             :models   [{:id "deepseek-v4-flash"}]}}})
+                         [:auth :deepseek])]
+        (is (= :deepseek (:provider auth)))
+        (is (= "env:DEEPSEEK_API_KEY" (:api-key auth))
+            "registry stores the raw env: spec — NOT snapshotted at parse time")
+        (is (true? (:auth-header? auth)))
+        (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-sentinel")]
+          (is (= "sk-deepseek-sentinel"
+                 (psi.ai.providers.request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))
+              "env:DEEPSEEK_API_KEY resolves through the shared request-time env lookup"))))))

@@ -110,6 +110,21 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   across the three transports) now live in
   `providers/request_support.clj`, parameterized by the built-in provider
   keyword + env var name. Pure refactor — no behavior change.
+- **Request-time `env:` key resolution (review 26):** custom-provider
+  `:api-key "env:VAR"` specs are stored RAW in the registry (not resolved
+  at models.edn parse time) and re-resolved through `getenv` per request by
+  the shared `request-support/resolve-api-key` — matching the built-in env
+  fallback's live semantics, so exporting the var after psi has loaded
+  models.edn works without a reload. The custom-provider missing-key error
+  now names the unset variable when the configured spec is an `env:` string.
+- **Shared built-in OpenAI chat-completions classification (review 26):**
+  agent-session's mid-conversation system-message inference
+  (`model_capabilities.clj`) now uses the shared
+  `request-support/builtin-openai-chat-completions?` predicate instead of
+  an inline `(and (= :openai provider) (= :openai-completions api)
+  (not :custom?))` copy, so the origin-tag built-in-classification
+  semantics (review 14) live in one place. Pure refactor — no behavior
+  change.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

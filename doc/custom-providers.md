@@ -201,6 +201,12 @@ Notes:
   Keyless requests (`:auth-header? false`/`:no-auth-header`, or a recognized
   `x-api-key`/`Authorization` header among custom `:headers` with no
   configured key) send no auth header at all.
+- `env:` keys are re-read on **every request**, not snapshot when psi loads
+  `models.edn`: you can export the variable after psi has started (or change
+  it in a different shell) and the next request picks it up — no reload
+  needed. If the variable is unset when a request is made, the error names
+  the variable (e.g. "environment variable MINIMAX_API_KEY is unset") so it
+  does not look like a config mistake.
 
 ## Anthropic-compatible example
 
@@ -335,6 +341,12 @@ Notes:
   `https://api.deepseek.com/anthropic/` would silently produce
   `https://api.deepseek.com/anthropic//v1/messages` (double slash). Use
   `https://api.deepseek.com/anthropic` exactly as shown.
+- `env:` keys are re-read on **every request**, not snapshot when psi loads
+  `models.edn`: you can `export DEEPSEEK_API_KEY=...` after psi has started
+  (or in a different shell) and the next request picks it up — no reload
+  needed. If the variable is unset when a request is made, the error names
+  the variable ("environment variable DEEPSEEK_API_KEY is unset — env: keys
+  are re-read per request") so it does not look like a config mistake.
 - pricing/context-window figures above are from DeepSeek's published pricing
   page as of this writing; confirm current figures in DeepSeek's own docs
   before relying on them for cost tracking
@@ -468,7 +480,9 @@ The `:auth` map supports more than just an API key:
 ```
 
 Use cases:
-- `:api-key` — literal key or `"env:VAR_NAME"`
+- `:api-key` — literal key or `"env:VAR_NAME"` (env: keys are re-read on
+  every request, not snapshotted when models.edn loads — export the variable
+  before the first request; no reload needed)
 - `:auth-header? false` — omit the normal auth header for servers that reject it
 - `:headers` — add custom request headers
 

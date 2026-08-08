@@ -97,6 +97,11 @@ value ProviderRequest {
 
 -- Environment(name): read an env var by name (System/getenv); nil when unset.
 --   Used for the built-in OPENAI_API_KEY fallback.
+-- ResolveApiKey(spec): the mechanical api-key spec resolution from
+--   spec/custom-providers.allium (ResolveApiKey rule): nil/blank → nil,
+--   "env:VAR" → Environment("VAR"), literal → as-is. Applied at REQUEST time
+--   (review 26): the registry stores the raw spec and the transports
+--   re-resolve env: keys per request.
 -- BlankOrNil(x) / IsBlank(x): x is nil or a blank/whitespace-only string
 --   (clojure.string/blank? semantics; nil counts as blank). The two names are
 --   synonyms; both appear below.
@@ -197,11 +202,11 @@ rule OpenAIApiKeyResolved {
 
     ensures: not stream.model.custom
         and (stream.model.provider == null or stream.model.provider == "openai")
-        implies stream.resolved_api_key = stream.options.api_key ?? Environment("OPENAI_API_KEY")
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key) ?? Environment("OPENAI_API_KEY")
     ensures: (stream.model.custom
               or (stream.model.provider != null and stream.model.provider != "openai"))
         and not stream.keyless
-        implies stream.resolved_api_key = stream.options.api_key
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key)
               and not IsBlank(stream.resolved_api_key)
     ensures: stream.keyless implies stream.resolved_api_key = null
 }
