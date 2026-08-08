@@ -1437,3 +1437,46 @@
       `scheduler-lifecycle-test`. The inventory now names all four known
       races (response-mode-retry, prompt-provider-retry, scheduler-lifecycle,
       model-dispatch).
+
+## Follow-ups (implementation review 18, 2026-08-08)
+
+- [ ] Openai test files' synthetic custom-provider fixtures omit the
+      `:custom?` origin tag (review-17 deferred boundary, confirmed still
+      present): every custom models.edn model is stamped `:custom? true` by
+      `expand-model` (review 14), but the literal custom-provider fixtures in
+      `openai_test.clj` (`:custom-codex`, `:my-codex-proxy`, `:local-codex`)
+      and `openai_completions_test.clj` (`:custom-chat`, `:my-openai-proxy`,
+      `:local-chat`, `:local3`) omit it. Behavior-neutral today (none of the
+      names collide with built-in `:openai`/`:anthropic`, so `builtin?`
+      classifies them custom either way), but it is the exact drift class
+      reviews 15/17 closed on the anthropic test files — a future
+      `builtin?`/`:custom?` semantics change (e.g. keying built-in-ness on
+      the tag alone) would silently change these tests' behavior. Fix: add
+      `:custom? true` to these fixtures (or extract a shared custom-provider
+      fixture helper that always carries the tag), mirroring
+      `anthropic_test.clj` / `anthropic_auth_test.clj` /
+      `anthropic_stream_test.clj`.
+- [ ] Design AC "`bb test` green" does not hold on current HEAD: post-task
+      human commit b26f84f25 ("update workflows to use deepseek") re-enabled
+      the `.psi/project.edn` deepseek workflow session-profiles that review 2
+      reverted (the f0c818cc1 regression class) — the delegate-review live
+      test fails when `deepseek/deepseek-v4-flash` is unresolvable (CI /
+      fresh checkout), so a full-suite run on HEAD is red for the documented
+      reason. The task's recorded full-suite green (ef4db8c0e, 2567 tests)
+      predates that commit. Before close, decide: treat b26f84f25 as an
+      intentional user-local override excluded from the task AC, or revert /
+      conditionalize the profiles so the committed tree stays green; either
+      way re-run `bb test` on the state being closed and record the result.
+- [ ] Custom `chatgpt-account-id` header interplay on the
+      `:openai-codex-responses` transport is untested and undocumented:
+      `build-codex-request` derives `chatgpt-account-id` from the resolved
+      key (omitted for keyless requests) but `(merge base-hdrs custom)` lets
+      a custom `chatgpt-account-id` header silently replace the derived
+      value (configured-key case) or supply one (keyless case). The
+      review-11/14 interplay locks
+      (`codex-configured-key-plus-recognized-auth-header-interplay-test`)
+      cover only `Authorization`/`X-API-Key`, and doc/custom-providers.md's
+      "don't mix" guidance names only auth headers. Add a codex interplay
+      assertion (custom account-id header with a configured key → replaces
+      the derived value; keyless + custom account-id → passes through)
+      and/or a doc sentence naming the override.

@@ -941,3 +941,4 @@
   `psi.ai.providers.anthropic-stream-test` 10/94 green (unchanged counts —
   the `:custom?` fixture tags are behavior-neutral);
   clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
+- Review 18 (2026-08-08): added 3 steps to be addressed.
