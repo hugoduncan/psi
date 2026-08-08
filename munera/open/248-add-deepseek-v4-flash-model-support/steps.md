@@ -2173,3 +2173,66 @@
       → Resolved: `(is (true? (:custom? model)))` added to the parse-lock's
       first testing block (with a review-25 comment naming the merge-order
       regression it guards). Namespace green (16 tests / 115 assertions).
+
+## Follow-ups (implementation review 26, 2026-08-08)
+
+- [ ] `env:VAR` custom-provider API keys are snapshotted at models.edn parse
+      time, not re-read per request: `extract-provider-auth` (user_models.clj)
+      resolves `"env:DEEPSEEK_API_KEY"` via `resolve-api-key-spec` once when
+      the model registry loads, and the resolved value (or nil) is stored in
+      `registry-state :auth` and served per request by
+      `provider-auth/provider-api-key` → `session->request-options` → the
+      transports' `resolve-api-key` (which only ever sees the
+      already-resolved `:api-key options`). The built-in anthropic/openai env
+      fallback IS request-time (`request-support/getenv` inside
+      `resolve-api-key`), so custom `env:` keys are the odd case. Consequence
+      for the task's headline example: a user who exports `DEEPSEEK_API_KEY`
+      AFTER psi has already loaded models.edn (psi running, or the var set in
+      a different shell than the one that started psi) keeps getting the
+      review-3/12 "Missing API key for provider deepseek" error — and that
+      error tells them to configure models.edn `:auth {:api-key ...}`, which
+      they already did, so it is actively misleading (the var WAS set; the
+      registry just snapshotted nil at load). Verified live (2026-08-08):
+      `parse-models-config` on the documented `env:DEEPSEEK_API_KEY` auth with
+      `getenv` returning a sentinel yields the sentinel in `:auth`, while
+      with `getenv` → nil the same config yields nil — the resolution happens
+      entirely inside parse, and nothing re-resolves at request time.
+      Fix options: (a) resolve `env:` specs at request time — store the raw
+      spec (e.g. "env:DEEPSEEK_API_KEY") in the registry auth and have the
+      transports' shared `request-support/resolve-api-key` re-resolve through
+      `getenv` per request (making custom providers match the built-in env
+      fallback's live semantics); or (b) minimally, document in
+      doc/custom-providers.md next to "Then export your key" that `env:` keys
+      are read when models.edn loads and env changes require a models reload
+      (`refresh!`/restart), and consider having the custom-provider
+      missing-key error hint "env:VAR was unset at models load time" when the
+      configured spec is an `env:` string — so the error stops looking like a
+      config mistake. Option (a) is the behavior fix; (b) is the
+      doc/UX-only fallback.
+- [ ] `supports-mid-system-messages?` (components/agent-session/src/psi/
+      agent_session/model_capabilities.clj) re-implements built-in
+      classification inline — `(and (= :openai (:provider model))
+      (= :openai-completions (:api model)) (not (:custom? model)))` — instead
+      of reusing the shared `request-support/builtin?` predicate that all
+      three provider transports have used since review 14 ("so future fixes
+      land once"). The review-25 fix added the `:custom?` origin-tag guard to
+      this inline copy, but the origin-tag built-in-classification semantics
+      now live in TWO places: `request-support/builtin?` (ai component,
+      `(not (:custom? model))` + provider nil/builtin-name) and this
+      agent-session branch. The next origin-tag/builtin-classification change
+      (new built-in provider keyword, different tag semantics, a
+      `:custom?`-adjacent field) can silently drift one of them — the exact
+      triplication failure review 14/16 consolidated inside the ai component,
+      which never reached this agent-session predicate. Note the api
+      constraint must be preserved: the inference is intentionally
+      chat-completions-only (codex-routed built-ins like gpt-5.5/
+      gpt-5.6-* under OAuth must NOT get the inference from this branch).
+      Fix: extract a shared "built-in openai chat-completions" predicate
+      (e.g. `(and (request-support/builtin? model :openai)
+      (= :openai-completions (:api model)))`) in `psi.ai.providers.
+      request-support` (or reuse `builtin?` directly with the api constraint
+      at the call site), and have `supports-mid-system-messages?` call it —
+      agent-session's model-capabilities already depends on the ai component
+      (`psi.ai.model-registry`), so the require is available. Add/extend a
+      direct model-capabilities test locking the custom-provider-named-openai
+      (`:custom? true`) exclusion through the shared predicate.

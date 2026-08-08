@@ -1367,3 +1367,4 @@
   (doc/custom-providers.md, spec mirror); parse-lock `:custom? true`
   assertion (user_models_test.clj). Namespaces green (user-models 16/115,
   model-dispatch 13/158); clj-kondo + file-lengths clean.
+- Review 26 (2026-08-08): added 2 steps to be addressed.
