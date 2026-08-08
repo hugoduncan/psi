@@ -1440,7 +1440,7 @@
 
 ## Follow-ups (implementation review 18, 2026-08-08)
 
-- [ ] Openai test files' synthetic custom-provider fixtures omit the
+- [x] Openai test files' synthetic custom-provider fixtures omit the
       `:custom?` origin tag (review-17 deferred boundary, confirmed still
       present): every custom models.edn model is stamped `:custom? true` by
       `expand-model` (review 14), but the literal custom-provider fixtures in
@@ -1456,7 +1456,22 @@
       fixture helper that always carries the tag), mirroring
       `anthropic_test.clj` / `anthropic_auth_test.clj` /
       `anthropic_stream_test.clj`.
-- [ ] Design AC "`bb test` green" does not hold on current HEAD: post-task
+      → Resolved: `:custom? true` added to every synthetic custom-provider
+      fixture in both named files — `openai_test.clj` (`:custom-codex`,
+      `:my-codex-proxy`, `:local-codex`) and `openai_completions_test.clj`
+      (`:custom-chat`, `:my-openai-proxy`, `:local-chat`, `:local3`), plus
+      the bare `:local` fixtures in both files (same drift class, named in
+      the review-17 boundary note) — 21 fixtures tagged, all behavior-neutral
+      (non-built-in provider names; `builtin?` requires `:custom?` false, so
+      the tag only changes built-in classification). The already-tagged
+      custom-provider-named-`"openai"` fixtures and built-in
+      `:provider :openai` catalog fixtures were left untouched.
+      `psi.ai.providers.openai-test` 16/88 and
+      `psi.ai.providers.openai-completions-test` 16/70 green; clj-kondo +
+      cljfmt clean. Note: `openai_request_headers_test.clj`'s custom `:local`
+      fixtures remain untagged (outside this item's named scope; boundary
+      recorded in implementation.md).
+- [x] Design AC "`bb test` green" does not hold on current HEAD: post-task
       human commit b26f84f25 ("update workflows to use deepseek") re-enabled
       the `.psi/project.edn` deepseek workflow session-profiles that review 2
       reverted (the f0c818cc1 regression class) — the delegate-review live
@@ -1467,7 +1482,27 @@
       intentional user-local override excluded from the task AC, or revert /
       conditionalize the profiles so the committed tree stays green; either
       way re-run `bb test` on the state being closed and record the result.
-- [ ] Custom `chatgpt-account-id` header interplay on the
+      → Resolved (option b — revert the activation; decision 2026-08-08):
+      the failure is NOT CI-only — verified the delegate-review live test
+      fails deterministically on this machine too ("unknown model
+      deepseek/deepseek-v4-flash": the live test snapshots the committed
+      session profiles against a temp model registry containing only
+      `local/test-model`, so the deepseek profiles are unresolvable
+      everywhere, user-global models.edn notwithstanding). Option (a) would
+      leave the task unable to demonstrate its AC on any machine, so
+      `.psi/project.edn` was restored to the review-2-established committed
+      default (ef4db8c0e state): built-in anthropic catalog profiles active,
+      deepseek + openai maps kept commented with the existing explanatory
+      note — the human's local deepseek workflow preference remains a
+      one-line local flip, and the file's own comment documents this
+      convention. Delegate-review live test green again (3 tests / 21
+      assertions). Full `bb test` on the state being closed: 2567 tests /
+      19271 assertions / 0 failures (one run hit the documented
+      scheduler-lifecycle flake, one run hit a newly-observed
+      `workflow_judge_cancellation_test.clj` timing flake — both pass in
+      isolation and are pre-existing; see implementation.md flake
+      inventory).
+- [x] Custom `chatgpt-account-id` header interplay on the
       `:openai-codex-responses` transport is untested and undocumented:
       `build-codex-request` derives `chatgpt-account-id` from the resolved
       key (omitted for keyless requests) but `(merge base-hdrs custom)` lets
@@ -1480,3 +1515,19 @@
       assertion (custom account-id header with a configured key → replaces
       the derived value; keyless + custom account-id → passes through)
       and/or a doc sentence naming the override.
+      → Resolved (both options): `openai_test.clj`
+      `codex-configured-key-plus-recognized-auth-header-interplay-test` gains
+      two testing blocks — (1) configured key + custom `chatgpt-account-id`
+      header → the custom value REPLACES the derived account id (configured
+      key's account id not sent; configured key still sent as the bearer
+      Authorization); (2) keyless (`:no-auth-header true`) + custom
+      `chatgpt-account-id` header → passes through unmodified (supplies an
+      account id for a keyless request, no Authorization). `doc/
+      custom-providers.md` "Local servers and custom headers" merge
+      paragraph now names the `:openai-codex-responses` `chatgpt-account-id`
+      override (replaces the derived value; supplies one for keyless
+      requests; don't mix a configured `:api-key` with a custom
+      `chatgpt-account-id` header either). No production code change — the
+      behavior is inherent in `build-codex-request`'s `(merge base-hdrs
+      custom)` (design AC forbids transport changes). Namespace green (16
+      tests / 88 assertions; +4 assertions from the two blocks).

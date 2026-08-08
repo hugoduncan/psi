@@ -209,6 +209,7 @@
     (let [base-model {:id                 "custom-chat-model"
                       :name               "Custom Chat Model"
                       :provider           :custom-chat
+                      :custom? true
                       :api                :openai-completions
                       :base-url           "https://example.com/v1"
                       :supports-reasoning true
@@ -247,6 +248,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -270,6 +272,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -295,6 +298,7 @@
     (let [model {:id "my-proxy-model"
                  :name "My Proxy Model"
                  :provider :my-openai-proxy
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://my-proxy.example.com/v1"
                  :supports-reasoning true
@@ -328,6 +332,7 @@
     (let [model {:id "local-chat-model"
                  :name "Local Chat Model"
                  :provider :local-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "http://localhost:8080/v1"
                  :supports-reasoning true
@@ -350,6 +355,7 @@
     (let [model {:id "local-chat-model"
                  :name "Local Chat Model"
                  :provider :local-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "http://localhost:8080/v1"
                  :supports-reasoning true
@@ -374,6 +380,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -437,6 +444,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -458,6 +466,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -487,6 +496,7 @@
     (let [model {:id "custom-chat-model"
                  :name "Custom Chat Model"
                  :provider :custom-chat
+                 :custom? true
                  :api :openai-completions
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -536,6 +546,7 @@
   (let [model {:id                 "local-completions"
                :name               "Local Completions"
                :provider           :local
+               :custom? true
                :api                :openai-completions
                :base-url           "http://localhost:8080/v1"
                :locality           :local
@@ -601,6 +612,7 @@
   (testing "non-streaming local OpenAI-compatible responses keep usage totals"
     (let [model {:id "qwen-3.6-27b"
                  :provider :local3
+                 :custom? true
                  :api :openai-completions
                  :base-url "http://localhost:8082/v1"
                  :supports-text true}
@@ -672,6 +684,7 @@
   (testing "chat completions keep trailing usage when finish_reason arrives before usage"
     (let [model {:id "qwen-3.6-27b"
                  :provider :local3
+                 :custom? true
                  :api :openai-completions
                  :base-url "http://localhost:1234"
                  :supports-text true}

@@ -141,6 +141,7 @@
       (let [model           {:id                 "local-codex"
                              :name               "Local Codex"
                              :provider           :local
+                             :custom? true
                              :api                :openai-codex-responses
                              :base-url           "http://localhost:8080/v1"
                              :supports-reasoning true
@@ -260,6 +261,7 @@
     (let [model {:id "custom-codex-model"
                  :name "Custom Codex Model"
                  :provider :custom-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -283,6 +285,7 @@
     (let [model {:id "my-proxy-codex"
                  :name "My Proxy Codex"
                  :provider :my-codex-proxy
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "https://my-proxy.example.com/v1"
                  :supports-reasoning true
@@ -322,6 +325,7 @@
     (let [model {:id "local-codex"
                  :name "Local Codex"
                  :provider :local-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "http://localhost:8080/v1"
                  :supports-reasoning true
@@ -346,6 +350,7 @@
     (let [model {:id "local-codex"
                  :name "Local Codex"
                  :provider :local-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "http://localhost:8080/v1"
                  :supports-reasoning true
@@ -372,6 +377,7 @@
     (let [model {:id "custom-codex-model"
                  :name "Custom Codex Model"
                  :provider :custom-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -431,6 +437,7 @@
     (let [model {:id "custom-codex-model"
                  :name "Custom Codex Model"
                  :provider :custom-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -456,6 +463,7 @@
     (let [model {:id "custom-codex-model"
                  :name "Custom Codex Model"
                  :provider :custom-codex
+                 :custom? true
                  :api :openai-codex-responses
                  :base-url "https://example.com/v1"
                  :supports-reasoning true
@@ -478,7 +486,67 @@
       (is (= "acc_configured" (get-in req [:headers "chatgpt-account-id"]))
           "chatgpt-account-id derived from the configured key")
       (is (= "other-key" (get-in req [:headers "X-API-Key"]))
-          "custom X-API-Key header merged in as-is — duplicate auth header on the wire"))))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
+
+  (testing "custom chatgpt-account-id header replaces the derived value (configured-key case)"
+    ;; Review 18: build-codex-request derives chatgpt-account-id from the
+    ;; resolved key, but (merge base-hdrs custom) lets a custom
+    ;; chatgpt-account-id header silently replace the derived value — the
+    ;; same merge behavior locked for Authorization/X-API-Key in review 14.
+    (let [model {:id "custom-codex-model"
+                 :name "Custom Codex Model"
+                 :provider :custom-codex
+                 :custom? true
+                 :api :openai-codex-responses
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request
+                 convo model
+                 {:api-key (jwt-with-account-id "acc_configured")
+                  :headers {"chatgpt-account-id" "custom-account"}})]
+      (is (= "custom-account" (get-in req [:headers "chatgpt-account-id"]))
+          "custom chatgpt-account-id header replaces the derived value — the configured key's account id is not sent")
+      (is (= (str "Bearer " (jwt-with-account-id "acc_configured"))
+             (get-in req [:headers "Authorization"]))
+          "configured key still sent as the bearer Authorization header")))
+
+  (testing "keyless codex request + custom chatgpt-account-id header passes through"
+    ;; Review 18: a keyless request derives no account id (no api-key), so a
+    ;; custom chatgpt-account-id header legitimately supplies one — it must
+    ;; pass through unmodified rather than being stripped.
+    (let [model {:id "local-codex"
+                 :name "Local Codex"
+                 :provider :local-codex
+                 :custom? true
+                 :api :openai-codex-responses
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (openai/build-codex-request
+                 convo model
+                 {:no-auth-header true
+                  :headers {"chatgpt-account-id" "custom-account"}})]
+      (is (= "custom-account" (get-in req [:headers "chatgpt-account-id"]))
+          "keyless request passes the custom chatgpt-account-id header through")
+      (is (nil? (get-in req [:headers "Authorization"]))
+          "no Authorization for a keyless request"))))
 (deftest codex-adaptive-thinking-ignored-for-custom-providers-test
   ;; Review 15: the doc/custom-providers.md claim that :adaptive-thinking "is
   ;; ignored for OpenAI-compatible custom providers" now names

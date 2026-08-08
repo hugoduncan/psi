@@ -414,7 +414,12 @@ exact-case `x-api-key` collides with it and silently replaces the configured
 key; on the `:openai-completions` and `:openai-codex-responses` transports a
 custom `Authorization` (exact-case) replaces the resolved bearer key, while
 a lowercase `authorization` duplicates beside it — the server's
-case-insensitive header merge decides. Pick one auth mechanism per provider.
+case-insensitive header merge decides. On the `:openai-codex-responses`
+transport the same merge lets a custom `chatgpt-account-id` header replace
+the account id psi derives from the resolved key (and, for keyless codex
+requests, supply one that would otherwise be omitted) — don't mix a
+configured `:api-key` with a custom `chatgpt-account-id` header either. Pick
+one auth mechanism per provider.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is

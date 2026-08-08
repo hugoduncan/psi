@@ -942,3 +942,79 @@
   the `:custom?` fixture tags are behavior-neutral);
   clj-kondo clean (0 errors, 0 warnings) on all changed source + test files.
 - Review 18 (2026-08-08): added 3 steps to be addressed.
+
+## Follow-ups review 18 addressed (2026-08-08)
+
+- addressed 3 review steps (all review-18 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Openai fixture origin-tag drift closed (review-18 item 1): `:custom? true`
+  added to every synthetic custom-provider fixture in `openai_test.clj`
+  (`:custom-codex`, `:my-codex-proxy`, `:local-codex`) and
+  `openai_completions_test.clj` (`:custom-chat`, `:my-openai-proxy`,
+  `:local-chat`, `:local3`), plus the bare `:local` fixtures in both files
+  (same drift class, named in the review-17 boundary note) — 21 fixtures,
+  all behavior-neutral (`builtin?` requires `:custom?` false, so the tag only
+  changes built-in classification; none of these names are built-in).
+  Already-tagged `"openai"`-named custom fixtures and built-in
+  `:provider :openai` catalog fixtures untouched. Boundary: the custom
+  `:local` fixtures in `openai_request_headers_test.clj` remain untagged —
+  outside this item's named scope (mirrors the review-17 boundary for the
+  openai files; available for a future follow-up if reviewers want them).
+- project.edn deepseek-activation regression resolved (review-18 item 2 —
+  decision: revert the activation): verified the delegate-review live test
+  fails DETERMINISTICALLY on this machine too, not just CI — "unknown model
+  deepseek/deepseek-v4-flash" (the live test snapshots the committed
+  session profiles against a temp model registry containing only
+  `local/test-model`, so the deepseek profiles are unresolvable everywhere,
+  user-global models.edn notwithstanding — the review-2 note's "developer
+  machine can resolve" hypothesis is incorrect for this test). Option (a)
+  (treat b26f84f25 as intentional user-local override excluded from the AC)
+  was therefore rejected: it would leave the task unable to demonstrate its
+  AC ("`bb test` green") on any machine. Restored `.psi/project.edn` to the
+  review-2-established committed default (ef4db8c0e state): built-in
+  anthropic catalog profiles active, deepseek + openai maps kept commented
+  with the existing explanatory note — the human's local deepseek workflow
+  preference remains a one-line local flip and the file's own comment
+  documents this convention (b26f84f25's only change was project.edn; the
+  restore is byte-identical to ef4db8c0e's file). Delegate-review live test
+  green again (3 tests / 21 assertions).
+- Codex `chatgpt-account-id` interplay locked + documented (review-18 item
+  3): `codex-configured-key-plus-recognized-auth-header-interplay-test`
+  gains two blocks — configured key + custom `chatgpt-account-id` →
+  custom replaces the derived value (configured key still sent as bearer
+  Authorization); keyless (`:no-auth-header true`) + custom
+  `chatgpt-account-id` → passes through unmodified (supplies an account id
+  for a keyless request, no Authorization). doc/custom-providers.md "Local
+  servers and custom headers" merge paragraph names the
+  `:openai-codex-responses` override. No production code change — the
+  behavior is inherent in `build-codex-request`'s `(merge base-hdrs
+  custom)` (design AC forbids transport changes).
+- NEW flake observed + inventoried (5th entry): a full-suite run (seed
+  1292130533; 2566 passed / 1 failed) failed
+  `workflow_judge_cancellation_test.clj/judge-turn-dispatch-cancel-cannot-
+  land-between-final-read-and-prompt-submit-test` ("the judge prompt entry
+  is ordered before the D31 cancel checkpoint, not after it"). Verified
+  pre-existing: passes in isolation (8 tests / 34 assertions green);
+  `components/agent-session/` has zero diff across the task commit range
+  (3c286a46e → HEAD); the test file was last touched by 04861433f
+  ("Fix tool-result duplication and workflow cancellation"), an ancestor of
+  the task base — same scheduler-timing race class as the four documented
+  flakes. Added to the flake inventory: known races are now (1)
+  `response-mode-retry-test`, (2)
+  `prompt-provider-retry-after-tool-result...`, (3)
+  `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-
+  lifecycle-test`, (4) `model-dispatch-test/model-thinking-dispatch-test`,
+  (5) `workflow_judge_cancellation_test/judge-turn-dispatch-cancel-cannot-
+  land-between-final-read-and-prompt-submit-test`.
+- Verification (state being closed): full `bb test` green — 2567 tests /
+  19271 assertions / 0 failures (two prior runs each hit one documented/
+  inventoried flake: judge-turn-dispatch-cancel..., then scheduler-lifecycle
+  — both pass in isolation, pre-existing). `psi.ai.providers.openai-test`
+  16/88 (was 16/84; +4 assertions from the two new interplay blocks),
+  `psi.ai.providers.openai-completions-test` 16/70 (unchanged — tags
+  behavior-neutral); delegate-review live test 3/21 green. clj-kondo clean
+  (0 errors, 0 warnings) on all changed test files; `bb fmt:check` clean;
+  `bb commit-check:file-lengths` clean.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment (verified again 2026-08-08); request-shaping coverage
+  only by design (steps.md item left unchecked).
