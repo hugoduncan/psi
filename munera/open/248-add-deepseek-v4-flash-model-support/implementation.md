@@ -1402,3 +1402,37 @@
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment; request-shaping coverage only by design.
 - Review 27 (2026-08-08): added 4 steps to be addressed.
+
+## Follow-ups review 27 addressed (2026-08-08)
+
+- addressed 4 review steps (review-27; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- doc/custom-providers.md mid-system inference claims qualified as
+  built-in-only in both places ("What a provider definition contains" +
+  DeepSeek example note): only built-in OpenAI chat-completions catalog
+  models get `:supports-mid-conversation-system-messages` inferred from the
+  runtime API shape; a custom models.edn provider named "openai" is tagged
+  `:custom? true` and does not — every custom OpenAI-compatible provider
+  must declare the field explicitly. Both paragraphs now agree with the
+  adjacent "Note on `:custom?`" and `request-support/builtin-openai-chat-completions?`.
+- CHANGELOG: `Added` entry parenthetical corrected to "built-in-only — only
+  built-in `:openai`/`:openai-completions` catalog models get it inferred";
+  new `Changed` entry documents the built-in gating of the inference
+  (custom provider named "openai" previously received the inferred
+  capability by name; now must declare the field explicitly, else
+  `:session/inject-mid-system-message` returns `:capability-not-supported`).
+- `resolve-key-spec` env: prefix case-sensitivity documented (docs option,
+  in scope): doc/custom-providers.md `:api-key` bullet + `resolve-key-spec`
+  docstring now state the `env:` prefix is case-sensitive (lowercase `env:`
+  only; `ENV:VAR`/`Env:VAR` sent as a literal key, provider-side 401, never
+  an env lookup). Chose docs over case-insensitive handling (design AC
+  forbids changing key-resolution logic in this task).
+- Codex deftest dedup: seven byte-identical deftests deleted from
+  `openai_test.clj` (canonical copies remain in `openai_codex_test.clj`);
+  file 775 → 607 lines, under the 800-line commit gate. Helpers remain used.
+- Verification: full `bb test` green (2579 tests / 19383 assertions /
+  0 failures; test count 2586→2579 = exactly the 7 removed duplicates);
+  `psi.ai.providers.openai-test` 9/65, `psi.ai.providers.openai-codex-test`
+  9/30, `psi.ai.user-models-test` 16/116 (doc parse-lock unaffected by the
+  prose edits), `psi.agent-session.model-dispatch-test` 13/161 green;
+  clj-kondo clean; `bb commit-check:file-lengths` passes.

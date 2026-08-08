@@ -28,6 +28,12 @@
    - \"env:VAR\" → (getenv \"VAR\"), nil if unset
    - anything else → the literal string
 
+   The `env:` prefix is case-sensitive: only the exact lowercase `env:`
+   prefix triggers environment lookup — \"ENV:VAR\"/\"Env:VAR\" fall through
+   to the literal branch and are sent as the key verbatim (provider-side
+   401, never an env lookup). Docs and the missing-key error suggestion use
+   lowercase `env:` consistently.
+
    Custom-provider `env:` keys are stored RAW in the registry (not resolved
    at models.edn parse time, review 26) and re-resolved here per request —
    matching the built-in env fallback's live semantics, so exporting the var

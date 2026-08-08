@@ -2278,7 +2278,7 @@
 
 ## Follow-ups (implementation review 27, 2026-08-08)
 
-- [ ] `doc/custom-providers.md` mid-conversation system-message inference
+- [x] `doc/custom-providers.md` mid-conversation system-message inference
       claim is stale after the review-25/26 built-in gating: "What a provider
       definition contains" says "only OpenAI chat-completions models
       (`:openai`/`:openai-completions`) get the capability inferred from the
@@ -2296,7 +2296,18 @@
       claims. Fix: qualify the inference as built-in-only in both places
       (custom OpenAI-compatible providers must declare the field; a custom
       provider named "openai" is tagged `:custom? true` and does not get it).
-- [ ] CHANGELOG `[Unreleased]` carries the same stale inference claim AND
+      → Resolved: both doc claims now qualify the inference as built-in-only.
+      "What a provider definition contains" states the inference applies only
+      to built-in OpenAI chat-completions catalog models (not tagged
+      `:custom?`), that a custom models.edn provider named "openai" is tagged
+      `:custom? true` and does not get it, and that every custom
+      OpenAI-compatible provider must declare the field explicitly; the
+      DeepSeek example note says the same. Both paragraphs now agree with the
+      adjacent "Note on `:custom?`" and with
+      `request-support/builtin-openai-chat-completions?`. Parse-lock
+      (`psi.ai.user-models-test`, reads the doc's EDN block) green — 16
+      tests / 116 assertions.
+- [x] CHANGELOG `[Unreleased]` carries the same stale inference claim AND
       has no entry for the review-25/26 behavior change: the review-22
       `Added` entry for `:supports-mid-conversation-system-messages` says
       "(only `:openai`/`:openai-completions` models get the capability
@@ -2311,7 +2322,16 @@
       and OAuth). Fix: correct the `Added` entry's parenthetical to
       "built-in" and add a `Changed` entry documenting the built-in gating
       of the inference.
-- [ ] `resolve-key-spec` (request_support.clj) recognizes only the lowercase
+      → Resolved: the `Added` entry's parenthetical now reads "the capability
+      inference is built-in-only — only built-in `:openai`/`:openai-
+      completions` catalog models get it inferred from the runtime API
+      shape"; a new `[Unreleased]` → `Changed` entry documents the built-in
+      gating of the inference (custom provider named "openai", tagged
+      `:custom? true`, previously received the inferred capability by name —
+      now must declare the field explicitly, else
+      `:session/inject-mid-system-message` returns
+      `:capability-not-supported`).
+- [x] `resolve-key-spec` (request_support.clj) recognizes only the lowercase
       `"env:"` prefix: `"ENV:DEEPSEEK_API_KEY"` or `"Env:..."` (or `" env:..."`)
       falls through to the literal branch and is sent as the API key verbatim
       — a silently bogus key (provider-side 401) instead of the clear
@@ -2324,7 +2344,17 @@
       case-sensitive — lowercase `env:` only") and/or the
       `resolve-key-spec` docstring; or handle the prefix case-insensitively
       with a test in request_support_test.clj.
-- [ ] Pre-existing codex deftest duplication in `openai_test.clj` (flagged
+      → Resolved (docs option, in scope): `doc/custom-providers.md` `:api-key`
+      bullet now notes the `env:` prefix is case-sensitive — lowercase `env:`
+      only, so `ENV:VAR`/`Env:VAR` is sent as a literal key and fails
+      provider-side; `request_support.clj` `resolve-key-spec` docstring now
+      states the same (only exact lowercase `env:` triggers env lookup; other
+      casings fall through to the literal branch, provider-side 401, never an
+      env lookup). Chose documentation over case-insensitive handling to keep
+      behavior byte-stable (the design AC forbids changing provider
+      request-shaping/key-resolution logic in this task); the docs and the
+      missing-key error suggestion already emit lowercase `env:` only.
+- [x] Pre-existing codex deftest duplication in `openai_test.clj` (flagged
       in review 21's resolution as "outside review-21 scope; flagged here for
       a future dedup", never opened as a follow-up): the seven codex deftests
       `codex-requires-chatgpt-token-test`,
@@ -2343,3 +2373,14 @@
       the seven duplicates from `openai_test.clj` (or make them delegate to
       the codex file) and re-verify `psi.ai.providers.openai-test` +
       `psi.ai.providers.openai-codex-test` + `bb commit-check:file-lengths`.
+      → Resolved: the seven byte-identical deftests are deleted from
+      `openai_test.clj` (verified byte-identical against
+      `openai_codex_test.clj`, the canonical copies remain there; the only
+      delta was a trailing blank line in one copy). `openai_test.clj` drops
+      775 → 607 lines, well under the 800-line commit gate. `jwt-with-account-id`
+      / `stream-body` helpers remain used by surviving tests (no orphans).
+      Verification: `psi.ai.providers.openai-test` 9 tests / 65 assertions
+      green (was 16/88 — exactly the 7 duplicates removed);
+      `psi.ai.providers.openai-codex-test` 9 tests / 30 assertions green;
+      `bb commit-check:file-lengths` passes (exit 0); clj-kondo clean on the
+      changed test file.

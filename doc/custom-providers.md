@@ -58,11 +58,14 @@ capability: the agent-session `:session/inject-mid-system-message` mutation
 returns `:capability-not-supported` unless the runtime active model supports
 it. The default depends on the transport — for `:anthropic-messages` custom
 providers the field defaults to `false` (omitted → not supported), so
-Anthropic-compatible providers must declare it explicitly; only OpenAI
-chat-completions models (`:openai`/`:openai-completions`) get the capability
-inferred from the runtime API shape. Set it `true` only after verifying the
-endpoint actually honours per-turn `system` changes (see the DeepSeek
-example notes).
+Anthropic-compatible providers must declare it explicitly. The inference is
+built-in-only: only built-in OpenAI chat-completions catalog models
+(`:openai`/`:openai-completions`, not tagged `:custom?`) get the capability
+inferred from the runtime API shape — a custom models.edn provider named
+"openai" is tagged `:custom? true` and does not, so every custom
+OpenAI-compatible provider must also declare the field explicitly. Set it
+`true` only after verifying the endpoint actually honours per-turn `system`
+changes (see the DeepSeek example notes).
 
 Note on `:custom?`: psi tags every custom models.edn model with an internal
 `:custom? true` origin marker at parse time. It is never declared in
@@ -328,10 +331,13 @@ Notes:
   "local" helper and receive conversation excerpts on the local-only path.
 - mid-conversation system messages are NOT enabled in this example:
   `:supports-mid-conversation-system-messages` defaults to `false` for
-  `:anthropic-messages` custom providers (only `:openai`/
-  `:openai-completions` models get the capability inferred), and DeepSeek's
-  compat table lists `system` as fully supported but per-turn `system`
-  changes (mid-conversation switching) are unverified against a live turn.
+  `:anthropic-messages` custom providers (the capability inference is
+  built-in-only — only built-in OpenAI chat-completions catalog models get
+  it; a custom models.edn provider named "openai" is tagged `:custom? true`
+  and does not, so every custom OpenAI-compatible provider must declare the
+  field explicitly), and DeepSeek's compat table lists `system` as fully
+  supported but per-turn `system` changes (mid-conversation switching) are
+  unverified against a live turn.
   Set `:supports-mid-conversation-system-messages true` on this model only
   after verifying DeepSeek's endpoint honours per-turn `system` changes;
   until then the `:session/inject-mid-system-message` capability returns
@@ -482,7 +488,9 @@ The `:auth` map supports more than just an API key:
 Use cases:
 - `:api-key` — literal key or `"env:VAR_NAME"` (env: keys are re-read on
   every request, not snapshotted when models.edn loads — export the variable
-  before the first request; no reload needed)
+  before the first request; no reload needed; the `env:` prefix is
+  case-sensitive — lowercase `env:` only, so `ENV:VAR` or `Env:VAR` is sent
+  as a literal key and fails provider-side)
 - `:auth-header? false` — omit the normal auth header for servers that reject it
 - `:headers` — add custom request headers
 
