@@ -81,3 +81,125 @@
     (is (true? (request-support/auth-header? "authorization")))
     (is (true? (request-support/auth-header? :x-api-key)))
     (is (false? (request-support/auth-header? "X-Client")))))
+
+(deftest builtin?-origin-tag-gate-test
+  ;; Review 24: builtin? is the review-14 origin-tag gate — the predicate
+  ;; that decides env-var fallback / OAuth treatment, and the most
+  ;; security-relevant helper in the namespace. Previously only exercised
+  ;; indirectly through transport tests.
+  (testing ":custom? absent → built-in classification by provider name/nil"
+    (is (true? (request-support/builtin? {:provider :anthropic} :anthropic)))
+    (is (true? (request-support/builtin? {:provider nil} :anthropic)))
+    (is (true? (request-support/builtin? {} :anthropic))
+        "nil provider is built-in"))
+  (testing ":custom? false → still built-in"
+    (is (true? (request-support/builtin? {:provider :anthropic :custom? false}
+                                         :anthropic))))
+  (testing ":custom? true → never built-in, even when named like the built-in"
+    (is (false? (request-support/builtin? {:provider :anthropic :custom? true}
+                                          :anthropic))
+        "a custom models.edn provider literally named anthropic is NOT built-in")
+    (is (false? (request-support/builtin? {:provider :openai :custom? true}
+                                          :anthropic))))
+  (testing "provider mismatch → not built-in"
+    (is (false? (request-support/builtin? {:provider :openai} :anthropic)))
+    (is (false? (request-support/builtin? {:provider :deepseek} :anthropic)))
+    (is (false? (request-support/builtin? {:provider :deepseek :custom? true}
+                                          :anthropic)))))
+
+(deftest find-headers-case-insensitive-all-matches-test
+  ;; Review 19: redaction must find EVERY case-insensitive match per
+  ;; auth-header name — a differently-cased duplicate on the wire would
+  ;; otherwise leak verbatim into the :on-provider-request capture.
+  (testing "find-headers returns every case-insensitive match under its original casing"
+    (let [headers {"x-api-key" "configured" "X-API-Key" "custom" "X-Client" "psi"}]
+      (is (= #{["x-api-key" "configured"] ["X-API-Key" "custom"]}
+             (set (request-support/find-headers headers "x-api-key"))))
+      (is (= #{["x-api-key" "configured"] ["X-API-Key" "custom"]}
+             (set (request-support/find-headers headers "X-API-KEY"))))
+      (is (empty? (request-support/find-headers headers "authorization")))))
+  (testing "keyword keys match case-insensitively too"
+    (is (= [[:x-api-key "k"]]
+           (request-support/find-headers {:x-api-key "k"} "x-api-key")))))
+
+(deftest find-header-first-match-test
+  (testing "find-header returns the first case-insensitive match, or nil"
+    (let [[k v] (request-support/find-header {"x-api-key" "configured"
+                                              "X-API-Key" "custom"}
+                                             "x-api-key")]
+      (is (contains? #{"x-api-key" "X-API-Key"} k))
+      (is (contains? #{"configured" "custom"} v)))
+    (is (nil? (request-support/find-header {"X-Client" "psi"} "authorization")))))
+
+(deftest redact-secret-test
+  (testing "redact-secret emits ***REDACTED***, with a length suffix only for values > 20 chars"
+    (is (= "***REDACTED***" (request-support/redact-secret "short")))
+    (is (= "***REDACTED***" (request-support/redact-secret (apply str (repeat 20 "x")))))
+    (is (= "***REDACTED*** (len=21)"
+           (request-support/redact-secret (apply str (repeat 21 "x")))))
+    (is (= "***REDACTED*** (len=30)"
+           (request-support/redact-secret (apply str (repeat 30 "a"))))))
+  (testing "non-string values redact to nil"
+    (is (nil? (request-support/redact-secret nil)))
+    (is (nil? (request-support/redact-secret 42)))))
+
+(deftest redact-authorization-test
+  ;; Review 13: redact-authorization strips a leading "Bearer " prefix before
+  ;; counting, so (len=N) measures the secret itself, not the 7-char prefix.
+  (testing "Bearer-prefixed values count the secret only"
+    (is (= "Bearer ***REDACTED***"
+           (request-support/redact-authorization "Bearer short")))
+    (is (= "Bearer ***REDACTED*** (len=30)"
+           (request-support/redact-authorization
+            (str "Bearer " (apply str (repeat 30 "a")))))))
+  (testing "a token without the Bearer prefix is counted whole"
+    (is (= "Bearer ***REDACTED*** (len=30)"
+           (request-support/redact-authorization (apply str (repeat 30 "a"))))))
+  (testing "non-string values redact to nil"
+    (is (nil? (request-support/redact-authorization nil)))))
+
+(deftest mask-chatgpt-account-id-test
+  (testing "mask-chatgpt-account-id keeps the first 6 chars, then ..."
+    (is (= "acc_12..." (request-support/mask-chatgpt-account-id "acc_1234567890")))
+    (is (= "abc..." (request-support/mask-chatgpt-account-id "abc"))))
+  (testing "non-string values mask to nil"
+    (is (nil? (request-support/mask-chatgpt-account-id nil)))))
+
+(deftest redact-headers-all-matches-dual-casing-test
+  ;; Review 19: redact-headers must redact EVERY case-insensitive match per
+  ;; auth-header name (base x-api-key + custom X-API-Key, or Authorization +
+  ;; authorization) — redacting only the first would leak the duplicate
+  ;; verbatim into the capture. Redacted values are written back under the
+  ;; original key casing.
+  (testing "dual-casing x-api-key → both redacted, non-auth headers pass through"
+    (let [redacted (request-support/redact-headers
+                    {"x-api-key" "configured-key"
+                     "X-API-Key" "custom-secret"
+                     "X-Client"  "psi"}
+                    [["x-api-key" request-support/redact-secret]])]
+      (is (= "***REDACTED***" (get redacted "x-api-key")))
+      (is (= "***REDACTED***" (get redacted "X-API-Key"))
+          "the differently-cased duplicate is redacted too — no verbatim secret")
+      (is (= "psi" (get redacted "X-Client"))
+          "non-auth headers pass through unchanged")
+      (is (not (some #{"configured-key" "custom-secret"} (vals redacted))))))
+  (testing "dual-casing authorization → both Bearer-redacted with per-value lengths"
+    (let [redacted (request-support/redact-headers
+                    {"Authorization" (str "Bearer " (apply str (repeat 30 "a")))
+                     "authorization" (str "Bearer " (apply str (repeat 25 "b")))}
+                    [["Authorization" request-support/redact-authorization]])]
+      (is (= "Bearer ***REDACTED*** (len=30)" (get redacted "Authorization")))
+      (is (= "Bearer ***REDACTED*** (len=25)" (get redacted "authorization")))))
+  (testing "dual-casing chatgpt-account-id → both masked (review 21 mask semantics)"
+    (let [redacted (request-support/redact-headers
+                    {"chatgpt-account-id" "acc_1234567890"
+                     "ChatGPT-Account-Id" "acc_0987654321"}
+                    [["chatgpt-account-id" request-support/mask-chatgpt-account-id]])]
+      (is (= "acc_12..." (get redacted "chatgpt-account-id")))
+      (is (= "acc_09..." (get redacted "ChatGPT-Account-Id")))))
+  (testing "redacted values are written back under the original key casing"
+    (let [redacted (request-support/redact-headers
+                    {"X-API-Key" "secret"}
+                    [["x-api-key" request-support/redact-secret]])]
+      (is (contains? redacted "X-API-Key"))
+      (is (= "***REDACTED***" (get redacted "X-API-Key"))))))

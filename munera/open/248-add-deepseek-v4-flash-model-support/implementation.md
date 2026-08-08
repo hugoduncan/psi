@@ -1317,3 +1317,46 @@
   only by design (steps.md item left unchecked).
 
 - Review 24 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 24 addressed (2026-08-08)
+
+- addressed 2 review steps (all review-24 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY — verified again
+  2026-08-08)
+- `:custom?` origin tag added to the last untagged custom-provider fixture in
+  a task-touched test file: `openai_completions_logprobs_test.clj`'s
+  `:provider :local3` model map in
+  `completion-response-with-logprobs-and-missing-model-pricing-test` now
+  carries `:custom? true` (review-18 boundary closed; behavior-neutral —
+  `:local3` never collides with built-in names and the fixture only feeds
+  `completion-response->assistant-message`, which never reads `:custom?`).
+  `psi.ai.providers.openai-completions-logprobs-test` green (10 tests / 27
+  assertions, counts unchanged).
+- Direct shared-namespace unit tests added for the remaining
+  `request-support` primitives (review-24 item 2): `request_support_test.clj`
+  gains 7 deftests — `builtin?-origin-tag-gate-test` (`:custom?`
+  true/false/absent × provider nil/builtin/other; custom provider literally
+  named "anthropic" is NOT built-in — the review-14 origin-tag gate),
+  `find-headers-case-insensitive-all-matches-test` (all case-insensitive
+  matches under original casing; keyword keys), `find-header-first-match-test`,
+  `redact-secret-test` (length suffix only > 20 chars; non-strings → nil),
+  `redact-authorization-test` (Bearer prefix stripped before counting —
+  review-13 len semantics), `mask-chatgpt-account-id-test` (first-6-chars
+  masking), `redact-headers-all-matches-dual-casing-test` (dual-casing
+  x-api-key / Authorization / chatgpt-account-id → EVERY match redacted, no
+  verbatim secret, original key casing preserved, non-auth headers pass
+  through — review-19 semantics). A shared-namespace regression now fails
+  without needing the transport files. Namespace green (9 tests / 57
+  assertions, was 2/18).
+- Verification (state being closed): full `bb test` green — 2582 tests /
+  18667 assertions / 0 failures (+7 deftests vs the committed 2575 = the
+  seven new request-support tests; assertion count varies run-to-run per the
+  review-5 flake analysis — no known flake observed on this run);
+  `psi.ai.providers.request-support-test` 9/57 (was 2/18),
+  `psi.ai.providers.openai-completions-logprobs-test` 10/27 green;
+  clj-kondo clean (0 errors, 0 warnings) on both changed test files;
+  `bb fmt:check` clean; `bb commit-check:file-lengths` clean (both files
+  well under the 800-line gate).
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment (verified again 2026-08-08); request-shaping coverage
+  only by design (steps.md item left unchecked).

@@ -105,6 +105,7 @@
   (testing "non-streaming logprob response tolerates models without pricing metadata"
     (let [model  {:id "qwen-3.6-27b"
                   :provider :local3
+                  :custom? true
                   :api :openai-completions
                   :base-url "http://localhost:1234"
                   :supports-text true}

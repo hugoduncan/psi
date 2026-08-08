@@ -2040,7 +2040,7 @@
 
 ## Follow-ups (implementation review 24, 2026-08-08)
 
-- [ ] `openai_completions_logprobs_test.clj`'s literal custom-provider
+- [x] `openai_completions_logprobs_test.clj`'s literal custom-provider
       fixture (`:provider :local3`, line ~107,
       `completion-response-with-logprobs-and-missing-model-pricing-test`)
       lacks the `:custom? true` origin tag — the last untagged custom
@@ -2056,7 +2056,14 @@
       fixture's classification — the same gap the task closed everywhere
       else. Fix: add `:custom? true` (one line) and re-run
       `psi.ai.providers.openai-completions-logprobs-test`.
-- [ ] Direct shared-namespace unit tests for the remaining
+      → Resolved: `:custom? true` added to the `:local3` fixture (the model
+      map in `completion-response-with-logprobs-and-missing-model-pricing-test`),
+      matching the review-14 expand-model shape and closing the last
+      untagged custom fixture in a task-touched test file. Behavior-neutral
+      (`:local3` is never a built-in name; the fixture feeds only
+      `completion-response->assistant-message`). Namespace green (10 tests /
+      27 assertions, unchanged counts — the tag is behavior-neutral).
+- [x] Direct shared-namespace unit tests for the remaining
       `request-support` primitives: `request_support_test.clj` (review 22)
       locks `resolve-api-key`/`no-auth?`/`auth-header?` directly, but
       `builtin?` (the review-14 origin-tag gate — the predicate that
@@ -2071,3 +2078,17 @@
       `redact-headers` dual-casing all-matches semantics and
       `redact-authorization` Bearer-prefix length) so a shared-namespace
       regression fails without needing the transport files.
+      → Resolved: `request_support_test.clj` gains 7 direct deftests —
+      `builtin?-origin-tag-gate-test` (`:custom?` true/false/absent ×
+      provider nil/builtin/other; a custom provider literally named
+      "anthropic" is NOT built-in), `find-headers-case-insensitive-all-matches-test`
+      (every case-insensitive match under its original casing; keyword keys),
+      `find-header-first-match-test`, `redact-secret-test` (length suffix
+      only for values > 20 chars; non-strings → nil),
+      `redact-authorization-test` (Bearer prefix stripped before counting —
+      review-13 len semantics), `mask-chatgpt-account-id-test` (first-6-chars
+      masking), `redact-headers-all-matches-dual-casing-test` (dual-casing
+      x-api-key/Authorization/chatgpt-account-id → every match redacted, no
+      verbatim secret, original key casing preserved, non-auth headers pass
+      through). A shared-namespace regression now fails without needing the
+      transport files. Namespace green (9 tests / 57 assertions, was 2/18).
