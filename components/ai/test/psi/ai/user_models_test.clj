@@ -406,7 +406,15 @@
       (is (= 0.14 (:input-cost model)))
       (is (= 0.28 (:output-cost model)))
       (is (= 0.0028 (:cache-read-cost model)))
-      (is (= 0.14 (:cache-write-cost model))))
+      (is (= 0.14 (:cache-write-cost model)))
+      ;; Review 21: the example must NOT fall through to the custom-model
+      ;; defaults (:locality :local / :latency-tier :low / :cost-tier :zero)
+      ;; — a cloud model with defaulted locality can be selected for (and
+      ;; charged as) a "local" helper on psi's local-only helper paths.
+      (is (= :cloud (:locality model))
+          "example must classify deepseek-v4-flash as a cloud model")
+      (is (= :low (:latency-tier model)))
+      (is (= :low (:cost-tier model))))
 
     (testing "auth resolves provider-scoped from env:DEEPSEEK_API_KEY"
       ;; Redefs the env lookup (getenv) to a sentinel so the resolution path

@@ -310,7 +310,10 @@
    :input-cost 0.14
    :output-cost 0.28
    :cache-read-cost 0.0028
-   :cache-write-cost 0.14})
+   :cache-write-cost 0.14
+   :locality :cloud
+   :latency-tier :low
+   :cost-tier :low})
 
 (deftest build-request-adaptive-thinking-custom-provider-test
   (testing "a non-catalog custom-provider model map with :adaptive-thinking true emits the adaptive shape"

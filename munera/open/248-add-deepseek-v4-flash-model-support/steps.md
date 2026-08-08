@@ -1670,7 +1670,7 @@
 
 ## Follow-ups (implementation review 21, 2026-08-08)
 
-- [ ] The documented DeepSeek example misclassifies a cloud model as local/free:
+- [x] The documented DeepSeek example misclassifies a cloud model as local/free:
       `doc/custom-providers.md`'s `deepseek-v4-flash` model map sets none of
       `:locality`, `:latency-tier`, `:cost-tier`, so `expand-model`'s
       `model-defaults` apply — `:locality :local`, `:latency-tier :low`,
@@ -1691,7 +1691,27 @@
       the example. (The pre-existing MiniMax example has the same
       latency/cost omission but predates this task; scope this item to the
       DeepSeek example this task documents.)
-- [ ] `spec/openai-provider.allium` does not model the keyless request
+      → Resolved (all four sub-items): `doc/custom-providers.md` DeepSeek
+      example model map now sets `:locality :cloud` `:latency-tier :low`
+      `:cost-tier :low` explicitly; the "What a provider definition
+      contains" section now documents the three fields and their
+      `model-defaults` (`:locality :local`, `:latency-tier :low`,
+      `:cost-tier :zero`) plus the local-helper-selection implication
+      (context-manager requires `:latency-tier :low` + `:cost-tier
+      #{:zero :low}` with a strong `:locality :local` preference and a
+      non-local guard, so a cloud model with defaulted locality can be
+      selected for (and charged as) a "local" helper); the DeepSeek notes
+      gain a bullet naming the explicit values and the same consequence.
+      `parse-documented-deepseek-example-test` now asserts
+      `:locality :cloud`/`:latency-tier :low`/`:cost-tier :low` on the
+      parsed example (the guard locks); `deepseek-custom-provider-model`
+      (anthropic_test.clj) and the literal deepseek fixture in
+      `anthropic_stream_test.clj`'s adaptive-shape 400-retry test (same
+      drift class) aligned with the example. Verification:
+      `psi.ai.user-models-test` 15/108 (was 15/105; +3 locality/tier
+      assertions), anthropic namespaces green; clj-kondo clean; full `bb
+      test` green.
+- [x] `spec/openai-provider.allium` does not model the keyless request
       construction path: `CompletionsRequestBuilt` requires
       `not IsBlank(stream.resolved_api_key)` and `CodexRequestBuilt`
       requires `not IsBlank(stream.resolved_api_key)` AND
@@ -1712,7 +1732,24 @@
       `KeylessCodexRequestBuilt`) or relax the `requires` clauses and model
       the omitted auth headers. Manual allium-check (no automated checker in
       repo) per the established pattern.
-- [ ] `chatgpt-account-id` capture masking has no test lock: the shared
+      → Resolved (gate-the-keyless-build-separately option, mirroring the
+      anthropic spec): `spec/openai-provider.allium` gains
+      `KeylessCompletionsRequestBuilt` and `KeylessCodexRequestBuilt`
+      (`requires: stream.keyless`; body identical to the authenticated
+      build, guidance documents the omitted `Authorization` and — for codex
+      — omitted `chatgpt-account-id`, with the custom-header-supplied
+      account-id pass-through noted), and the authenticated
+      `CompletionsRequestBuilt`/`CodexRequestBuilt` rules now carry an
+      explicit `requires: not stream.keyless` so the keyless/authenticated
+      build paths are cleanly partitioned (keyless → nil key per
+      `OpenAIApiKeyResolved`, so the old `requires` already implied it; the
+      gate is self-documenting). No code change — spec-only. Manual
+      allium-check (no automated checker in repo): all referenced entities/
+      attributes (`stream.keyless`, `request_api`, `request_url`,
+      `resolved_api_key`, `chatgpt_account_id`, `ProviderRequestBuilt`,
+      `CompletionsRequestBody`, `CodexRequestBody`,
+      `RequestBodyDoesNotContain`) are defined in the spec.
+- [x] `chatgpt-account-id` capture masking has no test lock: the shared
       `request-support/mask-chatgpt-account-id` (first 6 chars + "...",
       review 11) is wired into `openai/transport.clj`
       `redact-request-headers`, but no capture-path test asserts the masked
@@ -1725,3 +1762,28 @@
       review-19 dual-casing locks) is masked to its first-6-chars form in
       the `:on-provider-request` payload, so the mask cannot silently regress
       to verbatim.
+      → Resolved: `openai_codex_test.clj` gains
+      `codex-chatgpt-account-id-capture-masked-test` — a keyless
+      `:openai-codex-responses` stream request (`:no-auth-header true`,
+      custom `:headers {"chatgpt-account-id" "acc_1234567890"
+      "ChatGPT-Account-Id" "acc_0987654321"}` passing through per the
+      review-18 keyless pass-through) asserts the `:on-provider-request`
+      payload masks BOTH casings to first-6-chars + "..."
+      (`"acc_12..."`/`"acc_09..."` under the original key casing — review-19
+      dual-casing semantics via the shared `find-headers`-based
+      `redact-headers`) and that the keyless request sends no
+      `Authorization`. The test lives in `openai_codex_test.clj` (the
+      existing codex transport test home) rather than `openai_test.clj`:
+      adding it to `openai_test.clj` pushed that file to 830 lines, failing
+      the repo `commit-check:file-lengths` gate (committed state 775);
+      moving it to the codex file keeps `openai_test.clj` at its committed
+      775 and the gate green (`openai_codex_test.clj` 267 lines). Note:
+      `openai_test.clj` still carries seven codex deftests
+      (`codex-requires-chatgpt-token`, `codex-reasoning-*`,
+      `codex-tool-call-id-roundtrip`, `codex-function-call-done`) that are
+      byte-identical to copies in `openai_codex_test.clj` — pre-existing
+      duplication (openai_codex_test.clj predates this task, commit
+      008b1e094) outside review-21's scope; recorded here for a future
+      dedup. Verification: `psi.ai.providers.openai-codex-test` 9/30 (was
+      8/27; +1 deftest +3 assertions), `psi.ai.providers.openai-test` 16/88
+      (unchanged); clj-kondo clean; full `bb test` green.

@@ -469,6 +469,7 @@ rule EmacsThinkingClearedOnTurnFinalize {
 rule CompletionsRequestBuilt {
     when: OpenAIStreamRequested(stream)
     requires: stream.request_api = openai_completions
+    requires: not stream.keyless
     requires: not IsBlank(stream.resolved_api_key)
 
     ensures: ProviderRequestBuilt(stream, ProviderRequest{
@@ -482,11 +483,39 @@ rule CompletionsRequestBuilt {
         -- Request body includes:
         --   model, messages, stream=true, stream_options.include_usage=true,
         --   temperature default 0, optional max_tokens/tools/reasoning_effort.
+        -- Authenticated build only; the keyless build is KeylessCompletionsRequestBuilt.
+}
+
+rule KeylessCompletionsRequestBuilt {
+    -- Review 21: a keyless :openai-completions request (:no-auth-header, or a
+    -- recognized auth header among custom :headers with no configured key —
+    -- the documented "Local servers and custom headers" pattern) had no
+    -- request-construction rule: CompletionsRequestBuilt requires a non-blank
+    -- resolved key, and OpenAIApiKeyResolved ensures keyless → nil key, so no
+    -- rule produced ProviderRequestBuilt for the keyless path. Mirrors the
+    -- anthropic spec, whose request-body rule has no key `requires`.
+
+    when: OpenAIStreamRequested(stream)
+    requires: stream.request_api = openai_completions
+    requires: stream.keyless
+
+    ensures: ProviderRequestBuilt(stream, ProviderRequest{
+        url: stream.request_url,
+        body: JsonEncode(CompletionsRequestBody(stream.conversation, stream.model, stream.options))
+    })
+
+    @guidance
+        -- Keyless build (build-request's no-auth? path in
+        -- providers/openai/chat_completions.clj): the body is identical to
+        -- the authenticated build, but NO Authorization header is sent
+        -- (the auth is carried by :no-auth-header config or a custom
+        -- x-api-key/Authorization header, or the endpoint needs none).
 }
 
 rule CodexRequestBuilt {
     when: OpenAIStreamRequested(stream)
     requires: stream.request_api = openai_codex_responses
+    requires: not stream.keyless
     requires: not IsBlank(stream.resolved_api_key)
     requires: not IsBlank(stream.chatgpt_account_id)
 
@@ -506,6 +535,36 @@ rule CodexRequestBuilt {
         --           "id": stream.options.id,
         --           "conversation_id": stream.options.id}
         -- Codex backend rejects top-level temperature; omit even when provided.
+        -- Authenticated build only; the keyless build is KeylessCodexRequestBuilt.
+}
+
+rule KeylessCodexRequestBuilt {
+    -- Review 21: a keyless :openai-codex-responses request had no
+    -- request-construction rule — CodexRequestBuilt requires a non-blank
+    -- resolved key AND a non-blank chatgpt_account_id, while review 13's
+    -- keyless exemption (KeylessRequestDetermined + the keyless branches of
+    -- CodexRequestRequiresApiKey / CodexRequiresChatGptAccountId) builds a
+    -- request with NO Authorization and NO chatgpt-account-id. Mirrors the
+    -- anthropic spec, whose request-body rule has no key `requires`.
+
+    when: OpenAIStreamRequested(stream)
+    requires: stream.request_api = openai_codex_responses
+    requires: stream.keyless
+
+    ensures: ProviderRequestBuilt(stream, ProviderRequest{
+        url: stream.request_url,
+        body: JsonEncode(CodexRequestBody(stream.conversation, stream.model, stream.options))
+    })
+    ensures: RequestBodyDoesNotContain(stream, "temperature")
+
+    @guidance
+        -- Keyless codex build (build-codex-request's no-auth? path in
+        -- providers/openai/codex_responses.clj, review 13): the body is
+        -- identical to the authenticated build, but NO Authorization header
+        -- and NO chatgpt-account-id header are sent (a custom
+        -- chatgpt-account-id header among :headers supplies one if the
+        -- endpoint requires it; the account-id requirement is waived for
+        -- keyless requests).
 }
 
 rule ConversationMessageTransformsAreDeterministic {

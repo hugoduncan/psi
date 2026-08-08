@@ -1103,3 +1103,69 @@
 ## Review 21 (2026-08-08)
 
 - Review 21: added 3 steps to be addressed.
+
+## Follow-ups review 21 addressed (2026-08-08)
+
+- addressed 3 review steps (review-21; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- DeepSeek example locality/tier misclassification fixed (docs + parse-lock +
+  fixtures): `doc/custom-providers.md` DeepSeek example model map now sets
+  `:locality :cloud` / `:latency-tier :low` / `:cost-tier :low` explicitly;
+  "What a provider definition contains" now documents the three fields and
+  their `model-defaults` (`:locality :local` / `:latency-tier :low` /
+  `:cost-tier :zero`) plus the local-helper-selection consequence
+  (context-manager requires `:latency-tier :low` + `:cost-tier #{:zero
+  :low}`, strong `:locality :local`, non-local guard — a cloud model with
+  defaulted locality can be selected for/charged as a "local" helper);
+  DeepSeek notes gain the explicit-values bullet.
+  `parse-documented-deepseek-example-test` (user_models_test.clj) now
+  asserts `:locality :cloud` / `:latency-tier :low` / `:cost-tier :low` on
+  the parsed doc example (guard locks; +3 assertions). Fixtures aligned:
+  `deepseek-custom-provider-model` (anthropic_test.clj) and the literal
+  deepseek fixture in `anthropic_stream_test.clj`'s adaptive-shape 400-retry
+  test (same drift class; behavior-neutral — none of the transport paths
+  read locality/tier).
+- `spec/openai-provider.allium` keyless request construction modeled
+  (spec-only): new `KeylessCompletionsRequestBuilt` /
+  `KeylessCodexRequestBuilt` rules (`requires: stream.keyless`; body
+  identical to the authenticated build, guidance documents omitted
+  `Authorization` and — codex — omitted `chatgpt-account-id` with the
+  custom-header-supplied account-id pass-through), and the authenticated
+  `CompletionsRequestBuilt`/`CodexRequestBuilt` rules gained an explicit
+  `requires: not stream.keyless` (self-documenting partition; keyless → nil
+  key per `OpenAIApiKeyResolved` already implied it). Manual allium-check
+  (no automated checker in repo): all referenced entities/attributes
+  defined in the spec.
+- `chatgpt-account-id` capture masking locked: `openai_codex_test.clj` gains
+  `codex-chatgpt-account-id-capture-masked-test` — keyless
+  `:openai-codex-responses` stream request with custom
+  `:headers {"chatgpt-account-id" "acc_1234567890" "ChatGPT-Account-Id"
+  "acc_0987654321"}` asserts BOTH casings masked to first-6-chars + "..."
+  in the `:on-provider-request` payload (review-19 dual-casing semantics via
+  shared `find-headers`-based `redact-headers`) and no `Authorization` on a
+  keyless request. Placed in `openai_codex_test.clj` (existing codex
+  transport test home) rather than `openai_test.clj`: adding to
+  `openai_test.clj` pushed it to 830 lines, failing the repo
+  `commit-check:file-lengths` gate (committed 775); the move keeps
+  `openai_test.clj` at its committed 775 and the gate green
+  (`openai_codex_test.clj` 267 lines). Discovered + recorded: the seven
+  codex deftests still in `openai_test.clj`
+  (`codex-requires-chatgpt-token`, `codex-reasoning-*`,
+  `codex-tool-call-id-roundtrip`, `codex-function-call-done`) are
+  byte-identical duplicates of `openai_codex_test.clj` copies — pre-existing
+  (openai_codex_test.clj predates this task, commit 008b1e094), outside
+  review-21 scope; flagged here for a future dedup.
+- Verification (state being closed): full `bb test` green — 2569 tests /
+  19291 assertions / 0 failures (+1 deftest vs 2568 = the new codex
+  capture-masking test; +6 assertions = 3 parse-lock locality/tier + 3
+  capture-mask; assertion count varies run-to-run per the review-5 flake
+  analysis); `psi.ai.user-models-test` 15/108 (was 15/105),
+  `psi.ai.providers.anthropic-test` 15/98, `psi.ai.providers.anthropic-auth-
+  test` 5/42, `psi.ai.providers.anthropic-stream-test` 11/106,
+  `psi.ai.providers.openai-test` 16/88 (unchanged),
+  `psi.ai.providers.openai-codex-test` 9/30 (was 8/27) green; clj-kondo
+  clean (0 errors, 0 warnings) on all changed source/test files; `bb
+  fmt:check` clean; `bb commit-check:file-lengths` clean.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design (steps.md item
+  left unchecked).

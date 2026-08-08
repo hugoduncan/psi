@@ -33,6 +33,25 @@ Each provider entry defines:
 - optional `:auth` settings
 - one or more `:models`
 
+Each model definition may carry the selection-classification fields
+`:locality`, `:latency-tier` and `:cost-tier`. They default to
+`:locality :local`, `:latency-tier :low` and `:cost-tier :zero` when a
+model map omits them (the `model-defaults` in `user_models.clj`) — the
+same defaults psi applies to local runners like Ollama. Set them
+explicitly for hosted/cloud providers: `:locality :cloud` in particular
+matters, because psi's local-only helper paths (e.g. the context-manager's
+per-turn local-model helper selection, whose required constraints include
+`:latency-tier :low` + `:cost-tier #{:zero :low}` and a strong
+`:locality :local` preference) treat a `:locality :local` model as a
+candidate for local helper duty — a cloud model with defaulted locality can
+be selected for (and charged as) a "local" helper and receive conversation
+excerpts on the local-only path. `:latency-tier`/`:cost-tier` participate
+in ranking/filtering for model selection (e.g. local helper paths require
+`:cost-tier` `:zero`/`:low`); choose values that describe the provider's
+actual latency and pricing (built-in cloud providers use
+`:latency-tier :low`, with `:cost-tier` derived from the model's input/
+output costs).
+
 Supported custom-provider API protocols are:
 
 - `:openai-completions`
@@ -256,7 +275,10 @@ ignored), so this example sets `:adaptive-thinking true`:
                :input-cost         0.14
                :output-cost        0.28
                :cache-read-cost    0.0028
-               :cache-write-cost   0.14}]}}}
+               :cache-write-cost   0.14
+               :locality           :cloud
+               :latency-tier       :low
+               :cost-tier          :low}]}}}
 ```
 
 Then export your key:
@@ -266,6 +288,14 @@ export DEEPSEEK_API_KEY=...
 ```
 
 Notes:
+- `:locality :cloud` is set explicitly (with explicit `:latency-tier :low` /
+  `:cost-tier :low`): custom models default to `:locality :local`,
+  `:latency-tier :low`, `:cost-tier :zero` when omitted (see "What a
+  provider definition contains"), and psi's local-only helper paths (e.g.
+  the context-manager's per-turn local-model helper) treat a
+  `:locality :local` model as a candidate for local helper duty — a cloud
+  model with defaulted locality can be selected for (and charged as) a
+  "local" helper and receive conversation excerpts on the local-only path.
 - `:base-url` must not end in a trailing slash: psi concatenates
   `/v1/messages` onto it verbatim, so
   `https://api.deepseek.com/anthropic/` would silently produce
