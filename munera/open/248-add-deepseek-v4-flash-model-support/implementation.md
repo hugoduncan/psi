@@ -1018,3 +1018,5 @@
 - Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
   set in environment (verified again 2026-08-08); request-shaping coverage
   only by design (steps.md item left unchecked).
+
+- Review 19 (2026-08-08): added 2 steps to be addressed.

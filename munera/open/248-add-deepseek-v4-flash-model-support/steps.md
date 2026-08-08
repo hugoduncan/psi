@@ -1531,3 +1531,45 @@
       behavior is inherent in `build-codex-request`'s `(merge base-hdrs
       custom)` (design AC forbids transport changes). Namespace green (16
       tests / 88 assertions; +4 assertions from the two blocks).
+
+## Follow-ups (implementation review 19, 2026-08-08)
+
+- [ ] Capture redaction leaks a differently-cased duplicate of an auth
+      header: `request-support/redact-headers` redacts only the FIRST
+      case-insensitive match per auth-header name (`find-header` returns the
+      first `[k v]` whose lower-cased name matches; `assoc` replaces only that
+      key). When a request carries BOTH casings of the same auth header —
+      base `"x-api-key"` (configured key) + custom `"X-API-Key"`, or
+      `"Authorization"` + `"authorization"` — the second one persists
+      VERBATIM in the `:on-provider-request` capture. Verified end-to-end
+      through `anthropic/build-request` + `capture-request!`: wire headers
+      `{x-api-key configured-key, X-API-Key secret-custom-key}` capture as
+      `{x-api-key ***REDACTED***, X-API-Key secret-custom-key}`. This is the
+      exact "don't mix" scenario the review-11/14 interplay tests exercise on
+      the wire (configured key + mixed-case custom header), and it contradicts
+      the CHANGELOG claim that "secrets carried in custom :headers never
+      persist verbatim in :on-provider-request session captures". Applies to
+      all three transports (shared `redact-headers`). Fix: redact ALL
+      case-insensitive matches per auth-header name (not just the first), and
+      add a capture-path test on the anthropic transport (mirrored on the
+      openai transport) with dual-casing auth headers asserting no verbatim
+      secret in the capture.
+- [ ] 400-fallback `:without-all-betas` step is skipped for keyless
+      custom-header Bearer auth: `fallback-request-steps-for-400` gates
+      `:without-all-betas` on `(not (oauth-auth-request? request))`, and
+      `anthropic/error.clj` `oauth-auth-request?` classifies ANY request
+      carrying an `Authorization: Bearer ...` header as an OAuth request —
+      including a keyless custom provider whose auth comes from a custom
+      `Authorization: Bearer` header (the documented "Local servers and
+      custom headers" keyless pattern). On a beta-related 400 such a request
+      keeps ALL beta headers on the retry (e.g. `fast-mode-2026-02-01`), so
+      the retry repeats the same 400 and hard-fails — the review-8 fast-mode
+      note's "beta stripped, speed retained" degradation is worse here (not
+      even the beta is stripped). Verified: `fallback-request-for-400` for a
+      prompt-caching-beta request with a custom Bearer header selects only
+      `[:without-prompt-caching]`, omitting `:without-all-betas`. Fix: narrow
+      `oauth-auth-request?` (or the gate) to actual built-in OAuth requests —
+      e.g. require the request's Authorization to have come from the
+      transport's own OAuth resolution (built-in model + OAuth-shaped key)
+      rather than any Bearer header — or document the limitation; add a
+      fallback-selection test for the keyless custom-header-Bearer case.
