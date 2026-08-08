@@ -1171,3 +1171,97 @@
   left unchecked).
 
 - Review 22 (2026-08-08): added 4 steps to be addressed.
+
+## Follow-ups review 22 addressed (2026-08-08)
+
+- addressed 4 review steps (all review-22 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- 400-fallback OAuth decision threaded from build-request (review-22 item 1):
+  `build-request` attaches the transport's COMPUTED `oauth?` boolean
+  (built-in Anthropic model + OAuth-shaped key, review 11) to the request map
+  as `::oauth?`; `handle-400-response!` passes `:oauth-auth-request? (fn [req]
+  (boolean (::oauth? req)))` in the beta-config, replacing the header
+  content-sniff for the `:without-all-betas` selection. A keyless custom
+  `:anthropic-messages` provider whose custom `:headers` reproduce all three
+  Claude Code CLI markers (Authorization Bearer + user-agent: claude-cli/… +
+  x-app: cli) is no longer classified OAuth — on a beta-related 400 it gets
+  `:without-all-betas` (betas stripped, custom headers preserved) instead of
+  retaining every beta, repeating the 400 and hard-failing (review-19
+  regression class). New
+  `stream-anthropic-400-fallback-uses-transport-oauth-decision-test`
+  (keyless custom provider, three markers + `:speed-mode :fast` → 400 →
+  `[:without-all-betas]`, stream completes) — verified to FAIL against the
+  old content-sniffing predicate (6 assertions) and pass with the fix. The
+  content-sniffing `oauth-auth-request?` (error.clj) is kept for error
+  diagnostics only. `spec/anthropic-provider.allium` HTTP-400 section updated
+  (fallback decision = `stream.oauth`, not header content-sniff); the spec's
+  stale "OpenAI transport only exempts on explicit :no-auth-header" comment
+  in `KeylessRequestDetermined` also fixed.
+- `resolve-api-key` keyless early-return unified with `no-auth?` (review-22
+  item 2): `request-support/resolve-api-key` now computes its keyless
+  early-return via the shared `no-auth?` predicate instead of testing only
+  `(:no-auth-header options)` — the keyless contract lives in one predicate
+  and the public function is safe for direct callers (headers-auth keyless →
+  nil; `:no-auth-header` keyless → nil; blank-key non-keyless → throws).
+  Behavior-preserving for the three transports (they gate on `no-auth?`
+  first anyway). New shared-namespace test file
+  `components/ai/test/psi/ai/providers/request_support_test.clj`
+  (`resolve-api-key-keyless-contract-test` + `no-auth?-predicate-test`).
+- `:supports-mid-conversation-system-messages` documented + schema-gated
+  (review-22 item 3): the closed `ModelDef` schema in `user_models.clj` gains
+  the optional boolean field (previously models.edn custom providers could
+  not declare the capability at all — the canonical `Model` schema already
+  had it); it flows through `expand-model`'s verbatim merge. `doc/
+  custom-providers.md` "What a provider definition contains" documents the
+  field (gates `:session/inject-mid-system-message`; default false for
+  `:anthropic-messages` custom providers; `:openai`/`:openai-completions`
+  inferred) and the DeepSeek example notes state the example does NOT enable
+  it (DeepSeek compat lists `system` fully supported but per-turn switching
+  unverified — set it only after live verification; deliberately not added to
+  the example EDN). New `supports-mid-conversation-system-messages-field-test`
+  (user_models_test.clj); `spec/custom-providers.allium`
+  `CustomModelDef`/`ResolvedCustomModel`/`ParseModelsConfig` carry the field;
+  CHANGELOG `[Unreleased]` → `Added` entry added.
+- Custom `anthropic-beta` header interplay documented + tested (review-22
+  item 4; docs option chosen — making `:without-all-betas` strip only
+  transport-known betas would be a transport change the design AC forbids):
+  `doc/custom-providers.md` "Local servers and custom headers" documents that
+  a custom `"anthropic-beta"` header REPLACES the transport-generated betas
+  on the wire (transport-gated features e.g. fast mode stop working) and that
+  `:without-all-betas` wipes the custom beta too on a beta-related 400 (the
+  retry may then 400 for a different reason, masking the original error).
+  Tests: `build-request-custom-anthropic-beta-header-replaces-transport-betas-test`
+  (anthropic_test.clj — custom beta wins the merge over fast-mode +
+  interleaved-thinking; without it the transport betas are sent) and
+  `stream-anthropic-custom-anthropic-beta-header-stripped-by-without-all-betas-test`
+  (anthropic_stream_test.clj — custom beta on first request, 400 →
+  `[:without-all-betas]`, retried request has no `anthropic-beta` at all,
+  configured `x-api-key` preserved, stream completes). CHANGELOG `[Unreleased]`
+  → `Fixed` entry added for the 400-fallback OAuth fix.
+- File-length gate: the two new stream deftests pushed
+  `anthropic_stream_test.clj` to 878 lines (> 800 gate). Split the cohesive
+  HTTP-400 compatibility-retry cluster (6 deftests, incl. the two new ones)
+  into a new `components/ai/test/psi/ai/providers/anthropic_retry_test.clj`
+  (421 lines); `anthropic_stream_test.clj` is now 479 lines and no longer
+  requires `anthropic.error` (the `run-stream` SSE-parser helper moved back
+  with the SSE-parser tests it serves). `bb commit-check:file-lengths` green.
+- Verification (state being closed): full `bb test` unit suite green — 2575
+  tests / 19337 assertions / 0 failures (+6 deftests vs the committed 2569:
+  2 request-support, 1 user-models mid-system, 2 anthropic-stream/retry, 1
+  anthropic build-request; assertion count varies run-to-run per the review-5
+  flake analysis — no flake observed on this run); extensions suite green
+  (364 passed / 0 failed / 1566 assertions; the summary's "1 unknown" is the
+  pre-existing `:integration`-meta skip in the extensions suite, unrelated to
+  this task); `psi.ai.user-models-test` 16/114 (was 15/108),
+  `psi.ai.providers.anthropic-test` 16/104 (was 15/98),
+  `psi.ai.providers.anthropic-stream-test` 7/65 + `psi.ai.providers.anthropic-retry-test`
+  6/58 (was 11/106 pre-split; counts unchanged across the split),
+  `psi.ai.providers.request-support-test` 2/18 (new),
+  `psi.ai.providers.openai-test` 16/88, `psi.ai.providers.openai-completions-test`
+  16/70, `psi.ai.providers.openai-codex-test` 9/30, `psi.ai.providers.
+  openai-request-headers-test` 6/30 green; clj-kondo clean (0 errors, 0
+  warnings) on all changed source + test files; `bb fmt:check` clean;
+  `bb commit-check:file-lengths` clean.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment (verified again 2026-08-08); request-shaping coverage
+  only by design (steps.md item left unchecked).

@@ -52,6 +52,18 @@ actual latency and pricing (built-in cloud providers use
 `:latency-tier :low`, with `:cost-tier` derived from the model's input/
 output costs).
 
+A model may also declare `:supports-mid-conversation-system-messages`
+(`true`/`false`) to opt into psi's mid-conversation system-message
+capability: the agent-session `:session/inject-mid-system-message` mutation
+returns `:capability-not-supported` unless the runtime active model supports
+it. The default depends on the transport — for `:anthropic-messages` custom
+providers the field defaults to `false` (omitted → not supported), so
+Anthropic-compatible providers must declare it explicitly; only OpenAI
+chat-completions models (`:openai`/`:openai-completions`) get the capability
+inferred from the runtime API shape. Set it `true` only after verifying the
+endpoint actually honours per-turn `system` changes (see the DeepSeek
+example notes).
+
 Supported custom-provider API protocols are:
 
 - `:openai-completions`
@@ -296,6 +308,16 @@ Notes:
   `:locality :local` model as a candidate for local helper duty — a cloud
   model with defaulted locality can be selected for (and charged as) a
   "local" helper and receive conversation excerpts on the local-only path.
+- mid-conversation system messages are NOT enabled in this example:
+  `:supports-mid-conversation-system-messages` defaults to `false` for
+  `:anthropic-messages` custom providers (only `:openai`/
+  `:openai-completions` models get the capability inferred), and DeepSeek's
+  compat table lists `system` as fully supported but per-turn `system`
+  changes (mid-conversation switching) are unverified against a live turn.
+  Set `:supports-mid-conversation-system-messages true` on this model only
+  after verifying DeepSeek's endpoint honours per-turn `system` changes;
+  until then the `:session/inject-mid-system-message` capability returns
+  `:capability-not-supported` for `deepseek-v4-flash`.
 - `:base-url` must not end in a trailing slash: psi concatenates
   `/v1/messages` onto it verbatim, so
   `https://api.deepseek.com/anthropic/` would silently produce
@@ -465,6 +487,19 @@ the account id psi derives from the resolved key (and, for keyless codex
 requests, supply one that would otherwise be omitted) — don't mix a
 configured `:api-key` with a custom `chatgpt-account-id` header either. Pick
 one auth mechanism per provider.
+
+The same merge applies to `anthropic-beta`: a custom `"anthropic-beta"`
+header among `:headers` REPLACES the transport-generated beta header on the
+`:anthropic-messages` transport — psi's own betas (prompt-caching,
+interleaved-thinking, fast-mode) are silently dropped from the wire, so
+features gated by those betas (e.g. fast mode) stop working. And on a
+beta-related HTTP 400 the compatibility retry's `:without-all-betas` step
+wipes the custom beta too (`clear-beta-header` drops the whole
+`anthropic-beta` header on the retry), so the retry may then 400 for a
+*different* reason (missing provider-required beta) and hard-fail, masking
+the original error. Avoid a custom `anthropic-beta` header on
+`:anthropic-messages` providers unless you need to override the transport
+betas and accept both consequences.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is

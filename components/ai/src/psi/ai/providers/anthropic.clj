@@ -276,8 +276,15 @@
          headers            (if-let [custom (:headers options)]
                               (merge base-hdrs custom)
                               base-hdrs)]
+     ;; ::oauth? carries the transport's COMPUTED OAuth decision (built-in
+     ;; Anthropic model + OAuth-shaped key, review 11) for the HTTP-400
+     ;; compatibility retry: handle-400-response! uses it instead of
+     ;; content-sniffing the merged headers, so a keyless custom provider
+     ;; whose custom :headers reproduce the Claude Code CLI marker set is
+     ;; still NOT treated as OAuth (review 22).
      {:headers headers
-      :body    (json/generate-string body*)})))
+      :body    (json/generate-string body*)
+      ::oauth? oauth?})))
 
 (defn- safe-call!
   [f payload]
@@ -447,7 +454,17 @@
                      request
                      {:prompt-caching-beta prompt-caching-beta
                       :interleaved-thinking-beta interleaved-thinking-beta
-                      :oauth-auth-request? anthropic-error/oauth-auth-request?})]
+                      ;; Review 22: the :without-all-betas decision uses the
+                      ;; transport's COMPUTED oauth? boolean (threaded from
+                      ;; build-request via ::oauth?), NOT the header
+                      ;; content-sniff — a keyless custom provider whose
+                      ;; custom :headers reproduce the Claude Code CLI marker
+                      ;; set (Authorization Bearer + user-agent: claude-cli/…
+                      ;; + x-app: cli) is still not OAuth and must get
+                      ;; :without-all-betas on a beta-related 400. The
+                      ;; content-sniffing oauth-auth-request? predicate is
+                      ;; kept for error diagnostics only.
+                      :oauth-auth-request? (fn [req] (boolean (::oauth? req)))})]
     (let [first-error (anthropic-error/response->error response request)]
       (capture-response! model options url (assoc first-error
                                                   :retrying-with-compatibility-fallback true

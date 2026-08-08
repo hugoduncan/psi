@@ -340,8 +340,8 @@ rule KeylessRequestDetermined {
     -- case-insensitive) with no configured key. Incidental custom headers
     -- (e.g. X-Client) do NOT make a request keyless — with a blank configured
     -- key such a request fast-fails with the provider-scoped "Missing API
-    -- key" error (consistent with the OpenAI transport, which only exempts on
-    -- explicit :no-auth-header).
+    -- key" error (the OpenAI transports share the same no-auth? predicate
+    -- via providers/request_support.clj, review 14).
 
     when: AnthropicStreamRequested(stream)
 
@@ -553,14 +553,21 @@ rule RedactRequestHeaders {
 --                             :thinking body key is present (extended OR
 --                             adaptive thinking)
 --   :without-all-betas      — any beta header value is present and the
---                             request is NOT a genuine OAuth request
---                             (oauth-auth-request? in
---                             providers/anthropic/error.clj — requires the
---                             transport's OAuth signature: Authorization
---                             Bearer + user-agent: claude-cli/… + x-app: cli;
---                             a keyless custom provider's custom
---                             Authorization: Bearer header is NOT OAuth,
---                             review 19)
+--                             request is NOT OAuth. The OAuth decision is the
+--                             transport's COMPUTED oauth? boolean (built-in
+--                             Anthropic model + OAuth-shaped key, review 11),
+--                             threaded from build-request via the request
+--                             map's ::oauth? entry — NOT a header
+--                             content-sniff (review 22). A keyless custom
+--                             provider whose custom :headers reproduce the
+--                             Claude Code CLI marker set (Authorization
+--                             Bearer + user-agent: claude-cli/… + x-app: cli)
+--                             is therefore NOT OAuth and still gets
+--                             :without-all-betas. The content-sniffing
+--                             oauth-auth-request? predicate
+--                             (providers/anthropic/error.clj) is kept for
+--                             error diagnostics only (review 19 narrowed it
+--                             to the full marker set).
 -- If no step applies the request is unchanged and the 400 is surfaced
 -- without a retry. The non-streaming execute-anthropic path has no 400
 -- fallback at all (the review-13 streaming/non-streaming asymmetry).
@@ -578,10 +585,19 @@ rule RedactRequestHeaders {
 --   PromptCachingBetaPresent(request)  — request headers carry the prompt-caching beta
 --   ThinkingRequest(request)           — interleaved-thinking beta OR :thinking body key
 --   AnyBetaHeaderPresent(request)      — request headers carry a non-empty anthropic-beta
---   OAuthAuthRequest(request)          — request carries the transport's own OAuth auth
---                                       shape (Authorization Bearer + user-agent:
---                                       claude-cli/… + x-app: cli); a bare custom Bearer
---                                       header is NOT OAuth (review 19)
+--   OAuthAuthRequest(request)          — the transport's COMPUTED OAuth
+--                                       decision (stream.oauth from
+--                                       OAuthDetectedFromApiKey: built-in
+--                                       Anthropic model + OAuth-shaped key),
+--                                       carried on the built request as
+--                                       ::oauth? (review 22). NOT a header
+--                                       content-sniff: a keyless custom
+--                                       provider whose custom :headers
+--                                       reproduce the Claude Code CLI marker
+--                                       set is not OAuth. (The error-diagnostic
+--                                       oauth-auth-request? predicate still
+--                                       content-sniffs the full marker set;
+--                                       it does not drive fallback selection.)
 --   RemoveBetaValue(headers, beta)     — drop one beta value from anthropic-beta
 --   ClearBetaHeader(headers)           — drop the anthropic-beta header entirely
 --   RemovePromptCachingBetas(headers)  — drop prompt-caching beta values

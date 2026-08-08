@@ -1790,7 +1790,7 @@
 
 ## Follow-ups (implementation review 22, 2026-08-08)
 
-- [ ] `oauth-auth-request?` (anthropic/error.clj) content-sniffs the three-marker
+- [x] `oauth-auth-request?` (anthropic/error.clj) content-sniffs the three-marker
       OAuth signature from the MERGED request headers, so the documented
       keyless custom-header pattern can reproduce it: a keyless custom
       `:anthropic-messages` provider whose custom `:headers` carry
@@ -1816,7 +1816,29 @@
       stripped on the retry) — fails against the current content-sniffing
       predicate. Keep `oauth-auth-request?` for error diagnostics only, or
       align the doc sentence to name the marker-set limitation.
-- [ ] `request-support/resolve-api-key`'s keyless early-return tests only
+      → Resolved (thread-the-computed-decision option): `build-request` now
+      attaches the transport's COMPUTED `oauth?` boolean (built-in Anthropic
+      model + OAuth-shaped key, review 11) to the request map as `::oauth?`,
+      and `handle-400-response!` passes `:oauth-auth-request? (fn [req]
+      (boolean (::oauth? req)))` in the beta-config — replacing the header
+      content-sniff for the `:without-all-betas` selection. A keyless custom
+      `:anthropic-messages` provider whose custom `:headers` reproduce all
+      three Claude Code CLI markers (Authorization Bearer + user-agent:
+      claude-cli/… + x-app: cli) is no longer classified OAuth: on a
+      beta-related 400 it now selects `:without-all-betas` (all betas
+      stripped on the retry, custom headers preserved) instead of retaining
+      every beta, repeating the 400 and hard-failing. New stream test
+      `stream-anthropic-400-fallback-uses-transport-oauth-decision-test`
+      (keyless custom provider, three markers + `:speed-mode :fast` → 400 →
+      retry with `[:without-all-betas]`, stream completes) — verified to FAIL
+      against the old content-sniffing predicate (6 assertions). The
+      content-sniffing `oauth-auth-request?` (error.clj) is kept for error
+      diagnostics only (`auth=oauth` hint in 400 messages); the
+      doc/custom-providers.md fast-mode note's "only genuine built-in
+      Anthropic OAuth requests keep their betas" claim is now exact.
+      `spec/anthropic-provider.allium` HTTP-400 section updated (the
+      fallback decision is `stream.oauth`, not a header content-sniff).
+- [x] `request-support/resolve-api-key`'s keyless early-return tests only
       `(:no-auth-header options)`, not the shared `no-auth?` predicate — the
       two keyless definitions can drift, and the public function throws for
       a headers-auth keyless config when called directly: `(resolve-api-key
@@ -1830,7 +1852,22 @@
       the keyless logic lives in one predicate; add a direct-call test
       (headers-auth keyless → nil; `:no-auth-header` keyless → nil;
       blank-key no-auth → throws) locking the unified contract.
-- [ ] `doc/custom-providers.md` never documents
+      → Resolved: `request-support/resolve-api-key` now computes its keyless
+      early-return with the shared `no-auth?` predicate (`(when-not (no-auth?
+      options) …)`) — the keyless contract lives in one predicate, and the
+      function is safe for direct callers (headers-auth keyless and
+      `:no-auth-header` keyless both return nil; blank-key non-keyless still
+      throws the provider-scoped "Missing API key" error). Behavior-
+      preserving for all real callers (the three transports gate on
+      `no-auth?` first anyway). New direct-call contract tests in a new
+      shared-namespace test file
+      `components/ai/test/psi/ai/providers/request_support_test.clj`
+      (`resolve-api-key-keyless-contract-test` + `no-auth?-predicate-test`):
+      keyless → nil for both exemption classes, incidental-headers → throws,
+      built-in env fallback preserved, configured key passes through.
+      `spec/custom-providers.allium` / both provider specs already model the
+      keyless contract via `stream.keyless` (no spec delta needed).
+- [x] `doc/custom-providers.md` never documents
       `:supports-mid-conversation-system-messages`, and the DeepSeek example
       omits it: the field exists in the canonical `Model` schema and gates a
       real session capability (`session-supports-mid-system-messages?` in
@@ -1847,7 +1884,26 @@
       chat-completions inference) and add a note to the DeepSeek example
       (set it only after verifying the endpoint honours per-turn `system`
       changes), matching the review-21 locality/tier treatment.
-- [ ] Custom `anthropic-beta` header interplay with the 400-fallback is
+      → Resolved (schema gate + docs + test; NOT added to the example EDN —
+      the capability is unverified live, and the note says to set it only
+      after verifying): the closed `ModelDef` schema in `user_models.clj`
+      gains `[:supports-mid-conversation-system-messages {:optional true}
+      [:maybe boolean?]]` (the canonical `Model` schema already had it, but
+      models.edn custom providers could not declare it at all); the field
+      flows through `expand-model`'s verbatim merge. `doc/custom-providers.md`
+      "What a provider definition contains" now documents the field (what it
+      gates — `:session/inject-mid-system-message` →
+      `:capability-not-supported` without it; default false for
+      `:anthropic-messages` custom providers; the `:openai`/
+      `:openai-completions` inference) and the DeepSeek example notes gain a
+      bullet stating the example does NOT enable it (DeepSeek compat lists
+      `system` fully supported but per-turn switching unverified — set it
+      only after live verification). New `supports-mid-conversation-system-
+      messages-field-test` in `user_models_test.clj` (true/false accepted and
+      flow through; omitted stays valid and absent). `spec/custom-providers
+      .allium` `CustomModelDef`/`ResolvedCustomModel`/`ParseModelsConfig`
+      carry the new field. CHANGELOG `[Unreleased]` → `Added` entry added.
+- [x] Custom `anthropic-beta` header interplay with the 400-fallback is
       undocumented and untested: `build-request` merges custom `:headers`
       over the base headers, so a custom `"anthropic-beta"` header REPLACES
       the transport-generated beta header on the first request (the
@@ -1862,3 +1918,21 @@
       or make `:without-all-betas` strip only the transport-known betas
       (preserving custom-header beta values); add a build-request +
       400-fallback test for a custom `anthropic-beta` header.
+      → Resolved (docs + tests; chose documentation over the code option —
+      making `:without-all-betas` strip only transport-known betas would be
+      a transport behavior change the design AC forbids): `doc/
+      custom-providers.md` "Local servers and custom headers" now documents
+      both consequences — a custom `"anthropic-beta"` header replaces the
+      transport-generated betas on the wire (features gated by those betas
+      e.g. fast mode stop working), and `:without-all-betas` wipes the custom
+      beta too on a beta-related 400 (the retry may then 400 for a different
+      reason, masking the original error). Tests lock both:
+      `build-request-custom-anthropic-beta-header-replaces-transport-betas-test`
+      (anthropic_test.clj — `:speed-mode :fast` + `:thinking-level :medium`
+      with a custom `"anthropic-beta"` header → wire carries ONLY the custom
+      value; without it the transport betas are sent) and
+      `stream-anthropic-custom-anthropic-beta-header-stripped-by-without-all-
+      betas-test` (anthropic_stream_test.clj — custom beta on the first
+      request, 400 → `:without-all-betas` → retried request has no
+      `anthropic-beta` at all, `[:without-all-betas]` recorded, configured
+      `x-api-key` preserved, stream completes).

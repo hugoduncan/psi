@@ -379,6 +379,45 @@
       (is (not (contains? model :adaptive-thinking)))
       (is (false? (boolean (:adaptive-thinking model)))))))
 
+;; ── Mid-conversation system messages (custom providers) ─────────────────────
+
+(deftest supports-mid-conversation-system-messages-field-test
+  ;; Review 22: the canonical Model schema already carries
+  ;; :supports-mid-conversation-system-messages (gates the agent-session
+  ;; :session/inject-mid-system-message capability; OpenAI chat-completions
+  ;; is inferred, :anthropic-messages custom providers are not), but the
+  ;; closed ModelDef schema did not accept it — a models.edn custom provider
+  ;; could not declare the capability at all. Schema gate only; the field
+  ;; flows through expand-model's verbatim model-def merge like
+  ;; :adaptive-thinking (slice 1).
+  (testing "explicit true is accepted and flows through"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :supports-mid-conversation-system-messages true}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (true? (:supports-mid-conversation-system-messages model)))))
+
+  (testing "explicit false is accepted and flows through"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :supports-mid-conversation-system-messages false}]}}})
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (false? (:supports-mid-conversation-system-messages model)))))
+
+  (testing "omitted remains valid and stays absent (unchanged behaviour)"
+    (let [result (user-models/parse-models-config minimal-config)
+          model  (first (:models result))]
+      (is (nil? (:error result)))
+      (is (not (contains? model :supports-mid-conversation-system-messages))))))
+
 (deftest parse-documented-deepseek-example-test
   ;; Parse-lock: parses the EXACT models.edn example documented in
   ;; doc/custom-providers.md ("DeepSeek-compatible example") directly from the

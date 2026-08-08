@@ -86,13 +86,15 @@
    resolution introduced in review 3 for :anthropic-messages and extended to
    :openai-completions (review 10) and :openai-codex-responses (review 13)).
 
-   When `:no-auth-header` is set (e.g. `:auth-header? false` local servers),
-   no key is required: the caller strips the auth headers anyway, so this
-   returns nil instead of failing. (Headers-only auth without
-   `:no-auth-header` is handled by the request builders — they skip this
-   function entirely when `no-auth?` holds.)"
+   When the options are keyless (`no-auth?` — `:no-auth-header` set, e.g.
+   `:auth-header? false` local servers, or a recognized auth header among
+   custom `:headers` with no configured `:api-key`), no key is required: the
+   caller strips the auth headers anyway, so this returns nil instead of
+   failing. The keyless contract lives in one predicate (`no-auth?`, review
+   22) so a direct caller cannot drift from what the request builders gate
+   on."
   [model options config]
-  (when-not (:no-auth-header options)
+  (when-not (no-auth? options)
     (let [{:keys [builtin-provider env-var builtin-missing-msg]} config
           provider   (:provider model)
           builtin?   (builtin? model builtin-provider)

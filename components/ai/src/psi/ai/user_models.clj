@@ -46,6 +46,7 @@
    [:adaptive-thinking {:optional true} [:maybe boolean?]]
    [:supports-images {:optional true} [:maybe boolean?]]
    [:supports-text {:optional true} [:maybe boolean?]]
+   [:supports-mid-conversation-system-messages {:optional true} [:maybe boolean?]]
    [:context-window {:optional true} [:maybe pos-int?]]
    [:max-tokens {:optional true} [:maybe pos-int?]]
    [:parallel-tool-calls {:optional true} [:maybe boolean?]]

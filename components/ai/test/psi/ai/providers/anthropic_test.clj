@@ -581,3 +581,36 @@
               beta (get-in req [:headers "anthropic-beta"])]
           (is (not (contains? body :speed)))
           (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))))))))
+
+(deftest build-request-custom-anthropic-beta-header-replaces-transport-betas-test
+  ;; Review 22: build-request merges custom :headers over the base headers, so
+  ;; a custom "anthropic-beta" header REPLACES the transport-generated beta
+  ;; header on the first request — the transport's own betas (prompt-caching,
+  ;; interleaved-thinking, fast-mode) are silently dropped from the wire. The
+  ;; "don't mix" guidance covers auth headers only; this locks the beta-side
+  ;; merge for :anthropic-messages custom providers (documented in
+  ;; doc/custom-providers.md "Local servers and custom headers").
+  (testing "custom anthropic-beta replaces the transport-generated beta header"
+    (let [model   (models/get-model :sonnet-4.6)
+          convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
+          req     (#'anthropic/build-request convo model {:api-key "test-key"
+                                                          :speed-mode :fast
+                                                          :thinking-level :medium
+                                                          :headers {"anthropic-beta" "custom-beta-1"}})
+          beta    (get-in req [:headers "anthropic-beta"])]
+      (is (= "custom-beta-1" beta)
+          "custom anthropic-beta header must replace the transport betas on the wire")
+      (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))
+          "fast-mode beta must be dropped — the custom header wins the merge")
+      (is (not (re-find #"interleaved-thinking" (or beta "")))
+          "interleaved-thinking beta must be dropped — the custom header wins the merge")))
+
+  (testing "without a custom anthropic-beta header the transport betas are sent"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (-> (conv/create "sys") (conv/add-user-message "hi"))
+          req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                        :speed-mode :fast
+                                                        :thinking-level :medium})
+          beta  (get-in req [:headers "anthropic-beta"])]
+      (is (re-find #"fast-mode-2026-02-01" beta))
+      (is (re-find #"interleaved-thinking" beta)))))

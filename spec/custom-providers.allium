@@ -44,6 +44,15 @@ value CustomModelDef {
     -- extended-thinking shape (budget_tokens). Only meaningful for
     -- :api anthropic_messages custom providers (and built-in Anthropic
     -- catalog models); ignored for OpenAI-compatible providers.
+    supports_mid_conversation_system_messages: Boolean = false
+    -- Review 22: explicit declaration of per-turn system-message support for
+    -- the agent-session mid-conversation system-message capability
+    -- (session-supports-mid-system-messages? in agent-session
+    -- model_capabilities.clj). Omitted → false for :anthropic-messages custom
+    -- providers (only :openai / :openai-completions models are inferred);
+    -- set true only after verifying the endpoint honours per-turn system
+    -- changes. Schema gate only — flows through expand-model's verbatim
+    -- model-def merge like adaptive_thinking (slice 1).
     context_window: PositiveInt = 128000
     max_tokens: PositiveInt = 16384
     input_cost: Number = 0.0
@@ -77,6 +86,7 @@ value ResolvedCustomModel {
     supports_images: Boolean
     supports_text: Boolean
     adaptive_thinking: Boolean
+    supports_mid_conversation_system_messages: Boolean
     context_window: PositiveInt
     max_tokens: PositiveInt
     input_cost: Number
@@ -165,6 +175,7 @@ rule ParseModelsConfig {
                 supports_images: model_def.supports_images,
                 supports_text: model_def.supports_text,
                 adaptive_thinking: model_def.adaptive_thinking,
+                supports_mid_conversation_system_messages: model_def.supports_mid_conversation_system_messages,
                 context_window: model_def.context_window,
                 max_tokens: model_def.max_tokens,
                 input_cost: model_def.input_cost,
