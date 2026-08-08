@@ -567,8 +567,10 @@ rule RedactRequestHeaders {
     -- (redacted to "Bearer ***REDACTED***", with a length suffix for values
     -- longer than 20 chars), "x-api-key" (redacted to "***REDACTED***"), and
     -- "chatgpt-account-id" (masked to its first 6 chars + "..."). Redacted
-    -- values are written back under the original header key casing. Non-auth
-    -- headers pass through unmodified.
+    -- values are written back under the original header key casing. EVERY
+    -- case-insensitive match is redacted — a differently-cased duplicate
+    -- ("Authorization" + "authorization") must not leak verbatim (review 19).
+    -- Non-auth headers pass through unmodified.
 
     when: RequestHeadersAvailable(headers)
 

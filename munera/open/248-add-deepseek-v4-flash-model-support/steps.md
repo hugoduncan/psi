@@ -1534,7 +1534,7 @@
 
 ## Follow-ups (implementation review 19, 2026-08-08)
 
-- [ ] Capture redaction leaks a differently-cased duplicate of an auth
+- [x] Capture redaction leaks a differently-cased duplicate of an auth
       header: `request-support/redact-headers` redacts only the FIRST
       case-insensitive match per auth-header name (`find-header` returns the
       first `[k v]` whose lower-cased name matches; `assoc` replaces only that
@@ -1554,7 +1554,23 @@
       add a capture-path test on the anthropic transport (mirrored on the
       openai transport) with dual-casing auth headers asserting no verbatim
       secret in the capture.
-- [ ] 400-fallback `:without-all-betas` step is skipped for keyless
+      → Resolved: `request-support/redact-headers` now redacts EVERY
+      case-insensitive match per auth-header name — new `find-headers`
+      helper returns all matches, `find-header` delegates to it (first), and
+      `redact-headers` applies the redactor to each match under its original
+      key casing. A wire request carrying both casings of an auth header
+      (base `x-api-key` + custom `X-API-Key`, or `Authorization` +
+      `authorization`) now captures ALL matches redacted — no verbatim
+      secret persists, satisfying the CHANGELOG claim. Capture-path tests
+      added on both transports: `anthropic_stream_test.clj` (dual
+      x-api-key/X-API-Key → both `***REDACTED***`) and
+      `openai_request_headers_test.clj` (dual Authorization/authorization →
+      both `Bearer ***REDACTED***`). Both new tests verified to FAIL against
+      the old single-match implementation. Specs updated
+      (`RedactRequestHeaders` in anthropic-provider.allium and
+      openai-provider.allium note the all-matches semantics; the ∀-header
+      ensure already models it).
+- [x] 400-fallback `:without-all-betas` step is skipped for keyless
       custom-header Bearer auth: `fallback-request-steps-for-400` gates
       `:without-all-betas` on `(not (oauth-auth-request? request))`, and
       `anthropic/error.clj` `oauth-auth-request?` classifies ANY request
@@ -1573,3 +1589,27 @@
       transport's own OAuth resolution (built-in model + OAuth-shaped key)
       rather than any Bearer header — or document the limitation; add a
       fallback-selection test for the keyless custom-header-Bearer case.
+      → Resolved: `anthropic/error.clj` `oauth-auth-request?` narrowed to the
+      transport's own OAuth signature — `Authorization: Bearer` AND
+      `user-agent: claude-cli/…` AND `x-app: cli`, the exact headers
+      `request-headers` sets only for genuine built-in OAuth requests
+      (built-in Anthropic model + OAuth-shaped key, review 11). A keyless
+      custom provider's custom `Authorization: Bearer` header is no longer
+      classified OAuth, so a beta-related 400 on such a request now selects
+      `:without-all-betas` (ALL beta headers stripped on the retry; the
+      custom Authorization header preserved) instead of keeping every beta
+      and hard-failing. New
+      `stream-anthropic-retries-without-all-betas-on-400-for-keyless-bearer-test`
+      locks the fallback selection end-to-end (fast-mode beta on the first
+      request, cleared on the retry, `:retry-fallback-steps
+      [:without-all-betas]`, stream completes) plus direct
+      `oauth-auth-request?` predicate assertions (genuine OAuth with all
+      three markers still true; keyless custom Bearer false). Verified to
+      FAIL against the old any-Bearer predicate (7 assertions). The error
+      diagnostics also no longer label a keyless Bearer request `auth=oauth`.
+      `spec/anthropic-provider.allium` 400-retry section updated
+      (`BearerAuthRequest` → `OAuthAuthRequest` with the full signature);
+      `doc/custom-providers.md` fast-mode note now states the beta stripping
+      applies to keyless custom-header Bearer requests too (only genuine
+      built-in Anthropic OAuth requests keep their betas — DeepSeek never
+      is one).

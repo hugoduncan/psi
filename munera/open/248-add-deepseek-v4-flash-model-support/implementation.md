@@ -1020,3 +1020,55 @@
   only by design (steps.md item left unchecked).
 
 - Review 19 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 19 addressed (2026-08-08)
+
+- addressed 2 review steps (all review-19 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Dual-casing auth-header capture leak fixed (review-19 item 1):
+  `request-support/redact-headers` redacted only the FIRST case-insensitive
+  match per auth-header name, so a wire request carrying both casings of the
+  same auth header (base `x-api-key` + custom `X-API-Key`, or `Authorization`
+  + `authorization`) leaked the duplicate VERBATIM into the
+  `:on-provider-request` capture — contradicting the CHANGELOG "never persist
+  verbatim" claim. New `find-headers` returns ALL case-insensitive matches
+  (`find-header` delegates to it), and `redact-headers` applies the redactor
+  to every match under its original key casing. Capture-path tests added on
+  both transports (`anthropic_stream_test.clj` dual x-api-key/X-API-Key →
+  both `***REDACTED***`; `openai_request_headers_test.clj` dual
+  Authorization/authorization → both `Bearer ***REDACTED***`); each verified
+  to FAIL against the old single-match implementation. Specs updated
+  (`RedactRequestHeaders` in both provider allium files; the ∀-header ensure
+  already models all-matches).
+- `:without-all-betas` 400-fallback restored for keyless custom-header Bearer
+  auth (review-19 item 2): `oauth-auth-request?` (anthropic/error.clj)
+  classified ANY `Authorization: Bearer` header as OAuth, so a keyless custom
+  provider's custom-header Bearer request (documented "Local servers and
+  custom headers" pattern) kept ALL beta headers on a beta-related 400 retry
+  and hard-failed. Narrowed to the transport's own OAuth signature
+  (`Authorization: Bearer` AND `user-agent: claude-cli/…` AND `x-app: cli` —
+  the exact headers `request-headers` sets only for genuine built-in OAuth
+  requests), so keyless custom-header Bearer requests now get
+  `:without-all-betas` (betas stripped, custom Authorization preserved).
+  New `stream-anthropic-retries-without-all-betas-on-400-for-keyless-bearer-test`
+  locks the fallback selection end-to-end (fast-mode beta cleared on retry,
+  `:retry-fallback-steps [:without-all-betas]`, stream completes) + direct
+  `oauth-auth-request?` predicate assertions; verified to FAIL against the
+  old any-Bearer predicate. `spec/anthropic-provider.allium` 400-retry
+  section updated (`BearerAuthRequest` → `OAuthAuthRequest` with the full
+  signature); `doc/custom-providers.md` fast-mode note states the beta
+  stripping applies to keyless custom-header Bearer requests (only genuine
+  built-in OAuth keeps betas; DeepSeek never is one). The error diagnostics
+  no longer label a keyless Bearer request `auth=oauth`.
+- Verification (state being closed): full `bb test` green — 2568 tests /
+  19285 assertions / 0 failures (+1 deftest vs 2567); extensions suite green
+  (364 tests / 1566 assertions / 0 failed);
+  `psi.ai.providers.anthropic-stream-test` 11/106 (was 10/94; +1 deftest +
+  dual-casing capture block), `psi.ai.providers.openai-request-headers-test`
+  6/30 (was 6/28; +2 assertions); affected namespaces green (67 tests / 403
+  assertions across anthropic, anthropic-auth, openai-completions, openai,
+  user-models); clj-kondo clean (0 errors, 0 warnings); `bb fmt:check` clean;
+  `bb commit-check:file-lengths` clean.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment (verified again 2026-08-08); request-shaping coverage
+  only by design (steps.md item left unchecked).

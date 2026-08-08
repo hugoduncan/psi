@@ -162,7 +162,49 @@
          (fn [_ev] nil)))
       (is (= "Bearer ***REDACTED***"
              (get-in @request-capture [:request :headers "authorization"]))
-          "lowercase authorization header must be redacted via redact-authorization"))))
+          "lowercase authorization header must be redacted via redact-authorization")))
+
+  (testing "differently-cased duplicate Authorization headers are ALL redacted in captures"
+    ;; Review 19: redact-headers redacted only the FIRST case-insensitive
+    ;; match per auth header name, so a wire request carrying both
+    ;; "Authorization" (resolved bearer key) and a lowercase custom
+    ;; "authorization" header leaked the lowercase one VERBATIM into the
+    ;; :on-provider-request capture. Every case-insensitive match must be
+    ;; redacted so the CHANGELOG "never persist verbatim" claim holds.
+    (let [model           {:id                 "local-completions"
+                           :name               "Local Completions"
+                           :provider           :local
+                           :api                :openai-completions
+                           :base-url           "http://localhost:8080/v1"
+                           :supports-reasoning true
+                           :supports-images    false
+                           :supports-text      true
+                           :context-window     128000
+                           :max-tokens         16384
+                           :input-cost         0.0
+                           :output-cost        0.0
+                           :cache-read-cost    0.0
+                           :cache-write-cost   0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          sse             (str
+                           "data: " (json/generate-string
+                                     {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                           "data: [DONE]\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-configured"
+                      :headers {"authorization" "local-token"}
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_ev] nil)))
+      (is (= "Bearer ***REDACTED***"
+             (get-in @request-capture [:request :headers "Authorization"]))
+          "configured Authorization must be redacted")
+      (is (= "Bearer ***REDACTED***"
+             (get-in @request-capture [:request :headers "authorization"]))
+          "differently-cased authorization duplicate must ALSO be redacted — no verbatim secret in the capture"))))
 
 (deftest redact-authorization-length-excludes-bearer-prefix-test
   ;; Review 13: openai/transport's redact-authorization counted the WHOLE

@@ -123,17 +123,28 @@
 
 ;; ── Capture redaction ────────────────────────────────────────────────────────
 
-(defn find-header
-  "Find a header entry whose name matches header-name case-insensitively.
-   Returns a [key value] pair, or nil. Auth-header recognition is
-   case-insensitive, so a mixed-case X-API-Key / authorization header must
-   be redacted too (review 7)."
+(defn find-headers
+  "Find ALL header entries whose names match header-name case-insensitively.
+   Returns a seq of [key value] pairs (empty when none match). Auth-header
+   recognition is case-insensitive, so every differently-cased duplicate of
+   an auth header name on the wire (base \"x-api-key\" + custom \"X-API-Key\",
+   or \"Authorization\" + \"authorization\") must be found: redacting only
+   the first match would leak the duplicate verbatim into the
+   :on-provider-request capture (review 19)."
   [headers header-name]
   (let [target (str/lower-case header-name)]
-    (some (fn [[k v]]
+    (keep (fn [[k v]]
             (when (= target (str/lower-case (name k)))
               [k v]))
           headers)))
+
+(defn find-header
+  "Find the FIRST header entry whose name matches header-name
+   case-insensitively. Returns a [key value] pair, or nil. Auth-header
+   recognition is case-insensitive, so a mixed-case X-API-Key /
+   authorization header must be redacted too (review 7)."
+  [headers header-name]
+  (first (find-headers headers header-name)))
 
 (defn redact-secret
   [value]
@@ -159,12 +170,16 @@
 (defn redact-headers
   "Redact auth headers from a request header map. `redactors` is a seq of
    [header-name redactor-fn] pairs; header names are matched
-   case-insensitively and the redacted value is written back under the
-   original key casing. Non-auth headers pass through unchanged."
+   case-insensitively and EVERY matching header — including differently-cased
+   duplicates of the same auth header name on the wire (e.g. base
+   \"x-api-key\" + custom \"X-API-Key\", or \"Authorization\" +
+   \"authorization\") — is redacted, with the redacted value written back
+   under the original key casing. Non-auth headers pass through unchanged."
   [headers redactors]
   (reduce (fn [hdr [name redactor]]
-            (if-let [[k v] (find-header hdr name)]
-              (assoc hdr k (redactor v))
-              hdr))
+            (reduce (fn [h [k v]]
+                      (assoc h k (redactor v)))
+                    hdr
+                    (find-headers hdr name)))
           headers
           redactors))

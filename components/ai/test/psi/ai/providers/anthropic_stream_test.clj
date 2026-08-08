@@ -6,7 +6,8 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
-   [psi.ai.providers.anthropic :as anthropic])
+   [psi.ai.providers.anthropic :as anthropic]
+   [psi.ai.providers.anthropic.error :as anthropic-error])
   (:import [java.io ByteArrayInputStream]))
 
 (defn- sse-line [event-type data-map]
@@ -231,6 +232,50 @@
       (is (= "Bearer ***REDACTED***"
              (get-in @request-capture [:request :headers "authorization"]))
           "mixed-case authorization header must be redacted via redact-authorization")))
+
+  (testing "differently-cased duplicate auth headers are ALL redacted in captures"
+    ;; Review 19: redact-headers redacted only the FIRST case-insensitive
+    ;; match per auth header name, so a wire request carrying both casings of
+    ;; the same auth header — base "x-api-key" (configured key) + custom
+    ;; "X-API-Key" (the review-11/14 don't-mix scenario) — leaked the second
+    ;; one VERBATIM into the :on-provider-request capture. Every
+    ;; case-insensitive match must be redacted so the CHANGELOG claim
+    ;; "secrets carried in custom :headers never persist verbatim in
+    ;; :on-provider-request session captures" holds for dual-casing requests.
+    (let [model           {:id "local-proxy"
+                           :name "Local Proxy"
+                           :provider :local-proxy
+                           :custom? true
+                           :api :anthropic-messages
+                           :base-url "http://localhost:8080"
+                           :supports-reasoning false
+                           :supports-images false
+                           :supports-text true
+                           :context-window 128000
+                           :max-tokens 16384
+                           :input-cost 0.0
+                           :output-cost 0.0
+                           :cache-read-cost 0.0
+                           :cache-write-cost 0.0}
+          convo           (-> (conv/create "sys")
+                              (conv/add-user-message "hello"))
+          request-capture (atom nil)
+          sse             (str (sse-line "message_start" {:type "message_start"})
+                               (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic
+         convo model {:api-key "configured-key"
+                      :headers {"X-API-Key" "secret-custom-key"}
+                      :on-provider-request #(reset! request-capture %)}
+         (fn [_] nil)))
+
+      (is (= "***REDACTED***"
+             (get-in @request-capture [:request :headers "x-api-key"]))
+          "configured lowercase x-api-key must be redacted")
+      (is (= "***REDACTED***"
+             (get-in @request-capture [:request :headers "X-API-Key"]))
+          "differently-cased X-API-Key duplicate must ALSO be redacted — no verbatim secret in the capture")))
 
   (testing "Anthropic error replies capture raw body and headers"
     (let [model           (models/get-model :sonnet-4.6)
@@ -479,6 +524,95 @@
       (is (some #(= :done (:type %)) @events))
       (is (not-any? #(= :error (:type %)) @events)
           "retry succeeds — the 400 is absorbed, thinking silently ON on DeepSeek"))))
+
+(deftest stream-anthropic-retries-without-all-betas-on-400-for-keyless-bearer-test
+  ;; Review 19: fallback-request-steps-for-400 gates :without-all-betas on
+  ;; (not (oauth-auth-request? request)), and oauth-auth-request? classified
+  ;; ANY request carrying an Authorization: Bearer header as an OAuth request
+  ;; — including a keyless custom provider whose auth comes from a custom
+  ;; Authorization: Bearer header (the documented "Local servers and custom
+  ;; headers" keyless pattern). On a beta-related 400 such a request kept ALL
+  ;; beta headers on the retry (e.g. fast-mode-2026-02-01), repeating the same
+  ;; 400 and hard-failing — the review-8 fast-mode note's "beta stripped"
+  ;; degradation was worse there (not even the beta was stripped).
+  ;; oauth-auth-request? now requires the transport's own OAuth signature
+  ;; (Authorization Bearer + user-agent: claude-cli/… + x-app: cli), so a
+  ;; keyless custom-header-Bearer request gets :without-all-betas like any
+  ;; other non-OAuth request.
+  (testing "keyless custom-header Bearer request gets :without-all-betas on a beta-related 400"
+    (let [model    {:id                 "local-proxy"
+                    :name               "Local Proxy"
+                    :provider           :local-proxy
+                    :custom?            true
+                    :api                :anthropic-messages
+                    :base-url           "http://localhost:8080"
+                    :supports-reasoning false
+                    :supports-images    false
+                    :supports-text      true
+                    :context-window     128000
+                    :max-tokens         16384
+                    :input-cost         0.0
+                    :output-cost        0.0
+                    :cache-read-cost    0.0
+                    :cache-write-cost   0.0}
+          convo    (-> (conv/create "sys")
+                       (conv/add-user-message "hello"))
+          calls    (atom [])
+          captures (atom [])
+          events   (atom [])
+          sse      (str (sse-line "message_start" {:type "message_start"})
+                        (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url req]
+                                (swap! calls conj req)
+                                (if (= 1 (count @calls))
+                                  {:status 400
+                                   :headers {"request-id" "req_ant_first"}
+                                   :body (stream-body
+                                          (json/generate-string
+                                           {:error {:message "Anthropic rejected the request"}}))}
+                                  {:status 200
+                                   :headers {}
+                                   :body (stream-body sse)}))]
+        (anthropic/stream-anthropic
+         convo model {:no-auth-header true
+                      :headers {"Authorization" "Bearer local-token"}
+                      :speed-mode :fast
+                      :on-provider-response #(swap! captures conj %)}
+         (fn [e] (swap! events conj e))))
+      (is (= 2 (count @calls))
+          "keyless custom-header-Bearer 400 must retry once")
+      (let [first-betas  (or (get-in (first @calls) [:headers "anthropic-beta"]) "")
+            second-betas (or (get-in (second @calls) [:headers "anthropic-beta"]) "")
+            second-auth  (get-in (second @calls) [:headers "Authorization"])]
+        (is (re-find #"fast-mode" first-betas)
+            "first request carries the fast-mode beta")
+        (is (not (re-find #"fast-mode" second-betas))
+            ":without-all-betas must clear ALL beta headers on the retry")
+        (is (= "Bearer local-token" second-auth)
+            "custom Authorization header must be preserved on the retry"))
+      (is (some #(and (:retrying-with-compatibility-fallback (:event %))
+                      (= [:without-all-betas] (:retry-fallback-steps (:event %))))
+                @captures)
+          "response capture records the :without-all-betas fallback step")
+      (is (some #(= :start (:type %)) @events))
+      (is (some #(= :done (:type %)) @events))
+      (is (not-any? #(= :error (:type %)) @events)
+          "retry succeeds — the beta-related 400 is absorbed")))
+
+  (testing "oauth-auth-request? distinguishes genuine OAuth from keyless custom-header Bearer"
+    ;; Direct predicate lock for the review-19 narrowing: only the
+    ;; transport's own OAuth shape (Authorization Bearer + user-agent
+    ;; claude-cli/ + x-app: cli) counts as OAuth; a bare custom Bearer
+    ;; header does not.
+    (let [oauth-request  {:headers {"Authorization" "Bearer sk-ant-oat-token"
+                                    "user-agent"    "claude-cli/2.1.75"
+                                    "x-app"         "cli"}}
+          keyless-bearer {:headers {"Authorization" "Bearer local-token"
+                                    "Content-Type"  "application/json"}}]
+      (is (anthropic-error/oauth-auth-request? oauth-request)
+          "genuine OAuth request (all three markers) is still classified OAuth")
+      (is (not (anthropic-error/oauth-auth-request? keyless-bearer))
+          "keyless custom-header Bearer request is NOT classified OAuth"))))
 
 ;; ── SSE parser — thinking block routing ─────────────────────────────────────
 

@@ -300,6 +300,13 @@ rule ConsecutiveToolResultsMergedIntoSingleUserMessage {
 --   HeaderName(header) — the header's name as a string (keyword/string names
 --     accepted).
 --   LowerCase(s) — lower-case a string (clojure.string/lower-case).
+--   RedactSecret(value) — redact a secret to "***REDACTED***", with a
+--     (len=N) suffix for values longer than 20 chars (review 7).
+--   RedactBearer(value) — redact an Authorization value to "Bearer
+--     ***REDACTED***", stripping a leading "Bearer " before the length count
+--     (review 13).
+--   RedactedHeaderValue(header) — the header's value after redaction
+--     (defined per auth-header kind by the RedactRequestHeaders rule).
 
 rule ApiKeyResolved {
     when: AnthropicStreamRequested(stream)
@@ -513,13 +520,18 @@ rule ProviderResponseCaptureEmitted {
 rule RedactRequestHeaders {
     -- Auth header names are matched case-insensitively (find-header in
     -- providers/anthropic.clj, review 7); the redacted value is written back
-    -- under the original header key casing. Non-auth headers pass through
-    -- unmodified.
+    -- under the original header key casing. EVERY case-insensitive match is
+    -- redacted — a differently-cased duplicate of an auth header name on the
+    -- wire (base "x-api-key" + custom "X-API-Key", or "Authorization" +
+    -- "authorization") must not leak verbatim into the capture (review 19).
+    -- Non-auth headers pass through unmodified.
 
     when: RequestHeadersAvailable(headers)
 
     ensures: ∀ header ∈ headers:
-        if LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"}:
+        if LowerCase(HeaderName(header)) = "authorization":
+            RedactedHeaderValue(header) = RedactBearer(header.value)
+        else if LowerCase(HeaderName(header)) = "x-api-key":
             RedactedHeaderValue(header) = RedactSecret(header.value)
         else:
             header unchanged
@@ -541,9 +553,14 @@ rule RedactRequestHeaders {
 --                             :thinking body key is present (extended OR
 --                             adaptive thinking)
 --   :without-all-betas      — any beta header value is present and the
---                             request does NOT carry a Bearer Authorization
---                             header (oauth-auth-request? in
---                             providers/anthropic/error.clj)
+--                             request is NOT a genuine OAuth request
+--                             (oauth-auth-request? in
+--                             providers/anthropic/error.clj — requires the
+--                             transport's OAuth signature: Authorization
+--                             Bearer + user-agent: claude-cli/… + x-app: cli;
+--                             a keyless custom provider's custom
+--                             Authorization: Bearer header is NOT OAuth,
+--                             review 19)
 -- If no step applies the request is unchanged and the 400 is surfaced
 -- without a retry. The non-streaming execute-anthropic path has no 400
 -- fallback at all (the review-13 streaming/non-streaming asymmetry).
@@ -561,7 +578,10 @@ rule RedactRequestHeaders {
 --   PromptCachingBetaPresent(request)  — request headers carry the prompt-caching beta
 --   ThinkingRequest(request)           — interleaved-thinking beta OR :thinking body key
 --   AnyBetaHeaderPresent(request)      — request headers carry a non-empty anthropic-beta
---   BearerAuthRequest(request)         — request has a "Bearer " Authorization header
+--   OAuthAuthRequest(request)          — request carries the transport's own OAuth auth
+--                                       shape (Authorization Bearer + user-agent:
+--                                       claude-cli/… + x-app: cli); a bare custom Bearer
+--                                       header is NOT OAuth (review 19)
 --   RemoveBetaValue(headers, beta)     — drop one beta value from anthropic-beta
 --   ClearBetaHeader(headers)           — drop the anthropic-beta header entirely
 --   RemovePromptCachingBetas(headers)  — drop prompt-caching beta values
@@ -573,7 +593,7 @@ rule FallbackStepsSelectedFor400 {
         implies FallbackStep("without-prompt-caching") ∈ FallbackSteps(stream)
     ensures: ThinkingRequest(request)
         implies FallbackStep("without-thinking") ∈ FallbackSteps(stream)
-    ensures: AnyBetaHeaderPresent(request) and not BearerAuthRequest(request)
+    ensures: AnyBetaHeaderPresent(request) and not OAuthAuthRequest(request)
         implies FallbackStep("without-all-betas") ∈ FallbackSteps(stream)
 }
 

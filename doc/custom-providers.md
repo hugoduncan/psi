@@ -371,7 +371,11 @@ Notes:
   (`:without-all-betas` step) but leaves `"speed": "fast"` in the retried
   body, so a 400 caused by the unverified `speed` field retries once with
   the same field and hard-fails. Turn fast mode off (`/fast off`) to avoid
-  it; do not rely on the auto-retry to degrade gracefully.
+  it; do not rely on the auto-retry to degrade gracefully. The beta
+  stripping applies to any non-OAuth request — including a keyless custom
+  provider whose auth comes from a custom `Authorization: Bearer` header
+  (only genuine built-in Anthropic OAuth requests keep their betas, and
+  DeepSeek never is one).
 
 Custom providers do not define their own proxy fields. When a custom provider
 uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it
