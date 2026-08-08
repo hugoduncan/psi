@@ -436,6 +436,12 @@
       (is (= :deepseek (:provider model)))
       (is (= :anthropic-messages (:api model)))
       (is (= "https://api.deepseek.com/anthropic" (:base-url model)))
+      ;; Review 25: pin the review-14 origin tag on the exact shipped
+      ;; example — the doc lock is the natural home to catch an expand-model
+      ;; change that stops tagging custom models (e.g. a merge-order
+      ;; regression moving `:custom? true` before the model-def merge).
+      (is (true? (:custom? model))
+          "the documented example must carry the :custom? origin tag")
       (is (true? (:supports-reasoning model)))
       (is (true? (:adaptive-thinking model)))
       (is (false? (:supports-images model)))

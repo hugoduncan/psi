@@ -121,7 +121,9 @@ value ResolvedCustomModel {
     provider: String                           -- the custom provider key, e.g. "local"
     api: ApiProtocol
     base_url: String
-    custom: Boolean = true                     -- review 14: origin tag — custom models are never classified built-in
+    custom: Boolean = true                     -- review 14: origin tag — custom models are never classified built-in;
+                                                -- set by psi at parse time (expand-model), never declared in models.edn
+                                                -- (the closed ModelDef schema rejects a user-supplied :custom? key)
     supports_reasoning: Boolean
     supports_images: Boolean
     supports_text: Boolean

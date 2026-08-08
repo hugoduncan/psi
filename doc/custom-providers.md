@@ -64,6 +64,18 @@ inferred from the runtime API shape. Set it `true` only after verifying the
 endpoint actually honours per-turn `system` changes (see the DeepSeek
 example notes).
 
+Note on `:custom?`: psi tags every custom models.edn model with an internal
+`:custom? true` origin marker at parse time. It is never declared in
+models.edn — the closed model-definition schema rejects a user-supplied
+`:custom?` key with a generic "Invalid models.edn schema" error — and it is
+what gates built-in classification: provider transports treat a model as
+built-in only when it is NOT tagged `:custom?` (and its provider matches the
+built-in name), so a custom provider literally named "anthropic"/"openai"
+can never receive built-in-only treatment (env-var key fallback, OAuth
+headers, mid-conversation system-message inference). If you see `:custom?
+true` in an introspected model map (resolvers/EQL), it means that model came
+from a custom models.edn provider; leave it out of any models.edn you write.
+
 Supported custom-provider API protocols are:
 
 - `:openai-completions`

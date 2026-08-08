@@ -1361,3 +1361,9 @@
   set in environment (verified again 2026-08-08); request-shaping coverage
   only by design (steps.md item left unchecked).
 - Review 25 (2026-08-08): added 3 steps to be addressed.
+- Review 25 (2026-08-08): addressed 3 review steps — mid-system-messages
+  `:custom?` origin-tag guard + test (model_capabilities.clj,
+  model_dispatch_test.clj); `:custom?` reserved-tag docs note
+  (doc/custom-providers.md, spec mirror); parse-lock `:custom? true`
+  assertion (user_models_test.clj). Namespaces green (user-models 16/115,
+  model-dispatch 13/158); clj-kondo + file-lengths clean.

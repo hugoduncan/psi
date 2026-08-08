@@ -2095,7 +2095,7 @@
 
 ## Follow-ups (implementation review 25, 2026-08-08)
 
-- [ ] `supports-mid-system-messages?` (components/agent-session/src/psi/
+- [x] `supports-mid-system-messages?` (components/agent-session/src/psi/
       agent_session/model_capabilities.clj) infers the mid-conversation
       system-message capability from provider NAME + api —
       `(and (= :openai (:provider model)) (= :openai-completions (:api model)))`
@@ -2122,7 +2122,16 @@
       does NOT get the inference — fits beside
       `mid-system-capability-dispatch-test` in model_dispatch_test.clj or as
       a direct model-capabilities unit test.
-- [ ] `:custom?` is undocumented in doc/custom-providers.md: `expand-model`
+      → Resolved: `(not (:custom? model))` added to the inference branch in
+      `model_capabilities.clj` (behavior-preserving — no built-in catalog
+      model carries the tag; only `expand-model`-tagged custom models do).
+      New `mid-system-capability-custom-origin-test` deftest in
+      `model_dispatch_test.clj` locks it directly on the pure predicate:
+      custom "openai" (`:custom? true`) → false, custom "deepseek"
+      (`:custom? true`) → false, untagged built-in OpenAI shape → true,
+      and explicit `:supports-mid-conversation-system-messages` still wins
+      for custom models. Namespace green (13 tests / 158 assertions).
+- [x] `:custom?` is undocumented in doc/custom-providers.md: `expand-model`
       tags every custom models.edn model `:custom? true` (review 14 — the
       origin tag that gates built-in classification, env-key fallback and
       OAuth treatment), but the docs never mention it, and the closed
@@ -2137,7 +2146,15 @@
       spec/custom-providers.allium, where `ResolvedCustomModel.custom = true`
       is currently the only place the tag is described and nothing says it is
       not settable from models.edn.
-- [ ] `parse-documented-deepseek-example-test` (user_models_test.clj) asserts
+      → Resolved: "What a provider definition contains" gains a
+      "Note on `:custom?`" paragraph — internal origin tag set by psi at
+      parse time, never declared in models.edn (closed ModelDef schema
+      rejects it), gates built-in classification (env-key fallback, OAuth
+      headers, mid-conversation system-message inference), and is expected in
+      introspected model maps for custom providers. `spec/custom-providers.allium`
+      `ResolvedCustomModel.custom` comment mirrored (set by expand-model,
+      never declared in models.edn).
+- [x] `parse-documented-deepseek-example-test` (user_models_test.clj) asserts
       every resolved field of the documented DeepSeek example — id, name,
       provider, api, base-url, supports-reasoning, adaptive-thinking,
       supports-images, supports-text, context-window, max-tokens, all four
@@ -2153,3 +2170,6 @@
       merge) would then fail the doc lock too. Fix: add
       `(is (true? (:custom? model)))` to the parse-lock's first testing
       block.
+      → Resolved: `(is (true? (:custom? model)))` added to the parse-lock's
+      first testing block (with a review-25 comment naming the merge-order
+      regression it guards). Namespace green (16 tests / 115 assertions).
