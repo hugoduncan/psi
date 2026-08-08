@@ -1787,3 +1787,78 @@
       dedup. Verification: `psi.ai.providers.openai-codex-test` 9/30 (was
       8/27; +1 deftest +3 assertions), `psi.ai.providers.openai-test` 16/88
       (unchanged); clj-kondo clean; full `bb test` green.
+
+## Follow-ups (implementation review 22, 2026-08-08)
+
+- [ ] `oauth-auth-request?` (anthropic/error.clj) content-sniffs the three-marker
+      OAuth signature from the MERGED request headers, so the documented
+      keyless custom-header pattern can reproduce it: a keyless custom
+      `:anthropic-messages` provider whose custom `:headers` carry
+      `Authorization: Bearer …` PLUS `user-agent: claude-cli/…` AND `x-app:
+      cli` (all three markers — the "Local servers and custom headers"
+      pattern permits arbitrary headers, and a Claude Code-compatible
+      gateway could set exactly these) is classified as a genuine OAuth
+      request. Consequence: on a beta-related HTTP 400,
+      `fallback-request-steps-for-400` skips `:without-all-betas`, so ALL
+      betas (e.g. `fast-mode-2026-02-01`) are retained on the retry → the
+      retry repeats the same 400 and hard-fails — the review-19 regression
+      class, still reachable through the full marker set. This also
+      contradicts doc/custom-providers.md's fast-mode note claim that "only
+      genuine built-in Anthropic OAuth requests keep their betas" — the code
+      cannot distinguish a spoofed marker set from a genuine one (genuine
+      OAuth is a transport decision: `builtin-anthropic?` + `oauth-api-key?`
+      in `build-request`, review 11). Fix direction: thread the transport's
+      actual `oauth?` boolean from `build-request`/`stream-anthropic` into
+      `handle-400-response!`'s beta-config (replace the content-sniffing
+      predicate with the computed decision) and add a stream test with a
+      keyless custom-provider request carrying all three markers +
+      `:speed-mode :fast` asserting `:without-all-betas` is selected (betas
+      stripped on the retry) — fails against the current content-sniffing
+      predicate. Keep `oauth-auth-request?` for error diagnostics only, or
+      align the doc sentence to name the marker-set limitation.
+- [ ] `request-support/resolve-api-key`'s keyless early-return tests only
+      `(:no-auth-header options)`, not the shared `no-auth?` predicate — the
+      two keyless definitions can drift, and the public function throws for
+      a headers-auth keyless config when called directly: `(resolve-api-key
+      model {:headers {"X-API-Key" "k"}} config)` (no `:no-auth-header`,
+      blank key) throws "Missing API key" even though `no-auth?` is true for
+      the same options. Every real caller (`build-request` in all three
+      transports) gates on `no-auth?` first, so the `:no-auth-header` branch
+      is currently dead code whose docstring documents a contract the
+      callers never exercise. Unify: `(when-not (no-auth? options) …)` inside
+      `resolve-api-key` so the function itself is safe for direct callers and
+      the keyless logic lives in one predicate; add a direct-call test
+      (headers-auth keyless → nil; `:no-auth-header` keyless → nil;
+      blank-key no-auth → throws) locking the unified contract.
+- [ ] `doc/custom-providers.md` never documents
+      `:supports-mid-conversation-system-messages`, and the DeepSeek example
+      omits it: the field exists in the canonical `Model` schema and gates a
+      real session capability (`session-supports-mid-system-messages?` in
+      agent-session `model_capabilities.clj`; `:session/inject-mid-system-
+      message` returns `:capability-not-supported` for a
+      `:anthropic-messages` custom provider without the flag — only
+      `:openai`/`:openai-completions` is inferred). A DeepSeek user
+      following the documented example cannot use mid-conversation system
+      messages even though Anthropic's Messages API supports per-turn
+      `system` changes and DeepSeek's compat table lists `system` as fully
+      supported (mid-conversation switching unverified). Fix: document the
+      field in "What a provider definition contains" (what it gates, default
+      false for `:anthropic-messages` custom providers, the OpenAI
+      chat-completions inference) and add a note to the DeepSeek example
+      (set it only after verifying the endpoint honours per-turn `system`
+      changes), matching the review-21 locality/tier treatment.
+- [ ] Custom `anthropic-beta` header interplay with the 400-fallback is
+      undocumented and untested: `build-request` merges custom `:headers`
+      over the base headers, so a custom `"anthropic-beta"` header REPLACES
+      the transport-generated beta header on the first request (the
+      transport's own betas — prompt-caching, interleaved-thinking,
+      fast-mode — are silently dropped from the wire), and on a beta-related
+      400 `:without-all-betas` (`clear-beta-header`) wipes the user's custom
+      beta too — the retry may then 400 for a DIFFERENT reason (missing
+      provider-required beta) and hard-fail, masking the original error. The
+      "don't mix" guidance covers auth headers only, not betas. Fix (docs
+      and/or code): document that a custom `anthropic-beta` header replaces
+      the transport betas and is also stripped by `:without-all-betas`, and/
+      or make `:without-all-betas` strip only the transport-known betas
+      (preserving custom-header beta values); add a build-request +
+      400-fallback test for a custom `anthropic-beta` header.
