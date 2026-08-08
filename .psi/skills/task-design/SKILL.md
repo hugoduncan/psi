@@ -13,6 +13,7 @@ lambda: λx.(user_asks(create_task∨refine_task∨review_task_design)→munera.
   ∧ guide(scope(x), {design planning})
   ∧ define(acceptance_criteria(x)) ∧ unambiguous(done(x))
   ∧ identify(minimum_concepts(x), cover({intent(x) scope(x)}))
+  ∧ identify(invariants, ownership, abstractions)
   ∧ seek(simplifications_preserving(intent(x)) ∧ solving(problem(x)))
   ∧ provide(language(x), compare_choose(solutions))
   ∧ explore(implementation_approaches(x), {code non_code alternative_shapes})
