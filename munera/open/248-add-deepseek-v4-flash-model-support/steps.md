@@ -1613,3 +1613,37 @@
       applies to keyless custom-header Bearer requests too (only genuine
       built-in Anthropic OAuth requests keep their betas — DeepSeek never
       is one).
+
+## Follow-ups (implementation review 20, 2026-08-08)
+
+- [ ] `openai_request_headers_test.clj`'s custom `:provider :local` fixtures
+      still omit the `:custom?` origin tag — the exact drift class reviews
+      15/17/18 closed in every other touched test file (all anthropic test
+      fixtures, openai_test.clj, openai_completions_test.clj tagged), and the
+      review-18 resolution explicitly deferred this file ("boundary recorded
+      in implementation.md") without opening a follow-up. Verified 2026-08-08:
+      all five `:local` fixtures in the file (lines ~52/106/138/176/218)
+      lack `:custom? true`; behavior-neutral today (`:local` never collides
+      with built-in names, `builtin?` classifies it custom either way), but a
+      future `builtin?`/`:custom?` semantics change (e.g. keying
+      built-in-ness on the tag alone) would silently alter these tests — the
+      same gap the task closed everywhere else. Fix: add `:custom? true` to
+      these fixtures (or extract a shared custom-provider fixture helper that
+      always carries the tag) and re-run
+      `psi.ai.providers.openai-request-headers-test`.
+- [ ] Trailing-slash `:base-url` handling is inconsistent across the three
+      transports: `:openai-codex-responses` normalizes (`resolve-codex-url`
+      strips a trailing `/+$`), but `:anthropic-messages`
+      (`(str (:base-url model) "/v1/messages")`) and `:openai-completions`
+      (`(str (:base-url model) "/chat/completions")`) concatenate
+      unnormalized — a custom-provider `:base-url` ending in `/` (e.g.
+      `https://api.deepseek.com/anthropic/`) silently produces a double-slash
+      URL (`//v1/messages`). The DeepSeek example and the custom-provider
+      docs teach `:base-url` as "the API root" with no trailing-slash
+      guidance, and the review-14 three-transport consistency standard
+      (shared `request-support`) does not cover URL construction. Fix (docs
+      option, within this task's scope): add a "no trailing slash" note to
+      the `:base-url` description in `doc/custom-providers.md` and the
+      DeepSeek example notes; or normalize the join in shared
+      `request-support` as a separate transport change (design AC forbids
+      transport changes in this task).
