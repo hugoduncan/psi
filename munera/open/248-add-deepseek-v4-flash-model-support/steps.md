@@ -2037,3 +2037,37 @@
       `:logprobs-enabled`/`:top-logprobs` and `:structured-output` left out
       of scope per the item (no rule in this spec references them). Manual
       allium-check: no undefined fields/types introduced.
+
+## Follow-ups (implementation review 24, 2026-08-08)
+
+- [ ] `openai_completions_logprobs_test.clj`'s literal custom-provider
+      fixture (`:provider :local3`, line ~107,
+      `completion-response-with-logprobs-and-missing-model-pricing-test`)
+      lacks the `:custom? true` origin tag — the last untagged custom
+      fixture in a task-touched test file. Reviews 15/17/18/20 closed this
+      drift class in every other touched file (review 18 tagged the two
+      `:local3` fixtures in `openai_completions_test.clj`; this logprobs
+      file was outside that scope, though the task touched it in review 10
+      when adding `:api-key` to its build-request calls). Behavior-neutral
+      today (`:local3` is never a built-in name, and the fixture only feeds
+      `completion-response->assistant-message`, which never reads
+      `:custom?`), but a future `builtin?`/`:custom?` semantics change
+      (e.g. keying built-in-ness on the tag alone) would silently alter the
+      fixture's classification — the same gap the task closed everywhere
+      else. Fix: add `:custom? true` (one line) and re-run
+      `psi.ai.providers.openai-completions-logprobs-test`.
+- [ ] Direct shared-namespace unit tests for the remaining
+      `request-support` primitives: `request_support_test.clj` (review 22)
+      locks `resolve-api-key`/`no-auth?`/`auth-header?` directly, but
+      `builtin?` (the review-14 origin-tag gate — the predicate that
+      decides env-var fallback / OAuth treatment, and the most
+      security-relevant helper in the namespace) and the capture-redaction
+      helpers (`find-headers`/`find-header`/`redact-headers`/
+      `redact-secret`/`redact-authorization`/`mask-chatgpt-account-id`,
+      reviews 7/11/13/19) are only exercised indirectly through transport
+      capture tests. Since the shared namespace is the "future fixes land
+      once" home (review 14), add direct tests there (e.g. `builtin?` with
+      `:custom?` true/false/absent + provider nil/builtin/other;
+      `redact-headers` dual-casing all-matches semantics and
+      `redact-authorization` Bearer-prefix length) so a shared-namespace
+      regression fails without needing the transport files.
