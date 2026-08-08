@@ -58,6 +58,7 @@ value StreamOptions {
     no_auth_header: Boolean = false
     headers: Map<String, String>?
     id: String?
+    speed_mode: fast | normal | null
 
     on_provider_request: ProviderCallbackHandle?
     on_provider_response: ProviderCallbackHandle?
@@ -510,6 +511,22 @@ rule KeylessCompletionsRequestBuilt {
         -- the authenticated build, but NO Authorization header is sent
         -- (the auth is carried by :no-auth-header config or a custom
         -- x-api-key/Authorization header, or the endpoint needs none).
+}
+
+rule FastModeServiceTierMappedForCompletions {
+    -- Review 23: :speed-mode :fast → "service_tier": "flex" in the
+    -- chat-completions request body (build-request in
+    -- providers/openai/chat_completions.clj; locked by
+    -- speed-mode-fast-adds-service-tier-flex-test). The codex-responses
+    -- transport has no speed-mode mapping (no service_tier field is ever
+    -- emitted there).
+    when: OpenAIStreamRequested(stream)
+    requires: stream.request_api = openai_completions
+
+    ensures: stream.options.speed_mode = fast
+        implies CompletionsRequestBody(stream) contains "service_tier" = "flex"
+    ensures: stream.options.speed_mode != fast
+        implies CompletionsRequestBody(stream) does not contain "service_tier"
 }
 
 rule CodexRequestBuilt {

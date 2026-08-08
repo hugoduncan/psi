@@ -1266,3 +1266,52 @@
   set in environment (verified again 2026-08-08); request-shaping coverage
   only by design (steps.md item left unchecked).
 - Review 23 (2026-08-08): added 3 steps to be addressed.
+
+## Follow-ups review 23 addressed (2026-08-08)
+
+- addressed 3 review steps (all review-23 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `spec/custom-providers.allium` ModelDef drift closed: `CustomModelDef`
+  gains `parallel_tool_calls: Boolean?`, `locality: local | cloud = local`,
+  `latency_tier: low | medium | high = low`,
+  `cost_tier: zero | low | medium | high = zero`,
+  `capabilities: ModelCapabilities?` (new `ModelCapabilities` /
+  `StructuredOutputCapability` / `TextualToolCallFormat` values mirroring
+  schemas/ModelCapabilities); `ResolvedCustomModel` carries all five;
+  `ParseModelsConfig` maps them pass-through. The documented DeepSeek
+  example (locality :cloud / latency-tier :low / cost-tier :low, review 21)
+  now validates against the spec's `CustomModelDef`. `RequestOptions`
+  extended with `temperature: Number?`, `speed_mode: fast | normal | null`,
+  `effort_override: low | medium | high | xhigh | null` (mirrors the
+  anthropic spec's `StreamOptions`; logprobs/structured-output out of scope
+  per the item — no rule references them).
+- `spec/anthropic-provider.allium` first-request fast-mode/beta assembly
+  modeled: `StreamOptions` gains `speed_mode: fast | normal | null`; new
+  `FastModeBodyAndBetaHeaderForSpeedMode` / `NoFastModeFieldsWhenSpeedModeNotFast`
+  ensure `"speed": "fast"` + `fast-mode-2026-02-01` beta iff `speed_mode =
+  fast`; new `BetaHeaderAssembledForRequest` models the full first-request
+  anthropic-beta assembly (oauth → claude-code-20250219/oauth-2025-04-20/
+  context-management-2025-06-27/prompt-caching-scope-2026-01-05, classic
+  extended thinking → interleaved-thinking-2025-05-14, prompt-caching →
+  prompt-caching-2024-07-31, fast → fast-mode-2026-02-01, structured-output
+  → structured-outputs-2025-11-13; adaptive thinking never adds
+  interleaved-thinking), matching `beta-header`/`request-headers` in
+  providers/anthropic.clj and closing the gap where the HTTP-400 retry rules
+  referenced these betas by name without modeling their construction.
+- `spec/openai-provider.allium` same-class gap closed: `StreamOptions`
+  gains `speed_mode: fast | normal | null`; new
+  `FastModeServiceTierMappedForCompletions` ensures
+  `service_tier: "flex"` iff `speed_mode = fast` on `:openai-completions`
+  (locked by `speed-mode-fast-adds-service-tier-flex-test`; codex never
+  emits it).
+- Manual allium-check (no automated checker in repo, per the established
+  pattern): all three specs reference only defined
+  entities/fields/predicates — `ModelCapabilities`/
+  `StructuredOutputCapability`/`TextualToolCallFormat` defined in
+  custom-providers.allium; `AnthropicBetaHeader(stream)` is rule-defined
+  vocabulary (like `ThinkingParam(stream)`), with `PromptCachingActive` /
+  `StructuredOutputRequested` documented in-rule; `CompletionsRequestBody`
+  already established. No code/tests/docs changed (spec-only items).
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment (verified again 2026-08-08); request-shaping coverage
+  only by design (steps.md item left unchecked).

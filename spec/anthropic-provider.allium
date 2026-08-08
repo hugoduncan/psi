@@ -81,6 +81,7 @@ value StreamOptions {
     no_auth_header: Boolean = false
     headers: Map<String, String>?
     effort_override: low | medium | high | xhigh | null
+    speed_mode: fast | normal | null
 
     on_provider_request: ProviderCallbackHandle?
     on_provider_response: ProviderCallbackHandle?
@@ -484,6 +485,63 @@ rule AnthropicRequestBodyBuilt {
     ensures: RequestBodyContains("tools", ToolDefs(stream.conversation)) when stream.conversation.tools non-empty
     ensures: RequestBodyContains("thinking", ThinkingParam(stream)) when ThinkingParam(stream) != null
     ensures: RequestBodyContains("temperature", stream.options.temperature ?? config.default_temperature) when ThinkingParam(stream) = null and not stream.model.adaptive_thinking
+}
+
+------------------------------------------------------------
+-- Fast mode and first-request beta assembly
+------------------------------------------------------------
+
+-- Review 23: the HTTP-400 retry rules (below) reference the fast-mode beta
+-- header ("fast-mode-2026-02-01") and the "speed" body field by name, but the
+-- FIRST-request construction of both was unmodeled. These rules close that
+-- gap, mirroring request-body / beta-header / request-headers in
+-- providers/anthropic.clj. They also model the review-8 fast-mode note: a
+-- speed-field 400 retries with the field retained (WithoutAllBetasStepClears
+-- BetasAndOutputFormat) and hard-fails.
+
+rule FastModeBodyAndBetaHeaderForSpeedMode {
+    when: RequestBodyBuilt(stream)
+    requires: stream.options.speed_mode = fast
+
+    ensures: RequestBodyContains("speed", "fast")
+    ensures: AnthropicBetaHeader(stream) contains "fast-mode-2026-02-01"
+}
+
+rule NoFastModeFieldsWhenSpeedModeNotFast {
+    when: RequestBodyBuilt(stream)
+    requires: stream.options.speed_mode != fast
+
+    ensures: RequestBodyDoesNotContain("speed")
+    ensures: AnthropicBetaHeader(stream) does not contain "fast-mode-2026-02-01"
+}
+
+rule BetaHeaderAssembledForRequest {
+    -- Mirrors beta-header/request-headers in providers/anthropic.clj: the
+    -- anthropic-beta header is the distinct join of per-feature beta values.
+    -- Adaptive thinking (adaptive_thinking = true) must NOT add
+    -- interleaved-thinking-beta — only classic extended thinking (thinking
+    -- param non-null and NOT adaptive; beta-header's extended-thinking? =
+    -- thinking and not adaptive?) adds it.
+    -- Vocabulary: ThinkingParam(stream) (defined above);
+    -- PromptCachingActive(stream) = any conversation prompt unit
+    -- (system-prompt-blocks, tools, messages) carries :cache_control
+    -- (prompt-caching? in providers/anthropic.clj);
+    -- StructuredOutputRequested(stream) = the structured-output strategy is
+    -- provider-native with the :anthropic/json-schema-output native mechanism
+    -- (json-schema-output-mechanism? in
+    -- providers/anthropic/structured_output.clj).
+    when: AnthropicStreamRequested(stream)
+
+    ensures: AnthropicBetaHeader(stream) = Join(",", Distinct(concat(
+        stream.oauth = true →
+            ["claude-code-20250219", "oauth-2025-04-20",
+             "context-management-2025-06-27", "prompt-caching-scope-2026-01-05"],
+        ThinkingParam(stream) != null and not stream.model.adaptive_thinking →
+            ["interleaved-thinking-2025-05-14"],
+        PromptCachingActive(stream) → ["prompt-caching-2024-07-31"],
+        stream.options.speed_mode = fast → ["fast-mode-2026-02-01"],
+        StructuredOutputRequested(stream) → ["structured-outputs-2025-11-13"])))
+    ensures: (no beta condition applies) implies AnthropicBetaHeader(stream) = null
 }
 
 ------------------------------------------------------------

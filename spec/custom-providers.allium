@@ -59,6 +59,26 @@ value CustomModelDef {
     output_cost: Number = 0.0
     cache_read_cost: Number = 0.0
     cache_write_cost: Number = 0.0
+    parallel_tool_calls: Boolean?
+    -- Review 23: pass-through of the closed ModelDef schema's
+    -- :parallel-tool-calls field. Sent as :parallel_tool_calls by the OpenAI
+    -- transports when tool defs are present and the model declares it; the
+    -- Anthropic transport does not read it. Optional — the expanded model map
+    -- carries the key only when the models.edn entry declares it.
+    locality: local | cloud = local
+    latency_tier: low | medium | high = low
+    cost_tier: zero | low | medium | high = zero
+    -- Review 21/23: model-defaults (expand-model) are :locality :local /
+    -- :latency-tier :low / :cost-tier :zero; the documented DeepSeek example
+    -- sets :locality :cloud / :latency-tier :low / :cost-tier :low explicitly
+    -- (locked by parse-documented-deepseek-example-test). These drive
+    -- local-helper selection (context-manager requires :latency-tier :low +
+    -- :cost-tier #{:zero :low}, strong :locality :local).
+    capabilities: ModelCapabilities?
+    -- Review 23: optional :capabilities map matching
+    -- schemas/ModelCapabilities (:structured-output / :textual-tool-calls),
+    -- carried through expand-model's verbatim merge like every other
+    -- model-def key.
 }
 
 value CustomProviderDef {
@@ -71,6 +91,26 @@ value CustomProviderDef {
 value ModelsConfig {
     version: PositiveInt = 1
     providers: Map<String, CustomProviderDef>
+}
+
+value ModelCapabilities {
+    -- Mirrors schemas/ModelCapabilities in user_models.clj: a closed map with
+    -- optional :structured-output and :textual-tool-calls keys (review 23).
+    structured_output: StructuredOutputCapability?
+    textual_tool_calls: Set<TextualToolCallFormat>?
+}
+
+value StructuredOutputCapability {
+    -- Mirrors schemas/StructuredOutputCapability.
+    supported: Boolean
+    strategies: List<String>
+    native_mechanism: String?
+    defaulted: Boolean?
+    notes: String?
+}
+
+value TextualToolCallFormat {
+    format: xml
 }
 
 value ResolvedCustomModel {
@@ -93,6 +133,11 @@ value ResolvedCustomModel {
     output_cost: Number
     cache_read_cost: Number
     cache_write_cost: Number
+    parallel_tool_calls: Boolean?
+    locality: local | cloud
+    latency_tier: low | medium | high
+    cost_tier: zero | low | medium | high
+    capabilities: ModelCapabilities?
 }
 
 value ProviderAuth {
@@ -181,7 +226,12 @@ rule ParseModelsConfig {
                 input_cost: model_def.input_cost,
                 output_cost: model_def.output_cost,
                 cache_read_cost: model_def.cache_read_cost,
-                cache_write_cost: model_def.cache_write_cost
+                cache_write_cost: model_def.cache_write_cost,
+                parallel_tool_calls: model_def.parallel_tool_calls,
+                locality: model_def.locality,
+                latency_tier: model_def.latency_tier,
+                cost_tier: model_def.cost_tier,
+                capabilities: model_def.capabilities
             }
 }
 
@@ -202,6 +252,14 @@ value RequestOptions {
     no_auth_header: Boolean = false
     headers: Map<String, String>?
     thinking_level: off | minimal | low | medium | high | xhigh | null
+    temperature: Number?
+    speed_mode: fast | normal | null
+    effort_override: low | medium | high | xhigh | null
+    -- Review 23: extended to mirror the transport StreamOptions values —
+    -- session->request-options (prompt_request.clj) carries :temperature,
+    -- :speed-mode and :effort-override alongside the key/auth fields.
+    -- :logprobs-enabled/:top-logprobs and :structured-output stay out of
+    -- scope: no rule in this spec references them.
 }
 
 rule ResolveRequestApiKey {

@@ -1939,7 +1939,7 @@
 
 ## Follow-ups (implementation review 23, 2026-08-08)
 
-- [ ] `spec/custom-providers.allium`'s `CustomModelDef`/`ResolvedCustomModel`/
+- [x] `spec/custom-providers.allium`'s `CustomModelDef`/`ResolvedCustomModel`/
       `ParseModelsConfig` drift against the closed `ModelDef` schema in
       `user_models.clj`: the spec value models id/name/supports-reasoning/
       supports-images/supports-text/adaptive-thinking/
@@ -1960,7 +1960,17 @@
       `ResolvedCustomModel`; map them in `ParseModelsConfig` (pass-through
       like the other model-def fields). Manual allium-check per the
       established pattern (no automated checker in repo).
-- [ ] `spec/anthropic-provider.allium` models the HTTP-400 fallback's beta
+      → Resolved: `CustomModelDef` gains `parallel_tool_calls: Boolean?`,
+      `locality: local | cloud = local`, `latency_tier: low | medium | high
+      = low`, `cost_tier: zero | low | medium | high = zero` and
+      `capabilities: ModelCapabilities?` (new `ModelCapabilities` /
+      `StructuredOutputCapability` / `TextualToolCallFormat` values mirror
+      schemas/ModelCapabilities); `ResolvedCustomModel` carries all five;
+      `ParseModelsConfig` maps them pass-through. The documented DeepSeek
+      example (locality :cloud / latency-tier :low / cost-tier :low) now
+      validates against the spec's `CustomModelDef`. Manual allium-check:
+      every referenced field/type is defined in the spec.
+- [x] `spec/anthropic-provider.allium` models the HTTP-400 fallback's beta
       TRANSFORMS (`WithoutPromptCachingStep`, `WithoutThinkingStep`,
       `WithoutAllBetasStepClearsBetasAndOutputFormat`, incl. the review-22
       `stream.oauth` decision and the `"speed"`-retention rule) but never
@@ -1986,7 +1996,25 @@
       from `spec/openai-provider.allium`'s `StreamOptions`/
       `CompletionsRequestBuilt` — close both or split into separate steps.
       Manual allium-check per the established pattern.
-- [ ] `spec/custom-providers.allium`'s `RequestOptions` value models only
+      → Resolved (both specs): `spec/anthropic-provider.allium`
+      `StreamOptions` gains `speed_mode: fast | normal | null`; new
+      `FastModeBodyAndBetaHeaderForSpeedMode` /
+      `NoFastModeFieldsWhenSpeedModeNotFast` rules ensure the `"speed":
+      "fast"` body field + `fast-mode-2026-02-01` beta appear iff
+      `speed_mode = fast`; new `BetaHeaderAssembledForRequest` rule models
+      the full first-request beta assembly (oauth →
+      claude-code/oauth/context-management/prompt-caching-scope, classic
+      extended thinking → interleaved-thinking, prompt-caching →
+      prompt-caching, fast → fast-mode-2026-02-01, structured-output →
+      structured-outputs-2025-11-13; adaptive thinking never adds
+      interleaved-thinking), with `AnthropicBetaHeader(stream)` defined as
+      rule vocabulary. `spec/openai-provider.allium` `StreamOptions` gains
+      `speed_mode: fast | normal | null` and new
+      `FastModeServiceTierMappedForCompletions` rule ensures
+      `service_tier: "flex"` iff `speed_mode = fast` on
+      `:openai-completions` (codex never emits it). Manual allium-check:
+      all referenced entities/attributes defined.
+- [x] `spec/custom-providers.allium`'s `RequestOptions` value models only
       `api_key`/`no_auth_header`/`headers`/`thinking_level`, while the real
       request-options map (`prompt_request.clj` `session->request-options`
       + transport options) also carries `:temperature`, `:speed-mode`,
@@ -2001,3 +2029,11 @@
       `StreamOptions`); logprobs/structured-output can stay out of scope if
       the spec only models what its rules reference. Manual allium-check
       per the established pattern.
+      → Resolved: `RequestOptions` extended with `temperature: Number?`,
+      `speed_mode: fast | normal | null` and
+      `effort_override: low | medium | high | xhigh | null` — mirroring the
+      anthropic spec's `StreamOptions` for the same concept
+      (`session->request-options` in prompt_request.clj carries all three).
+      `:logprobs-enabled`/`:top-logprobs` and `:structured-output` left out
+      of scope per the item (no rule in this spec references them). Manual
+      allium-check: no undefined fields/types introduced.
