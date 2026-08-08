@@ -1936,3 +1936,68 @@
       request, 400 → `:without-all-betas` → retried request has no
       `anthropic-beta` at all, `[:without-all-betas]` recorded, configured
       `x-api-key` preserved, stream completes).
+
+## Follow-ups (implementation review 23, 2026-08-08)
+
+- [ ] `spec/custom-providers.allium`'s `CustomModelDef`/`ResolvedCustomModel`/
+      `ParseModelsConfig` drift against the closed `ModelDef` schema in
+      `user_models.clj`: the spec value models id/name/supports-reasoning/
+      supports-images/supports-text/adaptive-thinking/
+      supports-mid-conversation-system-messages/context-window/max-tokens/
+      input/output/cache costs, but the actual schema also accepts
+      `:parallel-tool-calls`, `:locality`, `:latency-tier`, `:cost-tier` and
+      `:capabilities` — and the task's own DeepSeek example (review 21) now
+      sets `:locality :cloud`/`:latency-tier :low`/`:cost-tier :low` (locked
+      by `parse-documented-deepseek-example-test`), so the exact documented
+      example EDN would NOT validate against the spec's `CustomModelDef`.
+      `ResolvedCustomModel` claims "carries all fields of a built-in model
+      plus origin metadata" but omits them, and `ParseModelsConfig` doesn't
+      map them. Fix: add `parallel_tool_calls: Boolean?`,
+      `locality: local | cloud = local`, `latency_tier: low | medium | high
+      = low`, `cost_tier: zero | low | medium | high = zero` and a
+      `capabilities` field (optional, matching the schema's
+      `ModelCapabilities`) to `CustomModelDef`; carry them in
+      `ResolvedCustomModel`; map them in `ParseModelsConfig` (pass-through
+      like the other model-def fields). Manual allium-check per the
+      established pattern (no automated checker in repo).
+- [ ] `spec/anthropic-provider.allium` models the HTTP-400 fallback's beta
+      TRANSFORMS (`WithoutPromptCachingStep`, `WithoutThinkingStep`,
+      `WithoutAllBetasStepClearsBetasAndOutputFormat`, incl. the review-22
+      `stream.oauth` decision and the `"speed"`-retention rule) but never
+      models the FIRST-request beta/body construction: `StreamOptions` has
+      no `speed_mode`, and `AnthropicRequestBodyBuilt` doesn't ensure the
+      `"speed": "fast"` body field or the assembled `anthropic-beta` header
+      (`beta-header`/`request-headers` in providers/anthropic.clj: oauth →
+      claude-code/oauth/context-management/prompt-caching-scope,
+      extended-thinking → interleaved-thinking, prompt-caching →
+      prompt-caching, `:fast` → fast-mode-2026-02-01, structured-output →
+      json-schema beta). The task documents fast mode on DeepSeek (review-8
+      note: `"speed": "fast"` + fast-mode beta are sent; a speed-field 400
+      retries with the field retained and hard-fails) and review 22 touched
+      the retry half of the same behavior, but the first-request half is
+      unmodeled. Fix: add `speed_mode: fast | normal | null` to
+      `StreamOptions`; a rule ensuring `RequestBodyContains("speed",
+      "fast")` plus the fast-mode beta header when `speed_mode = fast` and
+      neither when not; optionally a beta-header assembly rule covering the
+      oauth/prompt-caching/interleaved-thinking betas the retry rules
+      already reference by name. The openai spec has the same class of gap:
+      `:speed-mode :fast` → `service_tier: "flex"` on `:openai-completions`
+      (locked by `speed-mode-fast-adds-service-tier-flex-test`) is absent
+      from `spec/openai-provider.allium`'s `StreamOptions`/
+      `CompletionsRequestBuilt` — close both or split into separate steps.
+      Manual allium-check per the established pattern.
+- [ ] `spec/custom-providers.allium`'s `RequestOptions` value models only
+      `api_key`/`no_auth_header`/`headers`/`thinking_level`, while the real
+      request-options map (`prompt_request.clj` `session->request-options`
+      + transport options) also carries `:temperature`, `:speed-mode`,
+      `:effort-override`, `:logprobs-enabled`/`:top-logprobs` and
+      `:structured-output` — the anthropic spec's `StreamOptions` models
+      `temperature`/`effort_override` and (per the item above) should model
+      `speed_mode`, so the custom-providers spec's request-options model is
+      narrower than its sibling spec's for the same concept. Fix: extend
+      `RequestOptions` with `temperature: Number?`,
+      `speed_mode: fast | normal | null`,
+      `effort_override: low | medium | high | xhigh | null` (mirroring
+      `StreamOptions`); logprobs/structured-output can stay out of scope if
+      the spec only models what its rules reference. Manual allium-check
+      per the established pattern.
