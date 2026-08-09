@@ -1829,3 +1829,49 @@
   steps.md as the sole remaining unchecked item.
 
 - Review 39 (2026-08-09): added 3 steps to be addressed.
+
+## Follow-ups review 39 addressed (2026-08-09)
+
+- addressed 3 review steps (review-39; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `doc/custom-providers.md` "Switch to the configured model" section now
+  lists a third in-session selection variant — "or, for the DeepSeek
+  example: `/model deepseek deepseek-v4-flash`" — so every documented
+  example (MiniMax, Anthropic-compatible proxy, DeepSeek) has its
+  selection command at the natural lookup point. Doc-only; the DeepSeek
+  model parse-lock is unaffected (the new block is ```text, not
+  ```clojure).
+- `workflow_delegate_review_step_live_test.clj`: the review-38 durable
+  lock is no longer CWD-dependent. New `repo-root` helper (walk-up until
+  `doc/custom-providers.md` exists — the user_models_test.clj pattern)
+  and `committed-project-models-path` (resolves `.psi/models.edn` from
+  the repo root; throws a clear error if the committed
+  `.psi/project.edn` or `.psi/models.edn` is absent, so the lock fails
+  loud instead of silently vanishing). Live test green from the repo root
+  (3 tests / 21 assertions); the walk-up verified from a component-local
+  cwd (user.dir = components/agent-session → repo root, both files
+  found).
+- `.psi/project.edn` deepseek comment now documents the unverified
+  adaptive wire shape (review 39): thinking.type "adaptive" +
+  output_config.effort is unverified until a live DEEPSEEK_API_KEY turn
+  (the review-1 smoke test); a strict endpoint's 400 silently retries
+  `:without-thinking` on the streaming path (effort dropped, thinking ON
+  server-default) and hard-fails on the non-streaming path; the
+  documented fallback is `:adaptive-thinking false` (classic type
+  "enabled"); and the committed-file ↔ doc-example equality parse-lock
+  means `.psi/models.edn` and the doc example must move together if the
+  fallback is chosen. Comment-only; `.psi/project.edn` parses (7
+  profiles) and the live test stays green.
+- Full `bb test` on the working tree: 2585 tests / 1 failure — the
+  failure is `workflow_definitions_test/review-step-test` (follow-up step
+  skills now include code-shaper + test-shaper), caused ENTIRELY by the
+  external concurrent commit 5e5e5b1f0 "update review skills"
+  (`.psi/workflows/review-step.edn` + `review-follow-up-steps.md`),
+  which landed mid-run and updated the workflow skills without updating
+  the workflow-definitions test expectation. Proven pre-existing at HEAD:
+  with this task's working-tree changes stashed, the same namespace fails
+  identically (14 tests / 1 failure). Unrelated to this task's files and
+  outside the review-39 items' scope — not touched here.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY`
+  not set in environment; request-shaping coverage only by design.
+  Recorded in steps.md as the sole remaining unchecked item.

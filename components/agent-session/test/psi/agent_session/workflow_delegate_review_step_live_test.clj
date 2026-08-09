@@ -25,6 +25,40 @@
     (spit tmp (pr-str config))
     (.getAbsolutePath tmp)))
 
+(defn- repo-root
+  "Repo root: walk up from the process cwd until doc/custom-providers.md
+  exists. Tests run from the repo root via bb, but this also tolerates a
+  component-local cwd — the same helper user_models_test.clj uses (review
+  39: the review-38 durable lock resolved the committed project models
+  path via (System/getProperty \"user.dir\"), so from a component-local
+  cwd both .psi/models.edn and .psi/project.edn silently missed — missing
+  file → empty models / nil profiles — and the lock vanished instead of
+  failing loud)."
+  []
+  (loop [dir (.getCanonicalFile (java.io.File. "."))]
+    (if (or (.exists (java.io.File. dir "doc/custom-providers.md"))
+            (= dir (.getParentFile dir)))
+      dir
+      (recur (.getParentFile dir)))))
+
+(defn- committed-project-models-path
+  "Absolute path of the committed .psi/models.edn, resolved from the repo
+  root. Fails loud (throws) if the committed .psi/project.edn (whose
+  session profiles this test snapshots) or .psi/models.edn is absent, so
+  the review-2/18/28/38 durable lock cannot silently degrade to a no-op
+  from a wrong cwd."
+  []
+  (let [root        (repo-root)
+        project-edn (java.io.File. root ".psi/project.edn")
+        models-edn  (java.io.File. root ".psi/models.edn")]
+    (when-not (.exists project-edn)
+      (throw (ex-info "committed .psi/project.edn missing — the delegate-review live test's durable lock requires it (the session profiles this test snapshots resolve against the committed deepseek model)"
+                      {:path (.getAbsolutePath project-edn)})))
+    (when-not (.exists models-edn)
+      (throw (ex-info "committed .psi/models.edn missing — the delegate-review live test's durable lock requires it (session profiles reference deepseek/deepseek-v4-flash)"
+                      {:path (.getAbsolutePath models-edn)})))
+    (.getAbsolutePath models-edn)))
+
 (deftest init-built-in-workflow-registers-review-step-routing-operations-test
   (testing "built-in workflow bootstrap registers deterministic review-step routing operations"
     (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
@@ -139,8 +173,11 @@
           ;; committed project models file. This makes the test a durable
           ;; lock for the review-2/18/28/38 regression class: a committed
           ;; profile referencing a model NOT present in committed model
-          ;; sources fails here deterministically.
-          project-models-path (str (System/getProperty "user.dir") "/.psi/models.edn")]
+          ;; sources fails here deterministically. Review 39: the committed
+          ;; path is resolved via the repo-root walk-up (not user.dir) and
+          ;; fails loud on absence, so the lock cannot silently vanish from
+          ;; a component-local cwd.
+          project-models-path (committed-project-models-path)]
       (try
         (model-registry/init! {:user-models-path    models-path
                                :project-models-path project-models-path})

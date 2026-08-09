@@ -616,6 +616,12 @@ or, for the Anthropic-compatible example:
 /model my-anthropic-proxy proxy-sonnet
 ```
 
+or, for the DeepSeek example:
+
+```text
+/model deepseek deepseek-v4-flash
+```
+
 Once selected, the custom model behaves like any other model in psi.
 
 ## Multiple providers

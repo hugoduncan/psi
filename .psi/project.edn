@@ -54,6 +54,25 @@
   ;; user-local requirement is the runtime DEEPSEEK_API_KEY env var (the
   ;; auth spec is env:DEEPSEEK_API_KEY). The anthropic and openai maps
   ;; above are alternatives — flip the desired map in/out locally.
+  ;;
+  ;; NOTE (review 39): these profiles plus the committed .psi/models.edn
+  ;; (:adaptive-thinking true) activate the UNVERIFIED adaptive wire shape
+  ;; repo-wide — every delegated workflow turn sends thinking.type
+  ;; "adaptive" + output_config.effort, but DeepSeek's Thinking Mode guide
+  ;; documents only type "enabled"/"disabled" and "adaptive" appears
+  ;; nowhere in its Anthropic API docs (doc/custom-providers.md's DeepSeek
+  ;; notes; verified 2026-08-07). On a strict endpoint's 400 the streaming
+  ;; path silently retries :without-thinking (effort dropped, thinking ON
+  ;; server-default) and the non-streaming path hard-fails. Until a live
+  ;; DEEPSEEK_API_KEY turn (the task's review-1 smoke test) confirms the
+  ;; adaptive shape, treat it as unverified; the documented fallback is
+  ;; :adaptive-thinking false (classic type: "enabled", a documented
+  ;; honored value) — note the committed-file ↔ doc-example equality
+  ;; parse-lock
+  ;; (committed-project-models-edn-matches-documented-deepseek-example-test
+  ;; in user_models_test.clj) means .psi/models.edn and the
+  ;; doc/custom-providers.md example must move together if the fallback is
+  ;; chosen.
   {:designing
    {:model-provider "deepseek"
     :model-id "deepseek-v4-flash"

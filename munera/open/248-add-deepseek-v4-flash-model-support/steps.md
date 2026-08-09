@@ -3198,7 +3198,7 @@
 
 ## Follow-ups (implementation review 39, 2026-08-09)
 
-- [ ] doc/custom-providers.md "Switch to the configured model" section lists
+- [x] doc/custom-providers.md "Switch to the configured model" section lists
       only the MiniMax (`/model minimax MiniMax-M1`) and Anthropic-compatible-
       proxy (`/model my-anthropic-proxy proxy-sonnet`) in-session selection
       commands — the new DeepSeek section (added by this task) is a full
@@ -3211,7 +3211,14 @@
       the minimax and proxy-sonnet examples (or a third "or, for the
       DeepSeek example" variant) so every documented example has its
       in-session selection command.
-- [ ] delegate-review live test's review-38 "durable lock" is CWD-dependent —
+      → Resolved: `doc/custom-providers.md` "Switch to the configured model"
+      section now lists a third variant — "or, for the DeepSeek example:
+      `/model deepseek deepseek-v4-flash`" — so every documented example
+      (MiniMax, Anthropic-compatible proxy, DeepSeek) has its in-session
+      selection command at the natural lookup point. Doc-only change; the
+      DeepSeek model parse-lock (`deepseek-example-edn`) is unaffected (the
+      new block is ```text, not ```clojure).
+- [x] delegate-review live test's review-38 "durable lock" is CWD-dependent —
       workflow_delegate_review_step_live_test.clj resolves the committed
       project models path via `(str (System/getProperty "user.dir")
       "/.psi/models.edn")`, and the session-profiles read (shared-config) is
@@ -3228,7 +3235,17 @@
       committed `.psi/models.edn` (and assert `.psi/project.edn` exists, or
       fail loud on its absence) the same way, so the lock cannot degrade
       silently.
-- [ ] the committed deepseek default activates the UNVERIFIED adaptive wire
+      → Resolved: `workflow_delegate_review_step_live_test.clj` gains
+      `repo-root` (walk-up until `doc/custom-providers.md` exists, mirroring
+      user_models_test.clj) and `committed-project-models-path` (resolves
+      `.psi/models.edn` from the repo root, throws a clear error if the
+      committed `.psi/project.edn` or `.psi/models.edn` is absent — fail
+      loud, never silent). The live test binds `project-models-path` from
+      the helper instead of `user.dir`. Verified: test green from the repo
+      root (3 tests / 21 assertions) and the walk-up helper resolves the
+      committed files from a component-local cwd (`user.dir` =
+      components/agent-session → repo root, both files found).
+- [x] the committed deepseek default activates the UNVERIFIED adaptive wire
       shape repo-wide — `.psi/project.edn`'s seven workflow profiles plus the
       committed `.psi/models.edn` (`:adaptive-thinking true`) send
       `thinking.type "adaptive"` + `output_config.effort` on every delegated
@@ -3251,3 +3268,17 @@
       (`committed-project-models-edn-matches-documented-deepseek-example-test`)
       means the committed `.psi/models.edn` and the doc example must move
       together if the fallback is chosen.
+      → Resolved: `.psi/project.edn` deepseek comment now carries a NOTE
+      (review 39) stating the adaptive wire shape is unverified until a live
+      DEEPSEEK_API_KEY turn (the review-1 smoke test) confirms it, that a
+      strict endpoint's 400 silently retries `:without-thinking` on the
+      streaming path (effort dropped, thinking ON server-default) and
+      hard-fails on the non-streaming path, that the documented fallback is
+      `:adaptive-thinking false` (classic `type: "enabled"`, a documented
+      honored value), and that the committed-file ↔ doc-example equality
+      parse-lock
+      (`committed-project-models-edn-matches-documented-deepseek-example-test`)
+      means `.psi/models.edn` and the doc example must move together if the
+      fallback is chosen. Comment-only change; `.psi/project.edn` still
+      parses (7 profiles, deepseek default) and the delegate-review live
+      test (which snapshots these profiles) stays green.
