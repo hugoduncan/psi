@@ -2216,3 +2216,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   in isolation (23/116 green) — pre-existing, unrelated to this change
   (which touches only `providers/anthropic.clj` + its stream tests).
 - Review 48 (2026-08-09): added 3 follow-up steps to be addressed.
+- Review 49 (2026-08-09): added 1 follow-up step to be addressed.

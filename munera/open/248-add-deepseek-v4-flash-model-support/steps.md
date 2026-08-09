@@ -4097,3 +4097,40 @@
       start/stop emits no `:text-start`/`:text-end` mislabel, and extend
       the `ContentBlockStopEmitsTypedEndEvent` guidance in
       `spec/anthropic-provider.allium` accordingly.
+
+## Follow-ups (implementation review 49, 2026-08-09)
+
+- [ ] `stream-anthropic`'s terminal `:done` emission resets `done?` AFTER
+      the structured-output-result emissions and the `:done` consumption —
+      the ONLY terminal path across the three transports that does this.
+      The `message_delta`-with-`stop_reason` branch resets `done?` FIRST
+      (`(reset! done? true)` then the maybe-emit-* emissions + `:done`
+      consume), and every OpenAI-transport terminal emitter resets first
+      too (`emit-chat-completion-finish!`/`emit-chat-error!` in
+      chat_completions.clj, `emit-codex-done!`/`emit-codex-error!` in
+      codex_responses.clj all set `done?` before consuming). The
+      `message_stop` branch runs
+      maybe-emit-json-schema-output-result! /
+      maybe-emit-prompted-json-result! and the `:done` consume-fn FIRST and
+      only then `(reset! done? true)` — so a downstream exception during the
+      message_stop terminal processing (a structured-output emission or the
+      `:done` consume-fn, e.g. a statechart dispatch failure inside
+      make-provider-event-consumer's `:done` → `:turn/done` send) propagates
+      to the outer `(catch Exception e (when-not @done? ...))` with `done?`
+      still false and emits a SECOND `:error` terminal — the exact
+      double-terminal class reviews 43/44/46 eliminated on every other
+      terminal path, contradicting the spec's `OnceDoneNoFurtherEvent`
+      invariant ("no further Emit(StreamEvent) once stream.done") and the
+      CHANGELOG's "exactly one terminal event per stream" wording. The
+      review-48 `emit-terminal-done!` extraction (the EOF-level flush) keeps
+      this ordering (emissions → consume → `(reset! done? true)`), so the
+      fix must land in the shared helper too, not just the branch. Fix:
+      move `(reset! done? true)` to the TOP of the terminal emission — in
+      the `message_stop` branch AND the review-48 `emit-terminal-done!`
+      helper, before the structured-output emissions and the `:done`
+      consume — mirroring the `message_delta` branch; add a stream test
+      whose consume-fn throws on the `:done` event (message_stop terminal
+      path) asserting exactly one terminal event is emitted and no second
+      `:error` reaches the consumer; note the ordering in the
+      `MessageStopEmitsDoneWithUsage` guidance in
+      `spec/anthropic-provider.allium`.
