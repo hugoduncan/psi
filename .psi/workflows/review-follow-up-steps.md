@@ -7,7 +7,11 @@ tools:
   - edit
   - write
 skills:
-  - work-independently, clojure-coding-standards, testing-without-mocks
+  - work-independently
+  - clojure-coding-standards
+  - testing-without-mocks
+  - code-shaper
+  - test-shaper
 advertise: false
 ---
 For the Munera task identified by {{input}}, execute any unchecked,
