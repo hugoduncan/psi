@@ -4010,7 +4010,7 @@
 
 ## Follow-ups (implementation review 48, 2026-08-09)
 
-- [ ] `stream-anthropic` and `stream-openai` (chat completions) have no
+- [x] `stream-anthropic` and `stream-openai` (chat completions) have no
       EOF-level terminal flush — the codex transport does, so a stream that
       ends without an in-band terminal event hangs the turn until
       `llm-stream-idle-timeout-ms` on the two non-codex transports. Verified
@@ -4048,7 +4048,30 @@
         `spec/openai-provider.allium` (`OnceDoneNoFurtherEvent` covers
         post-done no-ops; nothing models the EOF-without-terminal case the
         codex transport's flush already closes).
-- [ ] OpenAI chat-completions terminal `:done` carries NO usage when the
+      → Resolved: both non-codex transports now flush the terminal `:done`
+      at EOF, mirroring the codex transport's post-doseq `(when-not @done?
+      ...)`. Anthropic: `consume-stream-response!` runs
+      `(when-not @done? (emit-terminal-done!) nil)` after the SSE `doseq`
+      (the shared `emit-terminal-done!` helper — the `message_stop` branch
+      and the flush emit the identical `:stop` terminal with the review-47
+      `usage-with-cost` shape). OpenAI: `stream-openai` runs the EOF flush
+      after its `doseq` — `flush-pending-chat-finish!` (pending
+      finish_reason, else the second `when-not @done?` block emits `:stop`
+      with `:start`-once + structured-output result + the last-seen usage),
+      all no-ops when an in-band terminal already fired. Tests (new
+      `anthropic_stream_termination_test.clj` +
+      `openai_completions_stream_test.clj`): anthropic error-free stream
+      ending at EOF without `message_stop` → exactly one `:done` (with the
+      accumulated input/cache usage); openai
+      finish_reason-chunk-then-EOF (no `[DONE]`) → exactly one `:done`
+      with the pending reason; openai `[DONE]` without `finish_reason` →
+      exactly one `:done` (`:stop`). Specs: new
+      `AnthropicTransportCloseEmitsDoneIfNotTerminal` +
+      `OpenAITransportCloseEmitsDoneIfNotTerminal` rules with a new
+      `ProviderTransportClosed(stream)` primitive model the EOF-without-
+      terminal flush on both transports (the previously-missing half the
+      codex flush already closed).
+- [x] OpenAI chat-completions terminal `:done` carries NO usage when the
       provider omits the `usage` chunk — the exact review-47 zero-usage
       class fixed on the anthropic `message_stop` terminal, still open on
       the sibling `:openai-completions` transport (and on codex's synthetic
@@ -4076,7 +4099,25 @@
       (finish_reason chunk → `[DONE]`, no usage chunk → `:done` carries no
       `:usage`, matching `handle-done!`'s zero-usage semantics) and update
       the CHANGELOG `Fixed` wording to name the openai omission path.
-- [ ] `"redacted_thinking"` content blocks are still mislabeled as text in
+      → Resolved: the openai transport now accumulates the last-seen usage
+      chunk (`:last-usage` stream-state atom, set in `finish-chat-chunk!`'s
+      `:usage` branch) and `flush-pending-chat-finish!` / the EOF flush
+      attach it to the flushed terminal `:done` when one was seen — a
+      trailing-`[DONE]`/EOF `:done` no longer hardcodes `usage nil` when a
+      usage chunk had been accumulated. A usage-omitting endpoint (ignores
+      `stream_options.include_usage` — common for local proxies / third-
+      party OpenAI-compatible endpoints) still gets a `:done` with no
+      `:usage` key → zero usage/cost recorded, now documented as the
+      consequence for usage-omitting endpoints. New test
+      `completions-done-without-usage-chunk-carries-no-usage-test`
+      (finish_reason chunk → `[DONE]`, no usage chunk → `:done` carries no
+      `:usage`, exactly one `:done`) + `completions-finish-reason-then-eof-
+      emits-done-test` (usage-omitting finish_reason-then-EOF flow);
+      CHANGELOG `Fixed` wording extended to name the openai omission path
+      (the review-47 zero-usage entry now covers both the anthropic
+      `message_stop` path and the `:openai-completions` usage-chunk-omitted
+      path).
+- [x] `"redacted_thinking"` content blocks are still mislabeled as text in
       the review-43-typed block events: `content-block-start-event` falls
       to the default `:text-start` and `content-block-stop-event` to
       `:text-end` for a `"redacted_thinking"` block (Anthropic's first
@@ -4097,10 +4138,25 @@
       start/stop emits no `:text-start`/`:text-end` mislabel, and extend
       the `ContentBlockStopEmitsTypedEndEvent` guidance in
       `spec/anthropic-provider.allium` accordingly.
+      → Resolved (skip option): `content-block-start-event` and
+      `content-block-stop-event` (extracted to the new
+      `psi.ai.providers.anthropic.stream-events` namespace) now return nil
+      for `"redacted_thinking"` blocks, and `consume-event!` (nil-guarded)
+      is used at both call sites — a redacted_thinking block's start/stop
+      emit NO event (no phantom text block, no mislabeled `:text-end`, no
+      unbalanced `:thinking-end` for a skipped start), and
+      `content-block-delta-event` skips the `redacted_thinking_delta` (no
+      `:text` in the delta). New `redacted-thinking-block-not-mislabeled-
+      as-text-test` (anthropic_stream_termination_test.clj) asserts no
+      `:text-start`/`:text-end`/`:thinking-start`/`:thinking-end`/
+      `:text-delta` and exactly one `:done`. Spec:
+      `ContentBlockStopEmitsTypedEndEvent` gains the
+      `"redacted_thinking"` → `Emit(nothing)` branch + guidance (start and
+      delta skipped symmetrically); CHANGELOG `Fixed` entry added.
 
 ## Follow-ups (implementation review 49, 2026-08-09)
 
-- [ ] `stream-anthropic`'s terminal `:done` emission resets `done?` AFTER
+- [x] `stream-anthropic`'s terminal `:done` emission resets `done?` AFTER
       the structured-output-result emissions and the `:done` consumption —
       the ONLY terminal path across the three transports that does this.
       The `message_delta`-with-`stop_reason` branch resets `done?` FIRST
@@ -4134,3 +4190,24 @@
       `:error` reaches the consumer; note the ordering in the
       `MessageStopEmitsDoneWithUsage` guidance in
       `spec/anthropic-provider.allium`.
+      → Resolved: `emit-terminal-done!` (the shared helper used by BOTH the
+      `message_stop` branch and the review-48 EOF-level flush) now resets
+      `done?` FIRST — `(reset! done? true)` at the top, before the
+      structured-output-result emissions and the `:done` consume — mirroring
+      the `message_delta`-with-`stop_reason` branch and every
+      OpenAI-transport terminal emitter. A downstream exception during the
+      terminal processing (here: the `:done` consume-fn throws, e.g. a
+      statechart dispatch failure inside make-provider-event-consumer's
+      `:done` → `:turn/done` send) propagates to the outer catch with
+      `done?` already true, so the `(when-not @done? ...)` guard swallows it
+      — no second `:error` terminal. New test
+      `stream-anthropic-message-stop-done-consumer-exception-no-second-error-test`
+      (anthropic_stream_termination_test.clj): consume-fn throws on the
+      `:done` (asserts the throw actually happened), exactly one `:done`
+      reaches the consumer, no `:error` at all, sequence
+      `[:start :text-start :text-delta :text-end :done]` — verified to FAIL
+      against the old emissions→consume→reset ordering (second `:error`
+      emitted), PASS with the fix. Spec: `MessageStopEmitsDoneWithUsage`
+      guidance notes the done?-first ordering (and that the review-48
+      `AnthropicTransportCloseEmitsDoneIfNotTerminal` shares the helper);
+      CHANGELOG `Fixed` entry added.

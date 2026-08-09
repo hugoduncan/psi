@@ -2217,3 +2217,75 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   (which touches only `providers/anthropic.clj` + its stream tests).
 - Review 48 (2026-08-09): added 3 follow-up steps to be addressed.
 - Review 49 (2026-08-09): added 1 follow-up step to be addressed.
+
+## Follow-ups review 48 + 49 addressed (2026-08-09)
+
+- addressed 4 review steps (review-48: 3; review-49: 1; no remaining
+  unchecked items in steps.md — grep "^\- \[ \]" returns 0)
+- EOF-level terminal flush on the two non-codex transports (review-48
+  item 1): `stream-anthropic`'s `consume-stream-response!` now runs
+  `(when-not @done? (emit-terminal-done!) nil)` after the SSE `doseq`, and
+  `stream-openai` runs the EOF flush after its `doseq`
+  (`flush-pending-chat-finish!` for a pending finish reason, else
+  `emit-structured-output-result!` + `emit-chat-completion-finish!`
+  `:stop`), both mirroring the codex transport's post-doseq
+  `(when-not @(:done? ...) ...)` — a stream that EOFs without an in-band
+  terminal event (anthropic: no `message_stop`/`message_delta`-with-
+  `stop_reason`/`"error"`; openai: finish_reason-chunk-then-EOF or
+  `[DONE]`-without-finish_reason) terminates with exactly one `:done`
+  instead of hanging until `llm-stream-idle-timeout-ms` (directly
+  task-relevant: review 47 established DeepSeek's streaming path is
+  unverified). Anthropic EOF-flush `:done` carries the review-47
+  `usage-with-cost` shape via the shared `emit-terminal-done!` helper
+  (also used by the `message_stop` branch); the openai flush attaches the
+  last-seen usage. `emit-terminal-done!`/the usage fns and the
+  content-block event shaping were extracted to new namespaces
+  (`anthropic/usage.clj`, `anthropic/stream_events.clj`) — pure refactors.
+- OpenAI zero-usage `:done` (review-48 item 2): `:last-usage` stream-state
+  atom records the last-seen usage chunk (finish-chat-chunk! `:usage`
+  branch) and `flush-pending-chat-finish!`/the EOF flush attach it to the
+  flushed terminal `:done`; a usage-omitting endpoint (ignores
+  `stream_options.include_usage`) still gets a usage-less `:done` → zero
+  usage/cost, now documented as the consequence. CHANGELOG `Fixed` wording
+  extended to name the openai omission path.
+- redacted_thinking typing (review-48 item 3): `content-block-start-event`/
+  `content-block-stop-event` (now in `stream_events.clj`) return nil for
+  `"redacted_thinking"` blocks, `consume-event!` (nil-guarded) used at both
+  call sites, delta skipped — no phantom text block, no mislabeled
+  `:text-start`/`:text-end` (built-in Anthropic path only; DeepSeek's
+  compat table does not support redacted-thinking).
+- done?-first reset (review-49): `emit-terminal-done!` resets `done?` FIRST
+  (before the structured-output-result emissions and the `:done` consume),
+  mirroring the `message_delta` branch and every OpenAI-transport terminal
+  emitter — a downstream exception during the message_stop terminal
+  processing can no longer propagate to the outer catch with `done?` false
+  and emit a second `:error` terminal. Verified FAIL pre-fix (second
+  `:error` emitted) / PASS post-fix via
+  `stream-anthropic-message-stop-done-consumer-exception-no-second-error-test`.
+- Tests: new `anthropic_stream_termination_test.clj` (3 deftests: EOF-flush
+  `:done` + usage, redacted_thinking skip, consume-fn-throws-on-`:done`
+  single-terminal) and `openai_completions_stream_test.clj` (3 deftests:
+  finish_reason-then-EOF, `[DONE]`-without-finish_reason, no-usage-chunk
+  `:done`) — split into new files to stay under the 800-line file-length
+  gate (168 + 103 lines).
+- Specs: `AnthropicTransportCloseEmitsDoneIfNotTerminal` +
+  `OpenAITransportCloseEmitsDoneIfNotTerminal` rules + new
+  `ProviderTransportClosed(stream)` primitive (both specs);
+  `ContentBlockStopEmitsTypedEndEvent` gains the `"redacted_thinking"` →
+  `Emit(nothing)` branch + guidance; `MessageStopEmitsDoneWithUsage`
+  guidance notes the done?-first ordering. Manual allium-check (no
+  automated checker in repo).
+- CHANGELOG `[Unreleased]` → `Fixed`: four entries — EOF-level terminal
+  flush (anthropic + openai), openai usage-chunk-omitted `:done` naming,
+  redacted_thinking blocks no longer mislabeled as text, and the done?-first
+  reset (no second `:error` on a consumer exception). design.md revision
+  note + AC exception wording updated with the review-48/49 bullet.
+- Verification (state being closed): full `bb test` green — 2604 tests /
+  19533 assertions / 0 failures (assertion count varies run-to-run per the
+  review-5 flake analysis); `psi.ai.providers.anthropic-stream-termination-test`
+  3/16, `psi.ai.providers.openai-completions-stream-test` 3/9,
+  `psi.ai.providers.anthropic-stream-test` 14/99,
+  `psi.ai.providers.anthropic-test` 16/103,
+  `psi.ai.providers.openai-completions-test` 17/75 green; clj-kondo clean
+  (0 errors, 0 warnings) on all changed source + test files;
+  `bb commit-check:file-lengths` passes (exit 0); cljfmt clean.

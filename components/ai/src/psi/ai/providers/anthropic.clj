@@ -9,7 +9,9 @@
             [psi.ai.providers.anthropic.message-transform :as message-transform]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
             [psi.ai.providers.anthropic.request-support :as anthropic-request-support]
+            [psi.ai.providers.anthropic.stream-events :as stream-events]
             [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
+            [psi.ai.providers.anthropic.usage :as usage]
             [psi.ai.providers.request-support :as request-support]
             [psi.ai.structured-output :as structured-output]))
 
@@ -332,97 +334,6 @@
           (catch Exception _
             nil))))))
 
-(defn- update-usage!
-  [usage-acc usage usage-map]
-  (when usage
-    (swap! usage-acc
-           (fn [acc]
-             (reduce-kv (fn [m k usage-key]
-                          (assoc m k (or (get usage usage-key) 0)))
-                        acc
-                        usage-map)))))
-
-(defn- update-start-usage!
-  [usage-acc usage]
-  (update-usage! usage-acc
-                 usage
-                 {:input-tokens       :input_tokens
-                  :cache-read-tokens  :cache_read_input_tokens
-                  :cache-write-tokens :cache_creation_input_tokens}))
-
-(defn- update-output-usage!
-  [usage-acc usage]
-  (update-usage! usage-acc
-                 usage
-                 {:output-tokens :output_tokens}))
-
-(defn- usage-with-cost
-  [model usage-acc]
-  (let [usage @usage-acc
-        usage (assoc usage :total-tokens (+ (:input-tokens usage)
-                                            (:output-tokens usage)
-                                            (:cache-read-tokens usage)
-                                            (:cache-write-tokens usage)))]
-    (assoc usage :cost (models/calculate-cost model usage))))
-
-(defn- content-block-start-event
-  [idx block]
-  (case (:type block)
-    "tool_use"
-    {:type          :toolcall-start
-     :content-index idx
-     :id            (:id block)
-     :name          (:name block)}
-
-    "thinking"
-    {:type          :thinking-start
-     :content-index idx
-     :thinking      (:thinking block)
-     :signature     (:signature block)}
-
-    {:type          :text-start
-     :content-index idx}))
-
-(defn- content-block-delta-event
-  [btype idx delta]
-  (case btype
-    "tool_use"
-    (when-let [json-delta (:partial_json delta)]
-      {:type          :toolcall-delta
-       :content-index idx
-       :delta         json-delta})
-
-    "thinking"
-    (cond
-      (some? (:signature delta))
-      {:type          :thinking-signature-delta
-       :content-index idx
-       :signature     (:signature delta)}
-
-      :else
-      (when-let [text (or (:thinking delta) (:text delta))]
-        {:type          :thinking-delta
-         :content-index idx
-         :delta         text}))
-
-    (when-let [text (:text delta)]
-      {:type          :text-delta
-       :content-index idx
-       :delta         text})))
-
-(defn- content-block-stop-event
-  [btype idx]
-  {:type          (case btype
-                    "tool_use" :toolcall-end
-                    "thinking" :thinking-end
-                    :text-end)
-   :content-index idx})
-
-(defn- consume-event!
-  [consume-fn event]
-  (when event
-    (consume-fn event)))
-
 (defn- stream-response
   [url request]
   (http/post url (merge request
@@ -504,7 +415,39 @@
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (letfn [(consume-stream-response! [response]
+      (letfn [(emit-terminal-done! []
+                ;; The terminal :done shared by the message_stop branch and
+                ;; the review-48 EOF-level flush (below): structured-output
+                ;; results for the completed buffers, then the :done with the
+                ;; review-47 usage-with-cost shape. Review 49: done? is reset
+                ;; FIRST — before the structured-output emissions and the
+                ;; :done consume — mirroring the message_delta-with-stop_reason
+                ;; branch and every OpenAI-transport terminal emitter
+                ;; (emit-chat-completion-finish!/emit-chat-error!/
+                ;; emit-codex-done!/emit-codex-error!): a downstream exception
+                ;; during the terminal processing (a structured-output
+                ;; emission or the :done consume-fn, e.g. a statechart
+                ;; dispatch failure inside make-provider-event-consumer's
+                ;; :done → :turn/done send) must NOT propagate to the outer
+                ;; catch with done? still false and emit a SECOND :error
+                ;; terminal — the double-terminal class reviews 43/44/46
+                ;; eliminated on every other terminal path
+                ;; (OnceDoneNoFurtherEvent).
+                (reset! done? true)
+                (anthropic-structured-output/maybe-emit-json-schema-output-result!
+                 consume-fn
+                 structured-result-emitted?
+                 strategy
+                 @json-schema-output-buffer)
+                (anthropic-structured-output/maybe-emit-prompted-json-result!
+                 consume-fn
+                 structured-result-emitted?
+                 strategy
+                 @prompted-json-buffer)
+                (consume-fn {:type   :done
+                             :reason :stop
+                             :usage  (usage/usage-with-cost model usage-acc)}))
+              (consume-stream-response! [response]
                 (with-open [reader (io/reader (:body response))]
                   (doseq [line (line-seq reader)]
                     (when-let [event-data (parse-sse-line line)]
@@ -524,7 +467,7 @@
                         (case (:type event-data)
                           "message_start"
                           (do
-                            (update-start-usage! usage-acc (get-in event-data [:message :usage]))
+                            (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
                             (consume-fn {:type :start}))
 
                           "content_block_start"
@@ -535,7 +478,11 @@
                             (when-not (anthropic-structured-output/structured-tool-block?
                                        structured-tool-name
                                        {:type (:type block) :name (:name block)})
-                              (consume-fn (content-block-start-event idx block))))
+                              ;; consume-event! guards nil — review 48:
+                              ;; content-block-start-event returns nil for
+                              ;; skipped "redacted_thinking" blocks.
+                              (stream-events/consume-event! consume-fn
+                                                            (stream-events/content-block-start-event idx block))))
 
                           "content_block_delta"
                           (let [idx (:index event-data)
@@ -555,10 +502,10 @@
 
                                     (anthropic-structured-output/json-schema-output-mechanism? strategy)
                                     (swap! json-schema-output-buffer str (:text delta))))
-                                (consume-event! consume-fn
-                                                (content-block-delta-event (:type block-info)
-                                                                           idx
-                                                                           delta)))))
+                                (stream-events/consume-event! consume-fn
+                                                              (stream-events/content-block-delta-event (:type block-info)
+                                                                                                       idx
+                                                                                                       delta)))))
 
                           "content_block_stop"
                           (let [idx (:index event-data)
@@ -570,8 +517,12 @@
                                consume-fn
                                strategy
                                (get @structured-buffers idx))
-                              (consume-fn (content-block-stop-event (:type block-info)
-                                                                    idx))))
+                              ;; consume-event! guards nil — review 48:
+                              ;; content-block-stop-event returns nil for
+                              ;; skipped "redacted_thinking" blocks.
+                              (stream-events/consume-event! consume-fn
+                                                            (stream-events/content-block-stop-event (:type block-info)
+                                                                                                    idx))))
 
                           "error"
                           ;; Anthropic's documented mid-stream SSE error shape
@@ -620,7 +571,7 @@
                           ;; is a full no-op. (Redundant with the outer
                           ;; review-46 guard but kept for branch-local clarity.)
                           (when-not @done?
-                            (update-output-usage! usage-acc (:usage event-data))
+                            (usage/update-output-usage! usage-acc (:usage event-data))
                             (when-let [reason (get-in event-data [:delta :stop_reason])]
                               (reset! done? true)
                               (anthropic-structured-output/maybe-emit-json-schema-output-result!
@@ -635,7 +586,7 @@
                                @prompted-json-buffer)
                               (consume-fn {:type   :done
                                            :reason (keyword reason)
-                                           :usage  (usage-with-cost model usage-acc)})))
+                                           :usage  (usage/usage-with-cost model usage-acc)})))
 
                           "message_stop"
                           ;; The terminal :done. done? is set here too
@@ -656,24 +607,34 @@
                           ;; Anthropic-compatible endpoint that omits
                           ;; message_delta — including the newly shipped
                           ;; DeepSeek provider whose streaming path is
-                          ;; unverified.
-                          (do
-                            (anthropic-structured-output/maybe-emit-json-schema-output-result!
-                             consume-fn
-                             structured-result-emitted?
-                             strategy
-                             @json-schema-output-buffer)
-                            (anthropic-structured-output/maybe-emit-prompted-json-result!
-                             consume-fn
-                             structured-result-emitted?
-                             strategy
-                             @prompted-json-buffer)
-                            (consume-fn {:type   :done
-                                         :reason :stop
-                                         :usage  (usage-with-cost model usage-acc)})
-                            (reset! done? true))
+                          ;; unverified. Review 48: emits through the shared
+                          ;; emit-terminal-done! (also used by the EOF-level
+                          ;; flush after the doseq).
+                          (emit-terminal-done!)
 
-                          nil))))))]
+                          nil)))))
+                  ;; Review 48: EOF-level terminal flush — mirror the codex
+                  ;; transport's (when-not @(:done? ...) ...) after its SSE
+                  ;; doseq. A stream that EOFs without an in-band terminal
+                  ;; event (message_stop, message_delta-with-stop_reason, or
+                  ;; "error") previously emitted NO :done/:error and hung the
+                  ;; turn until llm-stream-idle-timeout-ms — the review-43
+                  ;; hang class via the EOF path rather than a mid-stream
+                  ;; error, directly task-relevant since review 47 established
+                  ;; DeepSeek's streaming path is UNVERIFIED (the review-1
+                  ;; smoke test exercised only the non-streaming execute
+                  ;; path), so a DeepSeek stream that ends without
+                  ;; message_stop would hang 20 minutes instead of
+                  ;; terminating. The flush emits the same terminal as
+                  ;; message_stop (:stop, review-47 usage-with-cost shape);
+                  ;; when an in-band terminal already fired, done? makes it a
+                  ;; no-op.
+                (when-not @done?
+                  (emit-terminal-done!)
+                    ;; Preserve the pre-review-48 nil return of the stream fn
+                    ;; (the flush's when-not would otherwise return the last
+                    ;; consumed event via emit-terminal-done!'s reset!).
+                  nil))]
         (let [response (stream-response url request)
               status   (:status response)]
           (cond

@@ -742,8 +742,12 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 -- Primitives note — no undefined entity attributes are referenced):
 --   SseEventReceived(stream, type, event_data) — an SSE event line parsed
 --       into a typed event map ({"type": ..., ...}) reached the stream loop
+--   ProviderTransportClosed(stream)        — the SSE body reached EOF
 --   UsageAccUpdated(stream, deltas)          — usage-acc atom merge
 --   CurrentContentBlockType(stream, index)   — block type at a content index
+--   RedactedThinkingBlockSkipped(stream, index) — a "redacted_thinking"
+--       content-block stop produces no typed end event (block skipped,
+--       review 48; start/delta skipped symmetrically in the implementation)
 --   DoneEventReady(stream)                   — a terminal :done is ready
 --   FinalizedUsage(acc)                      — StreamUsage totals + cost
 --   Emit(StreamEvent{...})                   — executor-facing event surfaced
@@ -794,6 +798,8 @@ rule ContentBlockStopEmitsTypedEndEvent {
             Emit(StreamEvent{event_type: thinking_end, content_index: event_data.index})
         else if CurrentContentBlockType(stream, event_data.index) = "tool_use":
             Emit(StreamEvent{event_type: toolcall_end, content_index: event_data.index})
+        else if CurrentContentBlockType(stream, event_data.index) = "redacted_thinking":
+            RedactedThinkingBlockSkipped(stream, event_data.index)
         else:
             Emit(StreamEvent{event_type: text_end, content_index: event_data.index})
 
@@ -805,6 +811,19 @@ rule ContentBlockStopEmitsTypedEndEvent {
         -- last-provider-event diagnostic marker as text. DeepSeek returned a
         -- thinking content block in the live smoke test (2026-08-09), so the
         -- mislabel was reachable on this task's newly shipped provider.
+        -- Review 48: "redacted_thinking" blocks (Anthropic's first thinking
+        -- block in extended-thinking streams, carrying opaque base64 :data)
+        -- are SKIPPED — content-block-start-event returns nil for them too,
+        -- so start and stop are skipped symmetrically: no phantom text
+        -- block, no mislabeled :text-end, and no unbalanced :thinking-end
+        -- for a block whose start was skipped (which would create a phantom
+        -- CLOSED block in the accumulator via end-content-block! on an
+        -- unbegun index). redacted_thinking_delta events are skipped by
+        -- content-block-delta-event (no :text in the delta) as well. Not
+        -- reachable on the newly shipped DeepSeek provider (its compat
+        -- table explicitly does not support redacted-thinking blocks) — this
+        -- completes the review-43 typing change for the built-in Anthropic
+        -- path.
 }
 
 rule SseErrorEventEmitsErrorAndTerminates {
@@ -912,6 +931,43 @@ rule MessageStopEmitsDoneWithUsage {
         -- non-streaming path; streamed usage comes from message_start /
         -- message_delta SSE events only). Output tokens stay whatever
         -- usage-acc accumulated (0 when no message_delta was seen).
+        -- Review 48/49: the message_stop terminal emission (and the review-48
+        -- EOF-level flush, AnthropicTransportCloseEmitsDoneIfNotTerminal
+        -- below) shares the emit-terminal-done! helper, and done? is reset
+        -- FIRST — before the structured-output-result emissions and the
+        -- :done consume — mirroring MessageDeltaStopReasonEmitsDone and
+        -- every OpenAI-transport terminal emitter. A downstream exception
+        -- during the terminal processing (a structured-output emission or
+        -- the :done consume-fn) therefore cannot propagate to the stream's
+        -- outer catch with done? still false and emit a SECOND :error
+        -- terminal (see OnceDoneNoFurtherEvent).
+}
+
+rule AnthropicTransportCloseEmitsDoneIfNotTerminal {
+    when: ProviderTransportClosed(stream)
+    requires: stream.done = false
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword("stop"), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- Review 48: EOF-level terminal flush, mirroring the codex
+        -- transport's (when-not @(:done? ...) ...) after its SSE doseq. A
+        -- stream that EOFs without an in-band terminal event
+        -- (message_stop, message_delta-with-stop_reason, or "error")
+        -- previously emitted NO :done/:error and hung the turn until
+        -- llm-stream-idle-timeout-ms — the review-43 hang class via the EOF
+        -- path rather than a mid-stream error, directly task-relevant since
+        -- review 47 established DeepSeek's streaming path is UNVERIFIED (the
+        -- review-1 smoke test exercised only the non-streaming execute
+        -- path), so a DeepSeek stream that ends without message_stop would
+        -- hang 20 minutes instead of terminating. The flush emits the same
+        -- terminal as MessageStopEmitsDoneWithUsage (:stop, review-47
+        -- usage-with-cost shape) via the shared emit-terminal-done! helper,
+        -- and done? is reset FIRST (review 49 — see the
+        -- MessageStopEmitsDoneWithUsage guidance). When an in-band terminal
+        -- already fired, stream.done is true and this rule does not apply
+        -- (OnceDoneNoFurtherEvent).
 }
 
 rule OnceDoneNoFurtherEvent {

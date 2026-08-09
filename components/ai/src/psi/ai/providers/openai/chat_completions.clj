@@ -235,6 +235,14 @@
   {:stream-started?            (atom false)
    :done?                      (atom false)
    :pending-finish-reason      (atom nil)
+   ;; Review 48: last-seen usage chunk (completions-usage-map shape), so the
+   ;; flushed terminal :done (trailing [DONE] or the EOF flush) carries the
+   ;; provider's usage when one was seen — the review-47 zero-usage class on
+   ;; the :openai-completions sibling. A provider that omits the usage chunk
+   ;; entirely leaves this nil and the :done carries no :usage (zero
+   ;; usage/cost recorded — documented consequence for usage-omitting
+   ;; endpoints).
+   :last-usage                  (atom nil)
    :structured-result-emitted? (atom false)
    :text-buffer                (atom "")
    :next-tool-index            (atom 0)
@@ -423,6 +431,11 @@
                                         (if (= :provider-native (:strategy strategy))
                                           :openai/message-json
                                           :prompted-json/text))
+        ;; Review 48: record the last-seen usage so the flushed terminal
+        ;; :done (trailing [DONE] or EOF flush) can carry it when the done
+        ;; emission is deferred (see flush-pending-chat-finish! / the EOF
+        ;; flush in stream-openai).
+        (reset! (:last-usage stream-state) (completions-usage-map model (:usage chunk)))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
@@ -449,7 +462,11 @@
                                       (if (= :provider-native (:strategy strategy))
                                         :openai/message-json
                                         :prompted-json/text))
-      (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
+      ;; Review 48: attach the last-seen usage chunk (when one was seen) to
+      ;; the flushed :done instead of hardcoding nil — a usage chunk seen
+      ;; before the trailing [DONE]/EOF is preserved on the terminal event.
+      (emit-chat-completion-finish! consume-fn stream-started? done? reason
+                                    @(:last-usage stream-state))
       (reset! pending-finish-reason nil))))
 
 (defn- emit-chat-error!
@@ -587,9 +604,41 @@
                                  url
                                  consume-fn
                                  (transport/response->error response))
-          (with-open [reader (io/reader (:body response))]
-            (doseq [line (line-seq reader)]
-              (process-chat-sse-line! stream-state consume-fn model options url strategy line)))))
+          (do
+            (with-open [reader (io/reader (:body response))]
+              (doseq [line (line-seq reader)]
+                (process-chat-sse-line! stream-state consume-fn model options url strategy line)))
+            ;; Review 48: EOF-level terminal flush — mirror the codex
+            ;; transport's (when-not @(:done? ...) ...) after its SSE doseq.
+            ;; A stream that EOFs without an in-band terminal event (a usage
+            ;; chunk, a finish_reason chunk + [DONE], or an error chunk)
+            ;; previously emitted NO :done/:error and hung the turn until
+            ;; llm-stream-idle-timeout-ms: a final chunk carrying finish_reason
+            ;; but no trailing [DONE] left pending-finish-reason unflushed
+            ;; (flush-pending-chat-finish! runs only on a [DONE] line), and a
+            ;; [DONE] with no prior finish_reason chunk no-oped (the flush
+            ;; guards on the pending reason). The flush emits the pending
+            ;; finish reason when set, else :stop, and attaches the last-seen
+            ;; usage chunk when one was provided; when an in-band terminal
+            ;; already fired, done? makes it a no-op.
+            (when-not @(:done? stream-state)
+              (flush-pending-chat-finish! stream-state consume-fn strategy)
+              (when-not @(:done? stream-state)
+                (emit-structured-output-result! stream-state
+                                                consume-fn
+                                                strategy
+                                                (if (= :provider-native (:strategy strategy))
+                                                  :openai/message-json
+                                                  :prompted-json/text))
+                (emit-chat-completion-finish! consume-fn
+                                              (:stream-started? stream-state)
+                                              (:done? stream-state)
+                                              :stop
+                                              @(:last-usage stream-state)))
+              ;; Preserve the pre-review-48 nil return of the stream fn (the
+              ;; flush's when-not would otherwise return the last consumed
+              ;; event via emit-chat-completion-finish!'s consume-fn result).
+              nil))))
       (catch Exception e
         ;; Review 44: guard the error emission on done? (mirroring the codex
         ;; transport's emit-codex-error!) — if a mid-stream SSE error chunk

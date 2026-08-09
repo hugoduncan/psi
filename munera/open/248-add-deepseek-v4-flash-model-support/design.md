@@ -238,6 +238,33 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   downstream `retry-error?`/`provider-error-kind` classify a transient
   mid-stream 5xx/overload as retryable instead of `:unknown` (the
   review-23 class the openai transports already handle).
+- **EOF-level terminal flush + usage attachment + redacted_thinking
+  typing + done?-first reset (reviews 48/49):** four `stream-anthropic` /
+  `stream-openai` follow-up fixes. (a) Both non-codex transports now flush
+  the terminal `:done` at EOF, mirroring the codex transport's post-doseq
+  `(when-not @(:done? ...) ...)`: a stream that EOFs without an in-band
+  terminal event (`message_stop`/`message_delta`-with-`stop_reason`/
+  `"error"` on anthropic; a usage chunk / finish_reason+`[DONE]` / error
+  chunk on openai) previously emitted no `:done`/`:error` and hung the turn
+  until `llm-stream-idle-timeout-ms` — directly task-relevant since review
+  47 established DeepSeek's streaming path is unverified. The openai flush
+  emits the pending finish reason (else `:stop`) and attaches the last-seen
+  usage chunk; the anthropic flush reuses the message_stop terminal helper
+  (`:stop`, review-47 usage-with-cost shape). (b) The openai transport now
+  accumulates the last-seen usage chunk so the flushed terminal `:done`
+  carries it when one was seen; a usage-omitting endpoint's `:done` carries
+  no `:usage` (zero usage/cost — the documented consequence). (c)
+  `"redacted_thinking"` content blocks (Anthropic's first extended-thinking
+  block) are skipped in `content-block-start-event` /
+  `content-block-stop-event` (nil event, guarded by `consume-event!` at both
+  call sites) instead of being mislabeled `:text-start`/`:text-end` — the
+  review-43 typing fix's completion for the built-in Anthropic path (not
+  reachable on DeepSeek). (d) `emit-terminal-done!` (shared by the
+  `message_stop` branch and the EOF flush) resets `done?` FIRST — before
+  the structured-output-result emissions and the `:done` consume — so a
+  downstream exception during the terminal processing cannot propagate to
+  the outer catch with `done?` still false and emit a second `:error`
+  (the double-terminal class eliminated on every other terminal path).
 - **HTTP-400 compatibility retry OAuth decision (review 22):**
   `handle-400-response!`'s `:without-all-betas` selection now uses the
   transport's COMPUTED OAuth decision — `build-request` attaches the
@@ -433,8 +460,10 @@ independently confirms native JSON-Schema support can add
   retry OAuth decision (computed `::oauth?` from `build-request`, replacing
   the header content-sniff), mid-stream SSE error-event surfacing + the
   no-further-events-once-done guard on all three transports, `:thinking-end`
-  labeling for thinking-block stops, and the review-47 streamed-usage-on-the-
-  `message_stop`-terminal + SSE error `:status`-key extraction fixes);
+  labeling for thinking-block stops, the review-47 streamed-usage-on-the-
+  `message_stop`-terminal + SSE error `:status`-key extraction fixes, and
+  the review-48/49 EOF-level terminal flush + openai usage attachment +
+  redacted_thinking block typing + done?-first reset fixes);
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

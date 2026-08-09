@@ -160,6 +160,15 @@ entity OpenAIStream {
     started: Boolean = false
     done: Boolean = false
 
+    -- Review 48: EOF-level terminal flush state. pending_finish_reason is
+    -- the finish_reason keyword recorded by the (:finish_reason choice)
+    -- branch of finish-chat-chunk! (flushed on a trailing [DONE] or at EOF);
+    -- last_seen_usage is the most recent usage chunk normalized via
+    -- completions-usage-map (nil when the provider omits the usage chunk —
+    -- the documented zero-usage consequence for usage-omitting endpoints).
+    pending_finish_reason: String?
+    last_seen_usage: StreamUsage?
+
     resolved_api_key: String?
     chatgpt_account_id: String?
     keyless: Boolean = false
@@ -937,7 +946,33 @@ rule OpenAITransportCloseEmitsDoneIfNotTerminal {
     requires: stream.done = false
 
     ensures: StartEmittedOnce(stream)
-    ensures: Emit(StreamEvent{event_type: done, reason: stop})
+    ensures: Emit(StreamEvent{
+        event_type: done,
+        reason: stream.pending_finish_reason ?? stop,
+        usage: stream.last_seen_usage
+    })
+
+    @guidance
+        -- Review 48: EOF-level terminal flush, mirroring the codex
+        -- transport's (when-not @(:done? ...) ...) after its SSE doseq. A
+        -- stream that EOFs without an in-band terminal event (a usage chunk,
+        -- a finish_reason chunk + [DONE], or an error chunk) previously
+        -- emitted NO :done/:error and hung the turn until
+        -- llm-stream-idle-timeout-ms: a final chunk carrying finish_reason
+        -- but no trailing [DONE] left pending-finish-reason unflushed
+        -- (flush-pending-chat-finish! runs only on a [DONE] line), and a
+        -- [DONE] with no prior finish_reason chunk no-oped (the flush guards
+        -- on the pending reason). The flush emits the pending finish reason
+        -- when set (stream.pending_finish_reason, set by
+        -- CompletionsChunksNormalizeToExecutorEvents' finish_reason branch),
+        -- else :stop, and attaches the last-seen usage chunk when one was
+        -- provided (stream.last_seen_usage — the review-47 zero-usage class
+        -- on the :openai-completions sibling: an endpoint that ignores
+        -- stream_options.include_usage sends no usage chunk, so the :done
+        -- carries no :usage and handle-done! records ZERO usage/cost, the
+        -- documented consequence for usage-omitting endpoints). When an
+        -- in-band terminal already fired, stream.done is true and this rule
+        -- does not apply (OnceDoneNoFurtherEvent).
 }
 
 surface OpenAIProviderApi {
