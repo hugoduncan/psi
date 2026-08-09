@@ -4595,3 +4595,74 @@
       (it throws from `http/post` — the exact first-read scenario — and now
       expects `[:start :error]`). CHANGELOG `Fixed` entry + both provider
       specs + design.md revision note/AC updated.
+
+## Follow-ups (implementation review 54, 2026-08-09)
+
+- [ ] `stream-anthropic`'s CONTENT-BLOCK branches never emit `:start` — the
+      non-terminal half of the review-50 `:start`-before-first-event class
+      (reviews 50/52/53 fixed the terminal/error/catch emitters only, and
+      review 53's closing note claimed "the last :start-before-terminal
+      gap" — scoped to terminals). Verified empirically against the
+      committed tree: a malformed/non-conforming stream whose FIRST event
+      is `content_block_start` (no `message_start`) emits
+      `[:text-start :text-delta :text-end :start :done]` — the first
+      content event has NO preceding `:start`, and `:start` appears only at
+      the terminal, AFTER the content events. Both sibling transports emit
+      `:start` before the first content event: `:openai-completions`
+      (`emit-started-event!`/`emit-stream-start!` on any role/content/
+      tool emission) and `:openai-codex-responses`
+      (`emit-codex-start!`/`emit-codex-started-event!` on output_item.
+      added/output_text.delta). The `content_block_delta`/`content_block_stop`
+      branches have the same gap (a delta-first or stop-first stream emits
+      `[:text-delta ...]`/`[:text-end ...]` with no `:start`). Benign for
+      the consumer (`:start` is a no-op handler; the statechart is past
+      `:idle` via the turn-level `:turn/start`) but the same benign-yet-real
+      three-transport inconsistency class reviews 48/50/52/53 repeatedly
+      treated as actionable — reachable on any non-conforming
+      Anthropic-compatible endpoint, and DeepSeek's streaming path remains
+      unverified. Fix: emit `:start` once (`started?` compare-and-set,
+      mirroring `emit-terminal-done!`) before the first content-block event
+      when the stream never received `message_start`, + a
+      `content_block_start`-first stream test asserting `[:start :text-start
+      ...]` (FAIL pre-fix / PASS post-fix, per the established pattern).
+- [ ] `stream-anthropic`'s `content_block_delta`/`content_block_stop` for an
+      UNKNOWN index (no prior `content_block_start` — a stream that omits
+      start events, reuses indices, or reorders deltas/stops ahead of
+      starts) emit unbalanced `:text-delta`/`:text-end`: `(:type block-info)`
+      is nil for a missing index, which falls through `content-block-delta-event`/
+      `content-block-stop-event`'s default TEXT branch. Verified
+      empirically: a `content_block_delta` at index 5 with no prior start
+      yields `[:start :text-delta :done]` — a phantom `:text-delta` for a
+      block that never had a `:text-start`, which the turn accumulator's
+      `note-content-delta!` opens at an unbegun index — the exact
+      "unbalanced block events" harm the review-48 redacted_thinking fix
+      eliminated for skipped TYPES, still open for MISSING indices. Sibling
+      transports do not emit unbalanced events: `:openai-completions`
+      balances (tool-call path creates an entry and emits
+      `:toolcall-start` before the delta via `ensure-chat-tool-entry!`/
+      `start-chat-tool-if-ready!`), and `:openai-codex-responses` SKIPS an
+      unresolved index (`response.function_call_arguments.delta` guards on
+      `(number? idx)`). Fix: nil-guard the delta/stop branches on
+      `block-info` (skip events for unknown indices, mirroring the codex
+      skip — `consume-event!` already nil-guards) or balance them with a
+      synthetic start; + a stream test with a delta/stop at an index whose
+      start was never received.
+- [ ] The `:start`-once emitter is now triplicated across the three
+      transports — `stream-anthropic`'s `emit-start!` (review 50), the
+      `:openai-completions` `emit-stream-start!`, and the
+      `:openai-codex-responses` `emit-codex-start!` are byte-identical
+      `(when (compare-and-set! started false true) (consume-fn {:type
+      :start}))` one-liners modulo atom/param naming, introduced separately
+      across reviews 50/52/53. This is the exact triplication class review
+      14 extracted into the shared `providers/request_support.clj` (key
+      resolution, `no-auth?`, capture redaction) and review 16 (the openai
+      api-key config), with the documented rationale that "the copies
+      repeatedly drifted — reviews 9/10/13 reconciled spec/behavior
+      mismatches between them". The three `:start` emitters are the newest
+      instance: a future `:start`-semantics change (e.g. carrying a payload,
+      or a different once-guard) would have to land in three places with
+      drift risk. Fix: extract a shared
+      `request-support/emit-start! [consume-fn started-atom]` and use it in
+      all three transports (pure refactor, no behavior change — all three
+      call sites are already identical), or document the intentional
+      per-transport duplication in request_support.clj's ns docstring.
