@@ -314,6 +314,44 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   keeps its `request-id`-style headers on the `:error` event for
   diagnostics, the cross-transport error-surface inconsistency in the
   exact class this task's reviews 13/43/47 aligned.
+- **`:start`-before-terminal completion on the error paths + codex
+  catch-block headers + codex capture-once (review 52):** three follow-up
+  fixes completing reviews 50/51. (a) The review-50 `:start`-before-terminal
+  fix is extended to the ERROR paths and the remaining terminal gap:
+  `emit-chat-error!` (`:openai-completions`) and `emit-codex-error!`
+  (`:openai-codex-responses`) now emit `:start` first when the stream never
+  emitted it (an error-FIRST stream — the error arrives before any output
+  event; for codex this also covers the HTTP-error and exception paths that
+  share the emitter), and the anthropic `message_delta`-with-`stop_reason`
+  terminal branch emits `:start` first when the stream never received
+  `message_start` (review 50 tested `message_stop`-first and empty-body,
+  not `message_delta`-first) — so an error-first stream yields
+  `[:start :error]` and a `message_delta`-first stream `[:start :done]`
+  on all three transports, closing the last `:start`-before-terminal gaps
+  in the review-50 class. (b) `stream-openai-codex`'s catch block (a
+  stream-read exception surfaced via `exception->error`) now passes
+  `:headers` through to `emit-codex-error!`'s 4-arity instead of
+  destructuring them away — an exception whose ex-data carries response
+  headers keeps them on the `:error` event, the review-51 one-line class on
+  the sibling catch branch. (c) codex mid-stream SSE errors
+  (`response.failed`/`error`) are captured exactly once — the raw-event
+  capture in `handle-codex-event!` is skipped for the error event types, so
+  only the constructed `:error` (with normalized `:http-status`/`:headers`)
+  is captured via `emit-codex-error!`, matching the codex HTTP-error path
+  and giving a capture-count-consistent transport set (anthropic/openai
+  capture the raw line once; codex the constructed error once).
+- **Catch-block `:start`-before-terminal on stream-read exceptions (review
+  53):** the last gap in the review-50/52 `:start`-before-terminal class —
+  `stream-anthropic`'s and `stream-openai`'s outer CATCH blocks (a
+  stream-read exception before any output event, e.g. a connection reset on
+  the first read) previously emitted `[:error]` with no preceding `:start`
+  (the codex catch already gets `:start` via `emit-codex-error!`'s review-52
+  `emit-codex-start!`), while every in-band terminal/error emitter had been
+  fixed to emit `[:start ...]`. Both catch blocks now emit `:start` once
+  (compare-and-set on the started?/stream-started? atoms — the anthropic
+  side via the shared top-level `emit-start!` helper, moved out of the
+  letfn so the out-of-scope catch can use it) before the `:error`, so a
+  first-read exception yields `[:start :error]` on all three transports.
 - **HTTP-400 compatibility retry OAuth decision (review 22):**
   `handle-400-response!`'s `:without-all-betas` selection now uses the
   transport's COMPUTED OAuth decision — `build-request` attaches the
@@ -514,9 +552,13 @@ independently confirms native JSON-Schema support can add
   review-48/49 EOF-level terminal flush + openai usage attachment +
   redacted_thinking block typing + done?-first reset fixes, the review-50
   `:start`-before-terminal emission + explicit redacted_thinking delta
-  skip, and the review-51 turn-statechart `:idle` terminal transitions +
+  skip, the review-51 turn-statechart `:idle` terminal transitions +
   openai top-level `http_status` extraction + codex HTTP-error header
-  preservation);
+  preservation, and the review-52 `:start`-before-terminal completion on
+  the error paths (`emit-chat-error!`/`emit-codex-error!` + the anthropic
+  `message_delta` terminal) + codex catch-block header pass-through +
+  codex mid-stream-error capture-once, and the review-53 catch-block
+  `:start`-before-terminal on stream-read exceptions);
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

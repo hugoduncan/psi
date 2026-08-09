@@ -350,6 +350,28 @@
   (capture-response! model options url err)
   (consume-fn err))
 
+(defn- emit-start!
+  "Emit :start exactly once, before the terminal, when the stream never
+   emitted it (the stream's first event is a terminal/error rather than
+   message_start — a malformed/truncated stream, an error-first stream, or a
+   stream-read exception before any output). Review 50: stream-anthropic had
+   no started? tracking — :start was emitted only inside the message_start
+   case branch, so the terminal emitters emitted :done/:error with no
+   preceding :start when the stream never received message_start — the only
+   three-transport asymmetry left in the review-48 EOF-level flush (both
+   sibling transports emit :start first when not started:
+   emit-chat-completion-finish!'s stream-started? compare-and-set and the
+   codex EOF flush's emit-codex-start!). Review 53: the outer catch block (a
+   stream-read exception before any output) also emits :start first — the
+   last :start-before-terminal gap on this transport. Benign for the consumer
+   (:start is a no-op handler; the turn statechart is already past :idle via
+   the turn-level :turn/start) but removes the last cross-transport
+   asymmetry in the terminal-emission class this task has repeatedly treated
+   as actionable."
+  [consume-fn started?]
+  (when (compare-and-set! started? false true)
+    (consume-fn {:type :start})))
+
 (defn- consume-retry-response!
   [model options url consume-fn consume-stream-response! retry-request]
   (capture-request! model options url retry-request)
@@ -426,19 +448,7 @@
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (letfn [(emit-start! []
-                ;; Review 50: :start is emitted exactly once, before the
-                ;; terminal, when the stream never received message_start —
-                ;; mirroring emit-chat-completion-finish!'s stream-started?
-                ;; compare-and-set and the codex EOF flush's emit-codex-start!.
-                ;; Benign for the consumer (:start is a no-op handler; the
-                ;; turn statechart is already past :idle via the turn-level
-                ;; :turn/start) but removes the last cross-transport
-                ;; asymmetry in the terminal-emission class this task has
-                ;; repeatedly treated as actionable.
-                (when (compare-and-set! started? false true)
-                  (consume-fn {:type :start})))
-              (emit-terminal-done! []
+      (letfn [(emit-terminal-done! []
                 ;; The terminal :done shared by the message_stop branch and
                 ;; the review-48 EOF-level flush (below): structured-output
                 ;; results for the completed buffers, then the :done with the
@@ -461,7 +471,7 @@
                 ;; received message_start) — mirroring
                 ;; emit-chat-completion-finish!'s ordering (done? reset, then
                 ;; :start, then the terminal).
-                (emit-start!)
+                (emit-start! consume-fn started?)
                 (anthropic-structured-output/maybe-emit-json-schema-output-result!
                  consume-fn
                  structured-result-emitted?
@@ -496,7 +506,7 @@
                           "message_start"
                           (do
                             (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
-                            (emit-start!))
+                            (emit-start! consume-fn started?))
 
                           "content_block_start"
                           (let [idx   (:index event-data)
@@ -588,7 +598,7 @@
                             ;; never received message_start (a malformed
                             ;; stream whose first event is the error) —
                             ;; mirroring the terminal emitters' ordering.
-                            (emit-start!)
+                            (emit-start! consume-fn started?)
                             (consume-fn err))
 
                           "message_delta"
@@ -607,6 +617,19 @@
                             (usage/update-output-usage! usage-acc (:usage event-data))
                             (when-let [reason (get-in event-data [:delta :stop_reason])]
                               (reset! done? true)
+                              ;; Review 52: emit :start first when the stream
+                              ;; never received message_start (a malformed
+                              ;; stream whose FIRST event is a message_delta
+                              ;; carrying stop_reason) — mirroring
+                              ;; emit-terminal-done!'s ordering (done? reset,
+                              ;; then :start, then the terminal). Review 50
+                              ;; tested message_stop-first and empty-body but
+                              ;; not message_delta-first, so this branch
+                              ;; emitted [:done] while message_stop-first
+                              ;; emits [:start :done] — the last
+                              ;; :start-before-terminal gap on the anthropic
+                              ;; transport.
+                              (emit-start! consume-fn started?)
                               (anthropic-structured-output/maybe-emit-json-schema-output-result!
                                consume-fn
                                structured-result-emitted?
@@ -691,6 +714,18 @@
         ;; terminated the stream, a stream-read exception thrown afterwards
         ;; must not emit a SECOND :error.
         (when-not @done?
+          ;; Review 53: emit :start first — the catch block is the last
+          ;; :start-before-terminal gap on this transport. A stream-read
+          ;; exception before any output event (e.g. a connection reset on
+          ;; the first read) previously emitted [:error] with no preceding
+          ;; :start, while every in-band terminal/error emitter now emits
+          ;; [:start ...] (review-50 "error" branch, review-52
+          ;; message_delta branch, emit-terminal-done!). The catch now emits
+          ;; :start once (compare-and-set on started?) before the :error,
+          ;; mirroring the in-band error branch's ordering — so a
+          ;; first-read exception yields [:start :error] like every other
+          ;; error path on this transport.
+          (emit-start! consume-fn started?)
           (let [err (anthropic-error/exception->error e)]
             (capture-response! model options url err)
             (consume-fn err)))))))

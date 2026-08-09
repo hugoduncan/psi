@@ -139,6 +139,61 @@
       (is (not-any? #(= :done (:type %)) @events)
           "no :done — the :error is the terminal event"))))
 
+(deftest stream-anthropic-message-delta-first-emits-start-then-done-test
+  (testing "a stream whose first event is message_delta-with-stop_reason emits :start then the terminal :done"
+    ;; Review 52: the message_delta-with-stop_reason terminal branch emitted
+    ;; :done with no preceding :start when the stream never received
+    ;; message_start — review 50 tested message_stop-first and empty-body but
+    ;; NOT message_delta-first, so a malformed stream starting with a
+    ;; message_delta carrying stop_reason yielded [:done] while
+    ;; message_stop-first yields [:start :done]. The branch now emits :start
+    ;; first (mirroring emit-terminal-done!'s ordering: done? reset, then
+    ;; :start, then the terminal), closing the last :start-before-terminal
+    ;; gap on the anthropic transport.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (sse-line "message_delta"
+                           {:type "message_delta"
+                            :delta {:stop_reason "end_turn"}})]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :done] (mapv :type @events))
+          "message_delta-first emits :start then the terminal :done")
+      (is (= 1 (count (filterv #(= :done (:type %)) @events)))
+          "exactly one terminal :done")
+      (is (= :end_turn (:reason (first (filterv #(= :done (:type %)) @events))))
+          "the stop_reason keyword is carried through"))))
+
+(deftest stream-anthropic-first-read-exception-emits-start-then-error-test
+  (testing "a stream-read exception before any output event emits :start then the :error terminal"
+    ;; Review 53: the outer catch block emitted [:error] with no preceding
+    ;; :start when the exception fired before any output event (e.g. a
+    ;; connection reset on the first read) — the last gap in the
+    ;; review-50/52 :start-before-terminal class on this transport (every
+    ;; in-band terminal/error emitter now emits :start first: the review-50
+    ;; "error" branch, the review-52 message_delta branch, and
+    ;; emit-terminal-done!). The catch now emits :start once (compare-and-set
+    ;; on started? — the top-level emit-start! helper) before the :error, so
+    ;; a first-read exception yields [:start :error] like the in-band error
+    ;; branch.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])]
+      (with-redefs [http/post (fn [_url _req]
+                                (throw (ex-info "simulated connection reset"
+                                                {:status 503})))]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :error] (mapv :type @events))
+          "a first-read exception emits :start then the :error terminal")
+      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
+          "exactly one :error terminal")
+      (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
+          "the exception surfaces as an :error with a message"))))
+
 (deftest stream-anthropic-message-stop-done-consumer-exception-no-second-error-test
   (testing "a consume-fn exception on the message_stop :done does not emit a second :error terminal"
     ;; Review 49: the message_stop terminal :done reset done? AFTER the

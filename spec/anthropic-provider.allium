@@ -898,6 +898,14 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- MessageStartEmitsStartEvent), so a malformed stream whose FIRST
         -- event is the error yields [:start :error] instead of [:error],
         -- mirroring the terminal emitters.
+        -- Review 53: the OUTER catch block (a stream-read exception before
+        -- any output — e.g. a connection reset on the first read, http/post
+        -- throwing) is the last :start-before-terminal gap on this
+        -- transport: it emits the same [:start :error] sequence, calling
+        -- the shared top-level emit-start! helper (started? compare-and-set
+        -- — Review 50 moved the helper out of the letfn so the catch, which
+        -- is outside the letfn scope, can use it) before the :error
+        -- emission, mirroring this branch's ordering.
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
@@ -937,6 +945,16 @@ rule MessageDeltaStopReasonEmitsDone {
         -- established StreamEvent surface (cf. MessageStartEmitsStartEvent /
         -- ContentBlockStopEmitsTypedEndEvent); FinalizedUsage is the
         -- accumulation function defined by FinalUsageTotalsCalculated.
+        -- Review 52: the branch also ensures StartEmittedOnce — it emits
+        -- :start first when the stream never received message_start (a
+        -- malformed stream whose FIRST event is a message_delta carrying
+        -- stop_reason), mirroring emit-terminal-done!'s ordering (done?
+        -- reset, then :start, then the terminal). Review 50 tested
+        -- message_stop-first and empty-body but NOT message_delta-first, so
+        -- this branch emitted [:done] while message_stop-first emits
+        -- [:start :done] — the last :start-before-terminal gap on the
+        -- anthropic transport (see MessageStartEmitsStartEvent's review-50
+        -- guidance for the started? tracking).
 }
 
 rule MessageStopEmitsDoneWithUsage {

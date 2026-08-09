@@ -316,15 +316,19 @@
                                                          {:error {:message "cache_control requires prompt-caching beta"}}))})))]
         (anthropic/stream-anthropic convo model {:api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
-      (is (= 1 (count @events)))
-      (is (= :error (:type (first @events))))
+      ;; Review 53: the catch block (a stream-read exception before any
+      ;; output — http/post throws, no response received) now emits :start
+      ;; first, mirroring the in-band error branch — so the sequence is
+      ;; [:start :error] with the :error as the second event.
+      (is (= [:start :error] (mapv :type @events))
+          "a first-read exception emits :start then the :error terminal")
       (is (= "cache_control requires prompt-caching beta (status 400) [request-id req_ant_123]"
-             (:error-message (first @events))))
-      (is (= 400 (:http-status (first @events))))
-      (is (= "req_ant_123" (get-in (first @events) [:headers "request-id"])))
+             (:error-message (second @events))))
+      (is (= 400 (:http-status (second @events))))
+      (is (= "req_ant_123" (get-in (second @events) [:headers "request-id"])))
       (is (= {:error {:message "cache_control requires prompt-caching beta"}}
-             (:body (first @events))))
-      (is (string? (:body-text (first @events)))))))
+             (:body (second @events))))
+      (is (string? (:body-text (second @events)))))))
 
 (deftest stream-anthropic-non-2xx-response-map-surfaces-body-message-test
   (testing "non-2xx response map emits parsed provider error message"

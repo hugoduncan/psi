@@ -129,5 +129,64 @@
       (is (= "The server had an error while processing your request. (status 529)"
              (:error-message err))
           "error message extracted from the chunk's error body (with status suffix)")
+      (is (= [:start :error] (mapv :type events))
+          "an error-FIRST stream emits :start then the :error terminal (review 52)")
       (is (not-any? #(= :done (:type %)) events)
           "no :done after a mid-stream error — the :error event terminates the turn"))))
+
+(deftest completions-sse-error-first-stream-emits-start-then-error-test
+  (testing "an error-FIRST stream (error chunk before any role/content chunk) emits :start then :error"
+    ;; Review 52: emit-chat-error! emitted [:error] with no preceding :start
+    ;; when the stream errored before producing any output event — the
+    ;; review-50 :start-before-terminal fix covered the anthropic "error"
+    ;; branch and the terminal :done emitters but not the openai error
+    ;; emitter, and the existing error tests never caught it because they
+    ;; start with a role/content chunk that triggers :start via the
+    ;; non-error path (completions-sse-error-event-emits-error-and-
+    ;; terminates-test starts with {:choices [{:delta {:role
+    ;; "assistant"}}]}). The error emitter now emits :start first (mirroring
+    ;; emit-chat-completion-finish!'s ordering and the anthropic error
+    ;; branch), so an error-first stream yields [:start :error] like the
+    ;; anthropic transport — the last three-transport asymmetry in the
+    ;; review-50 class.
+    (let [events (run-stream (str
+                              "data: " (json/generate-string
+                                        {:error {:message "The server had an error while processing your request."
+                                                 :type "server_error"}}) "\n\n"
+                              "data: [DONE]\n\n"))
+          err    (first (filter #(= :error (:type %)) events))]
+      (is (= [:start :error] (mapv :type events))
+          "error-first stream emits :start then the :error terminal")
+      (is (some? err) "SSE error chunk must surface as an :error event")
+      (is (= "The server had an error while processing your request."
+             (:error-message err))
+          "error message extracted from the chunk's error body")
+      (is (not-any? #(= :done (:type %)) events)
+          "no :done — the :error event is terminal"))))
+
+(deftest completions-first-read-exception-emits-start-then-error-test
+  (testing "a stream-read exception before any output event emits :start then the :error terminal"
+    ;; Review 53: the catch block emitted [:error] with no preceding :start
+    ;; when the exception fired before any output event (e.g. a connection
+    ;; reset on the first read) — the last gap in the review-50/52
+    ;; :start-before-terminal class on this transport (emit-chat-error! now
+    ;; emits :start first per review 52, but the catch block routes through
+    ;; transport/emit-error!, which has no start logic). The catch now emits
+    ;; :start once (compare-and-set on stream-started?) before the :error, so
+    ;; a first-read exception yields [:start :error] like the in-band error
+    ;; chunk path.
+    (let [model  (models/get-model :gpt-5)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])]
+      (with-redefs [http/post (fn [_url _req]
+                                (throw (ex-info "simulated connection reset"
+                                                {:status 503})))]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [:start :error] (mapv :type @events))
+          "a first-read exception emits :start then the :error terminal")
+      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
+          "exactly one :error terminal")
+      (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
+          "the exception surfaces as an :error with a message"))))

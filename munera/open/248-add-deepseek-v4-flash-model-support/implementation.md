@@ -1006,6 +1006,30 @@
   lifecycle-test`, (4) `model-dispatch-test/model-thinking-dispatch-test`,
   (5) `workflow_judge_cancellation_test/judge-turn-dispatch-cancel-cannot-
   land-between-final-read-and-prompt-submit-test`.
+- NEW flake observed + inventoried (6th entry, review 53): a full
+  randomized-suite run (seed 281542343, 2026-08-09; 1 failure) failed
+  `psi.turn-runtime.response-mode-test/
+  execute-prepared-request-streaming-error-event-provider-headers-drive-
+  retry-test` — `(= 2 @attempts*)` actual 3 (the final
+  result/retry-metadata assertions all passed, so the retry pipeline
+  converged; the stream attempt ran three times instead of two — the same
+  attempt-count race class as the inventoried (1) `response-mode-retry-test`
+  flake (2 vs 53), but a NEW instance in a DIFFERENT namespace
+  (`response_mode_test.clj`, not `response_mode_retry_test.clj`) that the
+  inventory did not previously name). Verified pre-existing: passes in
+  isolation (1 test / 6 assertions green, re-verified 2026-08-09);
+  `components/turn-runtime/` has ZERO diff across the task commit range
+  (71d4821bf^..HEAD, `git diff --stat` empty — the component was never
+  touched by this task). Same retry-scheduling timing race class as entries
+  (1) and (2). Added to the flake inventory: known races are now (1)
+  `response-mode-retry-test`, (2)
+  `prompt-provider-retry-after-tool-result...`, (3)
+  `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-
+  lifecycle-test`, (4) `model-dispatch-test/model-thinking-dispatch-test`,
+  (5) `workflow_judge_cancellation_test/judge-turn-dispatch-cancel-cannot-
+  land-between-final-read-and-prompt-submit-test`, (6)
+  `response-mode-test/execute-prepared-request-streaming-error-event-
+  provider-headers-drive-retry-test`.
 - Verification (state being closed): full `bb test` green — 2567 tests /
   19271 assertions / 0 failures (two prior runs each hit one documented/
   inventoried flake: judge-turn-dispatch-cancel..., then scheduler-lifecycle
@@ -2337,3 +2361,67 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   `bb commit-check:file-lengths` passes (exit 0).
 - Review 52 (2026-08-09): added 3 steps to be addressed.
 - Review 53 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 52 + 53 addressed (2026-08-09)
+
+- addressed 5 review steps (review-52: 3; review-53: 2; review-1 optional
+  live smoke test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Review-52 items (working-tree changes from a concurrent review-step pass,
+  verified end-to-end here): `emit-chat-error!` (`:openai-completions`) and
+  `emit-codex-error!` (`:openai-codex-responses`) now emit `:start` first
+  when the stream never emitted it (error-FIRST streams, incl. the codex
+  HTTP-error + exception paths that share the emitter); the anthropic
+  `message_delta`-with-`stop_reason` terminal emits `:start` first when the
+  stream never received `message_start`; the codex catch block passes
+  `:headers` through from `exception->error` (4-arity) instead of
+  destructuring them away; codex mid-stream SSE errors (`response.failed`/
+  `error`) are captured exactly once (raw capture skipped for the error
+  event types; the constructed `:error` is captured via `emit-codex-error!`
+  — matching the codex HTTP-error path and the raw-once capture of the
+  sibling transports). Tests: `completions-sse-error-first-stream-emits-
+  start-then-error-test`, `codex-error-first-stream-emits-start-then-error-
+  test`, `stream-anthropic-message-delta-first-emits-start-then-done-test`,
+  `codex-catch-block-surfaces-exception-headers-test`,
+  `codex-mid-stream-error-captured-once-test`, existing codex tests updated
+  to `[:start :error]`; CHANGELOG + both provider specs + design.md
+  revision note/AC updated.
+- Review-53 item 1 (flake inventory): `psi.turn-runtime.response-mode-test/
+  execute-prepared-request-streaming-error-event-provider-headers-drive-
+  retry-test` added as the 6th flake-inventory entry with the full
+  review-14/17-pattern evidence — seed 281542343 (2026-08-09 full-suite
+  failure: `(= 2 @attempts*)` actual 3), isolated pass re-verified
+  (1 test / 6 assertions green via `bb clojure:test:scry --namespace
+  psi.turn-runtime.response-mode-test --var ...`), and `git diff
+  71d4821bf^..HEAD --stat -- components/turn-runtime/` empty (zero diff
+  across the whole task commit range). Chose the inventory option over
+  hardening the test: the test lives in `components/turn-runtime/` with
+  zero task diff and the race is definitionally pre-existing — the
+  established pattern for all five prior inventory entries.
+- Review-53 item 2 (catch-block `:start`): `stream-anthropic`'s and
+  `stream-openai`'s outer catch blocks now emit `:start` once before the
+  `:error` on a pre-output stream-read exception — the last
+  `:start`-before-terminal gap (the codex catch already gets `:start` via
+  `emit-codex-error!`). Anthropic: `emit-start!` moved out of the letfn to
+  a shared top-level helper `[consume-fn started?]` (4 existing call sites
+  updated; the catch is outside the letfn scope) and the catch now calls
+  it. Openai: the catch calls `emit-stream-start!` (stream-started?
+  compare-and-set) before `transport/emit-error!`. New tests:
+  `stream-anthropic-first-read-exception-emits-start-then-error-test` +
+  `completions-first-read-exception-emits-start-then-error-test` (redef'd
+  `http/post` throwing before any response → `[:start :error]`);
+  `stream-anthropic-error-includes-status-and-request-id-test` updated —
+  it throws from `http/post` (the exact first-read scenario) and now
+  expects `[:start :error]` with the error as the second event. CHANGELOG
+  `Fixed` entry + `SseErrorEventEmitsErrorAndTerminates` /
+  `CompletionsSseErrorChunkEmitsErrorAndTerminates` spec guidance +
+  design.md revision note/AC updated.
+- Verification (state being closed): all affected namespaces green —
+  `psi.ai.providers.anthropic-stream-termination-test` 7/28,
+  `psi.ai.providers.openai-completions-stream-test` 6/21,
+  `psi.ai.providers.anthropic-test` 16/103,
+  `psi.ai.providers.anthropic-stream-test` 14/98,
+  `psi.ai.providers.openai-test` 12/71,
+  `psi.ai.providers.openai-completions-test` 17/75,
+  `psi.ai.providers.openai-codex-test` 13/49,
+  `psi.ai.providers.openai-request-headers-test` 6/30; clj-kondo clean
+  (0 errors, 0 warnings) on changed source + test files.

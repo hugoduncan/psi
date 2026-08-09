@@ -480,9 +480,20 @@
    prevents a trailing [DONE]/finish chunk from emitting a second terminal
    event."
   [stream-state consume-fn chunk]
-  (let [{:keys [done?]} stream-state]
+  (let [{:keys [done? stream-started?]} stream-state]
     (when-not @done?
       (reset! done? true)
+      ;; Review 52: emit :start first when the stream never emitted it (an
+      ;; error-FIRST stream — the error chunk arrives before any role/content
+      ;; chunk) — mirroring emit-chat-completion-finish!'s ordering (done?
+      ;; reset, then :start, then the terminal) and the review-50-fixed
+      ;; anthropic "error" branch's [:start :error]. Previously an
+      ;; error-first stream emitted [:error] with no :start — the last
+      ;; three-transport asymmetry in the review-50 :start-before-terminal
+      ;; class (the existing error tests never caught it because they start
+      ;; with a role/content chunk that triggers :start via the non-error
+      ;; path).
+      (emit-stream-start! consume-fn stream-started?)
       (let [status (some (fn [s] (and (number? s) (>= s 400) s))
                          [(:status chunk)
                           (get-in chunk [:error :status])
@@ -656,6 +667,20 @@
         ;; a stream-read exception thrown afterwards must not emit a SECOND
         ;; :error.
         (when-not @(:done? stream-state)
+          ;; Review 53: emit :start first — the catch block is the last
+          ;; :start-before-terminal gap on this transport. A stream-read
+          ;; exception before any output event (e.g. a connection reset on
+          ;; the first read) previously emitted [:error] with no preceding
+          ;; :start (the catch routes through transport/emit-error!, which
+          ;; has no start logic), while every in-band terminal/error emitter
+          ;; now emits [:start ...] (review-52 emit-chat-error!,
+          ;; emit-chat-completion-finish!; the codex catch gets :start via
+          ;; emit-codex-error!'s review-52 emit-codex-start!). The catch now
+          ;; emits :start once (compare-and-set on stream-started?) before
+          ;; the :error, mirroring emit-chat-error!'s ordering — so a
+          ;; first-read exception yields [:start :error] like every other
+          ;; error path on this transport.
+          (emit-stream-start! consume-fn (:stream-started? stream-state))
           (transport/emit-error! model
                                  options
                                  :openai-completions

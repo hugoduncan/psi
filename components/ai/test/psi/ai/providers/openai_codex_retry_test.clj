@@ -25,6 +25,8 @@
 (deftest codex-stream-failed-event-preserves-status-and-headers-test
   ;; OpenAI Codex can report a terminal provider failure inside a 2xx SSE stream;
   ;; status and retry headers must survive so session retry can classify it.
+  ;; Review 52: emit-codex-error! emits :start first when the stream never
+  ;; produced output, so an error-first stream yields [:start :error].
   (let [model  (models/get-model :gpt-5.3-codex)
         token  (jwt-with-account-id "acc_test")
         convo  (-> (conv/create "sys")
@@ -43,10 +45,10 @@
       ((:stream openai/provider)
        convo model {:api-key token}
        (fn [ev] (swap! events conj ev))))
-    (is (= 1 (count @events)))
-    (is (= :error (:type (first @events))))
+    (is (= [:start :error] (mapv :type @events)))
+    (is (= :error (:type (second @events))))
     (is (= "The usage limit has been reached (status 429) [request-id req_123]"
-           (:error-message (first @events))))
-    (is (= 429 (:http-status (first @events))))
+           (:error-message (second @events))))
+    (is (= 429 (:http-status (second @events))))
     (is (= {"Retry-After" "8"}
-           (:headers (first @events))))))
+           (:headers (second @events))))))

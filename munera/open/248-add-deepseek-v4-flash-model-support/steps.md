@@ -4423,7 +4423,7 @@
 
 ## Follow-ups (implementation review 52, 2026-08-09)
 
-- [ ] The review-50 `:start`-before-terminal fix is incomplete on the ERROR
+- [x] The review-50 `:start`-before-terminal fix is incomplete on the ERROR
       paths of the two OpenAI transports: `emit-chat-error!`
       (`:openai-completions`) and `emit-codex-error!`
       (`:openai-codex-responses`) emit `[:error]` with NO preceding `:start`
@@ -4452,7 +4452,20 @@
       streams on all three transports (and a `message_delta`-first block on
       the anthropic test) asserting the emitted sequences — the same
       three-transport consistency class review 50 treated as actionable.
-- [ ] The review-51 codex HTTP-error headers fix left the sibling CATCH
+      → Resolved: `emit-chat-error!` (`:openai-completions`) and
+      `emit-codex-error!` (`:openai-codex-responses`) now emit `:start`
+      first (compare-and-set on `stream-started?`/`started?`) when the
+      stream never emitted it — for codex this also covers the HTTP-error
+      and exception paths that share the emitter; the anthropic
+      `message_delta`-with-`stop_reason` terminal branch emits `:start`
+      first when the stream never received `message_start`. Tests:
+      `completions-sse-error-first-stream-emits-start-then-error-test`,
+      `codex-error-first-stream-emits-start-then-error-test`,
+      `stream-anthropic-message-delta-first-emits-start-then-done-test`,
+      and the existing codex HTTP-error / account-id / capture tests updated
+      to `[:start :error]`. CHANGELOG + both provider specs + design.md
+      revision note updated.
+- [x] The review-51 codex HTTP-error headers fix left the sibling CATCH
       block dropping the same data: `stream-openai-codex`'s
       `(catch Exception e (let [{:keys [error-message http-status]}
       (transport/exception->error e)] (emit-codex-error! ...)))` still
@@ -4465,7 +4478,15 @@
       fix is the same one-line destructure change; pass `headers` through
       (and consider `:body-text` via the 4-arity's error map) for
       consistency with the review-51-fixed branch.
-- [ ] Codex double-captures mid-stream SSE errors while the other two
+      → Resolved: `stream-openai-codex`'s catch block now destructures
+      `:headers` from `transport/exception->error` and passes them to
+      `emit-codex-error!`'s 4-arity — an exception whose ex-data carries
+      response headers keeps them on the `:error` event for diagnostics.
+      New test `codex-catch-block-surfaces-exception-headers-test`
+      (redef'd `parse-sse-line` throwing with `:status`/`:headers` in
+      ex-data → `:error` carries `x-request-id`, status, and the
+      request-id-suffixed message).
+- [x] Codex double-captures mid-stream SSE errors while the other two
       transports capture once: `handle-codex-event!` captures the raw
       `response.failed`/`error` event at its top, then `emit-codex-error!`
       captures the CONSTRUCTED `:error` event again — two
@@ -4481,10 +4502,22 @@
       transports' HTTP-error-path behavior), or align the other transports
       to also capture the constructed error; add a capture-count/payload
       assertion to the codex SSE error tests.
+      → Resolved: `handle-codex-event!` skips the raw capture for the error
+      event types (`response.failed`/`error`) — only the CONSTRUCTED
+      `:error` (with normalized `:http-status`/`:headers`) is captured via
+      `emit-codex-error!`, matching the codex HTTP-error path; non-error
+      lines are still captured raw. Chose "drop the raw capture" (the
+      transports' HTTP-error-path behavior) over aligning the other
+      transports to the constructed capture — the codex transport now
+      captures exactly one `:on-provider-response` per mid-stream error,
+      like anthropic/openai capture one raw line. New test
+      `codex-mid-stream-error-captured-once-test` (2 captures: raw
+      non-error line + constructed error; the raw `response.failed` line
+      never captured).
 
 ## Follow-ups (implementation review 53, 2026-08-09)
 
-- [ ] Full-`bb test` is RED on the state being closed with a NEW
+- [x] Full-`bb test` is RED on the state being closed with a NEW
       un-inventoried flake instance: a full randomized-suite run (seed
       281542343, 2026-08-09) failed
       `psi.turn-runtime.response-mode-test/
@@ -4508,7 +4541,22 @@
       pattern), or harden the test (e.g. make the retry scheduling
       deterministic / assert the attempt count only after the pipeline
       fully settles) so a full-suite run can be green.
-- [ ] The anthropic + openai chat-completions CATCH blocks remain
+      → Resolved: added as the 6th flake-inventory entry in
+      implementation.md with the full evidence per the review-14/17
+      pattern — seed 281542343, isolated pass re-verified 2026-08-09
+      (1 test / 6 assertions green via
+      `bb clojure:test:scry --namespace psi.turn-runtime.response-mode-test
+      --var ...execute-prepared-request-streaming-error-event-provider-
+      headers-drive-retry-test`), and `git diff 71d4821bf^..HEAD --stat --
+      components/turn-runtime/` empty (zero diff across the whole task
+      commit range — the component was never touched by this task). Chose
+      the inventory option (the established pattern for all five prior
+      entries, all inventory-only) over hardening the test: the test file
+      lives in `components/turn-runtime/` with zero diff across the task
+      and the race is definitionally pre-existing, so a test-timing change
+      would be out-of-scope churn on a task that has repeatedly treated
+      the inventory as the resolution for this exact class.
+- [x] The anthropic + openai chat-completions CATCH blocks remain
       `:start`-less on a pre-output stream-read exception — the last gap
       in the review-50/52 `:start`-before-terminal class: `stream-anthropic`'s
       `(catch Exception e (when-not @done? ... (consume-fn err)))` and
@@ -4530,3 +4578,20 @@
       asserting `[:start :error]` on both transports — the same
       three-transport consistency class reviews 50/52 treated as
       actionable.
+      → Resolved: both catch blocks now emit `:start` once before the
+      `:error` — `stream-anthropic`'s catch calls the shared top-level
+      `emit-start!` helper (moved out of the letfn, which the catch is
+      outside of; 4 existing call sites updated to the two-arg form) and
+      `stream-openai`'s catch calls `emit-stream-start!`
+      (stream-started? compare-and-set) before `transport/emit-error!` — so
+      a first-read exception yields `[:start :error]` on both transports,
+      closing the last `:start`-before-terminal gap (the codex catch
+      already gets `:start` via `emit-codex-error!`'s review-52
+      `emit-codex-start!`). New tests:
+      `stream-anthropic-first-read-exception-emits-start-then-error-test` +
+      `completions-first-read-exception-emits-start-then-error-test`
+      (redef'd `http/post` throwing before any response);
+      `stream-anthropic-error-includes-status-and-request-id-test` updated
+      (it throws from `http/post` — the exact first-read scenario — and now
+      expects `[:start :error]`). CHANGELOG `Fixed` entry + both provider
+      specs + design.md revision note/AC updated.
