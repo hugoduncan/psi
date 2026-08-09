@@ -1626,3 +1626,4 @@
   parse-lock), clj-kondo clean (0 errors, 0 warnings), cljfmt clean,
   `bb commit-check:file-lengths` passes. Smoke-test step remains unchecked +
   BLOCKED (no DEEPSEEK_API_KEY in env).
+- Review 34 (2026-08-08): added 2 steps to be addressed.

@@ -2812,3 +2812,45 @@
       (`parse-documented-deepseek-example-test` reads only the DeepSeek
       section; `psi.ai.user-models-test` 17/120 green). Docs only; no
       behavior change.
+
+## Follow-ups (implementation review 34, 2026-08-08)
+
+- [ ] The "Anthropic-compatible example" (`proxy-sonnet`, doc/custom-providers.md)
+      still has the defaulted-locality problem review 33 fixed for MiniMax:
+      the model map (`:base-url "https://example.com/anthropic"`, no
+      `:locality`/`:latency-tier`/`:cost-tier`) falls through to
+      `model-defaults` `:locality :local` — a hosted (https) Anthropic
+      proxy copied from the doc's second example reproduces the exact
+      "cloud model with defaulted locality" misconfiguration the review-21
+      locality guidance ("What a provider definition contains" + DeepSeek
+      example notes) warns about (local-helper eligibility). Review 33
+      scoped its fix to MiniMax only, and this example is the direct
+      template the DeepSeek section points at ("it configures like any
+      other Anthropic-compatible provider"). Unlike MiniMax
+      (`api.minimax.chat`, unambiguously cloud), `example.com` is a
+      placeholder, so the fix is consistency with the shipped guidance:
+      add `:locality :cloud` + explicit `:latency-tier`/`:cost-tier` to the
+      example model map (matching the DeepSeek example shape), or add a
+      pointer note directing users to set the locality/tier fields per
+      "What a provider definition contains". Docs only, in scope; no
+      parse-lock impact (`parse-documented-deepseek-example-test` reads
+      only the DeepSeek section).
+- [ ] The "Local servers and custom headers" flagship example
+      (`{:auth {:api-key "env:LOCAL_LLM_KEY" :auth-header? false
+      :headers {"X-Client" "psi"}}}`) configures an api-key that is NEVER
+      resolved or sent: with `:auth-header? false`,
+      `provider-auth/provider-api-key` skips the registry key (the
+      `:auth-header?` gate returns nil), `provider-request-options` sets
+      `:no-auth-header`, and all three transports build a keyless request
+      (`no-auth?` → true; an explicit runtime-opts `:api-key` is ignored
+      too). The example therefore contradicts the section's own text
+      ("with `:auth-header? false`, psi does not require an API key and
+      sends no `x-api-key`/`Authorization` header") and its "Pick one auth
+      mechanism per provider" guidance — a user copying it exports
+      `LOCAL_LLM_KEY` expecting it to authenticate while the request is
+      silently keyless (and `catalog-view` `:configured?` still reports
+      true via the resolvable spec, masking the dead key). Fix (docs
+      option, in scope): drop the `:api-key` from the example, or add a
+      sentence stating the configured key is never sent when
+      `:auth-header? false` (omit it; use it only with the default
+      auth-header path or custom `:headers` auth).
