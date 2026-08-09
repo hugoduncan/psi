@@ -4666,3 +4666,68 @@
       all three transports (pure refactor, no behavior change — all three
       call sites are already identical), or document the intentional
       per-transport duplication in request_support.clj's ns docstring.
+
+## Follow-ups (implementation review 55, 2026-08-09)
+
+- [ ] The review-48 EOF-level terminal flush leaves content blocks / tool
+      calls OPEN at the terminal on two of the three transports — the
+      accumulator receives `:done` with an unclosed block index (no
+      phantom-or-unbalanced-block invariant, reviews 43/48/50), via the EOF
+      path. `stream-anthropic`'s `emit-terminal-done!` and `stream-openai`
+      chat-completions' EOF flush emit the terminal `:done` but never close
+      blocks started and never stopped: a tool_use block whose
+      `content_block_stop` never arrived, or a thinking/text block started
+      but not stopped (stream truncated / non-conforming endpoint), leaves
+      the turn accumulator with an OPEN block index when `handle-done!`
+      finalizes — no `:toolcall-end`/`:thinking-end`/`:text-end` precedes
+      the `:done`. Verified empirically (probe streams, FAIL pre-fix):
+      anthropic `message_start` + `content_block_start` (tool_use) + EOF
+      (no stop, no message_stop) → `[:start :toolcall-start :done]` (no
+      `:toolcall-end`); anthropic `message_start` + `content_block_start`
+      (thinking) + EOF → `[:start :thinking-start :done]` (no
+      `:thinking-end`); openai chat-completions a `tool_calls` delta chunk +
+      EOF (no finish_reason, no `[DONE]`) →
+      `[:start :toolcall-start :toolcall-delta :done]` (no
+      `:toolcall-end`). The codex transport BALANCES open tool calls at its
+      EOF flush — `emit-codex-done!` doseqs `:toolcall-end` over
+      `open-tool-indexes` (and chat-completions' own
+      `finish-chat-chunk!` usage/finish_reason branches call
+      `force-start-pending-chat-tools!` + `emit-chat-tool-ends!` — but the
+      EOF-flush path does NOT), so the review-48 EOF flush is the last
+      unbalanced-block class on this task's transports. Fix: track open
+      block/tool indexes on both transports (anthropic: mirror codex's
+      `open-tool-indexes` — conj on `content_block_start`, disj on
+      `content_block_stop`, emit `:toolcall-end`/`:thinking-end`/`:text-end`
+      for open indexes in `emit-terminal-done!` before the `:done`; openai:
+      call `force-start-pending-chat-tools!` + `emit-chat-tool-ends!` in
+      the EOF flush before the `:done`, reusing the existing helpers), +
+      EOF-mid-tool / EOF-mid-thinking stream tests on both transports
+      asserting the balancing events precede the `:done` (FAIL pre-fix /
+      PASS post-fix per the established pattern). Reachable on any
+      Anthropic-compatible endpoint that truncates a stream mid-block —
+      DeepSeek's streaming path remains unverified (see next item).
+- [ ] DeepSeek's STREAMING path is still unverified live — the task's
+      longest-standing unverified item, and no step has ever asked for the
+      verification even though the review-1 block was LIFTED (review 40:
+      `DEEPSEEK_API_KEY` now set in env; the review-1 smoke test built
+      psi's exact non-streaming request and POSTed it, HTTP 200 with a
+      `thinking` content block — the streaming path was never exercised).
+      Reviews 43-54 (and this review's EOF-balancing item) repeatedly
+      hardened the streaming transports citing "DeepSeek's streaming path
+      is unverified" as the reachability justification — EOF-level terminal
+      flush (48), `:start`-before-terminal/first-event (50/52/53/54),
+      mid-stream SSE error surfacing (43), usage on the `message_stop`
+      terminal (47), and now open-block balancing at EOF — none verified
+      against the actual endpoint. Fix (optional, like the review-1 smoke
+      test): run a live STREAMING turn through `stream-anthropic` with the
+      committed deepseek config (`.psi/models.edn` deepseek provider,
+      `:adaptive-thinking true`, env key) and record: the actual SSE event
+      sequence (does DeepSeek send `message_start`/`message_stop`, or
+      deviate — content-block-first / truncated streams, which directly
+      determines whether the malformed-stream hardening is reachable), the
+      adaptive `output_config.effort` wire shape, and the usage payload
+      (cache_read/cache_creation field names, review 2). Reconcile the
+      observed sequence with the review-43-55 hardening assumptions; if
+      DeepSeek conforms, note it; if it deviates, add the observed
+      non-conformance to the docs' DeepSeek notes and to the relevant
+      stream tests.
