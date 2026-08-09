@@ -3095,3 +3095,68 @@
       (codex_responses.clj), whose `redact-request-headers` delegates to the
       shared `request-support/redact-headers` — the `:openai-codex-responses`
       captures are redacted, and the CHANGELOG no longer misleads.
+
+## Follow-ups (implementation review 38, 2026-08-09)
+
+- [ ] `.psi/project.edn` deepseek workflow session-profile activation is back
+      at HEAD — the FOURTH recurrence of the regression reviews 2/18/28
+      caught and reverted. Commit d1b28eb93 ("update workflows to use
+      deepseek", 2026-08-09) re-activated the deepseek map (anthropic map
+      commented, deepseek map uncommented — the only project.edn delta vs
+      the review-37 state 67ec93bcb, verified by diff) and added a committed
+      `.psi/models.edn`. Verified 2026-08-09: the delegate-review live test
+      fails deterministically on HEAD (18 passed / 3 failed) — all seven
+      workflow profiles are invalid (`:reason :unknown-model`, "unknown
+      model deepseek/deepseek-v4-flash"), `:reviewing-implementation`
+      fails with `:invalid-session-profile`, so the design AC "`bb test`
+      green" is violated on the state being closed. The new committed
+      `.psi/models.edn` does NOT fix it: the live test inits the model
+      registry with a temp file containing only `local/test-model`
+      (`model-registry/init! {:user-models-path models-path}`) and never
+      triggers `:model-registry/reload` / `load-project-models!`, so the
+      deepseek provider is unresolvable in that test regardless of the
+      committed project models.edn. Also: the review-28 resolution
+      explicitly declined a durable pre-commit guard ("the delegate-review
+      live test IS the lock ... a separate commit-check would be redundant
+      with the existing gate and was not added"), and this recurrence
+      proves that decision wrong — the lock fires only AFTER the activation
+      is committed (b26f84f25, c90ae4043, d1b28eb93), and the file's own
+      comment ("requires ... a user-global models.edn — not committed") is
+      now stale since `.psi/models.edn` IS committed. Fix options: (a)
+      revert `.psi/project.edn` to the catalog-model committed default
+      (reviews 18/28 choice; the human's deepseek preference stays a
+      one-line local flip, and the stale "not committed" comment should be
+      updated to match the now-committed models.edn); (b) keep the deepseek
+      activation and instead make the delegate-review live test resolve the
+      deepseek provider (e.g. also load the committed project
+      `.psi/models.edn` in its temp-registry init) — this is now viable
+      because `.psi/models.edn` is committed, and it changes the
+      review-18/28 premise ("unresolvable everywhere") that drove the
+      revert; (c) add a durable pre-commit guard (bb commit-check or a
+      test) that fails when committed session profiles reference a model not
+      resolvable from committed model sources (catalog + committed
+      `.psi/models.edn`) so this regression class cannot return a fifth
+      time. Whichever option, re-run `bb test` on the state being closed
+      and record the result.
+- [ ] Committed `.psi/models.edn` deepseek model map omits the locality/tier
+      fields the task's own documented example mandates (review 21): the
+      committed `deepseek-v4-flash` map (`.psi/models.edn`, added
+      d1b28eb93) has no `:locality`/`:latency-tier`/`:cost-tier`, so
+      `expand-model` `model-defaults` apply — `:locality :local` /
+      `:latency-tier :low` / `:cost-tier :zero` — the exact "cloud model
+      with defaulted locality" misconfiguration reviews 21/33/34 fixed in
+      doc/custom-providers.md (the doc's DeepSeek example sets
+      `:locality :cloud` / `:latency-tier :low` / `:cost-tier :low`
+      explicitly, and its note explains that a cloud model with defaulted
+      locality can be selected for local-helper duty — context-manager
+      requires `:latency-tier :low` + `:cost-tier #{:zero :low}` with a
+      strong `:locality :local` preference — and charged as a "local"
+      helper, receiving conversation excerpts on the local-only path).
+      The committed file is covered by no test: the doc parse-locks
+      (`parse-documented-deepseek-example-test`,
+      `all-documented-models-edn-examples-parse-test`) read
+      doc/custom-providers.md only, so the committed file can silently
+      drift from the shipped example. Fix: align the committed
+      `.psi/models.edn` deepseek model map with the documented example (add
+      the three fields), and optionally add the committed file to the
+      parse-lock coverage (or a dedicated test) so it cannot drift again.
