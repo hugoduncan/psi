@@ -427,51 +427,59 @@
 
 (defn- handle-codex-event!
   [stream-state consume-fn model options url strategy event]
-  (transport/capture-response! model options :openai-codex-responses url event)
-  (let [event-type (:type event)]
-    (cond
-      (= "response.output_item.added" event-type)
-      (handle-codex-output-item-added! stream-state consume-fn event)
+  ;; Review 46: short-circuit the whole dispatch once the stream has
+  ;; terminated (done? — set by emit-codex-error! and emit-codex-done!). A
+  ;; trailing SSE event after response.failed/error previously still emitted
+  ;; non-terminal events: a trailing response.output_text.delta fired
+  ;; :text-delta (handle-codex-event! had no done? check at its top — only
+  ;; emit-codex-error!/emit-codex-done! self-guarded). Now every post-done
+  ;; event is a full no-op.
+  (when-not @(:done? stream-state)
+    (transport/capture-response! model options :openai-codex-responses url event)
+    (let [event-type (:type event)]
+      (cond
+        (= "response.output_item.added" event-type)
+        (handle-codex-output-item-added! stream-state consume-fn event)
 
-      (= "response.function_call_arguments.delta" event-type)
-      (let [idx   (resolve-codex-tool-index stream-state event)
-            delta (:delta event)]
-        (when (and (number? idx) (seq delta))
+        (= "response.function_call_arguments.delta" event-type)
+        (let [idx   (resolve-codex-tool-index stream-state event)
+              delta (:delta event)]
+          (when (and (number? idx) (seq delta))
+            (emit-codex-start! consume-fn (:started? stream-state))
+            (emit-codex-tool-delta! stream-state consume-fn idx delta)))
+
+        (= "response.output_item.done" event-type)
+        (handle-codex-output-item-done! stream-state consume-fn event)
+
+        (= "response.output_text.delta" event-type)
+        (when-let [delta (content/string-fragment (:delta event))]
+          (swap! (:text-buffer stream-state) str delta)
+          (emit-codex-started-event! consume-fn (:started? stream-state)
+                                     {:type :text-delta
+                                      :content-index 0
+                                      :delta delta}))
+
+        (contains? codex-thinking-delta-event-types event-type)
+        (emit-codex-thinking-delta! stream-state consume-fn event)
+
+        (contains? codex-done-event-types event-type)
+        (do
           (emit-codex-start! consume-fn (:started? stream-state))
-          (emit-codex-tool-delta! stream-state consume-fn idx delta)))
+          (emit-codex-done! stream-state consume-fn model event strategy))
 
-      (= "response.output_item.done" event-type)
-      (handle-codex-output-item-done! stream-state consume-fn event)
+        (= "response.failed" event-type)
+        (emit-codex-error! model stream-state consume-fn options url
+                           (codex-error-message event "Codex response failed")
+                           (codex-error-http-status event)
+                           (codex-error-headers event))
 
-      (= "response.output_text.delta" event-type)
-      (when-let [delta (content/string-fragment (:delta event))]
-        (swap! (:text-buffer stream-state) str delta)
-        (emit-codex-started-event! consume-fn (:started? stream-state)
-                                   {:type :text-delta
-                                    :content-index 0
-                                    :delta delta}))
+        (= "error" event-type)
+        (emit-codex-error! model stream-state consume-fn options url
+                           (codex-error-message event "Codex stream error")
+                           (codex-error-http-status event)
+                           (codex-error-headers event))
 
-      (contains? codex-thinking-delta-event-types event-type)
-      (emit-codex-thinking-delta! stream-state consume-fn event)
-
-      (contains? codex-done-event-types event-type)
-      (do
-        (emit-codex-start! consume-fn (:started? stream-state))
-        (emit-codex-done! stream-state consume-fn model event strategy))
-
-      (= "response.failed" event-type)
-      (emit-codex-error! model stream-state consume-fn options url
-                         (codex-error-message event "Codex response failed")
-                         (codex-error-http-status event)
-                         (codex-error-headers event))
-
-      (= "error" event-type)
-      (emit-codex-error! model stream-state consume-fn options url
-                         (codex-error-message event "Codex stream error")
-                         (codex-error-http-status event)
-                         (codex-error-headers event))
-
-      :else nil)))
+        :else nil))))
 
 (defn stream-openai-codex
   [conversation model options consume-fn]

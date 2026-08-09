@@ -477,17 +477,28 @@
 
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url strategy line]
-  (if-let [chunk (transport/parse-sse-line line)]
-    (do
-      (transport/capture-response! model options :openai-completions url chunk)
-      (if (:error chunk)
-        (emit-chat-error! stream-state consume-fn chunk)
-        (let [choice (first (:choices chunk))
-              delta  (:delta choice)]
-          (emit-chat-chunk! stream-state consume-fn choice delta)
-          (finish-chat-chunk! stream-state consume-fn model chunk choice strategy))))
-    (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
-      (flush-pending-chat-finish! stream-state consume-fn strategy))))
+  ;; Review 46: short-circuit the whole line once the stream has terminated
+  ;; (done? — set by emit-chat-error! and emit-chat-completion-finish!). A
+  ;; trailing chunk after a mid-stream SSE error chunk previously still
+  ;; emitted non-terminal events: a trailing :choices chunk fired
+  ;; :text-delta via emit-chat-chunk!, a trailing usage/finish chunk drove
+  ;; finish-chat-chunk!'s unguarded force-start-pending-chat-tools! /
+  ;; emit-chat-tool-ends! / emit-structured-output-result! (only
+  ;; emit-chat-completion-finish! was done?-guarded), and a trailing [DONE]
+  ;; with a pending finish reason fired flush-pending-chat-finish!'s
+  ;; :structured-output-result. Now every post-done line is a full no-op.
+  (when-not @(:done? stream-state)
+    (if-let [chunk (transport/parse-sse-line line)]
+      (do
+        (transport/capture-response! model options :openai-completions url chunk)
+        (if (:error chunk)
+          (emit-chat-error! stream-state consume-fn chunk)
+          (let [choice (first (:choices chunk))
+                delta  (:delta choice)]
+            (emit-chat-chunk! stream-state consume-fn choice delta)
+            (finish-chat-chunk! stream-state consume-fn model chunk choice strategy))))
+      (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
+        (flush-pending-chat-finish! stream-state consume-fn strategy)))))
 
 (defn- non-streaming-request
   [conversation model options]

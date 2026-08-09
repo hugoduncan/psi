@@ -645,3 +645,70 @@
       (is (not-any? #(= :done (:type %)) @events)
           "no :done — the :error event is terminal"))))
 
+(deftest completions-sse-error-then-trailing-choices-chunk-no-text-delta-test
+  (testing "a trailing :choices chunk after a mid-stream SSE error chunk does not emit :text-delta"
+    ;; Review 46: the review-43/44 done? guard covered only the TERMINAL
+    ;; emissions. A trailing :choices chunk after the error chunk still
+    ;; emitted :text-delta via emit-chat-chunk! (verified: events =
+    ;; [:start :error :text-delta]), and a trailing usage/finish chunk could
+    ;; drive finish-chat-chunk!'s unguarded force-start-pending-chat-tools! /
+    ;; emit-chat-tool-ends! / emit-structured-output-result! (only
+    ;; emit-chat-completion-finish! was done?-guarded). process-chat-sse-line!
+    ;; is now short-circuited on done? (set by emit-chat-error! and
+    ;; emit-chat-completion-finish!), so a post-error trailing chunk is a
+    ;; full no-op.
+    (let [model  (models/get-model :gpt-5)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant" :content "Hello"}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:error {:message "Overloaded"
+                                     :type "server_error"}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant" :content "trailing"}}]}) "\n\n"
+                  "data: [DONE]\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [:start :text-delta :error] (mapv :type @events))
+          "no :text-delta after the :error — the trailing :choices chunk and [DONE] are full no-ops once done")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no :done — the :error event is terminal"))))
+
+(deftest codex-error-then-trailing-output-text-delta-no-text-delta-test
+  (testing "a trailing response.output_text.delta after response.failed does not emit :text-delta"
+    ;; Review 46: handle-codex-event! had no done? check at its top — only
+    ;; emit-codex-error!/emit-codex-done! self-guarded, so a trailing
+    ;; response.output_text.delta after response.failed/error still emitted
+    ;; :text-delta (verified: events = [:start :error :text-delta]).
+    ;; handle-codex-event! is now short-circuited on done? (set by
+    ;; emit-codex-error! and emit-codex-done!), so a post-error trailing
+    ;; event is a full no-op.
+    (let [model  (models/get-model :gpt-5.3-codex)
+          token  (jwt-with-account-id "acc_test")
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:type "response.output_text.delta"
+                             :delta "Hello"}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.failed"
+                             :response {:error {:message "Overloaded"}}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.output_text.delta"
+                             :delta "trailing"}) "\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [:start :text-delta :error] (mapv :type @events))
+          "no :text-delta after the :error — the trailing response.output_text.delta is a full no-op once done")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no synthetic :done — the :error event is terminal"))))
+

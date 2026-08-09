@@ -177,23 +177,35 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   provider named `"anthropic"`/`"openai"` never receives the built-in
   same-named OAuth credential. `runtime/resolve-api-key-in` threads the
   resolved model's `:custom?` into `provider-api-key` the same way.
-- **Mid-stream SSE error-event surfacing + terminal-event guard (reviews
-  43/44):** both the `:anthropic-messages` transport (`stream-anthropic`'s
-  `"error"` SSE case branch) and the `:openai-completions` transport
-  (`emit-chat-error!`/`process-chat-sse-line!` in chat_completions.clj)
-  now surface a mid-stream provider SSE error as an `:error` event and
-  terminate the stream — previously such events fell to the stream loop's
-  default no-op, so a mid-stream provider failure hung the turn until
-  `llm-stream-idle-timeout-ms` with a misleading timeout (the codex
-  transport already handled both shapes). Review 44 completed the terminal
-  guard: the `message_delta` branch's terminal `:done` emission is guarded
-  on `done?` (a trailing `message_delta` carrying `stop_reason` after a
-  mid-stream SSE error no longer emits a second terminal event, and its
-  usage accumulation + structured-output-result emissions are suppressed
+- **Mid-stream SSE error-event surfacing + no-further-events-once-done
+  guard (reviews 43/44/46):** both the `:anthropic-messages` transport
+  (`stream-anthropic`'s `"error"` SSE case branch) and the
+  `:openai-completions` transport (`emit-chat-error!`/`process-chat-sse-line!`
+  in chat_completions.clj) now surface a mid-stream provider SSE error as an
+  `:error` event and terminate the stream — previously such events fell to
+  the stream loop's default no-op, so a mid-stream provider failure hung the
+  turn until `llm-stream-idle-timeout-ms` with a misleading timeout (the
+  codex transport already handled both shapes). Review 44 completed the
+  terminal guard: the `message_delta` branch's terminal `:done` emission is
+  guarded on `done?` (a trailing `message_delta` carrying `stop_reason`
+  after a mid-stream SSE error no longer emits a second terminal event, and
+  its usage accumulation + structured-output-result emissions are suppressed
   too), and both stream catch blocks' `:error` emission is guarded on
   `done?` (a post-error stream-read exception cannot emit a second
-  `:error`) — exactly one terminal event (`:error` or `:done`) per stream,
-  mirroring the codex transport's `emit-codex-error!`.
+  `:error`). Review 46 extended the guard from terminal emissions to NO
+  further event at all: the whole SSE dispatch is short-circuited on `done?`
+  on all three transports (`stream-anthropic`'s event `case`,
+  `process-chat-sse-line!`, and `handle-codex-event!` — the latter had no
+  `done?` check at its top), so a post-error trailing event — a
+  `content_block_stop`/`content_block_delta`/`content_block_start` (which
+  previously still emitted `:text-end`/`:text-delta`/`:text-start` and could
+  fire `maybe-emit-structured-result!`), a `:choices` chunk (`:text-delta`),
+  a codex `response.output_text.delta` (`:text-delta`), a `[DONE]`/finish
+  chunk (unguarded `force-start-pending-chat-tools!`/
+  `emit-chat-tool-ends!`/`emit-structured-output-result!`) — is a full
+  no-op, and `done?` is set on the anthropic `message_stop` terminal too —
+  exactly one terminal event (`:error` or `:done`) per stream and nothing
+  after it, mirroring the codex transport's `emit-codex-error!`.
 - **Thinking-block stop labeling (review 43):**
   `content-block-stop-event` now emits `:thinking-end` for `"thinking"`
   content-block stops instead of the mislabeled `:text-end` (tool_use
@@ -397,7 +409,8 @@ independently confirms native JSON-Schema support can add
   closing provider-name-based built-in detection, the HTTP-400-compatibility-
   retry OAuth decision (computed `::oauth?` from `build-request`, replacing
   the header content-sniff), mid-stream SSE error-event surfacing + the
-  terminal-event guard on both transports, and `:thinking-end` labeling for
+  no-further-events-once-done guard on all three transports, and
+  `:thinking-end` labeling for
   thinking-block stops); `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

@@ -751,6 +751,7 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 
 rule MessageStartEmitsStartEvent {
     when: SseEventReceived(stream, "message_start", event_data)
+    requires: not stream.done
 
     ensures: UsageAccUpdated(stream, {
         input_tokens: event_data.message.usage.input_tokens ?? 0,
@@ -758,10 +759,16 @@ rule MessageStartEmitsStartEvent {
         cache_write_tokens: event_data.message.usage.cache_creation_input_tokens ?? 0
     })
     ensures: Emit(StreamEvent{event_type: start})
+
+    @guidance
+        -- Review 46: requires not stream.done — the whole SSE dispatch is
+        -- short-circuited once the stream has terminated, so a post-error
+        -- trailing event is a full no-op (not just the terminal branches).
 }
 
 rule AnthropicThinkingStreamingIncludesSignatureMaterial {
     when: SseEventReceived(stream, "content_block_delta", event_data)
+    requires: not stream.done
     requires: CurrentContentBlockType(stream, event_data.index) = "thinking"
 
     ensures:
@@ -773,11 +780,14 @@ rule AnthropicThinkingStreamingIncludesSignatureMaterial {
     @guidance
         -- The provider must preserve enough thinking-block material to round-trip
         -- the final assistant thinking block, including signature, in a later
-        -- tool-use continuation request.
+        -- tool-use continuation request. Review 46: requires not stream.done —
+        -- a trailing content_block_delta after a mid-stream SSE error must
+        -- not emit :thinking-delta/:thinking-signature-delta post-error.
 }
 
 rule ContentBlockStopEmitsTypedEndEvent {
     when: SseEventReceived(stream, "content_block_stop", event_data)
+    requires: not stream.done
 
     ensures:
         if CurrentContentBlockType(stream, event_data.index) = "thinking":
@@ -823,7 +833,7 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- message_delta is a full no-op) AND a post-error stream-read
         -- exception (the outer catch block's :error emission is guarded on
         -- done?, mirroring the codex transport's emit-codex-error!). See the
-        -- OnceDoneNoFurtherTerminalEvent invariant below. The codex
+        -- OnceDoneNoFurtherEvent invariant below. The codex
         -- transport already handled "error" SSE events (in-repo precedent);
         -- the :openai-completions transport received the same class fix
         -- (review 43 decision).
@@ -868,23 +878,28 @@ rule MessageDeltaStopReasonEmitsDone {
         -- accumulation function defined by FinalUsageTotalsCalculated.
 }
 
-rule OnceDoneNoFurtherTerminalEvent {
+rule OnceDoneNoFurtherEvent {
     when: stream.done = true
 
-    ensures: no further Emit(StreamEvent{event_type: done | error})
+    ensures: no further Emit(StreamEvent)
 
     @guidance
-        -- Review 44 invariant: once the stream is done — whether terminated
-        -- by a mid-stream SSE error, a message_delta stop_reason, or
-        -- message_stop — no subsequent SSE event or stream-read exception
-        -- may emit another terminal event. This covers the message_delta
-        -- branch (guarded on done? — MessageDeltaAccumulatesOutputUsage and
-        -- MessageDeltaStopReasonEmitsDone both require not stream.done), the
-        -- message_stop branch (guarded since review 43), and both stream
-        -- catch blocks (the :error emission is now guarded on done?,
-        -- mirroring the codex transport's emit-codex-error!). A consumer
+        -- Review 44 + review 46 invariant: once the stream is done — whether
+        -- terminated by a mid-stream SSE error, a message_delta stop_reason,
+        -- or message_stop — no subsequent SSE event or stream-read exception
+        -- may emit ANY event, terminal or not. Review 44 covered only the
+        -- terminal emissions (:done/:error); review 46 extends the guard to
+        -- the NON-terminal branches too: the whole SSE dispatch is
+        -- short-circuited on done? (stream-anthropic's case is wrapped in
+        -- when-not @done?), so a post-error trailing event — a
+        -- content_block_stop (which previously emitted :text-end and could
+        -- fire maybe-emit-structured-result!), a content_block_delta
+        -- (:text-delta/:thinking-delta), a content_block_start (:text-start),
+        -- a message_delta (usage accumulation), or a message_stop — is a
+        -- full no-op. done? is also set on message_stop, so a malformed
+        -- event after a NORMAL completion is a no-op too. A consumer
         -- therefore receives at most one terminal event (:error or :done)
-        -- per stream.
+        -- per stream, and nothing at all after it.
 }
 
 rule FinalUsageTotalsCalculated {

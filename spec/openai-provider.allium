@@ -703,6 +703,7 @@ rule StreamParsesOnlySseDataLines {
 rule CompletionsChunksNormalizeToExecutorEvents {
     when: CompletionsChunkReceived(stream, chunk)
     requires: stream.request_api = openai_completions
+    requires: not stream.done
 
     ensures: StartEmittedOnce(stream)
     ensures: CompletionsTextDeltasEmitted(stream, chunk)
@@ -715,6 +716,15 @@ rule CompletionsChunksNormalizeToExecutorEvents {
             CompletionsDoneWithUsageEmitted(stream, chunk)
         else if ChunkFinishReason(chunk) != null:
             CompletionsDoneWithoutUsageEmitted(stream, chunk)
+
+    @guidance
+        -- Review 46: requires not stream.done — process-chat-sse-line! is
+        -- short-circuited on done? (set by emit-chat-error! and
+        -- emit-chat-completion-finish!), so a trailing :choices chunk after
+        -- a mid-stream SSE error chunk is a full no-op: no :text-delta via
+        -- emit-chat-chunk!, and finish-chat-chunk!'s unguarded
+        -- force-start-pending-chat-tools!/emit-chat-tool-ends!/
+        -- emit-structured-output-result! never fire post-error.
 }
 
 rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
@@ -740,31 +750,45 @@ rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
         -- (mirroring the codex transport's emit-codex-error!), so a
         -- stream-read exception thrown after this error chunk has terminated
         -- the stream cannot emit a second :error — see the
-        -- OnceDoneNoFurtherTerminalEvent invariant below.
+        -- OnceDoneNoFurtherEvent invariant below.
 }
 
-rule OnceDoneNoFurtherTerminalEvent {
+rule OnceDoneNoFurtherEvent {
     when: stream.done = true
 
-    ensures: no further Emit(StreamEvent{event_type: done | error})
+    ensures: no further Emit(StreamEvent)
 
     @guidance
-        -- Review 44 invariant (mirrored from the anthropic spec): once the
-        -- stream is done — whether terminated by a mid-stream SSE error
-        -- chunk, a finish chunk, or the transport closing — no subsequent
-        -- SSE event or stream-read exception may emit another terminal
-        -- event. The completions finish emissions
-        -- (emit-chat-completion-finish!, emit-chat-error!, and the
-        -- [DONE]/transport-close done) are all done?-guarded, and the
-        -- stream-openai catch block's :error emission is guarded on done?
-        -- (review 44, mirroring the codex transport's emit-codex-error!). A
-        -- consumer therefore receives at most one terminal event (:error or
-        -- :done) per stream.
+        -- Review 44 + review 46 invariant (mirrored from the anthropic spec):
+        -- once the stream is done — whether terminated by a mid-stream SSE
+        -- error chunk, a finish chunk, or the transport closing — no
+        -- subsequent SSE event or stream-read exception may emit ANY event,
+        -- terminal or not. Review 44 covered only the terminal emissions
+        -- (:done/:error); review 46 extends the guard to the NON-terminal
+        -- branches too: process-chat-sse-line! is short-circuited on done?
+        -- (set by emit-chat-error! and emit-chat-completion-finish!), so a
+        -- trailing :choices chunk after an error chunk is a full no-op (no
+        -- :text-delta via emit-chat-chunk!, no unguarded
+        -- force-start-pending-chat-tools!/emit-chat-tool-ends!/
+        -- emit-structured-output-result! from finish-chat-chunk!, and no
+        -- flush-pending-chat-finish! :structured-output-result on a trailing
+        -- [DONE] with a pending finish reason), and handle-codex-event! is
+        -- short-circuited on done? (set by emit-codex-error! and
+        -- emit-codex-done!) so a trailing response.output_text.delta after
+        -- response.failed is a full no-op. The completions finish emissions
+        -- (emit-chat-completion-finish!, emit-chat-error!) and the codex
+        -- terminal emissions (emit-codex-error!/emit-codex-done!) are
+        -- done?-guarded, and the stream-openai catch block's :error emission
+        -- is guarded on done? (review 44, mirroring the codex transport's
+        -- emit-codex-error!). A consumer therefore receives at most one
+        -- terminal event (:error or :done) per stream, and nothing at all
+        -- after it.
 }
 
 rule CodexEventsNormalizeToExecutorEvents {
     when: CodexEventReceived(stream, event)
     requires: stream.request_api = openai_codex_responses
+    requires: not stream.done
 
     ensures: StartEmittedOnce(stream)
     ensures: CodexTextDeltaEventsEmitted(stream, event)
@@ -776,6 +800,14 @@ rule CodexEventsNormalizeToExecutorEvents {
             CodexDoneEventEmitted(stream, event)
         else if EventType(event) in config.codex_failed_event_types:
             CodexErrorEventEmitted(stream, event)
+
+    @guidance
+        -- Review 46: requires not stream.done — handle-codex-event! is
+        -- short-circuited on done? (set by emit-codex-error! and
+        -- emit-codex-done!), so a trailing SSE event after
+        -- response.failed/error is a full no-op: no :text-delta from a
+        -- trailing response.output_text.delta, no output_item/thinking/tool
+        -- events, no synthetic :done.
 }
 
 rule ToolCallsAssembledAtTerminalBoundary {

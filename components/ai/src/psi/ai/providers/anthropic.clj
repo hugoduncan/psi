@@ -509,94 +509,127 @@
                   (doseq [line (line-seq reader)]
                     (when-let [event-data (parse-sse-line line)]
                       (capture-response! model options url event-data)
-                      (case (:type event-data)
-                        "message_start"
-                        (do
-                          (update-start-usage! usage-acc (get-in event-data [:message :usage]))
-                          (consume-fn {:type :start}))
+                      ;; Review 46: short-circuit the entire SSE dispatch once
+                      ;; the stream has terminated (done?) — NOT just the
+                      ;; terminal emissions. A post-error trailing event (a
+                      ;; content_block_stop / content_block_delta /
+                      ;; content_block_start, a trailing message_delta, a
+                      ;; message_stop) must be a full no-op: previously only
+                      ;; the terminal branches (:done/:error) were guarded, so
+                      ;; e.g. error → trailing content_block_stop still
+                      ;; emitted :text-end and could fire
+                      ;; maybe-emit-structured-result!, mutating turn-data
+                      ;; after handle-error! had finalized the result.
+                      (when-not @done?
+                        (case (:type event-data)
+                          "message_start"
+                          (do
+                            (update-start-usage! usage-acc (get-in event-data [:message :usage]))
+                            (consume-fn {:type :start}))
 
-                        "content_block_start"
-                        (let [idx   (:index event-data)
-                              block (:content_block event-data)]
-                          (swap! block-types assoc idx {:type (:type block)
-                                                        :name (:name block)})
-                          (when-not (anthropic-structured-output/structured-tool-block?
-                                     structured-tool-name
-                                     {:type (:type block) :name (:name block)})
-                            (consume-fn (content-block-start-event idx block))))
+                          "content_block_start"
+                          (let [idx   (:index event-data)
+                                block (:content_block event-data)]
+                            (swap! block-types assoc idx {:type (:type block)
+                                                          :name (:name block)})
+                            (when-not (anthropic-structured-output/structured-tool-block?
+                                       structured-tool-name
+                                       {:type (:type block) :name (:name block)})
+                              (consume-fn (content-block-start-event idx block))))
 
-                        "content_block_delta"
-                        (let [idx (:index event-data)
-                              block-info (get @block-types idx)
-                              delta (:delta event-data)]
-                          (if (anthropic-structured-output/structured-tool-block?
-                               structured-tool-name
-                               block-info)
-                            (when-let [json-delta (:partial_json delta)]
-                              (swap! structured-buffers update idx str json-delta))
-                            (do
-                              (when (and (= "text" (:type block-info))
-                                         (seq (:text delta)))
-                                (cond
-                                  (= :prompted-json (:strategy strategy))
-                                  (swap! prompted-json-buffer str (:text delta))
+                          "content_block_delta"
+                          (let [idx (:index event-data)
+                                block-info (get @block-types idx)
+                                delta (:delta event-data)]
+                            (if (anthropic-structured-output/structured-tool-block?
+                                 structured-tool-name
+                                 block-info)
+                              (when-let [json-delta (:partial_json delta)]
+                                (swap! structured-buffers update idx str json-delta))
+                              (do
+                                (when (and (= "text" (:type block-info))
+                                           (seq (:text delta)))
+                                  (cond
+                                    (= :prompted-json (:strategy strategy))
+                                    (swap! prompted-json-buffer str (:text delta))
 
-                                  (anthropic-structured-output/json-schema-output-mechanism? strategy)
-                                  (swap! json-schema-output-buffer str (:text delta))))
-                              (consume-event! consume-fn
-                                              (content-block-delta-event (:type block-info)
-                                                                         idx
-                                                                         delta)))))
+                                    (anthropic-structured-output/json-schema-output-mechanism? strategy)
+                                    (swap! json-schema-output-buffer str (:text delta))))
+                                (consume-event! consume-fn
+                                                (content-block-delta-event (:type block-info)
+                                                                           idx
+                                                                           delta)))))
 
-                        "content_block_stop"
-                        (let [idx (:index event-data)
-                              block-info (get @block-types idx)]
-                          (if (anthropic-structured-output/structured-tool-block?
-                               structured-tool-name
-                               block-info)
-                            (anthropic-structured-output/maybe-emit-structured-result!
-                             consume-fn
-                             strategy
-                             (get @structured-buffers idx))
-                            (consume-fn (content-block-stop-event (:type block-info)
-                                                                  idx))))
+                          "content_block_stop"
+                          (let [idx (:index event-data)
+                                block-info (get @block-types idx)]
+                            (if (anthropic-structured-output/structured-tool-block?
+                                 structured-tool-name
+                                 block-info)
+                              (anthropic-structured-output/maybe-emit-structured-result!
+                               consume-fn
+                               strategy
+                               (get @structured-buffers idx))
+                              (consume-fn (content-block-stop-event (:type block-info)
+                                                                    idx))))
 
-                        "error"
-                        ;; Anthropic's documented mid-stream SSE error shape
-                        ;; ({"type":"error","error":{...}} — e.g.
-                        ;; overloaded_error / rate-limit during a stream).
-                        ;; Review 43: the default case previously consumed
-                        ;; these as no-ops, so a mid-stream provider error
-                        ;; hung the turn until llm-stream-idle-timeout-ms
-                        ;; with a misleading timeout. Surface the event's
-                        ;; error body through anthropic-error (http-status
-                        ;; when present) and terminate the stream; the done?
-                        ;; guard prevents a trailing message_stop from
-                        ;; emitting a second terminal event.
-                        (let [err (anthropic-error/error-from-response-data
-                                   {:status           (or (get-in event-data [:error :http_status])
-                                                          (:http_status event-data))
-                                    :body-text        (json/generate-string event-data)
-                                    :fallback-message "Anthropic stream error"})]
+                          "error"
+                          ;; Anthropic's documented mid-stream SSE error shape
+                          ;; ({"type":"error","error":{...}} — e.g.
+                          ;; overloaded_error / rate-limit during a stream).
+                          ;; Review 43: the default case previously consumed
+                          ;; these as no-ops, so a mid-stream provider error
+                          ;; hung the turn until llm-stream-idle-timeout-ms
+                          ;; with a misleading timeout. Surface the event's
+                          ;; error body through anthropic-error (http-status
+                          ;; when present) and terminate the stream; the
+                          ;; outer done? guard (review 46) makes every
+                          ;; subsequent event a no-op.
+                          (let [err (anthropic-error/error-from-response-data
+                                     {:status           (or (get-in event-data [:error :http_status])
+                                                            (:http_status event-data))
+                                      :body-text        (json/generate-string event-data)
+                                      :fallback-message "Anthropic stream error"})]
+                            (reset! done? true)
+                            (consume-fn err))
+
+                          "message_delta"
+                          ;; Review 44: the terminal :done emission is guarded
+                          ;; on done? like the message_stop branch — a trailing
+                          ;; message_delta carrying delta.stop_reason after a
+                          ;; mid-stream SSE error must NOT emit a second
+                          ;; terminal :done (verified: events were
+                          ;; [:start :error :done] for error → message_delta
+                          ;; stop_reason end_turn). Usage accumulation and the
+                          ;; structured-output-result emissions stay inside the
+                          ;; guard with the :done so a post-error message_delta
+                          ;; is a full no-op. (Redundant with the outer
+                          ;; review-46 guard but kept for branch-local clarity.)
                           (when-not @done?
-                            (reset! done? true)
-                            (consume-fn err)))
+                            (update-output-usage! usage-acc (:usage event-data))
+                            (when-let [reason (get-in event-data [:delta :stop_reason])]
+                              (reset! done? true)
+                              (anthropic-structured-output/maybe-emit-json-schema-output-result!
+                               consume-fn
+                               structured-result-emitted?
+                               strategy
+                               @json-schema-output-buffer)
+                              (anthropic-structured-output/maybe-emit-prompted-json-result!
+                               consume-fn
+                               structured-result-emitted?
+                               strategy
+                               @prompted-json-buffer)
+                              (consume-fn {:type   :done
+                                           :reason (keyword reason)
+                                           :usage  (usage-with-cost model usage-acc)})))
 
-                        "message_delta"
-                        ;; Review 44: the terminal :done emission is guarded
-                        ;; on done? like the message_stop branch — a trailing
-                        ;; message_delta carrying delta.stop_reason after a
-                        ;; mid-stream SSE error must NOT emit a second
-                        ;; terminal :done (verified: events were
-                        ;; [:start :error :done] for error → message_delta
-                        ;; stop_reason end_turn). Usage accumulation and the
-                        ;; structured-output-result emissions stay inside the
-                        ;; guard with the :done so a post-error message_delta
-                        ;; is a full no-op.
-                        (when-not @done?
-                          (update-output-usage! usage-acc (:usage event-data))
-                          (when-let [reason (get-in event-data [:delta :stop_reason])]
-                            (reset! done? true)
+                          "message_stop"
+                          ;; The terminal :done. done? is set here too
+                          ;; (review 46) so a malformed event AFTER a normal
+                          ;; message_stop — or a cleanup exception — is also a
+                          ;; full no-op: the guarantee is "no further event at
+                          ;; all once done", not just "no second terminal".
+                          (do
                             (anthropic-structured-output/maybe-emit-json-schema-output-result!
                              consume-fn
                              structured-result-emitted?
@@ -607,25 +640,10 @@
                              structured-result-emitted?
                              strategy
                              @prompted-json-buffer)
-                            (consume-fn {:type   :done
-                                         :reason (keyword reason)
-                                         :usage  (usage-with-cost model usage-acc)})))
+                            (consume-fn {:type :done :reason :stop})
+                            (reset! done? true))
 
-                        "message_stop"
-                        (when-not @done?
-                          (anthropic-structured-output/maybe-emit-json-schema-output-result!
-                           consume-fn
-                           structured-result-emitted?
-                           strategy
-                           @json-schema-output-buffer)
-                          (anthropic-structured-output/maybe-emit-prompted-json-result!
-                           consume-fn
-                           structured-result-emitted?
-                           strategy
-                           @prompted-json-buffer)
-                          (consume-fn {:type :done :reason :stop}))
-
-                        nil)))))]
+                          nil))))))]
         (let [response (stream-response url request)
               status   (:status response)]
           (cond

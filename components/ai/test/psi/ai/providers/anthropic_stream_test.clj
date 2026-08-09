@@ -607,6 +607,43 @@
       (is (not-any? #(= :done (:type %)) @events)
           "no :done — the :error event is terminal"))))
 
+(deftest stream-anthropic-error-then-content-block-stop-no-text-end-test
+  (testing "a trailing content_block_stop after a mid-stream SSE error does not emit :text-end"
+    ;; Review 46: the review-43/44 done? guard covered only the TERMINAL
+    ;; branches (:done/:error emissions). The NON-terminal branches still
+    ;; fired after the stream had terminated with an :error — a trailing
+    ;; content_block_stop after the SSE error event emitted :text-end
+    ;; (verified: events = [:start :text-start :text-delta :error :text-end]),
+    ;; and a trailing structured-tool content_block_stop could fire
+    ;; maybe-emit-structured-result! post-error. The whole SSE dispatch is
+    ;; now short-circuited on done?, so a post-error trailing event is a
+    ;; full no-op.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "content_block_start"
+                                {:type "content_block_start" :index 0
+                                 :content_block {:type "text"}})
+                      (sse-line "content_block_delta"
+                                {:type "content_block_delta" :index 0
+                                 :delta {:type "text_delta" :text "Hello"}})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :http_status 529}})
+                      (sse-line "content_block_stop"
+                                {:type "content_block_stop" :index 0}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :text-start :text-delta :error] (mapv :type @events))
+          "no :text-end after the :error — the trailing content_block_stop is a full no-op once done")
+      (is (not-any? #(= :text-end (:type %)) @events)
+          "no :text-end at all — the block was never closed after the error"))))
+
 (deftest usage-captured-from-sse-events-test
   (testing "usage tokens are read from message_start and message_delta SSE events"
     (let [model (models/get-model :sonnet-4.6)

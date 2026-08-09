@@ -3845,7 +3845,7 @@
 
 ## Follow-ups (implementation review 46, 2026-08-09)
 
-- [ ] The review-43/44 mid-stream-error terminal-event guard is incomplete:
+- [x] The review-43/44 mid-stream-error terminal-event guard is incomplete:
       only the TERMINAL emissions (anthropic `message_delta`/`message_stop`
       `:done`, both transports' stream catch blocks' `:error`,
       `emit-chat-error!`'s own emission) are guarded on `done?` — the
@@ -3893,3 +3893,28 @@
       `spec/openai-provider.allium` (`OnceDoneNoFurtherTerminalEvent` covers
       only terminal events — extend to "no further event at all once done" or
       add a rule), and tighten the CHANGELOG wording to the exact guarantee.
+      → RESOLVED (2026-08-09): the whole SSE dispatch is now short-circuited
+      on `done?` on all three transports — `stream-anthropic`'s event `case`
+      is wrapped in `when-not @done?` (and `done?` is set on the `message_stop`
+      terminal too), `process-chat-sse-line!` and `handle-codex-event!` each
+      short-circuit at their top — so a post-error trailing event is a full
+      no-op on every branch, terminal or not. Three new stream tests lock the
+      behavior (`stream-anthropic-error-then-content-block-stop-no-text-end-test`,
+      `completions-sse-error-then-trailing-choices-chunk-no-text-delta-test`,
+      `codex-error-then-trailing-output-text-delta-no-text-delta-test`), all
+      three verified to FAIL against the pre-fix code and PASS with the fix.
+      Specs extended: `OnceDoneNoFurtherTerminalEvent` → `OnceDoneNoFurtherEvent`
+      ("no further `Emit(StreamEvent)` once `stream.done`") in both
+      `spec/anthropic-provider.allium` and `spec/openai-provider.allium`, with
+      `requires: not stream.done` added to the non-terminal dispatch rules
+      (`MessageStartEmitsStartEvent`,
+      `AnthropicThinkingStreamingIncludesSignatureMaterial`,
+      `ContentBlockStopEmitsTypedEndEvent`,
+      `CompletionsChunksNormalizeToExecutorEvents`,
+      `CodexEventsNormalizeToExecutorEvents`). CHANGELOG `Fixed` wording
+      tightened to the exact guarantee ("once the stream has terminated, no
+      further event of any kind is emitted"); design.md revision note +
+      AC updated. Full `bb test` green (2596 tests / 19492 assertions /
+      0 failures); clj-kondo clean (0 errors, 0 warnings); cljfmt clean;
+      `bb commit-check:file-lengths` passes (all touched files under 800
+      lines).
