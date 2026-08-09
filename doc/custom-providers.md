@@ -229,8 +229,20 @@ same way but set `:api` to `:anthropic-messages`.
                :supports-reasoning true
                :supports-text      true
                :context-window     200000
-               :max-tokens         8192}]}}}
+               :max-tokens         8192
+               :locality           :cloud
+               :latency-tier       :low
+               :cost-tier          :low}]}}}
 ```
+
+`:locality :cloud` is set explicitly (with `:latency-tier`/`:cost-tier`):
+custom models default to `:locality :local`, `:latency-tier :low`,
+`:cost-tier :zero` when omitted (see "What a provider definition contains"),
+and psi's local-only helper paths treat a `:locality :local` model as a
+candidate for local helper duty — a hosted proxy with defaulted locality can
+be selected for (and charged as) a "local" helper. `example.com` is a
+placeholder: pick tier values that describe your proxy's actual latency and
+pricing (the values shown mirror the DeepSeek example's shape).
 
 For Anthropic-compatible providers, psi uses the Anthropic transport and will
 send the configured key through the compatible auth path.
@@ -498,10 +510,16 @@ inherits the same environment-driven outbound proxy behavior documented in
 The `:auth` map supports more than just an API key:
 
 ```clojure
-{:auth {:api-key "env:LOCAL_LLM_KEY"
-        :auth-header? false
+{:auth {:auth-header? false
         :headers {"X-Client" "psi"}}}
 ```
+
+With `:auth-header? false`, psi never resolves or sends a configured
+`:api-key` (the `:auth-header?` gate skips it entirely, so the request is
+keyless even if the spec resolves) — omit the key in this configuration; it
+would be a dead key that reads as `:configured? true` in the model picker
+while every request is silently keyless. Use `:api-key` only with the default
+auth-header path (or a custom `:headers` auth header as described below).
 
 Use cases:
 - `:api-key` — literal key or `"env:VAR_NAME"` (env: keys are re-read on

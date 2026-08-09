@@ -1627,3 +1627,30 @@
   `bb commit-check:file-lengths` passes. Smoke-test step remains unchecked +
   BLOCKED (no DEEPSEEK_API_KEY in env).
 - Review 34 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 34 addressed (2026-08-08)
+
+- addressed 2 review steps (review-34; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Anthropic-compatible example locality fixed: doc/custom-providers.md's
+  `proxy-sonnet` model map (the direct template the DeepSeek section points
+  at) now sets `:locality :cloud` + explicit `:latency-tier :low` /
+  `:cost-tier :low` (matching the DeepSeek example shape) — no more fallback
+  to the `:local` default that would make a hosted proxy a local-helper
+  candidate. Added a pointer note: custom models default to
+  `:locality :local` when omitted (see "What a provider definition
+  contains"), `example.com` is a placeholder, and tier values should
+  describe the proxy's actual latency/pricing.
+- Dead-key flagship example fixed: the "Local servers and custom headers"
+  example no longer configures `:api-key "env:LOCAL_LLM_KEY"` alongside
+  `:auth-header? false` (a key that is never resolved or sent — all three
+  transports go keyless and `:configured?` still reports true, masking the
+  dead key). The key is dropped, and a new paragraph states psi never
+  resolves/sends a configured `:api-key` with `:auth-header? false` — use
+  `:api-key` only with the default auth-header path or custom `:headers`
+  auth, consistent with the section's "Pick one auth mechanism per
+  provider" guidance.
+- Verification: docs-only change; `psi.ai.user-models-test` 17/120 green
+  (the doc parse-lock reads only the DeepSeek section, unaffected). Review-1
+  optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not set in
+  environment; request-shaping coverage only by design.

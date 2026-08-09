@@ -2815,7 +2815,7 @@
 
 ## Follow-ups (implementation review 34, 2026-08-08)
 
-- [ ] The "Anthropic-compatible example" (`proxy-sonnet`, doc/custom-providers.md)
+- [x] The "Anthropic-compatible example" (`proxy-sonnet`, doc/custom-providers.md)
       still has the defaulted-locality problem review 33 fixed for MiniMax:
       the model map (`:base-url "https://example.com/anthropic"`, no
       `:locality`/`:latency-tier`/`:cost-tier`) falls through to
@@ -2835,7 +2835,14 @@
       "What a provider definition contains". Docs only, in scope; no
       parse-lock impact (`parse-documented-deepseek-example-test` reads
       only the DeepSeek section).
-- [ ] The "Local servers and custom headers" flagship example
+      → Resolved: `:locality :cloud` + explicit `:latency-tier :low` /
+      `:cost-tier :low` added to the `proxy-sonnet` model map (matching the
+      DeepSeek example shape), plus a pointer note stating custom models
+      default to `:locality :local` when omitted (local-helper eligibility),
+      that `example.com` is a placeholder, and to pick tier values
+      describing the proxy's actual latency/pricing. Docs only; no
+      parse-lock impact (`psi.ai.user-models-test` 17/120 green).
+- [x] The "Local servers and custom headers" flagship example
       (`{:auth {:api-key "env:LOCAL_LLM_KEY" :auth-header? false
       :headers {"X-Client" "psi"}}}`) configures an api-key that is NEVER
       resolved or sent: with `:auth-header? false`,
@@ -2854,3 +2861,10 @@
       sentence stating the configured key is never sent when
       `:auth-header? false` (omit it; use it only with the default
       auth-header path or custom `:headers` auth).
+      → Resolved: `:api-key "env:LOCAL_LLM_KEY"` dropped from the flagship
+      example (now `{:auth {:auth-header? false :headers {"X-Client"
+      "psi"}}}`) and a new paragraph states psi never resolves/sends a
+      configured `:api-key` with `:auth-header? false` (dead key that still
+      reads `:configured? true` while requests are keyless) — use `:api-key`
+      only with the default auth-header path or custom `:headers` auth.
+      Docs only; no parse-lock impact.
