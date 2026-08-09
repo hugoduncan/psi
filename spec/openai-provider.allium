@@ -83,6 +83,7 @@ value StreamEvent {
     usage: StreamUsage?
     error_message: String?
     http_status: Integer?
+    headers: Map<String, String>?          -- review 51: error events keep response headers (request-id etc.) for diagnostics
 }
 
 value ProviderRequest {
@@ -760,6 +761,15 @@ rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
         -- stream-read exception thrown after this error chunk has terminated
         -- the stream cannot emit a second :error — see the
         -- OnceDoneNoFurtherEvent invariant below.
+        -- Review 51: the status extraction ALSO reads the TOP-LEVEL
+        -- :http_status key (emit-chat-error!'s `some` locations now include
+        -- (:http_status chunk)) — the review-47-aligned anthropic "error"
+        -- branch reads that location too, so an OpenAI-compatible endpoint
+        -- emitting the status under a top-level http_status key
+        -- ({"http_status": 529, "error": {...}}) keeps its numeric
+        -- :http-status on the :error event and downstream retry-error? /
+        -- provider-error-kind classify a transient 5xx/overload as
+        -- retryable instead of :unknown.
 }
 
 rule OnceDoneNoFurtherEvent {
@@ -927,6 +937,22 @@ rule StreamErrorsNormalized {
         error_message: ErrorMessageWithStatusAndRequestId(error),
         http_status: HttpStatusOrNull(error)
     })
+    ensures: ProviderErrorHeadersPreserved(error)
+
+    @guidance
+        -- Review 51: ProviderErrorHeadersPreserved — the HTTP-error branch
+        -- surfaces the FULL error map from response->error (headers,
+        -- body-text, body), not just error-message + http-status. The codex
+        -- transport previously destructured AWAY :headers/:body-text/:body
+        -- (emit-codex-error!'s 4-arity accepts headers — used by the SSE
+        -- response.failed / error branches — but the HTTP-error branch
+        -- called the 3-arity), so a codex HTTP error (401/429/500 from the
+        -- ChatGPT backend or a custom codex endpoint) surfaced an :error
+        -- with no request-id-style headers for diagnostics while the
+        -- anthropic and openai chat-completions paths kept them. The branch
+        -- now passes the full error map through, mirroring the sibling
+        -- transports (and the codex SSE path's ProviderErrorHeadersPreserved
+        -- in CodexStreamFailurePreservesRetryMetadata).
 }
 
 rule CodexStreamFailurePreservesRetryMetadata {
@@ -939,6 +965,15 @@ rule CodexStreamFailurePreservesRetryMetadata {
         http_status: HttpStatusOrNull(event)
     })
     ensures: ProviderErrorHeadersPreserved(event)
+
+    @guidance
+        -- Review 51: the codex HTTP-error path (ProviderRequestFailed, see
+        -- StreamErrorsNormalized) now also preserves response headers —
+        -- previously the only transport whose HTTP-error branch lost
+        -- request-id-style headers (the destructure dropped :headers even
+        -- though emit-codex-error!'s 4-arity accepts them, used by this
+        -- SSE path). Both codex error paths are now header-preserving,
+        -- mirroring the anthropic and openai chat-completions transports.
 }
 
 rule OpenAITransportCloseEmitsDoneIfNotTerminal {

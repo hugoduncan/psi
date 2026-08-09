@@ -56,6 +56,21 @@
          :content-index idx
          :delta         text}))
 
+    ;; Review 50: explicit branch — the redacted_thinking_delta skip must not
+    ;; depend on the delta's current shape. Before this branch the type fell
+    ;; through to the default text branch and returned nil only because
+    ;; redacted_thinking_delta currently carries no :text key (it carries
+    ;; :data) — if Anthropic ever sends a redacted_thinking_delta with a
+    ;; :text key (or renames the payload field), the block would emit a
+    ;; :text-delta with no :text-start: a phantom text delta for a block
+    ;; whose start/stop are skipped (content-block-start-event /
+    ;; content-block-stop-event), leaving unbalanced block events (the
+    ;; accumulator's note-content-delta! would open a block at an unbegun
+    ;; index while start/stop stay nil). Explicit nil makes the skip
+    ;; symmetric with start/stop and shape-independent.
+    "redacted_thinking"
+    nil
+
     (when-let [text (:text delta)]
       {:type          :text-delta
        :content-index idx

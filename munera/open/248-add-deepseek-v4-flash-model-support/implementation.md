@@ -2292,3 +2292,46 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 
 - Review 50 (2026-08-09): added 2 steps to be addressed.
 - Review 51 (2026-08-09): added 3 steps to be addressed.
+
+## Follow-ups review 50 + 51 addressed (2026-08-09)
+
+- addressed 2 review-50 steps + verified 3 review-51 steps end-to-end
+- Review 50 (this pass): `stream-anthropic` now tracks `started?` (atom +
+  `emit-start!` compare-and-set) and emits `:start` once before the terminal
+  when the stream never received `message_start` — `emit-terminal-done!`
+  (message_stop + review-48 EOF flush) and the `"error"` SSE branch both call
+  it after the done? reset, so an empty/truncated body or a malformed stream
+  starting with `message_stop`/`"error"` yields `[:start :done]`/`[:start
+  :error]` like the openai/codex siblings (the last three-transport asymmetry
+  in the review-48 EOF flush). `content-block-delta-event` gained an explicit
+  `"redacted_thinking"` branch returning nil (the skip was previously
+  implicit — the type fell through to the default text branch and returned
+  nil only because the delta carries no `:text`; a future delta with `:text`
+  would have leaked a phantom `:text-delta`). Two new stream tests
+  (`stream-anthropic-eof-flush-no-message-start-emits-start-then-done-test`,
+  `stream-anthropic-error-without-message-start-emits-start-then-error-test`)
+  + the redacted-thinking test extended with a `:text`-carrying delta — all
+  verified FAIL pre-fix / PASS post-fix. `spec/anthropic-provider.allium`
+  guidance + CHANGELOG `Fixed` entries + design.md revision note/AC updated.
+- Review 51 (concurrent working-tree changes verified end-to-end here):
+  turn-statechart `:idle` gains `:turn/error`/`:turn/done` terminal
+  transitions (+ `terminal-from-idle-test`); `emit-chat-error!` status
+  extraction adds top-level `:http_status` (+
+  `completions-sse-error-top-level-http-status-kept-test`, moved to
+  `openai_completions_stream_test.clj` for the 800-line gate — the
+  completions file sits at 781); codex HTTP-error branch passes the full
+  error map (headers) through to `emit-codex-error!` (+
+  `codex-http-error-surfaces-response-headers-test`). openai spec rules +
+  CHANGELOG `Fixed` entries + design.md revision note/AC updated by that
+  pass; verified here (namespaces green, file-length gate passes).
+- Verification (state being closed): full `bb test` green — 2609 tests /
+  19557 assertions / 0 failures (assertion count varies run-to-run per the
+  review-5 flake analysis); `psi.ai.providers.anthropic-stream-termination-test`
+  5/22, `psi.ai.providers.anthropic-stream-test` 14/99,
+  `psi.ai.providers.anthropic-test` 16/103,
+  `psi.ai.providers.openai-completions-stream-test` 4/13,
+  `psi.ai.providers.openai-completions-test` 17/75,
+  `psi.ai.providers.openai-codex-test` 10/36,
+  `psi.turn-statechart.core-test` 15/75 green; clj-kondo clean (0 errors,
+  0 warnings) on all changed source + test files;
+  `bb commit-check:file-lengths` passes (exit 0).

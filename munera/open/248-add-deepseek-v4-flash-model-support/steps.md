@@ -4214,7 +4214,7 @@
 
 ## Follow-ups (implementation review 50, 2026-08-09)
 
-- [ ] `stream-anthropic`'s terminal emitters never emit a `:start` event
+- [x] `stream-anthropic`'s terminal emitters never emit a `:start` event
       when the stream never received `message_start` — the only
       three-transport asymmetry left in the review-48 EOF-level flush.
       `:start` is emitted only inside the `message_start` case branch, and
@@ -4245,7 +4245,28 @@
       EOFs with no `message_start` (empty body) asserting the emitted event
       sequence (and the same for the `"error"`-without-`message_start`
       case).
-- [ ] The review-48 `"redacted_thinking"` skip is explicit in
+      → Resolved (started?-tracking option, mirroring the siblings):
+      `stream-anthropic` now tracks `started?` (atom alongside `done?`, set
+      via a `compare-and-set!` in a new `emit-start!` helper) and emits
+      `:start` once before the terminal when the stream never received
+      `message_start` — `emit-terminal-done!` (shared by the `message_stop`
+      branch and the review-48 EOF flush) and the `"error"` SSE branch both
+      call `emit-start!` after the `done?` reset, mirroring
+      `emit-chat-completion-finish!`'s ordering — so a 200 whose body EOFs
+      before `message_start` (empty/truncated body, or a malformed stream
+      starting with `message_stop`/`"error"`) now yields
+      `[:start :done]`/`[:start :error]` like the openai/codex siblings
+      instead of `[:done]`/`[:error]`: the last three-transport asymmetry in
+      the review-48 EOF-level flush. Two new stream tests
+      (`stream-anthropic-eof-flush-no-message-start-emits-start-then-done-test`
+      — empty-body AND message_stop-first blocks — and
+      `stream-anthropic-error-without-message-start-emits-start-then-error-test`)
+      assert the emitted sequences; both verified to FAIL against the
+      pre-fix code (events were `[:done]`/`[:error]`) and PASS with the fix.
+      `MessageStartEmitsStartEvent` + the terminal/error rule guidance in
+      `spec/anthropic-provider.allium` updated; CHANGELOG `Fixed` entry;
+      design.md revision note + AC updated.
+- [x] The review-48 `"redacted_thinking"` skip is explicit in
       `content-block-start-event`/`content-block-stop-event` (dedicated
       `"redacted_thinking"` branches returning nil, guarded by
       `consume-event!`) but IMPLICIT in `content-block-delta-event`:
@@ -4269,10 +4290,27 @@
       extend `redacted-thinking-block-not-mislabeled-as-text-test` with a
       `redacted_thinking_delta` carrying a `:text` key to prove the
       explicit skip.
+      → Resolved: `content-block-delta-event` (`stream_events.clj`) now has
+      an explicit `"redacted_thinking"` branch returning nil, mirroring the
+      start/stop branches — the skip is symmetric and shape-independent
+      (previously the type fell through to the default text branch and
+      returned nil only because `redacted_thinking_delta` carries no
+      `:text`; a future delta with a `:text` key would have emitted a
+      phantom `:text-delta` for a block whose start/stop are skipped,
+      opening an unbalanced block in the accumulator's `note-content-delta!`
+      at an unbegun index). `redacted-thinking-block-not-mislabeled-as-text-test`
+      extended with a `redacted_thinking_delta` carrying a `:text` key
+      (`"should-not-leak"`) proving no `:text-delta` — verified to FAIL
+      against the pre-fix fall-through (the `:text` key leaked a
+      `:text-delta`, failing the existing "no :text-delta" assertion) and
+      PASS with the explicit branch. `ContentBlockStopEmitsTypedEndEvent`
+      guidance in `spec/anthropic-provider.allium` updated (the delta skip
+      is now the explicit branch, not the shape dependency);
+      `stream_events.clj` docstring updated.
 
 ## Follow-ups (implementation review 51, 2026-08-09)
 
-- [ ] Turn statechart has NO terminal transitions from its initial `:idle`
+- [x] Turn statechart has NO terminal transitions from its initial `:idle`
       state — `components/turn-statechart/src/psi/turn_statechart/chart.clj`'s
       `:idle` accepts only `:turn/start`; `:turn/error` and `:turn/done` are
       silently DROPPED there (verified live 2026-08-09 via
@@ -4300,7 +4338,18 @@
       terminal events are accepted from ANY state; add a statechart unit
       test sending `:turn/error`/`:turn/done` from the initial state and
       asserting the terminal phase + `done-p` delivery.
-- [ ] `emit-chat-error!` (openai chat-completions) http-status extraction
+      → Resolved: `chart.clj`'s `:idle` state now carries `:turn/done` →
+      `:done` and `:turn/error` → `:error` transitions (with the same
+      `:on-done`/`:on-error` dispatch scripts as the accumulating states),
+      so terminal events are accepted from ANY state and the terminal phase
+      is always recorded. New `terminal-from-idle-test` in
+      `core_test.clj` sends `:turn/done`/`:turn/error` from the INITIAL
+      state and asserts the terminal phase (`:done`/`:error`) AND `done-p`
+      delivery (deref'd with a timeout) — both previously failed (silent
+      drop, phase stayed `:idle`, `done-p` never delivered). Full
+      turn-statechart suite green (15 tests / 75 assertions, was 13/69).
+      Design AC + CHANGELOG `Fixed` entry updated.
+- [x] `emit-chat-error!` (openai chat-completions) http-status extraction
       omits the top-level `:http_status` location the review-47-aligned
       anthropic `"error"` branch reads: `emit-chat-error!` checks
       `(:status chunk)` / `[:error :status]` / `[:error :http_status]`
@@ -4318,7 +4367,22 @@
       `some` locations in `emit-chat-error!` and a test with a top-level
       `http_status` on an error chunk asserting the `:error` event's
       `:http-status`.
-- [ ] `stream-openai-codex`'s HTTP-error path drops the response headers /
+      → Resolved: `emit-chat-error!`'s `some` locations now include
+      `(:http_status chunk)` (the fourth location the anthropic "error"
+      branch reads), so a mid-stream error chunk with the status under a
+      top-level `http_status` key keeps its numeric `:http-status` and
+      downstream `retry-error?`/`provider-error-kind` classify a transient
+      5xx/overload as retryable instead of `:unknown`. New
+      `completions-sse-error-top-level-http-status-kept-test` (moved to
+      `openai_completions_stream_test.clj` for the 800-line file-length
+      gate; `openai_completions_test.clj` was 817 lines with it in place)
+      streams `{"http_status": 529, "error": {...}}` and asserts the
+      `:error` event's `:http-status` is 529 (verified FAIL pre-fix:
+      `:http-status` nil, `(status ...)` suffix absent — classified
+      `:unknown`; PASS with the fix). `CompletionsSseErrorChunkEmitsErrorAndTerminates`
+      guidance in `spec/openai-provider.allium` updated; CHANGELOG `Fixed`
+      entry.
+- [x] `stream-openai-codex`'s HTTP-error path drops the response headers /
       body from the surfaced `:error` event — the only transport that does:
       `(let [{:keys [error-message http-status]} (transport/response->error
       response)] (emit-codex-error! ... error-message http-status))`
@@ -4338,3 +4402,21 @@
       `emit-codex-error!` on the HTTP-error branch (the 4-arity already
       supports it), and add a stream test asserting a codex HTTP-error
       response's headers appear on the `:error` event.
+      → Resolved: the HTTP-error branch now destructures
+      `{:keys [error-message http-status headers]}` from
+      `transport/response->error` and calls `emit-codex-error!`'s 4-arity
+      with `headers` — the full error map (headers/body-text/body) flows
+      through, so a codex HTTP error (401/429/500 from the ChatGPT backend
+      or a custom codex endpoint) keeps its `request-id`-style headers on
+      the `:error` event for diagnostics, mirroring the sibling transports
+      (and the codex SSE `response.failed`/`error` branches). New
+      `codex-http-error-surfaces-response-headers-test` in
+      `openai_codex_test.clj` streams a 429 with
+      `{"x-request-id" "req_oai_429" "retry-after" "5"}` and asserts both
+      headers appear on the `:error` event (verified FAIL pre-fix: no
+      `:headers` key, and the error message lacked the `[request-id ...]`
+      suffix; PASS with the fix — message now includes
+      `[request-id req_oai_429]`). `StreamErrorsNormalized` +
+      `CodexStreamFailurePreservesRetryMetadata` guidance and the
+      `StreamEvent.headers` field in `spec/openai-provider.allium` updated;
+      CHANGELOG `Fixed` entry.

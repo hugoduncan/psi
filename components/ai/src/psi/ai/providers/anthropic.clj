@@ -409,13 +409,36 @@
                            :output-tokens      0
                            :cache-read-tokens  0
                            :cache-write-tokens 0})
-        done?       (atom false)]
+        done?       (atom false)
+        ;; Review 50: started? tracks whether :start was emitted (message_start
+        ;; received). stream-anthropic previously had no started? tracking —
+        ;; :start was emitted only inside the message_start case branch, so
+        ;; emit-terminal-done! (message_stop / EOF flush) and the "error"
+        ;; branch emitted :done/:error with no preceding :start when the
+        ;; stream never received message_start — the only three-transport
+        ;; asymmetry left in the review-48 EOF-level flush (both sibling
+        ;; transports emit :start first when not started:
+        ;; emit-chat-completion-finish!'s stream-started? compare-and-set and
+        ;; the codex EOF flush's emit-codex-start!).
+        started?    (atom false)]
     (try
       (capture-request! model options url request)
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (letfn [(emit-terminal-done! []
+      (letfn [(emit-start! []
+                ;; Review 50: :start is emitted exactly once, before the
+                ;; terminal, when the stream never received message_start —
+                ;; mirroring emit-chat-completion-finish!'s stream-started?
+                ;; compare-and-set and the codex EOF flush's emit-codex-start!.
+                ;; Benign for the consumer (:start is a no-op handler; the
+                ;; turn statechart is already past :idle via the turn-level
+                ;; :turn/start) but removes the last cross-transport
+                ;; asymmetry in the terminal-emission class this task has
+                ;; repeatedly treated as actionable.
+                (when (compare-and-set! started? false true)
+                  (consume-fn {:type :start})))
+              (emit-terminal-done! []
                 ;; The terminal :done shared by the message_stop branch and
                 ;; the review-48 EOF-level flush (below): structured-output
                 ;; results for the completed buffers, then the :done with the
@@ -434,6 +457,11 @@
                 ;; eliminated on every other terminal path
                 ;; (OnceDoneNoFurtherEvent).
                 (reset! done? true)
+                ;; Review 50: emit :start first (when the stream never
+                ;; received message_start) — mirroring
+                ;; emit-chat-completion-finish!'s ordering (done? reset, then
+                ;; :start, then the terminal).
+                (emit-start!)
                 (anthropic-structured-output/maybe-emit-json-schema-output-result!
                  consume-fn
                  structured-result-emitted?
@@ -468,7 +496,7 @@
                           "message_start"
                           (do
                             (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
-                            (consume-fn {:type :start}))
+                            (emit-start!))
 
                           "content_block_start"
                           (let [idx   (:index event-data)
@@ -556,6 +584,11 @@
                                          :body-text        (json/generate-string event-data)
                                          :fallback-message "Anthropic stream error"})]
                             (reset! done? true)
+                            ;; Review 50: emit :start first when the stream
+                            ;; never received message_start (a malformed
+                            ;; stream whose first event is the error) —
+                            ;; mirroring the terminal emitters' ordering.
+                            (emit-start!)
                             (consume-fn err))
 
                           "message_delta"

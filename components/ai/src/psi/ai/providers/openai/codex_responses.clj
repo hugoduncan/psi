@@ -495,8 +495,19 @@
                                     :structured-output strategy}))
             response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
-          (let [{:keys [error-message http-status]} (transport/response->error response)]
-            (emit-codex-error! model stream-state consume-fn options url error-message http-status))
+          ;; Review 51: surface the FULL error map (headers/body-text), not
+          ;; just error-message + http-status. The previous destructure
+          ;; dropped :headers/:body-text/:body even though
+          ;; emit-codex-error!'s 4-arity accepts headers (used by the SSE
+          ;; response.failed / error branches) — the only transport whose
+          ;; HTTP-error path lost request-id-style headers for diagnostics
+          ;; (the anthropic and openai chat-completions HTTP-error paths
+          ;; surface the full error map via response->error). A codex HTTP
+          ;; error (401/429/500 from the ChatGPT backend or a custom codex
+          ;; endpoint) now keeps its headers on the :error event, mirroring
+          ;; the sibling transports.
+          (let [{:keys [error-message http-status headers]} (transport/response->error response)]
+            (emit-codex-error! model stream-state consume-fn options url error-message http-status headers))
           (do
             (with-open [reader (io/reader (:body response))]
               (doseq [line (line-seq reader)]

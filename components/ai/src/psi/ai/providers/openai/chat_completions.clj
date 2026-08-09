@@ -486,7 +486,17 @@
       (let [status (some (fn [s] (and (number? s) (>= s 400) s))
                          [(:status chunk)
                           (get-in chunk [:error :status])
-                          (get-in chunk [:error :http_status])])
+                          (get-in chunk [:error :http_status])
+                          ;; Review 51: top-level :http_status — the
+                          ;; review-47-aligned anthropic "error" branch reads
+                          ;; this location too, so an OpenAI-compatible
+                          ;; endpoint emitting the status under a TOP-LEVEL
+                          ;; http_status key ({"http_status": 529,
+                          ;; "error": {...}}) keeps its numeric :http-status
+                          ;; and downstream retry-error? /
+                          ;; provider-error-kind classify a transient
+                          ;; 5xx/overload as retryable instead of :unknown.
+                          (:http_status chunk)])
             err    (transport/response->error {:status  status
                                                :headers nil
                                                :body    (json/generate-string chunk)})]

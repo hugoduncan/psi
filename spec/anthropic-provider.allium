@@ -768,6 +768,22 @@ rule MessageStartEmitsStartEvent {
         -- Review 46: requires not stream.done — the whole SSE dispatch is
         -- short-circuited once the stream has terminated, so a post-error
         -- trailing event is a full no-op (not just the terminal branches).
+        -- Review 50: the implementation emits :start via a started?
+        -- compare-and-set (started? tracked alongside done?) — exactly once,
+        -- and the TERMINAL emitters (emit-terminal-done! — shared by
+        -- MessageStopEmitsDoneWithUsage and
+        -- AnthropicTransportCloseEmitsDoneIfNotTerminal — and the "error"
+        -- branch, SseErrorEventEmitsErrorAndTerminates) also emit :start
+        -- first when the stream never received message_start, mirroring the
+        -- sibling transports (emit-chat-completion-finish!'s
+        -- stream-started? compare-and-set and the codex EOF flush's
+        -- emit-codex-start!). So a stream that EOFs before message_start
+        -- (empty/truncated body) or a malformed stream starting with
+        -- message_stop/"error" yields [:start :done] / [:start :error]
+        -- instead of [:done] / [:error] — the last three-transport
+        -- asymmetry in the review-48 EOF-level flush. Benign for the
+        -- consumer (:start is a no-op handler; the turn statechart is
+        -- already past :idle via the turn-level :turn/start).
 }
 
 rule AnthropicThinkingStreamingIncludesSignatureMaterial {
@@ -824,6 +840,16 @@ rule ContentBlockStopEmitsTypedEndEvent {
         -- table explicitly does not support redacted-thinking blocks) — this
         -- completes the review-43 typing change for the built-in Anthropic
         -- path.
+        -- Review 50: the delta skip is now an EXPLICIT "redacted_thinking"
+        -- branch in content-block-delta-event (returns nil, mirroring the
+        -- start/stop branches), not the implicit fall-through to the default
+        -- text branch that returned nil only because the delta carried no
+        -- :text — the skip is shape-independent: a future
+        -- redacted_thinking_delta with a :text key (or a renamed payload
+        -- field) still emits no :text-delta (no phantom text delta for a
+        -- block whose start/stop are skipped; no unbalanced block events —
+        -- the accumulator's note-content-delta! cannot open a block at an
+        -- unbegun index while start/stop stay nil).
 }
 
 rule SseErrorEventEmitsErrorAndTerminates {
@@ -867,6 +893,11 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- below. The codex transport already handled "error" SSE events
         -- (in-repo precedent); the :openai-completions transport received
         -- the same class fix (review 43 decision).
+        -- Review 50: the branch also emits :start first when the stream
+        -- never received message_start (started? tracking — see
+        -- MessageStartEmitsStartEvent), so a malformed stream whose FIRST
+        -- event is the error yields [:start :error] instead of [:error],
+        -- mirroring the terminal emitters.
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
@@ -941,6 +972,11 @@ rule MessageStopEmitsDoneWithUsage {
         -- the :done consume-fn) therefore cannot propagate to the stream's
         -- outer catch with done? still false and emit a SECOND :error
         -- terminal (see OnceDoneNoFurtherEvent).
+        -- Review 50: emit-terminal-done! also emits :start first when the
+        -- stream never received message_start (started? tracking — see
+        -- MessageStartEmitsStartEvent), so a malformed stream starting with
+        -- message_stop (no message_start) yields [:start :done] instead of
+        -- [:done].
 }
 
 rule AnthropicTransportCloseEmitsDoneIfNotTerminal {
@@ -968,6 +1004,11 @@ rule AnthropicTransportCloseEmitsDoneIfNotTerminal {
         -- MessageStopEmitsDoneWithUsage guidance). When an in-band terminal
         -- already fired, stream.done is true and this rule does not apply
         -- (OnceDoneNoFurtherEvent).
+        -- Review 50: the flush also emits :start first when the stream never
+        -- received message_start (started? tracking — see
+        -- MessageStartEmitsStartEvent), so an empty/truncated body that EOFs
+        -- before message_start yields [:start :done] instead of [:done],
+        -- mirroring the sibling transports' EOF flushes.
 }
 
 rule OnceDoneNoFurtherEvent {

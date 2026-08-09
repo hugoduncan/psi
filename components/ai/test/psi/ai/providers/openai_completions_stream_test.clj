@@ -1,10 +1,11 @@
 (ns psi.ai.providers.openai-completions-stream-test
-  "Review-48 stream follow-ups for the :openai-completions transport: the
+  "Review-48/51 stream follow-ups for the :openai-completions transport: the
   EOF-level terminal flush (finish_reason-chunk-then-EOF and
   [DONE]-without-finish_reason both terminate with exactly one :done instead
-  of hanging) and the zero-usage :done semantics for endpoints that omit the
-  usage chunk. Split out of openai_test.clj / openai_completions_test.clj to
-  stay under the 800-line file-length gate."
+  of hanging), the zero-usage :done semantics for endpoints that omit the
+  usage chunk, and the review-51 top-level http_status extraction on
+  mid-stream error chunks. Split out of openai_test.clj /
+  openai_completions_test.clj to stay under the 800-line file-length gate."
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
@@ -101,3 +102,32 @@
           "no :usage key on the :done — zero usage/cost recorded for a usage-omitting endpoint")
       (is (= :stop (:reason done))
           "the pending finish_reason is flushed"))))
+
+(deftest completions-sse-error-top-level-http-status-kept-test
+  (testing "a mid-stream error chunk with a TOP-LEVEL http_status keeps its numeric :http-status"
+    ;; Review 51: emit-chat-error! checked (:status chunk) /
+    ;; [:error :status] / [:error :http_status] only — the review-47-aligned
+    ;; anthropic "error" branch reads those three PLUS top-level
+    ;; (:http_status event-data), so an OpenAI-compatible endpoint emitting
+    ;; the status under a top-level http_status key
+    ;; ({"http_status": 529, "error": {...}}) lost its status on
+    ;; :openai-completions: the :error event carried no numeric
+    ;; :http-status, downstream retry-error? / provider-error-kind classified
+    ;; a transient 5xx/overload as :unknown and it was not auto-retried.
+    ;; The extraction now includes the top-level location, mirroring the
+    ;; anthropic branch. (Moved here from openai_completions_test.clj for
+    ;; the 800-line file-length gate.)
+    (let [events (run-stream (str
+                              "data: " (json/generate-string
+                                        {:http_status 529
+                                         :error {:message "The server had an error while processing your request."
+                                                 :type "server_error"}}) "\n\n"))
+          err    (first (filter #(= :error (:type %)) events))]
+      (is (some? err) "SSE error chunk must surface as an :error event")
+      (is (= 529 (:http-status err))
+          "top-level http_status 529 is kept on the :error event (retryable class)")
+      (is (= "The server had an error while processing your request. (status 529)"
+             (:error-message err))
+          "error message extracted from the chunk's error body (with status suffix)")
+      (is (not-any? #(= :done (:type %)) events)
+          "no :done after a mid-stream error — the :error event terminates the turn"))))

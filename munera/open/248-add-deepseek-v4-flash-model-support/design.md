@@ -265,6 +265,55 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   downstream exception during the terminal processing cannot propagate to
   the outer catch with `done?` still false and emit a second `:error`
   (the double-terminal class eliminated on every other terminal path).
+- **`:start`-before-terminal emission + explicit redacted_thinking delta
+  skip (review 50):** two `stream-anthropic` / `stream_events.clj`
+  follow-up fixes. (a) `stream-anthropic` now tracks `started?` and emits
+  `:start` once before the terminal when the stream never received
+  `message_start` — `emit-terminal-done!` (shared by the `message_stop`
+  branch and the review-48 EOF flush) and the `"error"` SSE branch emit
+  `:start` first when not started, mirroring the sibling transports'
+  `emit-chat-completion-finish!`/`emit-codex-start!` — so an empty/truncated
+  body that EOFs before `message_start` or a malformed stream starting with
+  `message_stop`/`"error"` yields `[:start :done]`/`[:start :error]`
+  instead of `[:done]`/`[:error]`: the last three-transport asymmetry in
+  the review-48 EOF-level flush (benign for the consumer — `:start` is a
+  no-op handler — but a real cross-transport inconsistency in the exact
+  class this task has repeatedly treated as actionable). (b) the
+  `"redacted_thinking"` skip in `content-block-delta-event` is now an
+  explicit branch returning nil (mirroring the start/stop branches) instead
+  of the implicit fall-through that returned nil only because
+  `redacted_thinking_delta` carries no `:text` — the delta skip is
+  shape-independent, so a future delta with a `:text` key (or a renamed
+  payload field) still emits no phantom `:text-delta` for a block whose
+  start/stop are skipped.
+- **Terminal events from the turn statechart's initial state + two openai
+  error-surface alignments (review 51):** three follow-up fixes. (a) the
+  turn statechart's `:idle` state now accepts `:turn/error` → `:error` and
+  `:turn/done` → `:done` (mirroring the `:text-accumulating` /
+  `:tool-accumulating` terminal transitions) — `:idle` previously accepted
+  only `:turn/start`, so a direct `create-turn-context` consumer feeding a
+  provider `:error`/`:done` as the FIRST event got a silent drop, `done-p`
+  never delivered, and only the 20-minute `llm-stream-idle-timeout-ms`
+  ended the turn (whose own `:turn/error` send was dropped too). Not
+  reachable through the live-turn path (`create-live-turn-context` sends
+  the turn-level `:turn/start` first) but closes a latent structural gap
+  in the "exactly one terminal event per turn" invariant the
+  review-43/44/46/48 CHANGELOG entries claim. (b) `emit-chat-error!`
+  (`:openai-completions`) status extraction now also reads top-level
+  `:http_status` (the review-47-aligned anthropic `"error"` branch reads
+  that location too) — an OpenAI-compatible endpoint emitting a mid-stream
+  error chunk with the status under a top-level `http_status` key
+  (`{"http_status": 529, "error": {...}}`) keeps its numeric
+  `:http-status` and downstream `retry-error?`/`provider-error-kind`
+  classify a transient 5xx/overload as retryable instead of `:unknown`.
+  (c) `stream-openai-codex`'s HTTP-error branch now passes the FULL error
+  map (headers/body-text) through to `emit-codex-error!` (whose 4-arity
+  already accepts headers, used by the SSE `response.failed`/`error`
+  branches) instead of destructuring away `:headers` — a codex HTTP error
+  (401/429/500 from the ChatGPT backend or a custom codex endpoint) now
+  keeps its `request-id`-style headers on the `:error` event for
+  diagnostics, the cross-transport error-surface inconsistency in the
+  exact class this task's reviews 13/43/47 aligned.
 - **HTTP-400 compatibility retry OAuth decision (review 22):**
   `handle-400-response!`'s `:without-all-betas` selection now uses the
   transport's COMPUTED OAuth decision — `build-request` attaches the
@@ -461,9 +510,13 @@ independently confirms native JSON-Schema support can add
   the header content-sniff), mid-stream SSE error-event surfacing + the
   no-further-events-once-done guard on all three transports, `:thinking-end`
   labeling for thinking-block stops, the review-47 streamed-usage-on-the-
-  `message_stop`-terminal + SSE error `:status`-key extraction fixes, and
-  the review-48/49 EOF-level terminal flush + openai usage attachment +
-  redacted_thinking block typing + done?-first reset fixes);
+  `message_stop`-terminal + SSE error `:status`-key extraction fixes, the
+  review-48/49 EOF-level terminal flush + openai usage attachment +
+  redacted_thinking block typing + done?-first reset fixes, the review-50
+  `:start`-before-terminal emission + explicit redacted_thinking delta
+  skip, and the review-51 turn-statechart `:idle` terminal transitions +
+  openai top-level `http_status` extraction + codex HTTP-error header
+  preservation);
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

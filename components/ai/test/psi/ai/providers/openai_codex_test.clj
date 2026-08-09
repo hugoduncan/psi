@@ -210,6 +210,43 @@
            (:error-message (first @events))))
     (is (= 429 (:http-status (first @events))))))
 
+(deftest codex-http-error-surfaces-response-headers-test
+  (testing "a codex HTTP-error response keeps its headers on the :error event"
+    ;; Review 51: stream-openai-codex's HTTP-error branch destructured away
+    ;; :headers/:body-text/:body even though emit-codex-error!'s 4-arity
+    ;; accepts headers (used by the SSE response.failed / error branches) —
+    ;; the only transport whose HTTP-error path lost request-id-style headers
+    ;; for diagnostics (the anthropic and openai chat-completions paths
+    ;; surface the full error map via response->error). A codex HTTP error
+    ;; (401/429/500 from the ChatGPT backend or a custom codex endpoint) now
+    ;; keeps its headers on the :error event, mirroring the sibling
+    ;; transports.
+    (let [model  (models/get-model :gpt-5.3-codex)
+          token  (jwt-with-account-id "acc_test")
+          convo  (-> (conv/create "sys")
+                     (conv/add-user-message "hello"))
+          events (atom [])]
+      (with-redefs [http/post (fn [_url _req]
+                                {:status 429
+                                 :headers {"x-request-id" "req_oai_429"
+                                           "retry-after"  "5"}
+                                 :body (stream-body
+                                        (json/generate-string
+                                         {:error {:message "rate limit exceeded"}}))})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [ev] (swap! events conj ev))))
+      (is (= 1 (count @events)))
+      (is (= :error (:type (first @events))))
+      (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
+             (:error-message (first @events)))
+          "error message still surfaces (with the request-id header now)")
+      (is (= 429 (:http-status (first @events))))
+      (is (= "req_oai_429" (get-in (first @events) [:headers "x-request-id"]))
+          "x-request-id header is kept on the :error event for diagnostics")
+      (is (= "5" (get-in (first @events) [:headers "retry-after"]))
+          "retry-after header is kept on the :error event"))))
+
 (deftest codex-chatgpt-account-id-capture-masked-test
   ;; Review 21: mask-chatgpt-account-id (first 6 chars + "...",
   ;; request_support.clj) is wired into openai/transport.clj

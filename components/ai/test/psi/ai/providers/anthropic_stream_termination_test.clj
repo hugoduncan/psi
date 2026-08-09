@@ -72,6 +72,73 @@
         (is (not-any? #(= :error (:type %)) @events)
             "no :error — the EOF flush is a clean terminal, not an error")))))
 
+(deftest stream-anthropic-eof-flush-no-message-start-emits-start-then-done-test
+  (testing "a stream that EOFs before message_start emits :start then the terminal :done"
+    ;; Review 50: stream-anthropic's terminal emitters never emitted :start
+    ;; when the stream never received message_start — the only three-transport
+    ;; asymmetry left in the review-48 EOF-level flush. :start was emitted
+    ;; only inside the message_start case branch and stream-anthropic had no
+    ;; started? tracking, so emit-terminal-done! (message_stop + the EOF
+    ;; flush) emitted :done with no preceding :start; the sibling transports
+    ;; both emit :start first when not started (emit-chat-completion-finish!'s
+    ;; stream-started? compare-and-set and the codex EOF flush's
+    ;; emit-codex-start!). Reachable on any 200 whose body EOFs before
+    ;; message_start (empty/truncated body, or a malformed stream starting
+    ;; with message_stop): the anthropic path emitted [:done] while
+    ;; openai/codex emit [:start :done]. Benign today (the consumer's :start
+    ;; handler is a no-op and the turn statechart is already past :idle via
+    ;; the turn-level :turn/start) but a genuine cross-transport
+    ;; inconsistency. The transport now tracks started? and emits :start once
+    ;; before the terminal."
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])]
+      (testing "empty body — EOF with no SSE events at all"
+        (with-redefs [http/post (fn [_url _req]
+                                  {:body (stream-body "")})]
+          (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                      (fn [e] (swap! events conj e))))
+        (is (= [:start :done] (mapv :type @events))
+            "empty body (EOF before message_start) emits :start then the EOF-flush :done")
+        (is (= 1 (count (filterv #(= :done (:type %)) @events)))
+            "exactly one terminal :done"))
+      (testing "malformed stream starting with message_stop (no message_start)"
+        (reset! events [])
+        (let [sse (sse-line "message_stop" {:type "message_stop"})]
+          (with-redefs [http/post (fn [_url _req]
+                                    {:body (stream-body sse)})]
+            (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                        (fn [e] (swap! events conj e)))))
+        (is (= [:start :done] (mapv :type @events))
+            "message_stop-without-message_start emits :start then the terminal :done")
+        (is (= 1 (count (filterv #(= :done (:type %)) @events)))
+            "exactly one terminal :done")))))
+
+(deftest stream-anthropic-error-without-message-start-emits-start-then-error-test
+  (testing "a mid-stream error with no message_start emits :start then :error"
+    ;; Review 50: the "error" SSE branch emitted :error with no preceding
+    ;; :start when the stream never received message_start (a malformed
+    ;; stream whose first event is the error) — the same review-50 asymmetry
+    ;; as the terminal :done, on the error path. The branch now emits :start
+    ;; first (when not started), mirroring the terminal emitters and the
+    ;; sibling transports' error paths.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (sse-line "error"
+                           {:type "error"
+                            :error {:type "overloaded_error"
+                                    :message "Overloaded"
+                                    :http_status 529}})]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :error] (mapv :type @events))
+          "error-without-message_start emits :start then the :error terminal")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no :done — the :error is the terminal event"))))
+
 (deftest stream-anthropic-message-stop-done-consumer-exception-no-second-error-test
   (testing "a consume-fn exception on the message_stop :done does not emit a second :error terminal"
     ;; Review 49: the message_stop terminal :done reset done? AFTER the
@@ -146,7 +213,20 @@
                       (sse-line "content_block_delta"
                                 {:type "content_block_delta" :index 0
                                  :delta {:type "redacted_thinking_delta"
-                                         :data "cmVkYWN0ZWQ="}})
+                                         :data "cmVkYWN0ZWQ="
+                                         ;; Review 50: a :text key on a
+                                         ;; redacted_thinking_delta proves the
+                                         ;; explicit skip branch — before the
+                                         ;; explicit "redacted_thinking"
+                                         ;; branch, the delta fell through to
+                                         ;; the default text branch and
+                                         ;; returned nil only because the
+                                         ;; delta carried no :text; a future
+                                         ;; delta with :text would have
+                                         ;; emitted a phantom :text-delta for
+                                         ;; a block whose start/stop are
+                                         ;; skipped.
+                                         :text "should-not-leak"}})
                       (sse-line "content_block_stop"
                                 {:type "content_block_stop" :index 0})
                       (sse-line "message_stop" {:type "message_stop"}))]
