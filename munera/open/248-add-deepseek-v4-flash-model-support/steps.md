@@ -4007,3 +4007,93 @@
       extraction (numeric `>= 400`, the status-carrying/lost-status
       consequence). CHANGELOG `Fixed` entry; design.md revision note + AC
       updated.
+
+## Follow-ups (implementation review 48, 2026-08-09)
+
+- [ ] `stream-anthropic` and `stream-openai` (chat completions) have no
+      EOF-level terminal flush — the codex transport does, so a stream that
+      ends without an in-band terminal event hangs the turn until
+      `llm-stream-idle-timeout-ms` on the two non-codex transports. Verified
+      against the committed code (2026-08-09):
+      - `stream-openai-codex` (codex_responses.clj) is the in-repo
+        precedent: after the SSE `doseq` it runs
+        `(when-not @(:done? stream-state) (emit-codex-start! …)
+        (emit-codex-done! … {:response {:status "completed"}} …))`, so a
+        truncated/non-conforming stream always gets a terminal `:done`.
+      - `stream-anthropic` (`consume-stream-response!`) and `stream-openai`
+        (`stream-openai`'s `doseq` of `process-chat-sse-line!`) end with
+        NOTHING after the loop. Anthropic: a stream that EOFs without
+        `message_stop` / `message_delta`-with-`stop_reason` / `"error"`
+        emits no terminal event — the review-43 hang class, still reachable
+        via the EOF path rather than a mid-stream error, and directly
+        task-relevant: review 47 established DeepSeek's streaming path is
+        UNVERIFIED (the review-1 smoke test exercised only the non-streaming
+        `execute` path), so a DeepSeek stream that ends without
+        `message_stop` currently hangs 20 minutes instead of terminating.
+        OpenAI: a final chunk carrying `finish_reason` but no trailing
+        `[DONE]` sets `pending-finish-reason` and never flushes it
+        (`flush-pending-chat-finish!` runs ONLY on a `[DONE]` line), and a
+        `[DONE]` with no prior `finish_reason` chunk no-ops
+        (`flush-pending-chat-finish!` guards on the pending reason) — both
+        leave the turn with no `:done`/`:error` until the idle timeout.
+        Fix: mirror the codex EOF flush on both transports (after the
+        `doseq`, `when-not @done?` → emit the terminal: anthropic `:done`
+        with the review-47 `usage-with-cost usage-acc` shape; openai `:done`
+        with the pending finish reason or `:stop`, and accumulated usage if
+        any was seen); add stream tests: anthropic error-free stream ending
+        at EOF without `message_stop` → exactly one `:done`; openai
+        finish_reason-chunk-then-EOF (no `[DONE]`) → exactly one `:done`;
+        openai `[DONE]` without `finish_reason` → exactly one `:done`.
+        Mirror the guarantee in `spec/anthropic-provider.allium` +
+        `spec/openai-provider.allium` (`OnceDoneNoFurtherEvent` covers
+        post-done no-ops; nothing models the EOF-without-terminal case the
+        codex transport's flush already closes).
+- [ ] OpenAI chat-completions terminal `:done` carries NO usage when the
+      provider omits the `usage` chunk — the exact review-47 zero-usage
+      class fixed on the anthropic `message_stop` terminal, still open on
+      the sibling `:openai-completions` transport (and on codex's synthetic
+      EOF `:done`, which passes `{:response {:status "completed"}}` with no
+      usage). Verified against the committed code (2026-08-09):
+      `finish-chat-chunk!`'s `(:finish_reason choice)` branch only records
+      `pending-finish-reason`, and `flush-pending-chat-finish!` (on the
+      trailing `[DONE]`) calls `emit-chat-completion-finish!` with
+      `usage nil` → `(cond-> {:type :done :reason reason} usage …)` emits a
+      `:done` with no `:usage` key → `handle-done!` (`(map? usage)` false)
+      records ZERO usage/cost. Reachable on any OpenAI-compatible custom
+      endpoint that ignores `stream_options.include_usage` (the body always
+      sets it, but local proxies / third-party endpoints commonly omit the
+      usage chunk) — the same class the task's review-47 CHANGELOG `Fixed`
+      entry claims to close ("a streamed turn … records the accumulated
+      tokens … instead of silently recording zero usage and cost"), which
+      names only the anthropic `message_stop` path. The existing
+      `completions-trailing-usage-after-finish-reason-is-preserved-test`
+      covers finish_reason-before-usage (usage chunk still arrives); no
+      test covers finish_reason + `[DONE]` with NO usage chunk. Fix: have
+      the openai transport accumulate the last-seen `:usage` (or the
+      review-47-style accumulated shape) and attach it to the flushed
+      `:done` when a usage chunk was seen, or document the zero-usage
+      consequence for usage-omitting endpoints; add a stream test
+      (finish_reason chunk → `[DONE]`, no usage chunk → `:done` carries no
+      `:usage`, matching `handle-done!`'s zero-usage semantics) and update
+      the CHANGELOG `Fixed` wording to name the openai omission path.
+- [ ] `"redacted_thinking"` content blocks are still mislabeled as text in
+      the review-43-typed block events: `content-block-start-event` falls
+      to the default `:text-start` and `content-block-stop-event` to
+      `:text-end` for a `"redacted_thinking"` block (Anthropic's first
+      thinking block in extended-thinking streams), so the accumulator
+      creates a phantom empty text block and the last-provider-event
+      diagnostic marker mislabels a thinking-family block stop as text —
+      the same mislabel class review 43 fixed for `"thinking"` (which now
+      emits `:thinking-start`/`:thinking-end`). Not reachable on the newly
+      shipped DeepSeek provider (its compat table explicitly does NOT
+      support redacted-thinking blocks — the review-43 fix's own
+      motivation was DeepSeek's thinking blocks), so this is a built-in
+      Anthropic-path completion of the review-43 typing change, not a
+      DeepSeek-path gap. Fix (either): skip `"redacted_thinking"` blocks in
+      `content-block-start-event`/`content-block-stop-event` (no phantom
+      text block, no mislabeled marker), or map them to
+      `:thinking-start`/`:thinking-end` (with the block's `:data`);
+      add a stream test asserting a `"redacted_thinking"` block's
+      start/stop emits no `:text-start`/`:text-end` mislabel, and extend
+      the `ContentBlockStopEmitsTypedEndEvent` guidance in
+      `spec/anthropic-provider.allium` accordingly.

@@ -2215,3 +2215,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   "3 vs 4 attempts", the same timing-sensitive retry-loop class); both pass
   in isolation (23/116 green) — pre-existing, unrelated to this change
   (which touches only `providers/anthropic.clj` + its stream tests).
+- Review 48 (2026-08-09): added 3 follow-up steps to be addressed.
