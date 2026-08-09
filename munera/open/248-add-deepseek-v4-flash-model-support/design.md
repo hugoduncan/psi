@@ -215,6 +215,29 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   for anthropic-path thinking-block stops — DeepSeek returned a `thinking`
   content block in the live smoke test (2026-08-09), so the mislabel was
   reachable on this task's newly shipped provider.
+- **Streamed usage on the message_stop terminal + SSE error status
+  extraction (review 47):** two `stream-anthropic` follow-up fixes to the
+  review-43/44/46 SSE handling. (a) The `message_stop` terminal `:done`
+  now carries `:usage (usage-with-cost model usage-acc)` like the
+  `message_delta`-with-`stop_reason` terminal — a stream terminating via
+  `message_stop` WITHOUT a preceding `message_delta` carrying `stop_reason`
+  previously emitted a bare `{:type :done :reason :stop}`, so
+  `handle-done!` (`(map? usage)` false) recorded ZERO usage/cost even
+  though `usage-acc` held the input + cache tokens accumulated from
+  `message_start`; reachable on any Anthropic-compatible endpoint that
+  omits `message_delta` (or sends it without `stop_reason`/`usage`) —
+  including the newly shipped DeepSeek provider whose STREAMING path is
+  unverified (the review-1 smoke test exercised only the non-streaming
+  path). (b) The mid-stream SSE `"error"` branch's http-status extraction
+  now mirrors the sibling transports' `emit-chat-error!` /
+  `codex-error-http-status` — `:status` / `[:error :status]` /
+  `[:error :http_status]`, numeric `>= 400` only — instead of reading
+  `[:error :http_status]`/`:http_status` only, so a status-carrying error
+  event (e.g. `{"error":{"status":529,...}}`, a generic message plus a
+  `status` key, or a string status) keeps a numeric `:http-status` and
+  downstream `retry-error?`/`provider-error-kind` classify a transient
+  mid-stream 5xx/overload as retryable instead of `:unknown` (the
+  review-23 class the openai transports already handle).
 - **HTTP-400 compatibility retry OAuth decision (review 22):**
   `handle-400-response!`'s `:without-all-betas` selection now uses the
   transport's COMPUTED OAuth decision — `build-request` attaches the
@@ -409,9 +432,10 @@ independently confirms native JSON-Schema support can add
   closing provider-name-based built-in detection, the HTTP-400-compatibility-
   retry OAuth decision (computed `::oauth?` from `build-request`, replacing
   the header content-sniff), mid-stream SSE error-event surfacing + the
-  no-further-events-once-done guard on all three transports, and
-  `:thinking-end` labeling for
-  thinking-block stops); `gpt-5.5`/`gpt-5.6-*`/
+  no-further-events-once-done guard on all three transports, `:thinking-end`
+  labeling for thinking-block stops, and the review-47 streamed-usage-on-the-
+  `message_stop`-terminal + SSE error `:status`-key extraction fixes);
+  `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.
 - CHANGELOG `[Unreleased]` → `Added` entry.

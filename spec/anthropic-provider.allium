@@ -823,20 +823,31 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- llm-stream-idle-timeout-ms with a misleading timeout. The event's
         -- error body is now mapped through anthropic-error
         -- (error_from_response_data: message from parsed-body [:error
-        -- :message], http-status from [:error :http_status] when present,
-        -- fallback "Anthropic stream error") and the stream terminates. The
-        -- done? guard prevents a trailing SSE event from emitting a second
-        -- terminal event — message_stop (review 43) AND, since review 44, a
-        -- message_delta carrying delta.stop_reason (the terminal :done
-        -- emission + usage accumulation + structured-output-result emissions
-        -- in that branch are now guarded on done?, so a post-error
-        -- message_delta is a full no-op) AND a post-error stream-read
-        -- exception (the outer catch block's :error emission is guarded on
-        -- done?, mirroring the codex transport's emit-codex-error!). See the
-        -- OnceDoneNoFurtherEvent invariant below. The codex
-        -- transport already handled "error" SSE events (in-repo precedent);
-        -- the :openai-completions transport received the same class fix
-        -- (review 43 decision).
+        -- :message], http-status when present, fallback "Anthropic stream
+        -- error") and the stream terminates. Review 47: http-status
+        -- extraction mirrors the sibling transports' emit-chat-error! /
+        -- codex-error-http-status — checked at :status / [:error :status] /
+        -- [:error :http_status], numeric >= 400 only — so a status-carrying
+        -- error event (e.g. {"error":{"status":529,...}} or a generic
+        -- message plus a status key, or a string status) keeps a NUMERIC
+        -- :http-status when the value is a valid status, and a non-numeric
+        -- status is dropped; without it, downstream retry-error? /
+        -- provider-error-kind (numeric #{429 500 502 503 529} membership +
+        -- message patterns) fell to :unknown and a transient mid-stream
+        -- 5xx/overload error was NOT auto-retried — the review-23 class the
+        -- openai emit-chat-error! and codex codex-error-http-status already
+        -- handle. The done? guard prevents a trailing SSE event from
+        -- emitting a second terminal event — message_stop (review 43) AND,
+        -- since review 44, a message_delta carrying delta.stop_reason (the
+        -- terminal :done emission + usage accumulation +
+        -- structured-output-result emissions in that branch are now guarded
+        -- on done?, so a post-error message_delta is a full no-op) AND a
+        -- post-error stream-read exception (the outer catch block's :error
+        -- emission is guarded on done?, mirroring the codex transport's
+        -- emit-codex-error!). See the OnceDoneNoFurtherEvent invariant
+        -- below. The codex transport already handled "error" SSE events
+        -- (in-repo precedent); the :openai-completions transport received
+        -- the same class fix (review 43 decision).
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
@@ -876,6 +887,31 @@ rule MessageDeltaStopReasonEmitsDone {
         -- established StreamEvent surface (cf. MessageStartEmitsStartEvent /
         -- ContentBlockStopEmitsTypedEndEvent); FinalizedUsage is the
         -- accumulation function defined by FinalUsageTotalsCalculated.
+}
+
+rule MessageStopEmitsDoneWithUsage {
+    when: SseEventReceived(stream, "message_stop", event_data)
+    requires: not stream.done
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword("stop"), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- Review 47: the message_stop terminal :done now carries the
+        -- accumulated usage (usage_with_cost on usage-acc) like the
+        -- message_delta-with-stop_reason terminal
+        -- (MessageDeltaStopReasonEmitsDone). Previously a stream terminating
+        -- via message_stop WITHOUT a preceding message_delta carrying
+        -- stop_reason emitted a bare {:type :done :reason :stop}, so the
+        -- consumer's handle-done! ((map? usage) false) recorded ZERO
+        -- usage/cost even though usage-acc held the input + cache tokens
+        -- accumulated from message_start. Reachable on any
+        -- Anthropic-compatible endpoint that omits message_delta — including
+        -- the newly shipped DeepSeek provider whose streaming path is
+        -- unverified (the review-1 live smoke test exercised only the
+        -- non-streaming path; streamed usage comes from message_start /
+        -- message_delta SSE events only). Output tokens stay whatever
+        -- usage-acc accumulated (0 when no message_delta was seen).
 }
 
 rule OnceDoneNoFurtherEvent {

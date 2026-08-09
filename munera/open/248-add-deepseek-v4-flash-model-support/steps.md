@@ -3921,7 +3921,7 @@
 
 ## Follow-ups (implementation review 47, 2026-08-09)
 
-- [ ] `stream-anthropic`'s `message_stop` terminal `:done` carries no
+- [x] `stream-anthropic`'s `message_stop` terminal `:done` carries no
       `:usage`: the `message_delta`-with-`stop_reason` branch emits
       `:done` WITH `(usage-with-cost model usage-acc)`, but the
       `message_stop` branch emits a bare `{:type :done :reason :stop}` — so
@@ -3947,7 +3947,22 @@
       carrying the accumulated input usage + cost map), and mirror the
       terminal in `spec/anthropic-provider.allium` if it models the
       `message_stop` `:done` shape.
-- [ ] Anthropic mid-stream SSE `"error"` branch status extraction is
+      → Resolved: `stream-anthropic`'s `message_stop` terminal `:done` now
+      carries `:usage (usage-with-cost model usage-acc)` like the
+      `message_delta`-with-`stop_reason` terminal — a stream ending via
+      `message_stop` without a `message_delta`-with-`stop_reason` records
+      the accumulated input/cache tokens + cost instead of zero (output
+      stays 0 — nothing accumulated it in that flow). New test:
+      `stream-anthropic-message-stop-done-carries-usage-test`
+      (message_start with input/cache usage → content blocks → message_stop,
+      no message_delta → exactly one `:done` carrying the accumulated input
+      usage + cost map; output-tokens 0; total = 130) — verified FAIL
+      against the pre-fix code (bare `{:type :done :reason :stop}`), PASS
+      with the fix. Spec: `MessageStopEmitsDoneWithUsage` rule added to
+      `spec/anthropic-provider.allium` (models the `message_stop` `:done`
+      with `FinalizedUsage(stream.usage_acc)`, `requires: not stream.done`).
+      CHANGELOG `Fixed` entry; design.md revision note + AC updated.
+- [x] Anthropic mid-stream SSE `"error"` branch status extraction is
       incomplete AND unvalidated vs the sibling transports: the branch reads
       http-status from `[:error :http_status]`/`:http_status` only, while
       the openai `emit-chat-error!` reads
@@ -3973,3 +3988,22 @@
       `SseErrorEventEmitsErrorAndTerminates` guidance in
       `spec/anthropic-provider.allium` (which currently documents
       http-status from `[:error :http_status]` only).
+      → Resolved: the `"error"` SSE branch's http-status extraction now
+      mirrors `emit-chat-error!`/`codex-error-http-status` — checked at
+      `:status` / `[:error :status]` / `[:error :http_status]` (keeping the
+      existing top-level `:http_status` read too), numeric `>= 400` only —
+      so a status-carrying error event (e.g.
+      `{"error":{"status":529,...}}`, a generic message plus a `status`
+      key) keeps its numeric `:http-status` and downstream
+      `retry-error?`/`provider-error-kind` classify a transient mid-stream
+      5xx/overload as retryable instead of `:unknown`; a non-numeric
+      (string) status is dropped. New test:
+      `stream-anthropic-sse-error-status-key-test` — error event carrying
+      `status 529` (not `http_status`) → `:error` carries `:http-status 529`
+      + "Overloaded (status 529)" message; string status `"529"` → dropped,
+      no numeric `:http-status` — verified FAIL against the pre-fix code,
+      PASS with the fix. `SseErrorEventEmitsErrorAndTerminates` guidance in
+      `spec/anthropic-provider.allium` now documents the review-47
+      extraction (numeric `>= 400`, the status-carrying/lost-status
+      consequence). CHANGELOG `Fixed` entry; design.md revision note + AC
+      updated.

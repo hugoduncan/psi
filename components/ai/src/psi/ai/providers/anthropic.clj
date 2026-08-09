@@ -581,15 +581,29 @@
                           ;; these as no-ops, so a mid-stream provider error
                           ;; hung the turn until llm-stream-idle-timeout-ms
                           ;; with a misleading timeout. Surface the event's
-                          ;; error body through anthropic-error (http-status
-                          ;; when present) and terminate the stream; the
-                          ;; outer done? guard (review 46) makes every
-                          ;; subsequent event a no-op.
-                          (let [err (anthropic-error/error-from-response-data
-                                     {:status           (or (get-in event-data [:error :http_status])
-                                                            (:http_status event-data))
-                                      :body-text        (json/generate-string event-data)
-                                      :fallback-message "Anthropic stream error"})]
+                          ;; error body through anthropic-error and terminate
+                          ;; the stream; the outer done? guard (review 46)
+                          ;; makes every subsequent event a no-op.
+                          ;; Review 47: http-status extraction mirrors the
+                          ;; sibling transports' emit-chat-error! /
+                          ;; codex-error-http-status — :status /
+                          ;; [:error :status] / [:error :http_status],
+                          ;; numeric >= 400 only — so a status-carrying error
+                          ;; event (e.g. {"error":{"status":529,...}}) keeps
+                          ;; its numeric :http-status and downstream
+                          ;; retry-error?/provider-error-kind classify a
+                          ;; transient mid-stream 5xx/overload as retryable
+                          ;; instead of :unknown (the review-23 class the
+                          ;; openai transports already handle).
+                          (let [status (some (fn [s] (and (number? s) (>= s 400) s))
+                                             [(get-in event-data [:error :http_status])
+                                              (get-in event-data [:error :status])
+                                              (:http_status event-data)
+                                              (:status event-data)])
+                                err    (anthropic-error/error-from-response-data
+                                        {:status           status
+                                         :body-text        (json/generate-string event-data)
+                                         :fallback-message "Anthropic stream error"})]
                             (reset! done? true)
                             (consume-fn err))
 
@@ -629,6 +643,20 @@
                           ;; message_stop — or a cleanup exception — is also a
                           ;; full no-op: the guarantee is "no further event at
                           ;; all once done", not just "no second terminal".
+                          ;; Review 47: the :done now carries the accumulated
+                          ;; usage (usage-with-cost on usage-acc) like the
+                          ;; message_delta-with-stop_reason terminal — a
+                          ;; stream terminating via message_stop WITHOUT a
+                          ;; preceding message_delta carrying stop_reason
+                          ;; previously emitted a bare {:type :done :reason
+                          ;; :stop}, so handle-done! ((map? usage) false)
+                          ;; recorded ZERO usage/cost even though usage-acc
+                          ;; held the input + cache tokens accumulated from
+                          ;; message_start. Reachable on any
+                          ;; Anthropic-compatible endpoint that omits
+                          ;; message_delta — including the newly shipped
+                          ;; DeepSeek provider whose streaming path is
+                          ;; unverified.
                           (do
                             (anthropic-structured-output/maybe-emit-json-schema-output-result!
                              consume-fn
@@ -640,7 +668,9 @@
                              structured-result-emitted?
                              strategy
                              @prompted-json-buffer)
-                            (consume-fn {:type :done :reason :stop})
+                            (consume-fn {:type   :done
+                                         :reason :stop
+                                         :usage  (usage-with-cost model usage-acc)})
                             (reset! done? true))
 
                           nil))))))]

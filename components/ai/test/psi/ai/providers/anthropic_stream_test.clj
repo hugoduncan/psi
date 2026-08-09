@@ -675,3 +675,100 @@
       (is (= 10  (:cache-write-tokens usage)) "cache-write-tokens from message_start")
       (is (= 180 (:total-tokens usage)) "total = input + output + cache-read + cache-write")
       (is (map? (:cost usage)) "cost map present"))))
+
+(deftest stream-anthropic-message-stop-done-carries-usage-test
+  (testing "a stream ending via message_stop without message_delta records the accumulated usage on the :done"
+    ;; Review 47: the message_stop terminal :done carried no :usage — the
+    ;; message_delta-with-stop_reason branch emits :done WITH
+    ;; (usage-with-cost model usage-acc), but a stream terminating via
+    ;; message_stop WITHOUT a preceding message_delta carrying stop_reason
+    ;; emitted a bare {:type :done :reason :stop}, so handle-done!
+    ;; ((map? usage) false) recorded ZERO usage/cost even though usage-acc
+    ;; held the input + cache tokens accumulated from message_start.
+    ;; Reachable on any Anthropic-compatible endpoint that omits
+    ;; message_delta — including the newly shipped DeepSeek provider whose
+    ;; streaming path is unverified.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start"
+                               {:type    "message_start"
+                                :message {:usage {:input_tokens                  100
+                                                  :cache_read_input_tokens        20
+                                                  :cache_creation_input_tokens    10}}})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text"}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "text_delta" :text "Hi"}})
+                     (sse-line "content_block_stop"
+                               {:type "content_block_stop" :index 0})
+                     (sse-line "message_stop" {:type "message_stop"}))
+          events (run-stream sse model {:api-key "test-key"})
+          dones  (filterv #(= :done (:type %)) events)
+          done   (first dones)
+          usage  (:usage done)]
+      (is (= 1 (count dones))
+          "exactly one :done — message_stop terminates the stream")
+      (is (some? done) "should emit a :done event")
+      (is (map? usage) ":done must carry the accumulated usage map (usage-with-cost)")
+      (is (= 100 (:input-tokens usage))  "input-tokens accumulated from message_start")
+      (is (= 20  (:cache-read-tokens usage))  "cache-read-tokens from message_start")
+      (is (= 10  (:cache-write-tokens usage)) "cache-write-tokens from message_start")
+      (is (= 0   (:output-tokens usage)) "output-tokens stays 0 — no message_delta in this flow")
+      (is (= 130 (:total-tokens usage)) "total = input + cache-read + cache-write")
+      (is (map? (:cost usage)) "cost map present"))))
+
+(deftest stream-anthropic-sse-error-status-key-test
+  (testing "a mid-stream SSE error carrying :status (not :http_status) surfaces a numeric http-status"
+    ;; Review 47: the "error" branch read http-status from [:error :http_status]/
+    ;; :http_status only, so an Anthropic-compatible endpoint emitting
+    ;; {"type":"error","error":{"status":529,...}} — or a generic message
+    ;; plus a status key — lost its status: the :error event carried no
+    ;; numeric :http-status, so downstream retry-error?/provider-error-kind
+    ;; fell to :unknown and a transient mid-stream 5xx/overload was NOT
+    ;; auto-retried (the review-23 class the openai emit-chat-error! and
+    ;; codex codex-error-http-status already handle). Now mirrors
+    ;; emit-chat-error!'s extraction: :status / [:error :status] /
+    ;; [:error :http_status], numeric >= 400 only.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :status 529}}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= "Overloaded (status 529)" (:error-message err))
+            "status from [:error :status] is appended to the message")
+        (is (= 529 (:http-status err))
+            "[:error :status] is carried through as the numeric :http-status")
+        (is (not-any? #(= :done (:type %)) @events)
+            "no :done after a mid-stream error — the :error event terminates the turn"))))
+
+  (testing "a non-numeric status is dropped — numeric >= 400 only"
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :status "529"}}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= "Overloaded" (:error-message err))
+            "string status is not appended to the message")
+        (is (nil? (:http-status err))
+            "string status must not become a numeric :http-status — only numeric >= 400 is kept")))))

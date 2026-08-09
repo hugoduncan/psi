@@ -2168,3 +2168,50 @@ Review 46 (2026-08-09): added 1 step to be addressed.
 - Specs extended: `OnceDoneNoFurtherTerminalEvent` → `OnceDoneNoFurtherEvent` ("no further `Emit(StreamEvent)` once `stream.done`") in both `spec/anthropic-provider.allium` and `spec/openai-provider.allium`; `requires: not stream.done` added to the non-terminal dispatch rules (`MessageStartEmitsStartEvent`, `AnthropicThinkingStreamingIncludesSignatureMaterial`, `ContentBlockStopEmitsTypedEndEvent`, `CompletionsChunksNormalizeToExecutorEvents`, `CodexEventsNormalizeToExecutorEvents`). CHANGELOG `Fixed` entry tightened to "once the stream has terminated, no further event of any kind is emitted". design.md revision note + AC wording updated (reviews 43/44/46).
 - Verification: full `bb test` green (2596 tests / 19492 assertions / 0 failures; 2593 → 2596 = the three new deftests; assertion count varies run-to-run per the review-5 flake analysis); `psi.ai.providers.anthropic-stream-test` 12/83 (was 11/81), `psi.ai.providers.openai-test` 12/71 (was 10/67), `psi.ai.providers.anthropic-test` 16/103, `psi.ai.providers.openai-completions-test` 17/75, `psi.ai.providers.anthropic-retry-test` 6/60 green; clj-kondo clean (0 errors, 0 warnings); cljfmt clean; `bb commit-check:file-lengths` passes (all touched files under 800 lines).
 - Review 47 (2026-08-09): added 2 steps to be addressed.
+
+Review 47 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 47 addressed (2026-08-09)
+
+- addressed 2 review steps (the two unchecked review-47 items; all steps.md
+  items now checked).
+- `stream-anthropic` `message_stop` terminal `:done` now carries
+  `:usage (usage-with-cost model usage-acc)` like the
+  `message_delta`-with-`stop_reason` terminal — a stream ending via
+  `message_stop` without a `message_delta`-with-`stop_reason` records the
+  accumulated input/cache tokens + cost instead of zero (output stays 0;
+  reachable on any Anthropic-compatible endpoint that omits `message_delta`,
+  incl. the newly shipped DeepSeek provider whose streaming path is
+  unverified). New test `stream-anthropic-message-stop-done-carries-usage-test`
+  (verified FAIL pre-fix — bare `{:type :done :reason :stop}` — PASS
+  post-fix).
+- The `"error"` SSE branch's http-status extraction now mirrors the sibling
+  transports' `emit-chat-error!`/`codex-error-http-status`: `:status` /
+  `[:error :status]` / `[:error :http_status]` (plus the existing top-level
+  `:http_status`), numeric `>= 400` only — a status-carrying mid-stream
+  error keeps its numeric `:http-status`, so `retry-error?`/
+  `provider-error-kind` classify a transient 5xx/overload as retryable
+  instead of `:unknown` (the review-23 class the openai transports already
+  handle); non-numeric statuses are dropped. New test
+  `stream-anthropic-sse-error-status-key-test` (+ non-numeric-status
+  negative case; verified FAIL pre-fix / PASS post-fix).
+- Spec: `MessageStopEmitsDoneWithUsage` rule added to
+  `spec/anthropic-provider.allium`; `SseErrorEventEmitsErrorAndTerminates`
+  guidance updated for the review-47 status extraction (numeric >= 400, the
+  status-carrying/lost-status consequence). CHANGELOG `Fixed` entries for
+  both fixes. design.md "Revision note (implementation reviews)" + AC
+  exception wording updated (review-47 bullet: streamed usage on the
+  message_stop terminal + SSE error `:status`-key extraction).
+- Verification: `psi.ai.providers.anthropic-stream-test` 14 tests / 99
+  assertions green (was 12/83 — +2 deftests), `psi.ai.providers.anthropic-test`
+  16/103, `psi.ai.providers.anthropic-retry-test` 6/60 green; clj-kondo
+  clean (0 errors, 0 warnings) on changed source + test; cljfmt clean;
+  `bb commit-check:file-lengths` passes (anthropic_stream_test.clj 774
+  lines < 800). Full `bb test`: 2596 tests / 19506 assertions / 2 failed —
+  both in `psi.agent-session.prompt-lifecycle-test`
+  (`prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test`
+  "53 vs 2 attempts" — the exact flake documented in the review-42
+  resolution — and `prompt-provider-retry-after-tool-result-does-not-rerun-tool-test`
+  "3 vs 4 attempts", the same timing-sensitive retry-loop class); both pass
+  in isolation (23/116 green) — pre-existing, unrelated to this change
+  (which touches only `providers/anthropic.clj` + its stream tests).
