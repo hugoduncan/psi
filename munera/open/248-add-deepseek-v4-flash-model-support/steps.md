@@ -3842,3 +3842,54 @@
       runtime. Namespace green (3 tests / 42 assertions — the snapshot block
       grew from 3 to 21 assertions); clj-kondo clean (0 errors, 0 warnings);
       file-length gate fine (263 lines &lt; 800).
+
+## Follow-ups (implementation review 46, 2026-08-09)
+
+- [ ] The review-43/44 mid-stream-error terminal-event guard is incomplete:
+      only the TERMINAL emissions (anthropic `message_delta`/`message_stop`
+      `:done`, both transports' stream catch blocks' `:error`,
+      `emit-chat-error!`'s own emission) are guarded on `done?` — the
+      NON-terminal branches still emit events after the stream has already
+      terminated with an `:error`, on all three transports (verified
+      empirically against the committed code with redef'd `http/post`):
+      - `stream-anthropic`: a trailing `content_block_stop` after the SSE
+        `error` event still emits `:text-end` (events = `[:start :text-start
+        :text-delta :error :text-end]`); trailing `content_block_delta` /
+        `content_block_start` similarly emit `:text-delta`/`:text-start`
+        post-error, and a trailing structured-tool `content_block_stop`
+        fires `maybe-emit-structured-result!` after the error.
+      - `stream-openai` (chat completions): a trailing `:choices` chunk
+        after the error chunk still emits `:text-delta` via
+        `emit-chat-chunk!` (events = `[:start :error :text-delta]`); a
+        trailing usage/finish chunk drives `finish-chat-chunk!`'s unguarded
+        `force-start-pending-chat-tools!`/`emit-chat-tool-ends!`/
+        `emit-structured-output-result!` (only `emit-chat-completion-finish!`
+        is done?-guarded), and `flush-pending-chat-finish!` on a trailing
+        `[DONE]` with a pending finish reason emits
+        `:structured-output-result` post-error.
+      - `stream-openai-codex`: a trailing `response.output_text.delta` after
+        `response.failed`/`error` still emits `:text-delta` (events =
+        `[:start :error :text-delta]`) — `handle-codex-event!` has no `done?`
+        check at its top (only `emit-codex-error!`/`emit-codex-done!`
+        self-guard).
+      This contradicts the review-44 claim ("a trailing SSE event after the
+      error ... suppressed by the done? guard") and the CHANGELOG `Fixed`
+      wording, which overstate the guard's coverage (they hold only for the
+      enumerated terminal shapes). Downstream, `make-provider-event-consumer`
+      dispatches the post-error events: `:text-end`/`:text-start`/
+      `:thinking-*`/`:logprob-delta`/`:structured-output-result` call the
+      accumulator actions DIRECTLY (bypassing the statechart, which is in
+      `:error` with no transitions), mutating turn-data after `handle-error!`
+      has already finalized the result (e.g. `end-content-block!` closing a
+      block after finalization, `note-last-provider-event!` overwriting the
+      `:error` marker with `:text-end`). Fix: guard ALL non-terminal branches
+      on `done?` (or short-circuit the line loop once `done?` is set) on all
+      three transports, so a post-error trailing event is a full no-op; add
+      stream tests (anthropic error → trailing `content_block_stop` → no
+      `:text-end` after `:error`; openai error → trailing `:choices` chunk →
+      no `:text-delta` after `:error`; codex error → trailing
+      `response.output_text.delta` → no `:text-delta` after `:error`);
+      mirror the invariant in `spec/anthropic-provider.allium` +
+      `spec/openai-provider.allium` (`OnceDoneNoFurtherTerminalEvent` covers
+      only terminal events — extend to "no further event at all once done" or
+      add a rule), and tighten the CHANGELOG wording to the exact guarantee.

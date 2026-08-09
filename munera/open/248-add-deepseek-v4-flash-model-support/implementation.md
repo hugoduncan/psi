@@ -2158,3 +2158,5 @@ Review 45 (2026-08-09): added 2 steps to be addressed.
   live test instead of surfacing only at delegated-workflow runtime.
   Namespace green (3 tests / 42 assertions); clj-kondo clean; file-length
   gate fine.
+
+Review 46 (2026-08-09): added 1 step to be addressed.
