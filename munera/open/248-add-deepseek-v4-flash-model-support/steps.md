@@ -4211,3 +4211,61 @@
       guidance notes the done?-first ordering (and that the review-48
       `AnthropicTransportCloseEmitsDoneIfNotTerminal` shares the helper);
       CHANGELOG `Fixed` entry added.
+
+## Follow-ups (implementation review 50, 2026-08-09)
+
+- [ ] `stream-anthropic`'s terminal emitters never emit a `:start` event
+      when the stream never received `message_start` — the only
+      three-transport asymmetry left in the review-48 EOF-level flush.
+      `:start` is emitted only inside the `message_start` case branch, and
+      `stream-anthropic` has no `started?` tracking; `emit-terminal-done!`
+      (shared by the `message_stop` branch and the EOF flush) and the
+      `"error"` SSE branch emit `:done`/`:error` with no preceding `:start`.
+      The sibling transports both emit `:start` first when not started:
+      `emit-chat-completion-finish!` (`stream-openai`) and the codex EOF
+      flush's `emit-codex-start!` both use a `compare-and-set!` on a
+      `stream-started?` atom. Reachable on any 200 response whose body EOFs
+      before `message_start` (empty body, truncated body, or a malformed
+      stream starting with `message_stop`/`"error"`): the anthropic path
+      then emits `[:done]`/`[:error]` while openai/codex emit
+      `[:start :done]`/`[:start :error]`. Benign today (the consumer's
+      `:start` handler is a no-op and the turn statechart is already past
+      `:idle` via the turn-level `:turn/start` sent by
+      `create-live-turn-context`, so the final assistant message is
+      identical on all three transports) — but it is a genuine
+      cross-transport inconsistency in the exact class this task has
+      repeatedly treated as actionable ("mirror the codex transport",
+      reviews 13/37/48), and `stream-anthropic-eof-flush-emits-done-test`
+      (review 48) covers only the message_start-present path. Fix: add a
+      `started?` atom to `stream-anthropic` (set in the `message_start`
+      branch) and emit `:start` in `emit-terminal-done!`/the `"error"`
+      branch when not started, mirroring `emit-chat-completion-finish!`/
+      `emit-codex-start!`; or explicitly document why the anthropic
+      transport intentionally omits it. Add a stream test for a stream that
+      EOFs with no `message_start` (empty body) asserting the emitted event
+      sequence (and the same for the `"error"`-without-`message_start`
+      case).
+- [ ] The review-48 `"redacted_thinking"` skip is explicit in
+      `content-block-start-event`/`content-block-stop-event` (dedicated
+      `"redacted_thinking"` branches returning nil, guarded by
+      `consume-event!`) but IMPLICIT in `content-block-delta-event`:
+      `stream_events.clj`'s `content-block-delta-event` has no
+      `"redacted_thinking"` branch — the type falls through to the default
+      text branch and returns nil only because `redacted_thinking_delta`
+      currently carries no `:text` key (it carries `:data`). The skip
+      therefore depends on the delta's current shape: if Anthropic ever
+      sends a `redacted_thinking_delta` that includes a `:text` key (or
+      renames the payload field), the block would emit a `:text-delta` with
+      no `:text-start` — a phantom text delta for a block whose start/stop
+      are skipped (unbalanced block events; the accumulator's
+      `note-content-delta!` would open a block at an unbegun index while
+      start/stop stay nil). The implementation.md review-48 entry and the
+      `ContentBlockStopEmitsTypedEndEvent` spec guidance ("redacted_thinking
+      _delta events are skipped by content-block-delta-event (no :text in
+      the delta)") document the skip as a fact, not as the implicit
+      fall-through it is. Fix: add an explicit `"redacted_thinking"` branch
+      to `content-block-delta-event` returning nil (mirroring the start/stop
+      branches), making the skip symmetric and shape-independent; optionally
+      extend `redacted-thinking-block-not-mislabeled-as-text-test` with a
+      `redacted_thinking_delta` carrying a `:text` key to prove the
+      explicit skip.
