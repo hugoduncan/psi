@@ -3381,3 +3381,45 @@
       `workflow-tui-repro-test` (2/11), the other `create-tui-context+session`
       users, green from the repo root; clj-kondo clean (0 errors, 0
       warnings).
+
+## Follow-ups (implementation review 41, 2026-08-09)
+
+- [ ] `doc/custom-providers.md` DeepSeek notes are internally inconsistent
+      about the live verification block: the temperature bullet (line ~390)
+      still says the temperature-with-thinking-ON acceptance case is
+      "(blocked: no `DEEPSEEK_API_KEY` in env, same block as the live smoke
+      test)" and the fast-mode bullet (line ~497) still says fast mode is
+      "Not verified against a live turn — blocked on the same missing
+      `DEEPSEEK_API_KEY` as the optional live smoke test" — but review 40
+      RESOLVED that block (DEEPSEEK_API_KEY now set in env; a live turn was
+      made 2026-08-09), and the same section's adaptive-shape bullet (line
+      ~404, "now unblocked") and cache-cost bullet ("verified live
+      2026-08-09") were updated to record the live verification. The block
+      was lifted, so these two bullets' stated reason for being unverified
+      is false: temperature-with-thinking-ON remains unverified because the
+      smoke test did not exercise it (it used the adaptive shape at effort
+      high, and psi never sends temperature for adaptive-thinking models
+      anyway), and fast mode because it was not exercised — not because the
+      env var is missing. Fix (doc-only): reword both bullets to say the
+      case was "not exercised in the review-1 live smoke test (2026-08-09,
+      which covered the adaptive thinking shape at effort high + cache field
+      names)" instead of "blocked: no `DEEPSEEK_API_KEY` in env" / "blocked
+      on the same missing `DEEPSEEK_API_KEY` as the optional live smoke
+      test"; the caveats themselves (assume unverified / assume unsupported
+      until verified) stay.
+- [ ] `workflow_test_support.clj`'s public `repo-root` walk-up helper
+      (added review 40, `(loop [dir (.getCanonicalFile (java.io.File. "."))]
+      ... doc/custom-providers.md ...)`) duplicates `user_models_test.clj`'s
+      private `repo-root` helper — the "established pattern" review 39
+      explicitly referenced when fixing the delegate-review live test's
+      CWD-dependence. Two copies of the same walk-up now exist in two
+      components (components/ai/test vs components/agent-session/test);
+      review 40's resolution created the second copy instead of extracting a
+      shared helper, and only the live test's private `repo-root` delegates
+      to the shared one. Fix (either): extract `repo-root` to a shared
+      test-support namespace on the unit test classpath (e.g. a new
+      `psi.test-support` helper reachable from both components; bases/main/
+      test is already on the unit classpath) and have both test files use
+      it; or, if cross-component test-code sharing is intentionally not
+      done, document that decision in workflow-test-support's docstring so a
+      future reader does not add a third copy.

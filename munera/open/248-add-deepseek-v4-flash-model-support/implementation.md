@@ -1918,3 +1918,5 @@
   effort, mid-conversation system messages) keep their caveats.
 - Full `bb test` green (2586 tests / 19431 assertions / 0 failures; assertion
   count varies run-to-run per the documented review-5 flake analysis).
+
+- Review 41 (2026-08-09): added 2 steps to be addressed.
