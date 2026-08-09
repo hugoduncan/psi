@@ -37,9 +37,10 @@
    Custom-provider `env:` keys are stored RAW in the registry (not resolved
    at models.edn parse time, review 26) and re-resolved here per request —
    matching the built-in env fallback's live semantics, so exporting the var
-   after psi has loaded models.edn works without a reload. The config-parse
-   layer (`user_models/resolve-api-key-spec`) delegates here so env-lookup
-   testability lives in one place."
+   after psi has loaded models.edn works without a reload. This shared helper
+   is the single env-resolution home (review 28: the config-parse layer's
+   `user_models/resolve-api-key-spec` delegation wrapper was deleted as
+   production-dead)."
   [raw]
   (cond
     (or (nil? raw) (str/blank? raw)) nil

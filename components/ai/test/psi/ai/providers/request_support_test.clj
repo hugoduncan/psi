@@ -108,10 +108,11 @@
                                           :anthropic)))))
 
 (deftest resolve-key-spec-test
-  ;; Review 26: the shared env: spec resolution — used by
-  ;; user-models/resolve-api-key-spec (delegation) AND by resolve-api-key at
-  ;; request time. Custom models.edn `env:` keys are stored RAW in the
-  ;; registry and re-resolved per request.
+  ;; Review 26: the shared env: spec resolution — used by resolve-api-key at
+  ;; request time (and directly by user_models_test.clj's resolve-key-spec-
+  ;; test since review 28 deleted the production-dead
+  ;; user_models/resolve-api-key-spec wrapper). Custom models.edn `env:` keys
+  ;; are stored RAW in the registry and re-resolved per request.
   (testing "nil/blank → nil"
     (is (nil? (request-support/resolve-key-spec nil)))
     (is (nil? (request-support/resolve-key-spec "")))

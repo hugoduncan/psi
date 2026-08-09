@@ -52,26 +52,33 @@
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
-(deftest resolve-api-key-spec-test
+(deftest resolve-key-spec-test
+  ;; Review 26: env: spec resolution happens per request through the shared
+  ;; `request-support/resolve-key-spec` (custom models.edn `env:` keys are
+  ;; stored RAW in the registry and re-resolved at request time). Review 28:
+  ;; the `user_models/resolve-api-key-spec` delegation wrapper is deleted
+  ;; (production-dead since review 26) — this test now targets the shared
+  ;; helper directly; request_support_test.clj's resolve-key-spec-test is the
+  ;; canonical coverage.
   (testing "nil returns nil"
-    (is (nil? (user-models/resolve-api-key-spec nil))))
+    (is (nil? (request-support/resolve-key-spec nil))))
 
   (testing "blank string returns nil"
-    (is (nil? (user-models/resolve-api-key-spec "")))
-    (is (nil? (user-models/resolve-api-key-spec "  "))))
+    (is (nil? (request-support/resolve-key-spec "")))
+    (is (nil? (request-support/resolve-key-spec "  "))))
 
   (testing "env: prefix reads environment variable"
     ;; PATH is always set
-    (is (string? (user-models/resolve-api-key-spec "env:PATH")))
+    (is (string? (request-support/resolve-key-spec "env:PATH")))
     (is (= (System/getenv "PATH")
-           (user-models/resolve-api-key-spec "env:PATH"))))
+           (request-support/resolve-key-spec "env:PATH"))))
 
   (testing "env: with nonexistent var returns nil"
-    (is (nil? (user-models/resolve-api-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ"))))
+    (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ"))))
 
   (testing "literal string returned as-is"
-    (is (= "my-secret-key" (user-models/resolve-api-key-spec "my-secret-key")))
-    (is (= "none" (user-models/resolve-api-key-spec "none")))))
+    (is (= "my-secret-key" (request-support/resolve-key-spec "my-secret-key")))
+    (is (= "none" (request-support/resolve-key-spec "none")))))
 
 ;; ── Valid config parsing ─────────────────────────────────────────────────────
 
@@ -469,7 +476,7 @@
       ;; getenv per request (matching the built-in env fallback's live
       ;; semantics). The redef exercises the genuine resolution path —
       ;; env:VAR → getenv → concrete key — instead of a tautological
-      ;; resolve-api-key-spec-vs-itself comparison.
+      ;; raw-spec-vs-itself comparison.
       (let [auth (get-in (user-models/parse-models-config
                           {:version 1
                            :providers

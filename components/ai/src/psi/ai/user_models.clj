@@ -12,7 +12,6 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [malli.core :as m]
-   [psi.ai.providers.request-support :as request-support]
    [psi.ai.schemas :as schemas]
    [psi.ai.structured-output :as structured-output]
    [taoensso.timbre :as log]))
@@ -71,23 +70,6 @@
    [:version {:optional true} [:maybe pos-int?]]
    [:providers [:map-of string? ProviderDef]]])
 
-;; ── API key resolution ───────────────────────────────────────────────────────
-
-(defn resolve-api-key-spec
-  "Resolve an api-key spec string to a concrete value.
-
-   - nil / blank → nil
-   - \"env:VAR\" → (System/getenv \"VAR\"), nil if unset
-   - anything else → literal string
-
-   Delegates to the shared `request-support/resolve-key-spec` (review 26) —
-   the config-parse layer keeps no separate env resolution, so env-lookup
-   testability lives in one place (review 15). Note the registry stores the
-   RAW spec (see extract-provider-auth); the transports re-resolve `env:`
-   keys per request through the same shared helper."
-  [raw]
-  (request-support/resolve-key-spec raw))
-
 ;; ── Model expansion ─────────────────────────────────────────────────────────
 
 (def ^:private model-defaults
@@ -136,7 +118,7 @@
    per request, matching the built-in env fallback's live semantics (a var
    exported after psi loaded models.edn is picked up without a reload).
    Blank/nil specs normalize to nil (unchanged from the pre-review-26
-   `resolve-api-key-spec` behavior)."
+   parse-time resolution behavior)."
   [provider-key provider-def]
   (let [auth     (:auth provider-def)
         api-key  (not-empty (:api-key auth))

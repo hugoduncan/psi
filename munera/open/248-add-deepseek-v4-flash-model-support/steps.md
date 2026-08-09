@@ -2387,7 +2387,7 @@
 
 ## Follow-ups (implementation review 28, 2026-08-08)
 
-- [ ] Committed `.psi/project.edn` at HEAD re-activates the deepseek
+- [x] Committed `.psi/project.edn` at HEAD re-activates the deepseek
       workflow session-profiles → `bb test` is RED again for the documented
       review-18 reason. Review 18 (2026-08-08) found the identical
       regression when post-task human commit b26f84f25 re-enabled the
@@ -2418,7 +2418,35 @@
       commit-check (or a lock in the delegate-review live test itself) that
       fails when the committed session profiles reference a non-catalog
       model, so this regression class cannot silently return a third time.
-- [ ] `model_capabilities.clj` `supports-mid-system-messages?` docstring
+      → Resolved (revert, per the review-18 decision): `.psi/project.edn`
+      restored byte-identical to the review-18 committed default
+      (ef4db8c0e) — built-in anthropic catalog profiles active, deepseek +
+      openai maps commented, the explanatory "keep the committed default on
+      catalog models so `bb test` stays green" note kept (the human's
+      deepseek preference remains a one-line local flip). c90ae4043's only
+      delta was the activation swap (verified: `diff` shows exactly the
+      anthropic map commented + deepseek map uncommented), so the restore is
+      the exact prior committed state. The delegate-review live test is the
+      lock for this regression class — it snapshots the committed session
+      profiles against a temp registry containing only `local/test-model`,
+      so ANY committed profile referencing a non-catalog model fails it
+      deterministically on every machine (how reviews 2/18/28 all caught
+      this); it runs in the AC-gated `bb test` suite, so a separate
+      commit-check would be redundant with the existing gate and was not
+      added (kept the change minimal). Verification (state being closed):
+      `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+      green again (3 tests / 21 assertions, matching the review-18 state);
+      full `bb test` green — 2579 tests / 19383 assertions / 0 failures
+      (two prior full-suite runs each hit one documented pre-existing flake
+      — `prompt-provider-retry-after-tool-result-does-not-rerun-tool-test`
+      then `scheduled-deliver-runs-canonical-prompt-lifecycle-test`; both
+      pass in isolation, both files have zero diff across the task range;
+      final run clean); extensions suite green (364 passed / 0 failed /
+      1566 assertions — "1 unknown" is the pre-existing `:integration`-meta
+      skip); clj-kondo clean (0 errors, 0 warnings) on all changed files
+      (the 2 dev-http warnings are pre-existing at HEAD in an untouched
+      file); `bb commit-check:file-lengths` clean; cljfmt clean.
+- [x] `model_capabilities.clj` `supports-mid-system-messages?` docstring
       retains a stale, self-contradictory claim from before the review-25/26
       built-in gating: "OpenAI chat-completions support is also inferred
       from the runtime API shape so custom/runtime-loaded OpenAI chat models
@@ -2437,7 +2465,19 @@
       to carry psi-specific metadata; custom models.edn providers must
       declare the field explicitly"), keeping the api constraint note
       (codex-routed built-ins must not match).
-- [ ] `user_models/resolve-api-key-spec` is production-dead since review 26
+      → Resolved: `supports-mid-system-messages?` docstring reworded — the
+      first clause now reads "built-in OpenAI chat-completions catalog
+      models do not need to carry psi-specific metadata" (the
+      custom/runtime-loaded claim is gone), the second clause keeps the
+      review-14 `:custom?` origin-tag gating description (custom models.edn
+      provider named "openai", tagged `:custom? true`, cannot receive the
+      built-in-only inference by name and must declare the field
+      explicitly), and the api constraint is now explicit: "The inference
+      is chat-completions-only: codex-routed built-ins (api
+      :openai-codex-responses) never match this branch." Docstring-only
+      change (no behavior delta); `psi.agent-session.model-dispatch-test`
+      green (13 tests / 161 assertions).
+- [x] `user_models/resolve-api-key-spec` is production-dead since review 26
       and its shared-helper docstring claims a delegation that no longer
       happens. `extract-provider-auth` now stores the RAW `:api-key` spec
       (review 26), so nothing in production calls
@@ -2455,3 +2495,25 @@
       retained for API/test stability only, not a parse-time resolution
       path. Avoid leaving a public function whose only callers are tests and
       whose docstrings describe a parse-time contract that no longer exists.
+      → Resolved (option (a) — delete the dead wrapper):
+      `user_models/resolve-api-key-spec` is deleted from `user_models.clj`
+      (production-dead since review 26; the only reference was the test),
+      together with its now-unused `psi.ai.providers.request-support` require
+      (verified: the namespace's remaining mention is a docstring reference,
+      not code). `user_models_test.clj`'s `resolve-api-key-spec-test` is
+      renamed `resolve-key-spec-test` and targets
+      `request-support/resolve-key-spec` directly (same five testing blocks,
+      unchanged coverage; `request_support_test.clj`'s resolve-key-spec-test
+      remains the canonical coverage). Both stale docstrings corrected:
+      `request_support.clj` `resolve-key-spec`'s docstring no longer claims
+      the config-parse layer delegates (it now states the wrapper was deleted
+      as production-dead and this shared helper is the single env-resolution
+      home); `user_models.clj` `extract-provider-auth`'s docstring
+      historical note no longer names the deleted function; the two
+      `resolve-api-key-spec`-vs-itself / delegation comments in
+      request_support_test.clj and user_models_test.clj updated to describe
+      the review-28 deletion. Repo-wide grep confirms no remaining code
+      references. Verification: `psi.ai.user-models-test` green (16 tests /
+      116 assertions), `psi.ai.providers.request-support-test` green (12
+      tests / 77 assertions), clj-kondo clean (0 errors, 0 warnings) on all
+      changed files, cljfmt clean.

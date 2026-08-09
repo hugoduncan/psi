@@ -11,14 +11,16 @@
 
    Explicit model metadata wins for providers that declare the feature. OpenAI
    chat-completions support is also inferred from the runtime API shape so
-   custom/runtime-loaded OpenAI chat models do not need to carry psi-specific
-   metadata — but only for built-in catalog models: the inference is gated on
-   the review-14 `:custom?` origin tag via the shared
+   built-in OpenAI chat-completions catalog models do not need to carry
+   psi-specific metadata — the inference is gated on the review-14 `:custom?`
+   origin tag via the shared
    `request-support/builtin-openai-chat-completions?` predicate (review 26),
    so a custom models.edn provider literally named \"openai\" (tagged
    `:custom? true` by `expand-model`) cannot receive the built-in-only
-   inference by name. Custom providers must declare
-   `:supports-mid-conversation-system-messages` explicitly."
+   inference by name and must declare
+   `:supports-mid-conversation-system-messages` explicitly. The inference is
+   chat-completions-only: codex-routed built-ins (api
+   :openai-codex-responses) never match this branch."
   [model]
   (let [explicit-support (:supports-mid-conversation-system-messages model)]
     (boolean

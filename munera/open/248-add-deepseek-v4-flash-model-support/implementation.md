@@ -1442,3 +1442,46 @@
 - added 3 steps to be addressed (bb test red at HEAD — deepseek session
   profiles re-activated; model_capabilities docstring stale claim;
   resolve-api-key-spec production-dead)
+
+## Follow-ups review 28 addressed (2026-08-08)
+
+- addressed 3 review steps (all review-28 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `.psi/project.edn` deepseek re-activation reverted (review-28 item 1):
+  restored byte-identical to the review-18 committed default (ef4db8c0e) —
+  built-in anthropic catalog profiles active, deepseek + openai maps
+  commented, the "keep the committed default on catalog models" note kept
+  (one-line local flip preserved). c90ae4043's only delta was the activation
+  swap, so the restore is the exact prior committed state. The delegate-review
+  live test IS the lock for this regression class (snapshots committed
+  session profiles against a temp registry with only local/test-model →
+  deterministic failure on any non-catalog profile, on every machine; how
+  reviews 2/18/28 caught it) and runs in the AC-gated `bb test` suite — a
+  separate commit-check was considered and not added as redundant. Verified:
+  delegate-review live test 3/21 green again (matches review-18 state); full
+  `bb test` green 2579 tests / 19383 assertions / 0 failures (two prior runs
+  hit documented pre-existing flakes — prompt-provider-retry-after-tool-result
+  then scheduled-deliver-runs-canonical-prompt-lifecycle; both pass in
+  isolation, zero diff across the task range; final run clean); extensions
+  suite green (364 passed / 0 failed / 1566 assertions, "1 unknown" = the
+  pre-existing `:integration`-meta skip); clj-kondo clean on all changed
+  files (the 2 dev-http warnings are pre-existing at HEAD in an untouched
+  file); `bb commit-check:file-lengths` + cljfmt clean.
+- `supports-mid-system-messages?` docstring stale claim fixed (review-28
+  item 2): reworded so the inference is described as built-in-only ("built-in
+  OpenAI chat-completions catalog models do not need to carry psi-specific
+  metadata"), custom models.edn providers must declare the field explicitly,
+  and the api constraint is now explicit (codex-routed built-ins, api
+  :openai-codex-responses, never match). Docstring-only; model-dispatch-test
+  green (13/161).
+- Dead `user_models/resolve-api-key-spec` wrapper deleted (review-28 item 3,
+  option (a)): removed from user_models.clj with its now-unused
+  request-support require; `user_models_test.clj`'s resolve-api-key-spec-test
+  renamed resolve-key-spec-test and retargeted at
+  request-support/resolve-key-spec directly; `request_support.clj`
+  resolve-key-spec docstring corrected (no longer claims a config-parse
+  delegation; states the wrapper was deleted as production-dead);
+  extract-provider-auth docstring historical note + two test-file comments
+  updated. Repo-wide grep confirms no remaining code references. Green:
+  user-models-test 16/116, request-support-test 12/77; clj-kondo + cljfmt
+  clean.
