@@ -2712,7 +2712,7 @@
 
 ## Follow-ups (implementation review 32, 2026-08-08)
 
-- [ ] `doc/custom-providers.md` `:api-key` bullet ("Local servers and custom
+- [x] `doc/custom-providers.md` `:api-key` bullet ("Local servers and custom
       headers") documents the `env:` prefix case-sensitivity (review 27) and
       per-request re-read semantics (reviews 26/29), but never mentions the
       review-30 empty-variable config error — the canonical user-facing env:
@@ -2734,3 +2734,17 @@
       `catalog-view-env-api-key-resolvability-test` locking `:configured?`
       false for an `"env:"` spec (currently only covered indirectly via
       request_support_test).
+      → Resolved: `doc/custom-providers.md` `:api-key` bullet ("Local servers
+      and custom headers") now states a blank variable name after the `env:`
+      prefix — `"env:"` or `"env: "` — is a config error naming the literal
+      spec ("api-key spec \"env:\" names an empty environment variable (use
+      \"env:VAR_NAME\")"), never an environment lookup of the empty string,
+      so always use `"env:VAR_NAME"` with a real variable name. Also added
+      the optional blank-var block to
+      `catalog-view-env-api-key-resolvability-test`
+      (`model_selection_test.clj`): a custom provider with `:api-key "env:"`
+      reports `:configured?` false (resolve-key-spec → nil; a set env cannot
+      rescue the invalid spec), locking the picker behavior directly instead
+      of only indirectly via request_support_test. Green:
+      `psi.ai.model-selection-test` 13/120 (+1 assertion), clj-kondo + cljfmt
+      clean. Docs + test only; no behavior change.

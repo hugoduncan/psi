@@ -137,10 +137,18 @@
                       :api      :anthropic-messages
                       :auth     {:headers {"x-api-key" "static-key"}}
                       :models   [{:id "header-model"}]}}}
+        blank-var-provider-config
+        {:version   1
+         :providers {"blank-var"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:api-key "env:"}
+                      :models   [{:id "blank-var-model"}]}}}
         path (write-temp-models! env-provider-config)
         keyless-path (write-temp-models! keyless-provider-config)
         incidental-path (write-temp-models! incidental-headers-provider-config)
-        auth-header-path (write-temp-models! auth-header-provider-config)]
+        auth-header-path (write-temp-models! auth-header-provider-config)
+        blank-var-path (write-temp-models! blank-var-provider-config)]
     (try
       (testing "unset env: var reports not configured (request-time resolvability)"
         (registry/init! {:user-models-path path})
@@ -174,11 +182,23 @@
         (registry/init! {:user-models-path auth-header-path})
         (is (true? (get-in (sut/find-candidate (sut/catalog-view) :auth-header-only "header-model")
                            [:reference :configured?]))))
+
+      (testing "blank env: var name reports not configured (config error, review 30/32)"
+        ;; An "env:" spec with a blank variable name is never an environment
+        ;; lookup — resolve-key-spec returns nil for it (a set env cannot
+        ;; rescue the invalid spec), so it reads as not configured, matching
+        ;; the per-request config error "api-key spec \"env:\" names an empty
+        ;; environment variable (use \"env:VAR_NAME\")" (request_support_test
+        ;; locks the message).
+        (registry/init! {:user-models-path blank-var-path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :blank-var "blank-var-model")
+                            [:reference :configured?]))))
       (finally
         (java.io.File/.delete (java.io.File. path))
         (java.io.File/.delete (java.io.File. keyless-path))
         (java.io.File/.delete (java.io.File. incidental-path))
-        (java.io.File/.delete (java.io.File. auth-header-path))))))
+        (java.io.File/.delete (java.io.File. auth-header-path))
+        (java.io.File/.delete (java.io.File. blank-var-path))))))
 
 (deftest role-defaults-test
   (testing "known roles expose default bundles"

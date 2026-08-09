@@ -507,7 +507,11 @@ Use cases:
   every request, not snapshotted when models.edn loads — export the variable
   before the first request; no reload needed; the `env:` prefix is
   case-sensitive — lowercase `env:` only, so `ENV:VAR` or `Env:VAR` is sent
-  as a literal key and fails provider-side)
+  as a literal key and fails provider-side; a blank variable name after the
+  prefix — `"env:"` or `"env: "` — is a config error naming the literal spec
+  ("api-key spec \"env:\" names an empty environment variable (use
+  \"env:VAR_NAME\")"), never an environment lookup of the empty string, so
+  always use `"env:VAR_NAME"` with a real variable name)
 - `:auth-header? false` — omit the normal auth header for servers that reject it
 - `:headers` — add custom request headers
 

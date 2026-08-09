@@ -1587,3 +1587,14 @@
      unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).
 
 - Review 32 (2026-08-08): added 1 step to be addressed.
+
+- Addressed 1 review-32 step (2026-08-08): docs + test only.
+  1. doc/custom-providers.md ":api-key" bullet ("Local servers and custom
+     headers") now documents the blank env: var name config error ("env:" /
+     "env: " → "api-key spec \"env:\" names an empty environment variable
+     (use \"env:VAR_NAME\")", never getenv ""). 2. Added optional blank-var
+     block to catalog-view-env-api-key-resolvability-test
+     (model_selection_test.clj): :api-key "env:" → :configured? false.
+     Green: model-selection-test 13/120 (+1 assertion), clj-kondo + cljfmt
+     clean. No behavior change. Smoke-test step remains unchecked + BLOCKED
+     (no DEEPSEEK_API_KEY in env).
