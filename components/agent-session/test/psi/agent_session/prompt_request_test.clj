@@ -187,6 +187,67 @@
       (is (nil? (:no-auth-header opts)))
       (is (nil? (:headers opts))))))
 
+(deftest built-in-session-never-inherits-custom-same-named-provider-auth-test
+  ;; Review 42: `provider-auth/provider-api-key` + `provider-request-options`
+  ;; resolved registry auth purely by provider NAME, and
+  ;; `session->request-options`/`resolve-api-key` consumed them without the
+  ;; session model's `:custom?` origin gate — so a custom models.edn provider
+  ;; literally named "anthropic" made the BUILT-IN same-named model session
+  ;; inherit the custom provider's auth config (headers / :no-auth-header /
+  ;; api-key spec). Registry-auth options/key resolution is now gated on the
+  ;; session model's `:custom?` origin: built-in models resolve only env/OAuth.
+  (let [path-headers (write-temp-models!
+                      {:version   1
+                       :providers {"anthropic"
+                                   {:base-url "https://third-party.example/anthropic"
+                                    :api      :anthropic-messages
+                                    :auth     {:headers {"x-api-key" "THIRD-PARTY-KEY"}}
+                                    :models   [{:id "my-custom-model"}]}}})
+        path-key (write-temp-models!
+                  {:version   1
+                   :providers {"anthropic"
+                               {:base-url "https://third-party.example/anthropic"
+                                :api      :anthropic-messages
+                                :auth     {:api-key "env:MY_THIRD_PARTY_KEY"}
+                                :models   [{:id "my-custom-model"}]}}})]
+    (try
+      (testing "headers/:no-auth-header variant — built-in claude session inherits nothing"
+        (model-registry/init! {:user-models-path path-headers})
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    (session-data-for :anthropic "claude-sonnet-4-6")
+                    {})]
+          (is (nil? (:api-key opts))
+              "the custom provider's registry auth is never resolved for the built-in model")
+          (is (nil? (:no-auth-header opts))
+              "the custom provider's :no-auth-header hint is not inherited")
+          (is (nil? (:headers opts))
+              "the custom provider's x-api-key header is not merged onto the built-in request")))
+
+      (testing "api-key variant — built-in claude session carries no custom provider key spec"
+        (model-registry/init! {:user-models-path path-key})
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    (session-data-for :anthropic "claude-sonnet-4-6")
+                    {})]
+          (is (nil? (:api-key opts))
+              "the custom provider's env:MY_THIRD_PARTY_KEY spec is never injected into the built-in request")
+          (is (nil? (:no-auth-header opts)))
+          (is (nil? (:headers opts)))))
+
+      (testing "the custom same-named model still resolves its own registry auth (positive control)"
+        (model-registry/init! {:user-models-path path-headers})
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    (session-data-for :anthropic "my-custom-model")
+                    {})]
+          (is (= {"x-api-key" "THIRD-PARTY-KEY"} (:headers opts))
+              "the custom provider's own session still gets its registry headers")))
+
+      (finally
+        (java.io.File/.delete (java.io.File. path-headers))
+        (java.io.File/.delete (java.io.File. path-key))))))
+
 (deftest provider-switch-never-reuses-stale-runtime-api-key-test
   ;; Review 35: `:runtime-api-key` is stored per-session, unscoped, at prompt
   ;; prepare; prompt_request/resolve-api-key gave it priority 2 ABOVE the
@@ -255,7 +316,7 @@
 
       (testing "same-provider stored key is still reused when it equals the current OAuth resolution (OAuth stability intent)"
         (with-redefs [provider-auth/provider-api-key
-                      (fn [_ctx provider]
+                      (fn [_ctx provider _custom?]
                         (when (= :anthropic (provider-auth/normalize-provider-id provider))
                           "sk-ant-oat-runtime-token"))]
           (let [opts (prompt-request/session->request-options
@@ -291,7 +352,7 @@
         ;; plain x-api-key to the custom provider's third-party base-url —
         ;; the exact review-36 credential disclosure. The origin check must
         ;; block it.
-        (with-redefs [provider-auth/provider-api-key (fn [_ctx _provider] nil)]
+        (with-redefs [provider-auth/provider-api-key (fn [_ctx _provider _custom?] nil)]
           (let [opts (prompt-request/session->request-options
                       {}
                       {:model                    {:provider "anthropic" :id "my-custom-model"}
@@ -305,7 +366,7 @@
 
       (testing "built-in anthropic never reuses a stored custom-origin raw spec"
         (with-redefs [provider-auth/provider-api-key
-                      (fn [_ctx provider]
+                      (fn [_ctx provider _custom?]
                         (when (= :anthropic (provider-auth/normalize-provider-id provider))
                           "sk-ant-oat-builtin-token"))]
           (let [opts (prompt-request/session->request-options

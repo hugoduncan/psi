@@ -158,12 +158,13 @@
   "True when the session's current model is a custom models.edn provider.
 
    The persistable session model map carries only `{:provider (name provider)
-   :id :reasoning}` — no origin marker (review 36) — so the built-in/custom
-   origin is resolved through the model registry's `:custom?` origin tag
-   (review 14). A custom models.edn provider literally named
-   \"anthropic\"/\"openai\" is tagged `:custom? true` and resolves true;
-   built-in catalog models resolve false. Unknown models (not in the
-   registry) resolve false."
+   :id model-id :reasoning bool}` (persistable-model: `:id` holds the
+   model-id string and `:reasoning` is a separate boolean key) — no origin
+   marker (review 36) — so the built-in/custom origin is resolved through the
+   model registry's `:custom?` origin tag (review 14). A custom models.edn
+   provider literally named \"anthropic\"/\"openai\" is tagged `:custom?
+   true` and resolves true; built-in catalog models resolve false. Unknown
+   models (not in the registry) resolve false."
   [session-data]
   (boolean
    (:custom?
@@ -225,7 +226,8 @@
    route through that shared helper."
   [ctx session-data runtime-opts]
   (let [provider (:provider (:model session-data))
-        current  (provider-auth/provider-api-key ctx provider)]
+        custom?  (session-model-custom? session-data)
+        current  (provider-auth/provider-api-key ctx provider custom?)]
     (or (:api-key runtime-opts)
         (when-let [stored (session-runtime-api-key session-data)]
           ;; The stored key is a cache of a prior prepare-time resolution for
@@ -255,8 +257,10 @@
   [ctx session-data runtime-opts]
   (let [api-key          (resolve-api-key ctx session-data runtime-opts)
         idle-timeout-ms  (resolve-llm-stream-idle-timeout-ms ctx runtime-opts)
-        provider-options (some-> (:provider (:model session-data))
-                                 provider-auth/provider-request-options)]
+        provider-options (when-let [provider (:provider (:model session-data))]
+                           (provider-auth/provider-request-options
+                            provider
+                            (session-model-custom? session-data)))]
     (cond-> {}
       (contains? session-data :thinking-level)
       (assoc :thinking-level (:thinking-level session-data))

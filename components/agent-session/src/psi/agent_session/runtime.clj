@@ -59,9 +59,16 @@
    concrete only when the transport re-resolves it per request via
    `request-support/resolve-key-spec` (the `:runtime-opts :api-key` /
    `:runtime-api-key` session-data flow does this). Callers that need a
-   concrete key must route through that shared helper."
+   concrete key must route through that shared helper.
+
+   Origin gate (review 42): registry-auth resolution is gated on the
+   resolved model's `:custom?` origin tag (review 14) — a custom models.edn
+   provider literally named \"anthropic\"/\"openai\" can neither leak its
+   auth config into a built-in same-named session nor receive the built-in
+   same-named OAuth credential (provider-auth/provider-api-key branches on
+   `custom?`)."
   [ctx _session-id ai-model]
-  (provider-auth/provider-api-key ctx (:provider ai-model)))
+  (provider-auth/provider-api-key ctx (:provider ai-model) (:custom? ai-model)))
 
 (defn- sync->recursion-trigger-type
   [sync]

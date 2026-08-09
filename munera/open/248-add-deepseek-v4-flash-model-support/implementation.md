@@ -1963,3 +1963,65 @@
   2586 tests / 18722 assertions / 0 failures (assertion count varies
   run-to-run per the review-5 analysis).
 - Review 42 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 42 addressed (2026-08-09)
+
+- addressed 2 review steps (review-42; both items actionable, no remaining
+  unchecked steps — task's follow-up list is now fully closed)
+- **Session request-options origin gate (review-42 item 1):** the
+  provider-name-collision class (reviews 14/25/26/27/36 closed it at the
+  transport, capability-inference and session-data layers) was STILL OPEN at
+  the session request-options layer: `provider-auth/provider-api-key` +
+  `provider-request-options` resolved registry `:auth` purely by provider
+  NAME, so a custom models.edn provider literally named "anthropic"/"openai"
+  keyed the registry `:auth` entry by that name and a BUILT-IN same-named
+  model session inherited the custom provider's auth config (custom headers /
+  `:no-auth-header` / api-key spec sent to the built-in's endpoint).
+  `provider-api-key`/`provider-request-options` now take the resolved model's
+  `:custom?` origin tag (2-arity/1-arity default nil = built-in): registry
+  auth is consulted only for custom models; OAuth only for built-in models.
+  Callers updated: `prompt_request/resolve-api-key` +
+  `session->request-options` pass `(session-model-custom? session-data)`;
+  `runtime/resolve-api-key-in` passes `(:custom? ai-model)` (the resolved
+  model map from the registry carries the tag for custom models). This closes
+  BOTH directions: a built-in same-named session resolves only env/OAuth
+  (never the custom provider's registry auth), and a custom provider named
+  "anthropic"/"openai" never receives the built-in same-named OAuth
+  credential (OAuth login is built-in-only). Tests: core_test.clj
+  (built-in+OAuth → OAuth / built-in no-OAuth → nil / custom → registry /
+  custom never gets same-named OAuth credential / provider-request-options
+  built-in → nil), runtime_test.clj (built-in anthropic with a custom
+  "anthropic" registry entry + OAuth → OAuth wins; custom minimax with a
+  same-named OAuth credential → registry wins, never OAuth; custom fixtures
+  tagged `:custom? true` per the review-14 expand-model shape),
+  prompt_request_test.clj
+  `built-in-session-never-inherits-custom-same-named-provider-auth-test`
+  (both verified review variants: `:headers {"x-api-key" ...}` and
+  `:api-key "env:MY_THIRD_PARTY_KEY"` custom "anthropic" providers → built-in
+  claude session carries no headers/`:no-auth-header`/api-key; positive
+  control: the custom same-named model still gets its own registry headers).
+  `spec/custom-providers.allium` `InjectCustomProviderAuth` now
+  `requires: model.custom` (origin gate; manual allium-check per the
+  established pattern — no automated checker in repo). CHANGELOG `[Unreleased]`
+  → `Fixed` entry added; design.md revision note updated (review-42 bullet).
+- **`session-model-custom?` docstring corrected (review-42 item 2):** the
+  persistable session model shape is now documented as
+  `{:provider (name provider) :id model-id :reasoning bool}` (persistable-
+  model: `:id` holds the model-id string, `:reasoning` is a separate boolean
+  key) — the old "`{:provider (name provider) :id :reasoning}`" wording could
+  make a reader believe the session model's `:id` is a `:reasoning` keyword.
+  Docstring-only; no behavior change.
+- Verification: full `bb test` green (2587 tests / 19445 assertions /
+  0 failures — assertion count varies run-to-run per the review-5 flake
+  analysis; one run hit the documented timing-sensitive retry-loop flake
+  `prompt-execution-result-retryable-error-enters-retrying-and-schedules-
+  retry-test` (53 vs 2 attempts), passes in isolation — pre-existing,
+  unrelated to this change; final run clean); targeted namespaces green
+  (`psi.provider-auth.core-test` 4/16, `psi.agent-session.prompt-request-test`
+  23/74, `psi.agent-session.runtime-test` 6/44, `psi.agent-session.logprobs-test`
+  11/20, `psi.agent-session.model-dispatch-test` 13/161); clj-kondo clean
+  (0 errors, 0 warnings; one pre-existing info at runtime_test.clj:82);
+  cljfmt clean on all changed files; `bb commit-check:file-lengths` passes.
+- No remaining unchecked follow-up items in steps.md — the review-1 optional
+  live smoke test is marked RESOLVED (live 2026-08-09); all 42 review passes'
+  items are now closed.

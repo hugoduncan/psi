@@ -391,8 +391,19 @@ rule InjectCustomProviderAuth {
     -- ResolveRequestApiKey applies the mechanical ResolveApiKey resolution
     -- per request (so ai_options.api_key = auth.api_key carries the raw spec
     -- into options, resolved at request time).
+    --
+    -- Review 42: the injection is gated on the model's `:custom?` origin tag.
+    -- Registry auth is keyed by provider NAME and populated only from custom
+    -- models.edn providers — a BUILT-IN same-named model must never inherit a
+    -- custom provider's auth config (headers / :no-auth-header / api-key
+    -- spec), so built-in models resolve only env/OAuth. Symmetrically, a
+    -- custom provider named "anthropic"/"openai" never receives the built-in
+    -- same-named OAuth credential (provider-auth/provider-api-key branches
+    -- on `custom?`).
 
     when: BuildPreparedRequest(session, model, options)
+
+    requires: model.custom
 
     let auth = LookupProviderAuth(model.provider)
     let keyless = auth != null and (

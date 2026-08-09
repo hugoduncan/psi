@@ -3463,7 +3463,7 @@
 
 ## Follow-ups (implementation review 42, 2026-08-09)
 
-- [ ] `provider-auth/provider-api-key` and `provider-auth/provider-request-options`
+- [x] `provider-auth/provider-api-key` and `provider-auth/provider-request-options`
       resolve registry auth purely by provider NAME (`model-registry/get-auth`),
       and `prompt_request/session->request-options` + `resolve-api-key` consume
       them without consulting the session model's `:custom?` origin tag (review
@@ -3494,7 +3494,42 @@
       `session->request-options`/`resolve-api-key` on `session-model-custom?` so
       built-in models resolve only env/OAuth) — plus regression tests for both
       the headers/`:no-auth-header` variant and the api-key variant.
-- [ ] `prompt_request/session-model-custom?` docstring misstates the persistable
+      → Resolved (thread-the-origin option): `provider-auth/provider-api-key` +
+      `provider-request-options` now take the resolved model's `:custom?` origin
+      tag (2-arity/1-arity default nil = built-in): registry auth is consulted
+      only when `custom?` is true, and OAuth only when `custom?` is false — so a
+      built-in same-named model resolves only env/OAuth (never the custom
+      provider's registry headers/`:no-auth-header`/api-key spec), and a custom
+      provider named "anthropic"/"openai" never receives the built-in same-named
+      OAuth credential (the reverse direction of the same class). Callers
+      updated: `prompt_request/resolve-api-key` + `session->request-options`
+      pass `(session-model-custom? session-data)`; `runtime/resolve-api-key-in`
+      passes `(:custom? ai-model)`. Regression tests added: core_test.clj
+      (built-in + OAuth → OAuth, never registry; built-in + no OAuth → nil;
+      custom → registry; custom never receives same-named OAuth credential;
+      provider-request-options built-in → nil / custom → options),
+      runtime_test.clj (built-in anthropic with a custom "anthropic" registry
+      entry + OAuth credential → OAuth wins; custom minimax with a same-named
+      OAuth credential → registry auth wins, never the OAuth credential; custom
+      fixtures tagged `:custom? true` per the review-14 expand-model shape),
+      prompt_request_test.clj
+      `built-in-session-never-inherits-custom-same-named-provider-auth-test`
+      (both variants: `:headers {"x-api-key" ...}` custom "anthropic" provider →
+      built-in claude session carries no headers/`:no-auth-header`/api-key;
+      `:api-key "env:MY_THIRD_PARTY_KEY"` variant → built-in carries no custom
+      spec; positive control: the custom same-named model still gets its own
+      registry headers). `spec/custom-providers.allium`
+      `InjectCustomProviderAuth` now `requires: model.custom` (the origin gate;
+      built-in same-named models never receive registry auth injection).
+      CHANGELOG `[Unreleased]` → `Fixed` entry added; design.md revision note
+      updated. Full `bb test` green (2587 tests / 19445 assertions / 0 failures
+      — assertion count varies run-to-run per the review-5 flake analysis; one
+      run hit the documented timing-sensitive retry-loop flake
+      `prompt-execution-result-retryable-error-enters-retrying-and-schedules-
+      retry-test`, 53 vs 2 attempts, passes in isolation — pre-existing,
+      unrelated to this change); clj-kondo clean (0 errors, 0 warnings);
+      cljfmt clean; file-lengths pass.
+- [x] `prompt_request/session-model-custom?` docstring misstates the persistable
       session model shape: it says the map "carries only `{:provider (name
       provider) :id :reasoning}`" — but the canonical persistable shape
       (`model-registry/persistable-model`, used by `/model`/RPC/TUI selection)
@@ -3502,3 +3537,8 @@
       the model-id string and `:reasoning` is a separate boolean key, not the
       `:id` value. Fix the docstring so a reader does not believe the session
       model's `:id` is a `:reasoning` keyword.
+      → Resolved: `session-model-custom?` docstring now states the persistable
+      shape as `{:provider (name provider) :id model-id :reasoning bool}`
+      (persistable-model: `:id` holds the model-id string and `:reasoning` is a
+      separate boolean key), so a reader cannot mistake the session model's
+      `:id` for a `:reasoning` keyword. Docstring-only; no behavior change.

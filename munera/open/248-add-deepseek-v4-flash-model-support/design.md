@@ -158,6 +158,25 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   keep the session working across continuation turns. Same-provider
   same-origin OAuth stability is preserved (provider-auth re-resolves the
   same token).
+- **Session request-options origin gate for registry auth (review 42):**
+  `provider-auth/provider-api-key` and `provider-auth/provider-request-options`
+  resolved registry `:auth` purely by provider NAME
+  (`model-registry/get-auth`), and `prompt_request/session->request-options` +
+  `resolve-api-key` consumed them without the session model's `:custom?`
+  origin tag — so the provider-name-collision class (closed at the transport,
+  capability-inference and session-data layers by reviews 14/25/26/27/36)
+  remained open at the session request-options layer: a custom models.edn
+  provider literally named `"anthropic"`/`"openai"` keys the registry
+  `:auth` entry by that provider name, and a session running the BUILT-IN
+  same-named model inherited the custom provider's auth config (custom
+  headers / `:no-auth-header` / api-key spec sent to the built-in's
+  endpoint). Both functions now take the resolved model's `:custom?` origin
+  tag: registry auth is consulted only for custom models, and OAuth only
+  for built-in models — so a built-in same-named model resolves only
+  env/OAuth (never the custom provider's registry auth), and a custom
+  provider named `"anthropic"`/`"openai"` never receives the built-in
+  same-named OAuth credential. `runtime/resolve-api-key-in` threads the
+  resolved model's `:custom?` into `provider-api-key` the same way.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

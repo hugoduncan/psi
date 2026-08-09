@@ -18,39 +18,65 @@
     (is (nil? (provider-auth/provider-auth-config nil)))))
 
 (deftest provider-api-key-test
-  (testing "oauth auth wins over model-registry auth"
-    (with-redefs [oauth/get-api-key (fn [_ctx provider]
-                                      (when (= :anthropic provider) "oauth-k"))
-                  model-registry/get-auth (fn [_]
-                                            {:auth-header? true :api-key "registry-k"})]
+  (testing "built-in model (custom? false) resolves OAuth, never registry auth"
+    (with-redefs [oauth/get-api-key (fn [_ctx provider] (when (= :anthropic provider) "oauth-k"))
+                  model-registry/get-auth (fn [_] {:auth-header? true :api-key "registry-k"})]
+      ;; OAuth is the built-in auth path
+      (is (= "oauth-k"
+             (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic false)))
+      ;; review 42: a built-in same-named model must never inherit a custom
+      ;; provider's registry auth even when one exists for the provider name
       (is (= "oauth-k"
              (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic)))))
 
-  (testing "model-registry auth is used when auth headers are enabled"
+  (testing "built-in model with no OAuth resolves nil (registry auth not consulted)"
     (with-redefs [oauth/get-api-key (fn [_ _] nil)
-                  model-registry/get-auth (fn [_]
-                                            {:auth-header? true :api-key "registry-k"})]
-      (is (= "registry-k"
-             (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic)))))
+                  model-registry/get-auth (fn [_] {:auth-header? true :api-key "registry-k"})]
+      ;; review 42: custom-provider registry auth is never applied to a
+      ;; built-in same-named model — built-ins resolve only env/OAuth
+      (is (nil? (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic false)))))
 
-  (testing "model-registry auth is ignored when auth headers are disabled"
+  (testing "custom model (custom? true) resolves registry auth when auth headers are enabled"
     (with-redefs [oauth/get-api-key (fn [_ _] nil)
-                  model-registry/get-auth (fn [_]
-                                            {:auth-header? false :api-key "registry-k"})]
-      (is (nil? (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic))))))
+                  model-registry/get-auth (fn [_] {:auth-header? true :api-key "registry-k"})]
+      (is (= "registry-k"
+             (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic true)))))
+
+  (testing "custom model never receives a same-named OAuth credential (origin gate)"
+    ;; review 42: OAuth login is built-in-only — a custom models.edn provider
+    ;; literally named "anthropic"/"openai" must never receive the built-in
+    ;; same-named OAuth credential; registry auth resolves instead.
+    (with-redefs [oauth/get-api-key (fn [_ctx provider] (when (= :anthropic provider) "oauth-k"))
+                  model-registry/get-auth (fn [_] {:auth-header? true :api-key "registry-k"})]
+      (is (= "registry-k"
+             (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic true)))))
+
+  (testing "custom model registry auth is ignored when auth headers are disabled"
+    (with-redefs [oauth/get-api-key (fn [_ _] nil)
+                  model-registry/get-auth (fn [_] {:auth-header? false :api-key "registry-k"})]
+      (is (nil? (provider-auth/provider-api-key {:oauth-ctx {}} :anthropic true))))))
 
 (deftest provider-request-options-test
-  (testing "includes no-auth-header and headers from model-registry auth"
+  (testing "custom model (custom? true) includes no-auth-header and headers from model-registry auth"
     (with-redefs [model-registry/get-auth (fn [_]
                                             {:auth-header? false
                                              :headers {"x-test" "1"}})]
       (is (= {:no-auth-header true
               :headers {"x-test" "1"}}
-             (provider-auth/provider-request-options :anthropic)))))
+             (provider-auth/provider-request-options :anthropic true)))))
 
-  (testing "returns nil when no auth config exists"
+  (testing "built-in model (custom? false) never inherits custom-provider registry options"
+    ;; review 42: a built-in same-named model must never inherit a custom
+    ;; provider's :no-auth-header/headers config
+    (with-redefs [model-registry/get-auth (fn [_]
+                                            {:auth-header? false
+                                             :headers {"x-test" "1"}})]
+      (is (nil? (provider-auth/provider-request-options :anthropic false)))
+      (is (nil? (provider-auth/provider-request-options :anthropic)))))
+
+  (testing "custom model returns nil when no auth config exists"
     (with-redefs [model-registry/get-auth (fn [_] nil)]
-      (is (nil? (provider-auth/provider-request-options :anthropic))))))
+      (is (nil? (provider-auth/provider-request-options :anthropic true))))))
 
 (deftest oauth-backed-test
   (testing "true when provider has stored oauth credential"
