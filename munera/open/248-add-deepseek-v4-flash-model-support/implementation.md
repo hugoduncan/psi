@@ -1599,3 +1599,30 @@
      clean. No behavior change. Smoke-test step remains unchecked + BLOCKED
      (no DEEPSEEK_API_KEY in env).
 - Review 33 (2026-08-08): added 2 steps to be addressed.
+
+## Follow-ups review 33 addressed (2026-08-08)
+
+- addressed 2 review steps (all review-33 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Reserved-`:custom?`-tag rejection locked (review-33 item 1, test only):
+  new `custom-model-cannot-supply-reserved-custom-tag-test`
+  (user_models_test.clj) parses configs with a user-supplied `:custom?` key —
+  both `true` and `false` — and asserts `:error` matches "Invalid models.edn
+  schema" (closed ModelDef `:malli.core/extra-key`) and `:models` is empty,
+  locking the docs' "Note on `:custom?`" rejection claim in both directions:
+  a user cannot spoof built-in classification (env-key fallback, OAuth
+  headers, mid-system inference) from models.edn. Test only; no behavior
+  change. Green: `psi.ai.user-models-test` 17/120 (was 16/116; +1 deftest
+  +4 assertions), clj-kondo 0 errors / 0 warnings, cljfmt clean,
+  file-length gate passes (523 lines < 800).
+- MiniMax cloud example locality fixed (review-33 item 2, docs only):
+  `:locality :cloud` added to the MiniMax example model map in
+  doc/custom-providers.md — the doc's flagship hosted example no longer
+  falls through to the `model-defaults` `:locality :local` default, matching
+  the review-21 locality guidance shipped in the same doc. No parse-lock
+  impact (`parse-documented-deepseek-example-test` reads only the DeepSeek
+  section). No behavior change.
+- Verification: `psi.ai.user-models-test` 17/120 green (incl. the doc
+  parse-lock), clj-kondo clean (0 errors, 0 warnings), cljfmt clean,
+  `bb commit-check:file-lengths` passes. Smoke-test step remains unchecked +
+  BLOCKED (no DEEPSEEK_API_KEY in env).

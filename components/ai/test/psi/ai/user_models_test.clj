@@ -353,6 +353,33 @@
       (is (= :openai (:provider model)))
       (is (true? (:custom? model))))))
 
+(deftest custom-model-cannot-supply-reserved-custom-tag-test
+  ;; Review 33: the reserved-tag guarantee is a security property — `:custom?`
+  ;; is set by expand-model (origin tag gating built-in classification: env-key
+  ;; fallback, OAuth headers, mid-system inference), and the closed ModelDef
+  ;; schema rejects a user-supplied `:custom?` key, so a user cannot spoof
+  ;; built-in classification from models.edn. The docs' "Note on `:custom?`"
+  ;; claims this rejection; lock it in both directions.
+  (testing "user-supplied :custom? true is rejected"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :custom? true}]}}})]
+      (is (re-find #"Invalid models.edn schema" (str (:error result))))
+      (is (empty? (:models result)))))
+
+  (testing "user-supplied :custom? false is rejected"
+    (let [result (user-models/parse-models-config
+                  {:providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :models   [{:id "deepseek-v4-flash"
+                                            :custom? false}]}}})]
+      (is (re-find #"Invalid models.edn schema" (str (:error result))))
+      (is (empty? (:models result))))))
+
 ;; ── Adaptive thinking (custom providers) ─────────────────────────────────────
 
 (deftest adaptive-thinking-field-test

@@ -2751,7 +2751,7 @@
 
 ## Follow-ups (implementation review 33, 2026-08-08)
 
-- [ ] The docs' reserved-`:custom?`-tag claim is untested: "Note on `:custom?`"
+- [x] The docs' reserved-`:custom?`-tag claim is untested: "Note on `:custom?`"
       in doc/custom-providers.md (added review 25) states "the closed
       model-definition schema rejects a user-supplied `:custom?` key with a
       generic 'Invalid models.edn schema' error", but no test locks the
@@ -2771,7 +2771,19 @@
       key (both `true` and `false`) and asserting `:error` matches "Invalid
       models.edn schema" and `:models` is empty — locking the documented
       reserved-tag claim in both directions.
-- [ ] The MiniMax cloud example contradicts the review-21 locality guidance:
+      → Resolved: new `custom-model-cannot-supply-reserved-custom-tag-test`
+      deftest (user_models_test.clj, sibling of
+      `custom-provider-models-tagged-custom-test`) locks the rejection side
+      of the reserved-tag guarantee in both directions — a models.edn model
+      map with a user-supplied `:custom? true` (or `:custom? false`) fails
+      `parse-models-config` with `:error` matching "Invalid models.edn
+      schema" (the closed ModelDef's `:malli.core/extra-key`) and `:models`
+      empty, so a user cannot spoof built-in classification (env-key
+      fallback, OAuth headers, mid-system inference) from models.edn. Green:
+      `psi.ai.user-models-test` 17/120 (was 16/116; +1 deftest +4
+      assertions), clj-kondo + cljfmt clean, file-length gate passes (523
+      lines < 800). Test only; no behavior change.
+- [x] The MiniMax cloud example contradicts the review-21 locality guidance:
       "OpenAI-compatible example: MiniMax" (doc/custom-providers.md) — the
       doc's flagship hosted/cloud custom-provider example
       (`https://api.minimax.chat/v1`) sets `:latency-tier :medium` /
@@ -2792,3 +2804,11 @@
       `:locality :cloud` to the MiniMax example model map (no parse-lock
       impact — `parse-documented-deepseek-example-test` reads only the
       DeepSeek section).
+      → Resolved: `:locality :cloud` added to the MiniMax example model map
+      (doc/custom-providers.md) so the doc's flagship hosted example no
+      longer falls through to the `:local` default — consistent with the
+      review-21 locality guidance ("What a provider definition contains" +
+      DeepSeek example notes). No parse-lock impact
+      (`parse-documented-deepseek-example-test` reads only the DeepSeek
+      section; `psi.ai.user-models-test` 17/120 green). Docs only; no
+      behavior change.

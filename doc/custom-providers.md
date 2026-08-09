@@ -177,6 +177,7 @@ its own docs, then place a definition like this in `~/.psi/agent/models.edn` or
                :supports-text      true
                :context-window     128000
                :max-tokens         16384
+               :locality           :cloud
                :latency-tier       :medium
                :cost-tier          :medium}]}}}
 ```
