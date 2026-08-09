@@ -4481,3 +4481,52 @@
       transports' HTTP-error-path behavior), or align the other transports
       to also capture the constructed error; add a capture-count/payload
       assertion to the codex SSE error tests.
+
+## Follow-ups (implementation review 53, 2026-08-09)
+
+- [ ] Full-`bb test` is RED on the state being closed with a NEW
+      un-inventoried flake instance: a full randomized-suite run (seed
+      281542343, 2026-08-09) failed
+      `psi.turn-runtime.response-mode-test/
+      execute-prepared-request-streaming-error-event-provider-headers-drive-
+      retry-test` — `(= 2 @attempts*)` actual 3 (the final
+      result/retry-metadata assertions all passed, so the retry pipeline
+      converged, but the stream attempt ran three times instead of two).
+      The test passes 5/5 in isolation, and `components/turn-runtime/` has
+      ZERO diff across the whole task commit range (71d4821bf^..HEAD) —
+      the same pre-existing attempt-count race class as the inventoried
+      `psi.turn-runtime.response-mode-retry-test/
+      execute-prepared-request-streaming-retry-discards-failed-partial-
+      output-test` flake (2 vs 53), but a NEW instance in a DIFFERENT
+      namespace (`response_mode_test.clj`, not `response_mode_retry_test.
+      clj`) that the flake inventory does not name — the inventory entries
+      (reviews 5/14/17) record only the sibling test and
+      `prompt-provider-retry-after-tool-result...`, so the design AC
+      "`bb test` green" is violated on this state exactly like the
+      inventoried instances. Fix: add this test to the flake inventory
+      with the seed + isolated-pass + no-diff evidence (the review-14/17
+      pattern), or harden the test (e.g. make the retry scheduling
+      deterministic / assert the attempt count only after the pipeline
+      fully settles) so a full-suite run can be green.
+- [ ] The anthropic + openai chat-completions CATCH blocks remain
+      `:start`-less on a pre-output stream-read exception — the last gap
+      in the review-50/52 `:start`-before-terminal class: `stream-anthropic`'s
+      `(catch Exception e (when-not @done? ... (consume-fn err)))` and
+      `stream-openai`'s `(catch Exception e (when-not @done?
+      (transport/emit-error! ...)))` emit `[:error]` with NO preceding
+      `:start` when the exception fires before any output event (e.g. a
+      connection reset on the first read — verified empirically:
+      `[:error]` on both transports), while every IN-BAND terminal/error
+      emitter now emits `[:start ...]` (the review-50 anthropic "error"
+      branch, the review-52 in-progress `emit-chat-error!`/
+      `emit-codex-error!` fixes, and the codex catch block, which gets
+      `:start` for free by routing through `emit-codex-error!`'s new
+      `emit-codex-start!`). Review 52 item 1 scoped the fix to the named
+      in-band emitters + the anthropic `message_delta` branch, so the
+      anthropic/openai catch blocks are not covered. Fix: emit `:start`
+      once (compare-and-set on `started?`/`stream-started?`) in both catch
+      blocks before the `:error` (or route them through the `:start`-aware
+      emitters), + stream tests throwing on the first stream read
+      asserting `[:start :error]` on both transports — the same
+      three-transport consistency class reviews 50/52 treated as
+      actionable.
