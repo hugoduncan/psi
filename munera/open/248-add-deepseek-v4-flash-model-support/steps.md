@@ -3065,3 +3065,25 @@
       so the OAuth-stability intent is covered under the corrected
       semantics. CHANGELOG `Fixed` entry + design.md revision note extended
       with both review-36 refinements.
+
+## Follow-ups (implementation review 37, 2026-08-08)
+
+- [ ] CHANGELOG `[Unreleased]` → `Changed` redaction entry still claims the
+      case-insensitive capture redaction applies "on both transports"
+      (line 30: "Provider request captures now redact auth headers
+      case-insensitively on both transports (`x-api-key`, mixed-case
+      `Authorization`, `chatgpt-account-id`)"), but the shared
+      `request-support/redact-headers` is wired into both transport
+      redaction entry points — `anthropic.clj`'s `redact-request-headers`
+      AND `openai/transport.clj`'s `redact-request-headers` — and the
+      `:openai-codex-responses` path captures through
+      `transport/capture-request!`, so codex captures are redacted too
+      (locked by `codex-chatgpt-account-id-capture-masked-test` and
+      `codex-request-and-reply-capture-callbacks-test` in
+      `openai_codex_test.clj`). Review 13's "name all three transports"
+      update fixed the sibling provider-scoped key-resolution entry but
+      missed this review-12 bullet, so a user reading the CHANGELOG would
+      conclude `:openai-codex-responses` captures are NOT redacted — false.
+      Fix: "on both transports" → "on all three transports" (or name
+      `:anthropic-messages`, `:openai-completions`, `:openai-codex-responses`),
+      matching the sibling entry.
