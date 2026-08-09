@@ -1485,3 +1485,7 @@
   updated. Repo-wide grep confirms no remaining code references. Green:
   user-models-test 16/116, request-support-test 12/77; clj-kondo + cljfmt
   clean.
+
+## Review 29 (2026-08-08)
+
+- added 2 steps to be addressed

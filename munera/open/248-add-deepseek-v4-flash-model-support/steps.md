@@ -2517,3 +2517,51 @@
       116 assertions), `psi.ai.providers.request-support-test` green (12
       tests / 77 assertions), clj-kondo clean (0 errors, 0 warnings) on all
       changed files, cljfmt clean.
+
+## Follow-ups (implementation review 29, 2026-08-08)
+
+- [ ] `model_selection/catalog-view` `:configured?` no longer reflects key
+      resolvability after the review-26 raw-spec storage change.
+      `extract-provider-auth` (user_models.clj) now stores the RAW `:api-key`
+      spec (literal or "env:VAR") in the registry, and
+      `model_selection.clj`'s `catalog-view` reads `(:api-key auth)` directly
+      for the resolver-facing `:reference {:configured?}` flag. A custom
+      provider whose `env:` var is unset at request time therefore reports
+      `:configured? true` in the catalog (model pickers), while every request
+      fails with the missing-key error naming the variable. Before review 26
+      the parse-time resolution stored nil when the var was unset, so
+      `:configured?` was false — the review-26 change silently flipped the
+      flag's semantics from "a key will resolve" to "a key spec was declared",
+      without updating `catalog-view`, its docstring, or the CHANGELOG.
+      Verified live: with `:auth {:api-key "env:PSI_UNSET_TEST_VAR_XYZ"}`
+      (var unset), `catalog-view` → `find-candidate :deepseek
+      "deepseek-v4-flash"` returns `:configured? true` (registry api-key is
+      the raw "env:..." string). The existing
+      `catalog-view-unconfigured-provider-test` only covers the no-auth-at-all
+      case; no test pins the env:-spec behavior either way. Fix (either):
+      (a) resolve the spec in `catalog-view` via
+      `request-support/resolve-key-spec` so `:configured?` again reflects
+      request-time resolvability (restores pre-review-26 semantics), or
+      (b) accept the semantic change (declared config ≠ resolvable key) and
+      document it in the `:configured?` reference docstring + CHANGELOG and
+      lock it with a test. Avoid leaving the flag silently meaning something
+      different than it did before review 26.
+- [ ] `runtime/resolve-api-key-in` (and `prompt_request.clj`'s `resolve-api-key`)
+      docstrings do not document the review-26 raw-spec contract.
+      `provider-auth/provider-api-key` returns the registry's RAW `:api-key`
+      spec verbatim for custom providers (literal or "env:VAR"), so
+      `resolve-api-key-in` — public, used by the RPC prompt/command paths —
+      and `prompt_request/resolve-api-key` can return a raw `"env:VAR"`
+      string, not a concrete key; it becomes concrete only when the transport
+      re-resolves it per request via `request-support/resolve-key-spec` (the
+      `:runtime-opts :api-key` / `:runtime-api-key` session-data flow does
+      this). `provider_auth/core.clj`'s `provider-api-key` docstring was
+      updated for this in review 26 ("Callers that need a concrete key must
+      route through that shared helper"), but the agent-session call sites
+      still claim to "resolve the API key" with no note that the value may be
+      a raw spec — the same stale-contract class review 28 fixed in
+      `request_support.clj`. Fix: extend both docstrings to state the
+      raw-spec contract (return value may be `"env:VAR"` for custom
+      providers; concrete resolution happens per request in the transports
+      via `request-support/resolve-key-spec`; `:runtime-api-key` session data
+      stores the raw spec). Docstring-only; no behavior change.
