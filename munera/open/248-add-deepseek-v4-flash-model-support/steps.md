@@ -2868,3 +2868,68 @@
       reads `:configured? true` while requests are keyless) — use `:api-key`
       only with the default auth-header path or custom `:headers` auth.
       Docs only; no parse-lock impact.
+
+## Follow-ups (implementation review 35, 2026-08-08)
+
+- [ ] Stale `:runtime-api-key` is reused across a mid-session provider
+      switch, sending the previous provider's key to the new provider's
+      endpoint — the cross-provider credential disclosure class this task
+      closed for the env-var fallback (reviews 3/10/13) and OAuth
+      content-sniffing (review 11), but via session-data. `prompt_request/
+      resolve-api-key` gives `(:runtime-api-key session-data)` priority 2,
+      ABOVE the current provider's own `provider-auth/provider-api-key`
+      (priority 3), and `:runtime-api-key` is stored per-session, unscoped,
+      at `turn/handlers.clj` prompt-prepare from the previous turn's
+      `:ai-options :api-key` (for a custom provider that is the RAW spec or
+      literal, e.g. `"env:MINIMAX_API_KEY"`; for an OAuth built-in it is the
+      OAuth token). Nothing clears or scopes it on `:session/set-model` or
+      `:session/apply-session-profile` (the handler only assocs `:model` +
+      `:thinking-level`), so after `/model` switches from provider A to
+      provider B the next turn injects A's key/spec into B's request
+      options, the transport treats it as configured (provider-scoped
+      `resolve-api-key` only guards the env fallback, not an injected
+      `:api-key` option), and A's live key is sent to B's `:base-url`
+      (e.g. `https://api.deepseek.com/anthropic/v1/messages`). Verified by
+      code trace: `session->request-options` → `resolve-api-key`
+      (prompt_request.clj) → `:runtime-api-key` wins over
+      `provider-api-key`; `request-support/resolve-api-key` re-resolves the
+      stale `env:` spec via `getenv` per request. No test covers the
+      model-switch path (`prompt_request_test.clj` tests only first-turn
+      resolution). Fix: clear `:runtime-api-key` when the session
+      model/provider changes (in the `:session/set-model` and
+      `:session/apply-session-profile` handlers), or scope the stored value
+      per provider and only reuse it when the provider matches (preserving
+      the same-provider OAuth stability intent); add a `prompt_request_test`
+      locking that a provider switch never reuses the prior provider's key
+      (e.g. session-data `:model {:provider "deepseek" ...}` + stale
+      `:runtime-api-key "env:MINIMAX_API_KEY"` resolves the deepseek
+      registry auth, not the stale spec).
+- [ ] Only the DeepSeek doc example is parse-locked; the other documented
+      `models.edn` examples can silently drift. `parse-documented-deepseek-
+      example-test` (user_models_test.clj, review 6) guards only the
+      DeepSeek section of doc/custom-providers.md. Reviews 33/34 found real
+      defects in the other two example model maps (MiniMax locality;
+      proxy-sonnet locality/tiers) by MANUAL review, and each fix was
+      docs-only with "no parse-lock impact" — meaning the closed
+      ModelDef/AuthConfig schemas can silently reject or mis-parse the
+      doc's other copy-paste examples with no test catching it (the same
+      docs/code drift class review 6 built the DeepSeek parse-lock for).
+      Fix (test only): generalize the doc-EDN extraction to parse every
+      `models.edn` example block in doc/custom-providers.md (MiniMax,
+      proxy-sonnet, DeepSeek, and the "Local servers and custom headers"
+      `:auth` snippet where applicable) through `parse-models-config` and
+      assert zero errors, so future doc edits cannot break the shipped
+      examples.
+- [ ] The documented `speed`-field HTTP-400 non-recovery is untested.
+      doc/custom-providers.md claims the `:without-all-betas` compatibility
+      retry "leaves `"speed": "fast"` in the retried body" so a 400 caused
+      by the unverified `speed` field retries once with the same field and
+      hard-fails. The retry tests cover beta stripping
+      (`stream-anthropic-retries-without-all-betas-on-400-for-keyless-
+      bearer-test`, which uses `:speed-mode :fast` but asserts only that
+      the fast-mode beta is gone from the retry HEADERS) — none asserts the
+      retried BODY still carries `:speed "fast"` (the documented
+      non-recovery). Fix (test only): extend the keyless-bearer retry test
+      (or add a sibling) to assert the retried request body retains
+      `:speed "fast"` while the beta header is stripped, locking the
+      documented "fast-mode 400 is not auto-recoverable" degradation.
