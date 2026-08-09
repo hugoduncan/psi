@@ -578,6 +578,44 @@
           (is (seq (:models result))
               (str "documented models.edn example must resolve at least one model: " (pr-str edn))))))))
 
+(deftest committed-project-models-edn-matches-documented-deepseek-example-test
+  ;; Review 38: the committed .psi/models.edn (added d1b28eb93, used by the
+  ;; committed .psi/project.edn deepseek workflow session-profiles) is
+  ;; covered by no test — the doc parse-locks read doc/custom-providers.md
+  ;; only, so the committed file can silently drift from the shipped example
+  ;; (the review-38 recurrence: the committed deepseek model map omitted the
+  ;; :locality/:latency-tier/:cost-tier fields the documented example
+  ;; mandates, so expand-model applied the custom-model defaults
+  ;; (:locality :local) — the exact "cloud model with defaulted locality"
+  ;; misconfiguration reviews 21/33/34 fixed in the docs). Parse the
+  ;; committed file and assert its deepseek model equals the documented
+  ;; example's resolved model, so committed-file ↔ doc drift fails here in
+  ;; both directions.
+  (testing "the committed .psi/models.edn deepseek model matches the documented example"
+    (let [committed-file (io/file (repo-root) ".psi" "models.edn")
+          _              (is (.exists committed-file)
+                             "committed .psi/models.edn must exist (the delegate-review live test resolves session profiles against it)")
+          committed      (user-models/parse-models-config
+                          (edn/read-string (slurp committed-file)))
+          committed-model (first (filter #(= "deepseek-v4-flash" (:id %))
+                                         (:models committed)))
+          documented-model (first (filter #(= "deepseek-v4-flash" (:id %))
+                                          (:models (user-models/parse-models-config
+                                                    (deepseek-example-edn)))))]
+      (is (nil? (:error committed))
+          "committed .psi/models.edn must be schema-valid")
+      (is (some? committed-model)
+          "committed .psi/models.edn must carry the deepseek-v4-flash model")
+      ;; Review 21/38: the committed file must NOT fall through to the
+      ;; custom-model defaults — a cloud model with defaulted locality can
+      ;; be selected for (and charged as) a "local" helper.
+      (is (= :cloud (:locality committed-model))
+          "committed deepseek model must classify as cloud, not default to :local")
+      (is (= :low (:latency-tier committed-model)))
+      (is (= :low (:cost-tier committed-model)))
+      (is (= documented-model committed-model)
+          "committed deepseek model must equal the documented example's resolved model (no drift)"))))
+
 (deftest local-servers-auth-snippet-parses-test
   ;; Review 35: the 'Local servers and custom headers' :auth snippet (the
   ;; flagship keyless local-provider pattern, `{:auth {:auth-header? false

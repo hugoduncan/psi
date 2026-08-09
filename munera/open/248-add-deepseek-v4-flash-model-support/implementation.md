@@ -1795,3 +1795,35 @@
   set in environment; request-shaping coverage only by design. Recorded in
   steps.md as the sole remaining unchecked item.
 - Review 38 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 38 addressed (2026-08-09)
+
+- addressed 2 review steps (review-38; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- `.psi/project.edn` deepseek workflow activation kept (option b — the
+  human re-activated it three times, so reverting would invite a fifth
+  recurrence): the delegate-review live test now loads the committed
+  `.psi/models.edn` via `:project-models-path` in its temp-registry init,
+  mirroring the production bootstrap (app-runtime/psi-tool/dispatch-effects
+  all load `<cwd>/.psi/models.edn`) — the deepseek profiles resolve against
+  committed model sources, `bb test` is green with the activation in place,
+  and the test is now a durable lock (a committed profile referencing a
+  model absent from committed sources fails at test time, not after commit —
+  closing the review-28 gap). Stale "user-global models.edn — not
+  committed" comment rewritten (only the runtime DEEPSEEK_API_KEY env var
+  is user-local now).
+- Committed `.psi/models.edn` deepseek model aligned with the documented
+  example: added `:locality :cloud` / `:latency-tier :low` /
+  `:cost-tier :low` (was falling through to `:locality :local` — the
+  review-21/33/34 cloud-with-defaulted-locality misconfiguration). New
+  parse-lock `committed-project-models-edn-matches-documented-deepseek-example-test`
+  reads the committed file and asserts full-map equality with the
+  documented example's resolved deepseek model.
+- Verification: delegate-review live test green (3/21, was 18/3 failed);
+  full `bb test` green (2586 tests / 19428 assertions / 0 failures);
+  extensions suite green (364 passed / 0 failed / 1566 assertions, "1
+  unknown" = pre-existing `:integration`-meta skip); clj-kondo clean (0
+  errors, 0 warnings) on changed test files.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design. Recorded in
+  steps.md as the sole remaining unchecked item.

@@ -3098,7 +3098,7 @@
 
 ## Follow-ups (implementation review 38, 2026-08-09)
 
-- [ ] `.psi/project.edn` deepseek workflow session-profile activation is back
+- [x] `.psi/project.edn` deepseek workflow session-profile activation is back
       at HEAD — the FOURTH recurrence of the regression reviews 2/18/28
       caught and reverted. Commit d1b28eb93 ("update workflows to use
       deepseek", 2026-08-09) re-activated the deepseek map (anthropic map
@@ -3138,7 +3138,29 @@
       `.psi/models.edn`) so this regression class cannot return a fifth
       time. Whichever option, re-run `bb test` on the state being closed
       and record the result.
-- [ ] Committed `.psi/models.edn` deepseek model map omits the locality/tier
+      → Resolved (option b — keep the activation, fix the lock; decision
+      2026-08-09): the deepseek profiles remain the committed default — the
+      human re-activated them three times (b26f84f25, c90ae4043, d1b28eb93),
+      so reverting again (option a) would invite a fifth recurrence. Option
+      (b) is viable exactly because d1b28eb93 committed `.psi/models.edn`:
+      the delegate-review live test now mirrors the production bootstrap
+      (app-runtime/psi-tool/dispatch-effects all load `<cwd>/.psi/models.edn`)
+      and passes `:project-models-path` pointing at the committed file in
+      its temp-registry init — the deepseek profiles resolve against
+      committed model sources, so the test is green with the activation in
+      place, and the test becomes a durable lock for the regression class (a
+      committed profile referencing a model absent from committed model
+      sources fails deterministically at test time, not after commit — the
+      review-28 "lock fires only after commit" gap). The stale
+      "user-global models.edn — not committed" comment in `.psi/project.edn`
+      was rewritten to match the now-committed models.edn (only the runtime
+      DEEPSEEK_API_KEY env var is user-local). Verification: delegate-review
+      live test green (3 tests / 21 assertions, was 18 passed / 3 failed);
+      full `bb test` green — 2586 tests / 19428 assertions / 0 failures;
+      extensions suite green (364 passed / 0 failed / 1566 assertions, "1
+      unknown" is the pre-existing `:integration`-meta skip); clj-kondo
+      clean (0 errors, 0 warnings) on the changed test files.
+- [x] Committed `.psi/models.edn` deepseek model map omits the locality/tier
       fields the task's own documented example mandates (review 21): the
       committed `deepseek-v4-flash` map (`.psi/models.edn`, added
       d1b28eb93) has no `:locality`/`:latency-tier`/`:cost-tier`, so
@@ -3160,3 +3182,16 @@
       `.psi/models.edn` deepseek model map with the documented example (add
       the three fields), and optionally add the committed file to the
       parse-lock coverage (or a dedicated test) so it cannot drift again.
+      → Resolved: the committed `.psi/models.edn` deepseek model map now
+      carries `:locality :cloud` / `:latency-tier :low` / `:cost-tier :low`
+      exactly as the documented example mandates — no more fall-through to
+      `:locality :local` (the review-21/33/34 cloud-with-defaulted-locality
+      misconfiguration). Parse-lock coverage added:
+      `committed-project-models-edn-matches-documented-deepseek-example-test`
+      in `user_models_test.clj` reads the committed file from the repo root
+      (walk-up helper) and asserts (a) it is schema-valid, (b) its deepseek
+      model carries the three locality/tier fields, and (c) the resolved
+      model EQUALS the documented example's resolved deepseek model
+      (full-map equality — committed-file ↔ doc drift fails in both
+      directions, the same lock class as the review-6/9 doc parse-locks).
+      `psi.ai.user-models-test` green (20 tests / 138 assertions).

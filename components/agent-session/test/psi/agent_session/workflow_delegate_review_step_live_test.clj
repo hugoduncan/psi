@@ -131,9 +131,19 @@
                         :providers {"local"
                                     {:base-url "http://localhost:8080/v1"
                                      :api :openai-completions
-                                     :models [{:id "test-model"}]}}})]
+                                     :models [{:id "test-model"}]}}})
+          ;; The committed .psi/project.edn session profiles reference
+          ;; deepseek/deepseek-v4-flash (the committed default); mirror the
+          ;; production bootstrap (app-runtime/psi-tool/dispatch-effects load
+          ;; <cwd>/.psi/models.edn) so those profiles resolve against the
+          ;; committed project models file. This makes the test a durable
+          ;; lock for the review-2/18/28/38 regression class: a committed
+          ;; profile referencing a model NOT present in committed model
+          ;; sources fails here deterministically.
+          project-models-path (str (System/getProperty "user.dir") "/.psi/models.edn")]
       (try
-        (model-registry/init! {:user-models-path models-path})
+        (model-registry/init! {:user-models-path    models-path
+                               :project-models-path project-models-path})
         (let [[ctx session-id]
               #_{:clj-kondo/ignore [:invalid-arity]}
               (workflow-test-support/create-tui-context+session

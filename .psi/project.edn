@@ -45,11 +45,15 @@
      :fixing-implementation
      {:model-provider "openai"
       :model-id "gpt-5.6-sol"}}
-  ;; The deepseek alternative requires the deepseek custom provider from a
-  ;; user-global models.edn (e.g. ~/.psi/agent/models.edn) — not committed, so
-  ;; not resolvable on a fresh checkout or in CI. Flip this map in when the
-  ;; provider is configured locally; keep the committed default on catalog
-  ;; models so `bb test` (which snapshots these profiles) stays green.
+  ;; The deepseek profiles are the committed default. The provider/model
+  ;; comes from the committed .psi/models.edn (deepseek-v4-flash via
+  ;; https://api.deepseek.com/anthropic), so the profiles resolve on fresh
+  ;; checkouts and in CI — the delegate-review live test mirrors the
+  ;; production bootstrap and loads the committed project models file, so
+  ;; `bb test` (which snapshots these profiles) stays green. The only
+  ;; user-local requirement is the runtime DEEPSEEK_API_KEY env var (the
+  ;; auth spec is env:DEEPSEEK_API_KEY). The anthropic and openai maps
+  ;; above are alternatives — flip the desired map in/out locally.
   {:designing
    {:model-provider "deepseek"
     :model-id "deepseek-v4-flash"
