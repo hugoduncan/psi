@@ -1708,3 +1708,4 @@
   agent-session src), cljfmt clean, `bb commit-check:file-lengths` passes.
   Review-1 optional live smoke test remains unchecked + BLOCKED (no
   DEEPSEEK_API_KEY in env; request-shaping coverage only by design).
+- Review 36 (2026-08-08): added 2 steps to be addressed (runtime-api-key origin-tag gap; same-provider stale-spec fixed point).

@@ -2968,3 +2968,65 @@
       beta header is stripped) — locking the documented non-recovery: the
       `:without-all-betas` transform removes beta headers only, so a
       speed-field 400 retries once with the same field and hard-fails.
+
+## Follow-ups (implementation review 36, 2026-08-08)
+
+- [ ] The review-35 provider scoping of the session-stored `:runtime-api-key`
+      ignores the `:custom?` origin tag — the exact provider-name collision
+      class this task's reviews 14/25/26/27 closed at the transport layer is
+      still open in the session-data layer. `session-runtime-api-key`
+      (prompt_request.clj) compares ONLY normalized provider ids, and
+      `turn/handlers.clj` prompt-prepare records `:runtime-api-key-provider`
+      from `(get-in session-data [:model :provider])` — but the persistable
+      session model map is `{:provider (name provider) :id ... :reasoning ...}`
+      with NO `:custom?` marker, so a custom models.edn provider literally
+      named "anthropic" (or "openai") has the SAME session provider string as
+      the built-in. A session that ran a built-in Anthropic OAuth turn
+      (stored key = the live `sk-ant-oat…` token, provider "anthropic") and
+      then `/model`-switches to the custom "anthropic" provider reuses the
+      OAuth token (provider match), and the transport — `builtin?` false on
+      the `:custom? true` model — sends it as plain `x-api-key` to the custom
+      provider's third-party `:base-url`: the cross-provider credential
+      disclosure review 35 claimed to close ("a mid-session /model or
+      session-profile provider switch can no longer inject the prior
+      provider's raw key spec/literal key/OAuth token into the new provider's
+      endpoint"), still reachable via the origin collision. The reverse
+      direction (custom "anthropic" raw spec stored → switch to built-in
+      claude) leaks the custom key into api.anthropic.com the same way.
+      Verified: `session->request-options` on
+      `{:model {:provider "anthropic" :id "my-custom-model"} :runtime-api-key
+      "sk-ant-oat-…" :runtime-api-key-provider "anthropic"}` returns the
+      OAuth token. No test covers a custom provider named "anthropic"/
+      "openai" in the provider-switch test (fixtures are deepseek/minimax
+      only). Fix: include origin in the reuse check — resolve the session's
+      runtime model (or record `:runtime-api-key-custom?` at prepare) and
+      require BOTH provider and built-in/custom origin to match before
+      reusing the stored key; add a `prompt_request_test` block with a
+      custom-provider-named-"anthropic" fixture proving the stored built-in
+      OAuth token is NOT reused for the custom origin (and vice versa).
+- [ ] The same-provider stored `:runtime-api-key` is a self-perpetuating
+      fixed point that pins a stale auth spec after a models.edn `:auth`
+      change: `session-runtime-api-key` (priority 2) returns the stored RAW
+      spec (e.g. `"env:DEEPSEEK_API_KEY"` or a literal) whenever the provider
+      matches, and `prompt-prepare-request-handler` re-records that same
+      stored value each prepare — so priority 3 (`provider-auth/provider-api-key`,
+      the CURRENT registry spec) is never consulted again for that session.
+      A user who edits the provider's `:auth {:api-key ...}` in models.edn
+      (e.g. rotates the env-var NAME, or switches env: → literal) and runs
+      `/reload-models` sees NO effect in the existing session: requests keep
+      resolving the old var name (which may now be unset → hard "environment
+      variable OLD_VAR is unset" failure), contradicting doc/custom-providers.md's
+      "env: keys are re-read on every request … no reload needed" and the
+      `/reload-models` reload contract. The review-35 same-provider test
+      actually LOCKS IN the wrong precedence for custom providers: the
+      "minimax-runtime-key" stored literal wins over the registry's current
+      "minimax-registry-key". Fix: reuse the stored key only when it still
+      equals what the current resolution would return for that provider
+      (OAuth stability is preserved — `provider-api-key` re-resolves the same
+      token from the OAuth store; the custom-provider raw spec only differs
+      from the registry when the config changed), or restrict the stored-key
+      flow to OAuth/built-in credentials; add a `prompt_request_test` locking
+      that a registry `:auth` change (re-init the registry with a different
+      spec between turns) wins over the stale stored key, and update the
+      review-35 same-provider block to use an OAuth-shaped fixture so the
+      OAuth-stability intent stays covered under the corrected semantics.
