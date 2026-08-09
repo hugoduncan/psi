@@ -4269,3 +4269,72 @@
       extend `redacted-thinking-block-not-mislabeled-as-text-test` with a
       `redacted_thinking_delta` carrying a `:text` key to prove the
       explicit skip.
+
+## Follow-ups (implementation review 51, 2026-08-09)
+
+- [ ] Turn statechart has NO terminal transitions from its initial `:idle`
+      state — `components/turn-statechart/src/psi/turn_statechart/chart.clj`'s
+      `:idle` accepts only `:turn/start`; `:turn/error` and `:turn/done` are
+      silently DROPPED there (verified live 2026-08-09 via
+      `sp/process-event!`: `enabled transitions => #{}`, phase stays
+      `:idle`, `done-p` never delivered). Not reachable through the current
+      live-turn path — `create-live-turn-context` (turn-runtime/core.clj,
+      used by every prompt execution path via
+      `execute-prepared-request!`) sends the turn-level `:turn/start`
+      before the provider stream starts, so the statechart is past `:idle`
+      when provider events arrive (the review-50 item-1 note relies on
+      this) — but it is a latent structural gap in the component whose core
+      invariant the task's review-43/44/46/48 CHANGELOG entries claim
+      ("exactly one terminal event per turn"): any direct
+      `create-turn-context` consumer (tests, embeddings, a future turn path
+      that skips the turn-level `:start`) that feeds a provider
+      `:error`/`:done` as the first event gets a silent drop, `done-p`
+      never delivered, and only the 20-minute `llm-stream-idle-timeout-ms`
+      ends the turn — and the timeout branch's own
+      `(turn-sc/send-event! :turn/error ...)` is ALSO dropped from `:idle`
+      (harmless today because the timeout branch returns the result map
+      directly, but the statechart never records the terminal phase). Fix
+      (cheap, defense-in-depth): add `:turn/error` → `:error` and
+      `:turn/done` → `:done` transitions to the `:idle` state (mirroring
+      the `:text-accumulating`/`:tool-accumulating` transitions) so
+      terminal events are accepted from ANY state; add a statechart unit
+      test sending `:turn/error`/`:turn/done` from the initial state and
+      asserting the terminal phase + `done-p` delivery.
+- [ ] `emit-chat-error!` (openai chat-completions) http-status extraction
+      omits the top-level `:http_status` location the review-47-aligned
+      anthropic `"error"` branch reads: `emit-chat-error!` checks
+      `(:status chunk)` / `[:error :status]` / `[:error :http_status]`
+      only, while `stream-anthropic`'s `"error"` branch checks those three
+      PLUS top-level `(:http_status event-data)` (the review-47 claim that
+      the anthropic branch "mirrors emit-chat-error!" is a one-directional
+      alignment — the anthropic branch is a superset). An OpenAI-compatible
+      endpoint emitting a mid-stream error chunk with the status under a
+      TOP-LEVEL `http_status` key (`{"http_status": 529, "error": {...}}`)
+      loses its status on `:openai-completions`: the `:error` event carries
+      no numeric `:http-status`, downstream `retry-error?` /
+      `provider-error-kind` classify a transient 5xx/overload as `:unknown`
+      and it is not auto-retried — the exact review-47/23 class the
+      anthropic branch now handles. Fix: add `(:http_status chunk)` to the
+      `some` locations in `emit-chat-error!` and a test with a top-level
+      `http_status` on an error chunk asserting the `:error` event's
+      `:http-status`.
+- [ ] `stream-openai-codex`'s HTTP-error path drops the response headers /
+      body from the surfaced `:error` event — the only transport that does:
+      `(let [{:keys [error-message http-status]} (transport/response->error
+      response)] (emit-codex-error! ... error-message http-status))`
+      destructures AWAY `:headers`, `:body-text` and `:body` even though
+      `emit-codex-error!`'s 4-arity accepts `headers` (used by the
+      SSE `response.failed`/`error` branches), while the anthropic and
+      openai HTTP-error paths surface the full error map
+      (`(emit-error! ... (anthropic-error/response->error response request))`
+      / `(transport/emit-error! ... (transport/response->error response))`
+      include `:headers`). A codex HTTP error (e.g. a 401/429/500 from the
+      ChatGPT backend or a custom codex endpoint) therefore surfaces an
+      `:error` with no `request-id`-style headers for diagnostics, while
+      the same status on the sibling transports keeps them — the
+      cross-transport error-surface inconsistency in the exact class this
+      task's reviews 13/43/47 aligned ("mirror the sibling transports").
+      Fix: pass the full error map (headers/body-text) through to
+      `emit-codex-error!` on the HTTP-error branch (the 4-arity already
+      supports it), and add a stream test asserting a codex HTTP-error
+      response's headers appear on the `:error` event.
