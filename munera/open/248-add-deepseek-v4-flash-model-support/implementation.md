@@ -1563,3 +1563,25 @@
   - Smoke-test step remains unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).
 
 - Review 31 (2026-08-08): added 3 steps to be addressed.
+
+- Addressed 3 review-31 steps (2026-08-08): all docs/docstring-only fixes.
+  1. catalog-view :configured? docstring + CHANGELOG Changed entry now carve
+     out built-ins: request-time-resolvability semantics are custom-only;
+     built-in catalog models always report :configured? true (get-auth nil,
+     no OAuth ctx in catalog-view). 2. DeepSeek temperature note qualified:
+     :temperature sent only with BOTH :adaptive-thinking false AND thinking
+     off; classic extended-thinking shape omits temperature too; DeepSeek's
+     omission-based thinking-off defaults ON server-side so temperature+
+     thinking-ON acceptance remains unverified (no DEEPSEEK_API_KEY in env).
+     3. Adaptive-thinking no-op note extended: :adaptive-thinking true without
+     :supports-reasoning true also forfeits temperature (adaptive temperature
+     exclusion applies whenever :adaptive-thinking set, independent of
+     :supports-reasoning). No behavior change. Verification: full bb test
+     green 2580/18686 (final run; two prior runs each hit one pre-existing
+     app-runtime flake — start-tui-runtime-routes-agent-prompts-through-
+     prompt-lifecycle-test, execute-prepared-request-streaming-error-event-
+     provider-headers-drive-retry-test + execute-prepared-request-streaming-
+     exception-preserves-retry-headers-test — all pass in isolation,
+     app-runtime has zero diff across the task range), extensions 364/1566,
+     clj-kondo + cljfmt clean, file-lengths pass. Smoke-test step remains
+     unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).

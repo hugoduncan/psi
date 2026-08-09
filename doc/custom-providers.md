@@ -263,8 +263,14 @@ default for most Anthropic-compatible providers.
 true`: psi gates the thinking parameter on `:supports-reasoning`, so a model
 declaring adaptive-thinking without supports-reasoning sends a plain
 non-thinking request — no `thinking` field and no `output_config.effort`, with
-no schema error or warning. Set both flags together when you want the adaptive
-shape.
+no schema error or warning. The misconfiguration also forfeits temperature
+control: the adaptive temperature exclusion applies whenever
+`:adaptive-thinking` is set, independent of `:supports-reasoning`, so this
+model never sends `temperature` either (the temperature gate is
+`(and (not thinking) (not adaptive?))`). A user who sets
+`:adaptive-thinking true` without `:supports-reasoning true` therefore loses
+temperature silently alongside the thinking no-op. Set both flags together
+when you want the adaptive shape.
 
 Effort also applies only when a thinking level is active: `output_config.effort`
 is derived from `/thinking`/`/effort`, but psi emits it only when `thinking` is
@@ -356,12 +362,23 @@ Notes:
 - pricing/context-window figures above are from DeepSeek's published pricing
   page as of this writing; confirm current figures in DeepSeek's own docs
   before relying on them for cost tracking
-- DeepSeek's compat table lists `temperature` as fully supported, but
-  `:adaptive-thinking true` forfeits temperature control — psi never sends
-  `temperature` for adaptive-thinking models (even with thinking off). If you
-  need temperature control, set `:adaptive-thinking false` (or omit it) and
-  rely on the classic extended-thinking shape DeepSeek accepts (it honours
-  `type: "enabled"` and ignores `budget_tokens`)
+- DeepSeek's compat table lists `temperature` as fully supported, but psi
+  sends `:temperature` only when BOTH `:adaptive-thinking` is off AND thinking
+  is off: `:adaptive-thinking true` forfeits temperature control (psi never
+  sends `temperature` for adaptive-thinking models, even with thinking off),
+  and the classic extended-thinking shape (`:adaptive-thinking false` with
+  `/thinking` on — the shape the older note recommended) ALSO omits
+  `temperature` (extended thinking is incompatible with temperature on the
+  Anthropic transport). So `temperature` is sent only with
+  `:adaptive-thinking false` AND `/thinking` off. And on DeepSeek,
+  thinking-off is signaled by OMITTING the `thinking` field (psi never sends
+  an explicit disabled signal), which DeepSeek's endpoint treats as thinking
+  ON (server default) — so whether DeepSeek accepts `temperature` alongside
+  its server-side thinking default is exactly the unverified case (blocked:
+  no `DEEPSEEK_API_KEY` in env, same block as the live smoke test). If you
+  need temperature control: set `:adaptive-thinking false` (or omit it),
+  keep `/thinking` off, and verify against a live turn that DeepSeek accepts
+  `temperature` with thinking effectively ON before relying on it.
 - `output_config.effort` is confirmed supported (DeepSeek's compat table:
   "output_config: Only effort is supported"; the Thinking Mode guide
   documents the Anthropic-format effort control as

@@ -79,7 +79,13 @@
      or a RECOGNIZED auth header (x-api-key/authorization) among custom
      `:headers` with no resolvable key — incidental custom headers (e.g.
      X-Client) do NOT count as configured, mirroring the per-request
-     fast-fail they cause (review 5 semantics).
+     fast-fail they cause (review 5 semantics). The request-time-resolvability
+     semantics apply to CUSTOM providers only: BUILT-IN catalog models always
+     report `:configured? true` — `get-auth` returns nil for built-ins (no
+     registry `:auth` entry), and `catalog-view` has no OAuth context, so psi
+     cannot know from the registry alone whether a built-in's env-var key is
+     set or an OAuth login exists (review 31). The per-request missing-key
+     error remains the authoritative signal for built-ins.
 
    No implicit locality or policy labels are invented here."
   []
