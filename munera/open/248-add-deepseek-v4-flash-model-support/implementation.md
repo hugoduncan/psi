@@ -1598,3 +1598,4 @@
      Green: model-selection-test 13/120 (+1 assertion), clj-kondo + cljfmt
      clean. No behavior change. Smoke-test step remains unchecked + BLOCKED
      (no DEEPSEEK_API_KEY in env).
+- Review 33 (2026-08-08): added 2 steps to be addressed.

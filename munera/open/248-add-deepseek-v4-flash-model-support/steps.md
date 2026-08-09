@@ -2748,3 +2748,47 @@
       of only indirectly via request_support_test. Green:
       `psi.ai.model-selection-test` 13/120 (+1 assertion), clj-kondo + cljfmt
       clean. Docs + test only; no behavior change.
+
+## Follow-ups (implementation review 33, 2026-08-08)
+
+- [ ] The docs' reserved-`:custom?`-tag claim is untested: "Note on `:custom?`"
+      in doc/custom-providers.md (added review 25) states "the closed
+      model-definition schema rejects a user-supplied `:custom?` key with a
+      generic 'Invalid models.edn schema' error", but no test locks the
+      rejection side of the origin-tag guarantee. `custom-provider-models-
+      tagged-custom-test` (user_models_test.clj) locks that expand-model
+      TAGS custom models `:custom? true`, and
+      `parse-documented-deepseek-example-test` locks the shipped example
+      carries the tag, but nothing asserts a user cannot SUPPLY the tag —
+      verified manually: a models.edn model map with `:custom? true` (or
+      `:custom? false`) fails `parse-models-config` with "Invalid models.edn
+      schema" (`:malli.core/extra-key` on the closed ModelDef), which is the
+      security property that makes the origin-tag scheme trustworthy (a user
+      cannot spoof built-in classification — env-key fallback, OAuth
+      headers, mid-system inference — from models.edn). Fix (test only, in
+      scope): add a block to `custom-provider-models-tagged-custom-test` (or
+      a sibling deftest) parsing a config with a user-supplied `:custom?`
+      key (both `true` and `false`) and asserting `:error` matches "Invalid
+      models.edn schema" and `:models` is empty — locking the documented
+      reserved-tag claim in both directions.
+- [ ] The MiniMax cloud example contradicts the review-21 locality guidance:
+      "OpenAI-compatible example: MiniMax" (doc/custom-providers.md) — the
+      doc's flagship hosted/cloud custom-provider example
+      (`https://api.minimax.chat/v1`) sets `:latency-tier :medium` /
+      `:cost-tier :medium` but omits `:locality`, so it falls through to
+      `model-defaults` `:locality :local` — exactly the "cloud model with
+      defaulted locality" case the review-21 locality guidance (added to
+      "What a provider definition contains" and the DeepSeek example notes)
+      warns can be selected for (and charged as) a "local" helper. The
+      review-21 resolution explicitly scoped this out ("the pre-existing
+      MiniMax example has the same latency/cost omission but predates this
+      task"), but that scope note predates the guidance now shipping in the
+      same doc — a user copying the first example in the doc reproduces the
+      documented misconfiguration. Real risk is lower than DeepSeek's was
+      (MiniMax's `:medium`/`:medium` tiers already exclude it from the
+      strict local-helper constraint set `:latency-tier :low` +
+      `:cost-tier #{:zero :low}`), so the primary fix is consistency with
+      the documented guidance. Fix (docs option, in scope): add
+      `:locality :cloud` to the MiniMax example model map (no parse-lock
+      impact — `parse-documented-deepseek-example-test` reads only the
+      DeepSeek section).
