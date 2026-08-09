@@ -158,7 +158,15 @@
   "Resolve API key in priority order:
    1. Explicit runtime-opts :api-key
    2. Session-stored key from prior turn
-   3. Shared provider-scoped auth resolution"
+   3. Shared provider-scoped auth resolution
+
+   Raw-spec contract (review 26): for custom models.edn providers the
+   registry stores the RAW `:api-key` spec, so this may return a literal key
+   or an \"env:VAR\" string — NOT yet a concrete key (the `:runtime-api-key`
+   session-data flow stores the raw spec too). It becomes concrete only when
+   the transport re-resolves it per request via
+   `request-support/resolve-key-spec`. Callers that need a concrete key must
+   route through that shared helper."
   [ctx session-data runtime-opts]
   (let [provider (:provider (:model session-data))]
     (or (:api-key runtime-opts)

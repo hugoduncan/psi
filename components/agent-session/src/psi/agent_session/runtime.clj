@@ -51,7 +51,15 @@
    Shared provider-auth resolution keeps runtime-facing helper paths aligned
    with canonical request preparation. `session-id` is accepted for call-path
    symmetry; explicit per-call overrides still belong in runtime-opts passed to
-   prompt preparation."
+   prompt preparation.
+
+   Raw-spec contract (review 26): for custom models.edn providers the
+   registry stores the RAW `:api-key` spec, so the return value may be a
+   literal key or an \"env:VAR\" string — NOT yet a concrete key. It becomes
+   concrete only when the transport re-resolves it per request via
+   `request-support/resolve-key-spec` (the `:runtime-opts :api-key` /
+   `:runtime-api-key` session-data flow does this). Callers that need a
+   concrete key must route through that shared helper."
   [ctx _session-id ai-model]
   (provider-auth/provider-api-key ctx (:provider ai-model)))
 

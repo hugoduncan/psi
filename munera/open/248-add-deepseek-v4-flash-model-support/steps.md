@@ -2520,7 +2520,7 @@
 
 ## Follow-ups (implementation review 29, 2026-08-08)
 
-- [ ] `model_selection/catalog-view` `:configured?` no longer reflects key
+- [x] `model_selection/catalog-view` `:configured?` no longer reflects key
       resolvability after the review-26 raw-spec storage change.
       `extract-provider-auth` (user_models.clj) now stores the RAW `:api-key`
       spec (literal or "env:VAR") in the registry, and
@@ -2546,7 +2546,27 @@
       document it in the `:configured?` reference docstring + CHANGELOG and
       lock it with a test. Avoid leaving the flag silently meaning something
       different than it did before review 26.
-- [ ] `runtime/resolve-api-key-in` (and `prompt_request.clj`'s `resolve-api-key`)
+      → Resolved (option (a) — restore request-time resolvability):
+      `catalog-view` now resolves the configured `:api-key` spec through the
+      shared `request-support/resolve-key-spec` before computing
+      `:configured?`, so the flag again means "a key will resolve at request
+      time": an unset `env:` var reads as not configured (matching the
+      per-request missing-key error the transports raise), a set var reads as
+      configured, and keyless configs (`:auth-header? false` / custom
+      `:headers`) count as configured without a key (unchanged). `catalog-view`
+      docstring now documents the request-time-resolvability semantics.
+      New `catalog-view-env-api-key-resolvability-test` in
+      `model_selection_test.clj` locks all three: unset `env:` var →
+      `:configured? false`, set var (redef'd `request-support/getenv`
+      sentinel) → `:configured? true`, keyless `:auth-header? false` →
+      `:configured? true`. CHANGELOG `Changed` entry for the review-26 env:
+      re-read change extended with the catalog `:configured?` implication
+      (pre-review-26 semantics restored). No external consumers of
+      `catalog-view`/`:configured?` outside model_selection.clj + its test
+      (repo grep). Green: `psi.ai.model-selection-test` 13/117 (was 12/113;
+      +1 deftest +4 assertions), `psi.ai.providers.request-support-test`
+      12/77; clj-kondo clean (0 errors, 0 warnings).
+- [x] `runtime/resolve-api-key-in` (and `prompt_request.clj`'s `resolve-api-key`)
       docstrings do not document the review-26 raw-spec contract.
       `provider-auth/provider-api-key` returns the registry's RAW `:api-key`
       spec verbatim for custom providers (literal or "env:VAR"), so
@@ -2565,3 +2585,15 @@
       providers; concrete resolution happens per request in the transports
       via `request-support/resolve-key-spec`; `:runtime-api-key` session data
       stores the raw spec). Docstring-only; no behavior change.
+      → Resolved: both docstrings extended with the raw-spec contract —
+      `runtime.clj` `resolve-api-key-in` and `prompt_request.clj`
+      `resolve-api-key` now state the return value may be a literal key or an
+      `"env:VAR"` string for custom providers (registry stores the RAW spec,
+      review 26; `:runtime-api-key` session data stores the raw spec too),
+      that it becomes concrete only when the transport re-resolves it per
+      request via `request-support/resolve-key-spec`, and that callers
+      needing a concrete key must route through that shared helper —
+      mirroring the `provider_auth/core.clj` `provider-api-key` docstring
+      language from review 26. Docstring-only; no behavior change. Green:
+      `psi.agent-session.runtime-test` 6/42, `psi.agent-session.prompt-request-test`
+      20/59; clj-kondo clean.

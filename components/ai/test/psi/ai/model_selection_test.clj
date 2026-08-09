@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as registry]
-   [psi.ai.model-selection :as sut]))
+   [psi.ai.model-selection :as sut]
+   [psi.ai.providers.request-support :as request-support]))
 
 (use-fixtures :each
   (fn [f]
@@ -106,6 +107,43 @@
           (is (false? (get-in candidate [:reference :configured?])))))
       (finally
         (java.io.File/.delete (java.io.File. path))))))
+
+(deftest catalog-view-env-api-key-resolvability-test
+  (let [env-provider-config
+        {:version   1
+         :providers {"deepseek"
+                     {:base-url "https://api.deepseek.com/anthropic"
+                      :api      :anthropic-messages
+                      :auth     {:api-key "env:PSI_UNSET_TEST_VAR_XYZ"}
+                      :models   [{:id "deepseek-v4-flash"}]}}}
+        keyless-provider-config
+        {:version   1
+         :providers {"local-proxy"
+                     {:base-url "http://localhost:8080/v1"
+                      :api      :anthropic-messages
+                      :auth     {:auth-header? false}
+                      :models   [{:id "proxy-model"}]}}}
+        path (write-temp-models! env-provider-config)
+        keyless-path (write-temp-models! keyless-provider-config)]
+    (try
+      (testing "unset env: var reports not configured (request-time resolvability)"
+        (registry/init! {:user-models-path path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :deepseek "deepseek-v4-flash")
+                            [:reference :configured?]))))
+
+      (testing "set env: var reports configured (request-time resolvability)"
+        (with-redefs [request-support/getenv (fn [_] "sk-deepseek-sentinel")]
+          (registry/init! {:user-models-path path})
+          (is (true? (get-in (sut/find-candidate (sut/catalog-view) :deepseek "deepseek-v4-flash")
+                             [:reference :configured?])))))
+
+      (testing "keyless config still counts as configured without a key"
+        (registry/init! {:user-models-path keyless-path})
+        (is (true? (get-in (sut/find-candidate (sut/catalog-view) :local-proxy "proxy-model")
+                           [:reference :configured?]))))
+      (finally
+        (java.io.File/.delete (java.io.File. path))
+        (java.io.File/.delete (java.io.File. keyless-path))))))
 
 (deftest role-defaults-test
   (testing "known roles expose default bundles"

@@ -10,7 +10,8 @@
    Later steps will add ranking and trace production on top of these data
    structures."
   (:require
-   [psi.ai.model-registry :as model-registry]))
+   [psi.ai.model-registry :as model-registry]
+   [psi.ai.providers.request-support :as request-support]))
 
 (def ^:private default-role
   :interactive)
@@ -68,7 +69,13 @@
    v1 intentionally exposes only queryable metadata that already exists:
    - facts: provider/api/capability/context/token attrs
    - estimates: currently raw cost attributes
-   - reference: provider auth/config availability
+   - reference: provider auth/config availability; `:configured?` reflects
+     REQUEST-TIME key resolvability — an `env:` api-key spec is resolved via
+     `request-support/resolve-key-spec` (review 29 restores the pre-review-26
+     semantics: an unset env var reads as not configured, matching the
+     missing-key error the transports raise per request), while keyless
+     configs (`:auth-header? false` / custom `:headers`) count as configured
+     without a key.
 
    No implicit locality or policy labels are invented here."
   []
@@ -97,7 +104,7 @@
                               :latency-tier       (:latency-tier model)
                               :cost-tier          (:cost-tier model)}
                   :reference {:configured? (boolean (or (nil? auth)
-                                                        (:api-key auth)
+                                                        (some? (request-support/resolve-key-spec (:api-key auth)))
                                                         (seq (:headers auth))
                                                         (false? (:auth-header? auth))))}})))
         (sort-by (juxt :provider :id))
