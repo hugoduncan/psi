@@ -4420,3 +4420,64 @@
       `CodexStreamFailurePreservesRetryMetadata` guidance and the
       `StreamEvent.headers` field in `spec/openai-provider.allium` updated;
       CHANGELOG `Fixed` entry.
+
+## Follow-ups (implementation review 52, 2026-08-09)
+
+- [ ] The review-50 `:start`-before-terminal fix is incomplete on the ERROR
+      paths of the two OpenAI transports: `emit-chat-error!`
+      (`:openai-completions`) and `emit-codex-error!`
+      (`:openai-codex-responses`) emit `[:error]` with NO preceding `:start`
+      when the stream errors before producing any output event, while the
+      review-50-fixed anthropic `"error"` branch emits `[:start :error]`
+      (verified against the committed code — neither error emitter calls
+      `emit-stream-start!`/`emit-codex-start!`; the review-50 resolution's
+      "mirroring the openai/codex siblings" claim is false for the error
+      path: the siblings' error emitters never emitted `:start`). The
+      existing error tests don't catch it because both start with a
+      content/role chunk that triggers `:start` via the non-error path
+      (`completions-sse-error-event-emits-error-and-terminates-test` starts
+      with `{:choices [{:delta {:role "assistant"}}]}`, and
+      `codex-error-then-trailing-output-text-delta-no-text-delta-test`
+      starts with `response.output_text.delta`) — neither exercises an
+      error-FIRST stream. Within the anthropic transport the same gap
+      remains on the `message_delta`-with-`stop_reason` terminal: that
+      branch emits `[:done]` without `:start` (review 50 tested
+      `message_stop`-first and empty-body, not `message_delta`-first), so
+      `message_delta`-first yields `[:done]` while `message_stop`-first
+      yields `[:start :done]`. Fix: emit `:start` once in
+      `emit-chat-error!`/`emit-codex-error!` (compare-and-set on the
+      existing `stream-started?`/`started?` atoms) and in the anthropic
+      `message_delta` terminal branch (or route it through a shared
+      start-first terminal helper), plus stream tests for error-first
+      streams on all three transports (and a `message_delta`-first block on
+      the anthropic test) asserting the emitted sequences — the same
+      three-transport consistency class review 50 treated as actionable.
+- [ ] The review-51 codex HTTP-error headers fix left the sibling CATCH
+      block dropping the same data: `stream-openai-codex`'s
+      `(catch Exception e (let [{:keys [error-message http-status]}
+      (transport/exception->error e)] (emit-codex-error! ...)))` still
+      destructures away `:headers`/`:body-text`/`:body` and calls the
+      3-arity (headers nil), even though `transport/exception->error`
+      returns them when the exception's ex-data carries them and
+      `emit-codex-error!`'s 4-arity accepts headers — the exact class
+      review 51 just fixed on the HTTP-error branch. Reachability is lower
+      (non-HTTP stream exceptions rarely carry response headers), but the
+      fix is the same one-line destructure change; pass `headers` through
+      (and consider `:body-text` via the 4-arity's error map) for
+      consistency with the review-51-fixed branch.
+- [ ] Codex double-captures mid-stream SSE errors while the other two
+      transports capture once: `handle-codex-event!` captures the raw
+      `response.failed`/`error` event at its top, then `emit-codex-error!`
+      captures the CONSTRUCTED `:error` event again — two
+      `:on-provider-response` callbacks per codex mid-stream error. The
+      anthropic `"error"` branch and openai `emit-chat-error!` capture only
+      the raw SSE line (the constructed `:error` with normalized
+      `:http-status`/`:headers` is never in the capture payload). The
+      capture payloads therefore differ per transport for the same error
+      class (codex: raw + normalized; anthropic/openai: raw only) — the
+      capture-consistency class reviews 7/11/13/19/37 treated as
+      actionable. Decide: drop the raw-event capture from the codex
+      mid-stream-error path (keep the constructed capture, matching the
+      transports' HTTP-error-path behavior), or align the other transports
+      to also capture the constructed error; add a capture-count/payload
+      assertion to the codex SSE error tests.
