@@ -178,26 +178,38 @@
               (workflow-test-support/create-tui-context+session
                mutations/all-mutations
                {:session-defaults {:model {:provider "local" :id "test-model" :reasoning false}}})]
-          ;; Durable-lock fail-loud assertion (review 40): the session
+          ;; Durable-lock fail-loud assertions (reviews 40 + 45): the session
           ;; worktree must resolve the committed .psi/project.edn (deepseek
-          ;; default profiles), so the run's session-profile snapshot
-          ;; contains the :reviewing-implementation deepseek profile. From a
-          ;; component-local cwd this fails loud instead of running with nil
-          ;; profiles and an unrelated "Unknown workflow" error.
-          (let [worktree-path  (ss/session-worktree-path-in ctx session-id)
-                snapshot       (session-profiles/profile-snapshot worktree-path)
-                review-profile (get-in snapshot [:profiles :reviewing-implementation])]
-            (is (contains? (:profiles snapshot) :reviewing-implementation)
-                (str "session-profile snapshot must contain the committed deepseek "
-                     ":reviewing-implementation profile — worktree " worktree-path
-                     " profiles " (pr-str (keys (:profiles snapshot)))))
-            (is (true? (:valid? review-profile))
-                (str ":reviewing-implementation must resolve validly — "
-                     (pr-str (:diagnostics review-profile))))
-            (is (= {:provider "deepseek" :id "deepseek-v4-flash"}
-                   (select-keys (get-in review-profile [:settings :model])
-                                [:provider :id]))
-                "the :reviewing-implementation profile must resolve to the committed deepseek/deepseek-v4-flash model (durable lock)"))
+          ;; default profiles), and ALL SEVEN committed session profiles must
+          ;; be present, valid, and resolve to the committed deepseek model.
+          ;; Review 45 extended the lock from :reviewing-implementation alone:
+          ;; a single-profile regression (one profile removed, retargeted at
+          ;; a nonexistent/typo'd model or provider, an invalid
+          ;; :thinking-level, or re-pointed at the commented anthropic/openai
+          ;; map) previously passed bb test green and failed only at
+          ;; delegated-workflow runtime. From a component-local cwd this
+          ;; fails loud instead of running with nil profiles and an unrelated
+          ;; "Unknown workflow" error.
+          (let [worktree-path      (ss/session-worktree-path-in ctx session-id)
+                snapshot           (session-profiles/profile-snapshot worktree-path)
+                committed-profiles [:designing :fixing-design :planning
+                                    :fixing-plan :implementing
+                                    :reviewing-implementation
+                                    :fixing-implementation]]
+            (doseq [profile-name committed-profiles]
+              (let [profile (get-in snapshot [:profiles profile-name])]
+                (is (contains? (:profiles snapshot) profile-name)
+                    (str "session-profile snapshot must contain the committed deepseek "
+                         profile-name " profile — worktree " worktree-path
+                         " profiles " (pr-str (keys (:profiles snapshot)))))
+                (is (true? (:valid? profile))
+                    (str profile-name " must resolve validly — "
+                         (pr-str (:diagnostics profile))))
+                (is (= {:provider "deepseek" :id "deepseek-v4-flash"}
+                       (select-keys (get-in profile [:settings :model])
+                                    [:provider :id]))
+                    (str "the " profile-name " profile must resolve to the committed "
+                         "deepseek/deepseek-v4-flash model (durable lock)")))))
           (workflow-test-support/init-built-in-workflow! ctx session-id)
           (try
             (workflow-test-support/load-all-workflow-definitions! ctx)

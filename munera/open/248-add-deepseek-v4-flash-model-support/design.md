@@ -203,6 +203,29 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   for anthropic-path thinking-block stops — DeepSeek returned a `thinking`
   content block in the live smoke test (2026-08-09), so the mislabel was
   reachable on this task's newly shipped provider.
+- **HTTP-400 compatibility retry OAuth decision (review 22):**
+  `handle-400-response!`'s `:without-all-betas` selection now uses the
+  transport's COMPUTED OAuth decision — `build-request` attaches the
+  computed `oauth?` boolean (built-in Anthropic model + OAuth-shaped key,
+  review 11) to the request map as `::oauth?`, and the 400-fallback's
+  beta-config reads it — instead of content-sniffing the merged request
+  headers for the three Claude Code CLI markers (`Authorization: Bearer …`,
+  `user-agent: claude-cli/…`, `x-app: cli`). A keyless custom provider whose
+  custom `:headers` reproduce that marker set is no longer classified OAuth:
+  on a beta-related 400 it now selects `:without-all-betas` (all beta
+  headers stripped on the retry, custom headers preserved) instead of
+  retaining every beta, repeating the same 400 and hard-failing. This is a
+  custom-provider behavior change with its own CHANGELOG `Fixed` entry; the
+  content-sniffing `oauth-auth-request?` predicate remains for error
+  diagnostics only.
+- **Shared keyless-predicate unification (review 22):**
+  `request-support/resolve-api-key`'s keyless early-return now uses the
+  shared `no-auth?` predicate (`:no-auth-header`, or a recognized
+  `x-api-key`/`Authorization` header among custom `:headers` with no
+  configured key) instead of testing `:no-auth-header` alone, so the
+  function is safe for direct callers and the keyless contract lives in one
+  predicate. Pure refactor — no behavior change (all real callers already
+  gate on `no-auth?` first).
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -277,6 +300,16 @@ In scope:
     flows through purely from the schema change.
   - Document the new field in `doc/custom-providers.md` next to the
     Anthropic-compatible example.
+- **Mid-conversation system-message capability field (review 22, pulled into
+  scope):** add `[:supports-mid-conversation-system-messages {:optional true}
+  [:maybe boolean?]]` to the `ModelDef` schema in
+  `components/ai/src/psi/ai/user_models.clj` (the canonical `Model` schema
+  already declared it; models.edn custom providers could not declare it at
+  all). It flows through `expand-model`'s verbatim merge, is documented in
+  `doc/custom-providers.md` (what it gates, the `:anthropic-messages`
+  default-false, the built-in-only `:openai`/`:openai-completions`
+  inference), and the DeepSeek example notes advise setting it only after
+  verifying the endpoint honours per-turn `system` changes.
 - A focused unit test proving psi's existing Anthropic transport shapes a
   request correctly for this exact custom-provider model map: `x-api-key`
   header from the configured key (not OAuth path), `anthropic-version`
@@ -343,9 +376,11 @@ independently confirms native JSON-Schema support can add
 - `doc/custom-providers.md` documents the new `:adaptive-thinking` custom
   model field (what it does, when to set it, and that it is only meaningful
   for `:api :anthropic-messages` custom providers).
-- `ModelDef` in `user_models.clj` accepts `:adaptive-thinking true/false` and
-  the parsed model map carries it through unchanged; omitting it remains
-  valid and behaves exactly as today (falsy → classic extended thinking).
+- `ModelDef` in `user_models.clj` accepts `:adaptive-thinking true/false`
+  (and the review-22 `:supports-mid-conversation-system-messages true/false`
+  field) and the parsed model map carries it through unchanged; omitting it
+  remains valid and behaves exactly as today (falsy → classic extended
+  thinking / no mid-conversation-system-message capability).
 - A unit test proves the `:anthropic-messages` transport builds a correct
   request (headers, URL, body) for a DeepSeek-shaped custom-provider model
   map, including the adaptive `output_config.effort` shape when
@@ -359,9 +394,11 @@ independently confirms native JSON-Schema support can add
   documented in the revision note (provider-scoped API-key resolution,
   `:no-auth-header` key tolerance, OAuth content-sniff gating to built-in
   models, case-insensitive capture redaction, the `:custom?` origin tag
-  closing provider-name-based built-in detection, mid-stream SSE error-event
-  surfacing + the terminal-event guard on both transports, and
-  `:thinking-end` labeling for thinking-block stops); `gpt-5.5`/`gpt-5.6-*`/
+  closing provider-name-based built-in detection, the HTTP-400-compatibility-
+  retry OAuth decision (computed `::oauth?` from `build-request`, replacing
+  the header content-sniff), mid-stream SSE error-event surfacing + the
+  terminal-event guard on both transports, and `:thinking-end` labeling for
+  thinking-block stops); `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.
 - CHANGELOG `[Unreleased]` → `Added` entry.

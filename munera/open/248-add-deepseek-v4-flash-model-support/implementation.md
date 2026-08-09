@@ -2138,3 +2138,23 @@ Review 44 (2026-08-09): added 2 steps to be addressed.
   lines). All steps.md items checked (0 unchecked).
 
 Review 45 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 45 addressed (2026-08-09)
+
+- addressed 2 review steps
+- design.md "Revision note (implementation reviews)" now enumerates the
+  review-22 provider-transport changes (HTTP-400 compatibility retry OAuth
+  decision — computed `::oauth?` threaded from `build-request` replaces the
+  header content-sniff for `:without-all-betas` selection; shared `no-auth?`
+  keyless-predicate unification in `request-support/resolve-api-key` — pure
+  refactor), and the In-scope list + AC schema bullet name the review-22
+  `[:supports-mid-conversation-system-messages {:optional true}
+  [:maybe boolean?]]` ModelDef schema field; AC exception wording names the
+  OAuth decision.
+- Delegate-review live test durable lock extended from
+  `:reviewing-implementation` alone to ALL SEVEN committed
+  `.psi/project.edn` deepseek profiles (present, `:valid?`, resolve to
+  deepseek/deepseek-v4-flash) — a single-profile regression now fails the
+  live test instead of surfacing only at delegated-workflow runtime.
+  Namespace green (3 tests / 42 assertions); clj-kondo clean; file-length
+  gate fine.

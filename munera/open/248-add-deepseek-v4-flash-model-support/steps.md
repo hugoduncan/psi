@@ -3748,7 +3748,7 @@
 
 ## Follow-ups (implementation review 45, 2026-08-09)
 
-- [ ] design.md's "Revision note (implementation reviews)" enumeration and the
+- [x] design.md's "Revision note (implementation reviews)" enumeration and the
       AC exception wording are still incomplete for the review-22 provider
       changes — review 44 added the review-43/44 bullets, but review-22's
       provider-transport changes were never enumerated, so the note's opening
@@ -3778,7 +3778,31 @@
       revision-note enumeration (or qualify the "only" claim) and name the
       schema field in the design's schema scope / AC, keeping the design
       artifact coherent with the implemented behavior per the change chain.
-- [ ] The delegate-review live test's durable lock covers only the
+      → Resolved: design.md "Revision note (implementation reviews)" now
+      carries two review-22 bullets — "HTTP-400 compatibility retry OAuth
+      decision (review 22)" (the computed `::oauth?` boolean threaded from
+      `build-request` into `handle-400-response!`'s beta-config replaces the
+      three-marker header content-sniff for `:without-all-betas` selection; a
+      keyless custom provider reproducing the Claude Code CLI marker set now
+      gets its betas stripped on a beta-related 400 instead of retaining
+      every beta and hard-failing; content-sniffing `oauth-auth-request?`
+      remains for error diagnostics only; a custom-provider behavior change
+      with its own CHANGELOG `Fixed` entry) and "Shared keyless-predicate
+      unification (review 22)" (`resolve-api-key`'s keyless early-return now
+      uses the shared `no-auth?` predicate — pure refactor, no behavior
+      change) — the "only provider-transport changes" claim now holds. The
+      In-scope list gains a "Mid-conversation system-message capability
+      field (review 22, pulled into scope)" bullet naming the
+      `[:supports-mid-conversation-system-messages {:optional true}
+      [:maybe boolean?]]` `ModelDef` schema field (canonical `Model` schema
+      already had it; models.edn custom providers could not declare it),
+      and the AC schema bullet now names both fields ("accepts
+      `:adaptive-thinking true/false` (and the review-22
+      `:supports-mid-conversation-system-messages true/false` field)").
+      The AC exception wording names the HTTP-400-compatibility-retry OAuth
+      decision alongside the other review-driven custom-provider behavior
+      changes.
+- [x] The delegate-review live test's durable lock covers only the
       `:reviewing-implementation` profile: the snapshot assertions check that
       ONE profile is present, valid, and resolves to
       deepseek/deepseek-v4-flash. The other six committed `.psi/project.edn`
@@ -3802,3 +3826,19 @@
       session-profiles all resolve against the committed `.psi/models.edn`
       deepseek model), so a partial profile regression fails loud instead of
       surfacing at workflow runtime.
+      → Resolved (live-test extension, the item's first option):
+      `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+      now doseqs ALL SEVEN committed `.psi/project.edn` session profiles
+      (`:designing :fixing-design :planning :fixing-plan :implementing
+      :reviewing-implementation :fixing-implementation`) from the
+      `session-profiles/profile-snapshot`, asserting each is present in the
+      snapshot, `:valid?` (covers the invalid-`:thinking-level` and
+      unknown-model regression sub-classes — `resolve-profile` marks both
+      invalid), and resolves to `{:provider "deepseek"
+      :id "deepseek-v4-flash"}` (covers retargeting at a nonexistent/typo'd
+      model or provider and re-pointing at the commented anthropic/openai
+      map). A single-profile regression now fails the live test
+      deterministically instead of surfacing only at delegated-workflow
+      runtime. Namespace green (3 tests / 42 assertions — the snapshot block
+      grew from 3 to 21 assertions); clj-kondo clean (0 errors, 0 warnings);
+      file-length gate fine (263 lines &lt; 800).
