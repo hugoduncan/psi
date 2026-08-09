@@ -3460,3 +3460,45 @@
       `workflow-async-path-test` (6/29) and `workflow-tui-repro-test`
       (2/11) green; clj-kondo clean (0 errors, 0 warnings) on all changed
       files; `bb commit-check:file-lengths` passes (exit 0).
+
+## Follow-ups (implementation review 42, 2026-08-09)
+
+- [ ] `provider-auth/provider-api-key` and `provider-auth/provider-request-options`
+      resolve registry auth purely by provider NAME (`model-registry/get-auth`),
+      and `prompt_request/session->request-options` + `resolve-api-key` consume
+      them without consulting the session model's `:custom?` origin tag (review
+      14) — so the provider-name-collision class reviews 14/25/26/27/36 closed
+      at the transport layer (`builtin?`/`builtin-anthropic?` on the resolved
+      model map), capability inference (`builtin-openai-chat-completions?`) and
+      session-data (`session-runtime-api-key` origin gate) is STILL OPEN at the
+      session request-options layer: when a custom models.edn provider is
+      literally named "anthropic"/"openai", `parse-providers` keys the registry
+      `:auth` entry by that provider name, and a session running the BUILT-IN
+      same-named model inherits the custom provider's auth config. Verified
+      end-to-end (models.edn with an "anthropic" provider carrying `:headers
+      {"x-api-key" "THIRD-PARTY-KEY"}` → a built-in `claude-opus-4-8` session's
+      `session->request-options` carries the custom headers and
+      `request-support/no-auth?` is TRUE → the transport resolves no key (the
+      built-in's own `ANTHROPIC_API_KEY`/OAuth is never resolved) and merges the
+      custom `x-api-key` onto the wire to api.anthropic.com; variant with
+      `:api-key "env:MY_THIRD_PARTY_KEY"` → the built-in's request options carry
+      the custom provider's spec and the transport resolves/sends that
+      third-party key to api.anthropic.com, or fails with the custom provider's
+      "environment variable MY_THIRD_PARTY_KEY is unset" error instead of
+      falling back to `ANTHROPIC_API_KEY`). No test covers this layer
+      (`built-in-provider-no-auth-injection-test` only covers a clean registry
+      with no `:anthropic` auth entry). Fix: gate registry-auth options/key
+      resolution on the session model's `:custom?` origin — apply
+      `provider-request-options`/`provider-api-key` only for custom models (e.g.
+      thread the resolved model's `:custom?` into provider-auth, or branch in
+      `session->request-options`/`resolve-api-key` on `session-model-custom?` so
+      built-in models resolve only env/OAuth) — plus regression tests for both
+      the headers/`:no-auth-header` variant and the api-key variant.
+- [ ] `prompt_request/session-model-custom?` docstring misstates the persistable
+      session model shape: it says the map "carries only `{:provider (name
+      provider) :id :reasoning}`" — but the canonical persistable shape
+      (`model-registry/persistable-model`, used by `/model`/RPC/TUI selection)
+      is `{:provider (name provider) :id model-id :reasoning bool}`: `:id` holds
+      the model-id string and `:reasoning` is a separate boolean key, not the
+      `:id` value. Fix the docstring so a reader does not believe the session
+      model's `:id` is a `:reasoning` keyword.

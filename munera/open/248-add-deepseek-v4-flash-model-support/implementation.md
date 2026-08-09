@@ -1962,3 +1962,4 @@
   (a87816dd9/008b1e094). Re-run after the flake: full `bb test` green —
   2586 tests / 18722 assertions / 0 failures (assertion count varies
   run-to-run per the review-5 analysis).
+- Review 42 (2026-08-09): added 2 steps to be addressed.
