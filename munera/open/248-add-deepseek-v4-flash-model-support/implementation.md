@@ -2561,3 +2561,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   `bb commit-check:file-lengths` passes (anthropic.clj 780, all test files
   under 800 after the capture-split + test-file moves).
 - Review 56 (2026-08-09): added 2 steps to be addressed.
+- Review 57 (2026-08-09): added 1 step to be addressed.

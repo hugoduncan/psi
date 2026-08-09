@@ -4795,3 +4795,47 @@
       (FAIL pre-fix / PASS post-fix), and extend the same CHANGELOG
       "no unbalanced or open block events at the terminal" wording (the
       claim is currently scoped to the `:done` paths only).
+
+## Follow-ups (implementation review 57, 2026-08-09)
+
+- [ ] The non-streaming `execute-anthropic` response mapping drops
+      `tool_use` blocks entirely — `response->assistant-message` builds the
+      assistant message `:content` via `text-content-blocks`, which keeps
+      only `"text"` blocks, so a non-streaming response whose `:content`
+      contains a `tool_use` block (Anthropic's tool-call shape, fully
+      supported by DeepSeek per its compat table) yields an assistant
+      message with NO `:tool-call` block while `:stop-reason :tool_use` is
+      preserved (probe-verified: response `{:content [{:type "tool_use"
+      :id "toolu_01" :name "get_weather" :input {}} {:type "text" :text
+      "Let me check"}] :stop_reason "tool_use"}` → assistant `{:content
+      [{:type :text :text "Let me check"}] :stop-reason :tool_use}` — the
+      tool call is silently lost). The turn-runtime's
+      `classify-assistant-message`/`extract-tool-calls` then finds no
+      `:tool-call` block, classifies the turn `:turn.outcome/stop` instead
+      of `:turn.outcome/tool-use`, and the tool call NEVER executes — a
+      silent functional loss (no error, no retry), reachable on the newly
+      shipped DeepSeek provider (and every `:anthropic-messages` custom
+      provider) via `response-mode :non-streaming` sessions with tools
+      enabled. This is inconsistent with BOTH the `:openai-completions`
+      sibling — `completion-message->content` maps `:tool_calls` into
+      `:tool-call` blocks (tool calls survive on the non-streaming openai
+      execute path) — and the anthropic transport's own STREAMING path
+      (the accumulator's `tool-content-blocks` keeps tool calls in the
+      final content); the non-streaming execute path is the only path that
+      drops them. The reviews 43-56 hardened the streaming transports
+      citing "reachable on the newly shipped DeepSeek provider" — the
+      non-streaming execute response mapping was never reviewed for tool
+      handling (the only execute-path reviews were the 400-fallback
+      asymmetry, review 45, and the usage-mapping notes, reviews 47/48;
+      no test covers `execute-anthropic` with a `tool_use` response — all
+      `:execute` anthropic tests are structured-output/usage/400-only).
+      Fix: map `tool_use` blocks to `:tool-call` content blocks in
+      `response->assistant-message` (mirroring `completion-message->content`'s
+      `tool-call-block` shape — id/name/arguments — and/or the streaming
+      accumulator's `tool-content-blocks`), + a non-streaming execute test
+      with a `tool_use` response asserting the `:tool-call` block survives
+      with its id/name/arguments (FAIL pre-fix / PASS post-fix per the
+      established pattern). (The same `text-content-blocks` mapping also
+      drops `thinking` blocks on the non-streaming execute path while the
+      streaming path keeps them in the final content — informational, but
+      the same mapping should preserve or document them.)
