@@ -1436,3 +1436,9 @@
   9/30, `psi.ai.user-models-test` 16/116 (doc parse-lock unaffected by the
   prose edits), `psi.agent-session.model-dispatch-test` 13/161 green;
   clj-kondo clean; `bb commit-check:file-lengths` passes.
+
+## Review 28 (2026-08-08)
+
+- added 3 steps to be addressed (bb test red at HEAD — deepseek session
+  profiles re-activated; model_capabilities docstring stale claim;
+  resolve-api-key-spec production-dead)

@@ -2384,3 +2384,74 @@
       `psi.ai.providers.openai-codex-test` 9 tests / 30 assertions green;
       `bb commit-check:file-lengths` passes (exit 0); clj-kondo clean on the
       changed test file.
+
+## Follow-ups (implementation review 28, 2026-08-08)
+
+- [ ] Committed `.psi/project.edn` at HEAD re-activates the deepseek
+      workflow session-profiles → `bb test` is RED again for the documented
+      review-18 reason. Review 18 (2026-08-08) found the identical
+      regression when post-task human commit b26f84f25 re-enabled the
+      deepseek profiles and RESOLVED it by restoring the committed default
+      to built-in anthropic catalog profiles (deepseek + openai maps
+      commented, explanatory note kept; the delegate-review live test fails
+      deterministically everywhere — "unknown model
+      deepseek/deepseek-v4-flash", because the live test snapshots the
+      committed session profiles against a temp model registry containing
+      only `local/test-model`, so the deepseek profiles are unresolvable on
+      every machine, user-global models.edn notwithstanding). The SAME
+      regression has now re-occurred at HEAD: commit c90ae4043 ("update
+      workflows to use deepseek", 2026-08-08 20:04, sitting on top of the
+      review-27 address commit c9a783040) re-activated the deepseek map, and
+      the current committed tree fails
+      `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+      (verified deterministic, `.scry-results` EDN: 3 failed assertions,
+      `:execution-error {:reason :invalid-session-profile ... :message
+      "unknown model deepseek/deepseek-v4-flash"}`; full suite 2578 passed /
+      1 failed). This violates the design AC "`bb test` green" on the state
+      being closed. Fix per the review-18 decision (option b — revert the
+      activation; option (a) "treat as intentional user-local override
+      excluded from the AC" was already rejected because the failure is not
+      CI-only): revert c90ae4043's `.psi/project.edn` activation so the
+      committed default stays on built-in catalog models (deepseek map
+      commented, one-line local flip preserved), then re-run the full suite
+      on the state being closed and record the result. Consider a
+      commit-check (or a lock in the delegate-review live test itself) that
+      fails when the committed session profiles reference a non-catalog
+      model, so this regression class cannot silently return a third time.
+- [ ] `model_capabilities.clj` `supports-mid-system-messages?` docstring
+      retains a stale, self-contradictory claim from before the review-25/26
+      built-in gating: "OpenAI chat-completions support is also inferred
+      from the runtime API shape so custom/runtime-loaded OpenAI chat models
+      do not need to carry psi-specific metadata — but only for built-in
+      catalog models: the inference is gated on the review-14 `:custom?`
+      origin tag ..." The first clause ("custom ... models do not need to
+      carry psi-specific metadata") directly contradicts the built-in-only
+      gating it documents in the second clause and the actual code
+      (`request-support/builtin-openai-chat-completions?`): a custom
+      models.edn OpenAI-compatible provider is tagged `:custom? true` and
+      does NOT get the inference — it must declare
+      `:supports-mid-conversation-system-messages` explicitly. This is the
+      same stale-claim class review 27 fixed in doc/custom-providers.md and
+      CHANGELOG, but the code docstring was missed. Fix: reword the first
+      clause (e.g. "so built-in OpenAI chat-completions models do not need
+      to carry psi-specific metadata; custom models.edn providers must
+      declare the field explicitly"), keeping the api constraint note
+      (codex-routed built-ins must not match).
+- [ ] `user_models/resolve-api-key-spec` is production-dead since review 26
+      and its shared-helper docstring claims a delegation that no longer
+      happens. `extract-provider-auth` now stores the RAW `:api-key` spec
+      (review 26), so nothing in production calls
+      `user_models/resolve-api-key-spec` — only
+      `user_models_test.clj`'s `resolve-api-key-spec-test` references it
+      (verified by repo-wide grep). Meanwhile `request_support.clj`
+      `resolve-key-spec`'s docstring still states "The config-parse layer
+      (`user_models/resolve-api-key-spec`) delegates here so env-lookup
+      testability lives in one place" — stale, since the config-parse layer
+      no longer resolves at parse time. Fix (either): (a) delete the dead
+      wrapper and point `resolve-api-key-spec-test` at
+      `request-support/resolve-key-spec` (the shared helper's own tests
+      already cover the same cases), or (b) keep it as a deliberate
+      test-facing/public delegation but correct both docstrings to say it is
+      retained for API/test stability only, not a parse-time resolution
+      path. Avoid leaving a public function whose only callers are tests and
+      whose docstrings describe a parse-time contract that no longer exists.
