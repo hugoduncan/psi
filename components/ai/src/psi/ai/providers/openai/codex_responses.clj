@@ -267,7 +267,7 @@
 (defn- emit-codex-error!
   ([model stream-state consume-fn options url msg http-status]
    (emit-codex-error! model stream-state consume-fn options url msg http-status nil))
-  ([model {:keys [done? started?]} consume-fn options url msg http-status headers]
+  ([model {:keys [done? started? open-tool-indexes tool-args-by-index]} consume-fn options url msg http-status headers]
    (when-not @done?
      (reset! done? true)
      ;; Review 52: emit :start first when the stream never emitted it (an
@@ -281,6 +281,20 @@
      ;; caught it because they start with an output event that triggers
      ;; :start via the non-error path).
      (emit-codex-start! consume-fn started?)
+     ;; Review 56: balance open tool calls before the :error — every codex
+     ;; error path (response.failed/error SSE events, the HTTP-error
+     ;; branch, the catch block) shares this emitter, and none previously
+     ;; balanced open-tool-indexes (only emit-codex-done! did), so a
+     ;; function_call output item followed by response.failed finalized the
+     ;; turn accumulator with an OPEN tool index (review 55's open-tool
+     ;; balancing covered only the :done path). The doseq mirrors
+     ;; emit-codex-done!'s — every open index gets :toolcall-end before the
+     ;; :error. A no-op when no tool calls were started (an error-first or
+     ;; HTTP-error stream — those fire before any output item was added).
+     (doseq [idx @open-tool-indexes]
+       (consume-fn {:type :toolcall-end :content-index idx}))
+     (reset! open-tool-indexes #{})
+     (reset! tool-args-by-index {})
      (let [err (cond-> {:type :error :error-message msg}
                  http-status (assoc :http-status http-status)
                  headers (assoc :headers headers))]

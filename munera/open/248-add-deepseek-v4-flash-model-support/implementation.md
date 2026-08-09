@@ -2562,3 +2562,38 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   under 800 after the capture-split + test-file moves).
 - Review 56 (2026-08-09): added 2 steps to be addressed.
 - Review 57 (2026-08-09): added 1 step to be addressed.
+- Addressed review 56 + 57 steps (2026-08-09): the two review-56 open-block/
+  open-tool balancing steps and the review-57 non-streaming execute tool_use
+  step are implemented, tested, and documented (see steps.md resolutions for
+  full detail):
+  - Review 56 item 1 (anthropic error-path balancing): shared
+    `balance-open-blocks!` helper (extracted from `emit-terminal-done!`'s
+    inline doseq) now runs before the `:error` in the mid-stream `"error"`
+    branch and the catch block, and before the inline `:done` in the
+    `message_delta`-with-`stop_reason` terminal — the HTTP-error path needs
+    no balancing (fires before any SSE line). 4 new stream tests (FAIL
+    pre-fix / PASS post-fix). CHANGELOG + `TerminalEmitsEndEventsForOpenBlocks`
+    spec rule + design.md wording de-overclaimed to "every terminal —
+    `:done` or `:error`".
+  - Review 56 item 2 (openai/codex error-path tool balancing):
+    `emit-chat-error!` + the `stream-openai` catch block call
+    `force-start-pending-chat-tools!`/`emit-chat-tool-ends!`;
+    `emit-codex-error!` (all codex error paths) now doseqs `:toolcall-end`
+    over `open-tool-indexes` like `emit-codex-done!`. 3 new stream tests
+    (FAIL pre-fix / PASS post-fix). New `ErrorPathEmitsToolCallEndsForOpenToolCalls`
+    + `CodexErrorEmitsToolCallEndsForOpenToolCalls` spec rules; CHANGELOG +
+    design.md updated.
+  - Review 57 (non-streaming execute drops tool_use): `text-content-blocks`
+    replaced by `non-streaming-content-blocks` (wire-order mapping: tool_use
+    → `:tool-call` id/name/arguments with `:input` JSON-encoded, thinking →
+    `:thinking` text/signature, text → `:text`) so a non-streaming `tool_use`
+    response yields a `:tool-call` block and the turn runtime classifies
+    `:turn.outcome/tool-use` (the tool call executes instead of being
+    silently lost on `response-mode :non-streaming` sessions with tools,
+    reachable on the newly shipped DeepSeek provider). 2 new execute tests
+    (FAIL pre-fix / PASS post-fix). Spec section comment + CHANGELOG +
+    design.md updated.
+  - `bb clojure:test:scry` green on the touched namespaces (anthropic-test
+    18/106, anthropic-stream-termination-test 18/46, openai-codex-test
+    14/52, openai-completions-stream-test 10/32); clj-kondo clean on changed
+    files.

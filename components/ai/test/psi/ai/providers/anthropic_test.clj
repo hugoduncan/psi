@@ -2,6 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
+   [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
@@ -614,3 +615,70 @@
           beta  (get-in req [:headers "anthropic-beta"])]
       (is (re-find #"fast-mode-2026-02-01" beta))
       (is (re-find #"interleaved-thinking" beta)))))
+
+;; ── non-streaming execute response mapping ──────────────────────────────────
+
+(deftest execute-anthropic-preserves-tool-use-blocks-test
+  ;; Review 57: the non-streaming execute response mapping previously kept
+  ;; only "text" blocks (text-content-blocks) — a response containing a
+  ;; tool_use block silently dropped the tool call while :stop-reason
+  ;; :tool_use was preserved, so classify-assistant-message /
+  ;; extract-tool-calls recorded :turn.outcome/stop and the tool call never
+  ;; executed (reachable on the newly shipped DeepSeek provider via
+  ;; response-mode :non-streaming sessions with tools; inconsistent with
+  ;; BOTH the :openai-completions sibling and the anthropic transport's own
+  ;; streaming accumulator). The mapping now mirrors those paths: tool_use →
+  ;; :tool-call (id/name/arguments, :input JSON-encoded so downstream
+  ;; tool-args/parse-args parses it), thinking → :thinking, text → :text,
+  ;; wire order preserved.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "What is the weather in Paris?"))
+        body  {:content [{:type "tool_use"
+                          :id "toolu_01"
+                          :name "get_weather"
+                          :input {:location "Paris"}}
+                         {:type "text" :text "Let me check"}]
+               :stop_reason "tool_use"
+               :usage {:input_tokens 12 :output_tokens 8}}
+        result (with-redefs [http/post (fn [_url _req]
+                                         {:status 200
+                                          :body (json/generate-string body)})]
+                 ((:execute anthropic/provider)
+                  convo model {:api-key "test-key"}))
+        content (:content (:assistant-message result))]
+    (is (= :tool_use (:stop-reason (:assistant-message result)))
+        "stop-reason :tool_use is preserved")
+    (is (= [{:type :tool-call
+             :id "toolu_01"
+             :name "get_weather"
+             :arguments "{\"location\":\"Paris\"}"}
+            {:type :text :text "Let me check"}]
+           content)
+        "tool_use block maps to :tool-call with id/name/JSON-string arguments, wire order preserved")))
+
+(deftest execute-anthropic-preserves-thinking-blocks-test
+  ;; Review 57 informational note: the old text-content-blocks mapping also
+  ;; dropped thinking blocks on the non-streaming execute path while the
+  ;; streaming accumulator keeps them in the final content — the same
+  ;; mapping now preserves them (:thinking with text/signature), matching
+  ;; thinking-blocks-in-order.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "Think then answer"))
+        body  {:content [{:type "thinking"
+                          :thinking "Let me reason about this step by step."
+                          :signature "sig_01"}
+                         {:type "text" :text "The answer is 42."}]
+               :stop_reason "end_turn"
+               :usage {:input_tokens 12 :output_tokens 8}}
+        result (with-redefs [http/post (fn [_url _req]
+                                         {:status 200
+                                          :body (json/generate-string body)})]
+                 ((:execute anthropic/provider)
+                  convo model {:api-key "test-key"}))
+        content (:content (:assistant-message result))]
+    (is (= [{:type :thinking
+             :text "Let me reason about this step by step."
+             :signature "sig_01"}
+            {:type :text :text "The answer is 42."}]
+           content)
+        "thinking block maps to :thinking with text/signature, wire order preserved")))

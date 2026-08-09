@@ -499,6 +499,21 @@
       ;; with a role/content chunk that triggers :start via the non-error
       ;; path).
       (emit-stream-start! consume-fn stream-started?)
+      ;; Review 56: balance open tool calls before the :error — a
+      ;; tool_calls delta chunk followed by a mid-stream error chunk
+      ;; (e.g. a server_error after tool calls were started) previously
+      ;; emitted [:start :toolcall-start :toolcall-delta :error] with the
+      ;; tool call still open at handle-error! (the review-55 open-tool
+      ;; balancing covered only the :done paths — finish_chunk/usage
+      ;; branches and the EOF flush). force-start-pending-chat-tools! +
+      ;; emit-chat-tool-ends! are the exact helpers the finish_chunk
+      ;; branches use, so an error-terminated stream degrades the same way
+      ;; a finish_reason-terminated one does: every started (or
+      ;; not-yet-started) tool call is closed with :toolcall-end before the
+      ;; :error. A no-op when no tool calls were started (an error-first
+      ;; stream).
+      (force-start-pending-chat-tools! stream-state consume-fn)
+      (emit-chat-tool-ends! stream-state consume-fn)
       (let [status (some (fn [s] (and (number? s) (>= s 400) s))
                          [(:status chunk)
                           (get-in chunk [:error :status])
@@ -624,6 +639,13 @@
                      :structured-output strategy}))
       (let [response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
+          ;; Review 56: no open-tool balancing is needed on the initial
+          ;; HTTP-error path (a 4xx/5xx response to the stream request) —
+          ;; it fires BEFORE any SSE line has been consumed, so
+          ;; @(:tool-state stream-state) is always empty; the mid-stream
+          ;; error chunk path (emit-chat-error!) and the catch block (the
+          ;; paths that can fire after tool calls were started) balance via
+          ;; force-start-pending-chat-tools!/emit-chat-tool-ends!.
           (transport/emit-error! model
                                  options
                                  :openai-completions
@@ -701,6 +723,15 @@
           ;; first-read exception yields [:start :error] like every other
           ;; error path on this transport.
           (emit-stream-start! consume-fn (:stream-started? stream-state))
+          ;; Review 56: balance open tool calls before the :error — a
+          ;; stream-read exception mid-tool-call (e.g. a connection reset
+          ;; after a tool_calls delta was processed) previously finalized
+          ;; the accumulator with an OPEN tool index (the catch routes
+          ;; through transport/emit-error!, which has no balancing — review
+          ;; 55 covered only the :done paths). Same helpers as the in-band
+          ;; error chunk path; a no-op when no tool calls were started.
+          (force-start-pending-chat-tools! stream-state consume-fn)
+          (emit-chat-tool-ends! stream-state consume-fn)
           (transport/emit-error! model
                                  options
                                  :openai-completions

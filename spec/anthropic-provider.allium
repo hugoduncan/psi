@@ -918,7 +918,10 @@ rule UnknownIndexContentBlockEventsSkipped {
 }
 
 rule TerminalEmitsEndEventsForOpenBlocks {
-    when: SseEventReceived(stream, "message_stop", event_data) OR ProviderTransportClosed(stream)
+    when: SseEventReceived(stream, "message_stop", event_data)
+          OR ProviderTransportClosed(stream)
+          OR SseEventReceived(stream, "error", event_data)
+          OR (SseEventReceived(stream, "message_delta", event_data) AND event_data.delta.stop_reason != null)
     requires: stream.done = false
 
     ensures: for each index in OpenBlockIndexes(stream):
@@ -948,6 +951,20 @@ rule TerminalEmitsEndEventsForOpenBlocks {
         -- end event would be unbalanced); a well-formed stream (every block
         -- stopped before message_stop) has an empty open set and emits no
         -- synthetic ends.
+        -- Review 56: the balancing is extended from the :done/EOF paths to
+        -- EVERY remaining terminal path — the mid-stream "error" branch
+        -- (SseErrorEventEmitsErrorAndTerminates), the
+        -- message_delta-with-stop_reason terminal
+        -- (MessageDeltaStopReasonEmitsDone; its inline :done previously
+        -- disagreed with message_stop — it now balances too, keeping the
+        -- real stop_reason rather than routing through emit-terminal-done!),
+        -- and the outer catch block (a stream-read exception mid-block).
+        -- All four sites use the shared balance-open-blocks! helper
+        -- (extracted from emit-terminal-done!'s inline doseq), so the two
+        -- :done branches and every :error branch balance identically. The
+        -- HTTP-error path needs no balancing (it fires before any SSE line
+        -- has been consumed, so OpenBlockIndexes is empty). The invariant
+        -- now holds at every terminal, :done or :error.
 }
 
 rule SseErrorEventEmitsErrorAndTerminates {
@@ -1004,6 +1021,15 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- — Review 50 moved the helper out of the letfn so the catch, which
         -- is outside the letfn scope, can use it) before the :error
         -- emission, mirroring this branch's ordering.
+        -- Review 56: this branch (and the message_delta-with-stop_reason
+        -- terminal and the catch block) also balances OPEN content blocks
+        -- before the terminal — see
+        -- TerminalEmitsEndEventsForOpenBlocks (whose when now includes this
+        -- error event and the message_delta terminal, and whose guidance
+        -- covers the catch) — so a stream that started a thinking/tool_use/
+        -- text block and then received the mid-stream error finalizes the
+        -- accumulator balanced (:toolcall-end/:thinking-end/:text-end before
+        -- the :error) instead of with an OPEN block index.
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
@@ -1053,6 +1079,17 @@ rule MessageDeltaStopReasonEmitsDone {
         -- [:start :done] — the last :start-before-terminal gap on the
         -- anthropic transport (see MessageStartEmitsStartEvent's review-50
         -- guidance for the started? tracking).
+        -- Review 56: the branch ALSO balances OPEN content blocks before
+        -- its inline :done (see TerminalEmitsEndEventsForOpenBlocks, whose
+        -- when now includes this message_delta-with-stop_reason terminal) —
+        -- review 55's balancing covered only the message_stop/EOF :done
+        -- paths (emit-terminal-done!), so this branch's inline :done
+        -- previously disagreed with message_stop: a non-conforming stream
+        -- sending message_delta-with-stop_reason while blocks are open
+        -- finalized with OPEN indices. It now balances via the shared
+        -- balance-open-blocks! helper, keeping the real stop_reason
+        -- (Keyword(event_data.delta.stop_reason)) rather than routing
+        -- through emit-terminal-done!'s hardcoded :stop.
 }
 
 rule MessageStopEmitsDoneWithUsage {
@@ -1164,6 +1201,33 @@ rule FinalUsageTotalsCalculated {
         cost: CalculateCost(stream.model, acc)
     }
 }
+
+-- Non-streaming execute-anthropic response mapping (review 57): the
+-- execute path (execute-anthropic → response->assistant-message) is not
+-- modeled as rules here (the spec's scope is streaming completions; the
+-- non-streaming 400-fallback asymmetry is documented the same way above),
+-- but its content-block mapping is task-relevant: the response :content
+-- blocks are mapped to the canonical assistant-message shape in WIRE
+-- ORDER — "text" → {:type :text}, "tool_use" → {:type :tool-call :id
+-- :name :arguments} with :input JSON-encoded (a string, so downstream
+-- tool-args/parse-args, which json/parse-strings :arguments, parses it —
+-- mirroring the streaming accumulator's string :arguments and the
+-- :openai-completions tool-call-block), and "thinking" → {:type :thinking
+-- :text :signature} (mirroring thinking-blocks-in-order). Previously only
+-- "text" blocks survived (text-content-blocks): a non-streaming response
+-- containing a tool_use block silently dropped the tool call while
+-- :stop-reason :tool_use was preserved, so classify-assistant-message /
+-- extract-tool-calls recorded :turn.outcome/stop and the tool call NEVER
+-- executed — silent functional loss reachable on the newly shipped
+-- DeepSeek provider via response-mode :non-streaming sessions with tools,
+-- and inconsistent with BOTH the :openai-completions sibling and the
+-- anthropic transport's own streaming accumulator. The mapping now
+-- preserves tool_use and thinking blocks; :stop-reason was already
+-- preserved (Keyword of the wire string), so the turn runtime now
+-- classifies a tool_use response :turn.outcome/tool-use and executes the
+-- call. Locked by execute-anthropic-preserves-tool-use-blocks-test and
+-- execute-anthropic-preserves-thinking-blocks-test (FAIL pre-fix /
+-- PASS post-fix).
 
 surface AnthropicProviderApi {
     facing executor: AgentExecutor

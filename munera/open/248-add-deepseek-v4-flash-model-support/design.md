@@ -405,6 +405,24 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   like a finish_reason-terminated one. The turn accumulator never
   finalizes with an OPEN block index (the no-phantom-or-unbalanced-block
   invariant reviews 43/48/50 asserted, via the EOF path).
+- **Open-block/tool balancing on the error + message_delta terminals
+  (review 56):** the review-55 balancing covered only the `:done`/EOF
+  paths — a stream ending with a mid-stream provider error (an Anthropic
+  SSE `error` event, an OpenAI chat-completions error chunk, a codex
+  `response.failed`/`error`, or a stream-read exception on any transport)
+  finalized the turn accumulator with OPEN block/tool indices, and the
+  Anthropic `message_delta`-with-`stop_reason` terminal (an inline `:done`
+  separate from `emit-terminal-done!`, kept inline to preserve the real
+  `stop_reason`) did not balance. The balancing is now applied before the
+  `:error` on every error path (anthropic: shared `balance-open-blocks!`
+  helper used by the `"error"` branch, the `message_delta` terminal and
+  the catch block; chat-completions: `force-start-pending-chat-tools!` +
+  `emit-chat-tool-ends!` in `emit-chat-error!` and the catch block; codex:
+  `emit-codex-error!` doseqs `:toolcall-end` over `open-tool-indexes`
+  like `emit-codex-done!`) — the HTTP-error paths need no balancing (no
+  SSE line has been consumed before they fire, so no block/tool is open).
+  The no-phantom-or-unbalanced-block invariant now holds at every
+  terminal, `:done` or `:error`.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -591,10 +609,22 @@ independently confirms native JSON-Schema support can add
   `:start`-before-terminal on stream-read exceptions, the review-54
   content-block-first `:start` emission + unknown-index content-block skip
   (with the `:start`-once emitter extracted to the shared
-  `request-support/emit-start!`), and the review-55 terminal open-block
-  balancing at the EOF flush / `message_stop` terminal on the anthropic and
-  openai chat-completions transports (`:toolcall-end`/`:thinking-end`/
-  `:text-end` for blocks started but never stopped before the `:done`));
+  `request-support/emit-start!`), and the review-55/56 terminal open-block
+  balancing on the anthropic and openai chat-completions transports
+  (`:toolcall-end`/`:thinking-end`/`:text-end` for blocks started but
+  never stopped, at every terminal — the EOF flush / `message_stop` /
+  `message_delta`-with-`stop_reason` `:done` AND every error path: the
+  mid-stream SSE error branches, the HTTP-400/stream-read exception
+  catch blocks, `emit-chat-error!`/`emit-codex-error!`), and the
+  review-57 non-streaming execute response-mapping fix (a `tool_use`
+  content block in a non-streaming `execute-anthropic` response now maps
+  to a `:tool-call` block — id/name/arguments with `:input` JSON-encoded —
+  instead of being silently dropped, and `thinking` blocks are preserved
+  as `:thinking` too, in wire order, mirroring the streaming accumulator
+  and the `:openai-completions` sibling; `:stop-reason :tool_use` was
+  already preserved, so the turn runtime now classifies the turn
+  `:turn.outcome/tool-use` and the tool call executes instead of being
+  silently lost on `response-mode :non-streaming` sessions with tools));
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

@@ -429,3 +429,45 @@
           "mixed-case duplicate chatgpt-account-id must also be masked (review 19 dual-casing)")
       (is (nil? (get-in @request-capture [:request :headers "Authorization"]))
           "keyless request sends no Authorization header"))))
+
+(deftest codex-error-after-tool-start-balances-open-tool-call-test
+  (testing "a response.failed after a function_call output item closes the open tool call before :error"
+    ;; Review 56: review-55's open-tool balancing covered only the :done
+    ;; path (emit-codex-done!'s open-tool-indexes doseq) — emit-codex-error!
+    ;; (shared by every codex error path: response.failed/error SSE events,
+    ;; the HTTP-error branch, the catch block) never balanced open tool
+    ;; indexes, so a function_call output item followed by response.failed
+    ;; finalized the turn accumulator with an OPEN tool index
+    ;; ([:start :toolcall-start :error]). The error emitter now doseqs
+    ;; :toolcall-end over the open indexes (mirroring emit-codex-done!)
+    ;; before the :error; a no-op on the error-first / HTTP-error paths
+    ;; (no output item was added before they fire).
+    (let [model  (models/get-model :gpt-5.3-codex)
+          token  (jwt-with-account-id "acc_test")
+          convo  (-> (conv/create "sys") (conv/add-user-message "run pwd"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:type "response.output_item.added"
+                             :output_index 0
+                             :item {:type "function_call"
+                                    :id "fc_1"
+                                    :call_id "call_1"
+                                    :name "bash"
+                                    :arguments ""}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.failed"
+                             :response {:error {:message "Overloaded"}
+                                        :status "failed"}}) "\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [:start :toolcall-start :toolcall-end :error]
+             (mapv :type @events))
+          "the open function_call tool is balanced with :toolcall-end before the :error")
+      (is (= "Overloaded" (:error-message (last @events)))
+          "the response.failed error still surfaces with its message")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no synthetic :done — the :error event is terminal"))))

@@ -4739,7 +4739,7 @@
       → Resolved (live, 2026-08-09): executed a real STREAMING turn through `stream-anthropic` with the committed .psi/models.edn deepseek config (:adaptive-thinking true, /thinking high, env key). DeepSeek CONFORMS to the Anthropic stream shape — SSE sequence message_start (1) → content_block_start (2: thinking + text) → content_block_delta (20) → content_block_stop (2) → message_delta (usage) → message_stop (1); every block balanced (no truncated/open-block or missing-message_start stream), so the review-43-55 malformed-stream hardening is NOT triggered by DeepSeek's actual streaming path (it remains defensive for non-conforming endpoints only). Provider event sequence [:start :thinking-start :thinking-delta x17 :thinking-signature-delta :thinking-end :text-start :text-delta x2 :text-end :done :end_turn] with usage-with-cost (input 90, output 20, cache 0/0, total cost 1.82e-5). The adaptive wire shape (thinking.type "adaptive" + output_config.effort "high") was accepted with a thinking content block, and the usage payload carried the Anthropic-shaped cache_read_input_tokens/cache_creation_input_tokens fields (review-2 field-name assumption confirmed on the streaming path too; both 0 in the no-cache turn). One observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event (not in Anthropic's event set), ignored harmlessly (no case branch → no-op, no error/hang) — documented in doc/custom-providers.md DeepSeek notes + locked by `stream-anthropic-ignores-deepseek-ping-events-test`.
 ## Follow-ups (implementation review 56, 2026-08-09)
 
-- [ ] The review-55 open-block balancing covers only the `:done` terminals
+- [x] The review-55 open-block balancing covers only the `:done` terminals
       (`message_stop` + the EOF flush, via the shared `emit-terminal-done!`)
       — the anthropic transport's OTHER finalization paths still leave the
       turn accumulator with OPEN content-block indices at the terminal:
@@ -4772,7 +4772,31 @@
       or open block events at the terminal") and the review-55 steps.md
       resolution ("never finalizes with an OPEN block index") are true
       only for the `:done`/EOF paths.
-- [ ] The review-55 open-tool balancing on the OpenAI transports covers
+      → Resolved: the review-55 balancing is extended to EVERY remaining
+      terminal path via the shared `balance-open-blocks!` helper (extracted
+      from `emit-terminal-done!`'s inline doseq): the mid-stream `"error"`
+      branch balances `@open-blocks` before the `:error`, the
+      `message_delta`-with-`stop_reason` terminal balances before its
+      inline `:done` (keeping the real `stop_reason`, not routing through
+      `emit-terminal-done!`'s hardcoded `:stop`), and the catch block
+      balances before the `:error` — the HTTP-error path needs no balancing
+      (it fires before any SSE line has been consumed, so `@open-blocks`
+      is always empty; documented at the call site). The two `:done`
+      branches and every `:error` branch now balance identically. New
+      tests (FAIL pre-fix / PASS post-fix, verified):
+      `stream-anthropic-error-after-thinking-start-balances-open-block-test`,
+      `stream-anthropic-error-after-tool-start-balances-open-block-test`,
+      `stream-anthropic-message-delta-stop-reason-with-open-blocks-balances-test`,
+      `stream-anthropic-catch-balances-open-block-before-error-test`
+      (anthropic_stream_termination_test.clj; the catch test redefs
+      `http/post` to throw after a `content_block_start` was consumed).
+      Overclaiming wording fixed: CHANGELOG Fixed entry now reads "no
+      unbalanced or open block events at any terminal — `:done` or
+      `:error`", `TerminalEmitsEndEventsForOpenBlocks` spec rule's `when`
+      now includes the `"error"` event and the `message_delta`-with-
+      `stop_reason` terminal (guidance updated), and the design.md
+      revision note/AC scoped the invariant to every terminal.
+- [x] The review-55 open-tool balancing on the OpenAI transports covers
       only the `:done` paths — the chat-completions `finish_chunk`/usage
       branches and the EOF flush call `force-start-pending-chat-tools!` +
       `emit-chat-tool-ends!`, and codex's `emit-codex-done!` doseqs
@@ -4795,10 +4819,32 @@
       (FAIL pre-fix / PASS post-fix), and extend the same CHANGELOG
       "no unbalanced or open block events at the terminal" wording (the
       claim is currently scoped to the `:done` paths only).
+      → Resolved: the error emitters now balance open tool calls before
+      the `:error` — `emit-chat-error!` and the `stream-openai` catch
+      block call `force-start-pending-chat-tools!` +
+      `emit-chat-tool-ends!` (the exact helpers the finish_chunk branches
+      and the EOF flush use), and `emit-codex-error!` (shared by EVERY
+      codex error path) now destructures `open-tool-indexes` +
+      `tool-args-by-index` and doseqs `:toolcall-end` over the open
+      indexes before the `:error` (mirroring `emit-codex-done!`'s doseq;
+      also resets the two atoms). The HTTP-error paths need no balancing
+      (no SSE line has been consumed before they fire, so no tool call is
+      open; documented at the call sites). New tests (FAIL pre-fix / PASS
+      post-fix, verified):
+      `completions-error-after-tool-start-balances-open-tool-call-test`
+      + `completions-catch-balances-open-tool-call-before-error-test`
+      (openai_completions_stream_test.clj) and
+      `codex-error-after-tool-start-balances-open-tool-call-test`
+      (openai_codex_test.clj — `response.failed` after a
+      function_call output item). CHANGELOG wording extended ("no
+      unbalanced or open block events at any terminal — `:done` or
+      `:error`"); new `ErrorPathEmitsToolCallEndsForOpenToolCalls` +
+      `CodexErrorEmitsToolCallEndsForOpenToolCalls` spec rules in
+      openai-provider.allium; design.md revision note/AC updated.
 
 ## Follow-ups (implementation review 57, 2026-08-09)
 
-- [ ] The non-streaming `execute-anthropic` response mapping drops
+- [x] The non-streaming `execute-anthropic` response mapping drops
       `tool_use` blocks entirely — `response->assistant-message` builds the
       assistant message `:content` via `text-content-blocks`, which keeps
       only `"text"` blocks, so a non-streaming response whose `:content`
@@ -4839,3 +4885,31 @@
       drops `thinking` blocks on the non-streaming execute path while the
       streaming path keeps them in the final content — informational, but
       the same mapping should preserve or document them.)
+      → Resolved: `text-content-blocks` is replaced by
+      `non-streaming-content-blocks` (anthropic.clj), which maps the
+      response `:content` blocks in WIRE ORDER — `"tool_use"` →
+      `{:type :tool-call :id :name :arguments}` with `:input` JSON-encoded
+      (a string, so downstream `tool-args/parse-args`, which
+      json/parse-strings `:arguments`, parses it — mirroring the streaming
+      accumulator's string `:arguments` and the `:openai-completions`
+      sibling's `tool-call-block`), `"thinking"` → `{:type :thinking
+      :text :signature}` (mirroring `thinking-blocks-in-order`; the
+      informational note is closed by preserving rather than documenting),
+      `"text"` → `{:type :text :text}`. A non-streaming `tool_use`
+      response now yields a `:tool-call` block, so
+      `classify-assistant-message`/`extract-tool-calls` record
+      `:turn.outcome/tool-use` and the tool call executes (the
+      `:stop-reason :tool_use` was already preserved). New tests (FAIL
+      pre-fix / PASS post-fix, verified against the old text-only
+      mapping): `execute-anthropic-preserves-tool-use-blocks-test`
+      (tool_use + text, asserts `[{:type :tool-call :id "toolu_01" :name
+      "get_weather" :arguments "{\"location\":\"Paris\"}"} {:type :text
+      :text "Let me check"}]` in order + `:stop-reason :tool_use`) and
+      `execute-anthropic-preserves-thinking-blocks-test` (thinking +
+      text, asserts the `:thinking` block with text/signature survives) in
+      anthropic_test.clj. Spec: a "Non-streaming execute-anthropic
+      response mapping (review 57)" section comment added to
+      spec/anthropic-provider.allium (the execute path is not
+      rule-modeled — same convention as the review-45 400-fallback
+      asymmetry note); CHANGELOG `Fixed` entry added; design.md revision
+      note/AC updated.

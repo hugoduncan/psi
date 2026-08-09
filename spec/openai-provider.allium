@@ -1098,6 +1098,61 @@ rule TerminalEmitsToolCallEndsForOpenToolCalls {
         -- [:start :toolcall-start :toolcall-delta :toolcall-end :done].
 }
 
+rule ErrorPathEmitsToolCallEndsForOpenToolCalls {
+    when: CompletionsChunkReceived(stream, chunk)
+    requires: stream.request_api = openai_completions
+    requires: chunk.error != null
+    requires: stream.done = false
+
+    ensures: for each index in OpenToolCallIndexes(stream):
+                 Emit(StreamEvent{event_type: toolcall_end, content_index: index})
+
+    @guidance
+        -- Review 56: emit-chat-error! (the mid-stream error-chunk path,
+        -- see CompletionsSseErrorChunkEmitsErrorAndTerminates) now calls
+        -- force-start-pending-chat-tools! + emit-chat-tool-ends! — the
+        -- exact helpers the finish_chunk branches and the EOF flush use —
+        -- before the :error. Review 55's
+        -- TerminalEmitsToolCallEndsForOpenToolCalls covered only the :done
+        -- paths (finish-chunk terminal + EOF flush), so a
+        -- tool_calls-delta-then-error-chunk stream previously finalized
+        -- with the tool call OPEN
+        -- ([:start :toolcall-start :toolcall-delta :error]); it now yields
+        -- [:start :toolcall-start :toolcall-delta :toolcall-end :error].
+        -- The stream-openai catch block (a stream-read exception
+        -- mid-tool-call, routed through transport/emit-error!) balances the
+        -- same way before the :error. A no-op when no tool calls were
+        -- started (an error-first stream; the HTTP-error path needs no
+        -- balancing either — no SSE line has been consumed before it
+        -- fires, so OpenToolCallIndexes is empty). OpenToolCallIndexes is
+        -- the tool-state set defined by
+        -- TerminalEmitsToolCallEndsForOpenToolCalls.
+}
+
+rule CodexErrorEmitsToolCallEndsForOpenToolCalls {
+    when: CodexFailedEventReceived(stream, event) OR ProviderRequestFailed(stream, error)
+    requires: stream.done = false
+
+    ensures: for each index in OpenToolCallIndexes(stream):
+                 Emit(StreamEvent{event_type: toolcall_end, content_index: index})
+
+    @guidance
+        -- Review 56: emit-codex-error! — shared by EVERY codex error path
+        -- (the response.failed/error SSE events via
+        -- CodexFailedEventReceived; the HTTP-error branch and the catch
+        -- block via ProviderRequestFailed) — now doseqs :toolcall-end over
+        -- the open tool indexes before the :error, mirroring
+        -- emit-codex-done!'s balancing. Review 55's open-tool balancing
+        -- covered only the :done path (the EOF flush's open-tool-indexes
+        -- doseq; the spec modeled only the completions side). A function_call
+        -- output item followed by response.failed previously finalized the
+        -- turn accumulator with an OPEN tool index
+        -- ([:start :toolcall-start :error]); it now yields
+        -- [:start :toolcall-start :toolcall-end :error]. A no-op on the
+        -- error-first / HTTP-error paths (no output item was added before
+        -- they fire, so OpenToolCallIndexes is empty).
+}
+
 surface OpenAIProviderApi {
     facing executor: AgentExecutor
 

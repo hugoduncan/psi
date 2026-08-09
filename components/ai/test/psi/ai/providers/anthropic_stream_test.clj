@@ -362,7 +362,7 @@
           "no :done — the :error event is terminal"))))
 
 (deftest stream-anthropic-error-then-content-block-stop-no-text-end-test
-  (testing "a trailing content_block_stop after a mid-stream SSE error does not emit :text-end"
+  (testing "a trailing content_block_stop after a mid-stream SSE error does not emit a second :text-end"
     ;; Review 46: the review-43/44 done? guard covered only the TERMINAL
     ;; branches (:done/:error emissions). The NON-terminal branches still
     ;; fired after the stream had terminated with an :error — a trailing
@@ -372,6 +372,14 @@
     ;; maybe-emit-structured-result! post-error. The whole SSE dispatch is
     ;; now short-circuited on done?, so a post-error trailing event is a
     ;; full no-op.
+    ;; Review 56: the ONE :text-end now comes from the "error" branch's
+    ;; open-block balancing (balance-open-blocks! — the block was started
+    ;; and never stopped, so it is closed BEFORE the :error), NOT from the
+    ;; trailing content_block_stop. The sequence is
+    ;; [:start :text-start :text-delta :text-end :error] — the accumulator
+    ;; finalizes balanced via the error path (review 55 balanced only the
+    ;; :done/EOF paths), and the post-error trailing stop is still a full
+    ;; no-op (exactly one :text-end, not two).
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])
@@ -393,10 +401,10 @@
                                 {:body (stream-body sse)})]
         (anthropic/stream-anthropic convo model {:api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
-      (is (= [:start :text-start :text-delta :error] (mapv :type @events))
-          "no :text-end after the :error — the trailing content_block_stop is a full no-op once done")
-      (is (not-any? #(= :text-end (:type %)) @events)
-          "no :text-end at all — the block was never closed after the error"))))
+      (is (= [:start :text-start :text-delta :text-end :error] (mapv :type @events))
+          "the error branch balances the open text block (:text-end BEFORE the :error); the trailing content_block_stop is a full no-op once done")
+      (is (= 1 (count (filterv #(= :text-end (:type %)) @events)))
+          "exactly one :text-end — from the error-branch balancing, not from the trailing stop"))))
 
 (deftest usage-captured-from-sse-events-test
   (testing "usage tokens are read from message_start and message_delta SSE events"

@@ -7,12 +7,14 @@
   mid-stream error chunks. Split out of openai_test.clj /
   openai_completions_test.clj to stay under the 800-line file-length gate."
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.openai :as openai])
+   [psi.ai.providers.openai :as openai]
+   [psi.ai.providers.openai.transport :as transport])
   (:import [java.io ByteArrayInputStream]))
 
 (defn- stream-body [s]
@@ -245,3 +247,89 @@
           "the not-yet-started tool call is force-started then closed before the EOF :done")
       (is (= 1 (count dones))
           "exactly one :done — the EOF flush terminates the stream"))))
+
+;; ── Open-tool balancing on the error/catch terminals (review 56) ────────────
+
+(deftest completions-error-after-tool-start-balances-open-tool-call-test
+  (testing "a mid-stream error chunk after a tool_calls delta closes the open tool call before :error"
+    ;; Review 56: review-55's open-tool balancing covered only the :done
+    ;; paths (finish_chunk/usage branches + the EOF flush) — emit-chat-error!
+    ;; emitted :error with no balancing, so a tool_calls-delta-then-error
+    ;; stream yielded [:start :toolcall-start :toolcall-delta :error] with
+    ;; the tool call still open at handle-error!. The error emitter now
+    ;; calls force-start-pending-chat-tools! + emit-chat-tool-ends! (the
+    ;; exact helpers the finish_chunk branches use) before the :error, so
+    ;; the accumulator finalizes balanced via the error path too.
+    (let [events (run-stream (str
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :content ""}}]}) "\n\n"
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :tool_calls [{:index 0
+                                                                          :id "call_1"
+                                                                          :function {:name "get_weather"
+                                                                                     :arguments ""}}]}}]}) "\n\n"
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :tool_calls [{:index 0
+                                                                          :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n"
+                              "data: " (json/generate-string
+                                        {:error {:message "The server had an error while processing your request."
+                                                 :type "server_error"}}) "\n\n"))]
+      (is (= [:start :toolcall-start :toolcall-delta :toolcall-end :error]
+             (mapv :type events))
+          "the open tool call is balanced with :toolcall-end before the :error")
+      (is (= 1 (count (filterv #(= :error (:type %)) events)))
+          "exactly one :error terminal")
+      (is (not-any? #(= :done (:type %)) events)
+          "no :done after the mid-stream error — the :error event terminates the turn"))))
+
+(deftest completions-catch-balances-open-tool-call-before-error-test
+  (testing "a stream-read exception after a tool_calls delta closes the open tool call before :error"
+    ;; Review 56: the catch block (a stream-read exception mid-tool-call,
+    ;; e.g. a connection reset after a tool_calls delta was processed)
+    ;; routed through transport/emit-error! with no balancing — review 55
+    ;; covered only the :done paths, and the HTTP-error path can't have
+    ;; open tool calls (no SSE consumed before it fires). The catch now
+    ;; calls the same force-start-pending-chat-tools! +
+    ;; emit-chat-tool-ends! helpers before the :error.
+    (let [events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant" :content ""}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant"
+                                                :tool_calls [{:index 0
+                                                              :id "call_1"
+                                                              :function {:name "get_weather"
+                                                                         :arguments ""}}]}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant"
+                                                :tool_calls [{:index 0
+                                                              :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n")
+          lines-seen (atom 0)
+          orig-parse-sse-line transport/parse-sse-line]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})
+                    transport/parse-sse-line
+                    (fn [line]
+                      ;; Count only "data:" lines — line-seq yields the
+                      ;; blank separator lines too (parse-sse-line skips
+                      ;; them); counting every line would throw before the
+                      ;; tool_calls delta was processed.
+                      (when (str/starts-with? (or line "") "data: ")
+                        (swap! lines-seen inc))
+                      (if (> @lines-seen 2)
+                        (throw (ex-info "simulated stream read failure"
+                                        {:status 503}))
+                        (orig-parse-sse-line line)))]
+        ((:stream openai/provider)
+         (-> (conv/create "sys") (conv/add-user-message "hi"))
+         (models/get-model :gpt-5) {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [:start :toolcall-start :toolcall-end :error]
+             (mapv :type @events))
+          "the open tool call is balanced with :toolcall-end before the catch's :error")
+      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
+          "exactly one :error terminal"))))

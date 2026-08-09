@@ -6,6 +6,7 @@
   text). Split out of anthropic_stream_test.clj to stay under the 800-line
   file-length gate."
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [clj-http.client :as http]
@@ -504,3 +505,136 @@
           "exactly one :done — the stream terminates normally via message_stop")
       (is (not-any? #(= :error (:type %)) events)
           "no :error — an unknown event type is a no-op, not an error"))))
+
+;; ── Open-block balancing on the error/message_delta terminals (review 56) ──
+
+(deftest stream-anthropic-error-after-thinking-start-balances-open-block-test
+  (testing "a mid-stream SSE error after a thinking block started closes the block before :error"
+    ;; Review 56: review-55's open-block balancing covered only the :done
+    ;; terminals (message_stop + the EOF flush) — the mid-stream "error"
+    ;; SSE branch emitted :error with no balancing, so a stream that started
+    ;; a thinking block and then received overloaded_error yielded
+    ;; [:start :thinking-start :thinking-delta :error] with the block
+    ;; :status :open in turn-data's :content-blocks (exposed via the
+    ;; :psi.turn/content-blocks telemetry resolver) — the exact
+    ;; no-phantom-or-unbalanced-block invariant review 55 asserted "via the
+    ;; EOF path", still open via the error path. The "error" branch now
+    ;; balances open blocks (shared balance-open-blocks!) before the :error.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "thinking"
+                                                :thinking "Let me think"
+                                                :signature "sig-1"}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "thinking_delta"
+                                        :thinking "Let me think further"}})
+                     (sse-line "error"
+                               {:type "error"
+                                :error {:type "overloaded_error"
+                                        :message "Overloaded"
+                                        :http_status 529}}))]
+      (is (= [:start :thinking-start :thinking-delta :thinking-end :error]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "the open thinking block is balanced with :thinking-end before the :error")
+      (is (= 1 (count (filterv #(= :error (:type %))
+                               (run-stream sse model {:api-key "test-key"}))))
+          "exactly one :error terminal"))))
+
+(deftest stream-anthropic-error-after-tool-start-balances-open-block-test
+  (testing "a mid-stream SSE error after a tool_use block started closes the block before :error"
+    ;; Review 56: same class as the thinking case — a tool_use block started
+    ;; but never stopped, then a mid-stream error, previously finalized with
+    ;; the tool call OPEN ([:start :toolcall-start :error]). The "error"
+    ;; branch now emits :toolcall-end for the open index before the :error.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "tool_use"
+                                                :id "toolu_01"
+                                                :name "get_weather"}})
+                     (sse-line "error"
+                               {:type "error"
+                                :error {:type "overloaded_error"
+                                        :message "Overloaded"
+                                        :http_status 529}}))]
+      (is (= [:start :toolcall-start :toolcall-end :error]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "the open tool_use block is balanced with :toolcall-end before the :error"))))
+
+(deftest stream-anthropic-message-delta-stop-reason-with-open-blocks-balances-test
+  (testing "a message_delta-with-stop_reason terminal with open blocks closes them before :done"
+    ;; Review 56: the message_delta-with-stop_reason branch emits its INLINE
+    ;; :done (separate from emit-terminal-done! since it carries the actual
+    ;; stop_reason) WITHOUT the review-55 open-block balancing — the two
+    ;; :done branches of the same transport disagreed (message_stop
+    ;; balanced, message_delta-with-stop_reason not), so a non-conforming
+    ;; stream that sends message_delta-with-stop_reason while a block is
+    ;; open finalized with an OPEN index. The branch now balances via the
+    ;; shared balance-open-blocks! before the :done, keeping the real
+    ;; stop_reason (the reason is NOT forced to :stop — the branch stays
+    ;; inline rather than routing through emit-terminal-done!).
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "tool_use"
+                                                :id "toolu_02"
+                                                :name "get_weather"}})
+                     (sse-line "message_delta"
+                               {:type "message_delta"
+                                :delta {:stop_reason "end_turn"}}))
+          events (run-stream sse model {:api-key "test-key"})]
+      (is (= [:start :toolcall-start :toolcall-end :done]
+             (mapv :type events))
+          "the open tool_use block is balanced with :toolcall-end before the message_delta :done")
+      (is (= :end_turn (:reason (first (filterv #(= :done (:type %)) events))))
+          "the real stop_reason is preserved on the :done (not forced to :stop)"))))
+
+(deftest stream-anthropic-catch-balances-open-block-before-error-test
+  (testing "a stream-read exception after a block started closes the block before :error"
+    ;; Review 56: the catch block (a stream-read exception mid-block, e.g. a
+    ;; connection reset after a content_block_start was consumed) routed the
+    ;; error straight to consume-fn with no balancing — review 55 covered
+    ;; only the :done/EOF paths, and the HTTP-error path can't have open
+    ;; blocks (no SSE consumed before it fires). The catch now balances via
+    ;; balance-open-blocks! before the :error.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "content_block_start"
+                                {:type "content_block_start" :index 0
+                                 :content_block {:type "thinking"
+                                                 :thinking "Let me think"
+                                                 :signature "sig-1"}})
+                      (sse-line "content_block_delta"
+                                {:type "content_block_delta" :index 0
+                                 :delta {:type "thinking_delta"
+                                         :thinking "more"}}))
+          orig-parse-sse-line anthropic/parse-sse-line
+          lines-seen (atom 0)]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})
+                    anthropic/parse-sse-line
+                    (fn [line]
+                      ;; Count only "data:" lines — line-seq yields the
+                      ;; "event:" prefixes and blank separators too, which
+                      ;; parse-sse-line skips; counting them would throw
+                      ;; before the second event was processed.
+                      (when (str/starts-with? (or line "") "data: ")
+                        (swap! lines-seen inc))
+                      (if (> @lines-seen 2)
+                        (throw (ex-info "simulated stream read failure"
+                                        {:status 503}))
+                        (orig-parse-sse-line line)))]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :thinking-start :thinking-end :error]
+             (mapv :type @events))
+          "the open thinking block is balanced with :thinking-end before the catch's :error")
+      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
+          "exactly one :error terminal"))))
