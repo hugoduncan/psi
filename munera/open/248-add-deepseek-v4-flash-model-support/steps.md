@@ -3745,3 +3745,60 @@
       the review-driven API-key resolution changes" phrase now reads "plus
       the review-driven provider-transport changes documented in the revision
       note".
+
+## Follow-ups (implementation review 45, 2026-08-09)
+
+- [ ] design.md's "Revision note (implementation reviews)" enumeration and the
+      AC exception wording are still incomplete for the review-22 provider
+      changes — review 44 added the review-43/44 bullets, but review-22's
+      provider-transport changes were never enumerated, so the note's opening
+      claim ("They are the *only* provider-transport changes in this task")
+      and the AC "no custom-provider behaviour changes except the
+      review-driven changes documented in the revision note" list remain
+      false in the same way review 44 found for 43/44. Omitted: (a) the
+      HTTP-400 compatibility retry's OAuth decision — review 22 replaced the
+      three-marker header content-sniff (`oauth-auth-request?`) in
+      `handle-400-response!`'s beta-config with the transport's COMPUTED
+      `oauth?` boolean threaded from `build-request` as `::oauth?`, so a
+      keyless custom provider whose custom `:headers` reproduce the Claude
+      Code CLI marker set now selects `:without-all-betas` on a beta-related
+      400 instead of retaining every beta, repeating the 400 and hard-failing
+      — a provider-transport BEHAVIOR change with its own CHANGELOG `Fixed`
+      entry, absent from the revision note; (b) the shared `no-auth?`
+      keyless-predicate unification in `request-support/resolve-api-key`
+      (review 22 moved the keyless early-return onto the shared predicate —
+      the same "pure refactor — no behavior change" class as the review-14
+      request-support bullet that IS enumerated); and (c) the review-22
+      `[:supports-mid-conversation-system-messages {:optional true}
+      [:maybe boolean?]]` ModelDef schema field — the design's In-scope list
+      and the AC schema bullet mention only `:adaptive-thinking`, yet the
+      field was added to the closed `ModelDef` schema (with a CHANGELOG
+      `Added` entry) and flows through `expand-model`. Every other
+      review-driven change got its bullet; fix: add review-22 bullets to the
+      revision-note enumeration (or qualify the "only" claim) and name the
+      schema field in the design's schema scope / AC, keeping the design
+      artifact coherent with the implemented behavior per the change chain.
+- [ ] The delegate-review live test's durable lock covers only the
+      `:reviewing-implementation` profile: the snapshot assertions check that
+      ONE profile is present, valid, and resolves to
+      deepseek/deepseek-v4-flash. The other six committed `.psi/project.edn`
+      deepseek profiles (`:designing :fixing-design :planning :fixing-plan
+      :implementing :fixing-implementation`) are unlocked — a SINGLE-profile
+      regression (one profile removed, retargeted at a nonexistent/typo'd
+      model-id or provider, an invalid `:thinking-level`, or re-pointed at
+      the commented anthropic/openai map) passes `bb test` green and fails
+      only at delegated-workflow runtime. The review-2/18/28/38 regression
+      class (all seven profiles invalid) is caught only because
+      `:reviewing-implementation` is one of the seven, so the review-38
+      "the delegate-review live test IS the lock" decision is only a partial
+      lock for that class. `profile-snapshot` already exposes
+      `:valid-profile-names`/`:invalid-profile-names` across ALL profiles, so
+      the fix is cheap: extend the live-test snapshot assertions to assert
+      all seven committed profiles are present, valid, and resolve to the
+      committed deepseek model — or add a dedicated `.psi/project.edn`
+      parse-lock test mirroring
+      `committed-project-models-edn-matches-documented-deepseek-example-test`
+      in user_models_test.clj (assert the committed project.edn's seven
+      session-profiles all resolve against the committed `.psi/models.edn`
+      deepseek model), so a partial profile regression fails loud instead of
+      surfacing at workflow runtime.
