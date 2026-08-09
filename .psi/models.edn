@@ -1,0 +1,18 @@
+{:version 1
+ :providers
+ {"deepseek"
+  {:base-url "https://api.deepseek.com/anthropic"
+   :api      :anthropic-messages
+   :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+   :models   [{:id                 "deepseek-v4-flash"
+               :name               "DeepSeek V4 Flash"
+               :supports-reasoning true
+               :adaptive-thinking  true
+               :supports-images    false
+               :supports-text      true
+               :context-window     1000000
+               :max-tokens         384000
+               :input-cost         0.14
+               :output-cost        0.28
+               :cache-read-cost    0.0028
+               :cache-write-cost   0.14}]}}}
