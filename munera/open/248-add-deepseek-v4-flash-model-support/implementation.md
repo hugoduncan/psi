@@ -2560,3 +2560,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
   errors, 0 warnings) on all changed source + test files; cljfmt clean;
   `bb commit-check:file-lengths` passes (anthropic.clj 780, all test files
   under 800 after the capture-split + test-file moves).
+- Review 56 (2026-08-09): added 2 steps to be addressed.

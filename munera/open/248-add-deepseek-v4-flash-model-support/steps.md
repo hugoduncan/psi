@@ -4737,3 +4737,61 @@
       stream tests.
 
       → Resolved (live, 2026-08-09): executed a real STREAMING turn through `stream-anthropic` with the committed .psi/models.edn deepseek config (:adaptive-thinking true, /thinking high, env key). DeepSeek CONFORMS to the Anthropic stream shape — SSE sequence message_start (1) → content_block_start (2: thinking + text) → content_block_delta (20) → content_block_stop (2) → message_delta (usage) → message_stop (1); every block balanced (no truncated/open-block or missing-message_start stream), so the review-43-55 malformed-stream hardening is NOT triggered by DeepSeek's actual streaming path (it remains defensive for non-conforming endpoints only). Provider event sequence [:start :thinking-start :thinking-delta x17 :thinking-signature-delta :thinking-end :text-start :text-delta x2 :text-end :done :end_turn] with usage-with-cost (input 90, output 20, cache 0/0, total cost 1.82e-5). The adaptive wire shape (thinking.type "adaptive" + output_config.effort "high") was accepted with a thinking content block, and the usage payload carried the Anthropic-shaped cache_read_input_tokens/cache_creation_input_tokens fields (review-2 field-name assumption confirmed on the streaming path too; both 0 in the no-cache turn). One observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event (not in Anthropic's event set), ignored harmlessly (no case branch → no-op, no error/hang) — documented in doc/custom-providers.md DeepSeek notes + locked by `stream-anthropic-ignores-deepseek-ping-events-test`.
+## Follow-ups (implementation review 56, 2026-08-09)
+
+- [ ] The review-55 open-block balancing covers only the `:done` terminals
+      (`message_stop` + the EOF flush, via the shared `emit-terminal-done!`)
+      — the anthropic transport's OTHER finalization paths still leave the
+      turn accumulator with OPEN content-block indices at the terminal:
+      (a) the mid-stream `"error"` SSE branch emits `:error` with no
+      balancing — a stream that started a thinking/tool_use block and then
+      receives the review-43 mid-stream error (e.g. `overloaded_error`)
+      yields `[:start :thinking-start :thinking-delta :error]` with the
+      block still `:status :open` in turn-data's `:content-blocks`
+      (exposed via the `:psi.turn/content-blocks` telemetry resolver) —
+      the exact no-phantom-or-unbalanced-block invariant review 55 asserted
+      "via the EOF path", still open via the error path; (b) the
+      `message_delta`-with-`stop_reason` terminal emits its INLINE `:done`
+      (reviews 44/52 restructured it separately from `emit-terminal-done!`)
+      WITHOUT the open-blocks balancing the shared helper does — the two
+      `:done` branches of the same transport now disagree (`message_stop`
+      finalizes balanced, `message_delta`-with-`stop_reason` does not), so
+      a non-conforming stream that sends `message_delta`-with-`stop_reason`
+      while blocks are open finalizes with open blocks; (c) the catch block
+      and the HTTP-error path route through `capture/emit-error!` with no
+      balancing. Fix: emit the matching `:toolcall-end`/`:thinking-end`/
+      `:text-end` for `@open-blocks` (the review-55 balancing, sorted by
+      index, shaped via `content-block-stop-event`) before the `:error` in
+      the `"error"` branch and before the `:done` in the `message_delta`
+      terminal (or route the `message_delta` terminal through
+      `emit-terminal-done!`), + stream tests (error-after-thinking-start /
+      error-after-tool-start / message_delta-with-stop_reason-with-open-
+      blocks) asserting the balancing events precede the terminal (FAIL
+      pre-fix / PASS post-fix). Also fix the overclaiming wording: the
+      CHANGELOG Fixed entry ("all three transports now emit no unbalanced
+      or open block events at the terminal") and the review-55 steps.md
+      resolution ("never finalizes with an OPEN block index") are true
+      only for the `:done`/EOF paths.
+- [ ] The review-55 open-tool balancing on the OpenAI transports covers
+      only the `:done` paths — the chat-completions `finish_chunk`/usage
+      branches and the EOF flush call `force-start-pending-chat-tools!` +
+      `emit-chat-tool-ends!`, and codex's `emit-codex-done!` doseqs
+      `open-tool-indexes` — but every ERROR path emits the terminal with
+      open tool calls: (a) `emit-chat-error!` (`:openai-completions` —
+      mid-stream error chunk) and the `transport/emit-error!` HTTP-error /
+      catch paths do NOT call `force-start-pending-chat-tools!`/
+      `emit-chat-tool-ends!`, so a tool_calls-delta-then-error-chunk stream
+      yields `[:start :toolcall-start :toolcall-delta :error]` with the
+      tool call open at `handle-error!`; (b) `emit-codex-error!` (all codex
+      error paths — `response.failed`/`error` SSE events, the HTTP-error
+      branch, the catch block) destructures only `done?`/`started?` and
+      never balances `open-tool-indexes` (only `emit-codex-done!` does), so
+      a function_call-output_item-then-`response.failed` stream finalizes
+      with an open tool call. Fix: balance open tool calls before the
+      `:error` on the error emitters (reuse the existing
+      `force-start-pending-chat-tools!`/`emit-chat-tool-ends!` helpers /
+      `emit-codex-done!`'s doseq), + error-after-tool-start stream tests on
+      both transports asserting the `:toolcall-end` precedes the `:error`
+      (FAIL pre-fix / PASS post-fix), and extend the same CHANGELOG
+      "no unbalanced or open block events at the terminal" wording (the
+      claim is currently scoped to the `:done` paths only).
