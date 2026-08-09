@@ -125,6 +125,19 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   (not :custom?))` copy, so the origin-tag built-in-classification
   semantics (review 14) live in one place. Pure refactor — no behavior
   change.
+- **Session-stored runtime API-key provider scoping (review 35):** the
+  session's `:runtime-api-key` (recorded at prompt prepare from the previous
+  turn's resolved `:ai-options :api-key`) is now stored together with the
+  provider it was resolved for (`:runtime-api-key-provider`) and reused only
+  while the session's current model provider still matches — a mid-session
+  `/model` or session-profile provider switch resolves the new provider's
+  own auth instead of injecting the prior provider's raw key spec/literal
+  key/OAuth token into the new provider's endpoint. An unscoped stored key
+  (legacy session data without a recorded provider) is never reused. This is
+  an agent-session session-data scoping change (not a provider-transport
+  change): it closes the last cross-provider credential-disclosure class —
+  via session-data — after reviews 3/10/13 closed the env-var fallback and
+  review 11 the OAuth content-sniff.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

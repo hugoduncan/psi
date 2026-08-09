@@ -154,10 +154,35 @@
    (or (ss/get-state-value-in ctx [:agent-session :sessions session-id :persistence :journal])
        [])))
 
+(defn- session-runtime-api-key
+  "Return the session-stored runtime API key only when it is scoped to the
+   session's current model provider.
+
+   `:runtime-api-key` is recorded at prompt prepare together with
+   `:runtime-api-key-provider` (the session model's provider at that moment,
+   review 35). A stored key is reused only when that recorded provider still
+   matches the session's current model provider, so a mid-session
+   `/model`/session-profile provider switch can never inject the previous
+   provider's key (or OAuth token) into the new provider's request — the same
+   cross-provider disclosure class already closed for the env-var fallback
+   and OAuth content-sniffing. An unscoped stored key (no recorded provider,
+   e.g. legacy session data) is never reused: without a recorded provider we
+   cannot prove it belongs to the current provider."
+  [session-data]
+  (let [runtime-provider (some-> (:runtime-api-key-provider session-data)
+                                 provider-auth/normalize-provider-id)
+        session-provider (provider-auth/normalize-provider-id
+                          (get-in session-data [:model :provider]))]
+    (when (and (:runtime-api-key session-data)
+               (= session-provider runtime-provider))
+      (:runtime-api-key session-data))))
+
 (defn- resolve-api-key
   "Resolve API key in priority order:
    1. Explicit runtime-opts :api-key
-   2. Session-stored key from prior turn
+   2. Session-stored key from a prior turn, ONLY when it is scoped to the
+      session's current model provider (review 35 — an unscoped or
+      cross-provider stored key is never reused)
    3. Shared provider-scoped auth resolution
 
    Raw-spec contract (review 26): for custom models.edn providers the
@@ -170,7 +195,7 @@
   [ctx session-data runtime-opts]
   (let [provider (:provider (:model session-data))]
     (or (:api-key runtime-opts)
-        (:runtime-api-key session-data)
+        (session-runtime-api-key session-data)
         (provider-auth/provider-api-key ctx provider))))
 
 (defn- resolve-llm-stream-idle-timeout-ms

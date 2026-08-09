@@ -19,36 +19,70 @@
       dir
       (recur (.getParentFile dir)))))
 
-(defn- deepseek-example-edn
-  "Parse the models.edn EDN block under the '## DeepSeek-compatible example'
-  heading in doc/custom-providers.md. Picks the first ```clojure block whose
-  content starts with the models.edn root map (`{:version ...`) so an
-  incidental code block (curl / request-shape sample) added to the section
-  prose before the example cannot silently move the parse-lock target
-  (review 11)."
+(defn- doc-clojure-blocks
+  "Parse every ```clojure code block in doc/custom-providers.md as EDN,
+   returning [{:heading <section-title> :edn <parsed>} ...] in document
+   order. :heading is the nearest preceding '## ' section title (review 35:
+   generalized doc extraction so every documented models.edn example can be
+   parse-locked, not just the DeepSeek one)."
   []
-  (let [lines    (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md")))
-        heading  (first (keep-indexed (fn [i l]
-                                        (when (str/starts-with? l "## DeepSeek-compatible example") i))
-                                      lines))]
-    (when (nil? heading)
-      (throw (ex-info "doc/custom-providers.md: '## DeepSeek-compatible example' heading not found" {})))
-    (let [blocks    (keep (fn [start]
-                            (let [end (first (keep-indexed (fn [i l]
-                                                             (when (and (> i start) (str/starts-with? l "```")) i))
-                                                           lines))]
-                              (when end
-                                {:start start
-                                 :lines (subvec (vec lines) (inc start) end)})))
-                          (keep-indexed (fn [i l]
-                                          (when (and (> i heading) (str/starts-with? l "```clojure")) i))
-                                        lines))
-          edn-block (first (filter (fn [{:keys [lines]}]
-                                     (str/starts-with? (str/trim (first lines)) "{:version"))
-                                   blocks))]
-      (when (nil? edn-block)
-        (throw (ex-info "doc/custom-providers.md: no ```clojure EDN block starting with {:version ...} found after the DeepSeek example heading" {})))
-      (edn/read-string (str/join "\n" (:lines edn-block))))))
+  (let [doc-lines (vec (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md"))))]
+    (->> (keep-indexed (fn [i l] (when (str/starts-with? l "```clojure") i)) doc-lines)
+         (keep (fn [start]
+                 (let [end (first (keep-indexed (fn [i l]
+                                                  (when (and (> i start) (str/starts-with? l "```")) i))
+                                                doc-lines))]
+                   (when end
+                     {:start start
+                      :lines (subvec doc-lines (inc start) end)}))))
+         (mapv (fn [{:keys [start lines]}]
+                 {:heading (some (fn [i]
+                                   (when (str/starts-with? (nth doc-lines i) "## ")
+                                     (subs (nth doc-lines i) 3)))
+                                 (range (dec start) -1 -1))
+                  :edn     (edn/read-string (str/join "\n" lines))})))))
+
+(defn- models-edn-example-blocks
+  "Every full models.edn example block in doc/custom-providers.md: a
+   ```clojure block whose content is the models.edn root map
+   (`{:version ... :providers {...}}`). Returns the parsed EDN maps in
+   document order (MiniMax, Anthropic-compatible proxy-sonnet, DeepSeek)."
+  []
+  (->> (doc-clojure-blocks)
+       (keep (fn [{:keys [edn]}]
+               (when (and (map? edn)
+                          (number? (:version edn))
+                          (map? (:providers edn)))
+                 edn)))
+       vec))
+
+(defn- deepseek-example-edn
+  "Parse the DeepSeek models.edn example block from doc/custom-providers.md
+  (the full models.edn block whose provider map carries the
+  `deepseek-v4-flash` model). Picks by model id rather than section heading so
+  the lock survives section reordering; a doc edit that breaks the example (or
+  a schema change that rejects it) fails the parse-lock test."
+  []
+  (or (first (filter (fn [edn]
+                       (some (fn [[_ p]]
+                               (some #(= "deepseek-v4-flash" (:id %)) (:models p)))
+                             (:providers edn)))
+                     (models-edn-example-blocks)))
+      (throw (ex-info "doc/custom-providers.md: DeepSeek models.edn example block not found" {}))))
+
+(defn- local-servers-auth-snippet
+  "Parse the {:auth ...} snippet under the '## Local servers and custom
+   headers' heading in doc/custom-providers.md — the flagship keyless local
+   pattern. Locked against the closed AuthConfig schema (review 35) by
+   wrapping the doc's exact snippet in a minimal provider definition."
+  []
+  (or (some (fn [{:keys [heading edn]}]
+              (when (and (= "Local servers and custom headers" heading)
+                         (map? edn)
+                         (contains? edn :auth))
+                edn))
+            (doc-clojure-blocks))
+      (throw (ex-info "doc/custom-providers.md: 'Local servers and custom headers' :auth snippet not found" {}))))
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
@@ -521,3 +555,51 @@
           (is (= "sk-deepseek-sentinel"
                  (psi.ai.providers.request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))
               "env:DEEPSEEK_API_KEY resolves through the shared request-time env lookup"))))))
+
+(deftest all-documented-models-edn-examples-parse-test
+  ;; Review 35: only the DeepSeek doc example was parse-locked; reviews 33/34
+  ;; found REAL defects in the other documented models.edn examples (MiniMax
+  ;; :locality, proxy-sonnet :locality/tiers) by MANUAL review, each fixed
+  ;; docs-only with "no parse-lock impact" — so the closed
+  ;; ModelDef/AuthConfig schemas could silently reject or mis-parse the doc's
+  ;; other copy-paste examples with no test catching it (the same docs/code
+  ;; drift class review 6 built the DeepSeek parse-lock for). Parse EVERY
+  ;; full models.edn example block in doc/custom-providers.md through
+  ;; parse-models-config and assert zero errors, so future doc edits cannot
+  ;; break the shipped examples.
+  (testing "every documented models.edn example block parses without error"
+    (let [blocks (models-edn-example-blocks)]
+      (is (>= (count blocks) 3)
+          "at least the MiniMax, Anthropic-compatible (proxy-sonnet) and DeepSeek examples must be locked")
+      (doseq [edn blocks]
+        (let [result (user-models/parse-models-config edn)]
+          (is (nil? (:error result))
+              (str "documented models.edn example must parse cleanly: " (pr-str edn)))
+          (is (seq (:models result))
+              (str "documented models.edn example must resolve at least one model: " (pr-str edn))))))))
+
+(deftest local-servers-auth-snippet-parses-test
+  ;; Review 35: the 'Local servers and custom headers' :auth snippet (the
+  ;; flagship keyless local-provider pattern, `{:auth {:auth-header? false
+  ;; :headers {"X-Client" "psi"}}}`) is part of the documented
+  ;; custom-provider surface and was never schema-locked. Wrap the doc's
+  ;; exact {:auth ...} snippet in a minimal provider definition and parse it
+  ;; through the closed AuthConfig schema.
+  (testing "the documented keyless :auth snippet is accepted by AuthConfig"
+    (let [auth   (:auth (local-servers-auth-snippet))
+          result (user-models/parse-models-config
+                  {:version 1
+                   :providers {"local-keyless"
+                               {:base-url "http://localhost:8080/v1"
+                                :api      :openai-completions
+                                :auth     auth
+                                :models   [{:id "test-model"}]}}})
+          stored (get-in result [:auth :local-keyless])]
+      (is (nil? (:error result))
+          (str "documented :auth snippet must be schema-valid: " (pr-str auth)))
+      (is (false? (:auth-header? stored))
+          "auth-header? false from the documented snippet is carried through")
+      (is (= {"X-Client" "psi"} (:headers stored))
+          "custom headers from the documented snippet are carried through")
+      (is (nil? (:api-key stored))
+          "the documented keyless snippet configures no api-key"))))

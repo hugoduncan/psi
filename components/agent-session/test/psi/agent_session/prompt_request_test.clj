@@ -186,6 +186,68 @@
       (is (nil? (:no-auth-header opts)))
       (is (nil? (:headers opts))))))
 
+(deftest provider-switch-never-reuses-stale-runtime-api-key-test
+  ;; Review 35: `:runtime-api-key` is stored per-session, unscoped, at prompt
+  ;; prepare; prompt_request/resolve-api-key gave it priority 2 ABOVE the
+  ;; current provider's own provider-auth/provider-api-key, and neither
+  ;; :session/set-model nor :session/apply-session-profile cleared or scoped
+  ;; it — so a mid-session /model provider switch (A → B) injected A's raw
+  ;; spec/literal key (or OAuth token) into B's request options, sending A's
+  ;; live credential to B's endpoint. The stored key is now recorded with
+  ;; `:runtime-api-key-provider` and reused only when it still matches the
+  ;; session's current model provider.
+  (let [path (write-temp-models!
+              {:version   1
+               :providers {"deepseek"
+                           {:base-url "https://api.deepseek.com/anthropic"
+                            :api      :anthropic-messages
+                            :auth     {:api-key "deepseek-registry-key"}
+                            :models   [{:id "deepseek-v4-flash"}]}
+                           "minimax"
+                           {:base-url "https://api.minimax.io/anthropic"
+                            :api      :anthropic-messages
+                            :auth     {:api-key "minimax-registry-key"}
+                            :models   [{:id "MiniMax-M2.7"}]}}})]
+    (try
+      (model-registry/init! {:user-models-path path})
+
+      (testing "cross-provider stale key is never reused — deepseek registry auth wins"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model               {:provider "deepseek" :id "deepseek-v4-flash"}
+                     :thinking-level      :off
+                     ;; stale from a prior minimax turn (recorded provider)
+                     :runtime-api-key        "env:MINIMAX_API_KEY"
+                     :runtime-api-key-provider "minimax"}
+                    {})]
+          (is (= "deepseek-registry-key" (:api-key opts))
+              "the new provider's own registry auth resolves, not the prior provider's stale key spec")))
+
+      (testing "unscoped legacy stored key (no recorded provider) is never reused"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model          {:provider "deepseek" :id "deepseek-v4-flash"}
+                     :thinking-level :off
+                     ;; legacy session data predating :runtime-api-key-provider
+                     :runtime-api-key "env:MINIMAX_API_KEY"}
+                    {})]
+          (is (= "deepseek-registry-key" (:api-key opts))
+              "without a recorded provider we cannot prove ownership — fall through to provider auth")))
+
+      (testing "same-provider stored key is still reused (OAuth stability intent)"
+        (let [opts (prompt-request/session->request-options
+                    {}
+                    {:model               {:provider "minimax" :id "MiniMax-M2.7"}
+                     :thinking-level      :off
+                     :runtime-api-key        "minimax-runtime-key"
+                     :runtime-api-key-provider "minimax"}
+                    {})]
+          (is (= "minimax-runtime-key" (:api-key opts))
+              "a key recorded for the CURRENT provider keeps working across turns")))
+
+      (finally
+        (java.io.File/.delete (java.io.File. path))))))
+
 (deftest journal->provider-messages-repairs-dangling-tool-use-test
   (testing "missing tool result is repaired with synthetic error toolResult before later messages"
     (let [assistant {:role "assistant"

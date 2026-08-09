@@ -2871,7 +2871,7 @@
 
 ## Follow-ups (implementation review 35, 2026-08-08)
 
-- [ ] Stale `:runtime-api-key` is reused across a mid-session provider
+- [x] Stale `:runtime-api-key` is reused across a mid-session provider
       switch, sending the previous provider's key to the new provider's
       endpoint — the cross-provider credential disclosure class this task
       closed for the env-var fallback (reviews 3/10/13) and OAuth
@@ -2904,7 +2904,21 @@
       (e.g. session-data `:model {:provider "deepseek" ...}` + stale
       `:runtime-api-key "env:MINIMAX_API_KEY"` resolves the deepseek
       registry auth, not the stale spec).
-- [ ] Only the DeepSeek doc example is parse-locked; the other documented
+      → Resolved (provider scoping chosen — the review's second option; it
+      is robust against ALL model-change paths, not just the two dispatch
+      handlers): `prompt_request/resolve-api-key` now reuses
+      `:runtime-api-key` only when its recorded `:runtime-api-key-provider`
+      matches the session's current model provider (normalized); an
+      unscoped stored key (no recorded provider) is never reused.
+      `turn/handlers.clj` prompt-prepare records `:runtime-api-key-provider`
+      (the session model's provider at prepare time) alongside
+      `:runtime-api-key`. New `provider-switch-never-reuses-stale-runtime-
+      api-key-test` (prompt_request_test.clj) locks: cross-provider stale
+      key (recorded minimax + deepseek model) resolves the deepseek
+      registry auth not the stale spec; unscoped legacy key never reused;
+      same-provider stored key still reused (OAuth stability). CHANGELOG
+      [Unreleased] → Fixed entry; design.md revision note updated.
+- [x] Only the DeepSeek doc example is parse-locked; the other documented
       `models.edn` examples can silently drift. `parse-documented-deepseek-
       example-test` (user_models_test.clj, review 6) guards only the
       DeepSeek section of doc/custom-providers.md. Reviews 33/34 found real
@@ -2920,7 +2934,22 @@
       `:auth` snippet where applicable) through `parse-models-config` and
       assert zero errors, so future doc edits cannot break the shipped
       examples.
-- [ ] The documented `speed`-field HTTP-400 non-recovery is untested.
+      → Resolved (test only): `user_models_test.clj` doc extraction
+      generalized — `doc-clojure-blocks` parses every ```clojure block in
+      doc/custom-providers.md with its nearest '## ' heading;
+      `models-edn-example-blocks` collects every full models.edn root map
+      (`{:version ... :providers ...}`; MiniMax, proxy-sonnet, DeepSeek);
+      `deepseek-example-edn` now selects by model id
+      (`deepseek-v4-flash`). New `all-documented-models-edn-examples-parse-
+      test` parses EVERY full models.edn block through `parse-models-config`
+      asserting zero errors + ≥1 model (≥3 blocks enforced); new
+      `local-servers-auth-snippet-parses-test` wraps the doc's exact
+      `{:auth {:auth-header? false :headers {"X-Client" "psi"}}}` snippet
+      in a minimal provider def and asserts the closed AuthConfig accepts it
+      (auth-header? false, headers carried, no api-key). The DeepSeek
+      per-field parse-lock test is unchanged (now reads via the generalized
+      extraction).
+- [x] The documented `speed`-field HTTP-400 non-recovery is untested.
       doc/custom-providers.md claims the `:without-all-betas` compatibility
       retry "leaves `"speed": "fast"` in the retried body" so a 400 caused
       by the unverified `speed` field retries once with the same field and
@@ -2933,3 +2962,9 @@
       (or add a sibling) to assert the retried request body retains
       `:speed "fast"` while the beta header is stripped, locking the
       documented "fast-mode 400 is not auto-recoverable" degradation.
+      → Resolved (test only): `anthropic_retry_test.clj`'s keyless-bearer
+      retry test now parses both request bodies and asserts `:speed "fast"`
+      on the FIRST request AND on the RETRIED body (while the fast-mode
+      beta header is stripped) — locking the documented non-recovery: the
+      `:without-all-betas` transform removes beta headers only, so a
+      speed-field 400 retries once with the same field and hard-fails.

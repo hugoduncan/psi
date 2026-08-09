@@ -1655,3 +1655,56 @@
   optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not set in
   environment; request-shaping coverage only by design.
 - Review 35 (2026-08-08): added 3 steps to be addressed.
+
+## Follow-ups review 35 addressed (2026-08-08)
+
+- addressed 3 review steps (all review-35 items; review-1 optional live smoke
+  test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Stale `:runtime-api-key` provider scoping (review-35 item 1, code + test +
+  changelog): `prompt_request/resolve-api-key` now reuses the session-stored
+  `:runtime-api-key` only when its recorded `:runtime-api-key-provider`
+  matches the session's current model provider (normalized); an unscoped
+  stored key (no recorded provider, e.g. legacy session data) is never
+  reused. `turn/handlers.clj` prompt-prepare records
+  `:runtime-api-key-provider` (the session model's provider at prepare time)
+  alongside `:runtime-api-key`. This closes the cross-provider credential
+  disclosure class via session-data — a mid-session `/model` or
+  session-profile provider switch can no longer inject the prior provider's
+  raw key spec/literal key/OAuth token into the new provider's endpoint;
+  same-provider switches keep the stored key (OAuth stability). New
+  `provider-switch-never-reuses-stale-runtime-api-key-test`
+  (prompt_request_test.clj) locks cross-provider stale key, unscoped legacy
+  key, and same-provider reuse. CHANGELOG [Unreleased] → Fixed entry;
+  design.md revision note documents the change. No allium spec update
+  needed: no spec rule models the session-data `:runtime-api-key` flow
+  (spec/oauth-auth.allium RuntimeApiKeySet/Removed is the OAuth store's
+  provider-keyed runtime_overrides, a different mechanism).
+- All documented models.edn examples parse-locked (review-35 item 2, test
+  only): user_models_test.clj doc extraction generalized —
+  `doc-clojure-blocks` (every ```clojure block + nearest '## ' heading),
+  `models-edn-example-blocks` (every full `{:version ... :providers ...}`
+  root map: MiniMax, proxy-sonnet, DeepSeek), `deepseek-example-edn` now
+  selects by model id. New `all-documented-models-edn-examples-parse-test`
+  parses EVERY block through `parse-models-config` (zero errors, ≥1 model,
+  ≥3 blocks enforced) — a doc edit that breaks any shipped example now
+  fails CI (reviews 33/34 found real MiniMax/proxy-sonnet defects manually
+  with "no parse-lock impact"); new `local-servers-auth-snippet-parses-test`
+  wraps the doc's exact `{:auth {:auth-header? false :headers {"X-Client"
+  "psi"}}}` snippet in a minimal provider def, locking the closed AuthConfig
+  against the flagship keyless pattern.
+- `speed`-field HTTP-400 non-recovery locked (review-35 item 3, test only):
+  `anthropic_retry_test.clj` keyless-bearer retry test now parses both
+  request bodies and asserts `:speed "fast"` on the first request AND on
+  the retried body (beta header stripped) — the `:without-all-betas`
+  transform removes beta headers only, so a speed-field 400 retries once
+  with the same field and hard-fails (documented degradation now proven).
+- Verification: full `bb test` green (2584 tests / 18707 assertions / 0
+  failures; assertion count varies run-to-run per the documented pre-existing
+  flaky response-mode-retry test); targeted namespaces green —
+  prompt-request-test 21/62, user-models-test 19/131, anthropic-retry-test
+  6/60, anthropic-stream-test 7/65, anthropic-test 16/103,
+  prompt-lifecycle-test 23/116, turn.handlers-test 4/11,
+  session-settings-test 7/7. clj-kondo 0 errors / 0 warnings (ai + 
+  agent-session src), cljfmt clean, `bb commit-check:file-lengths` passes.
+  Review-1 optional live smoke test remains unchecked + BLOCKED (no
+  DEEPSEEK_API_KEY in env; request-shaping coverage only by design).

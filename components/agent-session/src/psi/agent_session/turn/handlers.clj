@@ -167,13 +167,22 @@
                                                       :runtime-opts runtime-opts
                                                       :commands (command-registry/command-names-in (:extension-registry ctx))})
                   api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
+                  ;; Review 35: record the provider the resolved key belongs
+                  ;; to (the session's current model provider at prepare
+                  ;; time) so prompt_request/resolve-api-key can reuse the
+                  ;; stored key only while the session stays on that
+                  ;; provider — a mid-session provider switch must never
+                  ;; inject the prior provider's key into the new provider's
+                  ;; request.
+                  api-key-provider   (get-in session-data [:model :provider])
                   steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
               (cond-> {:root-state-update
                        (session/session-update
                         session-id
                         #(cond-> (assoc % :last-prepared-request-summary
                                         (prepared-request-state-summary turn-id prepared-request))
-                           api-key            (assoc :runtime-api-key api-key)
+                           api-key            (assoc :runtime-api-key api-key
+                                                     :runtime-api-key-provider api-key-provider)
                            steering-consumed? (assoc :steering-messages [])))
                        :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
                        :return-effect-result? true}

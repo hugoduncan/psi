@@ -237,13 +237,27 @@
           "keyless custom-header-Bearer 400 must retry once")
       (let [first-betas  (or (get-in (first @calls) [:headers "anthropic-beta"]) "")
             second-betas (or (get-in (second @calls) [:headers "anthropic-beta"]) "")
-            second-auth  (get-in (second @calls) [:headers "Authorization"])]
+            second-auth  (get-in (second @calls) [:headers "Authorization"])
+            first-body   (json/parse-string (:body (first @calls)) true)
+            second-body  (json/parse-string (:body (second @calls)) true)]
         (is (re-find #"fast-mode" first-betas)
             "first request carries the fast-mode beta")
         (is (not (re-find #"fast-mode" second-betas))
             ":without-all-betas must clear ALL beta headers on the retry")
         (is (= "Bearer local-token" second-auth)
-            "custom Authorization header must be preserved on the retry"))
+            "custom Authorization header must be preserved on the retry")
+        ;; Review 35: the :without-all-betas transform strips beta HEADERS but
+        ;; leaves the body's :speed "fast" field — the documented
+        ;; "fast-mode 400 is not auto-recoverable" degradation (a DeepSeek 400
+        ;; on the unverified speed field retries once with the same field and
+        ;; hard-fails). Lock the retained body key, not just the stripped
+        ;; header.
+        (is (= "fast" (:speed first-body))
+            "first request body carries \"speed\": \"fast\" in fast mode")
+        (is (= "fast" (:speed second-body))
+            "the retried body RETAINS \"speed\": \"fast\" — beta stripping does not
+             remove the unverified speed field, so a speed-field 400 repeats
+             and hard-fails (documented non-recovery)"))
       (is (some #(and (:retrying-with-compatibility-fallback (:event %))
                       (= [:without-all-betas] (:retry-fallback-steps (:event %))))
                 @captures)
