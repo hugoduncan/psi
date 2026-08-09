@@ -2082,3 +2082,5 @@
   6/60, `psi.ai.providers.openai-test` 9/65 green; clj-kondo clean (0 errors,
   0 warnings); cljfmt clean; `bb commit-check:file-lengths` passes (all
   touched files under 800 lines).
+
+Review 44 (2026-08-09): added 2 steps to be addressed.

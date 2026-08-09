@@ -3631,3 +3631,60 @@
       `thinking_signature_delta` StreamEvent to match the implementation).
       CHANGELOG `Fixed` entry. Full `bb test` green (2590 tests / 19462
       assertions / 0 failures); clj-kondo + cljfmt + file-lengths clean.
+
+## Follow-ups (implementation review 44, 2026-08-09)
+
+- [ ] `stream-anthropic`'s review-43 terminal-event guard is incomplete: the
+      `done?` guard was added to the `"error"` and `"message_stop"` branches,
+      but the `"message_delta"` branch's terminal emission is unguarded — a
+      mid-stream Anthropic SSE `error` event followed by a trailing
+      `message_delta` carrying `delta.stop_reason` emits a SECOND terminal
+      `:done` after the `:error` (verified live via the stream loop:
+      events = `[:start :error :done]` for error → message_delta
+      `{:delta {:stop_reason "end_turn"}}`), contradicting the review-43
+      fix's claim ("terminating the stream under the existing done? guard — a
+      trailing message_stop cannot emit a second terminal event"; the guard
+      covers only message_stop). The unguarded branch also fires the
+      structured-output-result emissions (`maybe-emit-json-schema-output-result!` /
+      `maybe-emit-prompted-json-result!`) after the `:error`, and
+      `update-output-usage!` runs on a post-error message_delta. Same
+      guard-completeness class in the sibling transports: the catch blocks of
+      `stream-anthropic` and `stream-openai` emit a second `:error` with no
+      `done?` check if the stream read throws after a mid-stream error has
+      already terminated the stream (the codex transport's `emit-codex-error!`
+      is properly `done?`-guarded — the in-repo model to mirror). Downstream,
+      the consumer sends `:turn/error` then `:turn/done` (or a second
+      `:turn/error`), so a post-error trailing event can mask or re-enter the
+      terminal state. Fix: guard the `:done` emission in the `message_delta`
+      branch with `when-not @done?` (keep usage accumulation and the
+      structured-result emissions inside the guard with the `:done`), guard
+      both stream catch blocks' `:error` emission on `done?` (emit nothing
+      when already terminated), and add stream tests: error →
+      message_delta-with-stop_reason → exactly one terminal event (the
+      `:error`, no `:done`), and error → stream-read exception → no second
+      `:error`. Mirror the invariant in `spec/anthropic-provider.allium` and
+      `spec/openai-provider.allium` (a "once done, no further terminal event
+      is emitted" rule — the review-43 rules set `stream.done = true` but no
+      rule forbids a subsequent terminal emission; the `MessageDelta` spec
+      rule models only usage), and tighten the CHANGELOG `Fixed` entry's
+      "terminates" wording if it implies the guard is complete.
+- [ ] design.md's "Revision note (implementation reviews)" is stale: its
+      opening claim — "They are the *only* provider-transport changes in this
+      task" — and the acceptance-criterion wording ("No change to
+      `providers/anthropic.clj`'s request-shaping logic itself ... only the
+      schema gate in `user_models.clj` plus the review-driven API-key
+      resolution changes documented in the revision note") enumerate the
+      review-driven provider-transport changes, but the review-43 changes are
+      provider-transport changes NOT in the enumeration: mid-stream SSE
+      `error`-event surfacing on the `:anthropic-messages` AND
+      `:openai-completions` transports (stream-anthropic's `"error"` case
+      branch + `emit-chat-error!`/`process-chat-sse-line!` in
+      chat_completions.clj) and the `content-block-stop-event` `:thinking-end`
+      labeling for `"thinking"` blocks (providers/anthropic.clj streaming
+      behavior change). A reader of design.md would conclude those changes do
+      not exist or were out of scope; every prior provider-transport review
+      (3/10/13/14/26/35/36/42) added its bullet(s) to the revision note.
+      Fix: add review-43 bullets to the revision-note enumeration (or qualify
+      the "only" claim to name the stream/error-surfacing + thinking-end
+      changes), keeping the design artifact coherent with the implemented
+      behavior per the change chain.
