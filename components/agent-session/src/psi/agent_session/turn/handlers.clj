@@ -13,6 +13,7 @@
    [psi.turn-runtime.request :as turn-request]
    [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-coordination.stop-signal :as stop-signal]
+   [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.workflow-cancellation-guard :as workflow-guard]
    [psi.agent-session.turn.augmentation-lifecycle :as augmentation-lifecycle]))
 
@@ -175,6 +176,17 @@
                   ;; inject the prior provider's key into the new provider's
                   ;; request.
                   api-key-provider   (get-in session-data [:model :provider])
+                  ;; Review 36: record the built-in/custom ORIGIN of the
+                  ;; session's model at prepare time alongside the provider.
+                  ;; The persistable session model map carries no origin
+                  ;; marker, so a custom models.edn provider literally named
+                  ;; "anthropic"/"openai" would otherwise collide with the
+                  ;; built-in of the same name and could reuse a key recorded
+                  ;; for the other origin (e.g. a built-in OAuth token sent to
+                  ;; a third-party endpoint as x-api-key). prompt_request/
+                  ;; session-runtime-api-key requires BOTH provider and origin
+                  ;; to match before reusing the stored key.
+                  api-key-custom?    (prompt-request/session-model-custom? session-data)
                   steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
               (cond-> {:root-state-update
                        (session/session-update
@@ -182,7 +194,8 @@
                         #(cond-> (assoc % :last-prepared-request-summary
                                         (prepared-request-state-summary turn-id prepared-request))
                            api-key            (assoc :runtime-api-key api-key
-                                                     :runtime-api-key-provider api-key-provider)
+                                                     :runtime-api-key-provider api-key-provider
+                                                     :runtime-api-key-custom? api-key-custom?)
                            steering-consumed? (assoc :steering-messages [])))
                        :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
                        :return-effect-result? true}

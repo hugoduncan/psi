@@ -2971,7 +2971,7 @@
 
 ## Follow-ups (implementation review 36, 2026-08-08)
 
-- [ ] The review-35 provider scoping of the session-stored `:runtime-api-key`
+- [x] The review-35 provider scoping of the session-stored `:runtime-api-key`
       ignores the `:custom?` origin tag — the exact provider-name collision
       class this task's reviews 14/25/26/27 closed at the transport layer is
       still open in the session-data layer. `session-runtime-api-key`
@@ -3004,7 +3004,24 @@
       reusing the stored key; add a `prompt_request_test` block with a
       custom-provider-named-"anthropic" fixture proving the stored built-in
       OAuth token is NOT reused for the custom origin (and vice versa).
-- [ ] The same-provider stored `:runtime-api-key` is a self-perpetuating
+      → Resolved: origin scoping implemented — `turn/handlers.clj`
+      prompt-prepare now records `:runtime-api-key-custom?` (the session
+      model's built-in/custom origin at prepare time, via the new public
+      `prompt-request/session-model-custom?` helper which resolves the
+      persistable `{:provider :id}` session model through the model
+      registry's `:custom?` origin tag), and `session-runtime-api-key`
+      requires BOTH the normalized provider AND the origin to match before
+      reusing the stored key. `prompt_request_test.clj` gains blocks with a
+      custom-provider-named-"anthropic" fixture: (1) stored built-in-origin
+      OAuth token + custom "anthropic" model → the custom provider's own
+      registry auth resolves, never the token; (2) the discriminating
+      keyless case — custom "anthropic" model with NO resolvable auth
+      (redef'd `provider-api-key` → nil) + stored built-in-origin token →
+      `:api-key` nil (verified to FAIL against the pre-review-36
+      provider-only check); (3) reverse direction — built-in claude +
+      stored custom-origin raw spec → the built-in's own current resolution
+      (OAuth token) wins.
+- [x] The same-provider stored `:runtime-api-key` is a self-perpetuating
       fixed point that pins a stale auth spec after a models.edn `:auth`
       change: `session-runtime-api-key` (priority 2) returns the stored RAW
       spec (e.g. `"env:DEEPSEEK_API_KEY"` or a literal) whenever the provider
@@ -3030,3 +3047,21 @@
       spec between turns) wins over the stale stored key, and update the
       review-35 same-provider block to use an OAuth-shaped fixture so the
       OAuth-stability intent stays covered under the corrected semantics.
+      → Resolved: staleness fix implemented — `resolve-api-key` now computes
+      the current `provider-auth/provider-api-key` resolution and reuses the
+      stored key only when it is NOT contradicted by it: a different fresh
+      resolution (models.edn `:auth` change, OAuth refresh) wins over the
+      stale stored spec; a nil current resolution (e.g. an RPC/extension-
+      threaded key that lives only in runtime-opts / session-data, not in
+      provider-auth — the tested `rpc-openai-codex-prompt-emits-tool-events-
+      with-final-args-test` continuation flow) lets the stored key keep
+      same-provider same-origin turns working. New
+      `registry-auth-change-wins-over-stale-stored-key-test` locks the
+      precedence: stored `env:DEEPSEEK_OLD_VAR` reused while the registry
+      holds it, then re-init with `env:DEEPSEEK_NEW_VAR` → the new spec wins
+      (verified to FAIL against the pre-review-36 unconditional reuse). The
+      review-35 same-provider block now uses an OAuth-shaped fixture
+      (redef'd `provider-api-key` returning a token equal to the stored key)
+      so the OAuth-stability intent is covered under the corrected
+      semantics. CHANGELOG `Fixed` entry + design.md revision note extended
+      with both review-36 refinements.

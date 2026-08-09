@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.prompt-request :as prompt-request]
+   [psi.provider-auth.core :as provider-auth]
    [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.session-persistence.core :as persist]
    [psi.skill-registry.root-storage :as skill-storage]
@@ -196,6 +197,15 @@
   ;; live credential to B's endpoint. The stored key is now recorded with
   ;; `:runtime-api-key-provider` and reused only when it still matches the
   ;; session's current model provider.
+  ;;
+  ;; Review 36: the reuse check additionally requires the built-in/custom
+  ;; ORIGIN to match (`:runtime-api-key-custom?` recorded at prepare vs the
+  ;; session model's registry `:custom?` tag) — a custom models.edn provider
+  ;; literally named "anthropic"/"openai" can no longer reuse a key recorded
+  ;; for the built-in same-named origin — and the stored key is reused only
+  ;; when it still equals the current provider-auth resolution (a models.edn
+  ;; `:auth` change wins over the stale stored spec; OAuth stability is
+  ;; preserved because provider-auth re-resolves the same token).
   (let [path (write-temp-models!
               {:version   1
                :providers {"deepseek"
@@ -207,7 +217,16 @@
                            {:base-url "https://api.minimax.io/anthropic"
                             :api      :anthropic-messages
                             :auth     {:api-key "minimax-registry-key"}
-                            :models   [{:id "MiniMax-M2.7"}]}}})]
+                            :models   [{:id "MiniMax-M2.7"}]}
+                           ;; review 36: a custom provider literally named
+                           ;; "anthropic" — tagged :custom? true by
+                           ;; expand-model (review 14), same session provider
+                           ;; string as the built-in.
+                           "anthropic"
+                           {:base-url "https://third-party.example/anthropic"
+                            :api      :anthropic-messages
+                            :auth     {:api-key "custom-anthropic-key"}
+                            :models   [{:id "my-custom-model"}]}}})]
     (try
       (model-registry/init! {:user-models-path path})
 
@@ -234,19 +253,123 @@
           (is (= "deepseek-registry-key" (:api-key opts))
               "without a recorded provider we cannot prove ownership — fall through to provider auth")))
 
-      (testing "same-provider stored key is still reused (OAuth stability intent)"
+      (testing "same-provider stored key is still reused when it equals the current OAuth resolution (OAuth stability intent)"
+        (with-redefs [provider-auth/provider-api-key
+                      (fn [_ctx provider]
+                        (when (= :anthropic (provider-auth/normalize-provider-id provider))
+                          "sk-ant-oat-runtime-token"))]
+          (let [opts (prompt-request/session->request-options
+                      {}
+                      {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
+                       :thinking-level           :off
+                       :runtime-api-key          "sk-ant-oat-runtime-token"
+                       :runtime-api-key-provider "anthropic"
+                       :runtime-api-key-custom?  false}
+                      {})]
+            (is (= "sk-ant-oat-runtime-token" (:api-key opts))
+                "a key recorded for the CURRENT provider+origin that still equals the current OAuth resolution keeps working across turns"))))
+
+      (testing "custom provider named anthropic never reuses a stored built-in origin OAuth token"
         (let [opts (prompt-request/session->request-options
                     {}
-                    {:model               {:provider "minimax" :id "MiniMax-M2.7"}
-                     :thinking-level      :off
-                     :runtime-api-key        "minimax-runtime-key"
-                     :runtime-api-key-provider "minimax"}
+                    {:model                    {:provider "anthropic" :id "my-custom-model"}
+                     :thinking-level           :off
+                     ;; recorded on the BUILT-IN anthropic origin (a prior
+                     ;; OAuth turn): provider string matches, origin does not
+                     :runtime-api-key          "sk-ant-oat-builtin-oauth-token"
+                     :runtime-api-key-provider "anthropic"
+                     :runtime-api-key-custom?  false}
                     {})]
-          (is (= "minimax-runtime-key" (:api-key opts))
-              "a key recorded for the CURRENT provider keeps working across turns")))
+          (is (= "custom-anthropic-key" (:api-key opts))
+              "the built-in origin OAuth token is NOT reused for the custom origin — the custom provider's own registry auth resolves")))
+
+      (testing "custom provider named anthropic with NO resolvable auth never reuses a stored built-in origin OAuth token"
+        ;; The discriminating origin-gate case: the current provider-auth
+        ;; resolution is nil (keyless custom provider), so WITHOUT the
+        ;; review-36 origin check the stored built-in-origin token would be
+        ;; reused (nil current lets the stored key fill the gap) and sent as
+        ;; plain x-api-key to the custom provider's third-party base-url —
+        ;; the exact review-36 credential disclosure. The origin check must
+        ;; block it.
+        (with-redefs [provider-auth/provider-api-key (fn [_ctx _provider] nil)]
+          (let [opts (prompt-request/session->request-options
+                      {}
+                      {:model                    {:provider "anthropic" :id "my-custom-model"}
+                       :thinking-level           :off
+                       :runtime-api-key          "sk-ant-oat-builtin-oauth-token"
+                       :runtime-api-key-provider "anthropic"
+                       :runtime-api-key-custom?  false}
+                      {})]
+            (is (nil? (:api-key opts))
+                "the built-in origin OAuth token is NOT reused for the custom origin when the custom provider has no resolvable auth"))))
+
+      (testing "built-in anthropic never reuses a stored custom-origin raw spec"
+        (with-redefs [provider-auth/provider-api-key
+                      (fn [_ctx provider]
+                        (when (= :anthropic (provider-auth/normalize-provider-id provider))
+                          "sk-ant-oat-builtin-token"))]
+          (let [opts (prompt-request/session->request-options
+                      {}
+                      {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
+                       :thinking-level           :off
+                       ;; recorded on the CUSTOM "anthropic" origin (a prior
+                       ;; turn against the third-party provider)
+                       :runtime-api-key          "env:CUSTOM_ANTHROPIC_KEY"
+                       :runtime-api-key-provider "anthropic"
+                       :runtime-api-key-custom?  true}
+                      {})]
+            (is (= "sk-ant-oat-builtin-token" (:api-key opts))
+                "the custom-origin raw spec is NOT reused for the built-in origin — the built-in's own current resolution (OAuth token) wins"))))
 
       (finally
         (java.io.File/.delete (java.io.File. path))))))
+
+(deftest registry-auth-change-wins-over-stale-stored-key-test
+  ;; Review 36: the same-provider stored `:runtime-api-key` is a
+  ;; self-perpetuating fixed point — priority-2 reuse re-recorded the stored
+  ;; RAW spec each prepare, so a models.edn `:auth` change + /reload-models
+  ;; never reached an existing session (old env: var name pinned). The stored
+  ;; key is now reused only when it still equals the current provider-auth
+  ;; resolution, so a registry `:auth` change wins over the stale stored spec.
+  (let [path-old (write-temp-models!
+                  {:version   1
+                   :providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :auth     {:api-key "env:DEEPSEEK_OLD_VAR"}
+                                :models   [{:id "deepseek-v4-flash"}]}}})
+        path-new (write-temp-models!
+                  {:version   1
+                   :providers {"deepseek"
+                               {:base-url "https://api.deepseek.com/anthropic"
+                                :api      :anthropic-messages
+                                :auth     {:api-key "env:DEEPSEEK_NEW_VAR"}
+                                :models   [{:id "deepseek-v4-flash"}]}}})
+        session-data {:model                    {:provider "deepseek" :id "deepseek-v4-flash"}
+                      :thinking-level           :off
+                      ;; stored spec from a prior turn while the registry
+                      ;; still pointed at OLD_VAR
+                      :runtime-api-key          "env:DEEPSEEK_OLD_VAR"
+                      :runtime-api-key-provider "deepseek"
+                      :runtime-api-key-custom?  true}]
+    (try
+      (model-registry/init! {:user-models-path path-old})
+
+      (testing "stored key equal to the current registry spec is still reused"
+        (let [opts (prompt-request/session->request-options {} session-data {})]
+          (is (= "env:DEEPSEEK_OLD_VAR" (:api-key opts)))))
+
+      ;; simulate a models.edn :auth edit + /reload-models between turns
+      (model-registry/init! {:user-models-path path-new})
+
+      (testing "registry :auth change wins over the stale stored spec"
+        (let [opts (prompt-request/session->request-options {} session-data {})]
+          (is (= "env:DEEPSEEK_NEW_VAR" (:api-key opts))
+              "the current registry auth resolves, not the stale stored env: spec")))
+
+      (finally
+        (java.io.File/.delete (java.io.File. path-old))
+        (java.io.File/.delete (java.io.File. path-new))))))
 
 (deftest journal->provider-messages-repairs-dangling-tool-use-test
   (testing "missing tool result is repaired with synthetic error toolResult before later messages"

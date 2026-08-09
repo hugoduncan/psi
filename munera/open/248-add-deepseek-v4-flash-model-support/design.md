@@ -138,6 +138,26 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   change): it closes the last cross-provider credential-disclosure class —
   via session-data — after reviews 3/10/13 closed the env-var fallback and
   review 11 the OAuth content-sniff.
+- **Session-stored runtime API-key origin + staleness hardening
+  (review 36):** two refinements to the review-35 scoping. (1) Origin
+  scoping: prompt prepare now records `:runtime-api-key-custom?` (whether
+  the session model was a custom models.edn provider at prepare time,
+  resolved via the registry's `:custom?` origin tag), and the reuse check
+  requires BOTH the provider AND the built-in/custom origin to match — a
+  custom models.edn provider literally named `"anthropic"`/`"openai"`
+  (same session provider string as the built-in, tagged `:custom? true`)
+  can no longer reuse a key recorded for the built-in same-named origin
+  (e.g. a built-in OAuth token sent as plain `x-api-key` to the custom
+  provider's third-party endpoint), and vice versa. (2) Staleness: the
+  stored key is no longer a self-perpetuating fixed point — it is reused
+  only when it is NOT contradicted by the current provider-auth resolution
+  (a models.edn `:auth` change + `/reload-models` wins over the stale
+  stored spec; an OAuth refresh wins over the old token), while a nil
+  current resolution (e.g. an RPC/extension-threaded key that lives only in
+  runtime-opts / session-data, not in provider-auth) lets the stored key
+  keep the session working across continuation turns. Same-provider
+  same-origin OAuth stability is preserved (provider-auth re-resolves the
+  same token).
 
 ## Verified facts (DeepSeek docs, 2026-07)
 

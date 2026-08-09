@@ -1709,3 +1709,69 @@
   Review-1 optional live smoke test remains unchecked + BLOCKED (no
   DEEPSEEK_API_KEY in env; request-shaping coverage only by design).
 - Review 36 (2026-08-08): added 2 steps to be addressed (runtime-api-key origin-tag gap; same-provider stale-spec fixed point).
+
+## Follow-ups review 36 addressed (2026-08-08)
+
+- addressed 2 review steps (review-36; review-1 optional live smoke test
+  remains BLOCKED on missing DEEPSEEK_API_KEY)
+- Origin scoping of the session-stored `:runtime-api-key` (review-36 item 1):
+  `turn/handlers.clj` prompt-prepare now records `:runtime-api-key-custom?`
+  (the session model's built-in/custom origin at prepare time) via the new
+  public `prompt-request/session-model-custom?` helper — it resolves the
+  persistable `{:provider :id}` session model (no origin marker) through the
+  model registry's `:custom?` origin tag (review 14). `session-runtime-api-key`
+  now requires BOTH the normalized provider AND the origin to match before
+  reusing the stored key — a custom models.edn provider literally named
+  "anthropic"/"openai" (tagged `:custom? true`, same session provider string
+  as the built-in) can no longer reuse a key recorded for the built-in
+  same-named origin (e.g. a built-in OAuth token sent as plain x-api-key to
+  the custom provider's third-party endpoint), and vice versa. Legacy
+  session data recorded before review 36 (no `:runtime-api-key-custom?`)
+  degrades safely to the fresh-resolution path (recorded origin false vs
+  custom session origin true → not reused). Tests in `prompt_request_test.clj`
+  `provider-switch-never-reuses-stale-runtime-api-key-test`: stored
+  built-in-origin OAuth token + custom "anthropic" model → custom provider's
+  own registry auth resolves; the DISCRIMINATING keyless case (custom
+  "anthropic" model, redef'd `provider-api-key` → nil, stored built-in-origin
+  token) → `:api-key` nil — verified to FAIL against the pre-review-36
+  provider-only check (the nil-current gap would have reused the token);
+  reverse direction (built-in claude + stored custom-origin raw spec) → the
+  built-in's own OAuth-token resolution wins.
+- Staleness fixed-point fix (review-36 item 2): `resolve-api-key` now
+  computes the current `provider-auth/provider-api-key` resolution and
+  reuses the stored key only when it is NOT contradicted by it — a
+  different fresh resolution (models.edn `:auth` change + /reload-models,
+  OAuth refresh) wins over the stale stored spec, while a nil current
+  resolution lets the stored key keep same-provider same-origin turns
+  working (required by the real RPC-threaded-key continuation flow:
+  `rpc-openai-codex-prompt-emits-tool-events-with-final-args-test` redefs
+  `runtime/resolve-api-key-in` — the token lives in runtime-opts/
+  session-data, NOT in provider-auth, so a strict
+  reuse-only-when-equal rule regressed it to a single request; verified by
+  running the test against the strict variant). New
+  `registry-auth-change-wins-over-stale-stored-key-test` locks the
+  precedence: stored `env:DEEPSEEK_OLD_VAR` reused while the registry holds
+  it → re-init with `env:DEEPSEEK_NEW_VAR` → the new spec wins (verified to
+  FAIL against pre-review-36 unconditional reuse). The review-35
+  same-provider block now uses an OAuth-shaped fixture (redef'd
+  `provider-api-key` returning a token equal to the stored key) so the
+  OAuth-stability intent stays covered under the corrected semantics.
+- CHANGELOG `[Unreleased]` → `Fixed` entry extended (origin + staleness
+  wording); design.md revision note gains a review-36 bullet.
+- Verification: full unit suite green (2585 tests / 19421 assertions / 0
+  failures — +1 deftest vs the review-35 state; assertion count varies
+  run-to-run per the documented pre-existing flaky retry tests);
+  extensions suite green (364 passed / 0 failed / 1566 assertions — "1
+  unknown" is the pre-existing :integration-meta skip); targeted namespaces
+  green — prompt-request-test 22/67, runtime-test 6/42,
+  prompt-lifecycle-test 23/116, prompt-lifecycle-pre-turn-test,
+  prompt-lifecycle-telemetry-test, prompt-lifecycle-workflow-cancellation-
+  test, model-dispatch-test 13/161, dispatch-test, rpc-prompt-test,
+  rpc-prompt-codex-test (the continuation-flow regression guard),
+  rpc-prompt-command-test, rpc-prompt-stream-test, rpc-prompt-thinking-test;
+  clj-kondo clean (0 errors, 0 warnings) on all changed source + test files;
+  cljfmt clean; file-lengths pass (prompt_request_test.clj 568 lines,
+  prompt_request.clj 459, turn/handlers.clj 327 — all < 800).
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design. Recorded in
+  steps.md as the sole remaining unchecked item.
