@@ -2600,7 +2600,7 @@
 
 ## Follow-ups (implementation review 30, 2026-08-08)
 
-- [ ] `model_selection/catalog-view` `:configured?` counts ANY custom
+- [x] `model_selection/catalog-view` `:configured?` counts ANY custom
       `:headers` as making a provider configured, contradicting the review-29
       request-time-resolvability semantics it just documented: the flag
       computes `(or (nil? auth) (some? (resolve-key-spec (:api-key auth)))
@@ -2625,7 +2625,20 @@
       false` → `:no-auth-header`), and add an incidental-headers block to
       `catalog-view-env-api-key-resolvability-test` asserting
       `:configured? false`.
-- [ ] Empty `env:` variable name is schema-valid and produces a misleading
+      → Resolved: `catalog-view` `:configured?` now reuses
+      `request-support/no-auth?` on the registry auth map (`:auth-header?
+      false` → `:no-auth-header`), so keyless counts as configured only when
+      the shared predicate would treat the request as keyless — a recognized
+      auth header (`x-api-key`/`authorization`, case-insensitive) among
+      custom `:headers` with no resolvable key, or `:auth-header? false`;
+      incidental custom headers (e.g. `X-Client`) no longer imply
+      configured, matching the per-request fast-fail they cause (review 5
+      semantics). Docstring updated. Tests: added incidental-headers
+      (`:configured? false`) and recognized-auth-header (`:configured? true`)
+      blocks to `catalog-view-env-api-key-resolvability-test`. Green:
+      `psi.ai.model-selection-test` 13/119 (+2 assertions), clj-kondo clean
+      (0 errors, 0 new warnings).
+- [x] Empty `env:` variable name is schema-valid and produces a misleading
       blank-var error: `ModelDef`'s `:api-key` is `[:maybe string?]`, so
       `:auth {:api-key "env:"}` parses and is stored raw; per request
       `request-support/resolve-key-spec` does `(getenv (subs "env:" 4))` →
@@ -2640,3 +2653,19 @@
       branch (e.g. treat `"env:"` with a blank var name as a config error
       naming the literal spec, never `getenv ""`); add a test locking the
       chosen behavior.
+      → Resolved: handled in `request-support` (the shared env-resolution
+      home, review 28) so all resolution paths — models.edn, RPC-passed raw
+      specs, direct `resolve-api-key` callers — are covered, not just
+      models.edn parse time. `resolve-key-spec` now returns nil for an
+      `env:` spec with a blank variable name (never `getenv ""` — a set env
+      cannot rescue `"env:"`, the spec itself is invalid); `resolve-api-key`'s
+      error branch gained a blank-var-name case that throws a config error
+      naming the literal spec (`api-key spec "env:" names an empty
+      environment variable (use "env:VAR_NAME")`) instead of the misleading
+      "environment variable  is unset" (double space, no variable name).
+      Tests: `resolve-key-spec-test` locks `"env:"`/`"env: "` → nil with a
+      `getenv` guard proving it is never called with `""`;
+      `resolve-api-key-request-time-env-resolution-test` locks the
+      config-error message and asserts the blank-var unset message is not
+      emitted. Green: `psi.ai.providers.request-support-test` 12/84 (+7
+      assertions), clj-kondo clean (0 errors, 0 new warnings).

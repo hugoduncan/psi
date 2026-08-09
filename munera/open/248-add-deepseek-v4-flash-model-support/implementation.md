@@ -1525,3 +1525,39 @@
   prompt-request-test 20/59.
 
 - Review 30 (2026-08-08): added 2 steps to be addressed.
+- Addressed 2 review-30 steps (catalog-view :configured? incidental-headers
+  drift; empty "env:" variable-name config error).
+  - catalog-view :configured? now reuses request-support/no-auth? on the
+    registry auth map (:auth-header? false → :no-auth-header): keyless counts
+    as configured only when the shared predicate would treat the request as
+    keyless — recognized auth header (x-api-key/authorization,
+    case-insensitive) among custom :headers with no resolvable key, or
+    :auth-header? false. Incidental custom headers (X-Client, no key) no
+    longer report configured, matching the per-request "Missing API key"
+    fast-fail they cause (review 5) and doc/custom-providers.md's own
+    incidental-headers claim. Docstring updated. Tests:
+    catalog-view-env-api-key-resolvability-test gained incidental-headers
+    (:configured? false) and recognized-auth-header (:configured? true)
+    blocks. Green: model-selection-test 13/119 (+2 assertions).
+  - resolve-key-spec now returns nil for an env: spec with a blank variable
+    name (never getenv "" — a set env cannot rescue "env:", the spec itself
+    is invalid); resolve-api-key's error branch gained a blank-var-name case
+    throwing a config error naming the literal spec ("api-key spec \"env:\"
+    names an empty environment variable (use \"env:VAR_NAME\")") instead of
+    the misleading "environment variable  is unset" (double space, no var
+    name). Chosen over schema/extract-provider-auth rejection so ALL
+    resolution paths are covered (models.edn, RPC-passed raw specs, direct
+    resolve-api-key callers) via the shared env-resolution home (review 28).
+    Tests: resolve-key-spec-test locks "env:"/"env: " → nil with a getenv
+    guard proving it is never called with ""; resolve-api-key-request-time-
+    env-resolution-test locks the config-error message and asserts the
+    blank-var unset message is not emitted. Green: request-support-test
+    12/84 (+7 assertions).
+  - CHANGELOG [Unreleased] → Changed: two entries added (catalog-view
+    :configured? incidental-headers alignment; empty env: var name config
+    error).
+  - Full verification: bb clojure:test:unit 2580/18686 (0 failures),
+    bb clojure:test:extensions 364/1566 (0 failures, 1 unknown = pending),
+    clj-kondo 0 errors / 0 new warnings (2 pre-existing dev-http-test
+    warnings on base commit).
+  - Smoke-test step remains unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).

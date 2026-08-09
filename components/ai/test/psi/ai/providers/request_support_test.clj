@@ -122,6 +122,19 @@
       (is (= "sk-live-env-key" (request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))))
     (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
       (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ")))))
+  (testing "env: with a blank variable name is unresolvable, never getenv \"\" (review 30)"
+    ;; "env:" / "env: " name an empty variable — a config error, not an env
+    ;; lookup of the empty string (which would silently return nil and
+    ;; surface as a misleading "environment variable  is unset" downstream).
+    (with-redefs [psi.ai.providers.request-support/getenv
+                  (fn [k] (is (not= "" k) "getenv must never be called with an empty var name")
+                    (when (= "" k) (throw (ex-info "getenv \"\"" {})))
+                    nil)]
+      (is (nil? (request-support/resolve-key-spec "env:")))
+      (is (nil? (request-support/resolve-key-spec "env: "))))
+    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-live-env-key")]
+      (is (nil? (request-support/resolve-key-spec "env:"))
+          "a set env cannot rescue a blank variable name — the spec itself is invalid")))
   (testing "literal string returned as-is"
     (is (= "sk-literal" (request-support/resolve-key-spec "sk-literal")))))
 
@@ -152,6 +165,22 @@
           (is (some? e))
           (is (re-find #"environment variable DEEPSEEK_API_KEY is unset" (ex-message e)))
           (is (re-find #"re-read per request" (ex-message e)))
+          (is (nil? (re-find #"/login" (ex-message e))))))))
+
+  (testing "env: with a blank variable name is a config error naming the literal spec (review 30)"
+    (let [model {:provider :deepseek :custom? true}]
+      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
+        (let [e (try
+                  (request-support/resolve-api-key model
+                                                   {:api-key "env:"}
+                                                   anthropic-config)
+                  nil
+                  (catch clojure.lang.ExceptionInfo e e))]
+          (is (some? e))
+          (is (re-find #"api-key spec \"env:\" names an empty environment variable"
+                       (ex-message e)))
+          (is (nil? (re-find #"environment variable  is unset" (ex-message e)))
+              "must not emit the blank-var unset message (double space)")
           (is (nil? (re-find #"/login" (ex-message e))))))))
 
   (testing "literal configured key passes through unchanged (not env:)"

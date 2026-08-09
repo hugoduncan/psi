@@ -74,8 +74,12 @@
      `request-support/resolve-key-spec` (review 29 restores the pre-review-26
      semantics: an unset env var reads as not configured, matching the
      missing-key error the transports raise per request), while keyless
-     configs (`:auth-header? false` / custom `:headers`) count as configured
-     without a key.
+     configs count as configured without a key. Keyless matches the shared
+     `request-support/no-auth?` predicate (review 30): `:auth-header? false`,
+     or a RECOGNIZED auth header (x-api-key/authorization) among custom
+     `:headers` with no resolvable key — incidental custom headers (e.g.
+     X-Client) do NOT count as configured, mirroring the per-request
+     fast-fail they cause (review 5 semantics).
 
    No implicit locality or policy labels are invented here."
   []
@@ -105,8 +109,15 @@
                               :cost-tier          (:cost-tier model)}
                   :reference {:configured? (boolean (or (nil? auth)
                                                         (some? (request-support/resolve-key-spec (:api-key auth)))
-                                                        (seq (:headers auth))
-                                                        (false? (:auth-header? auth))))}})))
+                                                        ;; Keyless configs count as configured only when the shared
+                                                        ;; no-auth? predicate would treat the request as keyless —
+                                                        ;; recognized auth header among custom :headers with no
+                                                        ;; resolvable key, or :auth-header? false (review 30:
+                                                        ;; incidental headers must not imply configured, matching
+                                                        ;; the per-request fast-fail they cause).
+                                                        (request-support/no-auth? (cond-> auth
+                                                                                    (false? (:auth-header? auth))
+                                                                                    (assoc :no-auth-header true)))))}})))
         (sort-by (juxt :provider :id))
         vec)})
 

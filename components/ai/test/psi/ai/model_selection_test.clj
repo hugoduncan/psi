@@ -123,8 +123,24 @@
                       :api      :anthropic-messages
                       :auth     {:auth-header? false}
                       :models   [{:id "proxy-model"}]}}}
+        incidental-headers-provider-config
+        {:version   1
+         :providers {"x-client-only"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:headers {"X-Client" "psi"}}
+                      :models   [{:id "incidental-model"}]}}}
+        auth-header-provider-config
+        {:version   1
+         :providers {"auth-header-only"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:headers {"x-api-key" "static-key"}}
+                      :models   [{:id "header-model"}]}}}
         path (write-temp-models! env-provider-config)
-        keyless-path (write-temp-models! keyless-provider-config)]
+        keyless-path (write-temp-models! keyless-provider-config)
+        incidental-path (write-temp-models! incidental-headers-provider-config)
+        auth-header-path (write-temp-models! auth-header-provider-config)]
     (try
       (testing "unset env: var reports not configured (request-time resolvability)"
         (registry/init! {:user-models-path path})
@@ -141,9 +157,28 @@
         (registry/init! {:user-models-path keyless-path})
         (is (true? (get-in (sut/find-candidate (sut/catalog-view) :local-proxy "proxy-model")
                            [:reference :configured?]))))
+
+      (testing "incidental custom headers do NOT count as configured (review 30)"
+        ;; A provider with only incidental headers (no :api-key, :auth-header?
+        ;; default true) fast-fails every request with "Missing API key"
+        ;; (request-support/no-auth? treats incidental headers as NOT keyless,
+        ;; review 5) — the picker must not advertise it as configured.
+        (registry/init! {:user-models-path incidental-path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :x-client-only "incidental-model")
+                            [:reference :configured?]))))
+
+      (testing "recognized auth header among custom :headers counts as configured (keyless, review 30)"
+        ;; Mirrors request-support/no-auth?: a recognized auth header
+        ;; (x-api-key/authorization) with no configured key is keyless, so the
+        ;; request succeeds — the picker reports configured.
+        (registry/init! {:user-models-path auth-header-path})
+        (is (true? (get-in (sut/find-candidate (sut/catalog-view) :auth-header-only "header-model")
+                           [:reference :configured?]))))
       (finally
         (java.io.File/.delete (java.io.File. path))
-        (java.io.File/.delete (java.io.File. keyless-path))))))
+        (java.io.File/.delete (java.io.File. keyless-path))
+        (java.io.File/.delete (java.io.File. incidental-path))
+        (java.io.File/.delete (java.io.File. auth-header-path))))))
 
 (deftest role-defaults-test
   (testing "known roles expose default bundles"

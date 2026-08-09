@@ -44,7 +44,15 @@
   [raw]
   (cond
     (or (nil? raw) (str/blank? raw)) nil
-    (str/starts-with? raw "env:") (getenv (subs raw 4))
+    (str/starts-with? raw "env:")
+    (let [var (subs raw 4)]
+      ;; A blank variable name after the prefix (e.g. "env:") is an
+      ;; unresolvable spec, never an environment lookup of the empty string
+      ;; (review 30) — `getenv ""` would silently return nil and the caller
+      ;; would report a misleading "environment variable  is unset" naming a
+      ;; blank variable. Nil here means "not resolvable", same as an unset var.
+      (when-not (str/blank? var)
+        (getenv var)))
     :else raw))
 
 (def openai-api-key-config
@@ -164,13 +172,26 @@
                 env-var (when (and (string? spec)
                                    (str/starts-with? spec "env:"))
                           (subs spec 4))]
-            (if env-var
+            (cond
+              ;; An env: spec with a blank variable name (e.g. "env:") is a
+              ;; config error naming the literal spec — never the misleading
+              ;; "environment variable  is unset" with a blank name (review 30).
+              (and (string? env-var) (str/blank? env-var))
+              (throw (ex-info (str "Missing API key for provider " (name provider)
+                                   ": api-key spec \"" spec "\" names an empty"
+                                   " environment variable (use \"env:VAR_NAME\").")
+                              {:error-code "auth/missing-api-key"
+                               :provider provider}))
+
+              env-var
               (throw (ex-info (str "Missing API key for provider " (name provider)
                                    ": environment variable " env-var
                                    " is unset (env: keys are re-read per request"
                                    " — export it and retry).")
                               {:error-code "auth/missing-api-key"
                                :provider provider}))
+
+              :else
               (throw (ex-info (str "Missing API key for provider " (name provider)
                                    ". Configure the provider's :auth {:api-key ...} in models.edn"
                                    ;; The suggested env var name normalizes kebab-case
