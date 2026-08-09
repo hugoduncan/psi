@@ -250,9 +250,14 @@
    :tool-state                 (atom {})})
 
 (defn- emit-stream-start!
+  "Emit :start exactly once, before the first output/terminal/error event
+   when the stream never emitted it. The once-semantics live in the shared
+   `request-support/emit-start!` (review 54 extracted the three
+   byte-identical per-transport copies — this was the openai-completions
+   copy from review 53); this private wrapper keeps the transport-local
+   name at the call sites."
   [consume-fn stream-started?]
-  (when (compare-and-set! stream-started? false true)
-    (consume-fn {:type :start})))
+  (request-support/emit-start! consume-fn stream-started?))
 
 (defn- emit-started-event!
   [consume-fn stream-started? event]
@@ -645,6 +650,21 @@
             (when-not @(:done? stream-state)
               (flush-pending-chat-finish! stream-state consume-fn strategy)
               (when-not @(:done? stream-state)
+                ;; Review 55: close any open tool calls before the terminal
+                ;; :done — a tool_calls delta chunk followed by EOF (no
+                ;; finish_reason, no [DONE], no usage chunk) previously
+                ;; emitted :done with no :toolcall-end, leaving the turn
+                ;; accumulator with an OPEN tool index when handle-done!
+                ;; finalized (the review-43/48/50
+                ;; no-phantom-or-unbalanced-block invariant, via the EOF
+                ;; path). force-start-pending-chat-tools! emits :toolcall-
+                ;; start for any pending (not-yet-started) tool calls so they
+                ;; are balanced by the subsequent emit-chat-tool-ends! —
+                ;; reusing the exact helpers the finish_chunk branches call
+                ;; (finish-chat-chunk!), so a truncated stream degrades the
+                ;; same way a finish_reason-terminated stream does.
+                (force-start-pending-chat-tools! stream-state consume-fn)
+                (emit-chat-tool-ends! stream-state consume-fn)
                 (emit-structured-output-result! stream-state
                                                 consume-fn
                                                 strategy

@@ -4598,7 +4598,7 @@
 
 ## Follow-ups (implementation review 54, 2026-08-09)
 
-- [ ] `stream-anthropic`'s CONTENT-BLOCK branches never emit `:start` — the
+- [x] `stream-anthropic`'s CONTENT-BLOCK branches never emit `:start` — the
       non-terminal half of the review-50 `:start`-before-first-event class
       (reviews 50/52/53 fixed the terminal/error/catch emitters only, and
       review 53's closing note claimed "the last :start-before-terminal
@@ -4625,7 +4625,8 @@
       when the stream never received `message_start`, + a
       `content_block_start`-first stream test asserting `[:start :text-start
       ...]` (FAIL pre-fix / PASS post-fix, per the established pattern).
-- [ ] `stream-anthropic`'s `content_block_delta`/`content_block_stop` for an
+      → Resolved: the content-block branches (content_block_start/delta/stop) now emit :start once (shared request-support/emit-start! compare-and-set — a no-op when message_start already fired) before the first content-block event when the stream never received message_start, mirroring the openai/codex siblings' emit-started-event!/emit-codex-started-event!. New test `stream-anthropic-content-block-start-first-emits-start-test` asserts a content_block_start-first stream emits [:start :text-start :text-delta :text-end :done] (FAIL pre-fix: :start appeared only at the terminal, AFTER the content events).
+- [x] `stream-anthropic`'s `content_block_delta`/`content_block_stop` for an
       UNKNOWN index (no prior `content_block_start` — a stream that omits
       start events, reuses indices, or reorders deltas/stops ahead of
       starts) emit unbalanced `:text-delta`/`:text-end`: `(:type block-info)`
@@ -4647,7 +4648,8 @@
       skip — `consume-event!` already nil-guards) or balance them with a
       synthetic start; + a stream test with a delta/stop at an index whose
       start was never received.
-- [ ] The `:start`-once emitter is now triplicated across the three
+      → Resolved: the content_block_delta/content_block_stop branches are now nil-guarded on block-info (skip events for an index whose content_block_start was never received, mirroring the codex sibling's skip of an unresolved index and the review-48 redacted_thinking skip) — no phantom :text-delta/:text-end for a block that never had a :text-start (the turn accumulator's note-content-delta! no longer opens a block at an unbegun index). New test `stream-anthropic-unknown-index-content-block-skipped-test` asserts a delta/stop-first stream emits [:start :done] with no unbalanced text events (FAIL pre-fix: [:start :text-delta :done]).
+- [x] The `:start`-once emitter is now triplicated across the three
       transports — `stream-anthropic`'s `emit-start!` (review 50), the
       `:openai-completions` `emit-stream-start!`, and the
       `:openai-codex-responses` `emit-codex-start!` are byte-identical
@@ -4667,9 +4669,10 @@
       call sites are already identical), or document the intentional
       per-transport duplication in request_support.clj's ns docstring.
 
+      → Resolved: the three byte-identical :start-once emitters (anthropic emit-start!, chat-completions emit-stream-start!, codex emit-codex-start!) now delegate to a shared `request-support/emit-start! [consume-fn started?]` (compare-and-set once-guard), extracted into the review-14 request_support.clj namespace the triplication class exists to prevent; the per-transport private wrappers keep the transport-local names at the call sites. New `emit-start-once-test` in request_support_test.clj locks the once-guard contract directly (fires exactly once across call sites; a pre-set started? atom suppresses the emission entirely).
 ## Follow-ups (implementation review 55, 2026-08-09)
 
-- [ ] The review-48 EOF-level terminal flush leaves content blocks / tool
+- [x] The review-48 EOF-level terminal flush leaves content blocks / tool
       calls OPEN at the terminal on two of the three transports — the
       accumulator receives `:done` with an unclosed block index (no
       phantom-or-unbalanced-block invariant, reviews 43/48/50), via the EOF
@@ -4706,7 +4709,8 @@
       PASS post-fix per the established pattern). Reachable on any
       Anthropic-compatible endpoint that truncates a stream mid-block —
       DeepSeek's streaming path remains unverified (see next item).
-- [ ] DeepSeek's STREAMING path is still unverified live — the task's
+      → Resolved: both transports now balance open blocks at the EOF terminal. Anthropic: stream-anthropic tracks OPEN content-block indices (open-blocks map, conj on content_block_start only when the start event was consumed, dissoc on content_block_stop) and emit-terminal-done! emits the matching :toolcall-end/:thinking-end/:text-end for each open index (sorted by index, shaped via the shared content-block-stop-event helper) before the :done — a truncated stream can no longer finalize the turn accumulator with an OPEN block index (the no-phantom-or-unbalanced-block invariant via the EOF path, mirroring codex's open-tool-indexes doseq). OpenAI chat-completions: the EOF flush now calls force-start-pending-chat-tools! + emit-chat-tool-ends! before the terminal :done, reusing the exact helpers the finish_chunk branches call — a tool_calls-delta-then-EOF stream closes its open tool call (a not-yet-started fragment is force-started so it is balanced). Tests (FAIL pre-fix / PASS post-fix, verified): `stream-anthropic-eof-balances-open-tool-block-test`, `stream-anthropic-eof-balances-open-thinking-block-test`, `stream-anthropic-eof-balances-open-text-block-test`, `stream-anthropic-eof-balances-multiple-open-blocks-in-index-order-test`, `completions-eof-balances-open-tool-call-test`, `completions-eof-balances-not-yet-started-tool-call-test`.
+- [x] DeepSeek's STREAMING path is still unverified live — the task's
       longest-standing unverified item, and no step has ever asked for the
       verification even though the review-1 block was LIFTED (review 40:
       `DEEPSEEK_API_KEY` now set in env; the review-1 smoke test built
@@ -4731,3 +4735,5 @@
       DeepSeek conforms, note it; if it deviates, add the observed
       non-conformance to the docs' DeepSeek notes and to the relevant
       stream tests.
+
+      → Resolved (live, 2026-08-09): executed a real STREAMING turn through `stream-anthropic` with the committed .psi/models.edn deepseek config (:adaptive-thinking true, /thinking high, env key). DeepSeek CONFORMS to the Anthropic stream shape — SSE sequence message_start (1) → content_block_start (2: thinking + text) → content_block_delta (20) → content_block_stop (2) → message_delta (usage) → message_stop (1); every block balanced (no truncated/open-block or missing-message_start stream), so the review-43-55 malformed-stream hardening is NOT triggered by DeepSeek's actual streaming path (it remains defensive for non-conforming endpoints only). Provider event sequence [:start :thinking-start :thinking-delta x17 :thinking-signature-delta :thinking-end :text-start :text-delta x2 :text-end :done :end_turn] with usage-with-cost (input 90, output 20, cache 0/0, total cost 1.82e-5). The adaptive wire shape (thinking.type "adaptive" + output_config.effort "high") was accepted with a thinking content block, and the usage payload carried the Anthropic-shaped cache_read_input_tokens/cache_creation_input_tokens fields (review-2 field-name assumption confirmed on the streaming path too; both 0 in the no-cache turn). One observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event (not in Anthropic's event set), ignored harmlessly (no case branch → no-op, no error/hang) — documented in doc/custom-providers.md DeepSeek notes + locked by `stream-anthropic-ignores-deepseek-ping-events-test`.

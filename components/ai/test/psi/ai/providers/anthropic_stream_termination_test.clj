@@ -301,3 +301,206 @@
           "no :text-delta — the redacted_thinking_delta is not misrouted as text")
       (is (= 1 (count (filterv #(= :done (:type %)) @events)))
           "exactly one :done — the stream terminates normally via message_stop"))))
+
+(defn- run-stream [sse-str model options]
+  (let [events (atom [])]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse-str)})]
+      (anthropic/stream-anthropic (-> (conv/create "sys") (conv/add-user-message "hi"))
+                                  model options
+                                  (fn [e] (swap! events conj e))))
+    @events))
+
+;; ── Malformed-stream :start + unknown-index block handling (review 54) ──────
+
+(deftest stream-anthropic-content-block-start-first-emits-start-test
+  (testing "a content_block_start-first stream (no message_start) emits :start before the first content event"
+    ;; Review 54: the content-block branches never emitted :start — the
+    ;; non-terminal half of the review-50 :start-before-first-event class
+    ;; (reviews 50/52/53 fixed the terminal/error/catch emitters only). A
+    ;; malformed/non-conforming stream whose FIRST event is
+    ;; content_block_start emitted [:text-start :text-delta :text-end
+    ;; :start :done] — the first content event had no preceding :start, and
+    ;; :start appeared only at the terminal, AFTER the content events. Both
+    ;; sibling transports emit :start before the first content event
+    ;; (:openai-completions emit-started-event!, :openai-codex-responses
+    ;; emit-codex-started-event!). The content-block branches now emit
+    ;; :start once (shared request-support/emit-start! compare-and-set — a
+    ;; no-op when message_start already fired).
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text" :text ""}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "text_delta" :text "Hello"}})
+                     (sse-line "content_block_stop" {:type "content_block_stop" :index 0})
+                     (sse-line "message_stop" {:type "message_stop"}))]
+      (is (= [:start :text-start :text-delta :text-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))))))
+
+(deftest stream-anthropic-unknown-index-content-block-skipped-test
+  (testing "content_block_delta/stop at an index whose start was never received are skipped — no unbalanced text events"
+    ;; Review 54: content_block_delta/content_block_stop for an UNKNOWN
+    ;; index (no prior content_block_start — a stream that omits start
+    ;; events, reuses indices, or reorders deltas/stops ahead of starts)
+    ;; previously emitted unbalanced :text-delta/:text-end: (:type
+    ;; block-info) is nil for a missing index, which fell through the
+    ;; default TEXT branch — a phantom :text-delta for a block that never
+    ;; had a :text-start (the turn accumulator's note-content-delta! opened
+    ;; a block at an unbegun index). The delta/stop branches are now
+    ;; nil-guarded on block-info (skip unknown indices, mirroring the codex
+    ;; sibling's skip of an unresolved index). :start is still emitted —
+    ;; the stream IS producing content-block events.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 5
+                                :delta {:type "text_delta" :text "phantom"}})
+                     (sse-line "content_block_stop" {:type "content_block_stop" :index 5})
+                     (sse-line "message_stop" {:type "message_stop"}))]
+      (is (= [:start :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "delta/stop-first stream: unknown-index events skipped, :start fires, message_stop terminates")))
+
+  (testing "unknown-index delta/stop after a normal message_start are skipped too"
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 5
+                                :delta {:type "text_delta" :text "phantom"}})
+                     (sse-line "content_block_stop" {:type "content_block_stop" :index 5})
+                     (sse-line "message_stop" {:type "message_stop"}))]
+      (is (= [:start :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "well-formed stream with a bad index: no phantom :text-delta/:text-end, exactly one terminal"))))
+
+;; ── EOF open-block balancing (review 55) ─────────────────────────────────────
+
+(deftest stream-anthropic-eof-balances-open-tool-block-test
+  (testing "a stream that EOFs mid-tool_use (no stop, no message_stop) closes the open block before :done"
+    ;; Review 55: the EOF-level terminal flush emitted :done with an OPEN
+    ;; block index — a tool_use block whose content_block_stop never arrived
+    ;; left the turn accumulator with an unclosed index when handle-done!
+    ;; finalized (no :toolcall-end precedes the :done), the
+    ;; no-phantom-or-unbalanced-block invariant via the EOF path (codex
+    ;; balances open tool indexes at its EOF flush; the anthropic EOF flush
+    ;; did not). Probe-verified pre-fix: message_start +
+    ;; content_block_start (tool_use) + EOF → [:start :toolcall-start :done].
+    ;; The terminal now emits :toolcall-end for every open index before the
+    ;; :done, mirroring codex's emit-codex-done! open-tool-indexes doseq.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "tool_use"
+                                                :id "toolu_01"
+                                                :name "get_weather"}}))]
+      (is (= [:start :toolcall-start :toolcall-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "the open tool_use block is balanced with :toolcall-end before the EOF :done"))))
+
+(deftest stream-anthropic-eof-balances-open-thinking-block-test
+  (testing "a stream that EOFs mid-thinking (no stop, no message_stop) closes the open block before :done"
+    ;; Review 55: same class as the tool_use case — a thinking block started
+    ;; but never stopped left the accumulator with an OPEN index at :done
+    ;; (probe-verified pre-fix: message_start + content_block_start
+    ;; (thinking) + EOF → [:start :thinking-start :done]). The terminal now
+    ;; balances it with :thinking-end (the review-43 typed-block event for
+    ;; the thinking type) before the :done.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "thinking"
+                                                :thinking "Let me think"
+                                                :signature "sig-1"}}))]
+      (is (= [:start :thinking-start :thinking-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "the open thinking block is balanced with :thinking-end before the EOF :done"))))
+
+(deftest stream-anthropic-eof-balances-open-text-block-test
+  (testing "a stream that EOFs mid-text closes the open block before :done"
+    ;; Review 55: text blocks have the same EOF gap — a text block started
+    ;; but never stopped (stream truncated mid-reply) left an OPEN index at
+    ;; :done. The terminal now balances it with :text-end. A well-formed
+    ;; stream (stop received) is unaffected: the stop branch dissocs the
+    ;; index, so a message_stop-terminated stream emits no synthetic end.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text" :text ""}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "text_delta" :text "Hi"}}))]
+      (is (= [:start :text-start :text-delta :text-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "the open text block is balanced with :text-end before the EOF :done")))
+
+  (testing "a well-formed stream (every block stopped before message_stop) emits no synthetic ends"
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text" :text ""}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "text_delta" :text "Hi"}})
+                     (sse-line "content_block_stop" {:type "content_block_stop" :index 0})
+                     (sse-line "message_stop" {:type "message_stop"}))]
+      (is (= [:start :text-start :text-delta :text-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "no duplicate :text-end — the stop branch dissoc'd the index before message_stop"))))
+
+(deftest stream-anthropic-eof-balances-multiple-open-blocks-in-index-order-test
+  (testing "multiple open blocks at EOF are balanced in index order before the :done"
+    ;; Review 55: the open-block doseq sorts by index so the balancing end
+    ;; events are deterministic — a truncated stream with a text block (0)
+    ;; and an unstarted/stopped tool block (1) still open closes both.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 1
+                                :content_block {:type "tool_use"
+                                                :id "toolu_02"
+                                                :name "get_weather"}})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text" :text ""}}))]
+      (is (= [:start :toolcall-start :text-start :text-end :toolcall-end :done]
+             (mapv :type (run-stream sse model {:api-key "test-key"})))
+          "ends emitted sorted by index (text 0 before tool 1) — deterministic balancing"))))
+
+(deftest stream-anthropic-ignores-deepseek-ping-events-test
+  (testing "a mid-stream ping SSE event (DeepSeek's extra event type) is ignored — no error, no hang, no unbalanced events"
+    ;; Review 55 (live verification, 2026-08-09): DeepSeek's streaming path
+    ;; was exercised live for the first time — the stream CONFORMED to the
+    ;; Anthropic shape (message_start / message_delta / message_stop,
+    ;; balanced content blocks, adaptive thinking accepted, Anthropic-shaped
+    ;; cache usage fields), with one observed deviation: an extra mid-stream
+    ;; `ping` SSE event (`data: {"type":"ping"}`) between content deltas,
+    ;; not part of Anthropic's event set. parse-sse-line parses it to
+    ;; `{:type "ping"}`, which matches no case branch → nil → no-op (no
+    ;; hang, no :error, no unbalanced event). Lock the tolerance so a
+    ;; future transport change that starts treating unknown event types as
+    ;; errors does not regress DeepSeek.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "text" :text ""}})
+                     (sse-line "ping" {:type "ping"})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "text_delta" :text "Hi"}})
+                     (sse-line "ping" {:type "ping"})
+                     (sse-line "content_block_stop" {:type "content_block_stop" :index 0})
+                     (sse-line "message_stop" {:type "message_stop"}))
+          events (run-stream sse model {:api-key "test-key"})]
+      (is (= [:start :text-start :text-delta :text-end :done]
+             (mapv :type events))
+          "the ping events are ignored — exactly the well-formed sequence")
+      (is (= 1 (count (filterv #(= :done (:type %)) events)))
+          "exactly one :done — the stream terminates normally via message_stop")
+      (is (not-any? #(= :error (:type %)) events)
+          "no :error — an unknown event type is a no-op, not an error"))))

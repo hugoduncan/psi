@@ -177,9 +177,14 @@
    :open-tool-indexes         (atom #{})})
 
 (defn- emit-codex-start!
+  "Emit :start exactly once, before the first output/terminal/error event
+   when the stream never emitted it. The once-semantics live in the shared
+   `request-support/emit-start!` (review 54 extracted the three
+   byte-identical per-transport copies — this was the codex copy from
+   review 52); this private wrapper keeps the transport-local name at the
+   call sites."
   [consume-fn started?]
-  (when (compare-and-set! started? false true)
-    (consume-fn {:type :start})))
+  (request-support/emit-start! consume-fn started?))
 
 (defn- emit-codex-started-event!
   [consume-fn started? event]

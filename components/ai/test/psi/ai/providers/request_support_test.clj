@@ -317,3 +317,27 @@
                     [["x-api-key" request-support/redact-secret]])]
       (is (contains? redacted "X-API-Key"))
       (is (= "***REDACTED***" (get redacted "X-API-Key"))))))
+
+(deftest emit-start-once-test
+  ;; Review 54: the shared :start emitter extracted from the three
+  ;; byte-identical per-transport copies (anthropic emit-start!, openai
+  ;; emit-stream-start!, codex emit-codex-start!) — the once-guard is the
+  ;; contract all three transports rely on, so it is locked here directly.
+  (testing "the compare-and-set once-guard fires exactly once across call sites"
+    (let [events   (atom [])
+          consume  (fn [e] (swap! events conj e))
+          started? (atom false)]
+      (request-support/emit-start! consume started?)
+      (request-support/emit-start! consume started?)
+      (is (= [{:type :start}] @events)
+          "the second call is a no-op — exactly one :start ever")
+      (is (true? @started?)
+          "the started? atom is set after the first emission")))
+
+  (testing "a pre-set started? atom suppresses the emission entirely"
+    (let [events   (atom [])
+          consume  (fn [e] (swap! events conj e))
+          started? (atom true)]
+      (request-support/emit-start! consume started?)
+      (is (empty? @events)
+          "a stream that already emitted :start never emits a second one"))))

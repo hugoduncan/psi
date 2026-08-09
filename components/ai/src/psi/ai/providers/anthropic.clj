@@ -5,6 +5,7 @@
             [cheshire.core :as json]
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
+            [psi.ai.providers.anthropic.capture :as capture]
             [psi.ai.providers.anthropic.error :as anthropic-error]
             [psi.ai.providers.anthropic.message-transform :as message-transform]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
@@ -288,42 +289,6 @@
       :body    (json/generate-string body*)
       ::oauth? oauth?})))
 
-(defn- safe-call!
-  [f payload]
-  (when (fn? f)
-    (try
-      (f payload)
-      (catch Exception _
-        nil))))
-
-(defn- redact-request-headers
-  [headers]
-  (request-support/redact-headers
-   headers
-   [["Authorization" request-support/redact-authorization]
-    ["x-api-key" request-support/redact-secret]]))
-
-(defn- capture-provider-id
-  [model]
-  (or (:provider model) :anthropic))
-
-(defn- capture-request!
-  [model options url request]
-  (safe-call! (:on-provider-request options)
-              {:provider (capture-provider-id model)
-               :api :anthropic-messages
-               :url url
-               :request {:headers (redact-request-headers (:headers request))
-                         :body (anthropic-request-support/parse-json-body-safe (:body request))}}))
-
-(defn- capture-response!
-  [model options url event]
-  (safe-call! (:on-provider-response options)
-              {:provider (capture-provider-id model)
-               :api :anthropic-messages
-               :url url
-               :event event}))
-
 (defn parse-sse-line
   [line]
   (when (str/starts-with? (or line "") "data: ")
@@ -334,82 +299,18 @@
           (catch Exception _
             nil))))))
 
-(defn- stream-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :stream :throw-exceptions false})))
-
-(defn- error-status?
-  [status]
-  (and (number? status)
-       (>= status 400)))
-
-(defn- emit-error!
-  [model options url consume-fn err]
-  (capture-response! model options url err)
-  (consume-fn err))
-
-(defn- emit-start!
-  "Emit :start exactly once, before the terminal, when the stream never
-   emitted it (the stream's first event is a terminal/error rather than
-   message_start — a malformed/truncated stream, an error-first stream, or a
-   stream-read exception before any output). Review 50: stream-anthropic had
-   no started? tracking — :start was emitted only inside the message_start
-   case branch, so the terminal emitters emitted :done/:error with no
-   preceding :start when the stream never received message_start — the only
-   three-transport asymmetry left in the review-48 EOF-level flush (both
-   sibling transports emit :start first when not started:
-   emit-chat-completion-finish!'s stream-started? compare-and-set and the
-   codex EOF flush's emit-codex-start!). Review 53: the outer catch block (a
-   stream-read exception before any output) also emits :start first — the
-   last :start-before-terminal gap on this transport. Benign for the consumer
-   (:start is a no-op handler; the turn statechart is already past :idle via
-   the turn-level :turn/start) but removes the last cross-transport
-   asymmetry in the terminal-emission class this task has repeatedly treated
-   as actionable."
-  [consume-fn started?]
-  (when (compare-and-set! started? false true)
-    (consume-fn {:type :start})))
-
-(defn- consume-retry-response!
-  [model options url consume-fn consume-stream-response! retry-request]
-  (capture-request! model options url retry-request)
-  (let [retry-response (stream-response url retry-request)
-        retry-status   (:status retry-response)]
-    (if (error-status? retry-status)
-      (emit-error! model options url consume-fn
-                   (anthropic-error/response->error retry-response retry-request))
-      (consume-stream-response! retry-response))))
-
 (defn- handle-400-response!
   [model options url request response consume-fn consume-stream-response!]
-  (if-let [fallback (anthropic-request-support/fallback-request-for-400
-                     request
-                     {:prompt-caching-beta prompt-caching-beta
-                      :interleaved-thinking-beta interleaved-thinking-beta
-                      ;; Review 22: the :without-all-betas decision uses the
-                      ;; transport's COMPUTED oauth? boolean (threaded from
-                      ;; build-request via ::oauth?), NOT the header
-                      ;; content-sniff — a keyless custom provider whose
-                      ;; custom :headers reproduce the Claude Code CLI marker
-                      ;; set (Authorization Bearer + user-agent: claude-cli/…
-                      ;; + x-app: cli) is still not OAuth and must get
-                      ;; :without-all-betas on a beta-related 400. The
-                      ;; content-sniffing oauth-auth-request? predicate is
-                      ;; kept for error diagnostics only.
-                      :oauth-auth-request? (fn [req] (boolean (::oauth? req)))})]
-    (let [first-error (anthropic-error/response->error response request)]
-      (capture-response! model options url (assoc first-error
-                                                  :retrying-with-compatibility-fallback true
-                                                  :retry-fallback-steps (:steps fallback)))
-      (consume-retry-response! model options
-                               url
-                               consume-fn
-                               consume-stream-response!
-                               (:request fallback)))
-    (emit-error! model options url consume-fn
-                 (anthropic-error/response->error response request))))
+  (capture/handle-400-response!
+   {:prompt-caching-beta prompt-caching-beta
+    :interleaved-thinking-beta interleaved-thinking-beta
+    ;; Review 55: oauth-auth-request? must close over THIS namespace —
+    ;; build-request attaches ::oauth? as :psi.ai.providers.anthropic/oauth?,
+    ;; and the capture ns's own ::oauth? would resolve to a different
+    ;; keyword (a namespaced-keyword drift that stripped ALL betas on the
+    ;; OAuth 400-retry — caught by the full suite).
+    :oauth-auth-request? (fn [req] (boolean (::oauth? req)))}
+   model options url request response consume-fn consume-stream-response!))
 
 (defn stream-anthropic
   "Stream response from Anthropic API."
@@ -423,6 +324,19 @@
                               strategy
                               request-body)
         block-types        (atom {})
+        ;; Review 55: content-block indices that are OPEN — a start event was
+        ;; consumed but no stop has arrived (a truncated/non-conforming
+        ;; stream that EOFs mid-block). Mirrors codex's open-tool-indexes:
+        ;; conj on content_block_start (only when the start event was
+        ;; consumed), dissoc on content_block_stop, balanced with the
+        ;; matching end event in emit-terminal-done! before the :done — so
+        ;; the turn accumulator never finalizes with an OPEN block index
+        ;; (no phantom-or-unbalanced-block invariant, reviews 43/48/50).
+        ;; Map of idx -> block type (the type is needed to shape the end
+        ;; event). Structured-output tool blocks and skipped
+        ;; redacted_thinking blocks are never tracked (their start events
+        ;; are never consumed, so an end event would be unbalanced).
+        open-blocks        (atom {})
         structured-buffers (atom {})
         prompted-json-buffer (atom "")
         json-schema-output-buffer (atom "")
@@ -444,7 +358,7 @@
         ;; the codex EOF flush's emit-codex-start!).
         started?    (atom false)]
     (try
-      (capture-request! model options url request)
+      (capture/capture-request! model options url request)
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
@@ -471,7 +385,25 @@
                 ;; received message_start) — mirroring
                 ;; emit-chat-completion-finish!'s ordering (done? reset, then
                 ;; :start, then the terminal).
-                (emit-start! consume-fn started?)
+                (capture/emit-start! consume-fn started?)
+                ;; Review 55: close any content blocks that were started but
+                ;; never stopped (a truncated/non-conforming stream that
+                ;; EOFs mid-block) so the accumulator receives no OPEN block
+                ;; index at :done — the EOF path was the last
+                ;; unbalanced-block class on this transport (codex balances
+                ;; open tool indexes at its EOF flush; the message_stop /
+                ;; message_delta-with-stop_reason in-band terminals only fire
+                ;; after a well-formed stream has stopped every block). The
+                ;; matching end event (:toolcall-end/:thinking-end/:text-end)
+                ;; is shaped from the tracked block type via the same
+                ;; content-block-stop-event helper the in-band stop branch
+                ;; uses (consume-event! nil-guards a skipped type — no
+                ;; tracked block is ever redacted_thinking, but defensive).
+                (doseq [idx (sort (keys @open-blocks))]
+                  (stream-events/consume-event! consume-fn
+                                                (stream-events/content-block-stop-event (get @open-blocks idx)
+                                                                                        idx)))
+                (reset! open-blocks {})
                 (anthropic-structured-output/maybe-emit-json-schema-output-result!
                  consume-fn
                  structured-result-emitted?
@@ -489,7 +421,7 @@
                 (with-open [reader (io/reader (:body response))]
                   (doseq [line (line-seq reader)]
                     (when-let [event-data (parse-sse-line line)]
-                      (capture-response! model options url event-data)
+                      (capture/capture-response! model options url event-data)
                       ;; Review 46: short-circuit the entire SSE dispatch once
                       ;; the stream has terminated (done?) — NOT just the
                       ;; terminal emissions. A post-error trailing event (a
@@ -506,61 +438,119 @@
                           "message_start"
                           (do
                             (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
-                            (emit-start! consume-fn started?))
+                            (capture/emit-start! consume-fn started?))
 
                           "content_block_start"
                           (let [idx   (:index event-data)
                                 block (:content_block event-data)]
+                            ;; Review 54: emit :start once before the first
+                            ;; content-block event when the stream never
+                            ;; received message_start (a malformed/
+                            ;; non-conforming stream whose first event is a
+                            ;; content_block_*) — mirroring the openai/codex
+                            ;; siblings' emit-started-event! /
+                            ;; emit-codex-started-event! (both emit :start
+                            ;; before the first content event). The started?
+                            ;; compare-and-set (shared
+                            ;; request-support/emit-start!) makes this a
+                            ;; no-op when message_start already fired.
+                            (capture/emit-start! consume-fn started?)
                             (swap! block-types assoc idx {:type (:type block)
                                                           :name (:name block)})
                             (when-not (anthropic-structured-output/structured-tool-block?
                                        structured-tool-name
                                        {:type (:type block) :name (:name block)})
-                              ;; consume-event! guards nil — review 48:
-                              ;; content-block-start-event returns nil for
-                              ;; skipped "redacted_thinking" blocks.
-                              (stream-events/consume-event! consume-fn
-                                                            (stream-events/content-block-start-event idx block))))
+                              (let [start-event (stream-events/content-block-start-event idx block)]
+                                ;; consume-event! guards nil — review 48:
+                                ;; content-block-start-event returns nil for
+                                ;; skipped "redacted_thinking" blocks.
+                                (stream-events/consume-event! consume-fn start-event)
+                                ;; Review 55: track the block as OPEN
+                                ;; (started, not yet stopped) so the terminal
+                                ;; can balance it at EOF. Only blocks whose
+                                ;; start event was CONSUMED are tracked —
+                                ;; structured-output tool blocks and skipped
+                                ;; redacted_thinking blocks never emitted a
+                                ;; start and must never get an end (an
+                                ;; unbalanced end would be the same
+                                ;; phantom-block harm the tracking exists to
+                                ;; prevent).
+                                (when start-event
+                                  (swap! open-blocks assoc idx (:type block))))))
 
                           "content_block_delta"
                           (let [idx (:index event-data)
                                 block-info (get @block-types idx)
                                 delta (:delta event-data)]
-                            (if (anthropic-structured-output/structured-tool-block?
-                                 structured-tool-name
-                                 block-info)
-                              (when-let [json-delta (:partial_json delta)]
-                                (swap! structured-buffers update idx str json-delta))
-                              (do
-                                (when (and (= "text" (:type block-info))
-                                           (seq (:text delta)))
-                                  (cond
-                                    (= :prompted-json (:strategy strategy))
-                                    (swap! prompted-json-buffer str (:text delta))
+                            ;; Review 54: :start before the first content
+                            ;; event (idempotent, see content_block_start).
+                            (capture/emit-start! consume-fn started?)
+                            ;; Review 54: an UNKNOWN index (no prior
+                            ;; content_block_start — a stream that omits
+                            ;; start events, reuses indices, or reorders
+                            ;; deltas/stops ahead of starts) must not emit
+                            ;; unbalanced :text-delta/:text-end for a block
+                            ;; that never had a :text-start — mirroring the
+                            ;; codex sibling's skip of an unresolved index
+                            ;; (response.function_call_arguments.delta
+                            ;; guards on (number? idx)) and the review-48
+                            ;; redacted_thinking skip. The structured-output
+                            ;; path is unreachable for a nil block-info
+                            ;; (structured-tool-block? is false for nil), so
+                            ;; the whole branch is a no-op for unknown
+                            ;; indices — consume-event! already nil-guards.
+                            (when block-info
+                              (if (anthropic-structured-output/structured-tool-block?
+                                   structured-tool-name
+                                   block-info)
+                                (when-let [json-delta (:partial_json delta)]
+                                  (swap! structured-buffers update idx str json-delta))
+                                (do
+                                  (when (and (= "text" (:type block-info))
+                                             (seq (:text delta)))
+                                    (cond
+                                      (= :prompted-json (:strategy strategy))
+                                      (swap! prompted-json-buffer str (:text delta))
 
-                                    (anthropic-structured-output/json-schema-output-mechanism? strategy)
-                                    (swap! json-schema-output-buffer str (:text delta))))
-                                (stream-events/consume-event! consume-fn
-                                                              (stream-events/content-block-delta-event (:type block-info)
-                                                                                                       idx
-                                                                                                       delta)))))
+                                      (anthropic-structured-output/json-schema-output-mechanism? strategy)
+                                      (swap! json-schema-output-buffer str (:text delta))))
+                                  (stream-events/consume-event! consume-fn
+                                                                (stream-events/content-block-delta-event (:type block-info)
+                                                                                                         idx
+                                                                                                         delta))))))
 
                           "content_block_stop"
                           (let [idx (:index event-data)
                                 block-info (get @block-types idx)]
-                            (if (anthropic-structured-output/structured-tool-block?
-                                 structured-tool-name
-                                 block-info)
-                              (anthropic-structured-output/maybe-emit-structured-result!
-                               consume-fn
-                               strategy
-                               (get @structured-buffers idx))
-                              ;; consume-event! guards nil — review 48:
-                              ;; content-block-stop-event returns nil for
-                              ;; skipped "redacted_thinking" blocks.
-                              (stream-events/consume-event! consume-fn
-                                                            (stream-events/content-block-stop-event (:type block-info)
-                                                                                                    idx))))
+                            ;; Review 54: :start before the first content
+                            ;; event (idempotent, see content_block_start).
+                            (capture/emit-start! consume-fn started?)
+                            ;; Review 54: unknown index (no prior
+                            ;; content_block_start) — skip, no unbalanced
+                            ;; :text-end/:thinking-end for a block whose
+                            ;; start was never received (see
+                            ;; content_block_delta).
+                            (when block-info
+                              (if (anthropic-structured-output/structured-tool-block?
+                                   structured-tool-name
+                                   block-info)
+                                (anthropic-structured-output/maybe-emit-structured-result!
+                                 consume-fn
+                                 strategy
+                                 (get @structured-buffers idx))
+                                (do
+                                  ;; consume-event! guards nil — review 48:
+                                  ;; content-block-stop-event returns nil for
+                                  ;; skipped "redacted_thinking" blocks.
+                                  (stream-events/consume-event! consume-fn
+                                                                (stream-events/content-block-stop-event (:type block-info)
+                                                                                                        idx))
+                                  ;; Review 55: the block is no longer open
+                                  ;; (its stop was received) — dissoc is a
+                                  ;; no-op for indices never tracked
+                                  ;; (redacted_thinking / structured-output
+                                  ;; tool blocks never entered open-blocks).
+                                  (swap! open-blocks dissoc idx)))))
 
                           "error"
                           ;; Anthropic's documented mid-stream SSE error shape
@@ -598,7 +588,7 @@
                             ;; never received message_start (a malformed
                             ;; stream whose first event is the error) —
                             ;; mirroring the terminal emitters' ordering.
-                            (emit-start! consume-fn started?)
+                            (capture/emit-start! consume-fn started?)
                             (consume-fn err))
 
                           "message_delta"
@@ -629,7 +619,7 @@
                               ;; emits [:start :done] — the last
                               ;; :start-before-terminal gap on the anthropic
                               ;; transport.
-                              (emit-start! consume-fn started?)
+                              (capture/emit-start! consume-fn started?)
                               (anthropic-structured-output/maybe-emit-json-schema-output-result!
                                consume-fn
                                structured-result-emitted?
@@ -691,7 +681,7 @@
                     ;; (the flush's when-not would otherwise return the last
                     ;; consumed event via emit-terminal-done!'s reset!).
                   nil))]
-        (let [response (stream-response url request)
+        (let [response (capture/stream-response url request)
               status   (:status response)]
           (cond
             (= 400 status)
@@ -702,9 +692,9 @@
                                   consume-fn
                                   consume-stream-response!)
 
-            (error-status? status)
-            (emit-error! model options url consume-fn
-                         (anthropic-error/response->error response request))
+            (capture/error-status? status)
+            (capture/emit-error! model options url consume-fn
+                                 (anthropic-error/response->error response request))
 
             :else
             (consume-stream-response! response))))
@@ -725,9 +715,9 @@
           ;; mirroring the in-band error branch's ordering — so a
           ;; first-read exception yields [:start :error] like every other
           ;; error path on this transport.
-          (emit-start! consume-fn started?)
+          (capture/emit-start! consume-fn started?)
           (let [err (anthropic-error/exception->error e)]
-            (capture-response! model options url err)
+            (capture/capture-response! model options url err)
             (consume-fn err)))))))
 
 (defn- execute-response
@@ -780,12 +770,12 @@
         strategy           (structured-output/select-strategy model structured-request)
         request            (build-request conversation model options false)]
     (try
-      (capture-request! model options url request)
+      (capture/capture-request! model options url request)
       (let [response (execute-response url request)]
-        (if (error-status? (:status response))
+        (if (capture/error-status? (:status response))
           (anthropic-error/response->error response request)
           (let [body (json/parse-string (:body response) true)]
-            (capture-response! model options url body)
+            (capture/capture-response! model options url body)
             (response->assistant-message model body strategy))))
       (catch Exception e
         (anthropic-error/exception->error e)))))

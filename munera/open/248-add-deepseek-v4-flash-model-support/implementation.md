@@ -2434,3 +2434,129 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 - Review 54 (2026-08-09): added 3 steps to be addressed.
 
 - Review 55 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 54 + 55 addressed (2026-08-09)
+
+- addressed 5 review steps (review 54: 3; review 55: 2; all unchecked
+  steps.md items now closed — no unchecked items remain)
+- Review-54 item 1 (content-block `:start`): the content-block branches
+  (content_block_start/delta/stop) in `stream-anthropic` now emit `:start`
+  once (shared `request-support/emit-start!` compare-and-set — no-op when
+  message_start fired) before the first content event, mirroring the
+  openai/codex siblings. Test
+  `stream-anthropic-content-block-start-first-emits-start-test` locks
+  `[:start :text-start :text-delta :text-end :done]` (FAIL pre-fix:
+  `[:text-start :text-delta :text-end :start :done]`).
+- Review-54 item 2 (unknown-index skip): `content_block_delta`/`stop`
+  branches nil-guard on `block-info` — an index whose start was never
+  received is skipped (mirrors the codex sibling's unresolved-index skip),
+  no phantom `:text-delta`/`:text-end`. Test
+  `stream-anthropic-unknown-index-content-block-skipped-test` locks
+  `[:start :done]` for a delta/stop-first stream (FAIL pre-fix:
+  `[:start :text-delta :done]`).
+- Review-54 item 3 (shared `:start` emitter): the three byte-identical
+  per-transport copies (anthropic `emit-start!`, chat-completions
+  `emit-stream-start!`, codex `emit-codex-start!`) now delegate to the
+  shared `request-support/emit-start!`; per-transport private wrappers keep
+  the local names. `emit-start-once-test` in request_support_test.clj locks
+  the once-guard contract.
+- Review-55 item 1 (EOF open-block balancing): `stream-anthropic` tracks
+  OPEN content-block indices (`open-blocks` map — conj on
+  content_block_start only when the start event was consumed, dissoc on
+  content_block_stop) and `emit-terminal-done!` emits the matching
+  `:toolcall-end`/`:thinking-end`/`:text-end` (sorted by index, shaped via
+  the shared content-block-stop-event) before the `:done`; the
+  `:openai-completions` EOF flush now calls `force-start-pending-chat-tools!`
+  + `emit-chat-tool-ends!` before the terminal `:done` (reusing the
+  finish_chunk helpers). Six tests, all FAIL pre-fix / PASS post-fix
+  (verified via stash): `stream-anthropic-eof-balances-open-tool-block-test`,
+  `stream-anthropic-eof-balances-open-thinking-block-test`,
+  `stream-anthropic-eof-balances-open-text-block-test`,
+  `stream-anthropic-eof-balances-multiple-open-blocks-in-index-order-test`,
+  `completions-eof-balances-open-tool-call-test`,
+  `completions-eof-balances-not-yet-started-tool-call-test`.
+- Review-55 item 2 (DeepSeek streaming live verification): RESOLVED live —
+  a real STREAMING turn through `stream-anthropic` with the committed
+  `.psi/models.edn` deepseek config (`:adaptive-thinking true`, `/thinking
+  high`, env `DEEPSEEK_API_KEY`) was accepted (HTTP 200). DeepSeek
+  CONFORMS: SSE sequence message_start (1) → content_block_start (2:
+  thinking + text) → content_block_delta (20) → content_block_stop (2) →
+  message_delta (usage) → message_stop (1); every block balanced, so the
+  review-43-55 malformed-stream hardening (EOF flush, `:start`-before-
+  first-event, open-block balancing) is not triggered by DeepSeek's actual
+  path — it remains defensive for non-conforming endpoints only. Provider
+  events `[:start :thinking-start :thinking-delta x17
+  :thinking-signature-delta :thinking-end :text-start :text-delta x2
+  :text-end :done :end_turn]` with usage-with-cost (input 90 / output 20 /
+  cache 0/0; total cost 1.82e-5). Adaptive wire shape
+  (`thinking.type "adaptive"` + `output_config.effort "high"`) accepted
+  with a thinking block; usage payload carries the Anthropic-shaped
+  `cache_read_input_tokens`/`cache_creation_input_tokens` fields
+  (review-2 field-name assumption confirmed on streaming; both 0 in the
+  no-cache turn) plus an ignored extra `:service_tier standard`. One
+  observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event
+  (not in Anthropic's event set) between content deltas — ignored
+  harmlessly (no case branch → no-op). Documented in
+  `doc/custom-providers.md` DeepSeek notes (streaming-verified bullet) +
+  locked by `stream-anthropic-ignores-deepseek-ping-events-test`.
+- File organization: the review-54 tests were moved out of
+  `anthropic_stream_test.clj` (back to 778 lines) into
+  `anthropic_stream_termination_test.clj` (506 lines) to stay under the
+  800-line file-length gate; review-55 tests added there too. CHANGELOG
+  `[Unreleased]` → `Fixed` gains two entries (EOF open-block balancing on
+  both transports; content-block-first `:start` + unknown-index skip +
+  shared `request-support/emit-start!`).
+- Verification: affected namespaces green —
+  `psi.ai.providers.anthropic-stream-test` 14/98,
+  `psi.ai.providers.anthropic-stream-termination-test` 14/39,
+  `psi.ai.providers.anthropic-stream-capture-test` 7/38,
+  `psi.ai.providers.openai-completions-stream-test` 8/27,
+  `psi.ai.providers.request-support-test` 6/49; clj-kondo clean (0 errors,
+  0 warnings) on all changed source + test files; `bb
+  commit-check:file-lengths` passes.
+- Concurrent capture-refactor (noted, not authored by this pass): the
+  working tree carries an extraction of the anthropic capture/stream-
+  plumbing helpers (`capture-provider-id`/`capture-request!`/
+  `capture-response!`/`stream-response`/`error-status?`/`emit-error!`/
+  `safe-call!`/`redact-request-headers`/`emit-start!`/
+  `consume-retry-response!`/`handle-400-response!`) into the new
+  `psi.ai.providers.anthropic.capture` namespace with the capture tests
+  moved to `anthropic_stream_capture_test.clj` — complete-looking,
+  behavior-preserving (same functions, updated call sites; all namespaces
+  green), verified here as part of the converged tree.
+- Full-suite verification: run below.
+- addressed 5 review steps (review 54: 3; review 55: 2 — verified end-to-end
+  on the converged tree; the concurrent review-step pass authored the code +
+  tests + live streaming verification, this pass fixed one regression it
+  introduced and completed the change chain)
+- Regression fixed (found by this pass's full-suite run): the concurrent
+  capture-refactor moved `handle-400-response!` into
+  `psi.ai.providers.anthropic.capture`, where its `:oauth-auth-request?`
+  fn's `(::oauth? req)` resolved to `:psi.ai.providers.anthropic.capture/
+  oauth?` — but `build-request` attaches `:psi.ai.providers.anthropic/
+  oauth?`, so the lookup always missed and every HTTP-400 compatibility
+  retry selected `:without-all-betas` (stripping ALL betas, including the
+  oauth/claude-code/context-management/scope betas the retry must keep for
+  OAuth requests — `stream-anthropic-retries-without-thinking-on-400-test`
+  failed 4 assertions). Fixed by threading `oauth-auth-request?` through the
+  capture config map from the `psi.ai.providers.anthropic` wrapper (where
+  `::oauth?` is in scope), matching the betas-param pattern; retry test
+  green (6/60).
+- Spec + design change-chain completion (this pass): `spec/anthropic-
+  provider.allium` gains the review-54/55 rules — `ContentBlockBranchesEmit-
+  StartWhenMessageStartAbsent`, `UnknownIndexContentBlockEventsSkipped`,
+  `TerminalEmitsEndEventsForOpenBlocks` (+ `started` on `AnthropicStream`,
+  `OpenBlockIndexes`/`BlockEndEventType`/`StartEmittedOnce` vocabulary);
+  `spec/openai-provider.allium` gains `TerminalEmitsToolCallEndsForOpenTool-
+  Calls` (review-55 chat-completions EOF balancing); design.md revision note
+  + AC exception list updated with the review-54/55 bullets. Manual
+  allium-check: no undefined entities/predicates beyond the documented
+  vocabulary.
+- Full-suite verification (this pass, converged tree + regression fix):
+  `bb test` green — 2626 tests / 19603 assertions / 0 failures (assertion
+  count varies run-to-run per the review-5 flake analysis; 2623 → 2626 =
+  the review-54/55 deftests: 2 content-block/unknown-index + 1 shared
+  emit-start! + review-55 EOF balancing + ping tests). clj-kondo clean (0
+  errors, 0 warnings) on all changed source + test files; cljfmt clean;
+  `bb commit-check:file-lengths` passes (anthropic.clj 780, all test files
+  under 800 after the capture-split + test-file moves).

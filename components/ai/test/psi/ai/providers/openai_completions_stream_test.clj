@@ -190,3 +190,58 @@
           "exactly one :error terminal")
       (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
           "the exception surfaces as an :error with a message"))))
+
+(deftest completions-eof-balances-open-tool-call-test
+  (testing "a tool_calls delta chunk followed by EOF closes the open tool call before :done"
+    ;; Review 55: the EOF-level terminal flush emitted :done with an OPEN
+    ;; tool index — a tool_calls delta chunk with no finish_reason, no
+    ;; [DONE] and no usage chunk (a truncated / non-conforming stream)
+    ;; left the turn accumulator with an unclosed tool index when
+    ;; handle-done! finalized (probe-verified pre-fix:
+    ;; [:start :toolcall-start :toolcall-delta :done] — no :toolcall-end).
+    ;; The EOF flush now calls force-start-pending-chat-tools! +
+    ;; emit-chat-tool-ends! before the terminal :done, reusing the exact
+    ;; helpers the finish_chunk branches call — a truncated stream degrades
+    ;; the same way a finish_reason-terminated stream does.
+    (let [events (run-stream (str
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :tool_calls [{:index 0
+                                                                          :id "call_1"
+                                                                          :function {:name "get_weather"
+                                                                                     :arguments ""}}]}}]}) "\n\n"
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :tool_calls [{:index 0
+                                                                          :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n"))
+          dones  (filterv #(= :done (:type %)) events)]
+      (is (= [:start :toolcall-start :toolcall-delta :toolcall-end :done]
+             (mapv :type events))
+          "the open tool call is balanced with :toolcall-end before the EOF :done")
+      (is (= 1 (count dones))
+          "exactly one :done — the EOF flush terminates the stream")
+      (is (= :stop (:reason (first dones)))
+          "no pending finish reason → the EOF flush emits :stop")
+      (is (not-any? #(= :error (:type %)) events)
+          "no :error — the EOF flush is a clean terminal"))))
+
+(deftest completions-eof-balances-not-yet-started-tool-call-test
+  (testing "a tool_calls fragment with a name but no id (never started) is force-started then closed at EOF"
+    ;; Review 55: force-start-pending-chat-tools! emits :toolcall-start for
+    ;; a pending (not-yet-started) tool entry so the subsequent
+    ;; emit-chat-tool-ends! balances it — a tool_calls delta carrying only
+    ;; a name (no id, so start-chat-tool-if-ready! could not fire during the
+    ;; stream) still gets a balanced :toolcall-start/:toolcall-end pair at
+    ;; the EOF terminal instead of an open index.
+    (let [events (run-stream (str
+                              "data: " (json/generate-string
+                                        {:choices [{:delta {:role "assistant"
+                                                            :tool_calls [{:index 0
+                                                                          :function {:name "get_weather"
+                                                                                     :arguments ""}}]}}]}) "\n\n"))
+          dones  (filterv #(= :done (:type %)) events)]
+      (is (= [:start :toolcall-start :toolcall-end :done]
+             (mapv :type events))
+          "the not-yet-started tool call is force-started then closed before the EOF :done")
+      (is (= 1 (count dones))
+          "exactly one :done — the EOF flush terminates the stream"))))

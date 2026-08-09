@@ -487,6 +487,24 @@ Notes:
   JSON carried `cache_read_input_tokens` and `cache_creation_input_tokens`
   (both 0 in that no-cache turn) alongside `input_tokens`/`output_tokens` —
   the example costs map onto real payload fields, no adjustment needed.
+- Streaming path verified live (2026-08-09): a live STREAMING turn through
+  `stream-anthropic` with this example config (`:adaptive-thinking true`,
+  `/thinking high`) was accepted and conformed to the Anthropic stream
+  shape — `message_start` → `content_block_start` (thinking, then text) →
+  deltas → `content_block_stop` per block → `message_delta` (with usage) →
+  `message_stop`, with every block balanced (no truncated/open-block or
+  missing-`message_start` stream), so psi's malformed-stream hardening
+  (EOF terminal flush, `:start`-before-first-event, open-block balancing at
+  EOF) is not triggered by DeepSeek's actual streaming path — it remains
+  defensive for non-conforming endpoints only. The adaptive shape
+  (`thinking.type "adaptive"` + `output_config.effort "high"`) was accepted
+  with a `thinking` content block, and the usage payload carried the same
+  Anthropic-shaped `cache_read_input_tokens`/`cache_creation_input_tokens`
+  fields as the non-streaming turn (both 0 in the no-cache run). One
+  observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event
+  (not in Anthropic's event set) between content deltas; psi ignores it
+  harmlessly (no case branch → no-op, no error/hang) — locked by a stream
+  test.
 - DeepSeek's Anthropic-compatible endpoint does not document a
   JSON-Schema-native structured-output mechanism, so this example omits
   `:capabilities :structured-output` (defaults to unsupported); add

@@ -1068,6 +1068,36 @@ rule OpenAITransportCloseEmitsDoneIfNotTerminal {
         -- does not apply (OnceDoneNoFurtherEvent).
 }
 
+rule TerminalEmitsToolCallEndsForOpenToolCalls {
+    when: ProviderTransportClosed(stream) OR TerminalBoundaryReached(stream)
+    requires: stream.done = false
+    requires: stream.request_api = openai_completions
+
+    ensures: for each index in OpenToolCallIndexes(stream):
+                 Emit(StreamEvent{event_type: toolcall_end, content_index: index})
+
+    @guidance
+        -- Review 55: the chat-completions EOF flush closes open tool calls
+        -- before the terminal :done — a tool_calls delta chunk followed by
+        -- EOF (no finish_reason, no [DONE], no usage chunk) previously
+        -- emitted :done with no :toolcall-end, leaving the turn accumulator
+        -- with an OPEN tool index when handle-done! finalized (the
+        -- no-phantom-or-unbalanced-block invariant via the EOF path; the
+        -- codex transport already balances open tool indexes at its EOF
+        -- flush — emit-codex-done! doseqs open-tool-indexes). The flush now
+        -- calls force-start-pending-chat-tools! + emit-chat-tool-ends! (the
+        -- exact helpers the finish_reason branches of finish-chat-chunk!
+        -- call), so a truncated stream degrades the same way a
+        -- finish_reason-terminated stream does: a not-yet-started fragment
+        -- (a tool_calls delta carrying only a name, no id) is force-started
+        -- so it is balanced, and every open tool index gets its
+        -- :toolcall-end before the :done. OpenToolCallIndexes(stream) is
+        -- the set of tool-state entries whose start was emitted and whose
+        -- end was not — probe-verified pre-fix: a tool_calls delta + EOF →
+        -- [:start :toolcall-start :toolcall-delta :done]; post-fix
+        -- [:start :toolcall-start :toolcall-delta :toolcall-end :done].
+}
+
 surface OpenAIProviderApi {
     facing executor: AgentExecutor
 

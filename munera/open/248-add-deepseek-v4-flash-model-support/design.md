@@ -375,6 +375,36 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   function is safe for direct callers and the keyless contract lives in one
   predicate. Pure refactor — no behavior change (all real callers already
   gate on `no-auth?` first).
+- **Content-block `:start` + unknown-index skip + shared `:start` emitter
+  (review 54):** `stream-anthropic`'s content-block branches
+  (`content_block_start`/`content_block_delta`/`content_block_stop`) now
+  emit `:start` once before the first content event when the stream never
+  received `message_start` (the non-terminal half of the review-50
+  `:start`-before-first-event class — previously a content-block-first
+  stream emitted `:start` only at the terminal, AFTER the content events,
+  unlike the openai/codex siblings). `content_block_delta`/`content_block_stop`
+  for an UNKNOWN index (no prior `content_block_start`) are now skipped
+  instead of emitting unbalanced phantom `:text-delta`/`:text-end` for a
+  block that never had a `:text-start`. The `:start`-once emitter is
+  extracted to a shared `request-support/emit-start!` used by all three
+  transports (was three byte-identical per-transport copies — the
+  review-14 triplication class). Pure event-emission changes — no
+  request-shaping change, no custom-provider config change; the only
+  cross-transport inconsistency class this task has repeatedly treated as
+  actionable.
+- **Terminal open-block balancing at EOF (review 55):** the anthropic and
+  openai chat-completions EOF-flush terminals now close content blocks /
+  tool calls that were started but never stopped before the terminal
+  `:done` — `stream-anthropic` tracks open content-block indices
+  (conj on a consumed start, dissoc on stop) and `emit-terminal-done!`
+  emits the matching `:toolcall-end`/`:thinking-end`/`:text-end` for each
+  open index before the `:done` (mirroring codex's `open-tool-indexes`
+  doseq); the chat-completions EOF flush calls
+  `force-start-pending-chat-tools!` + `emit-chat-tool-ends!` (the exact
+  helpers the finish-reason branches use) so a truncated stream degrades
+  like a finish_reason-terminated one. The turn accumulator never
+  finalizes with an OPEN block index (the no-phantom-or-unbalanced-block
+  invariant reviews 43/48/50 asserted, via the EOF path).
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -558,7 +588,13 @@ independently confirms native JSON-Schema support can add
   the error paths (`emit-chat-error!`/`emit-codex-error!` + the anthropic
   `message_delta` terminal) + codex catch-block header pass-through +
   codex mid-stream-error capture-once, and the review-53 catch-block
-  `:start`-before-terminal on stream-read exceptions);
+  `:start`-before-terminal on stream-read exceptions, the review-54
+  content-block-first `:start` emission + unknown-index content-block skip
+  (with the `:start`-once emitter extracted to the shared
+  `request-support/emit-start!`), and the review-55 terminal open-block
+  balancing at the EOF flush / `message_stop` terminal on the anthropic and
+  openai chat-completions transports (`:toolcall-end`/`:thinking-end`/
+  `:text-end` for blocks started but never stopped before the `:done`));
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

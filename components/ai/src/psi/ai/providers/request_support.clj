@@ -207,6 +207,29 @@
                                :provider provider}))))))
       api-key)))
 
+;; ── Stream event helpers ─────────────────────────────────────────────────────
+
+(defn emit-start!
+  "Emit :start exactly once for a stream, when the stream never emitted it.
+
+   The compare-and-set on the `started?` atom makes this idempotent across
+   every call site, so the transport can call it before any event that might
+   be the stream's first (:start must precede the first output/terminal/
+   error/content event when the stream never received its opening event —
+   message_start / a role-or-content chunk / output_item.added — e.g. a
+   malformed/truncated stream, an error-first stream, a content-block-first
+   stream, or a stream-read exception before any output).
+
+   Review 54: extracted from the three byte-identical per-transport copies
+   (anthropic's `emit-start!` from review 50, chat-completions'
+   `emit-stream-start!` from review 53, codex's `emit-codex-start!` from
+   review 52) — the review-14 triplication class request_support.clj exists
+   to prevent: a future :start-semantics change (e.g. carrying a payload, or
+   a different once-guard) must land in one place, not three."
+  [consume-fn started?]
+  (when (compare-and-set! started? false true)
+    (consume-fn {:type :start})))
+
 ;; ── Capture redaction ────────────────────────────────────────────────────────
 
 (defn find-headers

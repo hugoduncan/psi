@@ -139,6 +139,11 @@ entity AnthropicStream {
     block_types: Map<Integer, String>
     done: Boolean = false
     keyless: Boolean = false
+    -- Review 54: whether :start was emitted (the started? atom). Mirrors
+    -- the openai/codex streams' started tracking; set by the first
+    -- emission (message_start, terminal/error/catch, or content-block
+    -- branch — see ContentBlockBranchesEmitStartWhenMessageStartAbsent).
+    started: Boolean = false
 }
 
 ------------------------------------------------------------
@@ -745,6 +750,14 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 --   ProviderTransportClosed(stream)        — the SSE body reached EOF
 --   UsageAccUpdated(stream, deltas)          — usage-acc atom merge
 --   CurrentContentBlockType(stream, index)   — block type at a content index
+--   OpenBlockIndexes(stream)                 — content indices whose start
+--       event was consumed but whose stop was not yet received (review 55)
+--   BlockEndEventType(block_type)            — tool_use → toolcall_end,
+--       thinking → thinking_end, else text_end (review 55; shaped via
+--       content-block-stop-event, the same helper the in-band stop branch
+--       uses)
+--   StartEmittedOnce(stream)                 — :start surfaced exactly once
+--       (the started? compare-and-set; review 50/52/53/54)
 --   RedactedThinkingBlockSkipped(stream, index) — a "redacted_thinking"
 --       content-block stop produces no typed end event (block skipped,
 --       review 48; start/delta skipped symmetrically in the implementation)
@@ -850,6 +863,91 @@ rule ContentBlockStopEmitsTypedEndEvent {
         -- block whose start/stop are skipped; no unbalanced block events —
         -- the accumulator's note-content-delta! cannot open a block at an
         -- unbegun index while start/stop stay nil).
+}
+
+rule ContentBlockBranchesEmitStartWhenMessageStartAbsent {
+    when: SseEventReceived(stream, event_type, event_data)
+    requires: event_type in {"content_block_start", "content_block_delta", "content_block_stop"}
+    requires: not stream.done
+    requires: not stream.started
+
+    ensures: StartEmittedOnce(stream)
+
+    @guidance
+        -- Review 54: the content-block branches emit :start once before the
+        -- first content event when the stream never received message_start
+        -- (a malformed/non-conforming stream whose FIRST event is a
+        -- content_block_* — the non-terminal half of the review-50
+        -- :start-before-first-event class; reviews 50/52/53 fixed the
+        -- terminal/error/catch emitters only). Previously a
+        -- content_block_start-first stream emitted [:text-start :text-delta
+        -- :text-end :start :done] — :start appeared only at the terminal,
+        -- AFTER the content events. Both sibling transports emit :start
+        -- before the first content event (openai emit-started-event!, codex
+        -- emit-codex-started-event!). The once-semantics live in the shared
+        -- request-support/emit-start! (review 54 extracted the three
+        -- byte-identical per-transport copies); stream.started is set by the
+        -- first emission (compare-and-set), so a later message_start or
+        -- terminal-branch emit is a no-op.
+}
+
+rule UnknownIndexContentBlockEventsSkipped {
+    when: SseEventReceived(stream, event_type, event_data)
+    requires: event_type in {"content_block_delta", "content_block_stop"}
+    requires: not stream.done
+    requires: CurrentContentBlockType(stream, event_data.index) = null
+
+    ensures: no Emit(StreamEvent) for this event
+
+    @guidance
+        -- Review 54: content_block_delta/stop for an UNKNOWN index (no prior
+        -- content_block_start — a stream that omits start events, reuses
+        -- indices, or reorders deltas/stops ahead of starts) are skipped:
+        -- the delta/stop branches nil-guard on block-info, so no unbalanced
+        -- :text-delta/:text-end is emitted for a block that never had a
+        -- :text-start (the turn accumulator's note-content-delta! previously
+        -- opened a block at an unbegun index — the same
+        -- no-phantom-or-unbalanced-block harm review 48 eliminated for
+        -- skipped redacted_thinking TYPES, still open for MISSING indices).
+        -- Mirrors the codex sibling's skip of an unresolved index
+        -- (response.function_call_arguments.delta guards on (number? idx));
+        -- the structured-output path is unreachable for a null block-info
+        -- (structured-tool-block? is false for null). :start is still
+        -- emitted (the stream IS producing content-block events) — see
+        -- ContentBlockBranchesEmitStartWhenMessageStartAbsent.
+}
+
+rule TerminalEmitsEndEventsForOpenBlocks {
+    when: SseEventReceived(stream, "message_stop", event_data) OR ProviderTransportClosed(stream)
+    requires: stream.done = false
+
+    ensures: for each index in OpenBlockIndexes(stream):
+                 Emit(StreamEvent{event_type: BlockEndEventType(CurrentContentBlockType(stream, index)), content_index: index})
+
+    @guidance
+        -- Review 55: the terminal (:done via MessageStopEmitsDoneWithUsage
+        -- and AnthropicTransportCloseEmitsDoneIfNotTerminal, which share the
+        -- emit-terminal-done! helper) emits a typed end event for every OPEN
+        -- block — a content block whose start was consumed but whose stop
+        -- never arrived (a truncated/non-conforming stream that EOFs
+        -- mid-block) — before the :done, so the turn accumulator never
+        -- finalizes with an OPEN block index (no-phantom-or-unbalanced-block
+        -- invariant, reviews 43/48/50; the codex transport already balances
+        -- open tool indexes at its EOF flush). Probe-verified pre-fix:
+        -- message_start + content_block_start (tool_use) + EOF →
+        -- [:start :toolcall-start :done]; post-fix [:start :toolcall-start
+        -- :toolcall-end :done]. BlockEndEventType maps tool_use →
+        -- toolcall_end, thinking → thinking_end, else text_end — shaped via
+        -- the same content-block-stop-event helper the in-band stop branch
+        -- uses (see ContentBlockStopEmitsTypedEndEvent; consume-event!
+        -- nil-guards a skipped type). OpenBlockIndexes(stream) is the set of
+        -- block indices whose start event was CONSUMED (stream.started via
+        -- the block's start branch) minus those whose stop was received —
+        -- structured-output tool blocks and skipped redacted_thinking blocks
+        -- are never tracked (their start events are never consumed, so an
+        -- end event would be unbalanced); a well-formed stream (every block
+        -- stopped before message_stop) has an empty open set and emits no
+        -- synthetic ends.
 }
 
 rule SseErrorEventEmitsErrorAndTerminates {
