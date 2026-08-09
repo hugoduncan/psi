@@ -3634,7 +3634,7 @@
 
 ## Follow-ups (implementation review 44, 2026-08-09)
 
-- [ ] `stream-anthropic`'s review-43 terminal-event guard is incomplete: the
+- [x] `stream-anthropic`'s review-43 terminal-event guard is incomplete: the
       `done?` guard was added to the `"error"` and `"message_stop"` branches,
       but the `"message_delta"` branch's terminal emission is unguarded — a
       mid-stream Anthropic SSE `error` event followed by a trailing
@@ -3668,7 +3668,47 @@
       rule forbids a subsequent terminal emission; the `MessageDelta` spec
       rule models only usage), and tighten the CHANGELOG `Fixed` entry's
       "terminates" wording if it implies the guard is complete.
-- [ ] design.md's "Revision note (implementation reviews)" is stale: its
+      → Resolved: `stream-anthropic`'s `message_delta` branch is now wrapped
+      in `when-not @done?` — usage accumulation, the structured-output-result
+      emissions AND the terminal `:done` all sit inside the guard, so a
+      post-error trailing `message_delta` is a full no-op (verified: events
+      are now exactly `[:start :error]` for error → message_delta stop_reason
+      end_turn). Both stream catch blocks' `:error` emission is guarded on
+      `done?` (`stream-anthropic` and `stream-openai`; mirror the codex
+      transport's `emit-codex-error!`), so a stream-read exception thrown
+      after a mid-stream error has terminated the stream emits nothing.
+      Tests (all verified to FAIL against the old code): `anthropic_stream_test.clj`
+      `stream-anthropic-error-then-message-delta-single-terminal-event-test`
+      (error → message_delta-with-stop_reason → exactly one terminal event,
+      events = `[:start :error]`, no `:done`) and
+      `stream-anthropic-error-then-read-exception-no-second-error-test`
+      (post-error stream-read exception swallowed — exactly one `:error`);
+      `openai_test.clj`
+      `completions-sse-error-then-read-exception-no-second-error-test`
+      (error chunk → post-error stream-read exception → no second `:error`).
+      Specs: `spec/anthropic-provider.allium` gains
+      `OnceDoneNoFurtherTerminalEvent` (no further `done | error` Emit once
+      `stream.done`), `MessageDeltaAccumulatesOutputUsage` now `requires: not
+      stream.done`, and a new `MessageDeltaStopReasonEmitsDone` rule models
+      the guarded terminal `:done`; `spec/openai-provider.allium` mirrors the
+      `OnceDoneNoFurtherTerminalEvent` invariant and the
+      `CompletionsSseErrorChunkEmitsErrorAndTerminates` guidance records the
+      catch-block guard. CHANGELOG `Fixed` entry's "terminates" wording
+      tightened to the exact guarantee: exactly one terminal event per
+      stream, with the `message_delta`/`message_stop`/`[DONE]`-trailing and
+      post-error-exception cases named. Verification: full `bb test` green
+      (2593 tests / 0 failures; 2590 → 2593 = the three new deftests;
+      assertion count varies run-to-run per the review-5 flake analysis —
+      19467 then 18759 on the final tree); `psi.ai.providers.anthropic-stream-test` 11/81,
+      `psi.ai.providers.openai-test` 10/67 (was 9/65 on committed HEAD),
+      `psi.ai.providers.openai-completions-test` 17/75 (unchanged from
+      committed HEAD — the openai terminal-guard test lives in
+      `openai_test.clj` to keep the completions file under the 800-line
+      file-length gate), `psi.ai.providers.anthropic-test` 16/103,
+      `psi.ai.providers.anthropic-auth-test` 5/42 green; clj-kondo clean (0
+      errors, 0 warnings); `bb commit-check:file-lengths` passes (all
+      touched test files under 800 lines).
+- [x] design.md's "Revision note (implementation reviews)" is stale: its
       opening claim — "They are the *only* provider-transport changes in this
       task" — and the acceptance-criterion wording ("No change to
       `providers/anthropic.clj`'s request-shaping logic itself ... only the
@@ -3688,3 +3728,20 @@
       the "only" claim to name the stream/error-surfacing + thinking-end
       changes), keeping the design artifact coherent with the implemented
       behavior per the change chain.
+      → Resolved: design.md "Revision note (implementation reviews)" now
+      carries the review-43/44 bullets — "Mid-stream SSE error-event
+      surfacing + terminal-event guard (reviews 43/44)" (the `"error"` SSE
+      case branch on `:anthropic-messages` + `emit-chat-error!`/
+      `process-chat-sse-line!` on `:openai-completions`; review 44's
+      `done?`-guard completion: `message_delta` terminal `:done` + usage +
+      structured-result emissions guarded, both stream catch blocks'
+      `:error` emission guarded — exactly one terminal event per stream,
+      mirroring codex's `emit-codex-error!`) and "Thinking-block stop
+      labeling (review 43)" (`content-block-stop-event` emits `:thinking-end`
+      for `"thinking"` stops, not the mislabeled `:text-end`). The AC
+      exception wording now names both ("mid-stream SSE error-event surfacing
+      + the terminal-event guard on both transports, and `:thinking-end`
+      labeling for thinking-block stops") and the "only the schema gate plus
+      the review-driven API-key resolution changes" phrase now reads "plus
+      the review-driven provider-transport changes documented in the revision
+      note".

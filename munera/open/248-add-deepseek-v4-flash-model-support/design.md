@@ -177,6 +177,32 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   provider named `"anthropic"`/`"openai"` never receives the built-in
   same-named OAuth credential. `runtime/resolve-api-key-in` threads the
   resolved model's `:custom?` into `provider-api-key` the same way.
+- **Mid-stream SSE error-event surfacing + terminal-event guard (reviews
+  43/44):** both the `:anthropic-messages` transport (`stream-anthropic`'s
+  `"error"` SSE case branch) and the `:openai-completions` transport
+  (`emit-chat-error!`/`process-chat-sse-line!` in chat_completions.clj)
+  now surface a mid-stream provider SSE error as an `:error` event and
+  terminate the stream — previously such events fell to the stream loop's
+  default no-op, so a mid-stream provider failure hung the turn until
+  `llm-stream-idle-timeout-ms` with a misleading timeout (the codex
+  transport already handled both shapes). Review 44 completed the terminal
+  guard: the `message_delta` branch's terminal `:done` emission is guarded
+  on `done?` (a trailing `message_delta` carrying `stop_reason` after a
+  mid-stream SSE error no longer emits a second terminal event, and its
+  usage accumulation + structured-output-result emissions are suppressed
+  too), and both stream catch blocks' `:error` emission is guarded on
+  `done?` (a post-error stream-read exception cannot emit a second
+  `:error`) — exactly one terminal event (`:error` or `:done`) per stream,
+  mirroring the codex transport's `emit-codex-error!`.
+- **Thinking-block stop labeling (review 43):**
+  `content-block-stop-event` now emits `:thinking-end` for `"thinking"`
+  content-block stops instead of the mislabeled `:text-end` (tool_use
+  stops still emit `:toolcall-end`, text stops `:text-end`), so the turn
+  accumulator's dedicated `:on-thinking-end` handler
+  (`note-last-provider-event!` `:thinking-end` + `end-content-block!`) runs
+  for anthropic-path thinking-block stops — DeepSeek returned a `thinking`
+  content block in the live smoke test (2026-08-09), so the mislabel was
+  reachable on this task's newly shipped provider.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -326,14 +352,16 @@ independently confirms native JSON-Schema support can add
   `:adaptive-thinking true`. No change to
   `providers/anthropic.clj`'s request-shaping logic itself (thinking/
   adaptive/temperature/tools/headers) — only the schema gate in
-  `user_models.clj` plus the review-driven API-key resolution changes
+  `user_models.clj` plus the review-driven provider-transport changes
   documented in the revision note.
 - No existing built-in Anthropic model request shaping changes, and no
   custom-provider behaviour changes except the review-driven changes
   documented in the revision note (provider-scoped API-key resolution,
   `:no-auth-header` key tolerance, OAuth content-sniff gating to built-in
-  models, case-insensitive capture redaction, and the `:custom?` origin tag
-  closing provider-name-based built-in detection); `gpt-5.5`/`gpt-5.6-*`/
+  models, case-insensitive capture redaction, the `:custom?` origin tag
+  closing provider-name-based built-in detection, mid-stream SSE error-event
+  surfacing + the terminal-event guard on both transports, and
+  `:thinking-end` labeling for thinking-block stops); `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.
 - CHANGELOG `[Unreleased]` → `Added` entry.

@@ -2084,3 +2084,55 @@
   touched files under 800 lines).
 
 Review 44 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 44 addressed (2026-08-09)
+
+- addressed 2 review steps (review-44; all steps.md items now checked)
+- Terminal-event guard completed on the anthropic + openai-completions
+  streams: `stream-anthropic`'s `message_delta` branch is wrapped in
+  `when-not @done?` (usage accumulation, structured-output-result emissions
+  AND the terminal `:done` all inside the guard — a post-error trailing
+  `message_delta` is a full no-op; previously error → message_delta
+  stop_reason emitted a second `:done`, events = `[:start :error :done]`),
+  and both `stream-anthropic` + `stream-openai` catch blocks guard their
+  `:error` emission on `done?` (a stream-read exception after a mid-stream
+  error no longer emits a second `:error`; mirrors the codex transport's
+  `emit-codex-error!`). Three new stream tests lock the behavior
+  (`stream-anthropic-error-then-message-delta-single-terminal-event-test`,
+  `stream-anthropic-error-then-read-exception-no-second-error-test`,
+  `completions-sse-error-then-read-exception-no-second-error-test`) —
+  all three verified to FAIL against the pre-fix code (2 anthropic + 1
+  openai failures), PASS with the fix.
+- Specs mirror the invariant: `spec/anthropic-provider.allium` gains
+  `OnceDoneNoFurtherTerminalEvent` (no further `done | error` Emit once
+  `stream.done`), `MessageDeltaAccumulatesOutputUsage` now `requires: not
+  stream.done`, and a new `MessageDeltaStopReasonEmitsDone` rule models the
+  guarded terminal `:done` (Emit surface + FinalizedUsage — no undefined
+  vocabulary, per the review-9/10 self-containedness pattern; a vocabulary
+  note documents the SSE-section terms). `spec/openai-provider.allium`
+  mirrors `OnceDoneNoFurtherTerminalEvent` and the
+  `CompletionsSseErrorChunkEmitsErrorAndTerminates` guidance records the
+  catch-block guard. CHANGELOG `Fixed` entry tightened to the exact
+  guarantee (exactly one terminal event per stream; trailing
+  message_delta/message_stop/[DONE] and post-error exceptions suppressed).
+- design.md "Revision note (implementation reviews)" updated: review-43/44
+  bullets added ("Mid-stream SSE error-event surfacing + terminal-event
+  guard (reviews 43/44)", "Thinking-block stop labeling (review 43)") and
+  the AC wording now names them ("mid-stream SSE error-event surfacing +
+  the terminal-event guard on both transports, and `:thinking-end` labeling
+  for thinking-block stops"; "plus the review-driven provider-transport
+  changes documented in the revision note").
+- Verification: full `bb test` green (2593 tests / 0 failures; 2590 → 2593
+  = the three new deftests; assertion count varies run-to-run per the
+  review-5 flake analysis — 19467 then 18759 on the final tree);
+  `psi.ai.providers.anthropic-stream-test` 11/81 (was 9/77 on
+  committed HEAD; +2 deftests), `psi.ai.providers.openai-test` 10/67 (was
+  9/65 on committed HEAD; +1 deftest — the openai terminal-guard test lives
+  in `openai_test.clj`, not the completions file, to keep
+  `openai_completions_test.clj` under the 800-line file-length gate),
+  `psi.ai.providers.openai-completions-test` 17/75 (unchanged from committed
+  HEAD), `psi.ai.providers.anthropic-test` 16/103,
+  `psi.ai.providers.anthropic-auth-test` 5/42 green; clj-kondo clean
+  (0 errors, 0 warnings) on all changed source + test files; `bb
+  commit-check:file-lengths` passes (all touched test files under 800
+  lines). All steps.md items checked (0 unchecked).

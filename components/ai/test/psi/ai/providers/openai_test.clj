@@ -7,6 +7,7 @@
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
    [psi.ai.providers.openai :as openai]
+   [psi.ai.providers.openai.transport :as transport]
    [psi.ai.providers.request-support :as request-support])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
@@ -604,4 +605,43 @@
                  (models/get-model :gpt-5.1)
                  {:api-key "t"}
                  identity))))))
+
+(deftest completions-sse-error-then-read-exception-no-second-error-test
+  (testing "a stream-read exception after a mid-stream SSE error chunk does not emit a second :error"
+    ;; Review 44: the stream-openai catch block emitted a second :error with
+    ;; no done? check if the stream read threw after a mid-stream SSE error
+    ;; chunk had already terminated the stream (emit-chat-error! sets done?).
+    ;; Now guarded on done? (mirroring the codex transport's
+    ;; emit-codex-error!): the post-error exception is swallowed — exactly
+    ;; one :error, no second terminal event.
+    (let [model  (models/get-model :gpt-5)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:error {:message "Overloaded"
+                                     :type "server_error"}}) "\n\n"
+                  "\n")
+          orig-parse-sse-line transport/parse-sse-line
+          error-seen (atom false)]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})
+                    transport/parse-sse-line
+                    (fn [line]
+                      (let [parsed (orig-parse-sse-line line)]
+                        (if @error-seen
+                          (throw (ex-info "simulated stream read failure" {}))
+                          (do
+                            (when (:error parsed)
+                              (reset! error-seen true))
+                            parsed))))]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (is (= 1 (count (filter #(= :error (:type %)) @events)))
+          "exactly one :error — the post-error stream-read exception must not emit a second one")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no :done — the :error event is terminal"))))
 

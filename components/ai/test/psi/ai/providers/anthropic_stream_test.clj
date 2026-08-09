@@ -541,6 +541,72 @@
         (is (not-any? #(= :done (:type %)) @events)
             "no :done — the :error event is terminal")))))
 
+(deftest stream-anthropic-error-then-message-delta-single-terminal-event-test
+  (testing "a trailing message_delta after a mid-stream SSE error does not emit a second terminal :done"
+    ;; Review 44: the message_delta branch's terminal :done emission was
+    ;; unguarded — a mid-stream SSE error event followed by a trailing
+    ;; message_delta carrying delta.stop_reason emitted a SECOND terminal
+    ;; :done after the :error (verified: events = [:start :error :done]).
+    ;; The branch is now guarded on done? like message_stop, and the usage
+    ;; accumulation + structured-output-result emissions stay inside the
+    ;; guard so a post-error message_delta is a full no-op.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :http_status 529}})
+                      (sse-line "message_delta"
+                                {:type "message_delta"
+                                 :delta {:stop_reason "end_turn"}}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= [:start :error] (mapv :type @events))
+          "exactly one terminal event — the :error; the trailing message_delta must not emit a second :done")
+      (is (= 1 (count (filter #(= :error (:type %)) @events)))
+          "exactly one :error event"))))
+
+(deftest stream-anthropic-error-then-read-exception-no-second-error-test
+  (testing "a stream-read exception after a mid-stream SSE error does not emit a second :error"
+    ;; Review 44: the stream catch block emitted a second :error with no
+    ;; done? check if the stream read threw after a mid-stream error had
+    ;; already terminated the stream. Now guarded on done? (mirroring the
+    ;; codex transport's emit-codex-error!): the post-error exception is
+    ;; swallowed — exactly one :error, no second terminal event.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :http_status 529}}))
+          orig-parse-sse-line anthropic/parse-sse-line
+          error-seen (atom false)]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})
+                    anthropic/parse-sse-line
+                    (fn [line]
+                      (let [parsed (orig-parse-sse-line line)]
+                        (if @error-seen
+                          (throw (ex-info "simulated stream read failure" {}))
+                          (do
+                            (when (= "error" (:type parsed))
+                              (reset! error-seen true))
+                            parsed))))]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (is (= 1 (count (filter #(= :error (:type %)) @events)))
+          "exactly one :error — the post-error stream-read exception must not emit a second one")
+      (is (not-any? #(= :done (:type %)) @events)
+          "no :done — the :error event is terminal"))))
+
 (deftest usage-captured-from-sse-events-test
   (testing "usage tokens are read from message_start and message_delta SSE events"
     (let [model (models/get-model :sonnet-4.6)

@@ -738,6 +738,16 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 ------------------------------------------------------------
 -- SSE Parsing and usage
 ------------------------------------------------------------
+-- Vocabulary used below (rule-defined triggers/predicates; cf. the
+-- Primitives note — no undefined entity attributes are referenced):
+--   SseEventReceived(stream, type, event_data) — an SSE event line parsed
+--       into a typed event map ({"type": ..., ...}) reached the stream loop
+--   UsageAccUpdated(stream, deltas)          — usage-acc atom merge
+--   CurrentContentBlockType(stream, index)   — block type at a content index
+--   DoneEventReady(stream)                   — a terminal :done is ready
+--   FinalizedUsage(acc)                      — StreamUsage totals + cost
+--   Emit(StreamEvent{...})                   — executor-facing event surfaced
+--   ErrorEmitted(stream)                     — a :error StreamEvent is surfaced
 
 rule MessageStartEmitsStartEvent {
     when: SseEventReceived(stream, "message_start", event_data)
@@ -804,17 +814,77 @@ rule SseErrorEventEmitsErrorAndTerminates {
         -- error body is now mapped through anthropic-error
         -- (error_from_response_data: message from parsed-body [:error
         -- :message], http-status from [:error :http_status] when present,
-        -- fallback "Anthropic stream error") and the stream terminates; the
-        -- done? guard prevents a trailing message_stop from emitting a
-        -- second terminal event. The codex transport already handled
-        -- "error" SSE events (in-repo precedent); the :openai-completions
-        -- transport received the same class fix (review 43 decision).
+        -- fallback "Anthropic stream error") and the stream terminates. The
+        -- done? guard prevents a trailing SSE event from emitting a second
+        -- terminal event — message_stop (review 43) AND, since review 44, a
+        -- message_delta carrying delta.stop_reason (the terminal :done
+        -- emission + usage accumulation + structured-output-result emissions
+        -- in that branch are now guarded on done?, so a post-error
+        -- message_delta is a full no-op) AND a post-error stream-read
+        -- exception (the outer catch block's :error emission is guarded on
+        -- done?, mirroring the codex transport's emit-codex-error!). See the
+        -- OnceDoneNoFurtherTerminalEvent invariant below. The codex
+        -- transport already handled "error" SSE events (in-repo precedent);
+        -- the :openai-completions transport received the same class fix
+        -- (review 43 decision).
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
     when: SseEventReceived(stream, "message_delta", event_data)
+    requires: not stream.done
 
     ensures: UsageAccUpdated(stream, {output_tokens: event_data.usage.output_tokens ?? 0})
+
+    @guidance
+        -- Review 44: guarded on stream.done — a message_delta arriving after
+        -- a mid-stream SSE error has already terminated the stream (done =
+        -- true) is a full no-op: no output-usage accumulation, no
+        -- structured-output-result emissions, and no terminal :done. The
+        -- terminal emission itself is separately modeled by
+        -- MessageDeltaStopReasonEmitsDone (below) under the same guard.
+}
+
+rule MessageDeltaStopReasonEmitsDone {
+    when: SseEventReceived(stream, "message_delta", event_data)
+    requires: not stream.done
+    requires: event_data.delta.stop_reason != null
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword(event_data.delta.stop_reason), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- Review 44: the terminal :done emission in the message_delta branch
+        -- is guarded on done? like the message_stop branch. Previously a
+        -- trailing message_delta carrying delta.stop_reason after a
+        -- mid-stream SSE error emitted a SECOND terminal :done after the
+        -- :error (verified: events = [:start :error :done] for error →
+        -- message_delta stop_reason end_turn), contradicting the review-43
+        -- "trailing message_stop cannot emit a second terminal event" claim
+        -- (which covered only message_stop). The structured-output-result
+        -- emissions for the completed buffers sit inside the same guard —
+        -- a post-error message_delta fires none of them. Emit uses the
+        -- established StreamEvent surface (cf. MessageStartEmitsStartEvent /
+        -- ContentBlockStopEmitsTypedEndEvent); FinalizedUsage is the
+        -- accumulation function defined by FinalUsageTotalsCalculated.
+}
+
+rule OnceDoneNoFurtherTerminalEvent {
+    when: stream.done = true
+
+    ensures: no further Emit(StreamEvent{event_type: done | error})
+
+    @guidance
+        -- Review 44 invariant: once the stream is done — whether terminated
+        -- by a mid-stream SSE error, a message_delta stop_reason, or
+        -- message_stop — no subsequent SSE event or stream-read exception
+        -- may emit another terminal event. This covers the message_delta
+        -- branch (guarded on done? — MessageDeltaAccumulatesOutputUsage and
+        -- MessageDeltaStopReasonEmitsDone both require not stream.done), the
+        -- message_stop branch (guarded since review 43), and both stream
+        -- catch blocks (the :error emission is now guarded on done?,
+        -- mirroring the codex transport's emit-codex-error!). A consumer
+        -- therefore receives at most one terminal event (:error or :done)
+        -- per stream.
 }
 
 rule FinalUsageTotalsCalculated {

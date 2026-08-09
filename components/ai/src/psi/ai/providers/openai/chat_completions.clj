@@ -580,9 +580,15 @@
             (doseq [line (line-seq reader)]
               (process-chat-sse-line! stream-state consume-fn model options url strategy line)))))
       (catch Exception e
-        (transport/emit-error! model
-                               options
-                               :openai-completions
-                               url
-                               consume-fn
-                               (transport/exception->error e))))))
+        ;; Review 44: guard the error emission on done? (mirroring the codex
+        ;; transport's emit-codex-error!) — if a mid-stream SSE error chunk
+        ;; already terminated the stream (emit-chat-error! sets done?),
+        ;; a stream-read exception thrown afterwards must not emit a SECOND
+        ;; :error.
+        (when-not @(:done? stream-state)
+          (transport/emit-error! model
+                                 options
+                                 :openai-completions
+                                 url
+                                 consume-fn
+                                 (transport/exception->error e)))))))

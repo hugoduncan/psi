@@ -583,7 +583,17 @@
                             (consume-fn err)))
 
                         "message_delta"
-                        (do
+                        ;; Review 44: the terminal :done emission is guarded
+                        ;; on done? like the message_stop branch — a trailing
+                        ;; message_delta carrying delta.stop_reason after a
+                        ;; mid-stream SSE error must NOT emit a second
+                        ;; terminal :done (verified: events were
+                        ;; [:start :error :done] for error → message_delta
+                        ;; stop_reason end_turn). Usage accumulation and the
+                        ;; structured-output-result emissions stay inside the
+                        ;; guard with the :done so a post-error message_delta
+                        ;; is a full no-op.
+                        (when-not @done?
                           (update-output-usage! usage-acc (:usage event-data))
                           (when-let [reason (get-in event-data [:delta :stop_reason])]
                             (reset! done? true)
@@ -634,9 +644,14 @@
             :else
             (consume-stream-response! response))))
       (catch Exception e
-        (let [err (anthropic-error/exception->error e)]
-          (capture-response! model options url err)
-          (consume-fn err))))))
+        ;; Review 44: guard the error emission on done? (mirroring the codex
+        ;; transport's emit-codex-error!) — if a mid-stream SSE error already
+        ;; terminated the stream, a stream-read exception thrown afterwards
+        ;; must not emit a SECOND :error.
+        (when-not @done?
+          (let [err (anthropic-error/exception->error e)]
+            (capture-response! model options url err)
+            (consume-fn err)))))))
 
 (defn- execute-response
   [url request]

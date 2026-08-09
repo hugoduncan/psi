@@ -735,7 +735,31 @@ rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
         -- (parsed-body [:error :message]; a numeric http-status from
         -- :status / [:error :status] / [:error :http_status] when present);
         -- the done? guard prevents a trailing [DONE]/finish chunk from
-        -- emitting a second terminal event.
+        -- emitting a second terminal event. Review 44: the stream-openai
+        -- catch block's :error emission is now also guarded on done?
+        -- (mirroring the codex transport's emit-codex-error!), so a
+        -- stream-read exception thrown after this error chunk has terminated
+        -- the stream cannot emit a second :error — see the
+        -- OnceDoneNoFurtherTerminalEvent invariant below.
+}
+
+rule OnceDoneNoFurtherTerminalEvent {
+    when: stream.done = true
+
+    ensures: no further Emit(StreamEvent{event_type: done | error})
+
+    @guidance
+        -- Review 44 invariant (mirrored from the anthropic spec): once the
+        -- stream is done — whether terminated by a mid-stream SSE error
+        -- chunk, a finish chunk, or the transport closing — no subsequent
+        -- SSE event or stream-read exception may emit another terminal
+        -- event. The completions finish emissions
+        -- (emit-chat-completion-finish!, emit-chat-error!, and the
+        -- [DONE]/transport-close done) are all done?-guarded, and the
+        -- stream-openai catch block's :error emission is guarded on done?
+        -- (review 44, mirroring the codex transport's emit-codex-error!). A
+        -- consumer therefore receives at most one terminal event (:error or
+        -- :done) per stream.
 }
 
 rule CodexEventsNormalizeToExecutorEvents {
