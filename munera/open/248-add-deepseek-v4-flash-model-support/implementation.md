@@ -1920,3 +1920,45 @@
   count varies run-to-run per the documented review-5 flake analysis).
 
 - Review 41 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 41 addressed (2026-08-09)
+
+- addressed 2 review steps (all review-41 items; both were the last
+  unchecked items in steps.md)
+- `doc/custom-providers.md` DeepSeek notes: the temperature bullet and
+  fast-mode bullet reworded from "blocked: no `DEEPSEEK_API_KEY` in env,
+  same block as the live smoke test" / "blocked on the same missing
+  `DEEPSEEK_API_KEY` as the optional live smoke test" to "not exercised in
+  the review-1 live smoke test 2026-08-09 (which covered the adaptive
+  thinking shape at effort high + cache field names)" — the review-40 live
+  turn lifted the env-var block, so the old phrasing falsely attributed the
+  unverified status to a missing env var when the real reason is the smoke
+  test did not exercise those cases. Caveats (assume unverified / assume
+  unsupported until verified) kept. Doc-only; parse-lock untouched.
+- `repo-root` walk-up deduplicated: new
+  `bases/main/test/psi/test_support/repo_root.clj`
+  (`psi.test-support.repo-root`) is the single home; `workflow_test_support.clj`
+  and `user_models_test.clj` local copies deleted (both require the shared
+  ns), `workflow_delegate_review_step_live_test.clj` private `repo-root`
+  delegates to it directly. Cross-component test-code sharing was already
+  established (psi.test-support.workflow-test-fixtures), so extraction was
+  the right option over documenting a no-share decision.
+- Verification: `psi.ai.user-models-test` 20/138, delegate-review live test
+  3/24 from repo root AND from a component-local cwd (absolute classpath,
+  `-Duser.dir` override), `workflow-async-path-test` 6/29,
+  `workflow-tui-repro-test` 2/11 green; clj-kondo clean (0 errors, 0
+  warnings) on all changed files; `bb commit-check:file-lengths` exit 0.
+- NEW full-suite flake observed + inventoried (6th entry): the review-41
+  full-suite run (seed 422754440; 2585 passed / 1 failed) failed
+  `psi.turn-runtime.response-mode-test/execute-prepared-request-retry-
+  after-header-drives-delay-test` — attempts 54 vs expected 2 (the same
+  timing-sensitive retry-loop count-variance class as the documented
+  `response-mode-retry-test` and `prompt-provider-retry-after-tool-result`
+  flakes; the test asserts `(= 2 @attempts*)` after the 5s retry-after
+  delay, and the attempts count varies run-to-run). Verified pre-existing:
+  passes in isolation (18 tests / 135 assertions green);
+  `components/turn-runtime/` has zero diff across the task commit range
+  (3c286a46e → HEAD); the test file's last touch is pre-task
+  (a87816dd9/008b1e094). Re-run after the flake: full `bb test` green —
+  2586 tests / 18722 assertions / 0 failures (assertion count varies
+  run-to-run per the review-5 analysis).

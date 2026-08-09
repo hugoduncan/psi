@@ -7,29 +7,20 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.agent-session.workflow.core]
+   [psi.test-support.repo-root :as test-repo-root]
    [psi.workflow-loader.core :as workflow-file-loader]
    [psi.workflow-registry.registry :as workflow-registry]))
 
-(defn repo-root
-  "Repo root: walk up from the process cwd until doc/custom-providers.md
-   exists. Tests run from the repo root via bb, so this equals user.dir
-   there; from a component-local cwd it resolves the repo root so the
-   session worktree (the profile snapshot reads <cwd>/.psi/project.edn via
-   shared-config, a strict cwd path with no walk-up) and the
-   workflow-definitions load (<cwd>/.psi/workflows) target the committed
-   project config instead of silently missing (review 40: the delegate
+(def workflow-extensions-cwd
+  "Repo root (shared walk-up helper, review 41) so the session worktree (the
+   profile snapshot reads <cwd>/.psi/project.edn via shared-config, a strict
+   cwd path with no walk-up) and the workflow-definitions load
+   (<cwd>/.psi/workflows) target the committed project config instead of
+   silently missing from a component-local cwd (review 40: the delegate
    review live test failed from a component-local cwd with \"Unknown
    workflow review-task-implementation\" because user.dir drove both
    paths)."
-  []
-  (loop [dir (.getCanonicalFile (java.io.File. "."))]
-    (if (or (.exists (java.io.File. dir "doc/custom-providers.md"))
-            (= dir (.getParentFile dir)))
-      dir
-      (recur (.getParentFile dir)))))
-
-(def workflow-extensions-cwd
-  (str (repo-root)))
+  (str (test-repo-root/repo-root)))
 
 (defn poll-until
   "Poll `pred-fn` every `interval-ms` milliseconds until it returns truthy or

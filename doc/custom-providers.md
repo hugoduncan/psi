@@ -387,8 +387,11 @@ Notes:
   thinking-off is signaled by OMITTING the `thinking` field (psi never sends
   an explicit disabled signal), which DeepSeek's endpoint treats as thinking
   ON (server default) — so whether DeepSeek accepts `temperature` alongside
-  its server-side thinking default is exactly the unverified case (blocked:
-  no `DEEPSEEK_API_KEY` in env, same block as the live smoke test). If you
+  its server-side thinking default is exactly the unverified case (not
+  exercised in the review-1 live smoke test 2026-08-09, which covered the
+  adaptive thinking shape at effort high + cache field names; the smoke
+  test did not exercise temperature — psi never sends it for
+  adaptive-thinking models anyway). If you
   need temperature control: set `:adaptive-thinking false` (or omit it),
   keep `/thinking` off, and verify against a live turn that DeepSeek accepts
   `temperature` with thinking effectively ON before relying on it.
@@ -494,8 +497,9 @@ Notes:
   psi sends `"speed": "fast"` in the request body (plus the
   `fast-mode-2026-02-01` beta header), but DeepSeek's compat table does not
   list `speed`, and Anthropic-compatible endpoints typically reject unknown
-  body fields (400). Not verified against a live turn — blocked on the same
-  missing `DEEPSEEK_API_KEY` as the optional live smoke test; assume fast
+  body fields (400). Not exercised in the review-1 live smoke test
+  (2026-08-09, which covered the adaptive thinking shape at effort high +
+  cache field names; fast mode was not tested); assume fast
   mode is unsupported on DeepSeek until verified.
   And a `speed`-field 400 is not auto-recoverable: psi's compatibility
   retry for HTTP 400 strips the `fast-mode-2026-02-01` beta header

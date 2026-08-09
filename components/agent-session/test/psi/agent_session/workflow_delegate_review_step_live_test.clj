@@ -13,6 +13,7 @@
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.session-state.state :as ss]
    [psi.shared-config.session-profiles :as session-profiles]
+   [psi.test-support.repo-root :as test-repo-root]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (use-fixtures :each
@@ -30,7 +31,7 @@
 (defn- repo-root
   "Repo root, shared with workflow-test-support — see its docstring."
   []
-  (workflow-test-support/repo-root))
+  (test-repo-root/repo-root))
 
 (defn- committed-project-models-path
   "Absolute path of the committed .psi/models.edn, resolved from the repo

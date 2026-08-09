@@ -3384,7 +3384,7 @@
 
 ## Follow-ups (implementation review 41, 2026-08-09)
 
-- [ ] `doc/custom-providers.md` DeepSeek notes are internally inconsistent
+- [x] `doc/custom-providers.md` DeepSeek notes are internally inconsistent
       about the live verification block: the temperature bullet (line ~390)
       still says the temperature-with-thinking-ON acceptance case is
       "(blocked: no `DEEPSEEK_API_KEY` in env, same block as the live smoke
@@ -3407,7 +3407,23 @@
       on the same missing `DEEPSEEK_API_KEY` as the optional live smoke
       test"; the caveats themselves (assume unverified / assume unsupported
       until verified) stay.
-- [ ] `workflow_test_support.clj`'s public `repo-root` walk-up helper
+      → Resolved: both bullets reworded. Temperature bullet: the
+      temperature-with-thinking-ON case is now "the unverified case (not
+      exercised in the review-1 live smoke test 2026-08-09, which covered
+      the adaptive thinking shape at effort high + cache field names; the
+      smoke test did not exercise temperature — psi never sends it for
+      adaptive-thinking models anyway)" — the "blocked: no DEEPSEEK_API_KEY
+      in env, same block as the live smoke test" phrasing is gone; the
+      "verify against a live turn" caveat stays. Fast-mode bullet: "Not
+      exercised in the review-1 live smoke test (2026-08-09, which covered
+      the adaptive thinking shape at effort high + cache field names; fast
+      mode was not tested)" — the "blocked on the same missing
+      DEEPSEEK_API_KEY as the optional live smoke test" phrasing is gone;
+      "assume fast mode is unsupported on DeepSeek until verified" stays.
+      Doc-only; no parse-lock impact (the ```clojure EDN block is
+      untouched) — `psi.ai.user-models-test` green (20 tests / 138
+      assertions).
+- [x] `workflow_test_support.clj`'s public `repo-root` walk-up helper
       (added review 40, `(loop [dir (.getCanonicalFile (java.io.File. "."))]
       ... doc/custom-providers.md ...)`) duplicates `user_models_test.clj`'s
       private `repo-root` helper — the "established pattern" review 39
@@ -3423,3 +3439,24 @@
       it; or, if cross-component test-code sharing is intentionally not
       done, document that decision in workflow-test-support's docstring so a
       future reader does not add a third copy.
+      → Resolved (option a — shared helper; cross-component test-code
+      sharing IS already established via bases/main/test/psi/test_support/,
+      e.g. `psi.test-support.workflow-test-fixtures` used by both
+      agent-session and workflow-runtime tests, so the documented
+      "intentionally not done" option was not applicable): new
+      `bases/main/test/psi/test_support/repo_root.clj`
+      (`psi.test-support.repo-root`) owns the single `repo-root` walk-up;
+      `workflow_test_support.clj` and `user_models_test.clj` both require it
+      (their local copies deleted — `workflow_test_support.clj`'s docstring
+      on `workflow-extensions-cwd` now documents the shared helper), and
+      `workflow_delegate_review_step_live_test.clj`'s private `repo-root`
+      delegates to the shared namespace directly. One place for future
+      fixes; no third copy can be added without review. Verified:
+      `psi.ai.user-models-test` green (20/138),
+      `psi.agent-session.workflow-delegate-review-step-live-test` green
+      (3 tests / 24 assertions) from BOTH the repo root and a
+      component-local cwd (`user.dir` = components/agent-session, absolute
+      classpath — the walk-up resolves the committed files either way),
+      `workflow-async-path-test` (6/29) and `workflow-tui-repro-test`
+      (2/11) green; clj-kondo clean (0 errors, 0 warnings) on all changed
+      files; `bb commit-check:file-lengths` passes (exit 0).

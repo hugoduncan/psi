@@ -6,18 +6,13 @@
    [clojure.test :refer [deftest testing is]]
    [psi.ai.providers.request-support :as request-support]
    [psi.ai.structured-output :as structured-output]
-   [psi.ai.user-models :as user-models]))
+   [psi.ai.user-models :as user-models]
+   [psi.test-support.repo-root :as test-repo-root]))
 
 (defn- repo-root
-  "Repo root: walk up from the process cwd until doc/custom-providers.md
-  exists. Tests run from the repo root via bb, but this also tolerates a
-  component-local cwd."
+  "Repo root, shared with workflow-test-support — see its docstring."
   []
-  (loop [dir (.getCanonicalFile (io/file "."))]
-    (if (or (.exists (io/file dir "doc" "custom-providers.md"))
-            (= dir (.getParentFile dir)))
-      dir
-      (recur (.getParentFile dir)))))
+  (test-repo-root/repo-root))
 
 (defn- doc-clojure-blocks
   "Parse every ```clojure code block in doc/custom-providers.md as EDN,
