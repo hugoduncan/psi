@@ -2025,3 +2025,4 @@
 - No remaining unchecked follow-up items in steps.md — the review-1 optional
   live smoke test is marked RESOLVED (live 2026-08-09); all 42 review passes'
   items are now closed.
+- Review 43 (2026-08-09): added 2 steps to be addressed.

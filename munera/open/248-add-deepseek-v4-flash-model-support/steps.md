@@ -3542,3 +3542,46 @@
       (persistable-model: `:id` holds the model-id string and `:reasoning` is a
       separate boolean key), so a reader cannot mistake the session model's
       `:id` for a `:reasoning` keyword. Docstring-only; no behavior change.
+
+## Follow-ups (implementation review 43, 2026-08-09)
+
+- [ ] `stream-anthropic` silently drops Anthropic SSE `error` events
+      (`{"type":"error","error":{...}}` — Anthropic's documented mid-stream
+      error shape, e.g. `overloaded_error`/rate-limit during a stream). The
+      stream loop's `(case (:type event-data) ...)` handles only
+      message_start/content_block_start/content_block_delta/content_block_stop/
+      message_delta/message_stop; an `error` event falls to the default `nil`
+      and is consumed as a no-op — the line IS captured via
+      `capture-response!` (so `:on-provider-response` sees it) but no `:error`
+      event reaches the consumer and no terminal `:done` is emitted, so the
+      turn hangs until the 20-minute default `llm-stream-idle-timeout-ms`
+      (1200000, turn-runtime/stream.clj) and fails with a misleading timeout
+      instead of the provider's actual error. The `:openai-codex-responses`
+      transport already handles `"error"` SSE events explicitly
+      (handle-codex-event! → emit-codex-error!), so an in-repo precedent
+      exists; `:openai-completions` has the same silent-drop class (an error
+      chunk with no `:choices` no-ops in process-chat-sse-line!). Relevant to
+      this task's newly shipped DeepSeek provider: the docs (review-1 live
+      smoke test 2026-08-09) verified the happy path but no failure mode
+      beyond HTTP-level errors; a mid-stream DeepSeek error today hangs the
+      turn. Fix: add an `"error"` case branch in stream-anthropic that emits
+      an `:error` event (mapping the event's error body through
+      anthropic-error, with http-status when present) and terminates the
+      stream (respect the existing `done?` guard), plus a stream test feeding
+      an SSE error event and asserting the `:error` event + no hang; decide
+      whether the same class warrants a chat-completions fix (same pattern).
+- [ ] `content-block-stop-event` maps every non-tool block stop to `:text-end`
+      — including `thinking` content blocks, which `stream-anthropic` emits
+      (DeepSeek returned a `thinking` block in the live smoke test
+      2026-08-09, and `content-block-start-event`/`content-block-delta-event`
+      correctly emit `:thinking-start`/`:thinking-delta`/
+      `:thinking-signature-delta`). The accumulator (turn-runtime/
+      accumulator.clj) has a dedicated `:on-thinking-end` handler
+      (note-last-provider-event! `:thinking-end` + end-content-block!), but
+      it is dead code for the anthropic path: a thinking block's stop arrives
+      labeled `:text-end`, so the last-provider-event diagnostic marker
+      mislabels DeepSeek thinking-block stops as text. Fix: make
+      `content-block-stop-event` emit `:thinking-end` for `"thinking"`
+      blocks (keep `:toolcall-end` for tool_use, `:text-end` for text), and
+      add a stream-test assertion that a thinking block's stop emits
+      `:thinking-end` (no existing anthropic test asserts this).
