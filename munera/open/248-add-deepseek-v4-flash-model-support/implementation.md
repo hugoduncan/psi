@@ -1877,3 +1877,44 @@
   Recorded in steps.md as the sole remaining unchecked item.
 
 - Review 40 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 40 addressed (2026-08-09)
+
+- addressed 3 review steps (review-40 items 1 + 2; review-1 optional live
+  smoke test — all steps.md items now checked)
+- `workflow_definitions_test.clj` `review-step-test` skill expectation
+  fixed for the external commit 5e5e5b1f0: review step keeps the 3-skill
+  vector; follow-up step asserts the 5-skill vector (conj code-shaper +
+  test-shaper). Focused namespace green (15 tests / 276 assertions); full
+  `bb test` green on the closed state: 2586 tests / 19431 assertions /
+  0 failures.
+- Delegate-review live test CWD-independence completed: `workflow-test-support`
+  gains a public `repo-root` walk-up helper; `workflow-extensions-cwd` is now
+  repo-root-based; fixed the latent dead-opt in `create-tui-context+session`
+  (top-level `:worktree-path` opt is ignored by `create-context*` — switched
+  to `:cwd`, the opt that drives session-defaults `:worktree-path`), so the
+  session worktree + `load-all-workflow-definitions!` + the delegate's
+  loaded-definitions all resolve from the repo root from any cwd. Live test
+  now asserts the session-profile snapshot contains the deepseek
+  `:reviewing-implementation` profile (valid, deepseek/deepseek-v4-flash) so
+  nil profiles fail loud. Verified from BOTH the repo root and
+  `user.dir` = components/agent-session (3 tests / 24 assertions each);
+  other create-tui-context+session users green; clj-kondo clean.
+- Review-1 optional live smoke test RESOLVED (block lifted — DEEPSEEK_API_KEY
+  now set in env): built psi's exact non-streaming request for the committed
+  deepseek config (`:adaptive-thinking true`, `:thinking-level :high`) via
+  `anthropic/build-request` and POSTed to
+  https://api.deepseek.com/anthropic/v1/messages with the env key — HTTP 200
+  with a `thinking` content block in the response. Confirms x-api-key auth,
+  /v1/messages path, adaptive output_config.effort, AND that DeepSeek
+  accepts `thinking.type "adaptive"` (review-7 caveat superseded for the
+  tested shape); usage JSON carried Anthropic-shaped
+  cache_read_input_tokens/cache_creation_input_tokens (review-2 field-name
+  assumption verified, no cost adjustment needed). Docs updated:
+  doc/custom-providers.md DeepSeek notes (adaptive-shape / effort /
+  HTTP-400-retry / cache-cost bullets) and the .psi/project.edn review-39
+  NOTE now record the live verification; untested items (fast mode,
+  temperature with thinking-on, explicit thinking disabled, medium/highest
+  effort, mid-conversation system messages) keep their caveats.
+- Full `bb test` green (2586 tests / 19431 assertions / 0 failures; assertion
+  count varies run-to-run per the documented review-5 flake analysis).

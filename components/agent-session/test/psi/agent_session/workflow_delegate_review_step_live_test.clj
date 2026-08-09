@@ -11,6 +11,8 @@
    [psi.command-registry.registry :as command-registry]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
+   [psi.session-state.state :as ss]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (use-fixtures :each
@@ -26,20 +28,9 @@
     (.getAbsolutePath tmp)))
 
 (defn- repo-root
-  "Repo root: walk up from the process cwd until doc/custom-providers.md
-  exists. Tests run from the repo root via bb, but this also tolerates a
-  component-local cwd — the same helper user_models_test.clj uses (review
-  39: the review-38 durable lock resolved the committed project models
-  path via (System/getProperty \"user.dir\"), so from a component-local
-  cwd both .psi/models.edn and .psi/project.edn silently missed — missing
-  file → empty models / nil profiles — and the lock vanished instead of
-  failing loud)."
+  "Repo root, shared with workflow-test-support — see its docstring."
   []
-  (loop [dir (.getCanonicalFile (java.io.File. "."))]
-    (if (or (.exists (java.io.File. dir "doc/custom-providers.md"))
-            (= dir (.getParentFile dir)))
-      dir
-      (recur (.getParentFile dir)))))
+  (workflow-test-support/repo-root))
 
 (defn- committed-project-models-path
   "Absolute path of the committed .psi/models.edn, resolved from the repo
@@ -186,6 +177,26 @@
               (workflow-test-support/create-tui-context+session
                mutations/all-mutations
                {:session-defaults {:model {:provider "local" :id "test-model" :reasoning false}}})]
+          ;; Durable-lock fail-loud assertion (review 40): the session
+          ;; worktree must resolve the committed .psi/project.edn (deepseek
+          ;; default profiles), so the run's session-profile snapshot
+          ;; contains the :reviewing-implementation deepseek profile. From a
+          ;; component-local cwd this fails loud instead of running with nil
+          ;; profiles and an unrelated "Unknown workflow" error.
+          (let [worktree-path  (ss/session-worktree-path-in ctx session-id)
+                snapshot       (session-profiles/profile-snapshot worktree-path)
+                review-profile (get-in snapshot [:profiles :reviewing-implementation])]
+            (is (contains? (:profiles snapshot) :reviewing-implementation)
+                (str "session-profile snapshot must contain the committed deepseek "
+                     ":reviewing-implementation profile — worktree " worktree-path
+                     " profiles " (pr-str (keys (:profiles snapshot)))))
+            (is (true? (:valid? review-profile))
+                (str ":reviewing-implementation must resolve validly — "
+                     (pr-str (:diagnostics review-profile))))
+            (is (= {:provider "deepseek" :id "deepseek-v4-flash"}
+                   (select-keys (get-in review-profile [:settings :model])
+                                [:provider :id]))
+                "the :reviewing-implementation profile must resolve to the committed deepseek/deepseek-v4-flash model (durable lock)"))
           (workflow-test-support/init-built-in-workflow! ctx session-id)
           (try
             (workflow-test-support/load-all-workflow-definitions! ctx)

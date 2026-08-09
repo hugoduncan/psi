@@ -75,12 +75,37 @@
 - [x] Full `bb test` (unit + extension suites) to satisfy the design AC
       "`bb test` green" — implementation verified only the two targeted
       namespaces plus `clj-kondo`; full-suite run not demonstrated.
-- [ ] Optional manual smoke test before close: configure DeepSeek in a real
+- [x] Optional manual smoke test before close: configure DeepSeek in a real
       `models.edn`, select `deepseek-v4-flash`, run one live turn to confirm
       DeepSeek accepts the request (x-api-key auth, `/v1/messages` path,
       adaptive `output_config.effort`). Automated tests are request-shaping
       only by design; needs a `DEEPSEEK_API_KEY`. BLOCKED: `DEEPSEEK_API_KEY`
       not set in env (recorded in implementation.md).
+      → RESOLVED (live, 2026-08-09 — the env block lifted: `DEEPSEEK_API_KEY`
+      is now set in the environment): executed the smoke test through psi's
+      own request builder (`anthropic/build-request`, non-streaming) with the
+      committed `.psi/models.edn` deepseek config (`:adaptive-thinking true`)
+      + `:thinking-level :high` (the committed `:reviewing-implementation`
+      profile level) and POSTed to
+      `https://api.deepseek.com/anthropic/v1/messages` with the env key.
+      Result: **HTTP 200** — body
+      `{"model":"deepseek-v4-flash","max_tokens":384000,"messages":[...],"system":"sys","thinking":{"type":"adaptive","display":"summarized"},"output_config":{"effort":"high"}}`
+      was accepted; response contained a `thinking` content block (thinking
+      ran) + the text reply. Confirms x-api-key auth, `/v1/messages` path,
+      adaptive `output_config.effort`, AND that DeepSeek accepts
+      `thinking.type "adaptive"` (the review-7 unverified caveat — a 200 with
+      a thinking block, not a 400; the 2026-08-07 strict-endpoint
+      speculation is superseded for the tested shape). Usage JSON carried
+      Anthropic-shaped `cache_read_input_tokens`/`cache_creation_input_tokens`
+      (both 0 in the no-cache turn) — the review-2 cache-cost field-name
+      assumption is verified live, no adjustment needed. Docs updated:
+      `doc/custom-providers.md` DeepSeek notes (adaptive-shape, effort,
+      HTTP-400-retry, cache-cost bullets) and the `.psi/project.edn`
+      review-39 NOTE now record the live verification; unverified items that
+      remain (fast mode, `temperature` with thinking-on default,
+      `thinking.type "disabled"` explicit signal, `"medium"`/`"highest"`
+      effort values, mid-conversation system messages) were not exercised by
+      this single turn and keep their caveats.
 
 ## Follow-ups (implementation review 2, 2026-08-07)
 
@@ -3285,7 +3310,7 @@
 
 ## Follow-ups (implementation review 40, 2026-08-09)
 
-- [ ] `bb test` is RED at HEAD — `workflow_definitions_test/review-step-test`
+- [x] `bb test` is RED at HEAD — `workflow_definitions_test/review-step-test`
       fails (verified 2026-08-09: 14 tests / 1 failed), so the design AC
       "`bb test` green" is violated on the state being closed. The external
       concurrent commit 5e5e5b1f0 "update review skills" (in this task's
@@ -3302,7 +3327,15 @@
       `test-shaper` added), keep the review step's 3-skill assertion —
       then re-run `bb test` (full suite, and the focused namespace) and
       record the result on the state being closed.
-- [ ] The delegate-review live test's claimed CWD-independence (review 39)
+      → Resolved: `workflow_definitions_test.clj` `review-step-test` now
+      asserts the review step's 3-skill vector unchanged and the follow-up
+      step's 5-skill vector (`(conj actor-skills "code-shaper"
+      "test-shaper")`, matching the external commit's ordering). Focused
+      namespace green (15 tests / 276 assertions, 0 failures). Full `bb test`
+      green on the state being closed: 2586 tests / 19431 assertions /
+      0 failures (recorded in implementation.md; assertion count varies
+      run-to-run per the documented review-5 flake analysis).
+- [x] The delegate-review live test's claimed CWD-independence (review 39)
       is incomplete — verified 2026-08-09: with `user.dir` =
       components/agent-session the test FAILS with "Error: Unknown workflow
       'review-task-implementation'. Use action=list to see available
@@ -3323,3 +3356,28 @@
       profile so nil profiles fail loud) from the same repo-root walk-up,
       then verify the live test from both the repo root and a
       component-local cwd.
+      → Resolved (both options): `workflow-test-support` gains a public
+      `repo-root` walk-up helper and `workflow-extensions-cwd` is now
+      `(str (repo-root))` (repo root from any cwd — identical to user.dir in
+      normal bb runs from the repo root). Fixed a latent dead-opt bug in
+      `create-tui-context+session`: it passed a top-level `:worktree-path`
+      opt that `create-context*` ignores (the session worktree came from
+      `resolved-cwd` = user.dir); it now passes `:cwd workflow-extensions-cwd`
+      (the opt `create-context*` actually destructures → session-defaults
+      `:worktree-path`), so the session worktree AND `load-all-workflow-
+      definitions!` AND the delegate's `runtime-state/loaded-definitions`
+      all resolve from the repo root. The live test additionally asserts the
+      run's session-profile snapshot contains the deepseek
+      `:reviewing-implementation` profile (`:valid? true`, resolved model
+      deepseek/deepseek-v4-flash) — nil profiles fail loud instead of
+      running with an unrelated error. The live test's private `repo-root`
+      helper now delegates to the shared one. Verified BOTH ways:
+      `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-
+      review-step-live-test` green from the repo root (3 tests / 24
+      assertions) and green with `user.dir` = components/agent-session
+      (java -Duser.dir=<abs component path>, absolute classpath — 3 tests /
+      24 assertions; the walk-up helper + worktree fix make the two runs
+      equivalent). `workflow-async-path-test` (6/29) and
+      `workflow-tui-repro-test` (2/11), the other `create-tui-context+session`
+      users, green from the repo root; clj-kondo clean (0 errors, 0
+      warnings).

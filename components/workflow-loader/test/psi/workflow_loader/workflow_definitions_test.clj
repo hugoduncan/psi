@@ -420,7 +420,11 @@
          (is (= :off (:thinking-level follow-up-step))))
        (testing "review-step actor sessions use the review implementation skills"
          (is (= actor-skills (:skills review-step)))
-         (is (= actor-skills (:skills follow-up-step))))
+         ;; The follow-up step additionally carries code-shaper + test-shaper
+         ;; (external commit 5e5e5b1f0 "update review skills"), so its skill
+         ;; vector is the review skill set plus those two.
+         (is (= (conj actor-skills "code-shaper" "test-shaper")
+                (:skills follow-up-step))))
        (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)

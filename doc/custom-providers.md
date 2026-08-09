@@ -400,13 +400,16 @@ Notes:
   honored values — the Thinking Mode guide documents the Anthropic-format
   thinking toggle as `{"thinking": {"type": "enabled/disabled"}}` only, and
   "adaptive" appears nowhere in DeepSeek's Anthropic API docs (verified
-  2026-08-07). What DeepSeek does with `type: "adaptive"` is unverified: a
-  strict endpoint may reject it (400); a lenient one may ignore it, leaving
-  thinking ON (DeepSeek's default) with the effort applied. Verify against a
-  live turn (blocked: no `DEEPSEEK_API_KEY` in env) before relying on the
-  adaptive shape; if DeepSeek rejects it, fall back to
-  `:adaptive-thinking false` — the classic shape's `type: "enabled"` IS a
-  documented honored value (`budget_tokens` is ignored).
+  2026-08-07), but a live single-turn smoke test (2026-08-09, the task's
+  review-1 smoke test, now unblocked) confirmed DeepSeek ACCEPTS the
+  adaptive shape: psi's exact request (`thinking.type "adaptive"` +
+  `output_config.effort "high"`, x-api-key auth, `/v1/messages`) returned
+  200 with a `thinking` content block in the response — the endpoint does
+  not reject `type: "adaptive"`, and thinking ran with the requested
+  effort. (The 2026-08-07 strict-endpoint-400 / lenient-ignore speculation
+  is superseded by this live result for the tested shape; keep
+  `:adaptive-thinking false` — classic `type: "enabled"` — as the fallback
+  if a future DeepSeek change rejects it.)
   Also note psi's effort values vs DeepSeek's documented set: the Thinking
   Mode guide documents Anthropic-format effort as `"low/high/max"`, but
   psi's adaptive path emits `"low"` (`/thinking minimal` or `/thinking
@@ -415,9 +418,11 @@ Notes:
   emits `"max"`. `"low"` and `"high"` are within DeepSeek's documented set;
   `"medium"` and `"highest"` are undocumented (a strict endpoint may 400, a
   lenient one may map them unpredictably), and `"highest"` does not
-  correspond to DeepSeek's `"max"`. Unverified live (blocked: no
-  `DEEPSEEK_API_KEY` in env); until verified, prefer `/thinking minimal` /
-  `/thinking low` or `/thinking high` for documented-safe effort values.
+  correspond to DeepSeek's `"max"`. `"high"` (via `/thinking high`) was
+  verified live 2026-08-09 (the review-1 smoke test: 200, `thinking` block
+  returned); `"low"` is documented-safe; `"medium"`/`"highest"` remain
+  untested live — prefer `/thinking minimal` / `/thinking low` or
+  `/thinking high` for documented-safe effort values.
   And `output_config.effort` is only emitted when a thinking level is active:
   psi gates effort on `thinking` being on, so `/effort` (or
   `:effort-override`) with `/thinking` unset/off emits neither `thinking` nor
@@ -429,15 +434,17 @@ Notes:
   adaptive-shape request the `:without-thinking` step strips BOTH `thinking`
   and `output_config` from the retried body (locked by a stream test,
   `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`).
-  So if a strict DeepSeek endpoint rejects the unverified
-  `thinking.type "adaptive"` value with a 400, the streaming path does NOT
-  hard-fail — it retries with the `thinking` field omitted, which DeepSeek
-  treats as thinking ON (server default) at default effort, silently dropping
-  your effort setting. The non-streaming (`execute`) path has no 400 fallback
-  and hard-fails on the same request (streaming/non-streaming asymmetry).
-  Verify the adaptive shape against a live turn (blocked: no
-  `DEEPSEEK_API_KEY` in env) before relying on it; to fail fast instead of
-  silently degrading to thinking-ON, use `:adaptive-thinking false` — the
+  The live smoke test (2026-08-09) confirmed DeepSeek does NOT reject the
+  adaptive shape (200 with a `thinking` block returned), so this retry path
+  is not exercised for `type: "adaptive"` today. It remains a general safety
+  net: if a future DeepSeek change (or another Anthropic-compatible
+  provider) rejects the adaptive shape with a 400, the streaming path does
+  NOT hard-fail — it retries with the `thinking` field omitted, which
+  DeepSeek treats as thinking ON (server default) at default effort,
+  silently dropping your effort setting. The non-streaming (`execute`) path
+  has no 400 fallback and hard-fails on the same request
+  (streaming/non-streaming asymmetry). To fail fast instead of silently
+  degrading to thinking-ON, use `:adaptive-thinking false` — the
   classic shape's `type: "enabled"` is a documented honored value.
 - thinking-off is not honoured through the omitted-field path: psi never sends
   an explicit thinking-disabled signal — when `/thinking off` is active it
@@ -472,10 +479,11 @@ Notes:
   publishes no separate cache-write price, so `:cache-write-cost 0.14` mirrors
   the cache-miss/input rate as the effective write-path cost (Anthropic-style
   accounting reports the write/miss portion separately from `input_tokens`, so
-  this does not double-count the miss). This assumes DeepSeek's usage payload
-  uses those Anthropic field names — not yet verified against a live payload;
-  if DeepSeek reports usage in its native OpenAI-style shape, cache costs may
-  not be captured and the example costs should be adjusted.
+  this does not double-count the miss). The Anthropic field-name assumption
+  was verified live 2026-08-09 (the review-1 smoke test): DeepSeek's usage
+  JSON carried `cache_read_input_tokens` and `cache_creation_input_tokens`
+  (both 0 in that no-cache turn) alongside `input_tokens`/`output_tokens` —
+  the example costs map onto real payload fields, no adjustment needed.
 - DeepSeek's Anthropic-compatible endpoint does not document a
   JSON-Schema-native structured-output mechanism, so this example omits
   `:capabilities :structured-output` (defaults to unsupported); add
