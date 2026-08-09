@@ -1561,3 +1561,5 @@
     clj-kondo 0 errors / 0 new warnings (2 pre-existing dev-http-test
     warnings on base commit).
   - Smoke-test step remains unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).
+
+- Review 31 (2026-08-08): added 3 steps to be addressed.
