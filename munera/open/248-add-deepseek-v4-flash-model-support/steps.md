@@ -3195,3 +3195,59 @@
       (full-map equality — committed-file ↔ doc drift fails in both
       directions, the same lock class as the review-6/9 doc parse-locks).
       `psi.ai.user-models-test` green (20 tests / 138 assertions).
+
+## Follow-ups (implementation review 39, 2026-08-09)
+
+- [ ] doc/custom-providers.md "Switch to the configured model" section lists
+      only the MiniMax (`/model minimax MiniMax-M1`) and Anthropic-compatible-
+      proxy (`/model my-anthropic-proxy proxy-sonnet`) in-session selection
+      commands — the new DeepSeek section (added by this task) is a full
+      first-class copy-paste example the same shape as the other two, but a
+      user who configures DeepSeek per that section finds no selection
+      command for it anywhere in the doc's selection section (the natural
+      lookup point), which ends with "or, for the Anthropic-compatible
+      example" naming only the placeholder proxy. Docs-only fix: add a
+      DeepSeek selection line (`/model deepseek deepseek-v4-flash`) alongside
+      the minimax and proxy-sonnet examples (or a third "or, for the
+      DeepSeek example" variant) so every documented example has its
+      in-session selection command.
+- [ ] delegate-review live test's review-38 "durable lock" is CWD-dependent —
+      workflow_delegate_review_step_live_test.clj resolves the committed
+      project models path via `(str (System/getProperty "user.dir")
+      "/.psi/models.edn")`, and the session-profiles read (shared-config) is
+      likewise `<cwd>/.psi/project.edn`; from a component-local cwd both
+      silently miss (`load-models-file` returns an empty result for a missing
+      file, shared-config returns nil profiles), so the test runs GREEN
+      without exercising the deepseek lock — the durable lock review 38
+      claimed (a committed profile referencing a model absent from committed
+      sources fails at test time) silently vanishes instead of failing loud.
+      user_models_test.clj's committed-file lock already solved this exact
+      problem with a `repo-root` walk-up helper ("Tests run from the repo
+      root via bb, but this also tolerates a component-local cwd") that also
+      asserts the file exists with a clear failure. Fix: resolve the
+      committed `.psi/models.edn` (and assert `.psi/project.edn` exists, or
+      fail loud on its absence) the same way, so the lock cannot degrade
+      silently.
+- [ ] the committed deepseek default activates the UNVERIFIED adaptive wire
+      shape repo-wide — `.psi/project.edn`'s seven workflow profiles plus the
+      committed `.psi/models.edn` (`:adaptive-thinking true`) send
+      `thinking.type "adaptive"` + `output_config.effort` on every delegated
+      workflow turn, but DeepSeek's Thinking Mode guide documents only
+      `type: "enabled"/"disabled"` and "adaptive" appears nowhere in its
+      Anthropic API docs (doc/custom-providers.md's own DeepSeek notes say
+      the value is unverified and a strict endpoint may 400); on such a 400
+      the streaming path silently retries `:without-thinking` (effort
+      dropped, thinking ON server-default) and the non-streaming path
+      hard-fails — while the `.psi/project.edn` deepseek comment documents
+      only the env-var requirement and says nothing about the unverified
+      shape or the silent degradation. Fix (docs/decision): add a note to the
+      `.psi/project.edn` deepseek comment stating the adaptive shape is
+      unverified until a live DEEPSEEK_API_KEY turn (the review-1 smoke test)
+      confirms it, that a 400 silently degrades to thinking-ON at default
+      effort on the streaming path and hard-fails on the non-streaming path,
+      and the documented fallback is `:adaptive-thinking false` (classic
+      `type: "enabled"`, a documented honored value); note the committed-file
+      ↔ doc-example equality parse-lock
+      (`committed-project-models-edn-matches-documented-deepseek-example-test`)
+      means the committed `.psi/models.edn` and the doc example must move
+      together if the fallback is chosen.
