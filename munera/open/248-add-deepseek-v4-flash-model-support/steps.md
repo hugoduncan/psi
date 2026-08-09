@@ -3918,3 +3918,58 @@
       0 failures); clj-kondo clean (0 errors, 0 warnings); cljfmt clean;
       `bb commit-check:file-lengths` passes (all touched files under 800
       lines).
+
+## Follow-ups (implementation review 47, 2026-08-09)
+
+- [ ] `stream-anthropic`'s `message_stop` terminal `:done` carries no
+      `:usage`: the `message_delta`-with-`stop_reason` branch emits
+      `:done` WITH `(usage-with-cost model usage-acc)`, but the
+      `message_stop` branch emits a bare `{:type :done :reason :stop}` — so
+      when a stream terminates via `message_stop` WITHOUT a preceding
+      `message_delta` carrying `stop_reason`, the turn's `handle-done!`
+      (`(map? usage)` false) records ZERO usage/cost even though `usage-acc`
+      already holds the input + cache tokens accumulated from
+      `message_start` (the review-44/46 guards made this the ONLY terminal
+      in that flow; they addressed event ordering, not usage content).
+      Reachable on any Anthropic-compatible endpoint that omits
+      `message_delta` (or sends it without `stop_reason`/`usage`) —
+      including the newly shipped DeepSeek provider whose STREAMING path is
+      unverified: the review-1 live smoke test (2026-08-09) exercised only
+      the non-streaming `execute` path, whose usage comes from the response
+      body; the streaming usage path is `message_start`/`message_delta` SSE
+      events only, so a streamed DeepSeek turn ending via `message_stop`
+      without `message_delta` would silently record no cost despite the
+      documented cache-cost fields. Fix: attach
+      `:usage (usage-with-cost model usage-acc)` to the `message_stop`
+      `:done` (at minimum the accumulated input/cache tokens; output stays
+      0), add a stream test (message_start with input/cache usage → content
+      blocks → message_stop, no message_delta → exactly one `:done`
+      carrying the accumulated input usage + cost map), and mirror the
+      terminal in `spec/anthropic-provider.allium` if it models the
+      `message_stop` `:done` shape.
+- [ ] Anthropic mid-stream SSE `"error"` branch status extraction is
+      incomplete AND unvalidated vs the sibling transports: the branch reads
+      http-status from `[:error :http_status]`/`:http_status` only, while
+      the openai `emit-chat-error!` reads
+      `:status`/`[:error :status]`/`[:error :http_status]` and validates
+      `(and (number? s) (>= s 400) s)`, and codex's
+      `codex-error-http-status` reads eight locations incl.
+      `[:error :status]` (review-43's resolution text described the openai
+      locations but never flagged the anthropic branch's narrower read).
+      An Anthropic-compatible endpoint (DeepSeek's mid-stream error shapes
+      are unverified; the review-1 smoke test covered only the happy path)
+      emitting `{"type":"error","error":{"status":529,"message":"..."}}` —
+      or a generic message plus a `status` key, or a string status — loses
+      its status: the `:error` event carries no numeric `:http-status`, so
+      downstream `retry-error?`/`provider-error-kind`
+      (numeric `#{429 500 502 503 529}` membership + message patterns) falls
+      to `:unknown` → a transient mid-stream 5xx/overload error is NOT
+      auto-retried — the same class review 23 fixed for the OpenAI
+      transports. Fix: mirror `emit-chat-error!`'s status extraction on the
+      anthropic branch (check `:status`/`[:error :status]`/
+      `[:error :http_status]`, keep only numeric `>= 400`), add a stream
+      test with an error event carrying `status` (not `http_status`)
+      asserting the `:error` event's `:http-status`, and update the
+      `SseErrorEventEmitsErrorAndTerminates` guidance in
+      `spec/anthropic-provider.allium` (which currently documents
+      http-status from `[:error :http_status]` only).
