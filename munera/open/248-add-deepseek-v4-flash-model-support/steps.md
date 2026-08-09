@@ -3282,3 +3282,44 @@
       fallback is chosen. Comment-only change; `.psi/project.edn` still
       parses (7 profiles, deepseek default) and the delegate-review live
       test (which snapshots these profiles) stays green.
+
+## Follow-ups (implementation review 40, 2026-08-09)
+
+- [ ] `bb test` is RED at HEAD — `workflow_definitions_test/review-step-test`
+      fails (verified 2026-08-09: 14 tests / 1 failed), so the design AC
+      "`bb test` green" is violated on the state being closed. The external
+      concurrent commit 5e5e5b1f0 "update review skills" (in this task's
+      commit range 3c286a46e..HEAD) added `code-shaper` + `test-shaper` to
+      the review-step follow-up step's skills (`.psi/workflows/review-step.edn`
+      + `.psi/workflows/review-follow-up-steps.md`) but did not update the
+      test's `actor-skills` expectation: `workflow_definitions_test.clj`
+      (~line 423) asserts `(= actor-skills (:skills follow-up-step))` with
+      the 3-skill vector, so the committed state fails. Review 39 documented
+      the failure ("caused ENTIRELY by the external commit … not touched
+      here") but scoped it out — it remains the only red test in the suite
+      and blocks the AC at closure. Fix: update the test expectation —
+      the follow-up step now carries 5 skills (`code-shaper` +
+      `test-shaper` added), keep the review step's 3-skill assertion —
+      then re-run `bb test` (full suite, and the focused namespace) and
+      record the result on the state being closed.
+- [ ] The delegate-review live test's claimed CWD-independence (review 39)
+      is incomplete — verified 2026-08-09: with `user.dir` =
+      components/agent-session the test FAILS with "Error: Unknown workflow
+      'review-task-implementation'. Use action=list to see available
+      workflows." `workflow-test-support/workflow-extensions-cwd` (=
+      `(System/getProperty "user.dir")`) drives BOTH the session worktree
+      (`create-tui-context+session` → the run's session-profile snapshot
+      reads `<cwd>/.psi/project.edn` via shared-config, a strict cwd path
+      with no walk-up) AND `load-all-workflow-definitions!` (`<cwd>/.psi/
+      workflows`); only `committed-project-models-path` was made
+      repo-root-based (review 39 verified the walk-up helper, not the test
+      itself). So from a component-local cwd the test neither exercises the
+      deepseek durable lock nor fails loud about it — it fails with an
+      unrelated "Unknown workflow" error (the review-39 "runs GREEN without
+      exercising the deepseek lock" characterization is inaccurate; it fails
+      RED for the wrong reason). Fix: resolve the workflow-definitions load
+      path AND the session worktree (or assert the run's session-profile
+      snapshot actually contains the deepseek `:reviewing-implementation`
+      profile so nil profiles fail loud) from the same repo-root walk-up,
+      then verify the live test from both the repo root and a
+      component-local cwd.
