@@ -2709,3 +2709,28 @@
       `:adaptive-thinking true` and no `:supports-reasoning true` loses
       temperature silently alongside the thinking no-op. Docs-only; no code
       change.
+
+## Follow-ups (implementation review 32, 2026-08-08)
+
+- [ ] `doc/custom-providers.md` `:api-key` bullet ("Local servers and custom
+      headers") documents the `env:` prefix case-sensitivity (review 27) and
+      per-request re-read semantics (reviews 26/29), but never mentions the
+      review-30 empty-variable config error — the canonical user-facing env:
+      guidance omits the exact behavior that changed: an `:api-key "env:"`
+      (blank variable name) is schema-valid and stored raw, resolves to nil
+      (never `getenv ""` — a set env cannot rescue the invalid spec), reads as
+      NOT configured in the model picker (`catalog-view` `:configured?` via
+      `request-support/resolve-key-spec` → nil), and fails every request with
+      the config error "api-key spec \"env:\" names an empty environment
+      variable (use \"env:VAR_NAME\")" instead of the misleading "environment
+      variable  is unset" (blank name). The behavior is in the CHANGELOG and
+      `request_support_test` (`resolve-key-spec-test` locks "env:"/"env: " →
+      nil with a getenv guard; `resolve-api-key-request-time-env-resolution-test`
+      locks the config-error message) but not in the docs where users hit it.
+      Fix (docs option, in scope): add a sentence to the `:api-key` bullet —
+      a blank variable name after `env:` is a config error naming the literal
+      spec, never an environment lookup of the empty string (use
+      `"env:VAR_NAME"`); optionally also add a blank-var block to
+      `catalog-view-env-api-key-resolvability-test` locking `:configured?`
+      false for an `"env:"` spec (currently only covered indirectly via
+      request_support_test).

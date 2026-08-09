@@ -1585,3 +1585,5 @@
      app-runtime has zero diff across the task range), extensions 364/1566,
      clj-kondo + cljfmt clean, file-lengths pass. Smoke-test step remains
      unchecked + BLOCKED (no DEEPSEEK_API_KEY in env).
+
+- Review 32 (2026-08-08): added 1 step to be addressed.
