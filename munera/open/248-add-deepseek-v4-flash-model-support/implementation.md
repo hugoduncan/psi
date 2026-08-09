@@ -1523,3 +1523,5 @@
   provider_auth/core.clj `provider-api-key` docstring language from review 26.
   Docstring-only; no behavior change. Green: runtime-test 6/42,
   prompt-request-test 20/59.
+
+- Review 30 (2026-08-08): added 2 steps to be addressed.

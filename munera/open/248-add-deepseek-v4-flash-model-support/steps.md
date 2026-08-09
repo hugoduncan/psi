@@ -2597,3 +2597,46 @@
       language from review 26. Docstring-only; no behavior change. Green:
       `psi.agent-session.runtime-test` 6/42, `psi.agent-session.prompt-request-test`
       20/59; clj-kondo clean.
+
+## Follow-ups (implementation review 30, 2026-08-08)
+
+- [ ] `model_selection/catalog-view` `:configured?` counts ANY custom
+      `:headers` as making a provider configured, contradicting the review-29
+      request-time-resolvability semantics it just documented: the flag
+      computes `(or (nil? auth) (some? (resolve-key-spec (:api-key auth)))
+      (seq (:headers auth)) (false? (:auth-header? auth)))`, so a custom
+      provider with only INCIDENTAL headers (e.g. `:headers {"X-Client"
+      "psi"}`, no `:api-key`, `:auth-header?` default true) reports
+      `:configured? true` in the model picker — but `request-support/no-auth?`
+      treats incidental headers as NOT keyless (review 5), so every request
+      fast-fails with "Missing API key for provider <name>". Verified
+      end-to-end through `session->request-options` →
+      `provider-request-options` → `no-auth?` → `resolve-api-key` (throws);
+      `doc/custom-providers.md` "Local servers and custom headers" states the
+      same fast-fail for incidental headers, so the picker flag disagrees
+      with the docs' own claim for this exact case, and
+      `catalog-view-env-api-key-resolvability-test` (review 29) locks only
+      the unset/set-env and `:auth-header? false` cases — not the
+      incidental-headers case. Fix: align the headers clause with `no-auth?`
+      (a recognized auth header — `x-api-key`/`authorization`,
+      case-insensitive — among custom `:headers` with no resolvable key, or
+      `:auth-header? false`, or a resolvable key), e.g. reuse
+      `request-support/no-auth?` on the auth map (mapping `:auth-header?
+      false` → `:no-auth-header`), and add an incidental-headers block to
+      `catalog-view-env-api-key-resolvability-test` asserting
+      `:configured? false`.
+- [ ] Empty `env:` variable name is schema-valid and produces a misleading
+      blank-var error: `ModelDef`'s `:api-key` is `[:maybe string?]`, so
+      `:auth {:api-key "env:"}` parses and is stored raw; per request
+      `request-support/resolve-key-spec` does `(getenv (subs "env:" 4))` →
+      `(getenv "")` → nil, and `resolve-api-key`'s unset-var branch names the
+      empty substring — "Missing API key for provider deepseek: environment
+      variable  is unset" (double space, no variable name) — instead of a
+      config error. Not covered by `resolve-key-spec-test` /
+      `resolve-api-key-request-time-env-resolution-test` (they test
+      `"env:DEEPSEEK_API_KEY"` only). Fix (either): reject/blank-normalize a
+      non-empty var name after the `env:` prefix (schema or
+      `extract-provider-auth`), or handle it in `resolve-key-spec`/the error
+      branch (e.g. treat `"env:"` with a blank var name as a config error
+      naming the literal spec, never `getenv ""`); add a test locking the
+      chosen behavior.
