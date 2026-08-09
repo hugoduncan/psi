@@ -3068,7 +3068,7 @@
 
 ## Follow-ups (implementation review 37, 2026-08-08)
 
-- [ ] CHANGELOG `[Unreleased]` → `Changed` redaction entry still claims the
+- [x] CHANGELOG `[Unreleased]` → `Changed` redaction entry still claims the
       case-insensitive capture redaction applies "on both transports"
       (line 30: "Provider request captures now redact auth headers
       case-insensitively on both transports (`x-api-key`, mixed-case
@@ -3087,3 +3087,11 @@
       Fix: "on both transports" → "on all three transports" (or name
       `:anthropic-messages`, `:openai-completions`, `:openai-codex-responses`),
       matching the sibling entry.
+      → Resolved: CHANGELOG `[Unreleased]` → `Changed` redaction entry now
+      reads "on all three transports" and names them
+      (`:anthropic-messages`, `:openai-completions`, `:openai-codex-responses`),
+      matching the sibling provider-scoped key-resolution entry. Verified the
+      codex path captures through `transport/capture-request!`
+      (codex_responses.clj), whose `redact-request-headers` delegates to the
+      shared `request-support/redact-headers` — the `:openai-codex-responses`
+      captures are redacted, and the CHANGELOG no longer misleads.

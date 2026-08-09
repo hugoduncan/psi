@@ -1777,3 +1777,20 @@
   steps.md as the sole remaining unchecked item.
 
 - Review 37 (2026-08-08): added 1 step to be addressed.
+
+## Follow-ups review 37 addressed (2026-08-08)
+
+- addressed 1 review step (review-37 CHANGELOG wording; review-1 optional
+  live smoke test remains BLOCKED on missing DEEPSEEK_API_KEY)
+- CHANGELOG `[Unreleased]` → `Changed` redaction entry updated: "on both
+  transports" → "on all three transports" with the transports named
+  (`:anthropic-messages`, `:openai-completions`, `:openai-codex-responses`),
+  matching the sibling provider-scoped key-resolution entry. Verified the
+  codex path captures through `transport/capture-request!`
+  (codex_responses.clj line 484), whose `redact-request-headers` delegates
+  to the shared `request-support/redact-headers` — codex captures are
+  redacted, and the CHANGELOG no longer misleads readers into concluding
+  `:openai-codex-responses` captures are unredacted. Doc-only change.
+- Review-1 optional live smoke test remains BLOCKED: `DEEPSEEK_API_KEY` not
+  set in environment; request-shaping coverage only by design. Recorded in
+  steps.md as the sole remaining unchecked item.
