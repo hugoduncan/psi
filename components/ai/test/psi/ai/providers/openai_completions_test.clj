@@ -719,6 +719,43 @@
                 :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
                (:usage (first done-events))))))))
 
+(deftest completions-sse-error-event-emits-error-and-terminates-test
+  (testing "a mid-stream OpenAI SSE error chunk emits :error and terminates"
+    ;; Review 43: an error chunk ({"error": {...}} — no :choices) previously
+    ;; no-oped in process-chat-sse-line!: no :error event, no terminal :done,
+    ;; hanging the turn until the idle timeout — the same silent-drop class
+    ;; fixed for the anthropic transport's "error" SSE event.
+    (let [model  (models/get-model :gpt-5)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hello"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:error {:message "The server had an error while processing your request."
+                                     :type "server_error"
+                                     :code "server_error"}}) "\n\n"
+                  "data: [DONE]\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error chunk must surface as an :error event")
+        (is (= "The server had an error while processing your request."
+               (:error-message err))
+            "error message extracted from the chunk's error body")
+        (is (nil? (:http-status err))
+            "no numeric http-status in the chunk → no status suffix")
+        (is (= {:error {:message "The server had an error while processing your request."
+                        :type "server_error"
+                        :code "server_error"}}
+               (:body err))
+            "raw chunk body preserved")
+        (is (not-any? #(= :done (:type %)) @events)
+            "no :done after a mid-stream error — the :error event terminates the turn")))))
+
 (deftest completions-non-2xx-response-map-surfaces-body-message-test
   (let [model  (models/get-model :gpt-5)
         convo  (-> (conv/create "sys")

@@ -2026,3 +2026,59 @@
   live smoke test is marked RESOLVED (live 2026-08-09); all 42 review passes'
   items are now closed.
 - Review 43 (2026-08-09): added 2 steps to be addressed.
+
+## Follow-ups review 43 addressed (2026-08-09)
+
+- addressed 2 review steps (the two review-43 stream items; steps.md has no
+  remaining unchecked items)
+- `stream-anthropic` now surfaces Anthropic SSE `"error"` events instead of
+  silently dropping them: the stream loop's case gains an `"error"` branch
+  mapping the event's error body through
+  `anthropic-error/error-from-response-data` (message from parsed-body
+  `[:error :message]`, http-status from `[:error :http_status]` when present,
+  fallback "Anthropic stream error", raw event preserved as `:body`/
+  `:body-text`) and emitting the `:error` event, terminating the stream under
+  the existing `done?` guard (a trailing `message_stop` cannot emit a second
+  terminal event). The line was already captured via `capture-response!`, so
+  no double capture. Chat-completions decision (the review's explicit
+  "decide" item): FIXED — `process-chat-sse-line!` now detects a parsed chunk
+  carrying `:error` (no `:choices`) and emits an `:error` event + terminates
+  via new `emit-chat-error!` (numeric http-status from
+  `:status`/`[:error :status]`/`[:error :http_status]` when present, message
+  via the openai transport's `error-from-response-data`), mirroring the codex
+  transport's in-repo precedent.
+- `content-block-stop-event` now emits `:thinking-end` for `"thinking"`
+  blocks (keeps `:toolcall-end` for tool_use, `:text-end` for text), so the
+  accumulator's dedicated `:on-thinking-end` handler
+  (`note-last-provider-event!` `:thinking-end` + `end-content-block!`) runs
+  for anthropic-path thinking-block stops instead of the mislabeled
+  `:text-end` (the DeepSeek thinking blocks returned live 2026-08-09 were
+  previously mislabeled).
+- Tests added: `anthropic_stream_test.clj`
+  `stream-anthropic-surfaces-sse-error-event-test` (two blocks — with
+  `http_status 529` → "Overloaded (status 529)" + raw body + no `:done`;
+  without status → message only, no status suffix, no `:done`),
+  `thinking-block-stop-emits-thinking-end-test` (thinking stop →
+  `:thinking-end` at its index, not `:text-end`; text stop still
+  `:text-end`); `openai_completions_test.clj`
+  `completions-sse-error-event-emits-error-and-terminates-test` (server_error
+  chunk → `:error` event, no `:done`).
+- Specs updated per the change chain: `spec/anthropic-provider.allium` —
+  `SseErrorEventEmitsErrorAndTerminates`, `ContentBlockStopEmitsTypedEndEvent`
+  rules; `StreamEvent` `event_type` enum now carries `thinking_start`/
+  `thinking_signature_delta`/`thinking_end` (the start/signature-delta events
+  were already emitted but missing from the enum); `SignatureFragmentObserved`
+  replaced by the emitted `thinking_signature_delta` StreamEvent to match the
+  implementation. `spec/openai-provider.allium` —
+  `CompletionsSseErrorChunkEmitsErrorAndTerminates`. CHANGELOG `[Unreleased]`
+  → `Fixed` entries for both user-visible fixes (mid-stream error surfacing
+  on the anthropic + openai-completions transports; thinking-block stop
+  labeling).
+- Verification: full `bb test` green (2590 tests / 19462 assertions /
+  0 failures; +3 tests = the three new deftests vs the review-42 2587);
+  `psi.ai.providers.anthropic-stream-test` 9/77 (was 7/69 before the two new
+  deftests), `psi.ai.providers.openai-completions-test` 17/75 (was 16/68),
+  `psi.ai.providers.anthropic-test` 16/103, `psi.ai.providers.anthropic-retry-test`
+  6/60, `psi.ai.providers.openai-test` 9/65 green; clj-kondo clean (0 errors,
+  0 warnings); cljfmt clean; `bb commit-check:file-lengths` passes (all
+  touched files under 800 lines).

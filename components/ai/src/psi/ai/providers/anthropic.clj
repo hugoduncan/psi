@@ -412,8 +412,9 @@
 
 (defn- content-block-stop-event
   [btype idx]
-  {:type          (if (= "tool_use" btype)
-                    :toolcall-end
+  {:type          (case btype
+                    "tool_use" :toolcall-end
+                    "thinking" :thinking-end
                     :text-end)
    :content-index idx})
 
@@ -559,6 +560,27 @@
                              (get @structured-buffers idx))
                             (consume-fn (content-block-stop-event (:type block-info)
                                                                   idx))))
+
+                        "error"
+                        ;; Anthropic's documented mid-stream SSE error shape
+                        ;; ({"type":"error","error":{...}} — e.g.
+                        ;; overloaded_error / rate-limit during a stream).
+                        ;; Review 43: the default case previously consumed
+                        ;; these as no-ops, so a mid-stream provider error
+                        ;; hung the turn until llm-stream-idle-timeout-ms
+                        ;; with a misleading timeout. Surface the event's
+                        ;; error body through anthropic-error (http-status
+                        ;; when present) and terminate the stream; the done?
+                        ;; guard prevents a trailing message_stop from
+                        ;; emitting a second terminal event.
+                        (let [err (anthropic-error/error-from-response-data
+                                   {:status           (or (get-in event-data [:error :http_status])
+                                                          (:http_status event-data))
+                                    :body-text        (json/generate-string event-data)
+                                    :fallback-message "Anthropic stream error"})]
+                          (when-not @done?
+                            (reset! done? true)
+                            (consume-fn err)))
 
                         "message_delta"
                         (do

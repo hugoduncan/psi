@@ -717,6 +717,27 @@ rule CompletionsChunksNormalizeToExecutorEvents {
             CompletionsDoneWithoutUsageEmitted(stream, chunk)
 }
 
+rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
+    when: CompletionsChunkReceived(stream, chunk)
+    requires: chunk.error != null
+
+    ensures: ErrorEmitted(stream)
+    ensures: stream.done = true
+
+    @guidance
+        -- Review 43: an OpenAI SSE error chunk ({"error": {...}} — no
+        -- :choices) previously no-oped in process-chat-sse-line!: no :error
+        -- event, no terminal :done, hanging the turn until the idle timeout
+        -- with a misleading timeout — the same silent-drop class fixed for
+        -- the anthropic transport's "error" SSE event (and already handled
+        -- by the codex transport). The chunk's error message is extracted
+        -- through the openai transport's error-from-response-data
+        -- (parsed-body [:error :message]; a numeric http-status from
+        -- :status / [:error :status] / [:error :http_status] when present);
+        -- the done? guard prevents a trailing [DONE]/finish chunk from
+        -- emitting a second terminal event.
+}
+
 rule CodexEventsNormalizeToExecutorEvents {
     when: CodexEventReceived(stream, event)
     requires: stream.request_api = openai_codex_responses

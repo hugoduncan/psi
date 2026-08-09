@@ -3545,7 +3545,7 @@
 
 ## Follow-ups (implementation review 43, 2026-08-09)
 
-- [ ] `stream-anthropic` silently drops Anthropic SSE `error` events
+- [x] `stream-anthropic` silently drops Anthropic SSE `error` events
       (`{"type":"error","error":{...}}` — Anthropic's documented mid-stream
       error shape, e.g. `overloaded_error`/rate-limit during a stream). The
       stream loop's `(case (:type event-data) ...)` handles only
@@ -3570,7 +3570,34 @@
       stream (respect the existing `done?` guard), plus a stream test feeding
       an SSE error event and asserting the `:error` event + no hang; decide
       whether the same class warrants a chat-completions fix (same pattern).
-- [ ] `content-block-stop-event` maps every non-tool block stop to `:text-end`
+      → Resolved: `stream-anthropic`'s stream loop now has an `"error"` case
+      branch — the event's error body is mapped through
+      `anthropic-error/error-from-response-data` (message from parsed-body
+      `[:error :message]`, http-status from `[:error :http_status]` when
+      present, fallback "Anthropic stream error", raw event preserved as
+      `:body`/`:body-text`; the line was already captured via
+      `capture-response!`, so no double capture) and the `:error` event is
+      emitted, terminating the stream under the existing `done?` guard (a
+      trailing `message_stop` cannot emit a second terminal event).
+      Chat-completions decision: FIXED too — `process-chat-sse-line!` now
+      detects a parsed chunk carrying `:error` (no `:choices`) and emits an
+      `:error` event + terminates via new `emit-chat-error!` (numeric
+      http-status from `:status`/`[:error :status]`/`[:error :http_status]`
+      when present, message via the openai transport's
+      `error-from-response-data`), mirroring the codex transport's in-repo
+      precedent. Tests: `anthropic_stream_test.clj`
+      `stream-anthropic-surfaces-sse-error-event-test` (with `http_status 529`
+      → "Overloaded (status 529)" + raw body + no `:done`; without status →
+      message only, no status suffix, no `:done`);
+      `openai_completions_test.clj`
+      `completions-sse-error-event-emits-error-and-terminates-test`
+      (server_error chunk → `:error` event, no `:done`). Specs updated
+      (`spec/anthropic-provider.allium` `SseErrorEventEmitsErrorAndTerminates`;
+      `spec/openai-provider.allium`
+      `CompletionsSseErrorChunkEmitsErrorAndTerminates`); CHANGELOG `Fixed`
+      entry. Full `bb test` green (2590 tests / 19462 assertions / 0
+      failures); clj-kondo + cljfmt + file-lengths clean.
+- [x] `content-block-stop-event` maps every non-tool block stop to `:text-end`
       — including `thinking` content blocks, which `stream-anthropic` emits
       (DeepSeek returned a `thinking` block in the live smoke test
       2026-08-09, and `content-block-start-event`/`content-block-delta-event`
@@ -3585,3 +3612,22 @@
       blocks (keep `:toolcall-end` for tool_use, `:text-end` for text), and
       add a stream-test assertion that a thinking block's stop emits
       `:thinking-end` (no existing anthropic test asserts this).
+      → Resolved: `content-block-stop-event` now emits `:thinking-end` for
+      `"thinking"` blocks (keeps `:toolcall-end` for tool_use and `:text-end`
+      for text), so the accumulator's dedicated `:on-thinking-end` handler
+      (`note-last-provider-event!` `:thinking-end` + `end-content-block!`)
+      runs for anthropic-path thinking-block stops instead of the mislabeled
+      `:text-end`. Test: `anthropic_stream_test.clj`
+      `thinking-block-stop-emits-thinking-end-test` — a thinking block's stop
+      emits `:thinking-end` at its content-index, is NOT mislabeled
+      `:text-end`, and a following text block's stop still emits `:text-end`.
+      Spec updated (`spec/anthropic-provider.allium`
+      `ContentBlockStopEmitsTypedEndEvent`; the `StreamEvent` `event_type`
+      enum now also carries `thinking_start`/`thinking_signature_delta`/
+      `thinking_end` — the thinking-start and signature-delta events were
+      already emitted by `content-block-start-event`/
+      `content-block-delta-event` but missing from the enum;
+      `SignatureFragmentObserved` was replaced by the emitted
+      `thinking_signature_delta` StreamEvent to match the implementation).
+      CHANGELOG `Fixed` entry. Full `bb test` green (2590 tests / 19462
+      assertions / 0 failures); clj-kondo + cljfmt + file-lengths clean.

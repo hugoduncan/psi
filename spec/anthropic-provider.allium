@@ -97,11 +97,15 @@ value StreamUsage {
 }
 
 value StreamEvent {
-    event_type: start | text_start | text_delta | text_end | thinking_delta | toolcall_start | toolcall_delta | toolcall_end | done | error
+    event_type: start | text_start | text_delta | text_end
+              | thinking_start | thinking_delta | thinking_signature_delta | thinking_end
+              | toolcall_start | toolcall_delta | toolcall_end
+              | done | error
     content_index: Integer?
     id: String?
     name: String?
     delta: String?
+    signature: String?
     reason: String?
     usage: StreamUsage?
     error_message: String?
@@ -754,12 +758,57 @@ rule AnthropicThinkingStreamingIncludesSignatureMaterial {
         if event_data.delta.type = "thinking_delta":
             Emit(StreamEvent{event_type: thinking_delta, content_index: event_data.index, delta: event_data.delta.thinking})
         else if event_data.delta.type = "signature_delta":
-            SignatureFragmentObserved(stream, event_data.index, event_data.delta.signature)
+            Emit(StreamEvent{event_type: thinking_signature_delta, content_index: event_data.index, signature: event_data.delta.signature})
 
     @guidance
         -- The provider must preserve enough thinking-block material to round-trip
         -- the final assistant thinking block, including signature, in a later
         -- tool-use continuation request.
+}
+
+rule ContentBlockStopEmitsTypedEndEvent {
+    when: SseEventReceived(stream, "content_block_stop", event_data)
+
+    ensures:
+        if CurrentContentBlockType(stream, event_data.index) = "thinking":
+            Emit(StreamEvent{event_type: thinking_end, content_index: event_data.index})
+        else if CurrentContentBlockType(stream, event_data.index) = "tool_use":
+            Emit(StreamEvent{event_type: toolcall_end, content_index: event_data.index})
+        else:
+            Emit(StreamEvent{event_type: text_end, content_index: event_data.index})
+
+    @guidance
+        -- Review 43: a thinking block's stop must be labeled :thinking-end,
+        -- not :text-end, so the turn accumulator's dedicated :on-thinking-end
+        -- handler (note-last-provider-event! :thinking-end +
+        -- end-content-block!) runs instead of mislabeling the
+        -- last-provider-event diagnostic marker as text. DeepSeek returned a
+        -- thinking content block in the live smoke test (2026-08-09), so the
+        -- mislabel was reachable on this task's newly shipped provider.
+}
+
+rule SseErrorEventEmitsErrorAndTerminates {
+    when: SseEventReceived(stream, "error", event_data)
+
+    ensures: ErrorEmitted(stream)
+    ensures: stream.done = true
+
+    @guidance
+        -- Review 43: Anthropic SSE "error" events
+        -- ({"type":"error","error":{...}} — the documented mid-stream
+        -- overloaded_error/rate-limit shape) previously fell to the stream
+        -- loop's default no-op: the line was captured via
+        -- :on-provider-response but no :error event reached the consumer and
+        -- no terminal :done was emitted, hanging the turn until
+        -- llm-stream-idle-timeout-ms with a misleading timeout. The event's
+        -- error body is now mapped through anthropic-error
+        -- (error_from_response_data: message from parsed-body [:error
+        -- :message], http-status from [:error :http_status] when present,
+        -- fallback "Anthropic stream error") and the stream terminates; the
+        -- done? guard prevents a trailing message_stop from emitting a
+        -- second terminal event. The codex transport already handled
+        -- "error" SSE events (in-repo precedent); the :openai-completions
+        -- transport received the same class fix (review 43 decision).
 }
 
 rule MessageDeltaAccumulatesOutputUsage {

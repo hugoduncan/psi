@@ -452,15 +452,40 @@
       (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
       (reset! pending-finish-reason nil))))
 
+(defn- emit-chat-error!
+  "Surface a mid-stream OpenAI SSE error chunk ({\"error\": {...}}) as an
+   :error event and terminate the stream. Review 43: an error chunk with no
+   :choices previously no-oped in process-chat-sse-line! (no :error event, no
+   terminal :done), so a mid-stream provider error hung the turn until the
+   idle timeout with a misleading timeout — the same silent-drop class fixed
+   for the anthropic transport's \"error\" SSE event. The chunk is already
+   captured via capture-response! before this is called; the done? guard
+   prevents a trailing [DONE]/finish chunk from emitting a second terminal
+   event."
+  [stream-state consume-fn chunk]
+  (let [{:keys [done?]} stream-state]
+    (when-not @done?
+      (reset! done? true)
+      (let [status (some (fn [s] (and (number? s) (>= s 400) s))
+                         [(:status chunk)
+                          (get-in chunk [:error :status])
+                          (get-in chunk [:error :http_status])])
+            err    (transport/response->error {:status  status
+                                               :headers nil
+                                               :body    (json/generate-string chunk)})]
+        (consume-fn err)))))
+
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url strategy line]
   (if-let [chunk (transport/parse-sse-line line)]
     (do
       (transport/capture-response! model options :openai-completions url chunk)
-      (let [choice (first (:choices chunk))
-            delta  (:delta choice)]
-        (emit-chat-chunk! stream-state consume-fn choice delta)
-        (finish-chat-chunk! stream-state consume-fn model chunk choice strategy)))
+      (if (:error chunk)
+        (emit-chat-error! stream-state consume-fn chunk)
+        (let [choice (first (:choices chunk))
+              delta  (:delta choice)]
+          (emit-chat-chunk! stream-state consume-fn choice delta)
+          (finish-chat-chunk! stream-state consume-fn model chunk choice strategy))))
     (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
       (flush-pending-chat-finish! stream-state consume-fn strategy))))
 

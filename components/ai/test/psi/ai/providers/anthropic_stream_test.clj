@@ -446,6 +446,101 @@
       (is (not-any? #(= :thinking-delta (:type %)) events))
       (is (some #(= :text-delta (:type %)) events)))))
 
+(deftest thinking-block-stop-emits-thinking-end-test
+  (testing "thinking content block stops emit :thinking-end, not :text-end"
+    ;; Review 43: content-block-stop-event mapped every non-tool block stop
+    ;; to :text-end, so a thinking block's stop mislabeled the
+    ;; last-provider-event diagnostic marker as text and left the
+    ;; accumulator's dedicated :on-thinking-end handler
+    ;; (note-last-provider-event! :thinking-end + end-content-block!) dead
+    ;; code for the anthropic path.
+    (let [model (models/get-model :sonnet-4.6)
+          sse   (str (sse-line "message_start" {:type "message_start"})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 0
+                                :content_block {:type "thinking" :thinking "" :signature ""}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 0
+                                :delta {:type "thinking_delta" :thinking "I think"}})
+                     (sse-line "content_block_stop"
+                               {:type "content_block_stop" :index 0})
+                     (sse-line "content_block_start"
+                               {:type "content_block_start" :index 1
+                                :content_block {:type "text"}})
+                     (sse-line "content_block_delta"
+                               {:type "content_block_delta" :index 1
+                                :delta {:type "text_delta" :text "Hello"}})
+                     (sse-line "content_block_stop"
+                               {:type "content_block_stop" :index 1})
+                     (sse-line "message_stop" {:type "message_stop"}))
+          events (run-stream sse model {:api-key "test-key"})]
+      (is (some #(and (= :thinking-end (:type %))
+                      (= 0 (:content-index %)))
+                events)
+          "thinking block stop must emit :thinking-end")
+      (is (not-any? #(and (= :text-end (:type %))
+                          (= 0 (:content-index %)))
+                    events)
+          "thinking block stop must not be mislabeled :text-end")
+      (is (some #(and (= :text-end (:type %))
+                      (= 1 (:content-index %)))
+                events)
+          "text block stop must still emit :text-end"))))
+
+(deftest stream-anthropic-surfaces-sse-error-event-test
+  (testing "a mid-stream Anthropic SSE error event emits :error and terminates"
+    ;; Review 43: the stream loop's case handled only message_start/
+    ;; content_block_*/message_delta/message_stop, so an Anthropic "error"
+    ;; SSE event ({"type":"error","error":{...}} — the documented mid-stream
+    ;; overloaded_error/rate-limit shape) was consumed as a no-op: no :error
+    ;; event, no terminal :done, hanging the turn until the idle timeout.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "overloaded_error"
+                                         :message "Overloaded"
+                                         :http_status 529}})
+                      (sse-line "message_stop" {:type "message_stop"}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= "Overloaded (status 529)" (:error-message err))
+            "error message extracted from the event's error body, http-status appended")
+        (is (= 529 (:http-status err))
+            "http-status present in the event's error body is carried through")
+        (is (= {:type "overloaded_error" :message "Overloaded" :http_status 529}
+               (get-in err [:body :error]))
+            "raw event body preserved")
+        (is (not-any? #(= :done (:type %)) @events)
+            "no :done after a mid-stream error — the :error event terminates the turn"))))
+
+  (testing "a mid-stream SSE error event without http-status still surfaces the message"
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "error"
+                                {:type "error"
+                                 :error {:type "invalid_request_error"
+                                         :message "bad request"}}))]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+                                    (fn [e] (swap! events conj e))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= "bad request" (:error-message err))
+            "no http-status in the body → message without a status suffix")
+        (is (nil? (:http-status err)))
+        (is (not-any? #(= :done (:type %)) @events)
+            "no :done — the :error event is terminal")))))
+
 (deftest usage-captured-from-sse-events-test
   (testing "usage tokens are read from message_start and message_delta SSE events"
     (let [model (models/get-model :sonnet-4.6)
