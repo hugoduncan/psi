@@ -202,9 +202,10 @@ Notes:
   of silently sending your OpenAI key to the third-party endpoint. Only
   built-in OpenAI catalog models fall back to the `OPENAI_API_KEY`
   environment variable.
-  Keyless requests (`:auth-header? false`/`:no-auth-header`, or a recognized
-  `x-api-key`/`Authorization` header among custom `:headers` with no
-  configured key) send no auth header at all.
+  With `:auth-header? false`/`:no-auth-header`, psi sends no auth header of
+  its own. With no configured key and a recognized `x-api-key`/`Authorization`
+  header among custom `:headers`, psi sends that custom auth header but does
+  not generate an `Authorization` header.
 - `env:` keys are re-read from psi's own process environment on **every
   request**, not snapshotted when psi loads `models.edn`. Set the variable in
   the environment that launches psi; exporting or changing it later in

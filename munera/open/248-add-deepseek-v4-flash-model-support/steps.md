@@ -5370,7 +5370,7 @@
 
 ## Follow-ups (documentation review 4, 2026-08-09)
 
-- [ ] Correct the OpenAI-compatible example's keyless-auth wording in
+- [x] Correct the OpenAI-compatible example's keyless-auth wording in
       `doc/custom-providers.md`. The note currently says both
       `:auth-header? false` requests and requests authenticated by a recognized
       custom `x-api-key`/`Authorization` header “send no auth header at all,”
