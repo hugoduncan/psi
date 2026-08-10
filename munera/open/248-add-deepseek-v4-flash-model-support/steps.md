@@ -5039,3 +5039,26 @@
       nullable ∧ ¬mock ∧ ¬stub`. Assert the mapped content through the
       nullable and remove the `clj-http.client` test require if no pre-task
       test in `anthropic_test.clj` still needs it.
+
+## Follow-ups (test review 64, 2026-08-09)
+
+- [ ] Migrate the remaining task-added post-error stream-read tests to the
+      injectable nullable HTTP boundary without redefining parser logic:
+      `stream-anthropic-error-then-read-exception-no-second-error-test`,
+      `completions-sse-error-then-read-exception-no-second-error-test`, and
+      `codex-catch-block-surfaces-exception-headers-test`. They still globally
+      redefine `clj-http.client/post` and `parse-sse-line`, despite test review
+      62 claiming the parser-failure migration complete. Drive the real parser
+      with a nullable response body that throws after the error event; extend
+      the throwing stream/boundary fixture to attach response metadata for the
+      Codex header assertion. Preserve each terminal-event assertion and remove
+      imports made unused by the migration.
+- [ ] Replace task-added `with-redefs` of
+      `request-support/getenv` with an injectable nullable environment boundary.
+      The provider-scoped key-resolution, request-time `env:` resolution,
+      model-selection configured-state, and documented-example parse tests
+      currently replace an infrastructure dependency globally. Add a production
+      environment adapter plus a configurable nullable map/function, thread it
+      through key resolution (and callers), and assert resolved state/errors via
+      that public seam so these tests satisfy `injectable ∧ nullable ∧ ¬mock ∧
+      ¬stub`.
