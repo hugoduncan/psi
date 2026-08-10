@@ -5194,7 +5194,7 @@
 
 ## Follow-ups (test review 76, 2026-08-09)
 
-- [ ] Complete the exact-event-vector cleanup for task-added stream tests
+- [x] Complete the exact-event-vector cleanup for task-added stream tests
       omitted by review 75. Replace the terminal count/absence assertions in
       `stream-anthropic-error-then-read-exception-no-second-error-test` with
       one `[:start :error]` type-vector assertion; replace the five event-type

@@ -370,10 +370,8 @@
       (anthropic/stream-anthropic convo model {:http-boundary http-client
                                                :api-key "test-key"}
                                   (fn [e] (swap! events conj e)))
-      (is (= 1 (count (filter #(= :error (:type %)) @events)))
-          "exactly one :error — the post-error stream-read exception must not emit a second one")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no :done — the :error event is terminal"))))
+      (is (= [:start :error] (mapv :type @events))
+          "the post-error stream-read exception emits nothing after the terminal :error"))))
 
 (deftest stream-anthropic-error-then-content-block-stop-no-text-end-test
   (testing "a trailing content_block_stop after a mid-stream SSE error does not emit a second :text-end"

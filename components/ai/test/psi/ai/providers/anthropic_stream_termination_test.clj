@@ -311,18 +311,8 @@
         (anthropic/stream-anthropic convo model {:http-boundary http-client
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
-      (is (not-any? #(= :text-start (:type %)) @events)
-          "no :text-start — the redacted_thinking start is skipped, not mislabeled as text")
-      (is (not-any? #(= :text-end (:type %)) @events)
-          "no :text-end — the redacted_thinking stop is skipped, not mislabeled as text")
-      (is (not-any? #(= :thinking-start (:type %)) @events)
-          "no :thinking-start — the block is skipped entirely, no empty thinking block")
-      (is (not-any? #(= :thinking-end (:type %)) @events)
-          "no :thinking-end — the skip is balanced (no phantom closed block)")
-      (is (not-any? #(= :text-delta (:type %)) @events)
-          "no :text-delta — the redacted_thinking_delta is not misrouted as text")
-      (is (= 1 (count (filterv #(= :done (:type %)) @events)))
-          "exactly one :done — the stream terminates normally via message_stop"))))
+      (is (= [:start :done] (mapv :type @events))
+          "the redacted_thinking block is skipped and the stream terminates normally"))))
 
 (defn- run-stream [sse-str model options]
   (let [events (atom [])

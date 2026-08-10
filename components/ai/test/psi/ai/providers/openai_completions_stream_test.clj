@@ -63,14 +63,11 @@
                               "data: " (json/generate-string
                                         {:choices [{:delta {:role "assistant" :content ""}
                                                     :finish_reason "stop"}]}) "\n\n"))
-          dones  (filterv #(= :done (:type %)) events)
-          done   (first dones)]
-      (is (= 1 (count dones))
-          "exactly one :done — the EOF flush terminates the stream")
+          done   (last events)]
+      (is (= [:start :text-delta :done] (mapv :type events))
+          "the EOF flush terminates the stream with exactly one :done")
       (is (= :stop (:reason done))
-          "the pending finish_reason is flushed to the :done")
-      (is (not-any? #(= :error (:type %)) events)
-          "no :error — the EOF flush is a clean terminal"))))
+          "the pending finish_reason is flushed to the :done"))))
 
 (deftest completions-done-sentinel-without-finish-reason-emits-done-test
   (testing "a [DONE] sentinel without a prior finish_reason chunk emits exactly one terminal :done"
@@ -82,14 +79,11 @@
                               "data: " (json/generate-string
                                         {:choices [{:delta {:role "assistant" :content "Hello"}}]}) "\n\n"
                               "data: [DONE]\n\n"))
-          dones  (filterv #(= :done (:type %)) events)
-          done   (first dones)]
-      (is (= 1 (count dones))
-          "exactly one :done — the EOF flush terminates the stream")
+          done   (last events)]
+      (is (= [:start :text-delta :done] (mapv :type events))
+          "the [DONE] sentinel and EOF flush terminate the stream with exactly one :done")
       (is (= :stop (:reason done))
-          "no pending finish_reason → the EOF flush emits :stop")
-      (is (not-any? #(= :error (:type %)) events)
-          "no :error — the EOF flush is a clean terminal"))))
+          "no pending finish_reason → the EOF flush emits :stop"))))
 
 (deftest completions-done-without-usage-chunk-carries-no-usage-test
   (testing "a terminal :done for a stream with no usage chunk carries no :usage"
@@ -113,10 +107,9 @@
                                         {:choices [{:delta {:role "assistant" :content ""}
                                                     :finish_reason "stop"}]}) "\n\n"
                               "data: [DONE]\n\n"))
-          dones  (filterv #(= :done (:type %)) events)
-          done   (first dones)]
-      (is (= 1 (count dones))
-          "exactly one :done — the stream terminates normally")
+          done   (last events)]
+      (is (= [:start :text-delta :done] (mapv :type events))
+          "the usage-omitting stream terminates with exactly one :done")
       (is (nil? (:usage done))
           "no :usage key on the :done — zero usage/cost recorded for a usage-omitting endpoint")
       (is (= :stop (:reason done))
