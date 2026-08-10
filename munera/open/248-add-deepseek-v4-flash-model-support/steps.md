@@ -5029,7 +5029,7 @@
 
 ## Follow-ups (test review 63, 2026-08-09)
 
-- [ ] Migrate the task-added review-57 non-streaming Anthropic behavior proofs
+- [x] Migrate the task-added review-57 non-streaming Anthropic behavior proofs
       (`execute-anthropic-preserves-tool-use-blocks-test` and
       `execute-anthropic-preserves-thinking-blocks-test`) from global
       `clj-http.client/post` redefinitions to `http-boundary/nullable`.

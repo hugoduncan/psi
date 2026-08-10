@@ -2,7 +2,6 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
@@ -659,12 +658,13 @@
                          {:type "text" :text "Let me check"}]
                :stop_reason "tool_use"
                :usage {:input_tokens 12 :output_tokens 8}}
-        result (with-redefs [http/post (fn [_url _req]
-                                         {:status 200
-                                          :body (json/generate-string body)})]
-                 ((:execute anthropic/provider)
-                  convo model {:api-key "test-key"}))
+        http (http-boundary/nullable
+              [{:status 200 :body (json/generate-string body)}])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
         content (:content (:assistant-message result))]
+    (is (= 1 (count (http-boundary/requests http)))
+        "the behavior proof crosses the nullable HTTP boundary")
     (is (= :tool_use (:stop-reason (:assistant-message result)))
         "stop-reason :tool_use is preserved")
     (is (= [{:type :tool-call
@@ -689,12 +689,13 @@
                          {:type "text" :text "The answer is 42."}]
                :stop_reason "end_turn"
                :usage {:input_tokens 12 :output_tokens 8}}
-        result (with-redefs [http/post (fn [_url _req]
-                                         {:status 200
-                                          :body (json/generate-string body)})]
-                 ((:execute anthropic/provider)
-                  convo model {:api-key "test-key"}))
+        http (http-boundary/nullable
+              [{:status 200 :body (json/generate-string body)}])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
         content (:content (:assistant-message result))]
+    (is (= 1 (count (http-boundary/requests http)))
+        "the behavior proof crosses the nullable HTTP boundary")
     (is (= [{:type :thinking
              :text "Let me reason about this step by step."
              :signature "sig_01"}
