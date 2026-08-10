@@ -5402,7 +5402,7 @@
 
 ## Follow-ups (code-shaper review 2, 2026-08-09)
 
-- [ ] Finish removing review chronology from task-added production commentary
+- [x] Finish removing review chronology from task-added production commentary
       outside the provider transports. `provider-auth/core.clj`,
       `agent_session/model_capabilities.clj`, `prompt_request.clj`, `runtime.clj`,
       and `turn/handlers.clj` still contain `review N` provenance in docstrings

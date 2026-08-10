@@ -157,14 +157,10 @@
 (defn session-model-custom?
   "True when the session's current model is a custom models.edn provider.
 
-   The persistable session model map carries only `{:provider (name provider)
-   :id model-id :reasoning bool}` (persistable-model: `:id` holds the
-   model-id string and `:reasoning` is a separate boolean key) — no origin
-   marker (review 36) — so the built-in/custom origin is resolved through the
-   model registry's `:custom?` origin tag (review 14). A custom models.edn
-   provider literally named \"anthropic\"/\"openai\" is tagged `:custom?
-   true` and resolves true; built-in catalog models resolve false. Unknown
-   models (not in the registry) resolve false."
+   Persisted session models omit built-in/custom origin, so origin is resolved
+   from the model registry's `:custom?` tag. This distinguishes custom
+   providers named \"anthropic\" or \"openai\" from same-named built-ins.
+   Unknown models resolve as built-in (false)."
   [session-data]
   (boolean
    (:custom?
@@ -173,23 +169,13 @@
      (get-in session-data [:model :id])))))
 
 (defn- session-runtime-api-key
-  "Return the session-stored runtime API key only when it is scoped to the
-   session's current model provider AND origin.
+  "Return the stored runtime API key only when its recorded provider and
+   built-in/custom origin match the session's current model.
 
-   `:runtime-api-key` is recorded at prompt prepare together with
-   `:runtime-api-key-provider` and `:runtime-api-key-custom?` (the session
-   model's provider and built-in/custom origin at that moment, reviews
-   35/36). A stored key is reused only when the recorded provider AND origin
-   BOTH still match the session's current model — so a mid-session
-   `/model`/session-profile provider switch can never inject the previous
-   model's key (or OAuth token) into a different provider's request, and a
-   custom models.edn provider literally named \"anthropic\"/\"openai\"
-   (tagged `:custom? true`, review 14) can never reuse a key recorded for
-   the built-in same-named origin (review 36) or vice versa — the same
-   cross-provider disclosure class already closed for the env-var fallback
-   and OAuth content-sniffing. An unscoped stored key (no recorded provider,
-   e.g. legacy session data) is never reused: without a recorded provider we
-   cannot prove it belongs to the current model."
+   Prompt preparation records the key with `:runtime-api-key-provider` and
+   `:runtime-api-key-custom?`. Matching both prevents provider switches and
+   same-named built-in/custom providers from reusing one another's keys.
+   Unscoped legacy keys are not reused because their provenance is unknown."
   [session-data]
   (let [runtime-provider (some-> (:runtime-api-key-provider session-data)
                                  provider-auth/normalize-provider-id)
@@ -204,40 +190,26 @@
 
 (defn- resolve-api-key
   "Resolve API key in priority order:
-   1. Explicit runtime-opts :api-key
-   2. Session-stored key from a prior turn, ONLY when it is scoped to the
-      session's current model provider AND origin (reviews 35/36 — an
-      unscoped, cross-provider or cross-origin stored key is never reused)
-      and not contradicted by the current provider-auth resolution (review 36
-      — a models.edn `:auth` change or OAuth refresh wins over the stale
-      stored spec; the stored key is reused only when the current resolution
-      is nil — e.g. an RPC/extension-threaded key that lives only in
-      runtime-opts / session-data — or equals it, which is how OAuth
-      stability is preserved: provider-auth re-resolves the same token from
-      the OAuth store)
-   3. Shared provider-scoped auth resolution
+   1. Explicit `runtime-opts :api-key`.
+   2. A session-stored key scoped to the current provider and built-in/custom
+      origin, provided current provider auth does not contradict it. Current
+      models.edn auth or refreshed OAuth wins over stale session data; nil
+      current auth permits a key supplied only through runtime/session data,
+      while equal current auth preserves OAuth stability.
+   3. Current provider-scoped auth.
 
-   Raw-spec contract (review 26): for custom models.edn providers the
-   registry stores the RAW `:api-key` spec, so this may return a literal key
-   or an \"env:VAR\" string — NOT yet a concrete key (the `:runtime-api-key`
-   session-data flow stores the raw spec too). It becomes concrete only when
-   the transport re-resolves it per request via
-   `request-support/resolve-key-spec`. Callers that need a concrete key must
-   route through that shared helper."
+   Custom-provider registry auth remains a raw literal or `env:VAR` spec.
+   The transport resolves it per request through
+   `request-support/resolve-key-spec`; callers needing a concrete key must use
+   that shared helper."
   [ctx session-data runtime-opts]
   (let [provider (:provider (:model session-data))
         custom?  (session-model-custom? session-data)
         current  (provider-auth/provider-api-key ctx provider custom?)]
     (or (:api-key runtime-opts)
         (when-let [stored (session-runtime-api-key session-data)]
-          ;; The stored key is a cache of a prior prepare-time resolution for
-          ;; this (provider, origin). Reuse it only when it is NOT
-          ;; contradicted by a fresher current resolution: a models.edn
-          ;; `:auth` change (or OAuth refresh) wins over the stale stored
-          ;; spec (review 36), while a nil current resolution (e.g. an RPC /
-          ;; extension-threaded key that lives only in runtime-opts /
-          ;; session-data, not in provider-auth) lets the stored key keep the
-          ;; session working across continuation turns.
+          ;; Current auth overrides stale stored data. Nil current auth permits
+          ;; continuation with a key supplied only through runtime/session data.
           (when (or (nil? current) (= stored current))
             stored))
         current)))

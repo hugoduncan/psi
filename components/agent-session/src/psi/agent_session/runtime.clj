@@ -53,20 +53,15 @@
    symmetry; explicit per-call overrides still belong in runtime-opts passed to
    prompt preparation.
 
-   Raw-spec contract (review 26): for custom models.edn providers the
-   registry stores the RAW `:api-key` spec, so the return value may be a
-   literal key or an \"env:VAR\" string — NOT yet a concrete key. It becomes
-   concrete only when the transport re-resolves it per request via
-   `request-support/resolve-key-spec` (the `:runtime-opts :api-key` /
-   `:runtime-api-key` session-data flow does this). Callers that need a
-   concrete key must route through that shared helper.
+   Custom-provider registry auth remains a raw literal or `env:VAR` spec.
+   The transport resolves it per request through
+   `request-support/resolve-key-spec`; callers needing a concrete key must use
+   that shared helper.
 
-   Origin gate (review 42): registry-auth resolution is gated on the
-   resolved model's `:custom?` origin tag (review 14) — a custom models.edn
-   provider literally named \"anthropic\"/\"openai\" can neither leak its
-   auth config into a built-in same-named session nor receive the built-in
-   same-named OAuth credential (provider-auth/provider-api-key branches on
-   `custom?`)."
+   Registry auth is gated on the resolved model's `:custom?` origin tag.
+   This prevents custom providers named \"anthropic\" or \"openai\" from sharing
+   auth with same-named built-ins; `provider-auth/provider-api-key` branches
+   on that tag."
   [ctx _session-id ai-model]
   (provider-auth/provider-api-key ctx (:provider ai-model) (:custom? ai-model)))
 

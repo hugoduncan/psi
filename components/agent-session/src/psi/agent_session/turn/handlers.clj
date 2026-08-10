@@ -168,24 +168,12 @@
                                                       :runtime-opts runtime-opts
                                                       :commands (command-registry/command-names-in (:extension-registry ctx))})
                   api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
-                  ;; Review 35: record the provider the resolved key belongs
-                  ;; to (the session's current model provider at prepare
-                  ;; time) so prompt_request/resolve-api-key can reuse the
-                  ;; stored key only while the session stays on that
-                  ;; provider — a mid-session provider switch must never
-                  ;; inject the prior provider's key into the new provider's
-                  ;; request.
+                  ;; Record key provenance so reuse is restricted to this
+                  ;; provider across continuation turns.
                   api-key-provider   (get-in session-data [:model :provider])
-                  ;; Review 36: record the built-in/custom ORIGIN of the
-                  ;; session's model at prepare time alongside the provider.
-                  ;; The persistable session model map carries no origin
-                  ;; marker, so a custom models.edn provider literally named
-                  ;; "anthropic"/"openai" would otherwise collide with the
-                  ;; built-in of the same name and could reuse a key recorded
-                  ;; for the other origin (e.g. a built-in OAuth token sent to
-                  ;; a third-party endpoint as x-api-key). prompt_request/
-                  ;; session-runtime-api-key requires BOTH provider and origin
-                  ;; to match before reusing the stored key.
+                  ;; Persisted models omit built-in/custom origin, so record
+                  ;; it separately. Reuse requires both provider and origin to
+                  ;; match, including for custom providers with built-in names.
                   api-key-custom?    (prompt-request/session-model-custom? session-data)
                   steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
               (cond-> {:root-state-update

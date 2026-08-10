@@ -9,18 +9,13 @@
 (defn supports-mid-system-messages?
   "Return true when a resolved model supports mid-conversation system messages.
 
-   Explicit model metadata wins for providers that declare the feature. OpenAI
-   chat-completions support is also inferred from the runtime API shape so
-   built-in OpenAI chat-completions catalog models do not need to carry
-   psi-specific metadata — the inference is gated on the review-14 `:custom?`
-   origin tag via the shared
-   `request-support/builtin-openai-chat-completions?` predicate (review 26),
-   so a custom models.edn provider literally named \"openai\" (tagged
-   `:custom? true` by `expand-model`) cannot receive the built-in-only
-   inference by name and must declare
-   `:supports-mid-conversation-system-messages` explicitly. The inference is
-   chat-completions-only: codex-routed built-ins (api
-   :openai-codex-responses) never match this branch."
+   Explicit model metadata wins. Built-in OpenAI chat-completions support is
+   also inferred from the runtime API shape via
+   `request-support/builtin-openai-chat-completions?`, so catalog models need
+   no psi-specific metadata. The predicate gates inference on the `:custom?`
+   origin tag: a custom models.edn provider named \"openai\" must declare
+   `:supports-mid-conversation-system-messages` explicitly. Codex-routed
+   built-ins (`:api :openai-codex-responses`) never match this inference."
   [model]
   (let [explicit-support (:supports-mid-conversation-system-messages model)]
     (boolean
