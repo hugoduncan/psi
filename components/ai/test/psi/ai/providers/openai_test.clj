@@ -661,10 +661,8 @@
       ((:stream openai/provider)
        convo model {:http-boundary http-client :api-key "sk-test"}
        (fn [ev] (swap! events conj ev)))
-      (is (= 1 (count (filter #(= :error (:type %)) @events)))
-          "exactly one :error — the post-error stream-read exception must not emit a second one")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no :done — the :error event is terminal"))))
+      (is (= [:start :error] (mapv :type @events))
+          "the post-error stream-read exception must not emit a second terminal event"))))
 
 (deftest completions-sse-error-then-trailing-choices-chunk-no-text-delta-test
   (testing "a trailing :choices chunk after a mid-stream SSE error chunk does not emit :text-delta"
@@ -698,9 +696,7 @@
                       :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :text-delta :error] (mapv :type @events))
-          "no :text-delta after the :error — the trailing :choices chunk and [DONE] are full no-ops once done")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no :done — the :error event is terminal"))))
+          "no :text-delta after the :error — the trailing :choices chunk and [DONE] are full no-ops once done"))))
 
 (deftest codex-error-then-trailing-output-text-delta-no-text-delta-test
   (testing "a trailing response.output_text.delta after response.failed does not emit :text-delta"
@@ -733,6 +729,4 @@
                       :api-key token}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :text-delta :error] (mapv :type @events))
-          "no :text-delta after the :error — the trailing response.output_text.delta is a full no-op once done")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no synthetic :done — the :error event is terminal"))))
+          "no :text-delta after the :error — the trailing response.output_text.delta is a full no-op once done"))))

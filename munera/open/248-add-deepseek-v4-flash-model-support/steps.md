@@ -5278,7 +5278,7 @@
 
 ## Follow-ups (test review 83, 2026-08-09)
 
-- [ ] Finish the exact-event-vector cleanup in the three task-added post-error
+- [x] Finish the exact-event-vector cleanup in the three task-added post-error
       tests still omitted by reviews 73–78 in `openai_test.clj`.
       `completions-sse-error-then-read-exception-no-second-error-test` should
       assert its complete `[:start :error]` sequence instead of separate error
