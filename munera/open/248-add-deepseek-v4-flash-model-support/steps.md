@@ -5017,7 +5017,7 @@
       throws after the scripted bytes) and keep the real parser in the test;
       preserve the assertions that open blocks/tools close before `:error`.
 
-- [ ] Add state-based tests proving the new boundary is honored by both
+- [x] Add state-based tests proving the new boundary is honored by both
       non-streaming execute paths. Current `:http-boundary` usage in tests
       covers streaming only, while the design promises provider
       stream/execute requests cross the seam. Exercise

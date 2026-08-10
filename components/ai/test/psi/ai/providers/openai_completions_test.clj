@@ -616,6 +616,24 @@
           body  (json/parse-string (:body req) true)]
       (is (not (contains? body :temperature))))))
 
+(deftest execute-openai-honors-http-boundary-test
+  ;; Non-streaming requests cross the same injectable HTTP seam as streams.
+  (let [model (models/get-model :gpt-4o)
+        convo (-> (conv/create "sys") (conv/add-user-message "hello"))
+        response {:status 200
+                  :body (json/generate-string
+                         {:choices [{:finish_reason "stop"
+                                     :message {:role "assistant" :content "hello back"}}]
+                          :usage {:prompt_tokens 2 :completion_tokens 3 :total_tokens 5}})}
+        http (http-boundary/nullable [response])
+        result ((:execute openai/provider)
+                convo model {:api-key "sk-test" :http-boundary http})
+        recorded (first (http-boundary/requests http))]
+    (is (= "hello back" (get-in result [:assistant-message :content 0 :text])))
+    (is (= "https://api.openai.com/v1/chat/completions" (:url recorded)))
+    (is (= :text (get-in recorded [:request :as])))
+    (is (false? (get-in recorded [:request :throw-exceptions])))))
+
 (deftest local-openai-non-streaming-response-preserves-usage-test
   (testing "non-streaming local OpenAI-compatible responses keep usage totals"
     (let [model {:id "qwen-3.6-27b"

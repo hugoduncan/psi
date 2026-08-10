@@ -2616,3 +2616,8 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 
 - addressed 1 review step
 - Replaced Anthropic/OpenAI catch-path `parse-sse-line` redefinitions with a real `InputStream` that serves scripted SSE bytes and then throws; both tests now exercise the production parser and still prove open blocks/tools close before `:error`.
+
+## Follow-ups test review 62 — execute-path seam proofs (2026-08-09)
+
+- addressed 1 review step
+- Added state-based nullable-boundary tests for `execute-anthropic` and OpenAI chat-completions `:execute`; each asserts the mapped assistant result plus recorded endpoint URL and `:as :text` request state. Targeted namespaces green; clj-kondo clean.

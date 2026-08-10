@@ -7,6 +7,7 @@
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
    [psi.ai.providers.anthropic.request-schema :as request-schema]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.providers.request-support :as request-support]))
 
 ;; ── build-request ───────────────────────────────────────────────────────────
@@ -617,6 +618,24 @@
       (is (re-find #"interleaved-thinking" beta)))))
 
 ;; ── non-streaming execute response mapping ──────────────────────────────────
+
+(deftest execute-anthropic-honors-http-boundary-test
+  ;; Non-streaming requests cross the same injectable HTTP seam as streams.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "hello"))
+        response {:status 200
+                  :body (json/generate-string
+                         {:content [{:type "text" :text "hello back"}]
+                          :stop_reason "end_turn"
+                          :usage {:input_tokens 2 :output_tokens 3}})}
+        http (http-boundary/nullable [response])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
+        recorded (first (http-boundary/requests http))]
+    (is (= "hello back" (get-in result [:assistant-message :content 0 :text])))
+    (is (= "https://api.anthropic.com/v1/messages" (:url recorded)))
+    (is (= :text (get-in recorded [:request :as])))
+    (is (false? (get-in recorded [:request :throw-exceptions])))))
 
 (deftest execute-anthropic-preserves-tool-use-blocks-test
   ;; Review 57: the non-streaming execute response mapping previously kept
