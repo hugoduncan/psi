@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.provider-auth.core :as provider-auth]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.turn-runtime.augmentation :as turn-augmentation]
    [psi.session-persistence.core :as persist]
    [psi.skill-registry.root-storage :as skill-storage]
@@ -29,6 +29,11 @@
 (defn- session-data-for [provider-kw model-id]
   {:model {:provider provider-kw :id model-id}
    :thinking-level :off})
+
+(defn- anthropic-oauth-ctx [api-key]
+  {:oauth-ctx
+   (oauth/create-null-context
+    {:credentials {:anthropic {:type :api-key :key api-key}}})})
 
 ;; ── Auth injection tests ─────────────────────────────────────────────────────
 
@@ -315,20 +320,16 @@
               "without a recorded provider we cannot prove ownership — fall through to provider auth")))
 
       (testing "same-provider stored key is still reused when it equals the current OAuth resolution (OAuth stability intent)"
-        (with-redefs [provider-auth/provider-api-key
-                      (fn [_ctx provider _custom?]
-                        (when (= :anthropic (provider-auth/normalize-provider-id provider))
-                          "sk-ant-oat-runtime-token"))]
-          (let [opts (prompt-request/session->request-options
-                      {}
-                      {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
-                       :thinking-level           :off
-                       :runtime-api-key          "sk-ant-oat-runtime-token"
-                       :runtime-api-key-provider "anthropic"
-                       :runtime-api-key-custom?  false}
-                      {})]
-            (is (= "sk-ant-oat-runtime-token" (:api-key opts))
-                "a key recorded for the CURRENT provider+origin that still equals the current OAuth resolution keeps working across turns"))))
+        (let [opts (prompt-request/session->request-options
+                    (anthropic-oauth-ctx "sk-ant-oat-runtime-token")
+                    {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
+                     :thinking-level           :off
+                     :runtime-api-key          "sk-ant-oat-runtime-token"
+                     :runtime-api-key-provider "anthropic"
+                     :runtime-api-key-custom?  false}
+                    {})]
+          (is (= "sk-ant-oat-runtime-token" (:api-key opts))
+              "a key recorded for the CURRENT provider+origin that still equals the current OAuth resolution keeps working across turns")))
 
       (testing "custom provider named anthropic never reuses a stored built-in origin OAuth token"
         (let [opts (prompt-request/session->request-options
@@ -345,42 +346,46 @@
               "the built-in origin OAuth token is NOT reused for the custom origin — the custom provider's own registry auth resolves")))
 
       (testing "custom provider named anthropic with NO resolvable auth never reuses a stored built-in origin OAuth token"
-        ;; The discriminating origin-gate case: the current provider-auth
-        ;; resolution is nil (keyless custom provider), so WITHOUT the
-        ;; review-36 origin check the stored built-in-origin token would be
-        ;; reused (nil current lets the stored key fill the gap) and sent as
-        ;; plain x-api-key to the custom provider's third-party base-url —
-        ;; the exact review-36 credential disclosure. The origin check must
-        ;; block it.
-        (with-redefs [provider-auth/provider-api-key (fn [_ctx _provider _custom?] nil)]
-          (let [opts (prompt-request/session->request-options
-                      {}
-                      {:model                    {:provider "anthropic" :id "my-custom-model"}
-                       :thinking-level           :off
-                       :runtime-api-key          "sk-ant-oat-builtin-oauth-token"
-                       :runtime-api-key-provider "anthropic"
-                       :runtime-api-key-custom?  false}
-                      {})]
-            (is (nil? (:api-key opts))
-                "the built-in origin OAuth token is NOT reused for the custom origin when the custom provider has no resolvable auth"))))
+        ;; The discriminating origin-gate case: reload the same-named custom
+        ;; provider as explicitly keyless, so the real provider-auth path
+        ;; resolves nil. Without the origin check, the stored built-in token
+        ;; would fill that gap and leak to the third-party endpoint.
+        (let [keyless-path (write-temp-models!
+                            {:version 1
+                             :providers {"anthropic"
+                                         {:base-url "https://third-party.example/anthropic"
+                                          :api :anthropic-messages
+                                          :auth {:auth-header? false}
+                                          :models [{:id "my-custom-model"}]}}})]
+          (try
+            (model-registry/init! {:user-models-path keyless-path})
+            (let [opts (prompt-request/session->request-options
+                        (anthropic-oauth-ctx "sk-ant-oat-builtin-oauth-token")
+                        {:model                    {:provider "anthropic" :id "my-custom-model"}
+                         :thinking-level           :off
+                         :runtime-api-key          "sk-ant-oat-builtin-oauth-token"
+                         :runtime-api-key-provider "anthropic"
+                         :runtime-api-key-custom?  false}
+                        {})]
+              (is (nil? (:api-key opts))
+                  "the built-in origin OAuth token is NOT reused for the keyless custom origin"))
+            (finally
+              (java.io.File/.delete (java.io.File. keyless-path))
+              (model-registry/init! {:user-models-path path})))))
 
       (testing "built-in anthropic never reuses a stored custom-origin raw spec"
-        (with-redefs [provider-auth/provider-api-key
-                      (fn [_ctx provider _custom?]
-                        (when (= :anthropic (provider-auth/normalize-provider-id provider))
-                          "sk-ant-oat-builtin-token"))]
-          (let [opts (prompt-request/session->request-options
-                      {}
-                      {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
-                       :thinking-level           :off
-                       ;; recorded on the CUSTOM "anthropic" origin (a prior
-                       ;; turn against the third-party provider)
-                       :runtime-api-key          "env:CUSTOM_ANTHROPIC_KEY"
-                       :runtime-api-key-provider "anthropic"
-                       :runtime-api-key-custom?  true}
-                      {})]
-            (is (= "sk-ant-oat-builtin-token" (:api-key opts))
-                "the custom-origin raw spec is NOT reused for the built-in origin — the built-in's own current resolution (OAuth token) wins"))))
+        (let [opts (prompt-request/session->request-options
+                    (anthropic-oauth-ctx "sk-ant-oat-builtin-token")
+                    {:model                    {:provider "anthropic" :id "claude-sonnet-4-6"}
+                     :thinking-level           :off
+                     ;; recorded on the CUSTOM "anthropic" origin (a prior
+                     ;; turn against the third-party provider)
+                     :runtime-api-key          "env:CUSTOM_ANTHROPIC_KEY"
+                     :runtime-api-key-provider "anthropic"
+                     :runtime-api-key-custom?  true}
+                    {})]
+          (is (= "sk-ant-oat-builtin-token" (:api-key opts))
+              "the custom-origin raw spec is NOT reused for the built-in origin — the built-in's own current resolution (OAuth token) wins")))
 
       (finally
         (java.io.File/.delete (java.io.File. path))))))

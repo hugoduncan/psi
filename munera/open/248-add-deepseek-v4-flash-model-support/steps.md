@@ -5065,7 +5065,7 @@
 
 ## Follow-ups (test review 65, 2026-08-09)
 
-- [ ] Replace the task-added `provider_auth/core_test.clj` redefinitions of
+- [x] Replace the task-added `provider_auth/core_test.clj` redefinitions of
       `oauth/get-api-key` and `model-registry/get-auth` with existing real or
       nullable boundaries. Seed `oauth/create-null-context` for built-in OAuth
       cases and initialize the model registry from temporary `models.edn` data
@@ -5073,7 +5073,7 @@
       the review-42 built-in/custom origin gate. These are infrastructure
       dependencies with available nullable or state-based seams, so replacing
       them globally violates `injectable ∧ nullable ∧ ¬mock ∧ ¬stub`.
-- [ ] Remove the task-added `prompt_request_test.clj` redefinitions of
+- [x] Remove the task-added `prompt_request_test.clj` redefinitions of
       `provider-auth/provider-api-key` in
       `provider-switch-never-reuses-stale-runtime-api-key-test`. They replace a
       logic dependency and let the origin/staleness proof pass without running
