@@ -5367,3 +5367,14 @@
       step. Keep the fix described as defensive support for any
       Anthropic-compatible endpoint that omits `message_delta`, without naming
       DeepSeek as an observed/reachable example.
+
+## Follow-ups (documentation review 4, 2026-08-09)
+
+- [ ] Correct the OpenAI-compatible example's keyless-auth wording in
+      `doc/custom-providers.md`. The note currently says both
+      `:auth-header? false` requests and requests authenticated by a recognized
+      custom `x-api-key`/`Authorization` header “send no auth header at all,”
+      but the latter intentionally sends the configured custom auth header and
+      only omits psi's generated `Authorization` header. Match the accurate
+      wording already used in “Local servers and custom headers”: psi sends no
+      auth header *of its own* when custom-header auth supplies one.
