@@ -5226,3 +5226,18 @@
       already assert `[:start :error]`. This makes terminal cardinality and
       ordering discriminating, prevents unexpected non-terminal events from
       passing, and avoids duplicate failure signals for one sequence contract.
+
+## Follow-ups (test review 79, 2026-08-09)
+
+- [ ] Migrate the task-modified
+      `codex-stream-failed-event-preserves-status-and-headers-test` in
+      `openai_codex_retry_test.clj` from its global `clj-http.client/post`
+      redefinition to `http-boundary/nullable`, threading the boundary through
+      the provider options and retaining the exact `[:start :error]` sequence
+      plus status/header payload assertions. Remove the now-redundant separate
+      `(:type (second events))` assertion, which the exact vector already
+      proves, and remove the `clj-http.client` require/helper if they become
+      unused. The task changed this pre-existing test into the review-52
+      error-first proof, but it remains the lone such task-modified Codex proof
+      that stubs infrastructure instead of using the task's injectable nullable
+      seam.
