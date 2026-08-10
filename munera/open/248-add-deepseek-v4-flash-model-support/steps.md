@@ -5484,3 +5484,25 @@
       rather than review provenance. State only the durable rationale: this is
       the shared home replacing component-local copies so future fixes land in
       one place.
+
+## Follow-ups (code-shaper review 7, 2026-08-10)
+
+- [ ] Make every Anthropic and OpenAI chat-completions HTTP-error path set the
+      stream's `done?` state before invoking the consumer, matching the SSE and
+      Codex terminal emitters. The initial non-2xx branches currently call
+      `capture/emit-error!` / `transport/emit-error!` without updating `done?`,
+      and Anthropic's 400 compatibility retry helper has no terminal-state
+      handle at all. If a consumer throws while handling one of these `:error`
+      events, the outer catch still sees `done?` false and emits a second
+      `:error`. Route these branches through one guarded terminal-error helper
+      per transport (threading stream state through the Anthropic retry path),
+      and add consumer-throws tests for initial non-2xx and exhausted retry
+      responses that prove exactly one terminal event reaches the consumer.
+- [ ] Move Anthropic response capture inside the post-terminal guard in
+      `process-stream-event!`. It currently calls `capture-response!` before
+      `(when-not @done?)`, so a trailing parsed SSE event after `:error` or
+      `:done` is suppressed for consumers but still reaches
+      `:on-provider-response`. Both OpenAI dispatchers guard before capture, and
+      the Codex capture test explicitly defines a trailing event as a full
+      no-op. Align all three transports and add an Anthropic capture test that
+      proves post-terminal lines produce neither consumer events nor captures.
