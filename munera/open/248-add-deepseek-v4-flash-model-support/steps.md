@@ -4959,3 +4959,19 @@
       passes (the repository has no automated Allium checker): referenced
       entities/events are defined, the old unordered Codex error rule is
       removed, and spec/design/tests/code agree.
+
+## Follow-ups (test review 61, 2026-08-09)
+
+- [ ] Replace the task-added provider stream tests' global `with-redefs` of
+      `clj-http.client/post` with an injectable nullable HTTP boundary. The
+      new deterministic Codex balancing tests in `openai_codex_test.clj`
+      (and the task's sibling stream tests) currently install canned
+      `http/post` functions, so infrastructure is stubbed rather than
+      nullable and the tests violate the task-test-review invariant
+      `injectable ∧ nullable ∧ ¬mock ∧ ¬stub`. Add/configure a production
+      nullable HTTP adapter that returns scripted SSE/HTTP responses and
+      records requests through its public API, then drive the provider with
+      that adapter and keep assertions on emitted provider events/request
+      state. Preserve the discriminating `2`/`100` fixture: the pre-fix set
+      traversal is `[100 2]`, so both `:done` and `:error` tests must still
+      fail without ascending-index balancing.
