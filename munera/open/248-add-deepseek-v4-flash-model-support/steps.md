@@ -5378,3 +5378,24 @@
       only omits psi's generated `Authorization` header. Match the accurate
       wording already used in “Local servers and custom headers”: psi sends no
       auth header *of its own* when custom-header auth supplies one.
+
+## Follow-ups (code-shaper review, 2026-08-09)
+
+- [ ] Remove the stale DeepSeek-streaming claims from production source
+      commentary. `components/ai/src/psi/ai/providers/anthropic.clj` still says
+      `message_stop` handling is reachable on DeepSeek because its streaming
+      path is “unverified” (around lines 430 and 464), but the completed live
+      streaming step proves DeepSeek normally emits `message_delta` with usage
+      before `message_stop`. Describe the branch and EOF flush as defensive
+      support for truncated/non-conforming Anthropic-compatible streams, matching
+      the corrected docs and changelog.
+- [ ] Rewrite the task-added provider hot-path comments to state current
+      invariants and rationale without review chronology. The changed production
+      provider files contain 93 `Review N`/`reviews N` references (including
+      long multi-review narratives inside `stream-anthropic`,
+      `emit-chat-error!`, and shared request support); `anthropic.clj` alone is
+      641 lines with 287 comment-only lines. Preserve durable constraints such
+      as start-before-output, one terminal event, post-terminal no-op, balanced
+      blocks/tools, and provider-scoped credentials, but move provenance to git
+      and task artifacts so each function is locally comprehensible from its
+      present contract and mechanism.
