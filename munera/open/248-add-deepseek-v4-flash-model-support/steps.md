@@ -5306,3 +5306,18 @@
       event-vector assertions while retaining the distinct error payload
       assertions. Use `http-boundary/nullable` for the Anthropic cases rather
       than their remaining global `clj-http.client/post` redefinitions.
+
+## Follow-ups (test review 86, 2026-08-09)
+
+- [ ] Make the two review-53 first-read exception proofs exercise an actual
+      response-body read failure. `stream-anthropic-first-read-exception-emits-start-then-error-test`
+      and `completions-first-read-exception-emits-start-then-error-test` currently
+      script a nullable HTTP response function that throws from `post!`, before
+      either transport receives a response body; despite their names/comments,
+      they therefore prove an initial request exception, not a parser/stream-read
+      exception on the first read. Return a response map whose body is an
+      `InputStream` that throws before yielding any bytes (reuse/generalize the
+      existing `throwing-stream-after` fixture with an empty prefix), keep the
+      real parser, and retain the exact `[:start :error]` sequence plus the
+      concrete error-message assertion. This makes the tests behavior-focused
+      and preserves distinct coverage from the initial HTTP failure tests.
