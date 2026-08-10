@@ -246,10 +246,10 @@
           "classic chat-completions reasoning shape is unchanged"))))
 
 (deftest openai-provider-scoped-api-key-resolution-test
-  ;; Mirrors the anthropic transport's provider-scoped resolve-api-key (review
-  ;; 3): a custom :openai-completions provider must never silently receive the
+  ;; Mirrors the anthropic transport's provider-scoped resolve-api-key: a
+  ;; custom :openai-completions provider must never silently receive the
   ;; global OPENAI_API_KEY — the exact cross-provider credential disclosure
-  ;; class review 3 eliminated for :anthropic-messages. Custom providers fail
+  ;; class guarded against for :anthropic-messages. Custom providers fail
   ;; fast (or go keyless via :no-auth-header / recognized auth header among
   ;; custom :headers); only built-in OpenAI models fall back to the env var.
   (testing "custom provider never falls back to OPENAI_API_KEY env var (no cross-provider leak)"
@@ -419,7 +419,7 @@
         (is (empty? (environment-boundary/reads environment)))))))
 
 (deftest custom-provider-named-openai-not-builtin-test
-  ;; Review 14: built-in detection is by provider NAME, so a custom models.edn
+  ;; built-in detection is by provider NAME, so a custom models.edn
   ;; provider literally named "openai" was classified built-in and defeated
   ;; the provider-scoped guarantee — an unset configured key silently fell
   ;; back to OPENAI_API_KEY (sent to the third-party endpoint). Custom models
@@ -453,7 +453,7 @@
         (is (empty? (environment-boundary/reads environment)))))))
 
 (deftest configured-key-plus-recognized-auth-header-interplay-test
-  ;; Review 11: a custom :headers map carrying a recognized auth header name
+  ;; a custom :headers map carrying a recognized auth header name
   ;; silently replaces/duplicates the configured :api-key — untested for both
   ;; transports. OpenAI build-request merges custom headers LAST, so a custom
   ;; Authorization header silently REPLACES the resolved bearer key; a custom
@@ -507,7 +507,7 @@
           "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
 
   (testing "configured key + lowercase authorization custom header sends BOTH authorization headers"
-    ;; Review 14: the merge is on equal string keys — a custom header whose
+    ;; the merge is on equal string keys — a custom header whose
     ;; name is the exact lowercase "authorization" does NOT collide with the
     ;; base "Authorization" (capital A), so it DUPLICATES beside the resolved
     ;; bearer key (the reverse of the anthropic transport's exact-case
@@ -709,7 +709,7 @@
 
 (deftest completions-sse-error-event-emits-error-and-terminates-test
   (testing "a mid-stream OpenAI SSE error chunk emits :error and terminates"
-    ;; Review 43: an error chunk ({"error": {...}} — no :choices) previously
+    ;; an error chunk ({"error": {...}} — no :choices) previously
     ;; no-oped in process-chat-sse-line!: no :error event, no terminal :done,
     ;; hanging the turn until the idle timeout — the same silent-drop class
     ;; fixed for the anthropic transport's "error" SSE event.

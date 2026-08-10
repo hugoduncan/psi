@@ -88,7 +88,7 @@
       (anthropic/stream-anthropic convo model {:api-key "test-key"
                                                :http-boundary http}
                                   (fn [e] (swap! events conj e)))
-      ;; Review 53: the catch block (a stream-read exception before any
+      ;; the catch block (a stream-read exception before any
       ;; output — the HTTP boundary throws, no response received) now emits :start
       ;; first, mirroring the in-band error branch — so the sequence is
       ;; [:start :error] with the :error as the second event.
@@ -225,7 +225,7 @@
 
 (deftest thinking-block-stop-emits-thinking-end-test
   (testing "thinking content block stops emit :thinking-end, not :text-end"
-    ;; Review 43: content-block-stop-event mapped every non-tool block stop
+    ;; content-block-stop-event mapped every non-tool block stop
     ;; to :text-end, so a thinking block's stop mislabeled the
     ;; last-provider-event diagnostic marker as text and left the
     ;; accumulator's dedicated :on-thinking-end handler
@@ -271,7 +271,7 @@
 
 (deftest stream-anthropic-surfaces-sse-error-event-test
   (testing "a mid-stream Anthropic SSE error event emits :error and terminates"
-    ;; Review 43: the stream loop's case handled only message_start/
+    ;; the stream loop's case handled only message_start/
     ;; content_block_*/message_delta/message_stop, so an Anthropic "error"
     ;; SSE event ({"type":"error","error":{...}} — the documented mid-stream
     ;; overloaded_error/rate-limit shape) was consumed as a no-op: no :error
@@ -325,7 +325,7 @@
 
 (deftest stream-anthropic-error-then-message-delta-single-terminal-event-test
   (testing "a trailing message_delta after a mid-stream SSE error does not emit a second terminal :done"
-    ;; Review 44: the message_delta branch's terminal :done emission was
+    ;; the message_delta branch's terminal :done emission was
     ;; unguarded — a mid-stream SSE error event followed by a trailing
     ;; message_delta carrying delta.stop_reason emitted a SECOND terminal
     ;; :done after the :error (verified: events = [:start :error :done]).
@@ -355,7 +355,7 @@
 
 (deftest stream-anthropic-error-then-read-exception-no-second-error-test
   (testing "a stream-read exception after a mid-stream SSE error does not emit a second :error"
-    ;; Review 44: the stream catch block emitted a second :error with no
+    ;; the stream catch block emitted a second :error with no
     ;; done? check if the stream read threw after a mid-stream error had
     ;; already terminated the stream. Exercise the real parser through the
     ;; nullable HTTP boundary; the response body disconnects after the error.
@@ -378,7 +378,7 @@
 
 (deftest stream-anthropic-error-then-content-block-stop-no-text-end-test
   (testing "a trailing content_block_stop after a mid-stream SSE error does not emit a second :text-end"
-    ;; Review 46: the review-43/44 done? guard covered only the TERMINAL
+    ;; the done? guard covered only the terminal
     ;; branches (:done/:error emissions). The NON-terminal branches still
     ;; fired after the stream had terminated with an :error — a trailing
     ;; content_block_stop after the SSE error event emitted :text-end
@@ -387,12 +387,12 @@
     ;; maybe-emit-structured-result! post-error. The whole SSE dispatch is
     ;; now short-circuited on done?, so a post-error trailing event is a
     ;; full no-op.
-    ;; Review 56: the ONE :text-end now comes from the "error" branch's
+    ;; the ONE :text-end now comes from the "error" branch's
     ;; open-block balancing (balance-open-blocks! — the block was started
     ;; and never stopped, so it is closed BEFORE the :error), NOT from the
     ;; trailing content_block_stop. The sequence is
     ;; [:start :text-start :text-delta :text-end :error] — the accumulator
-    ;; finalizes balanced via the error path (review 55 balanced only the
+    ;; finalizes balanced via the error path (the earlier done-path balancing covered only the
     ;; :done/EOF paths), and the post-error trailing stop is still a full
     ;; no-op (exactly one :text-end, not two).
     (let [model  (models/get-model :sonnet-4.6)
@@ -455,7 +455,7 @@
 
 (deftest stream-anthropic-message-stop-done-carries-usage-test
   (testing "a stream ending via message_stop without message_delta records the accumulated usage on the :done"
-    ;; Review 47: the message_stop terminal :done carried no :usage — the
+    ;; the message_stop terminal :done carried no :usage — the
     ;; message_delta-with-stop_reason branch emits :done WITH
     ;; (usage-with-cost model usage-acc), but a stream terminating via
     ;; message_stop WITHOUT a preceding message_delta carrying stop_reason
@@ -464,7 +464,7 @@
     ;; held the input + cache tokens accumulated from message_start.
     ;; Reachable on any Anthropic-compatible endpoint that omits
     ;; message_delta — including the newly shipped DeepSeek provider whose
-    ;; streaming path is unverified.
+    ;; normal live DeepSeek stream is verified; this shape remains defensive.
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])
@@ -501,13 +501,13 @@
 
 (deftest stream-anthropic-sse-error-status-key-test
   (testing "a mid-stream SSE error carrying :status (not :http_status) surfaces a numeric http-status"
-    ;; Review 47: the "error" branch read http-status from [:error :http_status]/
+    ;; the "error" branch read http-status from [:error :http_status]/
     ;; :http_status only, so an Anthropic-compatible endpoint emitting
     ;; {"type":"error","error":{"status":529,...}} — or a generic message
     ;; plus a status key — lost its status: the :error event carried no
     ;; numeric :http-status, so downstream retry-error?/provider-error-kind
     ;; fell to :unknown and a transient mid-stream 5xx/overload was NOT
-    ;; auto-retried (the review-23 class the openai emit-chat-error! and
+    ;; auto-retried (a case the OpenAI emit-chat-error! and
     ;; codex codex-error-http-status already handle). Now mirrors
     ;; emit-chat-error!'s extraction: :status / [:error :status] /
     ;; [:error :http_status], numeric >= 400 only.

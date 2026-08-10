@@ -12,11 +12,11 @@
    [psi.workflow-registry.registry :as workflow-registry]))
 
 (def workflow-extensions-cwd
-  "Repo root (shared walk-up helper, review 41) so the session worktree (the
+  "Repo root resolved by a shared walk-up helper so the session worktree (the
    profile snapshot reads <cwd>/.psi/project.edn via shared-config, a strict
    cwd path with no walk-up) and the workflow-definitions load
    (<cwd>/.psi/workflows) target the committed project config instead of
-   silently missing from a component-local cwd (review 40: the delegate
+   silently missing from a component-local cwd. The delegate
    review live test failed from a component-local cwd with \"Unknown
    workflow review-task-implementation\" because user.dir drove both
    paths)."

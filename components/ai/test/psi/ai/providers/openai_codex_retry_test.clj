@@ -25,7 +25,7 @@
 (deftest codex-stream-failed-event-preserves-status-and-headers-test
   ;; OpenAI Codex can report a terminal provider failure inside a 2xx SSE stream;
   ;; status and retry headers must survive so session retry can classify it.
-  ;; Review 52: emit-codex-error! emits :start first when the stream never
+  ;; emit-codex-error! emits :start first when the stream never
   ;; produced output, so an error-first stream yields [:start :error].
   (let [model  (models/get-model :gpt-5.3-codex)
         token  (jwt-with-account-id "acc_test")

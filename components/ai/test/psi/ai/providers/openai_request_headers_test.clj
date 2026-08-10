@@ -95,12 +95,12 @@
                   @reply-captures))))))
 
 (deftest custom-header-auth-redacted-in-captures-test
-  ;; Review 11: transport/redact-request-headers redacted only exact-case
-  ;; "Authorization"/"chatgpt-account-id" — the review-10 keyless custom-header
+  ;; transport/redact-request-headers redacted only exact-case
+  ;; "Authorization"/"chatgpt-account-id" — keyless custom-header
   ;; auth patterns on :openai-completions (:headers {"X-API-Key" "local-key"}
   ;; or mixed-case authorization) leaked the secret verbatim into the
   ;; :on-provider-request capture payload. Redaction is now case-insensitive
-  ;; and covers x-api-key (mirroring the anthropic transport's review-7
+  ;; and covers x-api-key (mirroring the anthropic transport's
   ;; case-insensitive header-matching fix).
   (testing "mixed-case X-API-Key custom header is redacted in :on-provider-request captures"
     (let [model           {:id                 "local-completions"
@@ -173,7 +173,7 @@
           "lowercase authorization header must be redacted via redact-authorization")))
 
   (testing "differently-cased duplicate Authorization headers are ALL redacted in captures"
-    ;; Review 19: redact-headers redacted only the FIRST case-insensitive
+    ;; redact-headers redacted only the FIRST case-insensitive
     ;; match per auth header name, so a wire request carrying both
     ;; "Authorization" (resolved bearer key) and a lowercase custom
     ;; "authorization" header leaked the lowercase one VERBATIM into the
@@ -218,7 +218,7 @@
           "differently-cased authorization duplicate must ALSO be redacted — no verbatim secret in the capture"))))
 
 (deftest redact-authorization-length-excludes-bearer-prefix-test
-  ;; Review 13: openai/transport's redact-authorization counted the WHOLE
+  ;; openai/transport's redact-authorization counted the WHOLE
   ;; Authorization value including the "Bearer " prefix in the (len=N)
   ;; metadata, unlike the anthropic transport which strips ^Bearer\s+ first —
   ;; a capture of "Bearer abc…" recorded (len=N) with N = 7 + token length.

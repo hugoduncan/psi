@@ -18,9 +18,9 @@
 (defn- doc-clojure-blocks
   "Parse every ```clojure code block in doc/custom-providers.md as EDN,
    returning [{:heading <section-title> :edn <parsed>} ...] in document
-   order. :heading is the nearest preceding '## ' section title (review 35:
-   generalized doc extraction so every documented models.edn example can be
-   parse-locked, not just the DeepSeek one)."
+   order. :heading is the nearest preceding '## ' section title so every
+   documented models.edn example can be parse-locked, not just the DeepSeek
+   one."
   []
   (let [doc-lines (vec (str/split-lines (slurp (io/file (repo-root) "doc" "custom-providers.md"))))]
     (->> (keep-indexed (fn [i l] (when (str/starts-with? l "```clojure") i)) doc-lines)
@@ -69,7 +69,7 @@
 (defn- local-servers-auth-snippet
   "Parse the {:auth ...} snippet under the '## Local servers and custom
    headers' heading in doc/custom-providers.md — the flagship keyless local
-   pattern. Locked against the closed AuthConfig schema (review 35) by
+   pattern. Locked against the closed AuthConfig schema by
    wrapping the doc's exact snippet in a minimal provider definition."
   []
   (or (some (fn [{:keys [heading edn]}]
@@ -83,11 +83,11 @@
 ;; ── API key resolution ───────────────────────────────────────────────────────
 
 (deftest resolve-key-spec-test
-  ;; Review 26: env: spec resolution happens per request through the shared
+  ;; env: spec resolution happens per request through the shared
   ;; `request-support/resolve-key-spec` (custom models.edn `env:` keys are
-  ;; stored RAW in the registry and re-resolved at request time). Review 28:
+  ;; stored RAW in the registry and re-resolved at request time).
   ;; the `user_models/resolve-api-key-spec` delegation wrapper is deleted
-  ;; (production-dead since review 26) — this test now targets the shared
+  ;; because the delegation wrapper was production-dead, this test targets the shared
   ;; helper directly; request_support_test.clj's resolve-key-spec-test is the
   ;; canonical coverage.
   (testing "nil returns nil"
@@ -347,7 +347,7 @@
       (is (= :anthropic-messages (:api (first (:models result))))))))
 
 (deftest custom-provider-models-tagged-custom-test
-  ;; Review 14: built-in detection must not key off the provider NAME alone —
+  ;; built-in detection must not key off the provider NAME alone —
   ;; a custom models.edn provider literally named "anthropic"/"openai" is
   ;; classified built-in by provider name, defeating the provider-scoped
   ;; guarantees (env-var key fallback, Claude Code OAuth headers). Every
@@ -384,7 +384,7 @@
       (is (true? (:custom? model))))))
 
 (deftest custom-model-cannot-supply-reserved-custom-tag-test
-  ;; Review 33: the reserved-tag guarantee is a security property — `:custom?`
+  ;; the reserved-tag guarantee is a security property — `:custom?`
   ;; is set by expand-model (origin tag gating built-in classification: env-key
   ;; fallback, OAuth headers, mid-system inference), and the closed ModelDef
   ;; schema rejects a user-supplied `:custom?` key, so a user cannot spoof
@@ -446,7 +446,7 @@
 ;; ── Mid-conversation system messages (custom providers) ─────────────────────
 
 (deftest supports-mid-conversation-system-messages-field-test
-  ;; Review 22: the canonical Model schema already carries
+  ;; the canonical Model schema already carries
   ;; :supports-mid-conversation-system-messages (gates the agent-session
   ;; :session/inject-mid-system-message capability; OpenAI chat-completions
   ;; is inferred, :anthropic-messages custom providers are not), but the
@@ -500,7 +500,7 @@
       (is (= :deepseek (:provider model)))
       (is (= :anthropic-messages (:api model)))
       (is (= "https://api.deepseek.com/anthropic" (:base-url model)))
-      ;; Review 25: pin the review-14 origin tag on the exact shipped
+      ;; pin the custom-provider origin tag on the exact shipped
       ;; example — the doc lock is the natural home to catch an expand-model
       ;; change that stops tagging custom models (e.g. a merge-order
       ;; regression moving `:custom? true` before the model-def merge).
@@ -516,7 +516,7 @@
       (is (= 0.28 (:output-cost model)))
       (is (= 0.0028 (:cache-read-cost model)))
       (is (= 0.14 (:cache-write-cost model)))
-      ;; Review 21: the example must NOT fall through to the custom-model
+      ;; the example must NOT fall through to the custom-model
       ;; defaults (:locality :local / :latency-tier :low / :cost-tier :zero)
       ;; — a cloud model with defaulted locality can be selected for (and
       ;; charged as) a "local" helper on psi's local-only helper paths.
@@ -526,7 +526,7 @@
       (is (= :low (:cost-tier model))))
 
     (testing "auth stores the raw env: spec; resolution happens per request"
-      ;; Review 26: the registry snapshots the RAW spec (not the resolved
+      ;; the registry snapshots the RAW spec (not the resolved
       ;; value) — extract-provider-auth stores "env:DEEPSEEK_API_KEY"
       ;; verbatim, and the transports' shared
       ;; request-support/resolve-key-spec re-resolves env: keys through
@@ -557,13 +557,13 @@
                  (environment-boundary/reads environment))))))))
 
 (deftest all-documented-models-edn-examples-parse-test
-  ;; Review 35: only the DeepSeek doc example was parse-locked; reviews 33/34
+  ;; only the DeepSeek doc example was parse-locked; broader parsing
   ;; found REAL defects in the other documented models.edn examples (MiniMax
   ;; :locality, proxy-sonnet :locality/tiers) by MANUAL review, each fixed
   ;; docs-only with "no parse-lock impact" — so the closed
   ;; ModelDef/AuthConfig schemas could silently reject or mis-parse the doc's
   ;; other copy-paste examples with no test catching it (the same docs/code
-  ;; drift class review 6 built the DeepSeek parse-lock for). Parse EVERY
+  ;; drift class covered by the DeepSeek parse lock). Parse EVERY
   ;; full models.edn example block in doc/custom-providers.md through
   ;; parse-models-config and assert zero errors, so future doc edits cannot
   ;; break the shipped examples.
@@ -579,15 +579,15 @@
               (str "documented models.edn example must resolve at least one model: " (pr-str edn))))))))
 
 (deftest committed-project-models-edn-matches-documented-deepseek-example-test
-  ;; Review 38: the committed .psi/models.edn (added d1b28eb93, used by the
+  ;; the committed .psi/models.edn (added d1b28eb93, used by the
   ;; committed .psi/project.edn deepseek workflow session-profiles) is
   ;; covered by no test — the doc parse-locks read doc/custom-providers.md
   ;; only, so the committed file can silently drift from the shipped example
-  ;; (the review-38 recurrence: the committed deepseek model map omitted the
+  ;; (the committed deepseek model map once omitted the
   ;; :locality/:latency-tier/:cost-tier fields the documented example
   ;; mandates, so expand-model applied the custom-model defaults
   ;; (:locality :local) — the exact "cloud model with defaulted locality"
-  ;; misconfiguration reviews 21/33/34 fixed in the docs). Parse the
+  ;; misconfiguration guarded against in the docs). Parse the
   ;; committed file and assert its deepseek model equals the documented
   ;; example's resolved model, so committed-file ↔ doc drift fails here in
   ;; both directions.
@@ -606,7 +606,7 @@
           "committed .psi/models.edn must be schema-valid")
       (is (some? committed-model)
           "committed .psi/models.edn must carry the deepseek-v4-flash model")
-      ;; Review 21/38: the committed file must NOT fall through to the
+      ;; the committed file must NOT fall through to the
       ;; custom-model defaults — a cloud model with defaulted locality can
       ;; be selected for (and charged as) a "local" helper.
       (is (= :cloud (:locality committed-model))
@@ -617,7 +617,7 @@
           "committed deepseek model must equal the documented example's resolved model (no drift)"))))
 
 (deftest local-servers-auth-snippet-parses-test
-  ;; Review 35: the 'Local servers and custom headers' :auth snippet (the
+  ;; the 'Local servers and custom headers' :auth snippet (the
   ;; flagship keyless local-provider pattern, `{:auth {:auth-header? false
   ;; :headers {"X-Client" "psi"}}}`) is part of the documented
   ;; custom-provider surface and was never schema-locked. Wrap the doc's

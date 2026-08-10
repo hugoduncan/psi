@@ -258,9 +258,9 @@
       (is (nil? (:proxy-scheme @captured))))))
 
 (deftest codex-provider-scoped-api-key-resolution-test
-  ;; Review 13: the :openai-codex-responses transport is the third custom
+  ;; the :openai-codex-responses transport is the third custom
   ;; ModelDef ApiProtocol — it never received the provider-scoped key
-  ;; resolution reviews 3/10 gave :anthropic-messages/:openai-completions, so
+  ;; resolution used by :anthropic-messages/:openai-completions, so
   ;; a custom codex provider with no configured key silently sent the global
   ;; OPENAI_API_KEY to the third-party :base-url (or hard-failed confusingly
   ;; on a regular sk- env key). Mirrors
@@ -421,7 +421,7 @@
             "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key"))))
 
   (testing "custom codex provider named \"openai\" never falls back to OPENAI_API_KEY"
-    ;; Review 14: built-in detection must not key off the provider NAME — a
+    ;; built-in detection must not key off the provider NAME — a
     ;; custom provider literally named "openai" is tagged :custom? true at
     ;; parse time and the shared resolve-api-key treats it as custom on the
     ;; codex transport too.
@@ -450,7 +450,7 @@
             "OPENAI_API_KEY must not be used to satisfy a custom codex provider named \"openai\"")
         (is (empty? (environment-boundary/reads environment)))))))
 (deftest codex-configured-key-plus-recognized-auth-header-interplay-test
-  ;; Review 14: the review-11 interplay lock covers :anthropic-messages and
+  ;; the auth-header interplay tests cover :anthropic-messages and
   ;; :openai-completions only, but build-codex-request performs the identical
   ;; (merge base-hdrs custom) (codex_responses.clj) — a custom Authorization
   ;; header on a :openai-codex-responses provider silently replaces the
@@ -514,10 +514,10 @@
           "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
 
   (testing "custom chatgpt-account-id header replaces the derived value (configured-key case)"
-    ;; Review 18: build-codex-request derives chatgpt-account-id from the
+    ;; build-codex-request derives chatgpt-account-id from the
     ;; resolved key, but (merge base-hdrs custom) lets a custom
     ;; chatgpt-account-id header silently replace the derived value — the
-    ;; same merge behavior locked for Authorization/X-API-Key in review 14.
+    ;; same merge behavior locked for Authorization/X-API-Key.
     (let [model {:id "custom-codex-model"
                  :name "Custom Codex Model"
                  :provider :custom-codex
@@ -545,7 +545,7 @@
           "configured key still sent as the bearer Authorization header")))
 
   (testing "keyless codex request + custom chatgpt-account-id header passes through"
-    ;; Review 18: a keyless request derives no account id (no api-key), so a
+    ;; a keyless request derives no account id (no api-key), so a
     ;; custom chatgpt-account-id header legitimately supplies one — it must
     ;; pass through unmodified rather than being stripped.
     (let [model {:id "local-codex"
@@ -573,10 +573,10 @@
       (is (nil? (get-in req [:headers "Authorization"]))
           "no Authorization for a keyless request"))))
 (deftest codex-adaptive-thinking-ignored-for-custom-providers-test
-  ;; Review 15: the doc/custom-providers.md claim that :adaptive-thinking "is
+  ;; the doc/custom-providers.md claim that :adaptive-thinking "is
   ;; ignored for OpenAI-compatible custom providers" now names
-  ;; :openai-codex-responses too (review 13), but the only no-op lock is the
-  ;; completions one (review 10). The codex transport never reads
+  ;; :openai-codex-responses too, but the only no-op lock is the
+  ;; completions one. The codex transport never reads
   ;; :adaptive-thinking — expand-model carries it into every custom model
   ;; map, but openai/reasoning.clj reasoning-effort maps :thinking-level →
   ;; classic reasoning effort — so a custom :openai-codex-responses model
@@ -642,7 +642,7 @@
 
 (deftest completions-sse-error-then-read-exception-no-second-error-test
   (testing "a stream-read exception after a mid-stream SSE error chunk does not emit a second :error"
-    ;; Review 44: the stream-openai catch block emitted a second :error with
+    ;; the stream-openai catch block emitted a second :error with
     ;; no done? check after emit-chat-error! had terminated the stream. Drive
     ;; the real parser through a nullable response body that disconnects
     ;; after the error chunk.
@@ -666,7 +666,7 @@
 
 (deftest completions-sse-error-then-trailing-choices-chunk-no-text-delta-test
   (testing "a trailing :choices chunk after a mid-stream SSE error chunk does not emit :text-delta"
-    ;; Review 46: the review-43/44 done? guard covered only the TERMINAL
+    ;; the done? guard covered only the terminal
     ;; emissions. A trailing :choices chunk after the error chunk still
     ;; emitted :text-delta via emit-chat-chunk! (verified: events =
     ;; [:start :error :text-delta]), and a trailing usage/finish chunk could
@@ -700,7 +700,7 @@
 
 (deftest codex-error-then-trailing-output-text-delta-no-text-delta-test
   (testing "a trailing response.output_text.delta after response.failed does not emit :text-delta"
-    ;; Review 46: handle-codex-event! had no done? check at its top — only
+    ;; handle-codex-event! had no done? check at its top — only
     ;; emit-codex-error!/emit-codex-done! self-guarded, so a trailing
     ;; response.output_text.delta after response.failed/error still emitted
     ;; :text-delta (verified: events = [:start :error :text-delta]).

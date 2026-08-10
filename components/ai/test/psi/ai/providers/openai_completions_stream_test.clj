@@ -1,9 +1,9 @@
 (ns psi.ai.providers.openai-completions-stream-test
-  "Review-48/51 stream follow-ups for the :openai-completions transport: the
+  "Termination, usage, and error behavior for the :openai-completions transport: the
   EOF-level terminal flush (finish_reason-chunk-then-EOF and
   [DONE]-without-finish_reason both terminate with exactly one :done instead
   of hanging), the zero-usage :done semantics for endpoints that omit the
-  usage chunk, and the review-51 top-level http_status extraction on
+  usage chunk, and top-level http_status extraction on
   mid-stream error chunks. Split out of openai_test.clj /
   openai_completions_test.clj to stay under the 800-line file-length gate."
   (:require
@@ -50,7 +50,7 @@
 
 (deftest completions-finish-reason-then-eof-emits-done-test
   (testing "a stream ending with a finish_reason chunk but no trailing [DONE] emits exactly one terminal :done"
-    ;; Review 48: stream-openai ended with NOTHING after the SSE doseq, so a
+    ;; stream-openai ended with NOTHING after the SSE doseq, so a
     ;; final chunk carrying finish_reason but no trailing [DONE] set
     ;; pending-finish-reason and never flushed it — flush-pending-chat-finish!
     ;; runs ONLY on a [DONE] line — leaving the turn with no :done/:error
@@ -71,7 +71,7 @@
 
 (deftest completions-done-sentinel-without-finish-reason-emits-done-test
   (testing "a [DONE] sentinel without a prior finish_reason chunk emits exactly one terminal :done"
-    ;; Review 48: flush-pending-chat-finish! guards on the pending finish
+    ;; flush-pending-chat-finish! guards on the pending finish
     ;; reason, so a [DONE] line with no prior finish_reason chunk no-oped —
     ;; no :done, no :error, turn hangs until the idle timeout. The EOF flush
     ;; (which fires after the [DONE] no-op) now emits :stop.
@@ -87,13 +87,13 @@
 
 (deftest completions-done-without-usage-chunk-carries-no-usage-test
   (testing "a terminal :done for a stream with no usage chunk carries no :usage"
-    ;; Review 48: the openai terminal :done carries usage only when a usage
+    ;; the openai terminal :done carries usage only when a usage
     ;; chunk was seen. An OpenAI-compatible endpoint that ignores
     ;; stream_options.include_usage (the body always sets it, but local
     ;; proxies / third-party endpoints commonly omit the usage chunk) sends
     ;; no usage chunk, so the flushed :done carries no :usage and handle-done!
     ;; ((map? usage) false) records ZERO usage/cost — the documented
-    ;; consequence for usage-omitting endpoints (the review-47 zero-usage
+    ;; consequence for usage-omitting endpoints (the zero-usage
     ;; class on the :openai-completions sibling; the anthropic fix attached
     ;; accumulated usage to the message_stop terminal, but here there IS no
     ;; usage to attach). The existing
@@ -117,8 +117,8 @@
 
 (deftest completions-sse-error-top-level-http-status-kept-test
   (testing "a mid-stream error chunk with a TOP-LEVEL http_status keeps its numeric :http-status"
-    ;; Review 51: emit-chat-error! checked (:status chunk) /
-    ;; [:error :status] / [:error :http_status] only — the review-47-aligned
+    ;; emit-chat-error! checked (:status chunk) /
+    ;; [:error :status] / [:error :http_status] only — the aligned
     ;; anthropic "error" branch reads those three PLUS top-level
     ;; (:http_status event-data), so an OpenAI-compatible endpoint emitting
     ;; the status under a top-level http_status key
@@ -141,13 +141,13 @@
              (:error-message err))
           "error message extracted from the chunk's error body (with status suffix)")
       (is (= [:start :error] (mapv :type events))
-          "an error-FIRST stream emits :start then the :error terminal (review 52)"))))
+          "an error-FIRST stream emits :start then the :error terminal"))))
 
 (deftest completions-sse-error-first-stream-emits-start-then-error-test
   (testing "an error-FIRST stream (error chunk before any role/content chunk) emits :start then :error"
-    ;; Review 52: emit-chat-error! emitted [:error] with no preceding :start
+    ;; emit-chat-error! emitted [:error] with no preceding :start
     ;; when the stream errored before producing any output event — the
-    ;; review-50 :start-before-terminal fix covered the anthropic "error"
+    ;; start-before-terminal fix covered the anthropic "error"
     ;; branch and the terminal :done emitters but not the openai error
     ;; emitter, and the existing error tests never caught it because they
     ;; start with a role/content chunk that triggers :start via the
@@ -157,7 +157,7 @@
     ;; emit-chat-completion-finish!'s ordering and the anthropic error
     ;; branch), so an error-first stream yields [:start :error] like the
     ;; anthropic transport — the last three-transport asymmetry in the
-    ;; review-50 class.
+    ;; start-before-terminal invariant.
     (let [events (run-stream (str
                               "data: " (json/generate-string
                                         {:error {:message "The server had an error while processing your request."
@@ -172,11 +172,11 @@
 
 (deftest completions-first-read-exception-emits-start-then-error-test
   (testing "a stream-read exception before any output event emits :start then the :error terminal"
-    ;; Review 53: the catch block emitted [:error] with no preceding :start
+    ;; the catch block emitted [:error] with no preceding :start
     ;; when the exception fired before any output event (e.g. a connection
-    ;; reset on the first read) — the last gap in the review-50/52
+    ;; reset on the first read) — the last gap in the
     ;; :start-before-terminal class on this transport (emit-chat-error! now
-    ;; emits :start first per review 52, but the catch block routes through
+    ;; emits :start first by contract, but the catch block routes through
     ;; transport/emit-error!, which has no start logic). The catch now emits
     ;; :start once (compare-and-set on stream-started?) before the :error, so
     ;; a first-read exception yields [:start :error] like the in-band error
@@ -198,7 +198,7 @@
 
 (deftest completions-eof-balances-open-tool-call-test
   (testing "a tool_calls delta chunk followed by EOF closes the open tool call before :done"
-    ;; Review 55: the EOF-level terminal flush emitted :done with an OPEN
+    ;; the EOF-level terminal flush emitted :done with an OPEN
     ;; tool index — a tool_calls delta chunk with no finish_reason, no
     ;; [DONE] and no usage chunk (a truncated / non-conforming stream)
     ;; left the turn accumulator with an unclosed tool index when
@@ -228,7 +228,7 @@
 
 (deftest completions-eof-balances-not-yet-started-tool-call-test
   (testing "a tool_calls fragment with a name but no id (never started) is force-started then closed at EOF"
-    ;; Review 55: force-start-pending-chat-tools! emits :toolcall-start for
+    ;; force-start-pending-chat-tools! emits :toolcall-start for
     ;; a pending (not-yet-started) tool entry so the subsequent
     ;; emit-chat-tool-ends! balances it — a tool_calls delta carrying only
     ;; a name (no id, so start-chat-tool-if-ready! could not fire during the
@@ -244,11 +244,11 @@
              (mapv :type events))
           "the not-yet-started tool call is force-started then closed before the EOF :done"))))
 
-;; ── Open-tool balancing on the error/catch terminals (review 56) ────────────
+;; ── Open-tool balancing on the error/catch terminals ────────────
 
 (deftest completions-error-after-tool-start-balances-open-tool-call-test
   (testing "a mid-stream error chunk after a tool_calls delta closes the open tool call before :error"
-    ;; Review 56: review-55's open-tool balancing covered only the :done
+    ;; open-tool balancing covered only the :done
     ;; paths (finish_chunk/usage branches + the EOF flush) — emit-chat-error!
     ;; emitted :error with no balancing, so a tool_calls-delta-then-error
     ;; stream yielded [:start :toolcall-start :toolcall-delta :error] with

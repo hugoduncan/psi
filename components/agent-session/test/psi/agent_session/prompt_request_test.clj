@@ -193,7 +193,7 @@
       (is (nil? (:headers opts))))))
 
 (deftest built-in-session-never-inherits-custom-same-named-provider-auth-test
-  ;; Review 42: `provider-auth/provider-api-key` + `provider-request-options`
+  ;; `provider-auth/provider-api-key` + `provider-request-options`
   ;; resolved registry auth purely by provider NAME, and
   ;; `session->request-options`/`resolve-api-key` consumed them without the
   ;; session model's `:custom?` origin gate — so a custom models.edn provider
@@ -254,7 +254,7 @@
         (java.io.File/.delete (java.io.File. path-key))))))
 
 (deftest provider-switch-never-reuses-stale-runtime-api-key-test
-  ;; Review 35: `:runtime-api-key` is stored per-session, unscoped, at prompt
+  ;; `:runtime-api-key` is stored per-session, unscoped, at prompt
   ;; prepare; prompt_request/resolve-api-key gave it priority 2 ABOVE the
   ;; current provider's own provider-auth/provider-api-key, and neither
   ;; :session/set-model nor :session/apply-session-profile cleared or scoped
@@ -264,7 +264,7 @@
   ;; `:runtime-api-key-provider` and reused only when it still matches the
   ;; session's current model provider.
   ;;
-  ;; Review 36: the reuse check additionally requires the built-in/custom
+  ;; the reuse check additionally requires the built-in/custom
   ;; ORIGIN to match (`:runtime-api-key-custom?` recorded at prepare vs the
   ;; session model's registry `:custom?` tag) — a custom models.edn provider
   ;; literally named "anthropic"/"openai" can no longer reuse a key recorded
@@ -284,9 +284,9 @@
                             :api      :anthropic-messages
                             :auth     {:api-key "minimax-registry-key"}
                             :models   [{:id "MiniMax-M2.7"}]}
-                           ;; review 36: a custom provider literally named
+                           ;; a custom provider literally named
                            ;; "anthropic" — tagged :custom? true by
-                           ;; expand-model (review 14), same session provider
+                           ;; expand-model, same session provider
                            ;; string as the built-in.
                            "anthropic"
                            {:base-url "https://third-party.example/anthropic"
@@ -391,7 +391,7 @@
         (java.io.File/.delete (java.io.File. path))))))
 
 (deftest registry-auth-change-wins-over-stale-stored-key-test
-  ;; Review 36: the same-provider stored `:runtime-api-key` is a
+  ;; the same-provider stored `:runtime-api-key` is a
   ;; self-perpetuating fixed point — priority-2 reuse re-recorded the stored
   ;; RAW spec each prepare, so a models.edn `:auth` change + /reload-models
   ;; never reached an existing session (old env: var name pinned). The stored

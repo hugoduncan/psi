@@ -48,7 +48,7 @@
       ((:stream openai/provider)
        convo model {:api-key "not-a-jwt-token"}
        (fn [ev] (swap! events conj ev)))
-      ;; Review 52: emit-codex-error! emits :start first when the stream
+      ;; emit-codex-error! emits :start first when the stream
       ;; never produced output, so the sequence is [:start :error].
       (is (= [:start :error] (mapv :type @events)))
       (is (re-find #"chatgpt_account_id"
@@ -227,7 +227,7 @@
       ((:stream openai/provider)
        convo model {:api-key token}
        (fn [ev] (swap! events conj ev))))
-    ;; Review 52: emit-codex-error! emits :start first when the stream never
+    ;; emit-codex-error! emits :start first when the stream never
     ;; produced output, so the HTTP-error sequence is [:start :error].
     (is (= [:start :error] (mapv :type @events)))
     (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
@@ -236,7 +236,7 @@
 
 (deftest codex-http-error-surfaces-response-headers-test
   (testing "a codex HTTP-error response keeps its headers on the :error event"
-    ;; Review 51: stream-openai-codex's HTTP-error branch destructured away
+    ;; stream-openai-codex's HTTP-error branch destructured away
     ;; :headers/:body-text/:body even though emit-codex-error!'s 4-arity
     ;; accepts headers (used by the SSE response.failed / error branches) —
     ;; the only transport whose HTTP-error path lost request-id-style headers
@@ -263,7 +263,7 @@
                       :api-key token}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
-          "a stream that never produced output emits :start then the :error terminal (review 52)")
+          "a stream that never produced output emits :start then the :error terminal")
       (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
              (:error-message (second @events)))
           "error message still surfaces (with the request-id header now)")
@@ -275,16 +275,16 @@
 
 (deftest codex-error-first-stream-emits-start-then-error-test
   (testing "an error-FIRST codex stream (response.failed before any output event) emits :start then :error"
-    ;; Review 52: emit-codex-error! emitted [:error] with no preceding :start
+    ;; emit-codex-error! emitted [:error] with no preceding :start
     ;; when the stream errored before producing any output event — the
-    ;; review-50 :start-before-terminal fix covered the anthropic "error"
+    ;; start-before-terminal fix covered the anthropic "error"
     ;; branch and the terminal :done emitters but not the codex error
     ;; emitter, and the existing codex error test never caught it because it
     ;; starts with response.output_text.delta (which triggers :start via the
     ;; non-error path). The error emitter now emits :start first (mirroring
-    ;; emit-codex-start!'s role in the codex EOF flush and the review-50
+    ;; emit-codex-start!'s role in the codex EOF flush and the
     ;; anthropic error branch), so an error-first stream yields
-    ;; [:start :error] — the last three-transport asymmetry in the review-50
+    ;; [:start :error] — the last three-transport asymmetry in the
     ;; class.
     (let [model  (models/get-model :gpt-5.3-codex)
           token  (jwt-with-account-id "acc_test")
@@ -308,7 +308,7 @@
 
 (deftest codex-mid-stream-error-captured-once-test
   (testing "a codex mid-stream SSE error captures the constructed :error once, not the raw event twice"
-    ;; Review 52: handle-codex-event! captured the raw response.failed/error
+    ;; handle-codex-event! captured the raw response.failed/error
     ;; event at its top AND emit-codex-error! captured the CONSTRUCTED
     ;; :error event again — two :on-provider-response callbacks per codex
     ;; mid-stream error, while the anthropic "error" branch and openai
@@ -319,7 +319,7 @@
     ;; HTTP-error path); non-error lines are still captured raw (matching
     ;; the sibling transports' raw-line capture). The trailing
     ;; response.output_text.delta after the error is a full no-op (done?
-    ;; short-circuit — review 46), so it is not captured either.
+    ;; short-circuit), so it is not captured either.
     (let [model    (models/get-model :gpt-5.3-codex)
           token    (jwt-with-account-id "acc_test")
           convo    (-> (conv/create "sys") (conv/add-user-message "hi"))
@@ -359,7 +359,7 @@
 
 (deftest codex-catch-block-surfaces-exception-headers-test
   (testing "a stream-read exception with response headers in ex-data keeps them on the :error event"
-    ;; Review 52: the catch block must preserve exception response metadata.
+    ;; the catch block must preserve exception response metadata.
     ;; Exercise the real parser through a nullable response body that throws
     ;; with status and headers after serving one valid event.
     (let [model  (models/get-model :gpt-5.3-codex)
@@ -381,7 +381,7 @@
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (= [:start :text-delta :error] (mapv :type @events)))
         (is (= "req_catch_429" (get-in err [:headers "x-request-id"]))
-            "exception ex-data headers are kept on the :error event (review-52 catch-block fix)")
+            "exception ex-data headers are kept on the :error event")
         (is (= "simulated stream read failure (status 429) [request-id req_catch_429]"
                (:error-message err))
             "error message includes the status and request-id from the exception ex-data")
@@ -389,15 +389,15 @@
             "exception ex-data status is carried through")))))
 
 (deftest codex-chatgpt-account-id-capture-masked-test
-  ;; Review 21: mask-chatgpt-account-id (first 6 chars + "...",
+  ;; mask-chatgpt-account-id (first 6 chars + "...",
   ;; request_support.clj) is wired into openai/transport.clj
   ;; redact-request-headers, but no capture-path test asserts the masked
   ;; output — codex-request-and-reply-capture-callbacks-test asserts only
   ;; Authorization redaction, and custom-header-auth-redacted-in-captures-test
   ;; covers X-API-Key/authorization only. Locks the mask on the
   ;; :on-provider-request payload for a wire chatgpt-account-id header
-  ;; (keyless codex request, custom header passes through per review 18) and a
-  ;; mixed-case duplicate (review 19 dual-casing semantics: EVERY
+  ;; (keyless codex request, custom header passes through by contract) and a
+  ;; mixed-case duplicate (dual-casing semantics: EVERY
   ;; case-insensitive match is masked).
   (testing "wire chatgpt-account-id headers are masked to first-6-chars in :on-provider-request captures"
     (let [model           {:id                 "local-codex"
@@ -442,7 +442,7 @@
       (is (= "acc_12..." (get-in @request-capture [:request :headers "chatgpt-account-id"]))
           "lowercase chatgpt-account-id must be masked to first 6 chars + '...'")
       (is (= "acc_09..." (get-in @request-capture [:request :headers "ChatGPT-Account-Id"]))
-          "mixed-case duplicate chatgpt-account-id must also be masked (review 19 dual-casing)")
+          "mixed-case duplicate chatgpt-account-id must also be masked")
       (is (nil? (get-in @request-capture [:request :headers "Authorization"]))
           "keyless request sends no Authorization header"))))
 
@@ -529,7 +529,7 @@
 
 (deftest codex-error-after-tool-start-balances-open-tool-call-test
   (testing "a response.failed after a function_call output item closes the open tool call before :error"
-    ;; Review 56: review-55's open-tool balancing covered only the :done
+    ;; open-tool balancing covered only the :done
     ;; path (emit-codex-done!'s open-tool-indexes doseq) — emit-codex-error!
     ;; (shared by every codex error path: response.failed/error SSE events,
     ;; the HTTP-error branch, the catch block) never balanced open tool

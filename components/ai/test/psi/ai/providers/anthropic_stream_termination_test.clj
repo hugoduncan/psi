@@ -1,5 +1,5 @@
 (ns psi.ai.providers.anthropic-stream-termination-test
-  "Review-48 stream follow-ups for the :anthropic-messages transport:
+  "Termination and malformed-stream behavior for the :anthropic-messages transport:
   the EOF-level terminal flush (a stream that EOFs without an in-band
   terminal event terminates with :done instead of hanging) and the
   redacted_thinking content-block typing fix (skipped, not mislabeled as
@@ -42,17 +42,14 @@
 
 (deftest stream-anthropic-eof-flush-emits-done-test
   (testing "a stream that EOFs without an in-band terminal event emits exactly one terminal :done"
-    ;; Review 48: consume-stream-response! ended with NOTHING after the SSE
+    ;; consume-stream-response! ended with NOTHING after the SSE
     ;; doseq, so a stream that EOFs without message_stop /
     ;; message_delta-with-stop_reason / "error" emitted no terminal event and
-    ;; hung the turn until llm-stream-idle-timeout-ms — the review-43 hang
-    ;; class via the EOF path rather than a mid-stream error. Directly
-    ;; task-relevant: review 47 established DeepSeek's streaming path is
-    ;; UNVERIFIED (the review-1 smoke test exercised only the non-streaming
-    ;; execute path), so a DeepSeek stream ending without message_stop would
-    ;; hang 20 minutes instead of terminating. The EOF flush now emits the
-    ;; same terminal as message_stop (:stop, review-47 usage-with-cost
-    ;; shape); when an in-band terminal already fired, done? makes it a
+    ;; hung the turn until llm-stream-idle-timeout-ms. Live DeepSeek streaming
+    ;; follows the normal message_delta/message_stop shape; this EOF path is
+    ;; defensive support for truncated or non-conforming compatible streams.
+    ;; The flush emits the same usage-bearing :stop terminal as message_stop;
+    ;; when an in-band terminal already fired, done? makes it a
     ;; no-op (verified by every existing message_stop/message_delta/error
     ;; stream test still passing with exactly one terminal).
     (let [model  (models/get-model :sonnet-4.6)
@@ -86,7 +83,7 @@
         (is (= :stop (:reason done))
             "the EOF flush emits the same terminal reason as message_stop")
         (is (map? (:usage done))
-            "the EOF-flush :done carries the accumulated usage (review-47 usage-with-cost shape)")
+            "the EOF-flush :done carries the accumulated usage")
         (is (= 100 (get-in done [:usage :input-tokens]))
             "input tokens accumulated from message_start")
         (is (= 20 (get-in done [:usage :cache-read-tokens]))
@@ -94,9 +91,9 @@
 
 (deftest stream-anthropic-eof-flush-no-message-start-emits-start-then-done-test
   (testing "a stream that EOFs before message_start emits :start then the terminal :done"
-    ;; Review 50: stream-anthropic's terminal emitters never emitted :start
+    ;; stream-anthropic's terminal emitters never emitted :start
     ;; when the stream never received message_start — the only three-transport
-    ;; asymmetry left in the review-48 EOF-level flush. :start was emitted
+    ;; asymmetry left in the EOF-level flush. :start was emitted
     ;; only inside the message_start case branch and stream-anthropic had no
     ;; started? tracking, so emit-terminal-done! (message_stop + the EOF
     ;; flush) emitted :done with no preceding :start; the sibling transports
@@ -136,9 +133,9 @@
 
 (deftest stream-anthropic-error-without-message-start-emits-start-then-error-test
   (testing "a mid-stream error with no message_start emits :start then :error"
-    ;; Review 50: the "error" SSE branch emitted :error with no preceding
+    ;; the "error" SSE branch emitted :error with no preceding
     ;; :start when the stream never received message_start (a malformed
-    ;; stream whose first event is the error) — the same review-50 asymmetry
+    ;; stream whose first event is the error) — the same terminal-ordering gap
     ;; as the terminal :done, on the error path. The branch now emits :start
     ;; first (when not started), mirroring the terminal emitters and the
     ;; sibling transports' error paths.
@@ -161,9 +158,9 @@
 
 (deftest stream-anthropic-message-delta-first-emits-start-then-done-test
   (testing "a stream whose first event is message_delta-with-stop_reason emits :start then the terminal :done"
-    ;; Review 52: the message_delta-with-stop_reason terminal branch emitted
+    ;; the message_delta-with-stop_reason terminal branch emitted
     ;; :done with no preceding :start when the stream never received
-    ;; message_start — review 50 tested message_stop-first and empty-body but
+    ;; message_start — message_stop-first and empty-body were covered, but
     ;; NOT message_delta-first, so a malformed stream starting with a
     ;; message_delta carrying stop_reason yielded [:done] while
     ;; message_stop-first yields [:start :done]. The branch now emits :start
@@ -189,12 +186,12 @@
 
 (deftest stream-anthropic-first-read-exception-emits-start-then-error-test
   (testing "a stream-read exception before any output event emits :start then the :error terminal"
-    ;; Review 53: the outer catch block emitted [:error] with no preceding
+    ;; the outer catch block emitted [:error] with no preceding
     ;; :start when the exception fired before any output event (e.g. a
     ;; connection reset on the first read) — the last gap in the
-    ;; review-50/52 :start-before-terminal class on this transport (every
-    ;; in-band terminal/error emitter now emits :start first: the review-50
-    ;; "error" branch, the review-52 message_delta branch, and
+    ;; start-before-terminal class on this transport (every
+    ;; in-band terminal/error emitter now emits :start first: the
+    ;; "error" branch, the message_delta branch, and
     ;; emit-terminal-done!). The catch now emits :start once (compare-and-set
     ;; on started? — the top-level emit-start! helper) before the :error, so
     ;; a first-read exception yields [:start :error] like the in-band error
@@ -215,7 +212,7 @@
 
 (deftest stream-anthropic-message-stop-done-consumer-exception-no-second-error-test
   (testing "a consume-fn exception on the message_stop :done does not emit a second :error terminal"
-    ;; Review 49: the message_stop terminal :done reset done? AFTER the
+    ;; the message_stop terminal :done reset done? AFTER the
     ;; structured-output emissions and the :done consume — the ONLY terminal
     ;; path across the three transports that did this (message_delta-with-
     ;; stop_reason resets first; every OpenAI-transport terminal emitter
@@ -223,9 +220,9 @@
     ;; (here: the :done consume-fn throws, e.g. a statechart dispatch
     ;; failure inside make-provider-event-consumer's :done → :turn/done
     ;; send) propagated to the outer catch with done? still false and
-    ;; emitted a SECOND :error terminal — the double-terminal class reviews
-    ;; 43/44/46 eliminated on every other terminal path. emit-terminal-done!
-    ;; (shared by the message_stop branch and the review-48 EOF flush) now
+    ;; emitted a SECOND :error terminal — a double-terminal failure already
+    ;; prevented on every other terminal path. emit-terminal-done!
+    ;; (shared by the message_stop branch and the EOF flush) now
     ;; resets done? FIRST, so the exception is swallowed by the catch's
     ;; done? guard: exactly one terminal event, no second :error.
     (let [model  (models/get-model :sonnet-4.6)
@@ -261,18 +258,18 @@
 
 (deftest redacted-thinking-block-not-mislabeled-as-text-test
   (testing "a redacted_thinking content block's start/stop emit no :text-start/:text-end"
-    ;; Review 48: content-block-start-event/content-block-stop-event fell to
+    ;; content-block-start-event/content-block-stop-event fell to
     ;; the default :text-start/:text-end for "redacted_thinking" blocks
     ;; (Anthropic's first thinking block in extended-thinking streams,
     ;; carrying opaque base64 :data), so the accumulator created a phantom
     ;; empty text block and the last-provider-event marker mislabeled a
-    ;; thinking-family block stop as text — the same mislabel class review 43
+    ;; thinking-family block stop as text — the same mislabeling already fixed
     ;; fixed for "thinking". The block is now SKIPPED (no start event, no
     ;; stop event, no delta): no phantom text block, no mislabeled marker,
     ;; and no unbalanced :thinking-end for a block whose start was skipped
     ;; (which would create a phantom CLOSED block downstream). Not reachable
     ;; on the newly shipped DeepSeek provider (its compat table explicitly
-    ;; does not support redacted-thinking) — this completes the review-43
+    ;; does not support redacted-thinking) — this completes the
     ;; typing change for the built-in Anthropic path.
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
@@ -286,7 +283,7 @@
                                 {:type "content_block_delta" :index 0
                                  :delta {:type "redacted_thinking_delta"
                                          :data "cmVkYWN0ZWQ="
-                                         ;; Review 50: a :text key on a
+                                         ;; a :text key on a
                                          ;; redacted_thinking_delta proves the
                                          ;; explicit skip branch — before the
                                          ;; explicit "redacted_thinking"
@@ -319,13 +316,12 @@
                                 (fn [e] (swap! events conj e)))
     @events))
 
-;; ── Malformed-stream :start + unknown-index block handling (review 54) ──────
+;; ── Malformed-stream :start + unknown-index block handling ──────
 
 (deftest stream-anthropic-content-block-start-first-emits-start-test
   (testing "a content_block_start-first stream (no message_start) emits :start before the first content event"
-    ;; Review 54: the content-block branches never emitted :start — the
-    ;; non-terminal half of the review-50 :start-before-first-event class
-    ;; (reviews 50/52/53 fixed the terminal/error/catch emitters only). A
+    ;; the content-block branches never emitted :start — the
+    ;; non-terminal half of the :start-before-first-event invariant. A
     ;; malformed/non-conforming stream whose FIRST event is
     ;; content_block_start emitted [:text-start :text-delta :text-end
     ;; :start :done] — the first content event had no preceding :start, and
@@ -349,7 +345,7 @@
 
 (deftest stream-anthropic-unknown-index-content-block-skipped-test
   (testing "content_block_delta/stop at an index whose start was never received are skipped — no unbalanced text events"
-    ;; Review 54: content_block_delta/content_block_stop for an UNKNOWN
+    ;; content_block_delta/content_block_stop for an UNKNOWN
     ;; index (no prior content_block_start — a stream that omits start
     ;; events, reuses indices, or reorders deltas/stops ahead of starts)
     ;; previously emitted unbalanced :text-delta/:text-end: (:type
@@ -382,11 +378,11 @@
              (mapv :type (run-stream sse model {:api-key "test-key"})))
           "well-formed stream with a bad index: no phantom :text-delta/:text-end, exactly one terminal"))))
 
-;; ── EOF open-block balancing (review 55) ─────────────────────────────────────
+;; ── EOF open-block balancing ─────────────────────────────────────
 
 (deftest stream-anthropic-eof-balances-open-tool-block-test
   (testing "a stream that EOFs mid-tool_use (no stop, no message_stop) closes the open block before :done"
-    ;; Review 55: the EOF-level terminal flush emitted :done with an OPEN
+    ;; the EOF-level terminal flush emitted :done with an OPEN
     ;; block index — a tool_use block whose content_block_stop never arrived
     ;; left the turn accumulator with an unclosed index when handle-done!
     ;; finalized (no :toolcall-end precedes the :done), the
@@ -409,11 +405,11 @@
 
 (deftest stream-anthropic-eof-balances-open-thinking-block-test
   (testing "a stream that EOFs mid-thinking (no stop, no message_stop) closes the open block before :done"
-    ;; Review 55: same class as the tool_use case — a thinking block started
+    ;; same class as the tool_use case — a thinking block started
     ;; but never stopped left the accumulator with an OPEN index at :done
     ;; (probe-verified pre-fix: message_start + content_block_start
     ;; (thinking) + EOF → [:start :thinking-start :done]). The terminal now
-    ;; balances it with :thinking-end (the review-43 typed-block event for
+    ;; balances it with :thinking-end (the typed-block event for
     ;; the thinking type) before the :done.
     (let [model (models/get-model :sonnet-4.6)
           sse   (str (sse-line "message_start" {:type "message_start"})
@@ -428,7 +424,7 @@
 
 (deftest stream-anthropic-eof-balances-open-text-block-test
   (testing "a stream that EOFs mid-text closes the open block before :done"
-    ;; Review 55: text blocks have the same EOF gap — a text block started
+    ;; text blocks have the same EOF gap — a text block started
     ;; but never stopped (stream truncated mid-reply) left an OPEN index at
     ;; :done. The terminal now balances it with :text-end. A well-formed
     ;; stream (stop received) is unaffected: the stop branch dissocs the
@@ -462,7 +458,7 @@
 
 (deftest stream-anthropic-eof-balances-multiple-open-blocks-in-index-order-test
   (testing "multiple open blocks at EOF are balanced in index order before the :done"
-    ;; Review 55: the open-block doseq sorts by index so the balancing end
+    ;; the open-block doseq sorts by index so the balancing end
     ;; events are deterministic — a truncated stream with a text block (0)
     ;; and an unstarted/stopped tool block (1) still open closes both.
     (let [model (models/get-model :sonnet-4.6)
@@ -481,8 +477,7 @@
 
 (deftest stream-anthropic-ignores-deepseek-ping-events-test
   (testing "a mid-stream ping SSE event (DeepSeek's extra event type) is ignored — no error, no hang, no unbalanced events"
-    ;; Review 55 (live verification, 2026-08-09): DeepSeek's streaming path
-    ;; was exercised live for the first time — the stream CONFORMED to the
+    ;; Live DeepSeek streaming conforms to the
     ;; Anthropic shape (message_start / message_delta / message_stop,
     ;; balanced content blocks, adaptive thinking accepted, Anthropic-shaped
     ;; cache usage fields), with one observed deviation: an extra mid-stream
@@ -509,18 +504,18 @@
              (mapv :type events))
           "the ping events are ignored — exactly the well-formed sequence"))))
 
-;; ── Open-block balancing on the error/message_delta terminals (review 56) ──
+;; ── Open-block balancing on the error/message_delta terminals ──
 
 (deftest stream-anthropic-error-after-thinking-start-balances-open-block-test
   (testing "a mid-stream SSE error after a thinking block started closes the block before :error"
-    ;; Review 56: review-55's open-block balancing covered only the :done
+    ;; open-block balancing covered only the :done
     ;; terminals (message_stop + the EOF flush) — the mid-stream "error"
     ;; SSE branch emitted :error with no balancing, so a stream that started
     ;; a thinking block and then received overloaded_error yielded
     ;; [:start :thinking-start :thinking-delta :error] with the block
     ;; :status :open in turn-data's :content-blocks (exposed via the
     ;; :psi.turn/content-blocks telemetry resolver) — the exact
-    ;; no-phantom-or-unbalanced-block invariant review 55 asserted "via the
+    ;; no-phantom-or-unbalanced-block invariant held via the
     ;; EOF path", still open via the error path. The "error" branch now
     ;; balances open blocks (shared balance-open-blocks!) before the :error.
     (let [model (models/get-model :sonnet-4.6)
@@ -546,7 +541,7 @@
 
 (deftest stream-anthropic-error-after-tool-start-balances-open-block-test
   (testing "a mid-stream SSE error after a tool_use block started closes the block before :error"
-    ;; Review 56: same class as the thinking case — a tool_use block started
+    ;; same class as the thinking case — a tool_use block started
     ;; but never stopped, then a mid-stream error, previously finalized with
     ;; the tool call OPEN ([:start :toolcall-start :error]). The "error"
     ;; branch now emits :toolcall-end for the open index before the :error.
@@ -568,9 +563,9 @@
 
 (deftest stream-anthropic-message-delta-stop-reason-with-open-blocks-balances-test
   (testing "a message_delta-with-stop_reason terminal with open blocks closes them before :done"
-    ;; Review 56: the message_delta-with-stop_reason branch emits its INLINE
+    ;; the message_delta-with-stop_reason branch emits its INLINE
     ;; :done (separate from emit-terminal-done! since it carries the actual
-    ;; stop_reason) WITHOUT the review-55 open-block balancing — the two
+    ;; stop_reason) WITHOUT open-block balancing — the two
     ;; :done branches of the same transport disagreed (message_stop
     ;; balanced, message_delta-with-stop_reason not), so a non-conforming
     ;; stream that sends message_delta-with-stop_reason while a block is

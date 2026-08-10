@@ -359,7 +359,7 @@
     ;; thinking-param requires an active :thinking-level (session default
     ;; :off), so /effort on an adaptive model with /thinking unset/off emits
     ;; neither :thinking nor :output_config — a silent no-op, documented in
-    ;; doc/custom-providers.md (review 11).
+    ;; doc/custom-providers.md.
     (let [convo (conv/create "sys")
           req   (#'anthropic/build-request convo deepseek-custom-provider-model
                                            {:effort-override :xhigh
@@ -588,7 +588,7 @@
           (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))))))))
 
 (deftest build-request-custom-anthropic-beta-header-replaces-transport-betas-test
-  ;; Review 22: build-request merges custom :headers over the base headers, so
+  ;; build-request merges custom :headers over the base headers, so
   ;; a custom "anthropic-beta" header REPLACES the transport-generated beta
   ;; header on the first request — the transport's own betas (prompt-caching,
   ;; interleaved-thinking, fast-mode) are silently dropped from the wire. The
@@ -641,7 +641,7 @@
     (is (false? (get-in recorded [:request :throw-exceptions])))))
 
 (deftest execute-anthropic-preserves-tool-use-blocks-test
-  ;; Review 57: the non-streaming execute response mapping previously kept
+  ;; the non-streaming execute response mapping previously kept
   ;; only "text" blocks (text-content-blocks) — a response containing a
   ;; tool_use block silently dropped the tool call while :stop-reason
   ;; :tool_use was preserved, so classify-assistant-message /
@@ -680,7 +680,7 @@
         "tool_use block maps to :tool-call with id/name/JSON-string arguments, wire order preserved")))
 
 (deftest execute-anthropic-preserves-thinking-blocks-test
-  ;; Review 57 informational note: the old text-content-blocks mapping also
+  ;; the old text-content-blocks mapping also
   ;; dropped thinking blocks on the non-streaming execute path while the
   ;; streaming accumulator keeps them in the final content — the same
   ;; mapping now preserves them (:thinking with text/signature), matching

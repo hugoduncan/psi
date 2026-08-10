@@ -13,7 +13,7 @@
    :builtin-missing-msg "Missing Anthropic API key. Set ANTHROPIC_API_KEY or login via /login anthropic."})
 
 (deftest resolve-api-key-keyless-contract-test
-  ;; Review 22: resolve-api-key's keyless early-return used to test only
+  ;; resolve-api-key's keyless early-return used to test only
   ;; (:no-auth-header options), not the shared no-auth? predicate — the two
   ;; keyless definitions could drift, and the public function threw for a
   ;; headers-auth keyless config when called directly. The keyless contract
@@ -87,7 +87,7 @@
     (is (false? (request-support/auth-header? "X-Client")))))
 
 (deftest builtin?-origin-tag-gate-test
-  ;; Review 24: builtin? is the review-14 origin-tag gate — the predicate
+  ;; builtin? is the origin-tag gate — the predicate
   ;; that decides env-var fallback / OAuth treatment, and the most
   ;; security-relevant helper in the namespace. Previously only exercised
   ;; indirectly through transport tests.
@@ -112,9 +112,9 @@
                                           :anthropic)))))
 
 (deftest resolve-key-spec-test
-  ;; Review 26: the shared env: spec resolution — used by resolve-api-key at
+  ;; the shared env: spec resolution — used by resolve-api-key at
   ;; request time (and directly by user_models_test.clj's resolve-key-spec-
-  ;; test since review 28 deleted the production-dead
+  ;; test after deleting the production-dead
   ;; user_models/resolve-api-key-spec wrapper). Custom models.edn `env:` keys
   ;; are stored RAW in the registry and re-resolved per request.
   (testing "nil/blank → nil"
@@ -127,7 +127,7 @@
              (request-support/resolve-key-spec "env:DEEPSEEK_API_KEY" environment))))
     (let [environment (environment-boundary/nullable {})]
       (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ" environment)))))
-  (testing "env: with a blank variable name is unresolvable, never getenv \"\" (review 30)"
+  (testing "env: with a blank variable name is unresolvable, never getenv \"\""
     ;; "env:" / "env: " name an empty variable — a config error, not an env
     ;; lookup of the empty string (which would silently return nil and
     ;; surface as a misleading "environment variable  is unset" downstream).
@@ -203,7 +203,7 @@
               anthropic-config))))))
 
 (deftest builtin-openai-chat-completions?-test
-  ;; Review 26: the shared built-in-openai-chat-completions predicate used
+  ;; the shared built-in-openai-chat-completions predicate used
   ;; by agent-session's mid-conversation system-message inference — origin
   ;; tag + provider built-in classification must live here once (alongside
   ;; builtin?), not as an inline copy in model_capabilities that could drift.
@@ -230,7 +230,7 @@
                  {:provider :anthropic :api :openai-completions})))))
 
 (deftest find-headers-case-insensitive-all-matches-test
-  ;; Review 19: redaction must find EVERY case-insensitive match per
+  ;; redaction must find EVERY case-insensitive match per
   ;; auth-header name — a differently-cased duplicate on the wire would
   ;; otherwise leak verbatim into the :on-provider-request capture.
   (testing "find-headers returns every case-insensitive match under its original casing"
@@ -257,7 +257,7 @@
     (is (nil? (request-support/redact-secret 42)))))
 
 (deftest redact-authorization-test
-  ;; Review 13: redact-authorization strips a leading "Bearer " prefix before
+  ;; redact-authorization strips a leading "Bearer " prefix before
   ;; counting, so (len=N) measures the secret itself, not the 7-char prefix.
   (testing "Bearer-prefixed values count the secret only"
     (is (= "Bearer ***REDACTED***"
@@ -279,7 +279,7 @@
     (is (nil? (request-support/mask-chatgpt-account-id nil)))))
 
 (deftest redact-headers-all-matches-dual-casing-test
-  ;; Review 19: redact-headers must redact EVERY case-insensitive match per
+  ;; redact-headers must redact EVERY case-insensitive match per
   ;; auth-header name (base x-api-key + custom X-API-Key, or Authorization +
   ;; authorization) — redacting only the first would leak the duplicate
   ;; verbatim into the capture. Redacted values are written back under the
@@ -303,7 +303,7 @@
                     [["Authorization" request-support/redact-authorization]])]
       (is (= "Bearer ***REDACTED*** (len=30)" (get redacted "Authorization")))
       (is (= "Bearer ***REDACTED*** (len=25)" (get redacted "authorization")))))
-  (testing "dual-casing chatgpt-account-id → both masked (review 21 mask semantics)"
+  (testing "dual-casing chatgpt-account-id → both masked"
     (let [redacted (request-support/redact-headers
                     {"chatgpt-account-id" "acc_1234567890"
                      "ChatGPT-Account-Id" "acc_0987654321"}
@@ -318,7 +318,7 @@
       (is (= "***REDACTED***" (get redacted "X-API-Key"))))))
 
 (deftest emit-start-once-test
-  ;; Review 54: the shared :start emitter extracted from the three
+  ;; the shared :start emitter extracted from the three
   ;; byte-identical per-transport copies (anthropic emit-start!, openai
   ;; emit-stream-start!, codex emit-codex-start!) — the once-guard is the
   ;; contract all three transports rely on, so it is locked here directly.

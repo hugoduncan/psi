@@ -8,12 +8,12 @@
    [psi.ai.providers.anthropic :as anthropic]))
 
 ;; ── build-request auth: keyless providers, header interplay, OAuth gating ──
-;; Split out of anthropic_test.clj (review 14 finalization — the accumulated
-;; review-driven test additions pushed that file past the 800-line
+;; Split out of anthropic_test.clj because the accumulated auth tests pushed
+;; that file past the 800-line
 ;; commit-checks limit). These deftests form the cohesive "anthropic provider
 ;; auth" unit: keyless/no-auth-header requests, configured-key + custom-header
 ;; interplay (case-dependence), OAuth content-sniff gating to built-in
-;; models, and the review-14 custom-provider origin-tag (custom? true)
+;; models, and the custom-provider origin tag (`:custom? true`)
 ;; built-in detection gap.
 
 (deftest build-request-no-auth-header-custom-provider-test
@@ -177,7 +177,7 @@
           "no x-api-key when auth comes from an authorization header"))))
 
 (deftest configured-key-plus-recognized-auth-header-interplay-test
-  ;; Review 11: a custom :headers map carrying a recognized auth header name
+  ;; a custom :headers map carrying a recognized auth header name
   ;; silently replaces/duplicates the configured :api-key — untested for both
   ;; transports. Anthropic build-request merges custom headers OVER the base
   ;; headers, so :headers {"X-API-Key" "other"} with a configured key sends
@@ -235,7 +235,7 @@
           "custom Authorization header merged in as-is")))
 
   (testing "configured key + EXACT-case x-api-key custom header REPLACES the configured key"
-    ;; Review 14: the merge is on equal string keys — a custom header whose
+    ;; the merge is on equal string keys — a custom header whose
     ;; name is the exact lowercase "x-api-key" collides with the base header,
     ;; so the configured credential is silently DROPPED (not duplicated, as
     ;; with the mixed-case X-API-Key variant). The doc guidance is
@@ -286,7 +286,7 @@
           "api-key system prompt is sent as-is, without the Claude Code identity"))))
 
 (deftest build-request-oauth-gated-on-builtin-models-test
-  ;; Review 11: oauth-api-key? content-sniffs the resolved key with no
+  ;; oauth-api-key? content-sniffs the resolved key with no
   ;; provider gate, so a custom :anthropic-messages provider whose key merely
   ;; contains "sk-ant-oat" was treated as an OAuth request — Authorization:
   ;; Bearer + claude-cli user-agent + x-app headers, the claude-code/oauth/
@@ -336,7 +336,7 @@
           "built-in OAuth requests still prepend the Claude Code identity"))))
 
 (deftest custom-provider-named-anthropic-not-builtin-test
-  ;; Review 14: built-in detection is by provider NAME, so a custom models.edn
+  ;; built-in detection is by provider NAME, so a custom models.edn
   ;; provider literally named "anthropic" was classified built-in and defeated
   ;; the provider-scoped guarantees — an unset configured key silently fell
   ;; back to ANTHROPIC_API_KEY (sent to the third-party endpoint) and an

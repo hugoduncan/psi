@@ -37,7 +37,7 @@
   "Absolute path of the committed .psi/models.edn, resolved from the repo
   root. Fails loud (throws) if the committed .psi/project.edn (whose
   session profiles this test snapshots) or .psi/models.edn is absent, so
-  the review-2/18/28/38 durable lock cannot silently degrade to a no-op
+  the durable configuration lock cannot silently degrade to a no-op
   from a wrong cwd."
   []
   (let [root        (repo-root)
@@ -163,9 +163,9 @@
           ;; production bootstrap (app-runtime/psi-tool/dispatch-effects load
           ;; <cwd>/.psi/models.edn) so those profiles resolve against the
           ;; committed project models file. This makes the test a durable
-          ;; lock for the review-2/18/28/38 regression class: a committed
+          ;; lock for configuration completeness: a committed
           ;; profile referencing a model NOT present in committed model
-          ;; sources fails here deterministically. Review 39: the committed
+          ;; sources fails here deterministically. The committed
           ;; path is resolved via the repo-root walk-up (not user.dir) and
           ;; fails loud on absence, so the lock cannot silently vanish from
           ;; a component-local cwd.
@@ -178,11 +178,11 @@
               (workflow-test-support/create-tui-context+session
                mutations/all-mutations
                {:session-defaults {:model {:provider "local" :id "test-model" :reasoning false}}})]
-          ;; Durable-lock fail-loud assertions (reviews 40 + 45): the session
+          ;; Durable-lock fail-loud assertions: the session
           ;; worktree must resolve the committed .psi/project.edn (deepseek
           ;; default profiles), and ALL SEVEN committed session profiles must
           ;; be present, valid, and resolve to the committed deepseek model.
-          ;; Review 45 extended the lock from :reviewing-implementation alone:
+          ;; the lock covers every configured workflow profile, not only :reviewing-implementation:
           ;; a single-profile regression (one profile removed, retargeted at
           ;; a nonexistent/typo'd model or provider, an invalid
           ;; :thinking-level, or re-pointed at the commented anthropic/openai

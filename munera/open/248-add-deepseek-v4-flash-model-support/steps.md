@@ -5463,7 +5463,7 @@
 
 ## Follow-ups (code-shaper review 5, 2026-08-09)
 
-- [ ] Rewrite task-added test comments and namespace descriptions around the
+- [x] Rewrite task-added test comments and namespace descriptions around the
       behavior each test proves instead of implementation-review chronology.
       The changed test files still contain 184 `Review N`/`pre-review-N`
       references across 22 files, including long historical narratives that

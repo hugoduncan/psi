@@ -155,18 +155,18 @@
           (is (= n (count (persist/all-entries-in ctx2 session-id2)))))))))
 
 (deftest mid-system-capability-custom-origin-test
-  ;; Review 25: the mid-system-message inference branch must not classify a
+  ;; the mid-system-message inference branch must not classify a
   ;; custom models.edn provider by NAME. `expand-model` tags every custom
   ;; model `:custom? true`; a custom provider literally named "openai"
   ;; (api :openai-completions) previously received the built-in-only
   ;; inference while every other custom provider had to declare the field
-  ;; explicitly — the same provider-name-collision class review 14 closed
+  ;; explicitly — the same provider-name-collision class guarded against
   ;; for env-key fallback and OAuth treatment.
   (testing "a custom provider named \"openai\" (:custom? true) does NOT get the built-in inference"
     (is (false? (model-capabilities/supports-mid-system-messages?
                  {:provider :openai :api :openai-completions :custom? true}))))
 
-  (testing "the inference routes through the shared request-support predicate (review 26)"
+  (testing "the inference routes through the shared request-support predicate"
     (is (false? (request-support/builtin-openai-chat-completions?
                  {:provider :openai :api :openai-completions :custom? true}))
         "custom provider named openai is excluded by the shared predicate")

@@ -251,7 +251,7 @@
           oauth-ctx (oauth/create-null-context {:credentials {:anthropic {:type :api-key :key "oauth-key"}}})]
       (try
         (model-registry/init! {:user-models-path path})
-        ;; review 42: a custom models.edn provider literally named "anthropic"
+        ;; a custom models.edn provider literally named "anthropic"
         ;; keys the registry :auth by that name — a built-in same-named session
         ;; must resolve only env/OAuth, never the custom provider's registry key.
         (is (= "oauth-key"
@@ -272,7 +272,7 @@
           oauth-ctx (oauth/create-null-context {:credentials {:minimax {:type :api-key :key "oauth-key"}}})]
       (try
         (model-registry/init! {:user-models-path path})
-        ;; review 42: a custom provider must never receive an OAuth-store
+        ;; a custom provider must never receive an OAuth-store
         ;; credential for its provider name (OAuth is built-in-only) — the
         ;; custom provider's own registry auth resolves instead.
         (is (= "minimax-inline-key"

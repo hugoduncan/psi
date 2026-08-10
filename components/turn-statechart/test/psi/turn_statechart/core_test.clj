@@ -69,7 +69,7 @@
       (is (= :text-accumulating (turn-sc/turn-phase ctx))))))
 
 (deftest terminal-from-idle-test
-  ;; Review 51: :idle previously accepted only :turn/start — :turn/error and
+  ;; :idle previously accepted only :turn/start — :turn/error and
   ;; :turn/done were silently DROPPED there (enabled transitions => #{}), so
   ;; a direct create-turn-context consumer feeding a provider :error/:done as
   ;; the FIRST event (tests, embeddings, any future turn path that skips the

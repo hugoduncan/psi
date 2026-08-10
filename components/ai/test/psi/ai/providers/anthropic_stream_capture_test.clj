@@ -195,10 +195,10 @@
           "mixed-case authorization header must be redacted via redact-authorization")))
 
   (testing "differently-cased duplicate auth headers are ALL redacted in captures"
-    ;; Review 19: redact-headers redacted only the FIRST case-insensitive
+    ;; redact-headers redacted only the FIRST case-insensitive
     ;; match per auth header name, so a wire request carrying both casings of
     ;; the same auth header — base "x-api-key" (configured key) + custom
-    ;; "X-API-Key" (the review-11/14 don't-mix scenario) — leaked the second
+    ;; "X-API-Key" (a supported but discouraged mixed-auth scenario) — leaked the second
     ;; one VERBATIM into the :on-provider-request capture. Every
     ;; case-insensitive match must be redacted so the CHANGELOG claim
     ;; "secrets carried in custom :headers never persist verbatim in

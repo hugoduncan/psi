@@ -171,16 +171,16 @@
         (is (true? (get-in (sut/find-candidate (sut/catalog-view) :local-proxy "proxy-model")
                            [:reference :configured?]))))
 
-      (testing "incidental custom headers do NOT count as configured (review 30)"
+      (testing "incidental custom headers do NOT count as configured"
         ;; A provider with only incidental headers (no :api-key, :auth-header?
         ;; default true) fast-fails every request with "Missing API key"
         ;; (request-support/no-auth? treats incidental headers as NOT keyless,
-        ;; review 5) — the picker must not advertise it as configured.
+        ;; matching request-support/no-auth?) — the picker must not advertise it as configured.
         (registry/init! {:user-models-path incidental-path})
         (is (false? (get-in (sut/find-candidate (sut/catalog-view) :x-client-only "incidental-model")
                             [:reference :configured?]))))
 
-      (testing "recognized auth header among custom :headers counts as configured (keyless, review 30)"
+      (testing "recognized auth header among custom :headers counts as configured (keyless)"
         ;; Mirrors request-support/no-auth?: a recognized auth header
         ;; (x-api-key/authorization) with no configured key is keyless, so the
         ;; request succeeds — the picker reports configured.
@@ -188,7 +188,7 @@
         (is (true? (get-in (sut/find-candidate (sut/catalog-view) :auth-header-only "header-model")
                            [:reference :configured?]))))
 
-      (testing "blank env: var name reports not configured (config error, review 30/32)"
+      (testing "blank env: var name reports not configured (config error)"
         ;; An "env:" spec with a blank variable name is never an environment
         ;; lookup — resolve-key-spec returns nil for it (a set env cannot
         ;; rescue the invalid spec), so it reads as not configured, matching

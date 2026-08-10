@@ -3,7 +3,7 @@
    (fallback-request-steps-for-400 / fallback-request-for-400 /
    handle-400-response! in providers/anthropic.clj and
    providers/anthropic/request_support.clj). Extracted from
-   anthropic_stream_test.clj (review 22) to keep both files under the repo
+   anthropic_stream_test.clj to keep both files under the repo
    file-length gate."
   (:require
    [clojure.test :refer [deftest is testing]]
@@ -105,7 +105,7 @@
       (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test
-  ;; Review 13: the HTTP-400 compatibility retry's :without-thinking step
+  ;; the HTTP-400 compatibility retry's :without-thinking step
   ;; strips BOTH :thinking and :output_config from the retried body (verified
   ;; against request_support.clj request-transform). For an adaptive-shape
   ;; DeepSeek request (thinking.type "adaptive" + output_config.effort) a
@@ -179,14 +179,14 @@
       (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-retries-without-all-betas-on-400-for-keyless-bearer-test
-  ;; Review 19: fallback-request-steps-for-400 gates :without-all-betas on
+  ;; fallback-request-steps-for-400 gates :without-all-betas on
   ;; (not (oauth-auth-request? request)), and oauth-auth-request? classified
   ;; ANY request carrying an Authorization: Bearer header as an OAuth request
   ;; — including a keyless custom provider whose auth comes from a custom
   ;; Authorization: Bearer header (the documented "Local servers and custom
   ;; headers" keyless pattern). On a beta-related 400 such a request kept ALL
   ;; beta headers on the retry (e.g. fast-mode-2026-02-01), repeating the same
-  ;; 400 and hard-failing — the review-8 fast-mode note's "beta stripped"
+  ;; 400 and hard-failing — stripping only the fast-mode beta header
   ;; degradation was worse there (not even the beta was stripped).
   ;; oauth-auth-request? now requires the transport's own OAuth signature
   ;; (Authorization Bearer + user-agent: claude-cli/… + x-app: cli), so a
@@ -247,7 +247,7 @@
             ":without-all-betas must clear ALL beta headers on the retry")
         (is (= "Bearer local-token" second-auth)
             "custom Authorization header must be preserved on the retry")
-        ;; Review 35: the :without-all-betas transform strips beta HEADERS but
+        ;; the :without-all-betas transform strips beta HEADERS but
         ;; leaves the body's :speed "fast" field — the documented
         ;; "fast-mode 400 is not auto-recoverable" degradation (a DeepSeek 400
         ;; on the unverified speed field retries once with the same field and
@@ -266,7 +266,7 @@
       (is (= [:start :done] (mapv :type @events)))))
 
   (testing "oauth-auth-request? distinguishes genuine OAuth from keyless custom-header Bearer"
-    ;; Direct predicate lock for the review-19 narrowing: only the
+    ;; Direct predicate lock for the OAuth-signature narrowing: only the
     ;; transport's own OAuth shape (Authorization Bearer + user-agent
     ;; claude-cli/ + x-app: cli) counts as OAuth; a bare custom Bearer
     ;; header does not.
@@ -281,7 +281,7 @@
           "keyless custom-header Bearer request is NOT classified OAuth"))))
 
 (deftest stream-anthropic-400-fallback-uses-transport-oauth-decision-test
-  ;; Review 22: oauth-auth-request? (anthropic/error.clj) content-sniffs the
+  ;; oauth-auth-request? (anthropic/error.clj) content-sniffs the
   ;; three-marker OAuth signature (Authorization: Bearer + user-agent:
   ;; claude-cli/… + x-app: cli) from the MERGED request headers, so the
   ;; documented keyless custom-header pattern can reproduce it: a keyless
@@ -293,7 +293,7 @@
   ;; transport's COMPUTED oauth? boolean (built-in Anthropic model +
   ;; OAuth-shaped key, threaded from build-request via ::oauth?), not the
   ;; header content-sniff — so this keyless request gets :without-all-betas
-  ;; (betas stripped on the retry) exactly like the review-19 keyless Bearer
+  ;; (betas stripped on the retry) exactly like the keyless Bearer
   ;; case. Fails against the old content-sniffing predicate (the three-marker
   ;; request was classified OAuth → no steps → 400 surfaced without retry).
   (testing "keyless custom-provider request with all three OAuth markers still gets :without-all-betas"
@@ -336,7 +336,7 @@
          {:http-boundary http-client
           :no-auth-header true
           ;; The full Claude Code CLI marker set as custom headers — the
-          ;; exact reproduction of the OAuth signature review-22 flagged.
+          ;; exact reproduction of the OAuth signature used by built-in requests.
           :headers {"Authorization" "Bearer local-token"
                     "user-agent"    "claude-cli/2.1.75"
                     "x-app"         "cli"}
@@ -361,7 +361,7 @@
       (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-custom-anthropic-beta-header-stripped-by-without-all-betas-test
-  ;; Review 22: a custom "anthropic-beta" header REPLACES the transport betas
+  ;; a custom "anthropic-beta" header REPLACES the transport betas
   ;; on the first request (merge of custom headers over base headers, locked
   ;; by build-request-custom-anthropic-beta-header-replaces-transport-betas-test),
   ;; and on a beta-related 400 the :without-all-betas step wipes the user's
