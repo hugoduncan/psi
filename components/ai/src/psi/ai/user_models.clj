@@ -89,12 +89,11 @@
 (defn- expand-model
   "Expand a model definition into a fully-formed model map.
 
-   Every custom models.edn model is tagged `:custom? true`. Built-in
-   detection in the provider transports (`builtin?` /
-   `builtin-anthropic?`) keys off this flag in addition to the provider
-   name, so a custom provider literally named \"anthropic\"/\"openai\" can
-   never be classified built-in and receive built-in-only treatment (env-var
-   key fallback, Claude Code OAuth headers) — review 14."
+   Every custom models.edn model is tagged `:custom? true`. Provider
+   transports use this origin tag together with the provider name when
+   classifying models, so a custom provider literally named
+   \"anthropic\"/\"openai\" cannot receive built-in-only treatment such as
+   environment-key fallback or Claude Code OAuth headers."
   [provider-key base-url api model-def]
   (let [provider-kw (if (keyword? provider-key)
                       provider-key
@@ -111,14 +110,13 @@
 ;; ── Provider auth ────────────────────────────────────────────────────────────
 
 (defn- extract-provider-auth
-  "Extract auth config for a provider. The `:api-key` is stored as the RAW
-   spec (literal or \"env:VAR\") — it is NOT resolved at parse time (review
-   26): the registry snapshots the spec, and the transports' shared
-   `request-support/resolve-api-key` re-resolves `env:` keys through getenv
-   per request, matching the built-in env fallback's live semantics (a var
-   exported after psi loaded models.edn is picked up without a reload).
-   Blank/nil specs normalize to nil (unchanged from the pre-review-26
-   parse-time resolution behavior)."
+  "Extract auth config for a provider.
+
+   The registry stores `:api-key` as a raw literal or `env:VAR` spec. Shared
+   transport request support resolves `env:` specs from psi's process
+   environment per request. Editing models.edn therefore requires no key-value
+   snapshot refresh, but changing psi's launch environment requires relaunching
+   psi. Blank or nil specs normalize to nil."
   [provider-key provider-def]
   (let [auth     (:auth provider-def)
         api-key  (not-empty (:api-key auth))

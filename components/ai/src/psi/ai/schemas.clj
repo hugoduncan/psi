@@ -168,7 +168,8 @@
    [:base-url string?]
    [:supports-reasoning boolean?]
    [:adaptive-thinking {:optional true} boolean?]
-   [:custom? {:optional true} [:maybe boolean?]]  ;; review 14: origin tag — true for models.edn custom models
+   ;; Reserved origin tag: true only for models.edn custom models.
+   [:custom? {:optional true} [:maybe boolean?]]
    [:supports-mid-conversation-system-messages {:optional true} boolean?]
    [:supports-images boolean?]
    [:supports-text boolean?]

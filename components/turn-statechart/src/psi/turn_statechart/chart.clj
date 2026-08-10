@@ -19,24 +19,10 @@
                                (ele/transition {:event  :turn/start
                                                 :target :text-accumulating}
                                                (ele/script {:expr (fn [_env data] (dispatch! data :on-stream-start))}))
-                               ;; Review 51: terminal transitions from the
-                               ;; initial state. :idle previously accepted only
-                               ;; :turn/start — :turn/error and :turn/done were
-                               ;; silently DROPPED there (enabled transitions
-                               ;; => #{}), so a direct create-turn-context
-                               ;; consumer feeding a provider :error/:done as
-                               ;; the FIRST event got a silent drop, done-p
-                               ;; never delivered, and only the 20-minute
-                               ;; llm-stream-idle-timeout-ms ended the turn
-                               ;; (whose own :turn/error send was dropped too).
-                               ;; Not reachable through the live-turn path
-                               ;; (create-live-turn-context sends the
-                               ;; turn-level :turn/start first) but a latent
-                               ;; structural gap in the "exactly one terminal
-                               ;; event per turn" invariant. Mirror the
-                               ;; :text-accumulating / :tool-accumulating
-                               ;; terminal transitions so terminal events are
-                               ;; accepted from ANY state.
+                               ;; Accept terminal events from every state. Direct
+                               ;; consumers may receive :done or :error before
+                               ;; :start; both must deliver completion instead of
+                               ;; waiting for the stream idle timeout.
                                (ele/transition {:event  :turn/done
                                                 :target :done}
                                                (ele/script {:expr (fn [_env data] (dispatch! data :on-done))}))

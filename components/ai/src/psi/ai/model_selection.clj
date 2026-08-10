@@ -70,23 +70,19 @@
    v1 intentionally exposes only queryable metadata that already exists:
    - facts: provider/api/capability/context/token attrs
    - estimates: currently raw cost attributes
-   - reference: provider auth/config availability; `:configured?` reflects
-     REQUEST-TIME key resolvability — an `env:` api-key spec is resolved via
-     `request-support/resolve-key-spec` (review 29 restores the pre-review-26
-     semantics: an unset env var reads as not configured, matching the
-     missing-key error the transports raise per request), while keyless
-     configs count as configured without a key. Keyless matches the shared
-     `request-support/no-auth?` predicate (review 30): `:auth-header? false`,
-     or a RECOGNIZED auth header (x-api-key/authorization) among custom
-     `:headers` with no resolvable key — incidental custom headers (e.g.
-     X-Client) do NOT count as configured, mirroring the per-request
-     fast-fail they cause (review 5 semantics). The request-time-resolvability
-     semantics apply to CUSTOM providers only: BUILT-IN catalog models always
-     report `:configured? true` — `get-auth` returns nil for built-ins (no
-     registry `:auth` entry), and `catalog-view` has no OAuth context, so psi
-     cannot know from the registry alone whether a built-in's env-var key is
-     set or an OAuth login exists (review 31). The per-request missing-key
-     error remains the authoritative signal for built-ins.
+   - reference: provider auth/config availability. For custom providers,
+     `:configured?` reflects request-time key resolvability: an `env:` api-key
+     spec is resolved via `request-support/resolve-key-spec`, and an unset
+     variable reads as not configured, matching the transport's per-request
+     missing-key error. Keyless configs count as configured only when the
+     shared `request-support/no-auth?` predicate accepts them: either
+     `:auth-header? false`, or a recognized auth header
+     (x-api-key/authorization) among custom `:headers` with no resolvable key.
+     Incidental headers such as X-Client do not count. Built-in catalog models
+     always report `:configured? true`: they have no registry auth entry, and
+     this view lacks the OAuth context needed to determine whether built-in
+     credentials are available. The per-request missing-key error remains
+     authoritative for built-ins.
 
    No implicit locality or policy labels are invented here."
   ([]
@@ -120,11 +116,10 @@
                      :reference {:configured? (boolean (or (nil? auth)
                                                            (some? (request-support/resolve-key-spec (:api-key auth) environment))
                                                         ;; Keyless configs count as configured only when the shared
-                                                        ;; no-auth? predicate would treat the request as keyless —
-                                                        ;; recognized auth header among custom :headers with no
-                                                        ;; resolvable key, or :auth-header? false (review 30:
-                                                        ;; incidental headers must not imply configured, matching
-                                                        ;; the per-request fast-fail they cause).
+                                                        ;; no-auth? predicate would treat the request as keyless — a
+                                                        ;; recognized custom auth header with no resolvable key, or
+                                                        ;; :auth-header? false. Incidental headers must not imply
+                                                        ;; configured because requests with them still require a key.
                                                            (request-support/no-auth? (cond-> auth
                                                                                        (false? (:auth-header? auth))
                                                                                        (assoc :no-auth-header true)))))}})))

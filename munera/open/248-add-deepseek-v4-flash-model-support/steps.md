@@ -5413,7 +5413,7 @@
 
 ## Follow-ups (code-shaper review 3, 2026-08-09)
 
-- [ ] Finish removing review chronology from the remaining task-modified
+- [x] Finish removing review chronology from the remaining task-modified
       production commentary in `components/ai/src/psi/ai/model_selection.clj`,
       `components/ai/src/psi/ai/user_models.clj`,
       `components/ai/src/psi/ai/schemas.clj`, and
@@ -5424,7 +5424,7 @@
       `:idle`. The previous two code-shaper cleanup steps covered provider files
       and five agent-session/provider-auth files, but omitted these changed
       production files.
-- [ ] Correct `user_models.clj`'s `extract-provider-auth` docstring, which still
+- [x] Correct `user_models.clj`'s `extract-provider-auth` docstring, which still
       says an environment variable “exported after psi loaded models.edn is
       picked up without a reload.” Request-time resolution avoids a
       `models.edn` reload, but an export in another shell cannot mutate psi's
