@@ -5007,7 +5007,7 @@
       `clj-http.client` test requires. Do not broaden this item to unrelated
       pre-task tests.
 
-- [ ] Stop redefining provider SSE parser logic to simulate stream-read
+- [x] Stop redefining provider SSE parser logic to simulate stream-read
       failures. The migrated catch-path tests in
       `anthropic_stream_termination_test.clj` and
       `openai_completions_stream_test.clj` inject the HTTP boundary but still

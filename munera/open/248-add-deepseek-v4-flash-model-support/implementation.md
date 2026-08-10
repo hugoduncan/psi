@@ -2611,3 +2611,8 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 - addressed 1 review step
 - Migrated task-added Anthropic retry/capture/termination and OpenAI capture/error/termination stream tests from global `clj-http.client/post` redefinitions to `http-boundary/nullable`; retained pre-task tests unchanged. URL/retry behavior now derives assertions from nullable request state, and unused `clj-http.client` requires were removed where no legacy test still needs them.
 - Affected provider namespaces green; clj-kondo clean apart from three pre-existing redundant-let warnings in migrated files.
+
+## Follow-ups test review 62 — real parser failure path (2026-08-09)
+
+- addressed 1 review step
+- Replaced Anthropic/OpenAI catch-path `parse-sse-line` redefinitions with a real `InputStream` that serves scripted SSE bytes and then throws; both tests now exercise the production parser and still prove open blocks/tools close before `:error`.

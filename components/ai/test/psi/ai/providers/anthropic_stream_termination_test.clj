@@ -6,20 +6,39 @@
   text). Split out of anthropic_stream_test.clj to stay under the 800-line
   file-length gate."
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic])
-  (:import [java.io ByteArrayInputStream]))
+  (:import [java.io ByteArrayInputStream InputStream]))
 
 (defn- sse-line [event-type data-map]
   (str "event: " event-type "\ndata: " (json/generate-string data-map) "\n\n"))
 
 (defn- stream-body [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
+
+(defn- throwing-stream-after [s]
+  (let [bytes (.getBytes s "UTF-8")
+        index (atom 0)]
+    (proxy [InputStream] []
+      (read
+        ([]
+         (if (< @index (alength bytes))
+           (let [value (bit-and 0xff (aget bytes @index))]
+             (swap! index inc)
+             value)
+           (throw (ex-info "simulated stream read failure" {:status 503}))))
+        ([buffer offset length]
+         (if (< @index (alength bytes))
+           (let [remaining (- (alength bytes) @index)
+                 count (min length remaining)]
+             (System/arraycopy bytes @index buffer offset count)
+             (swap! index + count)
+             count)
+           (throw (ex-info "simulated stream read failure" {:status 503}))))))))
 
 (deftest stream-anthropic-eof-flush-emits-done-test
   (testing "a stream that EOFs without an in-band terminal event emits exactly one terminal :done"
@@ -611,42 +630,20 @@
 
 (deftest stream-anthropic-catch-balances-open-block-before-error-test
   (testing "a stream-read exception after a block started closes the block before :error"
-    ;; Review 56: the catch block (a stream-read exception mid-block, e.g. a
-    ;; connection reset after a content_block_start was consumed) routed the
-    ;; error straight to consume-fn with no balancing — review 55 covered
-    ;; only the :done/EOF paths, and the HTTP-error path can't have open
-    ;; blocks (no SSE consumed before it fires). The catch now balances via
-    ;; balance-open-blocks! before the :error.
-    (let [model  (models/get-model :sonnet-4.6)
-          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+    ;; Exercise the real SSE parser over a response stream that disconnects
+    ;; after the open block's bytes have been consumed.
+    (let [model (models/get-model :sonnet-4.6)
+          convo (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])
-          sse    (str (sse-line "message_start" {:type "message_start"})
-                      (sse-line "content_block_start"
-                                {:type "content_block_start" :index 0
-                                 :content_block {:type "thinking"
-                                                 :thinking "Let me think"
-                                                 :signature "sig-1"}})
-                      (sse-line "content_block_delta"
-                                {:type "content_block_delta" :index 0
-                                 :delta {:type "thinking_delta"
-                                         :thinking "more"}}))
-          orig-parse-sse-line anthropic/parse-sse-line
-          lines-seen (atom 0)
-          http (http-boundary/nullable [{:body (stream-body sse)}])]
-      (with-redefs [anthropic/parse-sse-line
-                    (fn [line]
-                      ;; Count only "data:" lines — line-seq yields the
-                      ;; "event:" prefixes and blank separators too, which
-                      ;; parse-sse-line skips; counting them would throw
-                      ;; before the second event was processed.
-                      (when (str/starts-with? (or line "") "data: ")
-                        (swap! lines-seen inc))
-                      (if (> @lines-seen 2)
-                        (throw (ex-info "simulated stream read failure"
-                                        {:status 503}))
-                        (orig-parse-sse-line line)))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key" :http-boundary http}
-                                    (fn [e] (swap! events conj e))))
+          sse (str (sse-line "message_start" {:type "message_start"})
+                   (sse-line "content_block_start"
+                             {:type "content_block_start" :index 0
+                              :content_block {:type "thinking"
+                                              :thinking "Let me think"
+                                              :signature "sig-1"}}))
+          http (http-boundary/nullable [{:body (throwing-stream-after sse)}])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key" :http-boundary http}
+                                  (fn [e] (swap! events conj e)))
       (is (= [:start :thinking-start :thinking-end :error]
              (mapv :type @events))
           "the open thinking block is balanced with :thinking-end before the catch's :error")

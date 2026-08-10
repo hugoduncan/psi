@@ -7,18 +7,36 @@
   mid-stream error chunks. Split out of openai_test.clj /
   openai_completions_test.clj to stay under the 800-line file-length gate."
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.openai.transport :as transport])
-  (:import [java.io ByteArrayInputStream]))
+   [psi.ai.providers.openai :as openai])
+  (:import [java.io ByteArrayInputStream InputStream]))
 
 (defn- stream-body [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
+
+(defn- throwing-stream-after [s]
+  (let [bytes (.getBytes s "UTF-8")
+        index (atom 0)]
+    (proxy [InputStream] []
+      (read
+        ([]
+         (if (< @index (alength bytes))
+           (let [value (bit-and 0xff (aget bytes @index))]
+             (swap! index inc)
+             value)
+           (throw (ex-info "simulated stream read failure" {:status 503}))))
+        ([buffer offset length]
+         (if (< @index (alength bytes))
+           (let [remaining (- (alength bytes) @index)
+                 count (min length remaining)]
+             (System/arraycopy bytes @index buffer offset count)
+             (swap! index + count)
+             count)
+           (throw (ex-info "simulated stream read failure" {:status 503}))))))))
 
 (defn- run-stream [sse]
   (let [model  (models/get-model :gpt-5)
@@ -288,46 +306,23 @@
 
 (deftest completions-catch-balances-open-tool-call-before-error-test
   (testing "a stream-read exception after a tool_calls delta closes the open tool call before :error"
-    ;; Review 56: the catch block (a stream-read exception mid-tool-call,
-    ;; e.g. a connection reset after a tool_calls delta was processed)
-    ;; routed through transport/emit-error! with no balancing — review 55
-    ;; covered only the :done paths, and the HTTP-error path can't have
-    ;; open tool calls (no SSE consumed before it fires). The catch now
-    ;; calls the same force-start-pending-chat-tools! +
-    ;; emit-chat-tool-ends! helpers before the :error.
+    ;; Exercise the real SSE parser over a response stream that disconnects
+    ;; after the open tool-call bytes have been consumed.
     (let [events (atom [])
-          sse    (str
-                  "data: " (json/generate-string
-                            {:choices [{:delta {:role "assistant" :content ""}}]}) "\n\n"
-                  "data: " (json/generate-string
-                            {:choices [{:delta {:role "assistant"
-                                                :tool_calls [{:index 0
-                                                              :id "call_1"
-                                                              :function {:name "get_weather"
-                                                                         :arguments ""}}]}}]}) "\n\n"
-                  "data: " (json/generate-string
-                            {:choices [{:delta {:role "assistant"
-                                                :tool_calls [{:index 0
-                                                              :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n")
-          lines-seen (atom 0)
-          orig-parse-sse-line transport/parse-sse-line
-          http (http-boundary/nullable [{:body (stream-body sse)}])]
-      (with-redefs [transport/parse-sse-line
-                    (fn [line]
-                      ;; Count only "data:" lines — line-seq yields the
-                      ;; blank separator lines too (parse-sse-line skips
-                      ;; them); counting every line would throw before the
-                      ;; tool_calls delta was processed.
-                      (when (str/starts-with? (or line "") "data: ")
-                        (swap! lines-seen inc))
-                      (if (> @lines-seen 2)
-                        (throw (ex-info "simulated stream read failure"
-                                        {:status 503}))
-                        (orig-parse-sse-line line)))]
-        ((:stream openai/provider)
-         (-> (conv/create "sys") (conv/add-user-message "hi"))
-         (models/get-model :gpt-5) {:api-key "sk-test" :http-boundary http}
-         (fn [ev] (swap! events conj ev))))
+          sse (str
+               "data: " (json/generate-string
+                         {:choices [{:delta {:role "assistant" :content ""}}]}) "\n\n"
+               "data: " (json/generate-string
+                         {:choices [{:delta {:role "assistant"
+                                             :tool_calls [{:index 0
+                                                           :id "call_1"
+                                                           :function {:name "get_weather"
+                                                                      :arguments ""}}]}}]}) "\n\n")
+          http (http-boundary/nullable [{:body (throwing-stream-after sse)}])]
+      ((:stream openai/provider)
+       (-> (conv/create "sys") (conv/add-user-message "hi"))
+       (models/get-model :gpt-5) {:api-key "sk-test" :http-boundary http}
+       (fn [ev] (swap! events conj ev)))
       (is (= [:start :toolcall-start :toolcall-end :error]
              (mapv :type @events))
           "the open tool call is balanced with :toolcall-end before the catch's :error")
