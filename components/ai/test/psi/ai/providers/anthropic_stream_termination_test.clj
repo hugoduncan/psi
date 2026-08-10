@@ -123,9 +123,7 @@
                                                    :api-key "test-key"}
                                       (fn [e] (swap! events conj e))))
         (is (= [:start :done] (mapv :type @events))
-            "empty body (EOF before message_start) emits :start then the EOF-flush :done")
-        (is (= 1 (count (filterv #(= :done (:type %)) @events)))
-            "exactly one terminal :done"))
+            "empty body (EOF before message_start) emits :start then the EOF-flush :done"))
       (testing "malformed stream starting with message_stop (no message_start)"
         (reset! events [])
         (let [sse (sse-line "message_stop" {:type "message_stop"})
@@ -136,9 +134,7 @@
                                                    :api-key "test-key"}
                                       (fn [e] (swap! events conj e))))
         (is (= [:start :done] (mapv :type @events))
-            "message_stop-without-message_start emits :start then the terminal :done")
-        (is (= 1 (count (filterv #(= :done (:type %)) @events)))
-            "exactly one terminal :done")))))
+            "message_stop-without-message_start emits :start then the terminal :done")))))
 
 (deftest stream-anthropic-error-without-message-start-emits-start-then-error-test
   (testing "a mid-stream error with no message_start emits :start then :error"
@@ -163,9 +159,7 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
-          "error-without-message_start emits :start then the :error terminal")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no :done — the :error is the terminal event"))))
+          "error-without-message_start emits :start then the :error terminal"))))
 
 (deftest stream-anthropic-message-delta-first-emits-start-then-done-test
   (testing "a stream whose first event is message_delta-with-stop_reason emits :start then the terminal :done"
@@ -192,8 +186,6 @@
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :done] (mapv :type @events))
           "message_delta-first emits :start then the terminal :done")
-      (is (= 1 (count (filterv #(= :done (:type %)) @events)))
-          "exactly one terminal :done")
       (is (= :end_turn (:reason (first (filterv #(= :done (:type %)) @events))))
           "the stop_reason keyword is carried through"))))
 
@@ -221,8 +213,6 @@
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
-      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
-          "exactly one :error terminal")
       (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
           "the exception surfaces as an :error with a message"))))
 
@@ -534,11 +524,7 @@
           events (run-stream sse model {:api-key "test-key"})]
       (is (= [:start :text-start :text-delta :text-end :done]
              (mapv :type events))
-          "the ping events are ignored — exactly the well-formed sequence")
-      (is (= 1 (count (filterv #(= :done (:type %)) events)))
-          "exactly one :done — the stream terminates normally via message_stop")
-      (is (not-any? #(= :error (:type %)) events)
-          "no :error — an unknown event type is a no-op, not an error"))))
+          "the ping events are ignored — exactly the well-formed sequence"))))
 
 ;; ── Open-block balancing on the error/message_delta terminals (review 56) ──
 
@@ -644,6 +630,4 @@
                                   (fn [e] (swap! events conj e)))
       (is (= [:start :thinking-start :thinking-end :error]
              (mapv :type @events))
-          "the open thinking block is balanced with :thinking-end before the catch's :error")
-      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
-          "exactly one :error terminal"))))
+          "the open thinking block is balanced with :thinking-end before the catch's :error"))))

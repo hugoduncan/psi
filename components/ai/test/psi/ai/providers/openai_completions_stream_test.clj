@@ -149,9 +149,7 @@
              (:error-message err))
           "error message extracted from the chunk's error body (with status suffix)")
       (is (= [:start :error] (mapv :type events))
-          "an error-FIRST stream emits :start then the :error terminal (review 52)")
-      (is (not-any? #(= :done (:type %)) events)
-          "no :done after a mid-stream error — the :error event terminates the turn"))))
+          "an error-FIRST stream emits :start then the :error terminal (review 52)"))))
 
 (deftest completions-sse-error-first-stream-emits-start-then-error-test
   (testing "an error-FIRST stream (error chunk before any role/content chunk) emits :start then :error"
@@ -179,9 +177,7 @@
       (is (some? err) "SSE error chunk must surface as an :error event")
       (is (= "The server had an error while processing your request."
              (:error-message err))
-          "error message extracted from the chunk's error body")
-      (is (not-any? #(= :done (:type %)) events)
-          "no :done — the :error event is terminal"))))
+          "error message extracted from the chunk's error body"))))
 
 (deftest completions-first-read-exception-emits-start-then-error-test
   (testing "a stream-read exception before any output event emits :start then the :error terminal"
@@ -207,8 +203,6 @@
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
-      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
-          "exactly one :error terminal")
       (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
           "the exception surfaces as an :error with a message"))))
 
@@ -298,11 +292,7 @@
                                                  :type "server_error"}}) "\n\n"))]
       (is (= [:start :toolcall-start :toolcall-delta :toolcall-end :error]
              (mapv :type events))
-          "the open tool call is balanced with :toolcall-end before the :error")
-      (is (= 1 (count (filterv #(= :error (:type %)) events)))
-          "exactly one :error terminal")
-      (is (not-any? #(= :done (:type %)) events)
-          "no :done after the mid-stream error — the :error event terminates the turn"))))
+          "the open tool call is balanced with :toolcall-end before the :error"))))
 
 (deftest completions-catch-balances-open-tool-call-before-error-test
   (testing "a stream-read exception after a tool_calls delta closes the open tool call before :error"
@@ -325,6 +315,4 @@
        (fn [ev] (swap! events conj ev)))
       (is (= [:start :toolcall-start :toolcall-end :error]
              (mapv :type @events))
-          "the open tool call is balanced with :toolcall-end before the catch's :error")
-      (is (= 1 (count (filterv #(= :error (:type %)) @events)))
-          "exactly one :error terminal"))))
+          "the open tool call is balanced with :toolcall-end before the catch's :error"))))

@@ -5158,7 +5158,7 @@
 
 ## Follow-ups (test review 74, 2026-08-09)
 
-- [ ] Remove the same redundant terminal-count and terminal-absence assertions
+- [x] Remove the same redundant terminal-count and terminal-absence assertions
       from the task-added sibling stream tests whose exact event-type vector
       already proves the complete sequence: the start-before-terminal,
       DeepSeek-ping, and catch/error balancing tests in
@@ -5168,7 +5168,7 @@
       the review-73 simplification applied consistently, avoiding duplicate
       failure signals for one contract.
 
-- [ ] Simplify the "built-in models still fall back to the env var" block in
+- [x] Simplify the "built-in models still fall back to the env var" block in
       `request_support_test.clj`: bind `model` and the nullable environment in
       one `let`, remove the `:redundant-let` suppression, and drop the
       tautological `(:provider model)` assertion. The test should retain only

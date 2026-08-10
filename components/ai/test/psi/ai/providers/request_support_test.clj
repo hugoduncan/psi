@@ -53,16 +53,15 @@
           "incidental custom headers do not imply keyless → throws")))
 
   (testing "built-in models still fall back to the env var"
-    (let [model {:provider :anthropic}]
-      #_{:clj-kondo/ignore [:redundant-let]}
-      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-env-fallback-key"})]
-        (is (= "sk-ant-env-fallback-key"
-               (request-support/resolve-api-key model
-                                                {:environment-boundary environment}
-                                                anthropic-config))
-            "built-in model with no configured key uses the env fallback")
-        (is (= ["ANTHROPIC_API_KEY"] (environment-boundary/reads environment)))
-        (is (= :anthropic (:provider model))))))
+    (let [model {:provider :anthropic}
+          environment (environment-boundary/nullable
+                       {"ANTHROPIC_API_KEY" "sk-ant-env-fallback-key"})]
+      (is (= "sk-ant-env-fallback-key"
+             (request-support/resolve-api-key model
+                                              {:environment-boundary environment}
+                                              anthropic-config))
+          "built-in model with no configured key uses the env fallback")
+      (is (= ["ANTHROPIC_API_KEY"] (environment-boundary/reads environment)))))
 
   (testing "configured key passes through for non-keyless options"
     (let [model {:provider :deepseek :custom? true}]
