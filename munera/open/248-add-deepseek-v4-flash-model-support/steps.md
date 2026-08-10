@@ -5136,3 +5136,14 @@
       logs adds incidental setup and redundant failure signals without covering
       another behavior; use a pure function fixture and retain the returned-value
       plus public recorded-state assertions.
+
+## Follow-ups (test review 72, 2026-08-09)
+
+- [ ] Make `stream-anthropic-error-after-thinking-start-balances-open-block-test`
+      execute its scripted stream once and derive both assertions from the
+      captured event vector. It currently calls `run-stream` separately for
+      the sequence assertion and the exactly-one-`:error` assertion, duplicating
+      HTTP/SSE setup and allowing one test to assert facets of two independent
+      executions. Bind `events` once, then assert the ordered event types and
+      terminal count from that value so the test is economical, deterministic,
+      and locally comprehensible.
