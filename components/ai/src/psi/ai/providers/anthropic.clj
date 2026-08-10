@@ -50,12 +50,12 @@
   (reset! open-blocks {}))
 
 (defn- handle-400-response!
-  [model options url request response consume-fn consume-stream-response!]
+  [model options url request response emit-terminal-error! consume-stream-response!]
   (capture/handle-400-response!
    {:prompt-caching-beta anthropic-request/prompt-caching-beta
     :interleaved-thinking-beta anthropic-request/interleaved-thinking-beta
     :oauth-auth-request? (fn [req] (boolean (::oauth? req)))}
-   model options url request response consume-fn consume-stream-response!))
+   model options url request response emit-terminal-error! consume-stream-response!))
 (defn- make-stream-state
   [model options url consume-fn strategy structured-tool-name]
   {:model                      model
@@ -98,6 +98,20 @@
                :reason reason
                :usage  (usage/usage-with-cost model usage-acc)}))
 
+(defn- emit-terminal-error!
+  ([stream-state error-event]
+   (emit-terminal-error! stream-state error-event true))
+  ([{:keys [model options url consume-fn open-blocks done? started?]}
+    error-event
+    capture?]
+   (when-not @done?
+     (reset! done? true)
+     (capture/emit-start! consume-fn started?)
+     (balance-open-blocks! consume-fn open-blocks)
+     (if capture?
+       (capture/emit-error! model options url consume-fn error-event)
+       (consume-fn error-event)))))
+
 (defn- process-stream-event!
   "Process one parsed Anthropic SSE event against the explicit stream state."
   [{:keys [model options url consume-fn strategy structured-tool-name
@@ -105,8 +119,8 @@
            json-schema-output-buffer usage-acc done? started?]
     :as stream-state}
    event-data]
-  (capture/capture-response! model options url event-data)
   (when-not @done?
+    (capture/capture-response! model options url event-data)
     (case (:type event-data)
       "message_start"
       (do
@@ -182,10 +196,7 @@
                          {:status           status
                           :body-text        (json/generate-string event-data)
                           :fallback-message "Anthropic stream error"})]
-        (reset! done? true)
-        (capture/emit-start! consume-fn started?)
-        (balance-open-blocks! consume-fn open-blocks)
-        (consume-fn error-event))
+        (emit-terminal-error! stream-state error-event false))
 
       "message_delta"
       (do
@@ -224,42 +235,34 @@
                                               url
                                               consume-fn
                                               strategy
-                                              structured-tool-name)
-        {:keys [done? started? open-blocks]} stream-state]
+                                              structured-tool-name)]
     (try
       (capture/capture-request! model options url request)
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (let [consume-response! (partial consume-stream-response! stream-state)
-            response          (capture/stream-response options url request)
-            status            (:status response)]
+      (let [consume-response!    (partial consume-stream-response! stream-state)
+            emit-terminal-error! (partial emit-terminal-error! stream-state)
+            response             (capture/stream-response options url request)
+            status               (:status response)]
         (cond
           (= 400 status)
-          (do
-            (capture/emit-start! consume-fn started?)
-            (handle-400-response! model options
-                                  url
-                                  request
-                                  response
-                                  consume-fn
-                                  consume-response!))
+          (handle-400-response! model options
+                                url
+                                request
+                                response
+                                emit-terminal-error!
+                                consume-response!)
 
           (capture/error-status? status)
-          (do
-            (capture/emit-start! consume-fn started?)
-            (capture/emit-error! model options url consume-fn
-                                 (anthropic-error/response->error response request)))
+          (emit-terminal-error!
+           (anthropic-error/response->error response request))
 
           :else
           (consume-response! response)))
       (catch Exception e
-        (when-not @done?
-          (capture/emit-start! consume-fn started?)
-          (balance-open-blocks! consume-fn open-blocks)
-          (let [error-event (anthropic-error/exception->error e)]
-            (capture/capture-response! model options url error-event)
-            (consume-fn error-event)))))))
+        (emit-terminal-error! stream-state
+                              (anthropic-error/exception->error e))))))
 
 (defn- execute-response
   [options url request]

@@ -16,6 +16,30 @@
 (defn- stream-body [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
 
+(deftest stream-anthropic-post-terminal-events-are-not-captured-test
+  (testing "parsed SSE events after a terminal event produce no events or captures"
+    (let [model    (models/get-model :sonnet-4.6)
+          convo    (-> (conv/create "sys") (conv/add-user-message "hello"))
+          events   (atom [])
+          captures (atom [])
+          sse      (str (sse-line "message_start" {:type "message_start"})
+                        (sse-line "message_stop" {:type "message_stop"})
+                        (sse-line "content_block_start"
+                                  {:type "content_block_start"
+                                   :index 0
+                                   :content_block {:type "text"}}))
+          http     (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "test-key"
+                    :on-provider-response #(swap! captures conj %)}
+       #(swap! events conj %))
+      (is (= [:start :done] (mapv :type @events))
+          "the trailing content event is suppressed")
+      (is (= ["message_start" "message_stop"]
+             (mapv (comp :type :event) @captures))
+          "the trailing content event is not captured"))))
+
 (deftest stream-anthropic-captures-provider-request-and-response-test
   (testing "Anthropic streaming emits provider request/response captures"
     (let [model           (models/get-model :sonnet-4.6)

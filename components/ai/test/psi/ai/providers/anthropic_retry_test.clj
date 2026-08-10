@@ -58,6 +58,29 @@
           "after prompt-caching fallback, system is collapsed to plain string")
       (is (= [:start :done] (mapv :type @events))))))
 
+(deftest stream-anthropic-exhausted-retry-consumer-exception-no-second-error-test
+  (testing "a consume-fn exception on an exhausted compatibility retry emits one terminal error"
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hello"))
+          events (atom [])
+          error-response {:status 400
+                          :body (stream-body
+                                 (json/generate-string
+                                  {:error {:message "unsupported beta"}}))}
+          http   (http-boundary/nullable [error-response error-response])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "test-key"
+                    :thinking-level :medium}
+       (fn [event]
+         (swap! events conj event)
+         (when (= :error (:type event))
+           (throw (ex-info "simulated error consume failure" {})))))
+      (is (= 2 (count (http-boundary/requests http)))
+          "the compatibility retry is exercised")
+      (is (= [:start :error] (mapv :type @events))
+          "the exhausted retry produces exactly one terminal error"))))
+
 (deftest stream-anthropic-retries-without-thinking-on-400-test
   (testing "oauth + thinking request retries once with compatibility fallbacks on 400"
     (let [model  (models/get-model :sonnet-4.6)

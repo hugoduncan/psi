@@ -769,6 +769,8 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 --   InitialHttpErrorObserved(stream)          — the initial streaming HTTP
 --       response is an error (including an unrecoverable 400 or failed
 --       compatibility retry), before any SSE line is consumed
+--   TerminalStateSetBeforeError(stream)       — stream.done becomes true
+--       before the consumer receives the terminal :error
 
 rule InitialHttpErrorEmitsStartBeforeError {
     when: InitialHttpErrorObserved(stream)
@@ -987,11 +989,28 @@ rule TerminalEmitsEndEventsForOpenBlocks {
         -- now holds at every terminal, :done or :error.
 }
 
+rule HttpErrorEmitsOneTerminalError {
+    when: InitialHttpErrorObserved(stream)
+    requires: stream.done = false
+
+    ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
+
+    @guidance
+        -- Initial non-2xx responses and exhausted HTTP-400 compatibility
+        -- retries share the guarded terminal-error emitter. It marks the
+        -- stream done before invoking the consumer, so a consumer exception
+        -- cannot reach the outer catch with done still false and produce a
+        -- second terminal error.
+}
+
 rule SseErrorEventEmitsErrorAndTerminates {
     when: SseEventReceived(stream, "error", event_data)
 
-    ensures: ErrorEmitted(stream)
     ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
 
     @guidance
         -- Review 43: Anthropic SSE "error" events
@@ -1188,6 +1207,7 @@ rule OnceDoneNoFurtherEvent {
     when: stream.done = true
 
     ensures: no further Emit(StreamEvent)
+    ensures: no further ProviderResponseCapture(stream)
 
     @guidance
         -- Review 44 + review 46 invariant: once the stream is done — whether
@@ -1203,9 +1223,11 @@ rule OnceDoneNoFurtherEvent {
         -- (:text-delta/:thinking-delta), a content_block_start (:text-start),
         -- a message_delta (usage accumulation), or a message_stop — is a
         -- full no-op. done? is also set on message_stop, so a malformed
-        -- event after a NORMAL completion is a no-op too. A consumer
-        -- therefore receives at most one terminal event (:error or :done)
-        -- per stream, and nothing at all after it.
+        -- event after a NORMAL completion is a no-op too. The response
+        -- capture callback is inside the same guard, so post-terminal SSE
+        -- lines are not captured either. A consumer therefore receives at
+        -- most one terminal event (:error or :done) per stream, and nothing
+        -- at all after it.
 }
 
 rule FinalUsageTotalsCalculated {

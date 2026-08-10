@@ -73,18 +73,18 @@
   (request-support/emit-start! consume-fn started?))
 
 (defn consume-retry-response!
-  [model options url consume-fn consume-stream-response! retry-request]
+  [model options url emit-terminal-error! consume-stream-response! retry-request]
   (capture-request! model options url retry-request)
   (let [retry-response (stream-response options url retry-request)
         retry-status   (:status retry-response)]
     (if (error-status? retry-status)
-      (emit-error! model options url consume-fn
-                   (anthropic-error/response->error retry-response retry-request))
+      (emit-terminal-error!
+       (anthropic-error/response->error retry-response retry-request))
       (consume-stream-response! retry-response))))
 
 (defn handle-400-response!
   [{:keys [prompt-caching-beta interleaved-thinking-beta oauth-auth-request?]}
-   model options url request response consume-fn consume-stream-response!]
+   model options url request response emit-terminal-error! consume-stream-response!]
   (if-let [fallback (anthropic-request-support/fallback-request-for-400
                      request
                      {:prompt-caching-beta prompt-caching-beta
@@ -96,8 +96,8 @@
                                                   :retry-fallback-steps (:steps fallback)))
       (consume-retry-response! model options
                                url
-                               consume-fn
+                               emit-terminal-error!
                                consume-stream-response!
                                (:request fallback)))
-    (emit-error! model options url consume-fn
-                 (anthropic-error/response->error response request))))
+    (emit-terminal-error!
+     (anthropic-error/response->error response request))))

@@ -210,6 +210,25 @@
              (:error-message (second @events)))
           "the first response-body read failure surfaces on the :error event"))))
 
+(deftest stream-anthropic-http-error-consumer-exception-no-second-error-test
+  (testing "a consume-fn exception on an initial HTTP error does not emit a second error"
+    ;; Terminal state must be visible before user code runs; otherwise the
+    ;; outer catch mistakes a consumer failure for a new provider failure.
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [{:status 503
+                    :body (stream-body "service unavailable")}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http :api-key "test-key"}
+       (fn [event]
+         (swap! events conj event)
+         (when (= :error (:type event))
+           (throw (ex-info "simulated error consume failure" {})))))
+      (is (= [:start :error] (mapv :type @events))
+          "exactly one terminal error reaches the consumer"))))
+
 (deftest stream-anthropic-message-stop-done-consumer-exception-no-second-error-test
   (testing "a consume-fn exception on the message_stop :done does not emit a second :error terminal"
     ;; the message_stop terminal :done reset done? AFTER the

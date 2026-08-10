@@ -113,6 +113,8 @@ value ProviderRequest {
 -- RedactSecret(value) / MaskAccountId(value): capture redaction helpers —
 --   see the RedactRequestHeaders rule in the Capture Callbacks section.
 -- EventOrder(stream, first, second): first is emitted before second.
+-- TerminalStateSetBeforeError(stream): stream.done becomes true before the
+-- consumer receives the terminal :error.
 
 ------------------------------------------------------------
 -- Config
@@ -739,12 +741,29 @@ rule CompletionsChunksNormalizeToExecutorEvents {
         -- emit-structured-output-result! never fire post-error.
 }
 
+rule CompletionsHttpErrorEmitsOneTerminalError {
+    when: HttpErrorObserved(stream, response)
+    requires: stream.request_api = openai_completions
+    requires: stream.done = false
+
+    ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
+
+    @guidance
+        -- The initial non-2xx response shares the guarded terminal-error
+        -- emitter with SSE and exception paths. It marks the stream done
+        -- before invoking the consumer, so a consumer exception cannot make
+        -- the outer catch emit a second terminal error.
+}
+
 rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
     when: CompletionsChunkReceived(stream, chunk)
     requires: chunk.error != null
 
-    ensures: ErrorEmitted(stream)
     ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
 
     @guidance
         -- Review 43: an OpenAI SSE error chunk ({"error": {...}} — no

@@ -48,6 +48,22 @@
      (fn [ev] (swap! events conj ev)))
     @events))
 
+(deftest completions-http-error-consumer-exception-no-second-error-test
+  (testing "a consume-fn exception on an initial HTTP error does not emit a second error"
+    (let [events (atom [])
+          http   (http-boundary/nullable
+                  [{:status 503 :body (stream-body "service unavailable")}])]
+      ((:stream openai/provider)
+       (-> (conv/create "sys") (conv/add-user-message "hi"))
+       (models/get-model :gpt-5)
+       {:api-key "sk-test" :http-boundary http}
+       (fn [event]
+         (swap! events conj event)
+         (when (= :error (:type event))
+           (throw (ex-info "simulated error consume failure" {})))))
+      (is (= [:start :error] (mapv :type @events))
+          "exactly one terminal error reaches the consumer"))))
+
 (deftest completions-finish-reason-then-eof-emits-done-test
   (testing "a stream ending with a finish_reason chunk but no trailing [DONE] emits exactly one terminal :done"
     ;; stream-openai ended with NOTHING after the SSE doseq, so a

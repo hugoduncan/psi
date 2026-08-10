@@ -454,26 +454,30 @@
                                     @(:last-usage stream-state))
       (reset! pending-finish-reason nil))))
 
-(defn- emit-chat-error!
-  "Surface a mid-stream SSE error as the sole terminal event. The chunk is
-   captured before this call; open tools are balanced before the error and
-   the done guard suppresses every trailing chunk."
-  [stream-state consume-fn chunk]
+(defn- emit-terminal-error!
+  [stream-state consume-fn emit-error!]
   (let [{:keys [done? stream-started?]} stream-state]
     (when-not @done?
       (reset! done? true)
       (emit-stream-start! consume-fn stream-started?)
       (force-start-pending-chat-tools! stream-state consume-fn)
       (emit-chat-tool-ends! stream-state consume-fn)
-      (let [status (some (fn [s] (and (number? s) (>= s 400) s))
-                         [(:status chunk)
-                          (get-in chunk [:error :status])
-                          (get-in chunk [:error :http_status])
-                          (:http_status chunk)])
-            err    (transport/response->error {:status  status
-                                               :headers nil
-                                               :body    (json/generate-string chunk)})]
-        (consume-fn err)))))
+      (emit-error!))))
+
+(defn- emit-chat-error!
+  "Surface a mid-stream SSE error as the sole terminal event. The chunk is
+   captured before this call; open tools are balanced before the error and
+   the done guard suppresses every trailing chunk."
+  [stream-state consume-fn chunk]
+  (let [status (some (fn [s] (and (number? s) (>= s 400) s))
+                     [(:status chunk)
+                      (get-in chunk [:error :status])
+                      (get-in chunk [:error :http_status])
+                      (:http_status chunk)])
+        err    (transport/response->error {:status  status
+                                           :headers nil
+                                           :body    (json/generate-string chunk)})]
+    (emit-terminal-error! stream-state consume-fn #(consume-fn err))))
 
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url strategy line]
@@ -571,9 +575,10 @@
                      :structured-output strategy}))
       (let [response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
-          (do
-            (emit-stream-start! consume-fn (:stream-started? stream-state))
-            (transport/emit-error! model
+          (emit-terminal-error!
+           stream-state
+           consume-fn
+           #(transport/emit-error! model
                                    options
                                    :openai-completions
                                    url
@@ -601,11 +606,10 @@
                                               @(:last-usage stream-state)))
               nil))))
       (catch Exception e
-        (when-not @(:done? stream-state)
-          (emit-stream-start! consume-fn (:stream-started? stream-state))
-          (force-start-pending-chat-tools! stream-state consume-fn)
-          (emit-chat-tool-ends! stream-state consume-fn)
-          (transport/emit-error! model
+        (emit-terminal-error!
+         stream-state
+         consume-fn
+         #(transport/emit-error! model
                                  options
                                  :openai-completions
                                  url
