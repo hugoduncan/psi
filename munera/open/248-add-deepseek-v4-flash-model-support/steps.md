@@ -5207,3 +5207,22 @@
       represented by the vectors. This applies the suite's established
       assertion style consistently and avoids multiple failure signals for a
       single sequence contract.
+
+## Follow-ups (test review 78, 2026-08-09)
+
+- [ ] Finish the task-added stream sequence cleanup that reviews 73–76 still
+      leave incomplete. In `anthropic_retry_test.clj`, replace each retry
+      test's separate `:start`/`:done` presence and `:error` absence assertions
+      with the exact `[:start :done]` event-type vector. Apply the same exact
+      vector proof to `stream-anthropic-eof-flush-emits-done-test` and
+      `stream-anthropic-message-stop-done-carries-usage-test`, retaining their
+      usage/reason payload assertions. Give both cases in
+      `stream-anthropic-surfaces-sse-error-event-test`, both cases in
+      `stream-anthropic-sse-error-status-key-test`, and
+      `codex-catch-block-surfaces-exception-headers-test` exact event-type
+      vectors, removing their redundant `some? err`/no-`:done` assertions but
+      retaining error payload assertions. Likewise remove the redundant
+      `some? err` assertions from the two OpenAI completion error tests that
+      already assert `[:start :error]`. This makes terminal cardinality and
+      ordering discriminating, prevents unexpected non-terminal events from
+      passing, and avoids duplicate failure signals for one sequence contract.
