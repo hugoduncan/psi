@@ -4913,3 +4913,20 @@
       rule-modeled — same convention as the review-45 400-fallback
       asymmetry note); CHANGELOG `Fixed` entry added; design.md revision
       note/AC updated.
+
+## Follow-ups (implementation review 58, 2026-08-09)
+
+- [ ] Make Codex terminal tool-call balancing deterministic for multiple open
+      calls. `emit-codex-done!` and the review-56 `emit-codex-error!` iterate
+      `@open-tool-indexes` directly, but that value is a set and its traversal
+      order is not a sequencing contract. Consequently the emitted
+      `:toolcall-end` event order can differ from content-index order, unlike
+      Anthropic's `balance-open-blocks!` (`sort (keys ...)`) and OpenAI chat
+      completions' `emit-chat-tool-ends!` (`sort-by key ...`). This conflicts
+      with psi's deterministic/replayable event-stream invariant and leaves
+      the new error path without a multi-tool ordering lock. Iterate sorted
+      indices in both Codex terminal emitters (prefer one shared balancing
+      helper so the done/error paths cannot drift), and add done + error
+      stream tests with at least two simultaneously open tool calls whose
+      insertion order differs from content-index order, asserting ordered
+      `:toolcall-end` events before the terminal.
