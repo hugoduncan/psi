@@ -12,7 +12,6 @@
    public vars."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [clj-http.client :as http]
             [cheshire.core :as json]
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
@@ -23,6 +22,7 @@
             [psi.ai.providers.anthropic.stream-events :as stream-events]
             [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
             [psi.ai.providers.anthropic.usage :as usage]
+            [psi.ai.providers.http-boundary :as http-boundary]
             [psi.ai.structured-output :as structured-output]))
 
 ;; Re-exports from the request-construction namespace (split out review 56
@@ -475,7 +475,7 @@
                     ;; (the flush's when-not would otherwise return the last
                     ;; consumed event via emit-terminal-done!'s reset!).
                   nil))]
-        (let [response (capture/stream-response url request)
+        (let [response (capture/stream-response options url request)
               status   (:status response)]
           (cond
             (= 400 status)
@@ -531,10 +531,12 @@
             (consume-fn err)))))))
 
 (defn- execute-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :text :throw-exceptions false})))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :text :throw-exceptions false})))
 
 (defn- non-streaming-content-blocks
   "Map the non-streaming response's :content blocks to the canonical
@@ -615,7 +617,7 @@
         request            (anthropic-request/build-request conversation model options false)]
     (try
       (capture/capture-request! model options url request)
-      (let [response (execute-response url request)]
+      (let [response (execute-response options url request)]
         (if (capture/error-status? (:status response))
           (anthropic-error/response->error response request)
           (let [body (json/parse-string (:body response) true)]

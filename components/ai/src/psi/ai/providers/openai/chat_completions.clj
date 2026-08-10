@@ -616,7 +616,7 @@
         request            (non-streaming-request conversation model options)]
     (try
       (transport/capture-request! model options :openai-completions url request)
-      (let [response (transport/execute-response url request)]
+      (let [response (transport/execute-response options url request)]
         (if (transport/error-status? (:status response))
           (transport/response->error response)
           (let [body (json/parse-string (:body response) true)
@@ -637,7 +637,7 @@
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (let [response (transport/stream-response url request)]
+      (let [response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
           ;; Review 56: no open-tool balancing is needed on the initial
           ;; HTTP-error path (a 4xx/5xx response to the stream request) —

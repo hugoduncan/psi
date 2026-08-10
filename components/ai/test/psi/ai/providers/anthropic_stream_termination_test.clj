@@ -12,7 +12,8 @@
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.anthropic :as anthropic])
+   [psi.ai.providers.anthropic :as anthropic]
+   [psi.ai.providers.http-boundary :as http-boundary])
   (:import [java.io ByteArrayInputStream]))
 
 (defn- sse-line [event-type data-map]
@@ -304,12 +305,11 @@
           "exactly one :done — the stream terminates normally via message_stop"))))
 
 (defn- run-stream [sse-str model options]
-  (let [events (atom [])]
-    (with-redefs [http/post (fn [_url _req]
-                              {:body (stream-body sse-str)})]
-      (anthropic/stream-anthropic (-> (conv/create "sys") (conv/add-user-message "hi"))
-                                  model options
-                                  (fn [e] (swap! events conj e))))
+  (let [events (atom [])
+        http   (http-boundary/nullable [{:body (stream-body sse-str)}])]
+    (anthropic/stream-anthropic (-> (conv/create "sys") (conv/add-user-message "hi"))
+                                model (assoc options :http-boundary http)
+                                (fn [e] (swap! events conj e)))
     @events))
 
 ;; ── Malformed-stream :start + unknown-index block handling (review 54) ──────
@@ -616,10 +616,9 @@
                                  :delta {:type "thinking_delta"
                                          :thinking "more"}}))
           orig-parse-sse-line anthropic/parse-sse-line
-          lines-seen (atom 0)]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})
-                    anthropic/parse-sse-line
+          lines-seen (atom 0)
+          http (http-boundary/nullable [{:body (stream-body sse)}])]
+      (with-redefs [anthropic/parse-sse-line
                     (fn [line]
                       ;; Count only "data:" lines — line-seq yields the
                       ;; "event:" prefixes and blank separators too, which
@@ -631,7 +630,7 @@
                         (throw (ex-info "simulated stream read failure"
                                         {:status 503}))
                         (orig-parse-sse-line line)))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+        (anthropic/stream-anthropic convo model {:api-key "test-key" :http-boundary http}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :thinking-start :thinking-end :error]
              (mapv :type @events))

@@ -13,6 +13,7 @@
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.providers.openai :as openai]
    [psi.ai.providers.openai.transport :as transport])
   (:import [java.io ByteArrayInputStream]))
@@ -23,12 +24,11 @@
 (defn- run-stream [sse]
   (let [model  (models/get-model :gpt-5)
         convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
-        events (atom [])]
-    (with-redefs [http/post (fn [_url _req]
-                              {:body (stream-body sse)})]
-      ((:stream openai/provider)
-       convo model {:api-key "sk-test"}
-       (fn [ev] (swap! events conj ev))))
+        events (atom [])
+        http   (http-boundary/nullable [{:body (stream-body sse)}])]
+    ((:stream openai/provider)
+     convo model {:api-key "sk-test" :http-boundary http}
+     (fn [ev] (swap! events conj ev)))
     @events))
 
 (deftest completions-finish-reason-then-eof-emits-done-test
@@ -309,10 +309,9 @@
                                                 :tool_calls [{:index 0
                                                               :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n")
           lines-seen (atom 0)
-          orig-parse-sse-line transport/parse-sse-line]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})
-                    transport/parse-sse-line
+          orig-parse-sse-line transport/parse-sse-line
+          http (http-boundary/nullable [{:body (stream-body sse)}])]
+      (with-redefs [transport/parse-sse-line
                     (fn [line]
                       ;; Count only "data:" lines — line-seq yields the
                       ;; blank separator lines too (parse-sse-line skips
@@ -326,7 +325,7 @@
                         (orig-parse-sse-line line)))]
         ((:stream openai/provider)
          (-> (conv/create "sys") (conv/add-user-message "hi"))
-         (models/get-model :gpt-5) {:api-key "sk-test"}
+         (models/get-model :gpt-5) {:api-key "sk-test" :http-boundary http}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :toolcall-start :toolcall-end :error]
              (mapv :type @events))

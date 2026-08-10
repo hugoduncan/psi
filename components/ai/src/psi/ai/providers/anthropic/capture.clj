@@ -5,10 +5,10 @@
   observability callbacks with redacted headers; the stream plumbing wraps
   the HTTP post and the terminal error/status handling shared by the
   streaming and non-streaming paths."
-  (:require [clj-http.client :as http]
-            [psi.ai.proxy :as proxy]
+  (:require [psi.ai.proxy :as proxy]
             [psi.ai.providers.anthropic.error :as anthropic-error]
             [psi.ai.providers.anthropic.request-support :as anthropic-request-support]
+            [psi.ai.providers.http-boundary :as http-boundary]
             [psi.ai.providers.request-support :as request-support]))
 
 (defn safe-call!
@@ -48,10 +48,12 @@
                :event event}))
 
 (defn stream-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :stream :throw-exceptions false})))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :stream :throw-exceptions false})))
 
 (defn error-status?
   [status]
@@ -92,7 +94,7 @@
 (defn consume-retry-response!
   [model options url consume-fn consume-stream-response! retry-request]
   (capture-request! model options url retry-request)
-  (let [retry-response (stream-response url retry-request)
+  (let [retry-response (stream-response options url retry-request)
         retry-status   (:status retry-response)]
     (if (error-status? retry-status)
       (emit-error! model options url consume-fn

@@ -4,6 +4,7 @@
    [cheshire.core :as json]
    [clj-http.client :as http]
    [psi.ai.conversation :as conv]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai]
    [psi.ai.providers.openai.transport :as transport])
@@ -456,12 +457,12 @@
                                     :arguments ""}}) "\n\n"
                   "data: " (json/generate-string
                             {:type "response.completed"
-                             :response {:status "completed"}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        ((:stream openai/provider)
-         convo model {:api-key token}
-         (fn [ev] (swap! events conj ev))))
+                             :response {:status "completed"}}) "\n\n")
+          http    (http-boundary/nullable [{:body (stream-body sse)}])]
+      ((:stream openai/provider)
+       convo model {:api-key token :http-boundary http}
+       (fn [ev] (swap! events conj ev)))
+      (is (= 1 (count (http-boundary/requests http))))
       (is (= [[:start nil]
               [:toolcall-start 2]
               [:toolcall-start 100]
@@ -497,12 +498,12 @@
                   "data: " (json/generate-string
                             {:type "response.failed"
                              :response {:error {:message "Overloaded"}
-                                        :status "failed"}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        ((:stream openai/provider)
-         convo model {:api-key token}
-         (fn [ev] (swap! events conj ev))))
+                                        :status "failed"}}) "\n\n")
+          http    (http-boundary/nullable [{:body (stream-body sse)}])]
+      ((:stream openai/provider)
+       convo model {:api-key token :http-boundary http}
+       (fn [ev] (swap! events conj ev)))
+      (is (= 1 (count (http-boundary/requests http))))
       (is (= [[:start nil]
               [:toolcall-start 2]
               [:toolcall-start 100]
@@ -539,12 +540,11 @@
                   "data: " (json/generate-string
                             {:type "response.failed"
                              :response {:error {:message "Overloaded"}
-                                        :status "failed"}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        ((:stream openai/provider)
-         convo model {:api-key token}
-         (fn [ev] (swap! events conj ev))))
+                                        :status "failed"}}) "\n\n")
+          http    (http-boundary/nullable [{:body (stream-body sse)}])]
+      ((:stream openai/provider)
+       convo model {:api-key token :http-boundary http}
+       (fn [ev] (swap! events conj ev)))
       (is (= [:start :toolcall-start :toolcall-end :error]
              (mapv :type @events))
           "the open function_call tool is balanced with :toolcall-end before the :error")

@@ -532,7 +532,7 @@
             _        (when strategy
                        (consume-fn {:type :structured-output-strategy
                                     :structured-output strategy}))
-            response (transport/stream-response url request)]
+            response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
           ;; Review 51: surface the FULL error map (headers/body-text), not
           ;; just error-message + http-status. The previous destructure

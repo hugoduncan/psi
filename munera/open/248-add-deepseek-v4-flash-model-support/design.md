@@ -125,6 +125,15 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   (not :custom?))` copy, so the origin-tag built-in-classification
   semantics (review 14) live in one place. Pure refactor — no behavior
   change.
+- **Injectable nullable provider HTTP boundary (test review 61):** provider
+  stream/execute requests now cross an explicit `:http-boundary` option,
+  defaulting to the production `clj-http` adapter. The production boundary
+  also supplies a configurable nullable implementation that consumes scripted
+  HTTP/SSE responses and records requests through its public API. Task-added
+  stream tests use this boundary instead of globally redefining
+  `clj-http.client/post`; the deterministic Codex terminal-balancing proofs
+  retain the discriminating content indices `2`/`100` on both `:done` and
+  `:error` paths.
 - **Session-stored runtime API-key provider scoping (review 35):** the
   session's `:runtime-api-key` (recorded at prompt prepare from the previous
   turn's resolved `:ai-options :api-key`) is now stored together with the
@@ -636,7 +645,10 @@ independently confirms native JSON-Schema support can add
   silently lost on `response-mode :non-streaming` sessions with tools),
   and review-58 deterministic Codex terminal balancing (multiple open tool
   calls close in ascending content-index order before both `:done` and
-  `:error`, never in the unspecified traversal order of the backing set));
+  `:error`, never in the unspecified traversal order of the backing set),
+  plus test-review-61's injectable nullable provider HTTP boundary (production
+  defaults to real `clj-http`; tests configure scripted responses and inspect
+  recorded requests without globally redefining infrastructure));
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

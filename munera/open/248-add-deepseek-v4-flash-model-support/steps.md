@@ -4962,7 +4962,7 @@
 
 ## Follow-ups (test review 61, 2026-08-09)
 
-- [ ] Replace the task-added provider stream tests' global `with-redefs` of
+- [x] Replace the task-added provider stream tests' global `with-redefs` of
       `clj-http.client/post` with an injectable nullable HTTP boundary. The
       new deterministic Codex balancing tests in `openai_codex_test.clj`
       (and the task's sibling stream tests) currently install canned
@@ -4975,3 +4975,19 @@
       state. Preserve the discriminating `2`/`100` fixture: the pre-fix set
       traversal is `[100 2]`, so both `:done` and `:error` tests must still
       fail without ascending-index balancing.
+      → Resolved: added `psi.ai.providers.http-boundary`, whose production
+      adapter delegates to `clj-http` and whose configurable nullable consumes
+      scripted response maps/functions/throwables and records requests through
+      `requests`. Anthropic/OpenAI transport seams now accept the boundary via
+      request options. The Codex `2`/`100` done/error proofs and sibling
+      task-added terminal-balancing helpers use the nullable rather than a
+      global `http/post` redefinition; the Codex proofs additionally assert a
+      recorded request. Nullable contract tests cover script order, recorded
+      state, failures, and exhaustion. Targeted namespaces green (46 tests /
+      141 assertions total); clj-kondo and file-length checks clean. Full unit
+      suite: 2642 tests / 19629 assertions with 1 unrelated failure caused by
+      the pre-existing uncommitted `.psi/project.edn` switch from committed
+      DeepSeek profiles to OpenAI profiles (the failing live test's 7 durable
+      profile assertions expected DeepSeek); provider tests all pass. Re-run
+      with the committed project config temporarily substituted (uncommitted
+      file restored by trap) green: 2643 tests / 18927 assertions / 0 failures.

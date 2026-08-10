@@ -1,7 +1,7 @@
 (ns psi.ai.providers.openai.transport
   (:require [clojure.string :as str]
-            [clj-http.client :as http]
             [cheshire.core :as json]
+            [psi.ai.providers.http-boundary :as http-boundary]
             [psi.ai.providers.request-support :as request-support]
             [psi.ai.proxy :as proxy]))
 
@@ -14,16 +14,20 @@
         nil))))
 
 (defn stream-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :stream :cookie-policy :none :throw-exceptions false})))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :stream :cookie-policy :none :throw-exceptions false})))
 
 (defn execute-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :text :cookie-policy :none :throw-exceptions false})))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :text :cookie-policy :none :throw-exceptions false})))
 
 (defn redact-request-headers
   [headers]

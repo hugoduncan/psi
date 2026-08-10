@@ -45,3 +45,11 @@ proven.
 2. `doc/custom-providers.md` DeepSeek example + `:adaptive-thinking` field
    docs + CHANGELOG entry.
 3. Full verification (`bb test`, `clj-kondo`) and commit.
+
+## Test-review 61 follow-up
+
+Introduce one production provider HTTP boundary with a real `clj-http`
+adapter and a configurable nullable implementation. Thread the boundary
+explicitly through provider request options, migrate the task-added terminal
+balancing stream tests to scripted responses/request-state assertions, retain
+the Codex `2`/`100` ordering fixture, and verify the affected provider suites.
