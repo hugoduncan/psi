@@ -5474,3 +5474,13 @@
       discriminating pre-fix behavior, and invariant explanations; remove
       review-number provenance and superseded claims, leaving history in git
       and the task artifacts.
+
+## Follow-ups (code-shaper review 6, 2026-08-10)
+
+- [ ] Remove the remaining review chronology from
+      `bases/main/test/psi/test_support/repo_root.clj`. Its namespace docstring
+      still says `Single home for this helper (review 41)`, even though the
+      completed production/test commentary cleanup requires current contracts
+      rather than review provenance. State only the durable rationale: this is
+      the shared home replacing component-local copies so future fixes land in
+      one place.
