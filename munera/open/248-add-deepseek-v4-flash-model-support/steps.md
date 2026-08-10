@@ -5096,7 +5096,7 @@
 
 ## Follow-ups (test review 68, 2026-08-09)
 
-- [ ] Make `find-header-first-match-test` prove the documented first-match
+- [x] Make `find-header-first-match-test` prove the documented first-match
       contract rather than accepting either matching entry. Supply an
       explicitly ordered header collection with two differently-cased matches
       and assert the exact first `[key value]` pair (plus the existing no-match
