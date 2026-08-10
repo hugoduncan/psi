@@ -59,15 +59,10 @@
     "Anthropic request failed"))
 
 (defn oauth-auth-request?
-  "True when the request carries the transport's own OAuth auth shape: the
-   Authorization: Bearer header PLUS the Claude Code CLI identity headers
-   (user-agent: claude-cli/…, x-app: cli) that request-headers sets only for
-   genuine OAuth requests (built-in Anthropic model + OAuth-shaped key,
-   review 11). A bare `Authorization: Bearer …` header — e.g. a keyless
-   custom provider's custom-header auth (the documented \"Local servers and
-   custom headers\" pattern) — is NOT an OAuth request: it must not suppress
-   the :without-all-betas 400-fallback step (review 19), and the error
-   diagnostics must not label it auth=oauth."
+  "True only for the complete Claude Code OAuth request shape.
+
+   A bare Authorization bearer header can be custom-provider auth; it must
+   retain compatibility fallback handling and must not be diagnosed as OAuth."
   [request]
   (let [headers (or (:headers request) {})
         auth    (or (get headers "Authorization")

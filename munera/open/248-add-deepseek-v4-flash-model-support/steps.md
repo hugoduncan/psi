@@ -5381,7 +5381,7 @@
 
 ## Follow-ups (code-shaper review, 2026-08-09)
 
-- [ ] Remove the stale DeepSeek-streaming claims from production source
+- [x] Remove the stale DeepSeek-streaming claims from production source
       commentary. `components/ai/src/psi/ai/providers/anthropic.clj` still says
       `message_stop` handling is reachable on DeepSeek because its streaming
       path is “unverified” (around lines 430 and 464), but the completed live
@@ -5389,7 +5389,7 @@
       before `message_stop`. Describe the branch and EOF flush as defensive
       support for truncated/non-conforming Anthropic-compatible streams, matching
       the corrected docs and changelog.
-- [ ] Rewrite the task-added provider hot-path comments to state current
+- [x] Rewrite the task-added provider hot-path comments to state current
       invariants and rationale without review chronology. The changed production
       provider files contain 93 `Review N`/`reviews N` references (including
       long multi-review narratives inside `stream-anthropic`,

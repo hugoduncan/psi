@@ -108,14 +108,6 @@
 (defn build-codex-request
   [conversation model options]
   (let [;; No auth key is required when the request is explicitly keyless
-        ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
-        ;; custom :headers supply a recognized auth header (x-api-key /
-        ;; authorization) without a configured :api-key. Incidental custom
-        ;; headers (e.g. X-Client) do NOT imply keyless: with a blank
-        ;; configured key such a request fast-fails with the clear
-        ;; "Missing API key" error instead of silently sending the global
-        ;; OPENAI_API_KEY to a custom endpoint — consistent with the
-        ;; :anthropic-messages and :openai-completions transports (review 13).
         no-auth?   (request-support/no-auth? options)
         api-key    (when-not no-auth?
                      (request-support/resolve-api-key
@@ -177,12 +169,7 @@
    :open-tool-indexes         (atom #{})})
 
 (defn- emit-codex-start!
-  "Emit :start exactly once, before the first output/terminal/error event
-   when the stream never emitted it. The once-semantics live in the shared
-   `request-support/emit-start!` (review 54 extracted the three
-   byte-identical per-transport copies — this was the codex copy from
-   review 52); this private wrapper keeps the transport-local name at the
-   call sites."
+  "Emit :start exactly once before the first output or terminal event."
   [consume-fn started?]
   (request-support/emit-start! consume-fn started?))
 
@@ -274,20 +261,7 @@
   ([model {:keys [done? started?] :as stream-state} consume-fn options url msg http-status headers]
    (when-not @done?
      (reset! done? true)
-     ;; Review 52: emit :start first when the stream never emitted it (an
-     ;; error-FIRST stream — response.failed/error before any output event,
-     ;; or an HTTP-error response to the stream request) — mirroring
-     ;; emit-codex-start!'s role in the codex EOF flush and the
-     ;; review-50-fixed anthropic "error" branch's [:start :error].
-     ;; Previously an error-first codex stream emitted [:error] with no
-     ;; :start — the last three-transport asymmetry in the review-50
-     ;; :start-before-terminal class (the existing codex error tests never
-     ;; caught it because they start with an output event that triggers
-     ;; :start via the non-error path).
      (emit-codex-start! consume-fn started?)
-     ;; Review 56: balance open tool calls before every error terminal.
-     ;; Review 58: share the done/error balancing path and close calls in
-     ;; content-index order so replay does not depend on set traversal order.
      (balance-open-codex-tools! stream-state consume-fn)
      (let [err (cond-> {:type :error :error-message msg}
                  http-status (assoc :http-status http-status)
@@ -451,28 +425,8 @@
 
 (defn- handle-codex-event!
   [stream-state consume-fn model options url strategy event]
-  ;; Review 46: short-circuit the whole dispatch once the stream has
-  ;; terminated (done? — set by emit-codex-error! and emit-codex-done!). A
-  ;; trailing SSE event after response.failed/error previously still emitted
-  ;; non-terminal events: a trailing response.output_text.delta fired
-  ;; :text-delta (handle-codex-event! had no done? check at its top — only
-  ;; emit-codex-error!/emit-codex-done! self-guarded). Now every post-done
-  ;; event is a full no-op.
   (when-not @(:done? stream-state)
     (let [event-type (:type event)]
-      ;; Review 52: skip the raw capture for the mid-stream error event types
-      ;; (response.failed / error) — emit-codex-error! captures the
-      ;; CONSTRUCTED :error event (with normalized :http-status/:headers).
-      ;; Previously the raw event was captured here AND the constructed error
-      ;; was captured in emit-codex-error! — two :on-provider-response
-      ;; callbacks per codex mid-stream error, while the anthropic "error"
-      ;; branch and openai emit-chat-error! capture the raw SSE line only
-      ;; (their constructed :error is never in the capture payload). The
-      ;; capture payloads are now consistent for the same error class: codex
-      ;; captures the constructed error (like its own HTTP-error path),
-      ;; anthropic/openai capture the raw line — exactly one
-      ;; :on-provider-response callback per mid-stream error on every
-      ;; transport.
       (when-not (or (= "response.failed" event-type)
                     (= "error" event-type))
         (transport/capture-response! model options :openai-codex-responses url event))
@@ -534,17 +488,6 @@
                                     :structured-output strategy}))
             response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
-          ;; Review 51: surface the FULL error map (headers/body-text), not
-          ;; just error-message + http-status. The previous destructure
-          ;; dropped :headers/:body-text/:body even though
-          ;; emit-codex-error!'s 4-arity accepts headers (used by the SSE
-          ;; response.failed / error branches) — the only transport whose
-          ;; HTTP-error path lost request-id-style headers for diagnostics
-          ;; (the anthropic and openai chat-completions HTTP-error paths
-          ;; surface the full error map via response->error). A codex HTTP
-          ;; error (401/429/500 from the ChatGPT backend or a custom codex
-          ;; endpoint) now keeps its headers on the :error event, mirroring
-          ;; the sibling transports.
           (let [{:keys [error-message http-status headers]} (transport/response->error response)]
             (emit-codex-error! model stream-state consume-fn options url error-message http-status headers))
           (do
@@ -556,13 +499,5 @@
               (emit-codex-start! consume-fn (-> stream-state :started?))
               (emit-codex-done! stream-state consume-fn model {:response {:status "completed"}} strategy)))))
       (catch Exception e
-        ;; Review 52: pass headers through from exception->error like the
-        ;; review-51-fixed HTTP-error branch — the catch previously
-        ;; destructured away :headers/:body-text/:body and called the 3-arity
-        ;; (headers nil), so an exception carrying response headers in its
-        ;; ex-data (rare for non-HTTP stream exceptions, but the same one-line
-        ;; class review 51 just fixed) lost them on the :error event. The
-        ;; 4-arity's error map carries headers for diagnostics, consistent
-        ;; with the HTTP-error branch and the sibling transports.
         (let [{:keys [error-message http-status headers]} (transport/exception->error e)]
           (emit-codex-error! model stream-state consume-fn options url error-message http-status headers))))))

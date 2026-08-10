@@ -2,13 +2,9 @@
   "Anthropic request construction for the :anthropic-messages transport:
    headers, body, and the request map (build-request).
 
-   Split out of psi.ai.providers.anthropic (review 56, 2026-08-09) to stay
-   under the 800-line file-length gate when the open-block-balancing
-   follow-ups grew the streaming side of that namespace. Pure move — no
-   behavior change. psi.ai.providers.anthropic re-exports build-request and
-   transform-messages (and reads the two beta constants it needs for the
-   HTTP-400 compatibility retry) so callers and tests keep the same public
-   vars."
+   psi.ai.providers.anthropic re-exports build-request and
+   transform-messages and reads the beta constants needed by its HTTP-400
+   compatibility retry."
   (:require [clojure.string :as str]
             [cheshire.core :as json]
             [psi.ai.providers.anthropic.message-transform :as message-transform]
@@ -92,7 +88,7 @@
    `:anthropic-messages` provider — even one literally named \"anthropic\"
    — whose configured key merely resembles an OAuth token must still use
    plain x-api-key auth, and must never receive the Claude Code OAuth
-   headers/system prompt (reviews 11/14)."
+   headers/system prompt."
   [model]
   (request-support/builtin? model :anthropic))
 
@@ -279,21 +275,6 @@
          headers            (if-let [custom (:headers options)]
                               (merge base-hdrs custom)
                               base-hdrs)]
-     ;; ::oauth? carries the transport's COMPUTED OAuth decision (built-in
-     ;; Anthropic model + OAuth-shaped key, review 11) for the HTTP-400
-     ;; compatibility retry: handle-400-response! uses it instead of
-     ;; content-sniffing the merged headers, so a keyless custom provider
-     ;; whose custom :headers reproduce the Claude Code CLI marker set is
-     ;; still NOT treated as OAuth (review 22).
-     ;; NOTE (review 56 split): the keyword is written EXPLICITLY as
-     ;; :psi.ai.providers.anthropic/oauth? — the request map is consumed by
-     ;; psi.ai.providers.anthropic's handle-400-response! closure, whose
-     ;; (::oauth? req) must resolve to the same namespaced keyword. A
-     ;; relative ::oauth? here would resolve to :psi.ai.providers.anthropic.
-     ;; request/oauth? (this namespace), silently breaking the 400-retry
-     ;; OAuth decision for every request — the review-55 namespaced-keyword
-     ;; drift class, reintroduced by moving build-request out of the
-     ;; transport namespace.
      {:headers headers
       :body    (json/generate-string body*)
       :psi.ai.providers.anthropic/oauth? oauth?})))

@@ -235,13 +235,6 @@
   {:stream-started?            (atom false)
    :done?                      (atom false)
    :pending-finish-reason      (atom nil)
-   ;; Review 48: last-seen usage chunk (completions-usage-map shape), so the
-   ;; flushed terminal :done (trailing [DONE] or the EOF flush) carries the
-   ;; provider's usage when one was seen — the review-47 zero-usage class on
-   ;; the :openai-completions sibling. A provider that omits the usage chunk
-   ;; entirely leaves this nil and the :done carries no :usage (zero
-   ;; usage/cost recorded — documented consequence for usage-omitting
-   ;; endpoints).
    :last-usage                  (atom nil)
    :structured-result-emitted? (atom false)
    :text-buffer                (atom "")
@@ -250,12 +243,7 @@
    :tool-state                 (atom {})})
 
 (defn- emit-stream-start!
-  "Emit :start exactly once, before the first output/terminal/error event
-   when the stream never emitted it. The once-semantics live in the shared
-   `request-support/emit-start!` (review 54 extracted the three
-   byte-identical per-transport copies — this was the openai-completions
-   copy from review 53); this private wrapper keeps the transport-local
-   name at the call sites."
+  "Emit :start exactly once before the first output or terminal event."
   [consume-fn stream-started?]
   (request-support/emit-start! consume-fn stream-started?))
 
@@ -436,10 +424,6 @@
                                         (if (= :provider-native (:strategy strategy))
                                           :openai/message-json
                                           :prompted-json/text))
-        ;; Review 48: record the last-seen usage so the flushed terminal
-        ;; :done (trailing [DONE] or EOF flush) can carry it when the done
-        ;; emission is deferred (see flush-pending-chat-finish! / the EOF
-        ;; flush in stream-openai).
         (reset! (:last-usage stream-state) (completions-usage-map model (:usage chunk)))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
@@ -467,66 +451,25 @@
                                       (if (= :provider-native (:strategy strategy))
                                         :openai/message-json
                                         :prompted-json/text))
-      ;; Review 48: attach the last-seen usage chunk (when one was seen) to
-      ;; the flushed :done instead of hardcoding nil — a usage chunk seen
-      ;; before the trailing [DONE]/EOF is preserved on the terminal event.
       (emit-chat-completion-finish! consume-fn stream-started? done? reason
                                     @(:last-usage stream-state))
       (reset! pending-finish-reason nil))))
 
 (defn- emit-chat-error!
-  "Surface a mid-stream OpenAI SSE error chunk ({\"error\": {...}}) as an
-   :error event and terminate the stream. Review 43: an error chunk with no
-   :choices previously no-oped in process-chat-sse-line! (no :error event, no
-   terminal :done), so a mid-stream provider error hung the turn until the
-   idle timeout with a misleading timeout — the same silent-drop class fixed
-   for the anthropic transport's \"error\" SSE event. The chunk is already
-   captured via capture-response! before this is called; the done? guard
-   prevents a trailing [DONE]/finish chunk from emitting a second terminal
-   event."
+  "Surface a mid-stream SSE error as the sole terminal event. The chunk is
+   captured before this call; open tools are balanced before the error and
+   the done guard suppresses every trailing chunk."
   [stream-state consume-fn chunk]
   (let [{:keys [done? stream-started?]} stream-state]
     (when-not @done?
       (reset! done? true)
-      ;; Review 52: emit :start first when the stream never emitted it (an
-      ;; error-FIRST stream — the error chunk arrives before any role/content
-      ;; chunk) — mirroring emit-chat-completion-finish!'s ordering (done?
-      ;; reset, then :start, then the terminal) and the review-50-fixed
-      ;; anthropic "error" branch's [:start :error]. Previously an
-      ;; error-first stream emitted [:error] with no :start — the last
-      ;; three-transport asymmetry in the review-50 :start-before-terminal
-      ;; class (the existing error tests never caught it because they start
-      ;; with a role/content chunk that triggers :start via the non-error
-      ;; path).
       (emit-stream-start! consume-fn stream-started?)
-      ;; Review 56: balance open tool calls before the :error — a
-      ;; tool_calls delta chunk followed by a mid-stream error chunk
-      ;; (e.g. a server_error after tool calls were started) previously
-      ;; emitted [:start :toolcall-start :toolcall-delta :error] with the
-      ;; tool call still open at handle-error! (the review-55 open-tool
-      ;; balancing covered only the :done paths — finish_chunk/usage
-      ;; branches and the EOF flush). force-start-pending-chat-tools! +
-      ;; emit-chat-tool-ends! are the exact helpers the finish_chunk
-      ;; branches use, so an error-terminated stream degrades the same way
-      ;; a finish_reason-terminated one does: every started (or
-      ;; not-yet-started) tool call is closed with :toolcall-end before the
-      ;; :error. A no-op when no tool calls were started (an error-first
-      ;; stream).
       (force-start-pending-chat-tools! stream-state consume-fn)
       (emit-chat-tool-ends! stream-state consume-fn)
       (let [status (some (fn [s] (and (number? s) (>= s 400) s))
                          [(:status chunk)
                           (get-in chunk [:error :status])
                           (get-in chunk [:error :http_status])
-                          ;; Review 51: top-level :http_status — the
-                          ;; review-47-aligned anthropic "error" branch reads
-                          ;; this location too, so an OpenAI-compatible
-                          ;; endpoint emitting the status under a TOP-LEVEL
-                          ;; http_status key ({"http_status": 529,
-                          ;; "error": {...}}) keeps its numeric :http-status
-                          ;; and downstream retry-error? /
-                          ;; provider-error-kind classify a transient
-                          ;; 5xx/overload as retryable instead of :unknown.
                           (:http_status chunk)])
             err    (transport/response->error {:status  status
                                                :headers nil
@@ -535,16 +478,6 @@
 
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url strategy line]
-  ;; Review 46: short-circuit the whole line once the stream has terminated
-  ;; (done? — set by emit-chat-error! and emit-chat-completion-finish!). A
-  ;; trailing chunk after a mid-stream SSE error chunk previously still
-  ;; emitted non-terminal events: a trailing :choices chunk fired
-  ;; :text-delta via emit-chat-chunk!, a trailing usage/finish chunk drove
-  ;; finish-chat-chunk!'s unguarded force-start-pending-chat-tools! /
-  ;; emit-chat-tool-ends! / emit-structured-output-result! (only
-  ;; emit-chat-completion-finish! was done?-guarded), and a trailing [DONE]
-  ;; with a pending finish reason fired flush-pending-chat-finish!'s
-  ;; :structured-output-result. Now every post-done line is a full no-op.
   (when-not @(:done? stream-state)
     (if-let [chunk (transport/parse-sse-line line)]
       (do
@@ -639,17 +572,7 @@
                      :structured-output strategy}))
       (let [response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
-          ;; Review 56: no open-tool balancing is needed on the initial
-          ;; HTTP-error path (a 4xx/5xx response to the stream request) —
-          ;; it fires BEFORE any SSE line has been consumed, so
-          ;; @(:tool-state stream-state) is always empty; the mid-stream
-          ;; error chunk path (emit-chat-error!) and the catch block (the
-          ;; paths that can fire after tool calls were started) balance via
-          ;; force-start-pending-chat-tools!/emit-chat-tool-ends!.
           (do
-            ;; Test review 85: an initial HTTP response error is terminal in
-            ;; the same provider-event stream as SSE and read errors, so it
-            ;; must observe the same :start-before-terminal ordering.
             (emit-stream-start! consume-fn (:stream-started? stream-state))
             (transport/emit-error! model
                                    options
@@ -661,35 +584,9 @@
             (with-open [reader (io/reader (:body response))]
               (doseq [line (line-seq reader)]
                 (process-chat-sse-line! stream-state consume-fn model options url strategy line)))
-            ;; Review 48: EOF-level terminal flush — mirror the codex
-            ;; transport's (when-not @(:done? ...) ...) after its SSE doseq.
-            ;; A stream that EOFs without an in-band terminal event (a usage
-            ;; chunk, a finish_reason chunk + [DONE], or an error chunk)
-            ;; previously emitted NO :done/:error and hung the turn until
-            ;; llm-stream-idle-timeout-ms: a final chunk carrying finish_reason
-            ;; but no trailing [DONE] left pending-finish-reason unflushed
-            ;; (flush-pending-chat-finish! runs only on a [DONE] line), and a
-            ;; [DONE] with no prior finish_reason chunk no-oped (the flush
-            ;; guards on the pending reason). The flush emits the pending
-            ;; finish reason when set, else :stop, and attaches the last-seen
-            ;; usage chunk when one was provided; when an in-band terminal
-            ;; already fired, done? makes it a no-op.
             (when-not @(:done? stream-state)
               (flush-pending-chat-finish! stream-state consume-fn strategy)
               (when-not @(:done? stream-state)
-                ;; Review 55: close any open tool calls before the terminal
-                ;; :done — a tool_calls delta chunk followed by EOF (no
-                ;; finish_reason, no [DONE], no usage chunk) previously
-                ;; emitted :done with no :toolcall-end, leaving the turn
-                ;; accumulator with an OPEN tool index when handle-done!
-                ;; finalized (the review-43/48/50
-                ;; no-phantom-or-unbalanced-block invariant, via the EOF
-                ;; path). force-start-pending-chat-tools! emits :toolcall-
-                ;; start for any pending (not-yet-started) tool calls so they
-                ;; are balanced by the subsequent emit-chat-tool-ends! —
-                ;; reusing the exact helpers the finish_chunk branches call
-                ;; (finish-chat-chunk!), so a truncated stream degrades the
-                ;; same way a finish_reason-terminated stream does.
                 (force-start-pending-chat-tools! stream-state consume-fn)
                 (emit-chat-tool-ends! stream-state consume-fn)
                 (emit-structured-output-result! stream-state
@@ -703,38 +600,10 @@
                                               (:done? stream-state)
                                               :stop
                                               @(:last-usage stream-state)))
-              ;; Preserve the pre-review-48 nil return of the stream fn (the
-              ;; flush's when-not would otherwise return the last consumed
-              ;; event via emit-chat-completion-finish!'s consume-fn result).
               nil))))
       (catch Exception e
-        ;; Review 44: guard the error emission on done? (mirroring the codex
-        ;; transport's emit-codex-error!) — if a mid-stream SSE error chunk
-        ;; already terminated the stream (emit-chat-error! sets done?),
-        ;; a stream-read exception thrown afterwards must not emit a SECOND
-        ;; :error.
         (when-not @(:done? stream-state)
-          ;; Review 53: emit :start first — the catch block is the last
-          ;; :start-before-terminal gap on this transport. A stream-read
-          ;; exception before any output event (e.g. a connection reset on
-          ;; the first read) previously emitted [:error] with no preceding
-          ;; :start (the catch routes through transport/emit-error!, which
-          ;; has no start logic), while every in-band terminal/error emitter
-          ;; now emits [:start ...] (review-52 emit-chat-error!,
-          ;; emit-chat-completion-finish!; the codex catch gets :start via
-          ;; emit-codex-error!'s review-52 emit-codex-start!). The catch now
-          ;; emits :start once (compare-and-set on stream-started?) before
-          ;; the :error, mirroring emit-chat-error!'s ordering — so a
-          ;; first-read exception yields [:start :error] like every other
-          ;; error path on this transport.
           (emit-stream-start! consume-fn (:stream-started? stream-state))
-          ;; Review 56: balance open tool calls before the :error — a
-          ;; stream-read exception mid-tool-call (e.g. a connection reset
-          ;; after a tool_calls delta was processed) previously finalized
-          ;; the accumulator with an OPEN tool index (the catch routes
-          ;; through transport/emit-error!, which has no balancing — review
-          ;; 55 covered only the :done paths). Same helpers as the in-band
-          ;; error chunk path; a no-op when no tool calls were started.
           (force-start-pending-chat-tools! stream-state consume-fn)
           (emit-chat-tool-ends! stream-state consume-fn)
           (transport/emit-error! model
