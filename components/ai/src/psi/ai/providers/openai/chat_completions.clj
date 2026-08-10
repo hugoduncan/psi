@@ -218,8 +218,7 @@
   [consume-fn stream-started? done? reason usage]
   (when-not @done?
     (reset! done? true)
-    (when (compare-and-set! stream-started? false true)
-      (consume-fn {:type :start}))
+    (request-support/emit-start! consume-fn stream-started?)
     (consume-fn (cond-> {:type :done
                          :reason reason}
                   usage (assoc :usage usage)))))

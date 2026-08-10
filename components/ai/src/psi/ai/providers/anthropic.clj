@@ -56,6 +56,158 @@
     :interleaved-thinking-beta anthropic-request/interleaved-thinking-beta
     :oauth-auth-request? (fn [req] (boolean (::oauth? req)))}
    model options url request response consume-fn consume-stream-response!))
+(defn- make-stream-state
+  [model options url consume-fn strategy structured-tool-name]
+  {:model                      model
+   :options                    options
+   :url                        url
+   :consume-fn                 consume-fn
+   :strategy                   strategy
+   :structured-tool-name       structured-tool-name
+   :block-types                (atom {})
+   :open-blocks                (atom {})
+   :structured-buffers         (atom {})
+   :prompted-json-buffer       (atom "")
+   :json-schema-output-buffer  (atom "")
+   :structured-result-emitted? (atom false)
+   :usage-acc                  (atom {:input-tokens       0
+                                      :output-tokens      0
+                                      :cache-read-tokens  0
+                                      :cache-write-tokens 0})
+   :done?                      (atom false)
+   :started?                   (atom false)})
+
+(defn- emit-terminal-done!
+  [{:keys [model consume-fn strategy open-blocks prompted-json-buffer
+           json-schema-output-buffer structured-result-emitted? usage-acc
+           done? started?]} reason]
+  (reset! done? true)
+  (capture/emit-start! consume-fn started?)
+  (balance-open-blocks! consume-fn open-blocks)
+  (anthropic-structured-output/maybe-emit-json-schema-output-result!
+   consume-fn
+   structured-result-emitted?
+   strategy
+   @json-schema-output-buffer)
+  (anthropic-structured-output/maybe-emit-prompted-json-result!
+   consume-fn
+   structured-result-emitted?
+   strategy
+   @prompted-json-buffer)
+  (consume-fn {:type   :done
+               :reason reason
+               :usage  (usage/usage-with-cost model usage-acc)}))
+
+(defn- process-stream-event!
+  "Process one parsed Anthropic SSE event against the explicit stream state."
+  [{:keys [model options url consume-fn strategy structured-tool-name
+           block-types open-blocks structured-buffers prompted-json-buffer
+           json-schema-output-buffer usage-acc done? started?]
+    :as stream-state}
+   event-data]
+  (capture/capture-response! model options url event-data)
+  (when-not @done?
+    (case (:type event-data)
+      "message_start"
+      (do
+        (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
+        (capture/emit-start! consume-fn started?))
+
+      "content_block_start"
+      (let [idx   (:index event-data)
+            block (:content_block event-data)]
+        (capture/emit-start! consume-fn started?)
+        (swap! block-types assoc idx {:type (:type block)
+                                      :name (:name block)})
+        (when-not (anthropic-structured-output/structured-tool-block?
+                   structured-tool-name
+                   {:type (:type block) :name (:name block)})
+          (let [start-event (stream-events/content-block-start-event idx block)]
+            (stream-events/consume-event! consume-fn start-event)
+            (when start-event
+              (swap! open-blocks assoc idx (:type block))))))
+
+      "content_block_delta"
+      (let [idx        (:index event-data)
+            block-info (get @block-types idx)
+            delta      (:delta event-data)]
+        (capture/emit-start! consume-fn started?)
+        (when block-info
+          (if (anthropic-structured-output/structured-tool-block?
+               structured-tool-name
+               block-info)
+            (when-let [json-delta (:partial_json delta)]
+              (swap! structured-buffers update idx str json-delta))
+            (do
+              (when (and (= "text" (:type block-info))
+                         (seq (:text delta)))
+                (cond
+                  (= :prompted-json (:strategy strategy))
+                  (swap! prompted-json-buffer str (:text delta))
+
+                  (anthropic-structured-output/json-schema-output-mechanism? strategy)
+                  (swap! json-schema-output-buffer str (:text delta))))
+              (stream-events/consume-event!
+               consume-fn
+               (stream-events/content-block-delta-event (:type block-info)
+                                                        idx
+                                                        delta))))))
+
+      "content_block_stop"
+      (let [idx        (:index event-data)
+            block-info (get @block-types idx)]
+        (capture/emit-start! consume-fn started?)
+        (when block-info
+          (if (anthropic-structured-output/structured-tool-block?
+               structured-tool-name
+               block-info)
+            (anthropic-structured-output/maybe-emit-structured-result!
+             consume-fn
+             strategy
+             (get @structured-buffers idx))
+            (do
+              (stream-events/consume-event!
+               consume-fn
+               (stream-events/content-block-stop-event (:type block-info) idx))
+              (swap! open-blocks dissoc idx)))))
+
+      "error"
+      (let [status (some (fn [candidate]
+                           (and (number? candidate) (>= candidate 400) candidate))
+                         [(get-in event-data [:error :http_status])
+                          (get-in event-data [:error :status])
+                          (:http_status event-data)
+                          (:status event-data)])
+            error-event (anthropic-error/error-from-response-data
+                         {:status           status
+                          :body-text        (json/generate-string event-data)
+                          :fallback-message "Anthropic stream error"})]
+        (reset! done? true)
+        (capture/emit-start! consume-fn started?)
+        (balance-open-blocks! consume-fn open-blocks)
+        (consume-fn error-event))
+
+      "message_delta"
+      (do
+        (usage/update-output-usage! usage-acc (:usage event-data))
+        (when-let [reason (get-in event-data [:delta :stop_reason])]
+          (emit-terminal-done! stream-state (keyword reason))))
+
+      "message_stop"
+      (emit-terminal-done! stream-state :stop)
+
+      nil)))
+
+(defn- consume-stream-response!
+  [stream-state response]
+  (with-open [reader (io/reader (:body response))]
+    (doseq [line (line-seq reader)]
+      (when-let [event-data (parse-sse-line line)]
+        (process-stream-event! stream-state event-data))))
+  (when-not @(get stream-state :done?)
+    (emit-terminal-done! stream-state :stop)
+    nil))
+
 (defn stream-anthropic
   "Stream response from Anthropic API."
   [conversation model options consume-fn]
@@ -67,180 +219,47 @@
         structured-tool-name (anthropic-structured-output/structured-tool-name-from-request
                               strategy
                               request-body)
-        block-types        (atom {})
-        open-blocks        (atom {})
-        structured-buffers (atom {})
-        prompted-json-buffer (atom "")
-        json-schema-output-buffer (atom "")
-        structured-result-emitted? (atom false)
-        usage-acc   (atom {:input-tokens       0
-                           :output-tokens      0
-                           :cache-read-tokens  0
-                           :cache-write-tokens 0})
-        done?       (atom false)
-        started?    (atom false)]
+        stream-state       (make-stream-state model
+                                              options
+                                              url
+                                              consume-fn
+                                              strategy
+                                              structured-tool-name)
+        {:keys [done? started? open-blocks]} stream-state]
     (try
       (capture/capture-request! model options url request)
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (letfn [(emit-terminal-done! []
-                (reset! done? true)
-                (capture/emit-start! consume-fn started?)
-                (balance-open-blocks! consume-fn open-blocks)
-                (anthropic-structured-output/maybe-emit-json-schema-output-result!
-                 consume-fn
-                 structured-result-emitted?
-                 strategy
-                 @json-schema-output-buffer)
-                (anthropic-structured-output/maybe-emit-prompted-json-result!
-                 consume-fn
-                 structured-result-emitted?
-                 strategy
-                 @prompted-json-buffer)
-                (consume-fn {:type   :done
-                             :reason :stop
-                             :usage  (usage/usage-with-cost model usage-acc)}))
-              (consume-stream-response! [response]
-                (with-open [reader (io/reader (:body response))]
-                  (doseq [line (line-seq reader)]
-                    (when-let [event-data (parse-sse-line line)]
-                      (capture/capture-response! model options url event-data)
-                      (when-not @done?
-                        (case (:type event-data)
-                          "message_start"
-                          (do
-                            (usage/update-start-usage! usage-acc (get-in event-data [:message :usage]))
-                            (capture/emit-start! consume-fn started?))
+      (let [consume-response! (partial consume-stream-response! stream-state)
+            response          (capture/stream-response options url request)
+            status            (:status response)]
+        (cond
+          (= 400 status)
+          (do
+            (capture/emit-start! consume-fn started?)
+            (handle-400-response! model options
+                                  url
+                                  request
+                                  response
+                                  consume-fn
+                                  consume-response!))
 
-                          "content_block_start"
-                          (let [idx   (:index event-data)
-                                block (:content_block event-data)]
-                            (capture/emit-start! consume-fn started?)
-                            (swap! block-types assoc idx {:type (:type block)
-                                                          :name (:name block)})
-                            (when-not (anthropic-structured-output/structured-tool-block?
-                                       structured-tool-name
-                                       {:type (:type block) :name (:name block)})
-                              (let [start-event (stream-events/content-block-start-event idx block)]
-                                (stream-events/consume-event! consume-fn start-event)
-                                (when start-event
-                                  (swap! open-blocks assoc idx (:type block))))))
+          (capture/error-status? status)
+          (do
+            (capture/emit-start! consume-fn started?)
+            (capture/emit-error! model options url consume-fn
+                                 (anthropic-error/response->error response request)))
 
-                          "content_block_delta"
-                          (let [idx (:index event-data)
-                                block-info (get @block-types idx)
-                                delta (:delta event-data)]
-                            (capture/emit-start! consume-fn started?)
-                            (when block-info
-                              (if (anthropic-structured-output/structured-tool-block?
-                                   structured-tool-name
-                                   block-info)
-                                (when-let [json-delta (:partial_json delta)]
-                                  (swap! structured-buffers update idx str json-delta))
-                                (do
-                                  (when (and (= "text" (:type block-info))
-                                             (seq (:text delta)))
-                                    (cond
-                                      (= :prompted-json (:strategy strategy))
-                                      (swap! prompted-json-buffer str (:text delta))
-
-                                      (anthropic-structured-output/json-schema-output-mechanism? strategy)
-                                      (swap! json-schema-output-buffer str (:text delta))))
-                                  (stream-events/consume-event! consume-fn
-                                                                (stream-events/content-block-delta-event (:type block-info)
-                                                                                                         idx
-                                                                                                         delta))))))
-
-                          "content_block_stop"
-                          (let [idx (:index event-data)
-                                block-info (get @block-types idx)]
-                            (capture/emit-start! consume-fn started?)
-                            (when block-info
-                              (if (anthropic-structured-output/structured-tool-block?
-                                   structured-tool-name
-                                   block-info)
-                                (anthropic-structured-output/maybe-emit-structured-result!
-                                 consume-fn
-                                 strategy
-                                 (get @structured-buffers idx))
-                                (do
-                                  (stream-events/consume-event! consume-fn
-                                                                (stream-events/content-block-stop-event (:type block-info)
-                                                                                                        idx))
-                                  (swap! open-blocks dissoc idx)))))
-
-                          "error"
-                          (let [status (some (fn [s] (and (number? s) (>= s 400) s))
-                                             [(get-in event-data [:error :http_status])
-                                              (get-in event-data [:error :status])
-                                              (:http_status event-data)
-                                              (:status event-data)])
-                                err    (anthropic-error/error-from-response-data
-                                        {:status           status
-                                         :body-text        (json/generate-string event-data)
-                                         :fallback-message "Anthropic stream error"})]
-                            (reset! done? true)
-                            (capture/emit-start! consume-fn started?)
-                            (balance-open-blocks! consume-fn open-blocks)
-                            (consume-fn err))
-
-                          "message_delta"
-                          (when-not @done?
-                            (usage/update-output-usage! usage-acc (:usage event-data))
-                            (when-let [reason (get-in event-data [:delta :stop_reason])]
-                              (reset! done? true)
-                              (capture/emit-start! consume-fn started?)
-                              (balance-open-blocks! consume-fn open-blocks)
-                              (anthropic-structured-output/maybe-emit-json-schema-output-result!
-                               consume-fn
-                               structured-result-emitted?
-                               strategy
-                               @json-schema-output-buffer)
-                              (anthropic-structured-output/maybe-emit-prompted-json-result!
-                               consume-fn
-                               structured-result-emitted?
-                               strategy
-                               @prompted-json-buffer)
-                              (consume-fn {:type   :done
-                                           :reason (keyword reason)
-                                           :usage  (usage/usage-with-cost model usage-acc)})))
-
-                          "message_stop"
-                          (emit-terminal-done!)
-
-                          nil)))))
-                (when-not @done?
-                  (emit-terminal-done!)
-                  nil))]
-        (let [response (capture/stream-response options url request)
-              status   (:status response)]
-          (cond
-            (= 400 status)
-            (do
-              (capture/emit-start! consume-fn started?)
-              (handle-400-response! model options
-                                    url
-                                    request
-                                    response
-                                    consume-fn
-                                    consume-stream-response!))
-
-            (capture/error-status? status)
-            (do
-              (capture/emit-start! consume-fn started?)
-              (capture/emit-error! model options url consume-fn
-                                   (anthropic-error/response->error response request)))
-
-            :else
-            (consume-stream-response! response))))
+          :else
+          (consume-response! response)))
       (catch Exception e
         (when-not @done?
           (capture/emit-start! consume-fn started?)
           (balance-open-blocks! consume-fn open-blocks)
-          (let [err (anthropic-error/exception->error e)]
-            (capture/capture-response! model options url err)
-            (consume-fn err)))))))
+          (let [error-event (anthropic-error/exception->error e)]
+            (capture/capture-response! model options url error-event)
+            (consume-fn error-event)))))))
 
 (defn- execute-response
   [options url request]

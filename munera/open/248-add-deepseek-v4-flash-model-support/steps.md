@@ -5435,14 +5435,14 @@
 
 ## Follow-ups (code-shaper review 4, 2026-08-09)
 
-- [ ] Route `emit-chat-completion-finish!` through
+- [x] Route `emit-chat-completion-finish!` through
       `request-support/emit-start!` instead of retaining its own inline
       `compare-and-set!` + `{:type :start}` implementation. The task already
       extracted the once-only start invariant for all three transports, and
       every other OpenAI chat-completions start path delegates to that helper;
       the terminal-success path is now a second implementation that can drift.
       Keep the terminal ordering and exact event-vector tests unchanged.
-- [ ] Split `request-support/resolve-api-key` so key resolution and missing-key
+- [x] Split `request-support/resolve-api-key` so key resolution and missing-key
       error construction are locally separate responsibilities. The current
       function interleaves built-in fallback lookup, custom `env:` validation,
       provider-specific recovery-message formatting, and exception data across
@@ -5451,7 +5451,7 @@
       error/message helper (or equivalent singular policy function), leaving
       `resolve-api-key` as the obvious resolve-or-throw flow while preserving
       exact messages and ex-data tests.
-- [ ] Extract Anthropic SSE event dispatch from `stream-anthropic` into a
+- [x] Extract Anthropic SSE event dispatch from `stream-anthropic` into a
       locally testable event-processing function with one explicit stream-state
       shape. `stream-anthropic` still combines HTTP lifecycle, reader iteration,
       a large event-type dispatch, mutable block/usage/structured-output state,

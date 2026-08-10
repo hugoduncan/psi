@@ -59,6 +59,49 @@
   (and (builtin? model :openai)
        (= :openai-completions (:api model))))
 
+(defn- custom-missing-api-key-error
+  "Build provider-scoped recovery guidance without suggesting built-in OAuth."
+  [provider api-key-spec]
+  (let [spec        (some-> api-key-spec str)
+        spec-env-var (when (and (string? spec)
+                                (str/starts-with? spec "env:"))
+                       (subs spec 4))
+        data        {:error-code "auth/missing-api-key"
+                     :provider provider}]
+    (cond
+      ;; Empty env names are configuration errors, not lookups.
+      (and (string? spec-env-var) (str/blank? spec-env-var))
+      (ex-info (str "Missing API key for provider " (name provider)
+                    ": api-key spec \"" spec "\" names an empty"
+                    " environment variable (use \"env:VAR_NAME\").")
+               data)
+
+      spec-env-var
+      (ex-info (str "Missing API key for provider " (name provider)
+                    ": environment variable " spec-env-var
+                    " is unset (env: keys are re-read per request;"
+                    " relaunch psi with the variable set in its process"
+                    " environment, then retry).")
+               data)
+
+      :else
+      (ex-info (str "Missing API key for provider " (name provider)
+                    ". Configure the provider's :auth {:api-key ...} in models.edn"
+                    ;; Shell variable names use underscores.
+                    " (e.g. \"env:" (-> (name provider)
+                                        (str/replace "-" "_")
+                                        str/upper-case)
+                    "_API_KEY\").")
+               data))))
+
+(defn- missing-api-key-error
+  [provider builtin? {:keys [builtin-provider builtin-missing-msg]} api-key-spec]
+  (if builtin?
+    (ex-info builtin-missing-msg
+             {:error-code "auth/missing-api-key"
+              :provider builtin-provider})
+    (custom-missing-api-key-error provider api-key-spec)))
+
 (defn resolve-api-key
   "Resolve an API key at request time without crossing provider boundaries.
 
@@ -68,54 +111,17 @@
    produce provider-scoped recovery guidance."
   [model options config]
   (when-not (no-auth? options)
-    (let [{:keys [builtin-provider env-var builtin-missing-msg]} config
+    (let [{:keys [builtin-provider env-var]} config
           provider    (:provider model)
           builtin?    (builtin? model builtin-provider)
           environment (environment-boundary/boundary options)
-          api-key     (resolve-key-spec (:api-key options) environment)
-          api-key     (if (and builtin? (str/blank? api-key))
+          configured-key (resolve-key-spec (:api-key options) environment)
+          api-key     (if (and builtin? (str/blank? configured-key))
                         (environment-boundary/lookup environment env-var)
-                        api-key)]
-      (when (str/blank? api-key)
-        (if builtin?
-          (throw (ex-info builtin-missing-msg
-                          {:error-code "auth/missing-api-key"
-                           :provider builtin-provider}))
-          ;; Custom-provider errors name their own configuration remedy and
-          ;; never suggest the built-in-only OAuth login flow.
-          (let [spec (some-> (:api-key options) str)
-                env-var (when (and (string? spec)
-                                   (str/starts-with? spec "env:"))
-                          (subs spec 4))]
-            (cond
-              ;; Empty env names are configuration errors, not lookups.
-              (and (string? env-var) (str/blank? env-var))
-              (throw (ex-info (str "Missing API key for provider " (name provider)
-                                   ": api-key spec \"" spec "\" names an empty"
-                                   " environment variable (use \"env:VAR_NAME\").")
-                              {:error-code "auth/missing-api-key"
-                               :provider provider}))
-
-              env-var
-              (throw (ex-info (str "Missing API key for provider " (name provider)
-                                   ": environment variable " env-var
-                                   " is unset (env: keys are re-read per request;"
-                                   " relaunch psi with the variable set in its process"
-                                   " environment, then retry).")
-                              {:error-code "auth/missing-api-key"
-                               :provider provider}))
-
-              :else
-              (throw (ex-info (str "Missing API key for provider " (name provider)
-                                   ". Configure the provider's :auth {:api-key ...} in models.edn"
-                                   ;; Shell variable names use underscores.
-                                   " (e.g. \"env:" (-> (name provider)
-                                                       (str/replace "-" "_")
-                                                       str/upper-case)
-                                   "_API_KEY\").")
-                              {:error-code "auth/missing-api-key"
-                               :provider provider}))))))
-      api-key)))
+                        configured-key)]
+      (if (str/blank? api-key)
+        (throw (missing-api-key-error provider builtin? config (:api-key options)))
+        api-key))))
 
 ;; ── Stream event helpers ─────────────────────────────────────────────────────
 
