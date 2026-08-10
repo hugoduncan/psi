@@ -1,9 +1,9 @@
 (ns psi.ai.providers.openai-codex-retry-test
   (:require
    [cheshire.core :as json]
-   [clj-http.client :as http]
    [clojure.test :refer [deftest is]]
    [psi.ai.conversation :as conv]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai])
   (:import [java.io ByteArrayInputStream]
@@ -38,15 +38,14 @@
                       :response {:error {:message "The usage limit has been reached (status 429) [request-id req_123]"
                                          :status 429
                                          :headers {"Retry-After" "8"}}}})
-                    "\n\n")]
-    (with-redefs [http/post (fn [_url _req]
-                              {:status 200
-                               :body (stream-body sse)})]
-      ((:stream openai/provider)
-       convo model {:api-key token}
-       (fn [ev] (swap! events conj ev))))
+                    "\n\n")
+        http   (http-boundary/nullable
+                [{:status 200 :body (stream-body sse)}])]
+    ((:stream openai/provider)
+     convo model {:api-key token :http-boundary http}
+     (fn [ev] (swap! events conj ev)))
+    (is (= 1 (count (http-boundary/requests http))))
     (is (= [:start :error] (mapv :type @events)))
-    (is (= :error (:type (second @events))))
     (is (= "The usage limit has been reached (status 429) [request-id req_123]"
            (:error-message (second @events))))
     (is (= 429 (:http-status (second @events))))

@@ -5229,7 +5229,7 @@
 
 ## Follow-ups (test review 79, 2026-08-09)
 
-- [ ] Migrate the task-modified
+- [x] Migrate the task-modified
       `codex-stream-failed-event-preserves-status-and-headers-test` in
       `openai_codex_retry_test.clj` from its global `clj-http.client/post`
       redefinition to `http-boundary/nullable`, threading the boundary through
