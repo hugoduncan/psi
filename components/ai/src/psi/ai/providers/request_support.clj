@@ -180,8 +180,9 @@
               env-var
               (throw (ex-info (str "Missing API key for provider " (name provider)
                                    ": environment variable " env-var
-                                   " is unset (env: keys are re-read per request"
-                                   " — export it and retry).")
+                                   " is unset (env: keys are re-read per request;"
+                                   " relaunch psi with the variable set in its process"
+                                   " environment, then retry).")
                               {:error-code "auth/missing-api-key"
                                :provider provider}))
 

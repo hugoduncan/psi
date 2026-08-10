@@ -5348,7 +5348,7 @@
 
 ## Follow-ups (documentation review 2, 2026-08-09)
 
-- [ ] Align the unset-`env:` runtime error with the corrected API-key lifecycle
+- [x] Align the unset-`env:` runtime error with the corrected API-key lifecycle
       documentation. `request-support/resolve-api-key` still says “export it
       and retry,” but exporting in another shell cannot change psi's running
       process environment; tell users to relaunch psi with the variable set (or

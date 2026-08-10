@@ -166,10 +166,11 @@
                anthropic-config)
               nil
               (catch clojure.lang.ExceptionInfo e e))]
-      (is (some? e))
-      (is (re-find #"environment variable DEEPSEEK_API_KEY is unset" (ex-message e)))
-      (is (re-find #"re-read per request" (ex-message e)))
-      (is (nil? (re-find #"/login" (ex-message e))))))
+      (is (= (str "Missing API key for provider deepseek: environment variable "
+                  "DEEPSEEK_API_KEY is unset (env: keys are re-read per request; "
+                  "relaunch psi with the variable set in its process environment, "
+                  "then retry).")
+             (ex-message e)))))
 
   (testing "env: with a blank variable name is a config error"
     (let [model {:provider :deepseek :custom? true}
