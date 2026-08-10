@@ -5321,3 +5321,27 @@
       real parser, and retain the exact `[:start :error]` sequence plus the
       concrete error-message assertion. This makes the tests behavior-focused
       and preserves distinct coverage from the initial HTTP failure tests.
+
+## Follow-ups (documentation review, 2026-08-09)
+
+- [ ] Correct the `env:` API-key lifecycle claims in
+      `doc/custom-providers.md` and `CHANGELOG.md`. Request-time lookup means
+      psi re-reads its own process environment on every request, but an
+      `export` performed after psi starts — especially in another shell —
+      cannot modify the already-running psi process environment. Remove the
+      promises that exporting/changing a variable after startup is picked up
+      without restart/relaunch; retain the accurate distinction that values
+      present in psi's process environment are resolved at request time rather
+      than snapshotted when `models.edn` is parsed.
+- [ ] Update the EOF-terminal `CHANGELOG.md` entry that still says DeepSeek's
+      streaming path is unverified. The task's completed live streaming check
+      and `doc/custom-providers.md` now verify the normal DeepSeek event shape;
+      describe the EOF flush as defensive support for truncated/non-conforming
+      streams without using the superseded DeepSeek-unverified rationale.
+- [ ] Reflect the shipped DeepSeek custom-provider capability in both required
+      summary surfaces: add a concise README model-controls/configuration note
+      pointing users to the documented `deepseek-v4-flash` setup, and add the
+      custom-provider/DeepSeek capability to `ramora/IMPLEMENTED.md`. At present
+      only `doc/custom-providers.md` and the changelog expose it, so the primary
+      user overview and AI-facing current-capabilities index omit the task's
+      headline behavior.
