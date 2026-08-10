@@ -5288,3 +5288,21 @@
       exact `[:start :text-delta :error]` vectors already prove no terminal or
       content event occurs after `:error`. This preserves discriminating
       ordering/cardinality coverage while avoiding duplicate failure signals.
+
+## Follow-ups (test review 85, 2026-08-09)
+
+- [ ] Align the initial HTTP-error stream tests and behavior with the task's
+      `:start`-before-terminal invariant. `stream-anthropic-non-2xx-response-map-surfaces-body-message-test`
+      and `completions-non-2xx-response-map-surfaces-body-message-test` currently
+      lock `[:error]` through separate count/type assertions because the
+      Anthropic and OpenAI chat-completions initial non-2xx branches call
+      `capture/emit-error!` / `transport/emit-error!` without first emitting
+      `:start`. Codex's equivalent HTTP-error path emits `[:start :error]`, as
+      do the three transports' error-first SSE and first-read-exception paths
+      after reviews 52–53; existing comments/spec guidance consequently
+      overclaim that every error path has the same ordering. Emit `:start` once
+      before initial HTTP-response errors on the two sibling transports, and
+      replace the redundant count/type checks with exact `[:start :error]`
+      event-vector assertions while retaining the distinct error payload
+      assertions. Use `http-boundary/nullable` for the Anthropic cases rather
+      than their remaining global `clj-http.client/post` redefinitions.
