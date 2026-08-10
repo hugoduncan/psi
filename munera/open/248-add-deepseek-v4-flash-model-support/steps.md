@@ -5241,3 +5241,13 @@
       error-first proof, but it remains the lone such task-modified Codex proof
       that stubs infrastructure instead of using the task's injectable nullable
       seam.
+
+## Follow-ups (test review 80, 2026-08-09)
+
+- [ ] Make the task diff whitespace-clean. Running `git diff --check` for
+      `3c286a46e2c97ba9dc24ca28db7fb9b0f3bde6aa..HEAD` currently reports
+      extra blank lines at EOF in `anthropic/request.clj`,
+      `anthropic_auth_test.clj`, `anthropic_retry_test.clj`, and
+      `openai_test.clj`, plus trailing whitespace in `implementation.md`.
+      Remove those whitespace errors and rerun `git diff --check` so the
+      task-modified tests and artifacts are well formed.
