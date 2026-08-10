@@ -5175,3 +5175,19 @@
       the observable key-resolution result and recorded environment read; the
       current nested fixture and assertion add incidental structure without
       covering another behavior.
+
+## Follow-ups (test review 75, 2026-08-09)
+
+- [ ] Finish applying review 73's exact-event-vector rule to the remaining
+      task-added stream tests. In `anthropic_stream_test.clj`, remove the
+      redundant terminal/block counts from
+      `stream-anthropic-error-then-message-delta-single-terminal-event-test`
+      and `stream-anthropic-error-then-content-block-stop-no-text-end-test`;
+      in `anthropic_stream_termination_test.clj`, remove the redundant
+      terminal count/absence checks from the done-consumer-failure test; in
+      `openai_completions_stream_test.clj`, remove the redundant done counts
+      and error-absence checks from the two EOF tool-balancing tests; and in
+      `openai_codex_test.clj`, remove redundant second-event type and
+      done-absence assertions where an exact event-type vector already proves
+      them. Retain assertions on terminal payloads (reason, message, status,
+      headers), which prove behavior not represented by the type vector.
