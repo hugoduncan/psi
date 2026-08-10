@@ -230,7 +230,6 @@
     ;; Review 52: emit-codex-error! emits :start first when the stream never
     ;; produced output, so the HTTP-error sequence is [:start :error].
     (is (= [:start :error] (mapv :type @events)))
-    (is (= :error (:type (second @events))))
     (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
            (:error-message (second @events))))
     (is (= 429 (:http-status (second @events))))))
@@ -265,7 +264,6 @@
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
           "a stream that never produced output emits :start then the :error terminal (review 52)")
-      (is (= :error (:type (second @events))))
       (is (= "rate limit exceeded (status 429) [request-id req_oai_429]"
              (:error-message (second @events)))
           "error message still surfaces (with the request-id header now)")
@@ -306,9 +304,7 @@
       (is (= [:start :error] (mapv :type @events))
           "error-first stream emits :start then the :error terminal")
       (is (= "Overloaded" (:error-message (second @events)))
-          "error message extracted from the response.failed body")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no synthetic :done — the :error event is terminal"))))
+          "error message extracted from the response.failed body"))))
 
 (deftest codex-mid-stream-error-captured-once-test
   (testing "a codex mid-stream SSE error captures the constructed :error once, not the raw event twice"
@@ -568,6 +564,4 @@
              (mapv :type @events))
           "the open function_call tool is balanced with :toolcall-end before the :error")
       (is (= "Overloaded" (:error-message (last @events)))
-          "the response.failed error still surfaces with its message")
-      (is (not-any? #(= :done (:type %)) @events)
-          "no synthetic :done — the :error event is terminal"))))
+          "the response.failed error still surfaces with its message"))))

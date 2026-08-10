@@ -5178,7 +5178,7 @@
 
 ## Follow-ups (test review 75, 2026-08-09)
 
-- [ ] Finish applying review 73's exact-event-vector rule to the remaining
+- [x] Finish applying review 73's exact-event-vector rule to the remaining
       task-added stream tests. In `anthropic_stream_test.clj`, remove the
       redundant terminal/block counts from
       `stream-anthropic-error-then-message-delta-single-terminal-event-test`

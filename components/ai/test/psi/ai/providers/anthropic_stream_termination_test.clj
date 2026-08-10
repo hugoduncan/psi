@@ -259,10 +259,6 @@
                (throw (ex-info "simulated :done consume failure" {})))))
           (catch Exception _ nil)))
       (is @threw "the :done consume-fn did throw (the scenario is exercised)")
-      (is (= 1 (count (filterv #(= :done (:type %)) @events)))
-          "exactly one terminal :done reached the consumer")
-      (is (not-any? #(= :error (:type %)) @events)
-          "no second :error — the post-:done exception is swallowed by the catch's done? guard")
       (is (= [:start :text-start :text-delta :text-end :done] (mapv :type @events))
           "the normal text-block events and exactly one terminal :done reach the consumer — nothing after :done"))))
 

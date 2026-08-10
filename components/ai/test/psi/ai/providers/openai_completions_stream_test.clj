@@ -229,16 +229,12 @@
                                         {:choices [{:delta {:role "assistant"
                                                             :tool_calls [{:index 0
                                                                           :function {:arguments "{\"city\":\"Paris\"}"}}]}}]}) "\n\n"))
-          dones  (filterv #(= :done (:type %)) events)]
+          done   (last events)]
       (is (= [:start :toolcall-start :toolcall-delta :toolcall-end :done]
              (mapv :type events))
           "the open tool call is balanced with :toolcall-end before the EOF :done")
-      (is (= 1 (count dones))
-          "exactly one :done — the EOF flush terminates the stream")
-      (is (= :stop (:reason (first dones)))
-          "no pending finish reason → the EOF flush emits :stop")
-      (is (not-any? #(= :error (:type %)) events)
-          "no :error — the EOF flush is a clean terminal"))))
+      (is (= :stop (:reason done))
+          "no pending finish reason → the EOF flush emits :stop"))))
 
 (deftest completions-eof-balances-not-yet-started-tool-call-test
   (testing "a tool_calls fragment with a name but no id (never started) is force-started then closed at EOF"
@@ -253,13 +249,10 @@
                                         {:choices [{:delta {:role "assistant"
                                                             :tool_calls [{:index 0
                                                                           :function {:name "get_weather"
-                                                                                     :arguments ""}}]}}]}) "\n\n"))
-          dones  (filterv #(= :done (:type %)) events)]
+                                                                                     :arguments ""}}]}}]}) "\n\n"))]
       (is (= [:start :toolcall-start :toolcall-end :done]
              (mapv :type events))
-          "the not-yet-started tool call is force-started then closed before the EOF :done")
-      (is (= 1 (count dones))
-          "exactly one :done — the EOF flush terminates the stream"))))
+          "the not-yet-started tool call is force-started then closed before the EOF :done"))))
 
 ;; ── Open-tool balancing on the error/catch terminals (review 56) ────────────
 

@@ -348,9 +348,7 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
-          "exactly one terminal event — the :error; the trailing message_delta must not emit a second :done")
-      (is (= 1 (count (filter #(= :error (:type %)) @events)))
-          "exactly one :error event"))))
+          "exactly one terminal event — the :error; the trailing message_delta must not emit a second :done"))))
 
 (deftest stream-anthropic-error-then-read-exception-no-second-error-test
   (testing "a stream-read exception after a mid-stream SSE error does not emit a second :error"
@@ -420,9 +418,7 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :text-start :text-delta :text-end :error] (mapv :type @events))
-          "the error branch balances the open text block (:text-end BEFORE the :error); the trailing content_block_stop is a full no-op once done")
-      (is (= 1 (count (filterv #(= :text-end (:type %)) @events)))
-          "exactly one :text-end — from the error-branch balancing, not from the trailing stop"))))
+          "the error branch balances the open text block (:text-end BEFORE the :error); the trailing content_block_stop is a full no-op once done"))))
 
 (deftest usage-captured-from-sse-events-test
   (testing "usage tokens are read from message_start and message_delta SSE events"
