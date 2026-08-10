@@ -1,55 +1,77 @@
 # Plan
 
-## Approach
+## Current implementation strategy
 
-Two small, independent slices, both additive and config/docs/schema-only —
-no changes to `providers/anthropic.clj`'s request-shaping logic itself:
+The task ships DeepSeek `deepseek-v4-flash` through psi's existing custom
+provider system and hardens the provider boundary behavior exercised while
+integrating it. Work is organized by observable behavior rather than the
+chronology of review passes.
 
-1. **Schema slice**: add `:adaptive-thinking` to the custom-provider
-   `ModelDef` schema in `user_models.clj`. `expand-model` already merges all
-   `model-def` keys through verbatim, so this is a pure schema-permission
-   change. Prove it with `user_models_test.clj` tests (accepted, flows
-   through, optional/absent-safe) and an `anthropic_test.clj` request-shaping
-   test using a raw custom-provider-shaped model map (following the existing
-   `MiniMax-M2.7` literal pattern already in that file) asserting the
-   adaptive `output_config.effort` shape appears when `:adaptive-thinking
-   true` is set on a non-catalog model map.
-2. **Docs slice**: add the DeepSeek `models.edn` example to
-   `doc/custom-providers.md` (new subsection, following the existing MiniMax
-   /Anthropic-compatible-proxy example shape) and document the new
-   `:adaptive-thinking` field there. Add the CHANGELOG entry.
+### Slice 1 — custom-model configuration
 
-Slice 1 before slice 2, since the docs example uses `:adaptive-thinking
-true` and should only be written once the field is actually schema-valid and
-proven.
+- Extend the closed custom-model schema with the capabilities required by the
+  documented DeepSeek model, including adaptive thinking and per-turn system
+  message support.
+- Preserve raw `env:` key specifications in the registry and tag custom-model
+  origin explicitly so request-time resolution cannot confuse same-named
+  custom and built-in providers.
+- Parse-lock the documented DeepSeek `models.edn` example against the schema.
 
-## Risks
+### Slice 2 — provider request safety
 
-- Low risk overall: additive optional schema field, no default-value change,
-  no existing custom-provider config becomes invalid.
-- `structured-output/normalize-model` runs after the merge in `expand-model`
-  — confirm it does not strip or choke on an unrecognized-to-it
-  `:adaptive-thinking` key (it currently operates only on
-  `:capabilities :structured-output`, so this should be a no-op, but verify
-  via the parse test rather than assuming).
-- Pricing/context-window numbers in the docs example are sourced from
-  DeepSeek's published pricing page (2026-07) and may drift; the example is
-  illustrative, consistent with how the existing MiniMax example already
-  disclaims exact figures ("confirm the provider's current base URL and
-  model ids in its own docs").
+- Resolve credentials at request time and scope built-in environment/OAuth
+  fallback to built-in model origin across Anthropic messages, OpenAI chat
+  completions, and OpenAI Codex responses.
+- Support explicitly keyless and custom-auth-header providers without allowing
+  incidental headers to bypass missing-key failures.
+- Centralize shared request support: origin classification, key resolution,
+  keyless detection, once-only start emission, capture redaction, and the
+  configurable nullable HTTP boundary used by tests.
+- Keep request captures secret-safe with case-insensitive redaction.
 
-## Slice order
+### Slice 3 — request and response compatibility
 
-1. `user_models.clj` schema change + `user_models_test.clj` tests +
-   `anthropic_test.clj` adaptive-thinking-via-custom-model-map test.
-2. `doc/custom-providers.md` DeepSeek example + `:adaptive-thinking` field
-   docs + CHANGELOG entry.
-3. Full verification (`bb test`, `clj-kondo`) and commit.
+- Shape DeepSeek adaptive-thinking requests through the Anthropic-compatible
+  endpoint and document the supported effort, temperature, fast-mode,
+  thinking-off, cache-cost, and HTTP-400 fallback constraints.
+- Preserve provider errors, status, headers, retry metadata, usage, thinking,
+  tool calls, and structured content consistently in streaming and
+  non-streaming paths.
+- Normalize all provider streams around the same invariants: `:start` precedes
+  output/terminal events, exactly one terminal event occurs, no event or
+  capture occurs after termination, and every open content/tool block is
+  balanced before the terminal event.
+- Use the real provider HTTP adapter through an explicit boundary; use the
+  nullable scripted implementation for deterministic transport tests.
 
-## Test-review 61 follow-up
+### Slice 4 — user-facing surfaces and formal specification
 
-Introduce one production provider HTTP boundary with a real `clj-http`
-adapter and a configurable nullable implementation. Thread the boundary
-explicitly through provider request options, migrate the task-added terminal
-balancing stream tests to scripted responses/request-state assertions, retain
-the Codex `2`/`100` ordering fixture, and verify the affected provider suites.
+- Document the DeepSeek configuration and operational caveats in
+  `doc/custom-providers.md`, and reflect the capability in README,
+  `ramora/IMPLEMENTED.md`, and CHANGELOG.
+- Keep `custom-providers.allium`, `anthropic-provider.allium`, and
+  `openai-provider.allium` aligned with the configuration, credential,
+  request-shaping, capture, retry, and terminal-event contracts.
+
+## Verification gates
+
+- Focused Scry suites cover custom-model parsing and all affected Anthropic and
+  OpenAI provider request/stream paths.
+- Full `bb test` is green; known unrelated timing-sensitive failures must be
+  reproduced and recorded rather than attributed to this task.
+- `clj-kondo` is clean on changed Clojure source and tests.
+- Documentation's DeepSeek EDN block parses through the production schema.
+- Live DeepSeek checks confirm both non-streaming request acceptance and the
+  normal streaming sequence when `DEEPSEEK_API_KEY` is available.
+- Spec guidance contains current contracts and rationale, not review history.
+
+## Risks and controls
+
+- Provider credential crossover is security-sensitive: origin and provider
+  scoping are explicit and covered on all three transports.
+- Anthropic-compatible implementations vary: compatibility retries are
+  bounded to one transformed retry, and defensive EOF/error handling preserves
+  terminal invariants for truncated or non-conforming streams.
+- Stream lifecycle regressions can hang turns or duplicate effects: exact event
+  vectors, terminal cardinality, capture guards, and open-block balancing are
+  tested at the transport boundary.

@@ -5527,7 +5527,7 @@
       Describe these rules as defensive support for truncated or non-conforming
       Anthropic-compatible streams, matching the source comments, docs, and
       changelog.
-- [ ] Reconcile `plan.md` with the approach actually taken. It still presents
+- [x] Reconcile `plan.md` with the approach actually taken. It still presents
       the task as two config/docs/schema-only slices with no provider code
       changes and mentions only the HTTP-boundary follow-up, while the design,
       implementation, specs, tests, and code now include provider credential,
