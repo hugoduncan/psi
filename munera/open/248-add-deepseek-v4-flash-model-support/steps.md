@@ -5358,7 +5358,7 @@
 
 ## Follow-ups (documentation review 3, 2026-08-09)
 
-- [ ] Remove the stale DeepSeek example from the `CHANGELOG.md` entry for the
+- [x] Remove the stale DeepSeek example from the `CHANGELOG.md` entry for the
       Anthropic `message_stop`-without-`message_delta` usage fix. The later live
       streaming verification established that DeepSeek's normal stream includes
       `message_delta` with usage before `message_stop`, so saying that this bug
