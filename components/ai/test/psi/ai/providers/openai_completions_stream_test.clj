@@ -135,7 +135,6 @@
                                          :error {:message "The server had an error while processing your request."
                                                  :type "server_error"}}) "\n\n"))
           err    (first (filter #(= :error (:type %)) events))]
-      (is (some? err) "SSE error chunk must surface as an :error event")
       (is (= 529 (:http-status err))
           "top-level http_status 529 is kept on the :error event (retryable class)")
       (is (= "The server had an error while processing your request. (status 529)"
@@ -167,7 +166,6 @@
           err    (first (filter #(= :error (:type %)) events))]
       (is (= [:start :error] (mapv :type events))
           "error-first stream emits :start then the :error terminal")
-      (is (some? err) "SSE error chunk must surface as an :error event")
       (is (= "The server had an error while processing your request."
              (:error-message err))
           "error message extracted from the chunk's error body"))))

@@ -79,10 +79,10 @@
         (anthropic/stream-anthropic convo model {:http-boundary http-client
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
-      (let [dones (filterv #(= :done (:type %)) @events)
-            done  (first dones)]
-        (is (= 1 (count dones))
-            "exactly one :done — the EOF flush terminates the stream")
+      (let [done (first (filter #(= :done (:type %)) @events))]
+        (is (= [:start :text-start :text-delta :text-end :done]
+               (mapv :type @events))
+            "the EOF flush terminates the complete stream with exactly one :done")
         (is (= :stop (:reason done))
             "the EOF flush emits the same terminal reason as message_stop")
         (is (map? (:usage done))
@@ -90,9 +90,7 @@
         (is (= 100 (get-in done [:usage :input-tokens]))
             "input tokens accumulated from message_start")
         (is (= 20 (get-in done [:usage :cache-read-tokens]))
-            "cache-read tokens accumulated from message_start")
-        (is (not-any? #(= :error (:type %)) @events)
-            "no :error — the EOF flush is a clean terminal, not an error")))))
+            "cache-read tokens accumulated from message_start")))))
 
 (deftest stream-anthropic-eof-flush-no-message-start-emits-start-then-done-test
   (testing "a stream that EOFs before message_start emits :start then the terminal :done"

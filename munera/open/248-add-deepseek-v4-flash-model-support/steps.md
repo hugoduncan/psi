@@ -5210,7 +5210,7 @@
 
 ## Follow-ups (test review 78, 2026-08-09)
 
-- [ ] Finish the task-added stream sequence cleanup that reviews 73–76 still
+- [x] Finish the task-added stream sequence cleanup that reviews 73–76 still
       leave incomplete. In `anthropic_retry_test.clj`, replace each retry
       test's separate `:start`/`:done` presence and `:error` absence assertions
       with the exact `[:start :done]` event-type vector. Apply the same exact

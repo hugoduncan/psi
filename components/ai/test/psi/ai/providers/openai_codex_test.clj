@@ -379,7 +379,7 @@
        convo model {:http-boundary http-client :api-key token}
        (fn [ev] (swap! events conj ev)))
       (let [err (first (filter #(= :error (:type %)) @events))]
-        (is (some? err) "the exception surfaces as an :error event")
+        (is (= [:start :text-delta :error] (mapv :type @events)))
         (is (= "req_catch_429" (get-in err [:headers "x-request-id"]))
             "exception ex-data headers are kept on the :error event (review-52 catch-block fix)")
         (is (= "simulated stream read failure (status 429) [request-id req_catch_429]"

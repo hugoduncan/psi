@@ -286,16 +286,14 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
-        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= [:start :error] (mapv :type @events)))
         (is (= "Overloaded (status 529)" (:error-message err))
             "error message extracted from the event's error body, http-status appended")
         (is (= 529 (:http-status err))
             "http-status present in the event's error body is carried through")
         (is (= {:type "overloaded_error" :message "Overloaded" :http_status 529}
                (get-in err [:body :error]))
-            "raw event body preserved")
-        (is (not-any? #(= :done (:type %)) @events)
-            "no :done after a mid-stream error — the :error event terminates the turn"))))
+            "raw event body preserved"))))
 
   (testing "a mid-stream SSE error event without http-status still surfaces the message"
     (let [model  (models/get-model :sonnet-4.6)
@@ -313,12 +311,10 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
-        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= [:start :error] (mapv :type @events)))
         (is (= "bad request" (:error-message err))
             "no http-status in the body → message without a status suffix")
-        (is (nil? (:http-status err)))
-        (is (not-any? #(= :done (:type %)) @events)
-            "no :done — the :error event is terminal")))))
+        (is (nil? (:http-status err)))))))
 
 (deftest stream-anthropic-error-then-message-delta-single-terminal-event-test
   (testing "a trailing message_delta after a mid-stream SSE error does not emit a second terminal :done"
@@ -478,12 +474,11 @@
                                {:type "content_block_stop" :index 0})
                      (sse-line "message_stop" {:type "message_stop"}))
           events (run-stream sse model {:api-key "test-key"})
-          dones  (filterv #(= :done (:type %)) events)
-          done   (first dones)
+          done   (first (filter #(= :done (:type %)) events))
           usage  (:usage done)]
-      (is (= 1 (count dones))
-          "exactly one :done — message_stop terminates the stream")
-      (is (some? done) "should emit a :done event")
+      (is (= [:start :text-start :text-delta :text-end :done]
+             (mapv :type events))
+          "message_stop terminates the complete stream with exactly one :done")
       (is (map? usage) ":done must carry the accumulated usage map (usage-with-cost)")
       (is (= 100 (:input-tokens usage))  "input-tokens accumulated from message_start")
       (is (= 20  (:cache-read-tokens usage))  "cache-read-tokens from message_start")
@@ -520,13 +515,11 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
-        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= [:start :error] (mapv :type @events)))
         (is (= "Overloaded (status 529)" (:error-message err))
             "status from [:error :status] is appended to the message")
         (is (= 529 (:http-status err))
-            "[:error :status] is carried through as the numeric :http-status")
-        (is (not-any? #(= :done (:type %)) @events)
-            "no :done after a mid-stream error — the :error event terminates the turn"))))
+            "[:error :status] is carried through as the numeric :http-status"))))
 
   (testing "a non-numeric status is dropped — numeric >= 400 only"
     (let [model  (models/get-model :sonnet-4.6)
@@ -545,7 +538,7 @@
                                                  :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
-        (is (some? err) "SSE error event must surface as an :error event")
+        (is (= [:start :error] (mapv :type @events)))
         (is (= "Overloaded" (:error-message err))
             "string status is not appended to the message")
         (is (nil? (:http-status err))

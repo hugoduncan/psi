@@ -56,9 +56,7 @@
       (is (= "sys"
              (:system (json/parse-string (:body (second @calls)) true)))
           "after prompt-caching fallback, system is collapsed to plain string")
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)))))
+      (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-retries-without-thinking-on-400-test
   (testing "oauth + thinking request retries once with compatibility fallbacks on 400"
@@ -104,9 +102,7 @@
             "scope beta should remain for oauth compatibility")
         (is (not (re-find #"interleaved-thinking" second-betas)))
         (is (nil? (:thinking second-body))))
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)))))
+      (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test
   ;; Review 13: the HTTP-400 compatibility retry's :without-thinking step
@@ -180,10 +176,7 @@
                       (= [:without-thinking] (:retry-fallback-steps (:event %))))
                 @captures)
           "response capture records the :without-thinking fallback step")
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)
-          "retry succeeds — the 400 is absorbed, thinking silently ON on DeepSeek"))))
+      (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-retries-without-all-betas-on-400-for-keyless-bearer-test
   ;; Review 19: fallback-request-steps-for-400 gates :without-all-betas on
@@ -270,10 +263,7 @@
                       (= [:without-all-betas] (:retry-fallback-steps (:event %))))
                 @captures)
           "response capture records the :without-all-betas fallback step")
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)
-          "retry succeeds — the beta-related 400 is absorbed")))
+      (is (= [:start :done] (mapv :type @events)))))
 
   (testing "oauth-auth-request? distinguishes genuine OAuth from keyless custom-header Bearer"
     ;; Direct predicate lock for the review-19 narrowing: only the
@@ -368,10 +358,7 @@
                       (= [:without-all-betas] (:retry-fallback-steps (:event %))))
                 @captures)
           "response capture records the :without-all-betas fallback step")
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)
-          "retry succeeds — the three-marker keyless request is not treated as OAuth"))))
+      (is (= [:start :done] (mapv :type @events))))))
 
 (deftest stream-anthropic-custom-anthropic-beta-header-stripped-by-without-all-betas-test
   ;; Review 22: a custom "anthropic-beta" header REPLACES the transport betas
@@ -440,8 +427,5 @@
                       (= [:without-all-betas] (:retry-fallback-steps (:event %))))
                 @captures)
           "response capture records the :without-all-betas fallback step")
-      (is (some #(= :start (:type %)) @events))
-      (is (some #(= :done (:type %)) @events))
-      (is (not-any? #(= :error (:type %)) @events)
-          "retry succeeds — the custom beta is stripped, the 400 is absorbed"))))
+      (is (= [:start :done] (mapv :type @events))))))
 
