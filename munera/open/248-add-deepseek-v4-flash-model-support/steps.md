@@ -5103,3 +5103,12 @@
       case); the current set-membership assertion proves association but would
       pass if `find-header` returned the second match instead of `(first
       (find-headers ...))`.
+
+## Follow-ups (test review 69, 2026-08-09)
+
+- [ ] Remove the production-dead `request-support/find-header` helper and its
+      direct `find-header-first-match-test`. Since review 19 moved capture
+      redaction to `find-headers`, `find-header` has no production caller; its
+      direct test now locks an unused implementation detail rather than an
+      observable contract, duplicating the live all-match behavior covered by
+      `find-headers-case-insensitive-all-matches-test` and the capture tests.
