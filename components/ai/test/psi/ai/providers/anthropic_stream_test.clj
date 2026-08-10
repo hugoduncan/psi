@@ -103,47 +103,48 @@
       (is (string? (:body-text (second @events)))))))
 
 (deftest stream-anthropic-non-2xx-response-map-surfaces-body-message-test
-  (testing "non-2xx response map emits parsed provider error message"
+  (testing "non-2xx response map emits start then the parsed provider error"
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys")
                      (conv/add-user-message "hello"))
-          events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                {:status 400
-                                 :headers {"request-id" "req_ant_400"}
-                                 :body (stream-body
-                                        (json/generate-string
-                                         {:error {:message "invalid messages payload"}}))})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
-                                    (fn [e] (swap! events conj e))))
-      (is (= 1 (count @events)))
-      (is (= :error (:type (first @events))))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [{:status 400
+                    :headers {"request-id" "req_ant_400"}
+                    :body (stream-body
+                           (json/generate-string
+                            {:error {:message "invalid messages payload"}}))}])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key"
+                                               :http-boundary http}
+                                  (fn [e] (swap! events conj e)))
+      (is (= [:start :error] (mapv :type @events)))
       (is (= "invalid messages payload (status 400) [request-id req_ant_400]"
-             (:error-message (first @events))))
-      (is (= 400 (:http-status (first @events))))))
+             (:error-message (second @events))))
+      (is (= 400 (:http-status (second @events))))))
 
   (testing "missing 400 body uses actionable fallback text"
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys")
                      (conv/add-user-message "hello"))
-          events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                {:status 400
-                                 :headers {"request-id" "req_ant_nobody"}
-                                 :body nil})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
-                                    (fn [e] (swap! events conj e))))
-      (is (= 1 (count @events)))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [{:status 400
+                    :headers {"request-id" "req_ant_nobody"}
+                    :body nil}])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key"
+                                               :http-boundary http}
+                                  (fn [e] (swap! events conj e)))
+      (is (= [:start :error] (mapv :type @events)))
       (is (re-find #"Anthropic rejected the request"
-                   (:error-message (first @events))))
+                   (:error-message (second @events))))
       (is (re-find #"no error body returned"
-                   (:error-message (first @events))))
+                   (:error-message (second @events))))
       (is (re-find #"possible causes"
-                   (:error-message (first @events))))
+                   (:error-message (second @events))))
       (is (re-find #"request\{model=claude-sonnet-4-6"
-                   (:error-message (first @events))))
+                   (:error-message (second @events))))
       (is (re-find #"request-id req_ant_nobody"
-                   (:error-message (first @events)))))))
+                   (:error-message (second @events)))))))
 
 ;; ── SSE parser — thinking block routing ─────────────────────────────────────
 

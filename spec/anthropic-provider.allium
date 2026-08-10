@@ -765,6 +765,26 @@ rule WithoutPromptCachingStepStripsCacheDirectives {
 --   FinalizedUsage(acc)                      — StreamUsage totals + cost
 --   Emit(StreamEvent{...})                   — executor-facing event surfaced
 --   ErrorEmitted(stream)                     — a :error StreamEvent is surfaced
+--   EventOrder(stream, first, second)         — first is emitted before second
+--   InitialHttpErrorObserved(stream)          — the initial streaming HTTP
+--       response is an error (including an unrecoverable 400 or failed
+--       compatibility retry), before any SSE line is consumed
+
+rule InitialHttpErrorEmitsStartBeforeError {
+    when: InitialHttpErrorObserved(stream)
+
+    ensures: StartEmittedOnce(stream)
+    ensures: ErrorEmitted(stream)
+    ensures: EventOrder(stream, start, error)
+
+    @guidance
+        -- Test review 85: initial HTTP response errors observe the same
+        -- :start-before-terminal invariant as error-first SSE events and
+        -- first-read exceptions. For a 400 with an applicable compatibility
+        -- fallback, :start is emitted before fallback handling; a successful
+        -- retry's message_start cannot duplicate it because started? uses the
+        -- shared compare-and-set emitter.
+}
 
 rule MessageStartEmitsStartEvent {
     when: SseEventReceived(stream, "message_start", event_data)

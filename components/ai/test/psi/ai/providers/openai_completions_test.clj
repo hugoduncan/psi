@@ -762,12 +762,11 @@
        convo model {:http-boundary http-client
                     :api-key "sk-test"}
        (fn [ev] (swap! events conj ev))))
-    (is (= 1 (count @events)))
-    (is (= :error (:type (first @events))))
+    (is (= [:start :error] (mapv :type @events)))
     (is (= "invalid request payload (status 400) [request-id req_oai_400]"
-           (:error-message (first @events))))
-    (is (= 400 (:http-status (first @events))))
-    (is (= "req_oai_400" (get-in (first @events) [:headers "x-request-id"])))
+           (:error-message (second @events))))
+    (is (= 400 (:http-status (second @events))))
+    (is (= "req_oai_400" (get-in (second @events) [:headers "x-request-id"])))
     (is (= {:error {:message "invalid request payload"}}
-           (:body (first @events))))
-    (is (string? (:body-text (first @events))))))
+           (:body (second @events))))
+    (is (string? (:body-text (second @events))))))

@@ -646,12 +646,17 @@
           ;; error chunk path (emit-chat-error!) and the catch block (the
           ;; paths that can fire after tool calls were started) balance via
           ;; force-start-pending-chat-tools!/emit-chat-tool-ends!.
-          (transport/emit-error! model
-                                 options
-                                 :openai-completions
-                                 url
-                                 consume-fn
-                                 (transport/response->error response))
+          (do
+            ;; Test review 85: an initial HTTP response error is terminal in
+            ;; the same provider-event stream as SSE and read errors, so it
+            ;; must observe the same :start-before-terminal ordering.
+            (emit-stream-start! consume-fn (:stream-started? stream-state))
+            (transport/emit-error! model
+                                   options
+                                   :openai-completions
+                                   url
+                                   consume-fn
+                                   (transport/response->error response)))
           (do
             (with-open [reader (io/reader (:body response))]
               (doseq [line (line-seq reader)]

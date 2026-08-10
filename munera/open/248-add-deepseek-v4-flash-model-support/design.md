@@ -361,6 +361,15 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   side via the shared top-level `emit-start!` helper, moved out of the
   letfn so the out-of-scope catch can use it) before the `:error`, so a
   first-read exception yields `[:start :error]` on all three transports.
+- **Initial HTTP-response `:start`-before-terminal completion (test review
+  85):** the Anthropic and OpenAI chat-completions streaming paths now emit
+  `:start` once before an initial non-2xx HTTP response's terminal `:error`,
+  matching Codex and the already-aligned error-first SSE / first-read
+  exception paths. Anthropic emits the start before 400 compatibility
+  handling; if the fallback succeeds, the once-only started state prevents
+  the retried stream's `message_start` from duplicating it. The provider
+  event invariant is therefore `[:start :error]` for initial unrecoverable
+  HTTP errors on all three transports.
 - **HTTP-400 compatibility retry OAuth decision (review 22):**
   `handle-400-response!`'s `:without-all-betas` selection now uses the
   transport's COMPUTED OAuth decision — `build-request` attaches the

@@ -5291,7 +5291,7 @@
 
 ## Follow-ups (test review 85, 2026-08-09)
 
-- [ ] Align the initial HTTP-error stream tests and behavior with the task's
+- [x] Align the initial HTTP-error stream tests and behavior with the task's
       `:start`-before-terminal invariant. `stream-anthropic-non-2xx-response-map-surfaces-body-message-test`
       and `completions-non-2xx-response-map-surfaces-body-message-test` currently
       lock `[:error]` through separate count/type assertions because the

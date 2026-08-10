@@ -479,12 +479,19 @@
               status   (:status response)]
           (cond
             (= 400 status)
-            (handle-400-response! model options
-                                  url
-                                  request
-                                  response
-                                  consume-fn
-                                  consume-stream-response!)
+            (do
+              ;; Test review 85: the initial HTTP-response path participates
+              ;; in the same :start-before-terminal invariant as in-band and
+              ;; exception errors. Starting before compatibility handling is
+              ;; harmless when its retry succeeds: started? keeps a later SSE
+              ;; message_start from emitting a duplicate.
+              (capture/emit-start! consume-fn started?)
+              (handle-400-response! model options
+                                    url
+                                    request
+                                    response
+                                    consume-fn
+                                    consume-stream-response!))
 
             (capture/error-status? status)
             ;; Review 56: no open-block balancing is needed on the initial
@@ -494,8 +501,10 @@
             ;; the message_delta terminal and the catch block (the paths
             ;; that can fire after content blocks were opened) balance via
             ;; balance-open-blocks!.
-            (capture/emit-error! model options url consume-fn
-                                 (anthropic-error/response->error response request))
+            (do
+              (capture/emit-start! consume-fn started?)
+              (capture/emit-error! model options url consume-fn
+                                   (anthropic-error/response->error response request)))
 
             :else
             (consume-stream-response! response))))

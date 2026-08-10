@@ -112,6 +112,7 @@ value ProviderRequest {
 -- SortAscending(indexes): return the indexes in ascending numeric order.
 -- RedactSecret(value) / MaskAccountId(value): capture redaction helpers —
 --   see the RedactRequestHeaders rule in the Capture Callbacks section.
+-- EventOrder(stream, first, second): first is emitted before second.
 
 ------------------------------------------------------------
 -- Config
@@ -973,14 +974,20 @@ rule CodexStatusMappedToDoneReason {
 rule StreamErrorsNormalized {
     when: ProviderRequestFailed(stream, error)
 
+    ensures: StartEmittedOnce(stream)
     ensures: Emit(StreamEvent{
         event_type: error,
         error_message: ErrorMessageWithStatusAndRequestId(error),
         http_status: HttpStatusOrNull(error)
     })
+    ensures: EventOrder(stream, start, error)
     ensures: ProviderErrorHeadersPreserved(error)
 
     @guidance
+        -- Test review 85: ProviderRequestFailed includes an initial non-2xx
+        -- streaming HTTP response. The chat-completions path now emits
+        -- :start once before that terminal :error, matching codex, error-first
+        -- SSE chunks, and first-read exceptions.
         -- Review 51: ProviderErrorHeadersPreserved — the HTTP-error branch
         -- surfaces the FULL error map from response->error (headers,
         -- body-text, body), not just error-message + http-status. The codex
