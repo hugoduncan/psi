@@ -77,18 +77,19 @@
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys")
                      (conv/add-user-message "hello"))
-          events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                (throw (ex-info "Error"
-                                                {:status 400
-                                                 :headers {"request-id" "req_ant_123"}
-                                                 :body (stream-body
-                                                        (json/generate-string
-                                                         {:error {:message "cache_control requires prompt-caching beta"}}))})))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
-                                    (fn [e] (swap! events conj e))))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [(ex-info "Error"
+                            {:status 400
+                             :headers {"request-id" "req_ant_123"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "cache_control requires prompt-caching beta"}}))})])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key"
+                                               :http-boundary http}
+                                  (fn [e] (swap! events conj e)))
       ;; Review 53: the catch block (a stream-read exception before any
-      ;; output — http/post throws, no response received) now emits :start
+      ;; output — the HTTP boundary throws, no response received) now emits :start
       ;; first, mirroring the in-band error branch — so the sequence is
       ;; [:start :error] with the :error as the second event.
       (is (= [:start :error] (mapv :type @events))

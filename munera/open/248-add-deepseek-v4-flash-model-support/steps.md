@@ -5266,7 +5266,7 @@
 
 ## Follow-ups (test review 82, 2026-08-09)
 
-- [ ] Migrate the task-modified
+- [x] Migrate the task-modified
       `stream-anthropic-error-includes-status-and-request-id-test` from its
       global `clj-http.client/post` redefinition to `http-boundary/nullable`.
       Review 53 changed this pre-existing test into the first-read HTTP failure
