@@ -5081,3 +5081,15 @@
       the real function using a seeded nullable OAuth context and temporary
       custom-provider registry state, including the keyless custom-provider
       case, while preserving the same stored-key reuse/non-reuse assertions.
+
+## Follow-ups (test review 67, 2026-08-09)
+
+- [ ] Strengthen `request_support_test.clj`'s
+      `find-header-first-match-test` to assert a valid `[key value]` entry as
+      one pair rather than checking key and value independently. The current
+      assertions accept either known key and either known value separately, so
+      an impossible mismatched result such as `["x-api-key" "custom"]` would
+      pass even though `find-header` must return an entry that actually exists
+      in the input map. Assert membership in the set of complete expected
+      entries (while retaining the no-match assertion) so failures identify a
+      broken entry association.
