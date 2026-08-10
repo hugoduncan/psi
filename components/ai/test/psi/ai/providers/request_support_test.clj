@@ -246,11 +246,10 @@
 
 (deftest find-header-first-match-test
   (testing "find-header returns the first case-insensitive match, or nil"
-    (let [[k v] (request-support/find-header {"x-api-key" "configured"
-                                              "X-API-Key" "custom"}
-                                             "x-api-key")]
-      (is (contains? #{"x-api-key" "X-API-Key"} k))
-      (is (contains? #{"configured" "custom"} v)))
+    (is (contains? #{["x-api-key" "configured"] ["X-API-Key" "custom"]}
+                   (request-support/find-header {"x-api-key" "configured"
+                                                 "X-API-Key" "custom"}
+                                                "x-api-key")))
     (is (nil? (request-support/find-header {"X-Client" "psi"} "authorization")))))
 
 (deftest redact-secret-test

@@ -5084,7 +5084,7 @@
 
 ## Follow-ups (test review 67, 2026-08-09)
 
-- [ ] Strengthen `request_support_test.clj`'s
+- [x] Strengthen `request_support_test.clj`'s
       `find-header-first-match-test` to assert a valid `[key value]` entry as
       one pair rather than checking key and value independently. The current
       assertions accept either known key and either known value separately, so
