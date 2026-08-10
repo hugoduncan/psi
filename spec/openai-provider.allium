@@ -109,6 +109,7 @@ value ProviderRequest {
 -- HeaderName(header): the header's name as a string (keyword/string names
 --   accepted).
 -- LowerCase(s): lower-case a string (clojure.string/lower-case).
+-- SortAscending(indexes): return the indexes in ascending numeric order.
 -- RedactSecret(value) / MaskAccountId(value): capture redaction helpers —
 --   see the RedactRequestHeaders rule in the Capture Callbacks section.
 
@@ -1129,28 +1130,36 @@ rule ErrorPathEmitsToolCallEndsForOpenToolCalls {
         -- TerminalEmitsToolCallEndsForOpenToolCalls.
 }
 
-rule CodexErrorEmitsToolCallEndsForOpenToolCalls {
-    when: CodexFailedEventReceived(stream, event) OR ProviderRequestFailed(stream, error)
+rule CodexTerminalEmitsToolCallEndsInAscendingIndexOrder {
+    when: CodexDoneEventEmitted(stream, event)
+          OR CodexFailedEventReceived(stream, event)
+          OR ProviderTransportClosed(stream)
+          OR ProviderRequestFailed(stream, error)
+    requires: stream.request_api = openai_codex_responses
     requires: stream.done = false
 
-    ensures: for each index in OpenToolCallIndexes(stream):
-                 Emit(StreamEvent{event_type: toolcall_end, content_index: index})
+    let ordered_indexes = SortAscending(OpenToolCallIndexes(stream))
+    ensures:
+        for index in ordered_indexes:
+            Emit(StreamEvent{event_type: toolcall_end, content_index: index})
+    ensures: all emissions above precede the terminal done or error event
 
     @guidance
-        -- Review 56: emit-codex-error! — shared by EVERY codex error path
-        -- (the response.failed/error SSE events via
-        -- CodexFailedEventReceived; the HTTP-error branch and the catch
-        -- block via ProviderRequestFailed) — now doseqs :toolcall-end over
-        -- the open tool indexes before the :error, mirroring
-        -- emit-codex-done!'s balancing. Review 55's open-tool balancing
-        -- covered only the :done path (the EOF flush's open-tool-indexes
-        -- doseq; the spec modeled only the completions side). A function_call
-        -- output item followed by response.failed previously finalized the
-        -- turn accumulator with an OPEN tool index
-        -- ([:start :toolcall-start :error]); it now yields
-        -- [:start :toolcall-start :toolcall-end :error]. A no-op on the
-        -- error-first / HTTP-error paths (no output item was added before
-        -- they fire, so OpenToolCallIndexes is empty).
+        -- Reviews 56/58: balance-open-codex-tools! is shared by the done
+        -- and error emitters. Every codex terminal path closes each open
+        -- tool call before :done/:error, and closes multiple calls in
+        -- ascending content-index order. The ordering is contractual: the
+        -- implementation must not traverse open-tool-indexes as an unordered
+        -- set because psi's provider event stream must be deterministic and
+        -- replayable. Tests deliberately open indices 2 then 100 (whose
+        -- persistent-set traversal differs from numeric order) and require
+        -- :toolcall-end events for 2, then 100, before both a completed
+        -- terminal and a response.failed terminal.
+        -- Review 56 established balancing on every error path
+        -- (response.failed/error SSE events, HTTP errors, and stream-read
+        -- exceptions), mirroring the existing done/EOF balancing. A no-op
+        -- when no tool calls are open, including error-first and HTTP-error
+        -- paths where no output item was consumed.
 }
 
 surface OpenAIProviderApi {

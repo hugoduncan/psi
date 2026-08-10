@@ -423,6 +423,15 @@ itself (thinking/adaptive/temperature/tools/headers) is otherwise unchanged.
   SSE line has been consumed before they fire, so no block/tool is open).
   The no-phantom-or-unbalanced-block invariant now holds at every
   terminal, `:done` or `:error`.
+- **Deterministic Codex terminal balancing (review 58):** the shared Codex
+  terminal-balancing helper closes multiple open tool calls in ascending
+  content-index order before both `:done` and `:error`. Open tool indices
+  are stored as a set, whose traversal order is not a sequencing contract;
+  sorting at the shared boundary makes the provider event stream
+  deterministic and replayable and prevents the done/error paths from
+  drifting. Tests open indices in an insertion order whose persistent-set
+  traversal differs from numeric order and require ordered `:toolcall-end`
+  events before each terminal.
 
 ## Verified facts (DeepSeek docs, 2026-07)
 
@@ -624,7 +633,10 @@ independently confirms native JSON-Schema support can add
   and the `:openai-completions` sibling; `:stop-reason :tool_use` was
   already preserved, so the turn runtime now classifies the turn
   `:turn.outcome/tool-use` and the tool call executes instead of being
-  silently lost on `response-mode :non-streaming` sessions with tools));
+  silently lost on `response-mode :non-streaming` sessions with tools),
+  and review-58 deterministic Codex terminal balancing (multiple open tool
+  calls close in ascending content-index order before both `:done` and
+  `:error`, never in the unspecified traversal order of the backing set));
   `gpt-5.5`/`gpt-5.6-*`/
   Opus 4.7/4.8/5 request shaping is unaffected.
 - `bb test` green; `clj-kondo` clean.

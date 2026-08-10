@@ -4939,7 +4939,7 @@
 
 ## Follow-ups (implementation review 59, 2026-08-09)
 
-- [ ] Propagate review 58's deterministic Codex terminal-balancing behavior
+- [x] Propagate review 58's deterministic Codex terminal-balancing behavior
       into the authoritative design/spec artifacts. The implementation and
       tests now require open tool calls to close in ascending content-index
       order on both `:done` and `:error`, but
@@ -4950,3 +4950,12 @@
       balancing rule) and record review 58 in design.md so future changes
       cannot satisfy the spec while reintroducing nondeterministic set
       traversal. Re-run the Allium coherence check after updating them.
+      → Resolved: `spec/openai-provider.allium` now has one shared Codex
+      terminal-balancing rule for done/error paths: sort open tool-call
+      content indices ascending, emit each `:toolcall-end` in that sequence,
+      then emit the terminal. `SortAscending` is documented as a primitive.
+      `design.md` records review 58 in both the review-driven transport
+      inventory and acceptance exception. Manual Allium coherence check
+      passes (the repository has no automated Allium checker): referenced
+      entities/events are defined, the old unordered Codex error rule is
+      removed, and spec/design/tests/code agree.
