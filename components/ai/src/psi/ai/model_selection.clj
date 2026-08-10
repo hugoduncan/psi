@@ -11,6 +11,7 @@
    structures."
   (:require
    [psi.ai.model-registry :as model-registry]
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [psi.ai.providers.request-support :as request-support]))
 
 (def ^:private default-role
@@ -88,44 +89,47 @@
      error remains the authoritative signal for built-ins.
 
    No implicit locality or policy labels are invented here."
-  []
-  {:candidates
-   (->> (model-registry/all-models)
-        (map (fn [[[provider id] model]]
-               (let [auth (model-registry/get-auth provider)]
-                 {:provider  provider
-                  :id        id
-                  :name      (:name model)
-                  :api       (:api model)
-                  :base-url  (:base-url model)
-                  :facts     {:provider            provider
-                              :id                  id
-                              :api                 (:api model)
-                              :supports-text       (boolean (:supports-text model))
-                              :supports-images     (boolean (:supports-images model))
-                              :supports-reasoning  (boolean (:supports-reasoning model))
-                              :context-window      (:context-window model)
-                              :max-tokens          (:max-tokens model)
-                              :locality            (:locality model)}
-                  :estimates {:input-cost         (:input-cost model)
-                              :output-cost        (:output-cost model)
-                              :cache-read-cost    (:cache-read-cost model)
-                              :cache-write-cost   (:cache-write-cost model)
-                              :latency-tier       (:latency-tier model)
-                              :cost-tier          (:cost-tier model)}
-                  :reference {:configured? (boolean (or (nil? auth)
-                                                        (some? (request-support/resolve-key-spec (:api-key auth)))
+  ([]
+   (catalog-view {}))
+  ([options]
+   (let [environment (environment-boundary/boundary options)]
+     {:candidates
+      (->> (model-registry/all-models)
+           (map (fn [[[provider id] model]]
+                  (let [auth (model-registry/get-auth provider)]
+                    {:provider  provider
+                     :id        id
+                     :name      (:name model)
+                     :api       (:api model)
+                     :base-url  (:base-url model)
+                     :facts     {:provider            provider
+                                 :id                  id
+                                 :api                 (:api model)
+                                 :supports-text       (boolean (:supports-text model))
+                                 :supports-images     (boolean (:supports-images model))
+                                 :supports-reasoning  (boolean (:supports-reasoning model))
+                                 :context-window      (:context-window model)
+                                 :max-tokens          (:max-tokens model)
+                                 :locality            (:locality model)}
+                     :estimates {:input-cost         (:input-cost model)
+                                 :output-cost        (:output-cost model)
+                                 :cache-read-cost    (:cache-read-cost model)
+                                 :cache-write-cost   (:cache-write-cost model)
+                                 :latency-tier       (:latency-tier model)
+                                 :cost-tier          (:cost-tier model)}
+                     :reference {:configured? (boolean (or (nil? auth)
+                                                           (some? (request-support/resolve-key-spec (:api-key auth) environment))
                                                         ;; Keyless configs count as configured only when the shared
                                                         ;; no-auth? predicate would treat the request as keyless —
                                                         ;; recognized auth header among custom :headers with no
                                                         ;; resolvable key, or :auth-header? false (review 30:
                                                         ;; incidental headers must not imply configured, matching
                                                         ;; the per-request fast-fail they cause).
-                                                        (request-support/no-auth? (cond-> auth
-                                                                                    (false? (:auth-header? auth))
-                                                                                    (assoc :no-auth-header true)))))}})))
-        (sort-by (juxt :provider :id))
-        vec)})
+                                                           (request-support/no-auth? (cond-> auth
+                                                                                       (false? (:auth-header? auth))
+                                                                                       (assoc :no-auth-header true)))))}})))
+           (sort-by (juxt :provider :id))
+           vec)})))
 
 (defn find-candidate
   "Find a resolver-facing candidate by provider/id."

@@ -5053,7 +5053,7 @@
       the throwing stream/boundary fixture to attach response metadata for the
       Codex header assertion. Preserve each terminal-event assertion and remove
       imports made unused by the migration.
-- [ ] Replace task-added `with-redefs` of
+- [x] Replace task-added `with-redefs` of
       `request-support/getenv` with an injectable nullable environment boundary.
       The provider-scoped key-resolution, request-time `env:` resolution,
       model-selection configured-state, and documented-example parse tests

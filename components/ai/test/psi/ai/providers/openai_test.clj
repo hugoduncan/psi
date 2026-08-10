@@ -1,5 +1,6 @@
 (ns psi.ai.providers.openai-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clj-http.client :as http]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
@@ -7,8 +8,7 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
-   [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.request-support :as request-support])
+   [psi.ai.providers.openai :as openai])
   (:import [java.io ByteArrayInputStream InputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -285,12 +285,14 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" (jwt-with-account-id "should-never-leak")})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-codex"
-             (openai/build-codex-request convo model {}))
-            "OPENAI_API_KEY must not be used to satisfy a custom codex provider's request"))))
+             (openai/build-codex-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom codex provider's request")
+        (is (empty? (environment-boundary/reads environment))))))
 
   (testing "custom codex missing-auth error points at models.edn :auth, never hints at /login, normalizes kebab-case env suggestion"
     (let [model {:id "my-proxy-codex"
@@ -324,13 +326,15 @@
     (let [model (models/get-model :gpt-5.3-codex)
           convo (conv/create "sys")
           token (jwt-with-account-id "acc_env")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] token)]
-        (let [req (openai/build-codex-request convo model {})]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" token})]
+        (let [req (openai/build-codex-request convo model {:environment-boundary environment})]
           (is (= (str "Bearer " token)
                  (get-in req [:headers "Authorization"]))
               "built-in codex requests without an explicit key use OPENAI_API_KEY")
           (is (= "acc_env" (get-in req [:headers "chatgpt-account-id"]))
-              "chatgpt-account-id is derived from the env fallback key")))))
+              "chatgpt-account-id is derived from the env fallback key")
+          (is (= ["OPENAI_API_KEY"] (environment-boundary/reads environment)))))))
 
   (testing "keyless custom codex provider with :no-auth-header true builds a request without Authorization or chatgpt-account-id"
     (let [model {:id "local-codex"
@@ -349,13 +353,16 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
-          req   (openai/build-codex-request convo model {:no-auth-header true})]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
-        (is (nil? (get-in req [:headers "Authorization"]))
-            "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
-        (is (nil? (get-in req [:headers "chatgpt-account-id"]))
-            "no chatgpt-account-id for a keyless request")
-        (is (= "application/json" (get-in req [:headers "Content-Type"]))))))
+          environment (environment-boundary/nullable
+                       {"OPENAI_API_KEY" (jwt-with-account-id "should-never-leak")})
+          req   (openai/build-codex-request convo model
+                                            {:no-auth-header true
+                                             :environment-boundary environment})]
+      (is (nil? (get-in req [:headers "Authorization"]))
+          "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
+      (is (nil? (get-in req [:headers "chatgpt-account-id"]))
+          "no chatgpt-account-id for a keyless request")
+      (is (= "application/json" (get-in req [:headers "Content-Type"])))))
 
   (testing "recognized auth header among custom headers (case-insensitive) implies keyless codex auth"
     (let [model {:id "local-codex"
@@ -374,15 +381,18 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
-          req   (openai/build-codex-request convo model {:headers {"X-API-Key" "local-key"}})
+          environment (environment-boundary/nullable
+                       {"OPENAI_API_KEY" (jwt-with-account-id "should-never-leak")})
+          req   (openai/build-codex-request convo model
+                                            {:headers {"X-API-Key" "local-key"}
+                                             :environment-boundary environment})
           headers (:headers req)]
       (is (= "local-key" (get headers "X-API-Key"))
           "custom auth header is preserved")
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
-        (is (nil? (get headers "Authorization"))
-            "env key must not replace/add a Bearer for a headers-auth keyless request")
-        (is (nil? (get headers "chatgpt-account-id"))
-            "no chatgpt-account-id for a headers-auth keyless request"))))
+      (is (nil? (get headers "Authorization"))
+          "env key must not replace/add a Bearer for a headers-auth keyless request")
+      (is (nil? (get headers "chatgpt-account-id"))
+          "no chatgpt-account-id for a headers-auth keyless request")))
 
   (testing "incidental custom headers with a blank key fast-fail (no env fallback)"
     (let [model {:id "custom-codex-model"
@@ -401,11 +411,13 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" (jwt-with-account-id "should-never-leak")})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-codex"
-             (openai/build-codex-request convo model {:headers {"X-Client" "psi"}}))
+             (openai/build-codex-request convo model {:headers {"X-Client" "psi"}
+                                                      :environment-boundary environment}))
             "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key"))))
 
   (testing "custom codex provider named \"openai\" never falls back to OPENAI_API_KEY"
@@ -429,12 +441,14 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] (jwt-with-account-id "should-never-leak"))]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" (jwt-with-account-id "should-never-leak")})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider openai"
-             (openai/build-codex-request convo model {}))
-            "OPENAI_API_KEY must not be used to satisfy a custom codex provider named \"openai\"")))))
+             (openai/build-codex-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom codex provider named \"openai\"")
+        (is (empty? (environment-boundary/reads environment)))))))
 (deftest codex-configured-key-plus-recognized-auth-header-interplay-test
   ;; Review 14: the review-11 interplay lock covers :anthropic-messages and
   ;; :openai-completions only, but build-codex-request performs the identical

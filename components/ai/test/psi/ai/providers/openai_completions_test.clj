@@ -1,12 +1,12 @@
 (ns psi.ai.providers.openai-completions-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.request-support :as request-support])
+   [psi.ai.providers.openai :as openai])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
@@ -269,12 +269,14 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-chat"
-             (#'openai/build-request convo model {}))
-            "OPENAI_API_KEY must not be used to satisfy a custom provider's request"))))
+             (#'openai/build-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider's request")
+        (is (empty? (environment-boundary/reads environment))))))
 
   (testing "custom-provider missing-auth error points at models.edn :auth and never hints at /login"
     (let [model {:id "custom-chat-model"
@@ -331,10 +333,12 @@
   (testing "built-in openai model falls back to OPENAI_API_KEY env var"
     (let [model (models/get-model :gpt-5)
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-env-fallback-key")]
-        (let [req (#'openai/build-request convo model {})]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-env-fallback-key"})]
+        (let [req (#'openai/build-request convo model {:environment-boundary environment})]
           (is (= "Bearer sk-env-fallback-key" (get-in req [:headers "Authorization"]))
-              "built-in OpenAI requests without an explicit key use OPENAI_API_KEY")))))
+              "built-in OpenAI requests without an explicit key use OPENAI_API_KEY")
+          (is (= ["OPENAI_API_KEY"] (environment-boundary/reads environment)))))))
 
   (testing "keyless custom provider with :no-auth-header true builds a request without Authorization"
     (let [model {:id "local-chat-model"
@@ -353,11 +357,12 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
-          req   (#'openai/build-request convo model {:no-auth-header true})]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
-        (is (nil? (get-in req [:headers "Authorization"]))
-            "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
-        (is (= "application/json" (get-in req [:headers "Content-Type"]))))))
+          environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})
+          req   (#'openai/build-request convo model {:no-auth-header true
+                                                     :environment-boundary environment})]
+      (is (nil? (get-in req [:headers "Authorization"]))
+          "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
+      (is (= "application/json" (get-in req [:headers "Content-Type"])))))
 
   (testing "recognized auth header among custom headers (case-insensitive) implies keyless auth"
     (let [model {:id "local-chat-model"
@@ -376,13 +381,15 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")
-          req   (#'openai/build-request convo model {:headers {"Authorization" "Bearer local-token"}})
+          environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})
+          req   (#'openai/build-request convo model
+                                        {:headers {"Authorization" "Bearer local-token"}
+                                         :environment-boundary environment})
           headers (:headers req)]
       (is (= "Bearer local-token" (get headers "Authorization"))
           "custom authorization header auth is preserved")
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
-        (is (= "Bearer local-token" (get headers "Authorization"))
-            "env key must not replace the custom auth header"))))
+      (is (= "Bearer local-token" (get headers "Authorization"))
+          "env key must not replace the custom auth header")))
 
   (testing "incidental custom headers with a blank key fast-fail (no env fallback)"
     (let [model {:id "custom-chat-model"
@@ -401,12 +408,15 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider custom-chat"
-             (#'openai/build-request convo model {:headers {"X-Client" "psi"}}))
-            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")))))
+             (#'openai/build-request convo model {:headers {"X-Client" "psi"}
+                                                  :environment-boundary environment}))
+            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")
+        (is (empty? (environment-boundary/reads environment)))))))
 
 (deftest custom-provider-named-openai-not-builtin-test
   ;; Review 14: built-in detection is by provider NAME, so a custom models.edn
@@ -433,12 +443,14 @@
                  :cache-read-cost 0.0
                  :cache-write-cost 0.0}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-should-never-leak")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider openai"
-             (#'openai/build-request convo model {}))
-            "OPENAI_API_KEY must not be used to satisfy a custom provider named \"openai\"")))))
+             (#'openai/build-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider named \"openai\"")
+        (is (empty? (environment-boundary/reads environment)))))))
 
 (deftest configured-key-plus-recognized-auth-header-interplay-test
   ;; Review 11: a custom :headers map carrying a recognized auth header name

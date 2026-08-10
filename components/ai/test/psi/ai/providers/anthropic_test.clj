@@ -1,13 +1,13 @@
 (ns psi.ai.providers.anthropic-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
    [psi.ai.providers.anthropic.request-schema :as request-schema]
-   [psi.ai.providers.http-boundary :as http-boundary]
-   [psi.ai.providers.request-support :as request-support]))
+   [psi.ai.providers.http-boundary :as http-boundary]))
 
 ;; ── build-request ───────────────────────────────────────────────────────────
 
@@ -125,20 +125,24 @@
                  :context-window 1000000
                  :max-tokens 384000}
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-should-never-leak")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-should-never-leak"})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider deepseek"
-             (#'anthropic/build-request convo model {}))
-            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider's request"))))
+             (#'anthropic/build-request convo model {:environment-boundary environment}))
+            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider's request")
+        (is (empty? (environment-boundary/reads environment))))))
 
   (testing "built-in anthropic model falls back to ANTHROPIC_API_KEY env var"
     (let [model (models/get-model :sonnet-4.6)
           convo (conv/create "sys")]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-env-fallback-key")]
-        (let [req (#'anthropic/build-request convo model {})]
-          (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
-              "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY"))))))
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-env-fallback-key"})
+            req (#'anthropic/build-request convo model {:environment-boundary environment})]
+        (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
+            "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY")
+        (is (= ["ANTHROPIC_API_KEY"] (environment-boundary/reads environment)))))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"

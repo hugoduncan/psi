@@ -1,9 +1,9 @@
 (ns psi.ai.model-selection-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as registry]
-   [psi.ai.model-selection :as sut]
-   [psi.ai.providers.request-support :as request-support]))
+   [psi.ai.model-selection :as sut]))
 
 (use-fixtures :each
   (fn [f]
@@ -156,10 +156,15 @@
                             [:reference :configured?]))))
 
       (testing "set env: var reports configured (request-time resolvability)"
-        (with-redefs [request-support/getenv (fn [_] "sk-deepseek-sentinel")]
+        (let [environment (environment-boundary/nullable
+                           {"PSI_UNSET_TEST_VAR_XYZ" "sk-deepseek-sentinel"})]
           (registry/init! {:user-models-path path})
-          (is (true? (get-in (sut/find-candidate (sut/catalog-view) :deepseek "deepseek-v4-flash")
-                             [:reference :configured?])))))
+          (is (true? (get-in (sut/find-candidate
+                              (sut/catalog-view {:environment-boundary environment})
+                              :deepseek "deepseek-v4-flash")
+                             [:reference :configured?])))
+          (is (= ["PSI_UNSET_TEST_VAR_XYZ"]
+                 (environment-boundary/reads environment)))))
 
       (testing "keyless config still counts as configured without a key"
         (registry/init! {:user-models-path keyless-path})

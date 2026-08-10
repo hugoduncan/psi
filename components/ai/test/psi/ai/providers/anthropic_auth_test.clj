@@ -1,11 +1,11 @@
 (ns psi.ai.providers.anthropic-auth-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.anthropic :as anthropic]
-   [psi.ai.providers.request-support :as request-support]))
+   [psi.ai.providers.anthropic :as anthropic]))
 
 ;; ── build-request auth: keyless providers, header interplay, OAuth gating ──
 ;; Split out of anthropic_test.clj (review 14 finalization — the accumulated
@@ -357,12 +357,14 @@
                  :context-window 128000
                  :max-tokens 16384}
           convo (conv/create "sys")]
-      (with-redefs [request-support/getenv (fn [_] "sk-ant-should-never-leak")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-should-never-leak"})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Missing API key for provider anthropic"
-             (#'anthropic/build-request convo model {}))
-            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider named \"anthropic\""))))
+             (#'anthropic/build-request convo model {:environment-boundary environment}))
+            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider named \"anthropic\"")
+        (is (empty? (environment-boundary/reads environment))))))
 
   (testing "custom provider named \"anthropic\" with an sk-ant-oat key is NOT treated as OAuth"
     (let [model {:id "not-a-builtin"

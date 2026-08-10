@@ -3,6 +3,7 @@
    (psi.ai.providers.request-support), used by all three transports
    (:anthropic-messages, :openai-completions, :openai-codex-responses)."
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [psi.ai.providers.request-support :as request-support]))
 
@@ -53,11 +54,15 @@
 
   (testing "built-in models still fall back to the env var"
     (let [model {:provider :anthropic}]
-      (with-redefs [psi.ai.providers.request-support/getenv
-                    (fn [_] "sk-ant-env-fallback-key")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-env-fallback-key"})]
         (is (= "sk-ant-env-fallback-key"
-               (request-support/resolve-api-key model {} anthropic-config))
-            "built-in model with no configured key uses the env fallback"))))
+               (request-support/resolve-api-key model
+                                                {:environment-boundary environment}
+                                                anthropic-config))
+            "built-in model with no configured key uses the env fallback")
+        (is (= ["ANTHROPIC_API_KEY"] (environment-boundary/reads environment)))
+        (is (= :anthropic (:provider model))))))
 
   (testing "configured key passes through for non-keyless options"
     (let [model {:provider :deepseek :custom? true}]
@@ -118,81 +123,84 @@
     (is (nil? (request-support/resolve-key-spec "")))
     (is (nil? (request-support/resolve-key-spec "  "))))
   (testing "env: prefix reads the environment at request time"
-    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-live-env-key")]
-      (is (= "sk-live-env-key" (request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))))
-    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
-      (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ")))))
+    (let [environment (environment-boundary/nullable {"DEEPSEEK_API_KEY" "sk-live-env-key"})]
+      (is (= "sk-live-env-key"
+             (request-support/resolve-key-spec "env:DEEPSEEK_API_KEY" environment))))
+    (let [environment (environment-boundary/nullable {})]
+      (is (nil? (request-support/resolve-key-spec "env:PSI_TEST_NONEXISTENT_VAR_XYZ" environment)))))
   (testing "env: with a blank variable name is unresolvable, never getenv \"\" (review 30)"
     ;; "env:" / "env: " name an empty variable — a config error, not an env
     ;; lookup of the empty string (which would silently return nil and
     ;; surface as a misleading "environment variable  is unset" downstream).
-    (with-redefs [psi.ai.providers.request-support/getenv
-                  (fn [k] (is (not= "" k) "getenv must never be called with an empty var name")
-                    (when (= "" k) (throw (ex-info "getenv \"\"" {})))
-                    nil)]
-      (is (nil? (request-support/resolve-key-spec "env:")))
-      (is (nil? (request-support/resolve-key-spec "env: "))))
-    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-live-env-key")]
-      (is (nil? (request-support/resolve-key-spec "env:"))
-          "a set env cannot rescue a blank variable name — the spec itself is invalid")))
+    (let [environment (environment-boundary/nullable
+                       (fn [_] (throw (ex-info "environment must not be read" {}))))]
+      (is (nil? (request-support/resolve-key-spec "env:" environment)))
+      (is (nil? (request-support/resolve-key-spec "env: " environment)))
+      (is (empty? (environment-boundary/reads environment))
+          "blank variable names never reach the environment boundary")))
   (testing "literal string returned as-is"
     (is (= "sk-literal" (request-support/resolve-key-spec "sk-literal")))))
 
 (deftest resolve-api-key-request-time-env-resolution-test
-  ;; Review 26: resolve-api-key re-resolves env: specs through getenv PER
-  ;; REQUEST (custom registry auth stores the raw spec), so exporting the
-  ;; var after psi loaded models.edn works without a reload — and an unset
-  ;; var fails fast with an error naming the variable instead of the generic
-  ;; "configure :auth in models.edn" (the config is already there).
+  ;; Custom env: specs resolve per request through the explicit nullable
+  ;; environment boundary; unset and malformed specs remain actionable.
   (testing "custom provider with env: spec resolves live at request time"
-    (let [model {:provider :deepseek :custom? true}]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-live")]
-        (is (= "sk-deepseek-live"
-               (request-support/resolve-api-key model
-                                                {:api-key "env:DEEPSEEK_API_KEY"}
-                                                anthropic-config))
-            "env: key is re-read per request, not snapshotted at parse time"))))
+    (let [model {:provider :deepseek :custom? true}
+          environment (environment-boundary/nullable
+                       {"DEEPSEEK_API_KEY" "sk-deepseek-live"})]
+      (is (= "sk-deepseek-live"
+             (request-support/resolve-api-key
+              model
+              {:api-key "env:DEEPSEEK_API_KEY"
+               :environment-boundary environment}
+              anthropic-config)))
+      (is (= ["DEEPSEEK_API_KEY"] (environment-boundary/reads environment)))))
 
   (testing "custom provider with unset env: spec fails fast naming the variable"
-    (let [model {:provider :deepseek :custom? true}]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
-        (let [e (try
-                  (request-support/resolve-api-key model
-                                                   {:api-key "env:DEEPSEEK_API_KEY"}
-                                                   anthropic-config)
-                  nil
-                  (catch clojure.lang.ExceptionInfo e e))]
-          (is (some? e))
-          (is (re-find #"environment variable DEEPSEEK_API_KEY is unset" (ex-message e)))
-          (is (re-find #"re-read per request" (ex-message e)))
-          (is (nil? (re-find #"/login" (ex-message e))))))))
+    (let [model {:provider :deepseek :custom? true}
+          environment (environment-boundary/nullable {})
+          e (try
+              (request-support/resolve-api-key
+               model
+               {:api-key "env:DEEPSEEK_API_KEY"
+                :environment-boundary environment}
+               anthropic-config)
+              nil
+              (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? e))
+      (is (re-find #"environment variable DEEPSEEK_API_KEY is unset" (ex-message e)))
+      (is (re-find #"re-read per request" (ex-message e)))
+      (is (nil? (re-find #"/login" (ex-message e))))))
 
-  (testing "env: with a blank variable name is a config error naming the literal spec (review 30)"
-    (let [model {:provider :deepseek :custom? true}]
-      (with-redefs [psi.ai.providers.request-support/getenv (fn [_] nil)]
-        (let [e (try
-                  (request-support/resolve-api-key model
-                                                   {:api-key "env:"}
-                                                   anthropic-config)
-                  nil
-                  (catch clojure.lang.ExceptionInfo e e))]
-          (is (some? e))
-          (is (re-find #"api-key spec \"env:\" names an empty environment variable"
-                       (ex-message e)))
-          (is (nil? (re-find #"environment variable  is unset" (ex-message e)))
-              "must not emit the blank-var unset message (double space)")
-          (is (nil? (re-find #"/login" (ex-message e))))))))
+  (testing "env: with a blank variable name is a config error"
+    (let [model {:provider :deepseek :custom? true}
+          environment (environment-boundary/nullable {})
+          e (try
+              (request-support/resolve-api-key
+               model
+               {:api-key "env:" :environment-boundary environment}
+               anthropic-config)
+              nil
+              (catch clojure.lang.ExceptionInfo e e))]
+      (is (some? e))
+      (is (re-find #"api-key spec \"env:\" names an empty environment variable"
+                   (ex-message e)))
+      (is (empty? (environment-boundary/reads environment)))))
 
-  (testing "literal configured key passes through unchanged (not env:)"
+  (testing "literal configured key passes through unchanged"
     (is (= "sk-deepseek-configured"
            (request-support/resolve-api-key {:provider :deepseek :custom? true}
                                             {:api-key "sk-deepseek-configured"}
                                             anthropic-config))))
 
   (testing "built-in env fallback still applies when no key is configured"
-    (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-ant-env-fallback")]
+    (let [environment (environment-boundary/nullable
+                       {"ANTHROPIC_API_KEY" "sk-ant-env-fallback"})]
       (is (= "sk-ant-env-fallback"
-             (request-support/resolve-api-key {:provider :anthropic} {} anthropic-config))))))
+             (request-support/resolve-api-key
+              {:provider :anthropic}
+              {:environment-boundary environment}
+              anthropic-config))))))
 
 (deftest builtin-openai-chat-completions?-test
   ;; Review 26: the shared built-in-openai-chat-completions predicate used

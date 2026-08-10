@@ -12,20 +12,14 @@
    between them). They live here once, parameterized by the transport's
    built-in provider keyword and env var name, so future fixes land once
    (review 14)."
-  (:require [clojure.string :as str]))
-
-(defn getenv
-  "Environment lookup indirection, redef-testable (review 3 pattern).
-   The three transports' `resolve-api-key` call this instead of
-   System/getenv directly so tests can stub the env without forking
-   processes."
-  [k]
-  (System/getenv k))
+  (:require
+   [clojure.string :as str]
+   [psi.ai.providers.environment-boundary :as environment-boundary]))
 
 (defn resolve-key-spec
   "Resolve an api-key spec at REQUEST time:
    - nil / blank → nil
-   - \"env:VAR\" → (getenv \"VAR\"), nil if unset
+   - \"env:VAR\" → environment-boundary lookup of \"VAR\", nil if unset
    - anything else → the literal string
 
    The `env:` prefix is case-sensitive: only the exact lowercase `env:`
@@ -41,19 +35,18 @@
    is the single env-resolution home (review 28: the config-parse layer's
    `user_models/resolve-api-key-spec` delegation wrapper was deleted as
    production-dead)."
-  [raw]
-  (cond
-    (or (nil? raw) (str/blank? raw)) nil
-    (str/starts-with? raw "env:")
-    (let [var (subs raw 4)]
-      ;; A blank variable name after the prefix (e.g. "env:") is an
-      ;; unresolvable spec, never an environment lookup of the empty string
-      ;; (review 30) — `getenv ""` would silently return nil and the caller
-      ;; would report a misleading "environment variable  is unset" naming a
-      ;; blank variable. Nil here means "not resolvable", same as an unset var.
-      (when-not (str/blank? var)
-        (getenv var)))
-    :else raw))
+  ([raw]
+   (resolve-key-spec raw environment-boundary/real))
+  ([raw environment]
+   (cond
+     (or (nil? raw) (str/blank? raw)) nil
+     (str/starts-with? raw "env:")
+     (let [var (subs raw 4)]
+       ;; A blank variable name after the prefix (e.g. "env:") is an
+       ;; unresolvable spec, never an environment lookup of the empty string.
+       (when-not (str/blank? var)
+         (environment-boundary/lookup environment var)))
+     :else raw)))
 
 (def openai-api-key-config
   "Shared OpenAI api-key resolution config for the :openai-completions and
@@ -152,12 +145,13 @@
   [model options config]
   (when-not (no-auth? options)
     (let [{:keys [builtin-provider env-var builtin-missing-msg]} config
-          provider   (:provider model)
-          builtin?   (builtin? model builtin-provider)
-          api-key    (resolve-key-spec (:api-key options))
-          api-key    (if (and builtin? (str/blank? api-key))
-                       (getenv env-var)
-                       api-key)]
+          provider    (:provider model)
+          builtin?    (builtin? model builtin-provider)
+          environment (environment-boundary/boundary options)
+          api-key     (resolve-key-spec (:api-key options) environment)
+          api-key     (if (and builtin? (str/blank? api-key))
+                        (environment-boundary/lookup environment env-var)
+                        api-key)]
       (when (str/blank? api-key)
         (if builtin?
           (throw (ex-info builtin-missing-msg

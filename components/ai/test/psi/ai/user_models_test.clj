@@ -1,5 +1,6 @@
 (ns psi.ai.user-models-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
@@ -546,10 +547,14 @@
         (is (= "env:DEEPSEEK_API_KEY" (:api-key auth))
             "registry stores the raw env: spec — NOT snapshotted at parse time")
         (is (true? (:auth-header? auth)))
-        (with-redefs [psi.ai.providers.request-support/getenv (fn [_] "sk-deepseek-sentinel")]
+        (let [environment (environment-boundary/nullable
+                           {"DEEPSEEK_API_KEY" "sk-deepseek-sentinel"})]
           (is (= "sk-deepseek-sentinel"
-                 (psi.ai.providers.request-support/resolve-key-spec "env:DEEPSEEK_API_KEY"))
-              "env:DEEPSEEK_API_KEY resolves through the shared request-time env lookup"))))))
+                 (psi.ai.providers.request-support/resolve-key-spec
+                  "env:DEEPSEEK_API_KEY" environment))
+              "env:DEEPSEEK_API_KEY resolves through the shared request-time env boundary")
+          (is (= ["DEEPSEEK_API_KEY"]
+                 (environment-boundary/reads environment))))))))
 
 (deftest all-documented-models-edn-examples-parse-test
   ;; Review 35: only the DeepSeek doc example was parse-locked; reviews 33/34
