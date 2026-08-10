@@ -5147,3 +5147,11 @@
       executions. Bind `events` once, then assert the ordered event types and
       terminal count from that value so the test is economical, deterministic,
       and locally comprehensible.
+
+## Follow-ups (test review 73, 2026-08-09)
+
+- [ ] Remove the redundant exactly-one-`:error` assertion from
+      `stream-anthropic-error-after-thinking-start-balances-open-block-test`.
+      Its exact event-type vector assertion already proves both that the sole
+      terminal is `:error` and that it occurs once, so the count assertion adds
+      no behavior coverage and yields a second failure for the same contract.
