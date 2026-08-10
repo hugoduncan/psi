@@ -6,9 +6,8 @@
    [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.openai :as openai]
-   [psi.ai.providers.openai.transport :as transport])
-  (:import [java.io ByteArrayInputStream]
+   [psi.ai.providers.openai :as openai])
+  (:import [java.io ByteArrayInputStream InputStream]
            [java.util Base64]))
 (defn- jwt-with-account-id
   [account-id]
@@ -21,6 +20,26 @@
 (defn- stream-body
   [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
+(defn- throwing-stream-after
+  [s ex-data]
+  (let [bytes (.getBytes s "UTF-8")
+        index (atom 0)]
+    (proxy [InputStream] []
+      (read
+        ([]
+         (if (< @index (alength bytes))
+           (let [value (bit-and 0xff (aget bytes @index))]
+             (swap! index inc)
+             value)
+           (throw (ex-info "simulated stream read failure" ex-data))))
+        ([buffer offset length]
+         (if (< @index (alength bytes))
+           (let [remaining (- (alength bytes) @index)
+                 count (min length remaining)]
+             (System/arraycopy bytes @index buffer offset count)
+             (swap! index + count)
+             count)
+           (throw (ex-info "simulated stream read failure" ex-data))))))))
 (deftest codex-requires-chatgpt-token-test
   (testing "non-ChatGPT token emits an error event (missing chatgpt_account_id)"
     (let [model  (models/get-model :gpt-5.3-codex)
@@ -344,15 +363,9 @@
 
 (deftest codex-catch-block-surfaces-exception-headers-test
   (testing "a stream-read exception with response headers in ex-data keeps them on the :error event"
-    ;; Review 52: stream-openai-codex's catch block destructured away
-    ;; :headers/:body-text/:body from transport/exception->error and called
-    ;; the 3-arity (headers nil) — the exact class review 51 just fixed on
-    ;; the HTTP-error branch. Reachability is lower (non-HTTP stream
-    ;; exceptions rarely carry response headers), but the fix is the same
-    ;; one-line destructure: the catch now passes headers through, so an
-    ;; exception whose ex-data carries headers surfaces them on the :error
-    ;; event for diagnostics, consistent with the review-51-fixed branch and
-    ;; the sibling transports.
+    ;; Review 52: the catch block must preserve exception response metadata.
+    ;; Exercise the real parser through a nullable response body that throws
+    ;; with status and headers after serving one valid event.
     (let [model  (models/get-model :gpt-5.3-codex)
           token  (jwt-with-account-id "acc_test")
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
@@ -360,17 +373,15 @@
           sse    (str
                   "data: " (json/generate-string
                             {:type "response.output_text.delta"
-                             :delta "Hello"}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})
-                    transport/parse-sse-line
-                    (fn [_line]
-                      (throw (ex-info "simulated stream read failure"
-                                      {:status 429
-                                       :headers {"x-request-id" "req_catch_429"}})))]
-        ((:stream openai/provider)
-         convo model {:api-key token}
-         (fn [ev] (swap! events conj ev))))
+                             :delta "Hello"}) "\n\n")
+          http-client (http-boundary/nullable
+                       [{:body (throwing-stream-after
+                                sse
+                                {:status 429
+                                 :headers {"x-request-id" "req_catch_429"}})}])]
+      ((:stream openai/provider)
+       convo model {:http-boundary http-client :api-key token}
+       (fn [ev] (swap! events conj ev)))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "the exception surfaces as an :error event")
         (is (= "req_catch_429" (get-in err [:headers "x-request-id"]))

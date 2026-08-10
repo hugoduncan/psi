@@ -8,13 +8,33 @@
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
    [psi.ai.providers.anthropic :as anthropic])
-  (:import [java.io ByteArrayInputStream]))
+  (:import [java.io ByteArrayInputStream InputStream]))
 
 (defn- sse-line [event-type data-map]
   (str "event: " event-type "\ndata: " (json/generate-string data-map) "\n\n"))
 
 (defn- stream-body [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
+
+(defn- throwing-stream-after [s ex-data]
+  (let [bytes (.getBytes s "UTF-8")
+        index (atom 0)]
+    (proxy [InputStream] []
+      (read
+        ([]
+         (if (< @index (alength bytes))
+           (let [value (bit-and 0xff (aget bytes @index))]
+             (swap! index inc)
+             value)
+           (throw (ex-info "simulated stream read failure" ex-data))))
+        ([buffer offset length]
+         (if (< @index (alength bytes))
+           (let [remaining (- (alength bytes) @index)
+                 count (min length remaining)]
+             (System/arraycopy bytes @index buffer offset count)
+             (swap! index + count)
+             count)
+           (throw (ex-info "simulated stream read failure" ex-data))))))))
 
 (deftest stream-anthropic-applies-proxy-request-options-test
   (testing "Anthropic stream request merges shared proxy options"
@@ -336,9 +356,8 @@
   (testing "a stream-read exception after a mid-stream SSE error does not emit a second :error"
     ;; Review 44: the stream catch block emitted a second :error with no
     ;; done? check if the stream read threw after a mid-stream error had
-    ;; already terminated the stream. Now guarded on done? (mirroring the
-    ;; codex transport's emit-codex-error!): the post-error exception is
-    ;; swallowed — exactly one :error, no second terminal event.
+    ;; already terminated the stream. Exercise the real parser through the
+    ;; nullable HTTP boundary; the response body disconnects after the error.
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])
@@ -348,21 +367,11 @@
                                  :error {:type "overloaded_error"
                                          :message "Overloaded"
                                          :http_status 529}}))
-          orig-parse-sse-line anthropic/parse-sse-line
-          error-seen (atom false)]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})
-                    anthropic/parse-sse-line
-                    (fn [line]
-                      (let [parsed (orig-parse-sse-line line)]
-                        (if @error-seen
-                          (throw (ex-info "simulated stream read failure" {}))
-                          (do
-                            (when (= "error" (:type parsed))
-                              (reset! error-seen true))
-                            parsed))))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
-                                    (fn [e] (swap! events conj e))))
+          http-client (http-boundary/nullable
+                       [{:body (throwing-stream-after sse {})}])]
+      (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                               :api-key "test-key"}
+                                  (fn [e] (swap! events conj e)))
       (is (= 1 (count (filter #(= :error (:type %)) @events)))
           "exactly one :error — the post-error stream-read exception must not emit a second one")
       (is (not-any? #(= :done (:type %)) @events)

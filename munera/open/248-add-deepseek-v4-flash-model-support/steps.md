@@ -5042,7 +5042,7 @@
 
 ## Follow-ups (test review 64, 2026-08-09)
 
-- [ ] Migrate the remaining task-added post-error stream-read tests to the
+- [x] Migrate the remaining task-added post-error stream-read tests to the
       injectable nullable HTTP boundary without redefining parser logic:
       `stream-anthropic-error-then-read-exception-no-second-error-test`,
       `completions-sse-error-then-read-exception-no-second-error-test`, and
