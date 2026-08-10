@@ -124,8 +124,11 @@ ChatGPT/Codex alias or alternate OAuth-compatible transport is added; `gpt-5.5`
 and the `gpt-5.6-sol`/`gpt-5.6-terra`/`gpt-5.6-luna` variants remain on the
 OAuth/ChatGPT Codex path. Named session profiles bundle reusable
 model/thinking/speed/effort settings for interactive selection
-(`/session-profile`) and workflow steps (`:session-profile`); see
-[`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
+(`/session-profile`) and workflow steps (`:session-profile`). Custom providers
+are configured through `models.edn`; the documented examples include
+DeepSeek's `deepseek-v4-flash` over its Anthropic-compatible endpoint. See
+[`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md),
+[`doc/custom-providers.md`](doc/custom-providers.md), and
 [`doc/workflows.md`](doc/workflows.md).
 
 ## Configuration

@@ -205,12 +205,13 @@ Notes:
   Keyless requests (`:auth-header? false`/`:no-auth-header`, or a recognized
   `x-api-key`/`Authorization` header among custom `:headers` with no
   configured key) send no auth header at all.
-- `env:` keys are re-read on **every request**, not snapshot when psi loads
-  `models.edn`: you can export the variable after psi has started (or change
-  it in a different shell) and the next request picks it up — no reload
-  needed. If the variable is unset when a request is made, the error names
-  the variable (e.g. "environment variable MINIMAX_API_KEY is unset") so it
-  does not look like a config mistake.
+- `env:` keys are re-read from psi's own process environment on **every
+  request**, not snapshotted when psi loads `models.edn`. Set the variable in
+  the environment that launches psi; exporting or changing it later in
+  another shell cannot modify the already-running psi process environment.
+  If the variable is unset when a request is made, the error names the
+  variable (e.g. "environment variable MINIMAX_API_KEY is unset") so it does
+  not look like a config mistake.
 
 ## Anthropic-compatible example
 
@@ -366,12 +367,14 @@ Notes:
   `https://api.deepseek.com/anthropic/` would silently produce
   `https://api.deepseek.com/anthropic//v1/messages` (double slash). Use
   `https://api.deepseek.com/anthropic` exactly as shown.
-- `env:` keys are re-read on **every request**, not snapshot when psi loads
-  `models.edn`: you can `export DEEPSEEK_API_KEY=...` after psi has started
-  (or in a different shell) and the next request picks it up — no reload
-  needed. If the variable is unset when a request is made, the error names
-  the variable ("environment variable DEEPSEEK_API_KEY is unset — env: keys
-  are re-read per request") so it does not look like a config mistake.
+- `env:` keys are re-read from psi's own process environment on **every
+  request**, not snapshotted when psi loads `models.edn`. Set
+  `DEEPSEEK_API_KEY` in the environment that launches psi; exporting or
+  changing it later in another shell cannot modify the already-running psi
+  process environment. If the variable is unset when a request is made, the
+  error names the variable ("environment variable DEEPSEEK_API_KEY is unset
+  — env: keys are re-read per request") so it does not look like a config
+  mistake.
 - pricing/context-window figures above are from DeepSeek's published pricing
   page as of this writing; confirm current figures in DeepSeek's own docs
   before relying on them for cost tracking
@@ -552,9 +555,10 @@ while every request is silently keyless. Use `:api-key` only with the default
 auth-header path (or a custom `:headers` auth header as described below).
 
 Use cases:
-- `:api-key` — literal key or `"env:VAR_NAME"` (env: keys are re-read on
-  every request, not snapshotted when models.edn loads — export the variable
-  before the first request; no reload needed; the `env:` prefix is
+- `:api-key` — literal key or `"env:VAR_NAME"` (`env:` keys are re-read from
+  psi's own process environment on every request, not snapshotted when
+  models.edn loads; set the variable before launching psi, because changes in
+  another shell cannot modify the running process; the `env:` prefix is
   case-sensitive — lowercase `env:` only, so `ENV:VAR` or `Env:VAR` is sent
   as a literal key and fails provider-side; a blank variable name after the
   prefix — `"env:"` or `"env: "` — is a config error naming the literal spec
