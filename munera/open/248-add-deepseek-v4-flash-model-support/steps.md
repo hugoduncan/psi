@@ -5115,7 +5115,7 @@
 
 ## Follow-ups (test review 70, 2026-08-09)
 
-- [ ] Add focused contract tests for the new
+- [x] Add focused contract tests for the new
       `environment-boundary/nullable`, parallel to `http_boundary_test.clj`.
       Existing provider/model tests exercise map-backed lookup and inspect
       recorded reads indirectly, but no test proves the nullable boundary's
