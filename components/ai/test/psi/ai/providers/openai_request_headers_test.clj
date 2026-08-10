@@ -101,7 +101,7 @@
   ;; or mixed-case authorization) leaked the secret verbatim into the
   ;; :on-provider-request capture payload. Redaction is now case-insensitive
   ;; and covers x-api-key (mirroring the anthropic transport's review-7
-  ;; find-header fix).
+  ;; case-insensitive header-matching fix).
   (testing "mixed-case X-API-Key custom header is redacted in :on-provider-request captures"
     (let [model           {:id                 "local-completions"
                            :name               "Local Completions"

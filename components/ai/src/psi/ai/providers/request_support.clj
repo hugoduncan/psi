@@ -241,14 +241,6 @@
               [k v]))
           headers)))
 
-(defn find-header
-  "Find the FIRST header entry whose name matches header-name
-   case-insensitively. Returns a [key value] pair, or nil. Auth-header
-   recognition is case-insensitive, so a mixed-case X-API-Key /
-   authorization header must be redacted too (review 7)."
-  [headers header-name]
-  (first (find-headers headers header-name)))
-
 (defn redact-secret
   [value]
   (when (string? value)

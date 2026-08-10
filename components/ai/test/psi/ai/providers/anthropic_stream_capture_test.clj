@@ -157,7 +157,7 @@
           "mixed-case X-API-Key must be redacted in the :on-provider-request payload")))
 
   (testing "mixed-case Authorization header is redacted case-insensitively in captures"
-    ;; The review-7 case-insensitive find-header redaction covers lowercase
+    ;; The case-insensitive find-headers redaction covers lowercase
     ;; x-api-key and mixed-case X-API-Key, but not the redact-authorization
     ;; path for a non-exact-case Authorization header (existing tests use
     ;; exact-case "Authorization" only). A keyless custom provider carrying

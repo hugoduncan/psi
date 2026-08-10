@@ -590,8 +590,8 @@ rule ProviderResponseCaptureEmitted {
 }
 
 rule RedactRequestHeaders {
-    -- Auth header names are matched case-insensitively (find-header in
-    -- providers/anthropic.clj, review 7); the redacted value is written back
+    -- Auth header names are matched case-insensitively (find-headers in
+    -- providers/request_support.clj); the redacted value is written back
     -- under the original header key casing. EVERY case-insensitive match is
     -- redacted — a differently-cased duplicate of an auth header name on the
     -- wire (base "x-api-key" + custom "X-API-Key", or "Authorization" +

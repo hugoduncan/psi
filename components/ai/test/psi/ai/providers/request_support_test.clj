@@ -244,14 +244,6 @@
     (is (= [[:x-api-key "k"]]
            (request-support/find-headers {:x-api-key "k"} "x-api-key")))))
 
-(deftest find-header-first-match-test
-  (testing "find-header returns the first case-insensitive match, or nil"
-    (is (= ["X-API-Key" "first"]
-           (request-support/find-header [["X-API-Key" "first"]
-                                         ["x-api-key" "second"]]
-                                        "x-api-key")))
-    (is (nil? (request-support/find-header {"X-Client" "psi"} "authorization")))))
-
 (deftest redact-secret-test
   (testing "redact-secret emits ***REDACTED***, with a length suffix only for values > 20 chars"
     (is (= "***REDACTED***" (request-support/redact-secret "short")))

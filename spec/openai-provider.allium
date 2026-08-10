@@ -655,7 +655,7 @@ rule ProviderRequestCaptureEmittedWithRedaction {
 rule RedactRequestHeaders {
     -- Mirrors redact-request-headers in
     -- providers/openai/transport.clj (review 11): auth header names are
-    -- matched case-insensitively (find-header helper) — "Authorization"
+    -- matched case-insensitively (shared find-headers helper) — "Authorization"
     -- (redacted to "Bearer ***REDACTED***", with a length suffix for values
     -- longer than 20 chars), "x-api-key" (redacted to "***REDACTED***"), and
     -- "chatgpt-account-id" (masked to its first 6 chars + "..."). Redacted

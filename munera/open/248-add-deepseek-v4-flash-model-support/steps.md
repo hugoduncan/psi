@@ -5106,7 +5106,7 @@
 
 ## Follow-ups (test review 69, 2026-08-09)
 
-- [ ] Remove the production-dead `request-support/find-header` helper and its
+- [x] Remove the production-dead `request-support/find-header` helper and its
       direct `find-header-first-match-test`. Since review 19 moved capture
       redaction to `find-headers`, `find-header` has no production caller; its
       direct test now locks an unused implementation detail rather than an
