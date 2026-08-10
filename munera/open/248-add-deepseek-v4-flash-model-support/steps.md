@@ -5506,3 +5506,38 @@
       the Codex capture test explicitly defines a trailing event as a full
       no-op. Align all three transports and add an Anthropic capture test that
       proves post-terminal lines produce neither consumer events nor captures.
+
+## Follow-ups (code-shaper review 8, 2026-08-10)
+
+- [ ] Rewrite the task-modified guidance in `spec/anthropic-provider.allium`,
+      `spec/openai-provider.allium`, and `spec/custom-providers.allium` around
+      current behavior and rationale rather than implementation-review
+      chronology. These specifications still contain more than 100 `Review N`,
+      `reviews N`, and `pre-review-N` references, including long narratives of
+      superseded mechanisms. Preserve enforceable invariants, inputs, outputs,
+      and discriminating rationale; leave provenance in git and the task
+      artifacts so each rule is locally comprehensible.
+- [ ] Correct the stale DeepSeek streaming claims in
+      `spec/anthropic-provider.allium`'s
+      `MessageStopEmitsDoneWithUsage` and
+      `AnthropicTransportCloseEmitsDoneIfNotTerminal` guidance. They still say
+      DeepSeek streaming is unverified and cite a non-streaming-only smoke test,
+      while the completed live streaming check established the normal DeepSeek
+      sequence includes `message_delta` usage followed by `message_stop`.
+      Describe these rules as defensive support for truncated or non-conforming
+      Anthropic-compatible streams, matching the source comments, docs, and
+      changelog.
+- [ ] Reconcile `plan.md` with the approach actually taken. It still presents
+      the task as two config/docs/schema-only slices with no provider code
+      changes and mentions only the HTTP-boundary follow-up, while the design,
+      implementation, specs, tests, and code now include provider credential,
+      capture, retry, event-normalization, and terminal-state changes. Replace
+      the obsolete approach with concise current slices and verification gates
+      so the task's implementation strategy is coherent and discoverable.
+- [ ] Shape `design.md` back to intent and behavioral boundaries. Its
+      "implementation reviews" section and acceptance criteria now embed a
+      long mechanism-by-mechanism review history, making the current contract
+      difficult to locate and duplicating `implementation.md` and git history.
+      Consolidate that material into the durable behavior changes and
+      invariants this task owns, while retaining the DeepSeek scope,
+      constraints, and observable acceptance criteria.
