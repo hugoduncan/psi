@@ -5244,7 +5244,7 @@
 
 ## Follow-ups (test review 80, 2026-08-09)
 
-- [ ] Make the task diff whitespace-clean. Running `git diff --check` for
+- [x] Make the task diff whitespace-clean. Running `git diff --check` for
       `3c286a46e2c97ba9dc24ca28db7fb9b0f3bde6aa..HEAD` currently reports
       extra blank lines at EOF in `anthropic/request.clj`,
       `anthropic_auth_test.clj`, `anthropic_retry_test.clj`, and

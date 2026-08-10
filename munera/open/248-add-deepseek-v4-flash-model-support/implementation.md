@@ -1728,7 +1728,7 @@
   prompt-request-test 21/62, user-models-test 19/131, anthropic-retry-test
   6/60, anthropic-stream-test 7/65, anthropic-test 16/103,
   prompt-lifecycle-test 23/116, turn.handlers-test 4/11,
-  session-settings-test 7/7. clj-kondo 0 errors / 0 warnings (ai + 
+  session-settings-test 7/7. clj-kondo 0 errors / 0 warnings (ai +
   agent-session src), cljfmt clean, `bb commit-check:file-lengths` passes.
   Review-1 optional live smoke test remains unchecked + BLOCKED (no
   DEEPSEEK_API_KEY in env; request-shaping coverage only by design).
@@ -2659,3 +2659,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 - Test review 79 (2026-08-09): added 1 step to be addressed.
 - addressed 1 review step
 - Test review 80 (2026-08-09): added 1 step to be addressed.
+- addressed 1 review step

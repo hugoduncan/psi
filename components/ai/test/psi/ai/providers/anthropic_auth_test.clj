@@ -395,4 +395,3 @@
           "no Claude Code identity prepended for a custom provider named \"anthropic\""))))
 
 ;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
-

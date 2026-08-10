@@ -428,4 +428,3 @@
                 @captures)
           "response capture records the :without-all-betas fallback step")
       (is (= [:start :done] (mapv :type @events))))))
-

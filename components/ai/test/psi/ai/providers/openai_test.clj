@@ -736,4 +736,3 @@
           "no :text-delta after the :error — the trailing response.output_text.delta is a full no-op once done")
       (is (not-any? #(= :done (:type %)) @events)
           "no synthetic :done — the :error event is terminal"))))
-
