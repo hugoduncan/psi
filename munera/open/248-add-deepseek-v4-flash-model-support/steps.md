@@ -5191,3 +5191,19 @@
       done-absence assertions where an exact event-type vector already proves
       them. Retain assertions on terminal payloads (reason, message, status,
       headers), which prove behavior not represented by the type vector.
+
+## Follow-ups (test review 76, 2026-08-09)
+
+- [ ] Complete the exact-event-vector cleanup for task-added stream tests
+      omitted by review 75. Replace the terminal count/absence assertions in
+      `stream-anthropic-error-then-read-exception-no-second-error-test` with
+      one `[:start :error]` type-vector assertion; replace the five event-type
+      absence checks plus done count in
+      `redacted-thinking-block-not-mislabeled-as-text-test` with one
+      `[:start :done]` assertion; and give the three initial EOF tests in
+      `openai_completions_stream_test.clj` exact event-type vectors instead of
+      done counts/error-absence checks. Retain the `:reason` and missing
+      `:usage` assertions because those prove terminal payload behavior not
+      represented by the vectors. This applies the suite's established
+      assertion style consistently and avoids multiple failure signals for a
+      single sequence contract.
