@@ -5112,3 +5112,16 @@
       direct test now locks an unused implementation detail rather than an
       observable contract, duplicating the live all-match behavior covered by
       `find-headers-case-insensitive-all-matches-test` and the capture tests.
+
+## Follow-ups (test review 70, 2026-08-09)
+
+- [ ] Add focused contract tests for the new
+      `environment-boundary/nullable`, parallel to `http_boundary_test.clj`.
+      Existing provider/model tests exercise map-backed lookup and inspect
+      recorded reads indirectly, but no test proves the nullable boundary's
+      own function-backed success path or ordered repeated-read contract.
+      Add `environment_boundary_test.clj` cases that use a function value,
+      assert the variable passed to it and returned value, and assert `reads`
+      preserves lookup order (including repeated names). This keeps the new
+      infrastructure seam locally comprehensible and prevents provider tests
+      from carrying sole responsibility for its reusable state-based contract.
