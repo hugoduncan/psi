@@ -3,11 +3,9 @@
    repo files (doc/custom-providers.md, .psi/models.edn, .psi/project.edn,
    .psi/workflows) from the repo root regardless of the process cwd.
 
-   Single home for this helper (review 41): user_models_test.clj and
-   workflow_test_support.clj historically carried byte-similar private
-   copies in two components; this namespace is the one place future fixes
-   land. bases/main/test is on the unit test classpath, so both
-   components' test files can require it."
+   This shared home replaces component-local copies so future fixes land in
+   one place. bases/main/test is on the unit test classpath, so tests in both
+   components can require it."
   (:require [clojure.java.io :as io]))
 
 (defn repo-root
