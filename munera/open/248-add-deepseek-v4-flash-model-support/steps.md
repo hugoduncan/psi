@@ -4991,3 +4991,38 @@
       profile assertions expected DeepSeek); provider tests all pass. Re-run
       with the committed project config temporarily substituted (uncommitted
       file restored by trap) green: 2643 tests / 18927 assertions / 0 failures.
+
+## Follow-ups (test review 62, 2026-08-09)
+
+- [ ] Complete the task-added provider-test migration to the injectable HTTP
+      boundary. Review 61 migrated the Codex ordering proofs and selected
+      stream helpers, but many tests added during task 248 still globally
+      redefine `clj-http.client/post` (including the Anthropic retry/capture/
+      termination suites and OpenAI capture/error/termination suites). These
+      tests still stub infrastructure despite the now-available production
+      seam, so the task-test-review invariant `injectable ∧ nullable ∧ ¬mock
+      ∧ ¬stub` is not yet met. Replace each task-added `http/post` redefinition
+      with `http-boundary/nullable`, assert recorded request state where the
+      behavior concerns URL/headers/body/retries, and remove now-unused
+      `clj-http.client` test requires. Do not broaden this item to unrelated
+      pre-task tests.
+
+- [ ] Stop redefining provider SSE parser logic to simulate stream-read
+      failures. The migrated catch-path tests in
+      `anthropic_stream_termination_test.clj` and
+      `openai_completions_stream_test.clj` inject the HTTP boundary but still
+      `with-redefs` `parse-sse-line`, replacing a logic dependency rather than
+      exercising it real. Model the failure at the nullable infrastructure
+      boundary instead (for example, return a response body/InputStream that
+      throws after the scripted bytes) and keep the real parser in the test;
+      preserve the assertions that open blocks/tools close before `:error`.
+
+- [ ] Add state-based tests proving the new boundary is honored by both
+      non-streaming execute paths. Current `:http-boundary` usage in tests
+      covers streaming only, while the design promises provider
+      stream/execute requests cross the seam. Exercise
+      `anthropic/execute-anthropic` and OpenAI chat-completions `:execute`
+      with nullable HTTP responses, assert their mapped results, and assert
+      the recorded URL/request (including `:as :text`) so a regression back
+      to direct `clj-http` cannot pass through the nullable's standalone
+      contract tests.
