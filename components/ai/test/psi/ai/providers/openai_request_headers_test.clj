@@ -1,8 +1,9 @@
 (ns psi.ai.providers.openai-request-headers-test
   (:require
+   [clj-http.client :as http]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai])
@@ -124,10 +125,12 @@
                            "data: " (json/generate-string
                                      {:choices [{:delta {:role "assistant"}}]}) "\n\n"
                            "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:headers {"X-API-Key" "local-key"}
+         convo model {:http-boundary http-client
+                      :headers {"X-API-Key" "local-key"}
                       :on-provider-request #(reset! request-capture %)}
          (fn [_ev] nil)))
       (is (= "***REDACTED***"
@@ -157,10 +160,12 @@
                            "data: " (json/generate-string
                                      {:choices [{:delta {:role "assistant"}}]}) "\n\n"
                            "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:headers {"authorization" "local-token"}
+         convo model {:http-boundary http-client
+                      :headers {"authorization" "local-token"}
                       :on-provider-request #(reset! request-capture %)}
          (fn [_ev] nil)))
       (is (= "Bearer ***REDACTED***"
@@ -196,10 +201,12 @@
                            "data: " (json/generate-string
                                      {:choices [{:delta {:role "assistant"}}]}) "\n\n"
                            "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-configured"
+         convo model {:http-boundary http-client
+                      :api-key "sk-configured"
                       :headers {"authorization" "local-token"}
                       :on-provider-request #(reset! request-capture %)}
          (fn [_ev] nil)))
@@ -240,10 +247,12 @@
                            "data: " (json/generate-string
                                      {:choices [{:delta {:role "assistant"}}]}) "\n\n"
                            "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:headers {"authorization" (str "Bearer " token)}
+         convo model {:http-boundary http-client
+                      :headers {"authorization" (str "Bearer " token)}
                       :on-provider-request #(reset! request-capture %)}
          (fn [_ev] nil)))
       (is (= (str "Bearer ***REDACTED*** (len=" (count token) ")")

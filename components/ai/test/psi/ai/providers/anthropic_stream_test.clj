@@ -1,8 +1,9 @@
 (ns psi.ai.providers.anthropic-stream-test
   (:require
+   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
@@ -258,9 +259,11 @@
                                          :message "Overloaded"
                                          :http_status 529}})
                       (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "SSE error event must surface as an :error event")
@@ -283,9 +286,11 @@
                                 {:type "error"
                                  :error {:type "invalid_request_error"
                                          :message "bad request"}}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "SSE error event must surface as an :error event")
@@ -316,9 +321,11 @@
                       (sse-line "message_delta"
                                 {:type "message_delta"
                                  :delta {:stop_reason "end_turn"}}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
           "exactly one terminal event — the :error; the trailing message_delta must not emit a second :done")
@@ -397,9 +404,11 @@
                                          :http_status 529}})
                       (sse-line "content_block_stop"
                                 {:type "content_block_stop" :index 0}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :text-start :text-delta :text-end :error] (mapv :type @events))
           "the error branch balances the open text block (:text-end BEFORE the :error); the trailing content_block_stop is a full no-op once done")
@@ -501,9 +510,11 @@
                                  :error {:type "overloaded_error"
                                          :message "Overloaded"
                                          :status 529}}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "SSE error event must surface as an :error event")
@@ -524,9 +535,11 @@
                                  :error {:type "overloaded_error"
                                          :message "Overloaded"
                                          :status "529"}}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "SSE error event must surface as an :error event")

@@ -2,7 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai]
@@ -40,10 +40,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (is (some #(= :start (:type %)) @events))
       (is (some #(and (= :toolcall-start (:type %))
@@ -81,10 +83,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (let [deltas (->> @events
                         (filter #(= :toolcall-delta (:type %)))
@@ -113,10 +117,12 @@
                                                                            :arguments "{\"path\":\"README.md\"}"}}]}
                                         :finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(and (= :toolcall-start (:type %))
@@ -146,10 +152,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "function_call"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(and (= :toolcall-start (:type %))
@@ -625,24 +633,26 @@
                                      :reasoning_content "internal reasoning"}}]
                 :usage {:prompt_tokens 15
                         :completion_tokens 152
-                        :total_tokens 167}}]
-      (with-redefs [http/post (fn [_url _req]
-                                {:status 200
-                                 :body (json/generate-string body)})]
-        (let [result ((:execute openai/provider) convo model {:no-auth-header true})]
-          (is (= "hi" (get-in result [:assistant-message :content 0 :text])))
-          (is (= :stop (get-in result [:assistant-message :stop-reason])))
-          (is (= {:input-tokens 15
-                  :output-tokens 152
-                  :cache-read-tokens 0
-                  :cache-write-tokens 0
-                  :total-tokens 167
-                  :cost {:input 0.0
-                         :output 0.0
-                         :cache-read 0.0
-                         :cache-write 0.0
-                         :total 0.0}}
-                 (get-in result [:assistant-message :usage]))))))))
+                        :total_tokens 167}}
+          response-fn (fn [_]
+                        {:status 200
+                         :body (json/generate-string body)})
+          http-client (http-boundary/nullable [response-fn response-fn])
+          result ((:execute openai/provider) convo model {:http-boundary http-client
+                                                          :no-auth-header true})]
+      (is (= "hi" (get-in result [:assistant-message :content 0 :text])))
+      (is (= :stop (get-in result [:assistant-message :stop-reason])))
+      (is (= {:input-tokens 15
+              :output-tokens 152
+              :cache-read-tokens 0
+              :cache-write-tokens 0
+              :total-tokens 167
+              :cost {:input 0.0
+                     :output 0.0
+                     :cache-read 0.0
+                     :cache-write 0.0
+                     :total 0.0}}
+             (get-in result [:assistant-message :usage]))))))
 
 (deftest completions-reasoning-delta-shapes-map-to-thinking-delta-test
   (testing "chat completions reasoning delta variants are emitted as :thinking-delta"
@@ -667,10 +677,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "stop"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(= :start (:type %)) @events))
@@ -703,10 +715,12 @@
                                   :completion_tokens 128
                                   :total_tokens 170}}) "\n\n"
                "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (let [done-events (filter #(= :done (:type %)) @events)]
         (is (= 1 (count done-events)))
@@ -736,10 +750,12 @@
                                      :type "server_error"
                                      :code "server_error"}}) "\n\n"
                   "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (let [err (first (filter #(= :error (:type %)) @events))]
         (is (some? err) "SSE error chunk must surface as an :error event")
@@ -761,14 +777,16 @@
         convo  (-> (conv/create "sys")
                    (conv/add-user-message "hello"))
         events (atom [])]
-    (with-redefs [http/post (fn [_url _req]
-                              {:status 400
-                               :headers {"x-request-id" "req_oai_400"}
-                               :body (stream-body
-                                      (json/generate-string
-                                       {:error {:message "invalid request payload"}}))})]
+    (let [response-fn (fn [_]
+                        {:status 400
+                         :headers {"x-request-id" "req_oai_400"}
+                         :body (stream-body
+                                (json/generate-string
+                                 {:error {:message "invalid request payload"}}))})
+          http-client (http-boundary/nullable [response-fn response-fn])]
       ((:stream openai/provider)
-       convo model {:api-key "sk-test"}
+       convo model {:http-boundary http-client
+                    :api-key "sk-test"}
        (fn [ev] (swap! events conj ev))))
     (is (= 1 (count @events)))
     (is (= :error (:type (first @events))))

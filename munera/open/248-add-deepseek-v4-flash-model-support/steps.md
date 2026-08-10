@@ -4994,7 +4994,7 @@
 
 ## Follow-ups (test review 62, 2026-08-09)
 
-- [ ] Complete the task-added provider-test migration to the injectable HTTP
+- [x] Complete the task-added provider-test migration to the injectable HTTP
       boundary. Review 61 migrated the Codex ordering proofs and selected
       stream helpers, but many tests added during task 248 still globally
       redefine `clj-http.client/post` (including the Anthropic retry/capture/

@@ -1,8 +1,9 @@
 (ns psi.ai.providers.openai-test
   (:require
+   [clj-http.client :as http]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
@@ -669,10 +670,12 @@
                   "data: " (json/generate-string
                             {:choices [{:delta {:role "assistant" :content "trailing"}}]}) "\n\n"
                   "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :text-delta :error] (mapv :type @events))
           "no :text-delta after the :error — the trailing :choices chunk and [DONE] are full no-ops once done")
@@ -702,10 +705,12 @@
                   "data: " (json/generate-string
                             {:type "response.output_text.delta"
                              :delta "trailing"}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key token}
+         convo model {:http-boundary http-client
+                      :api-key token}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :text-delta :error] (mapv :type @events))
           "no :text-delta after the :error — the trailing response.output_text.delta is a full no-op once done")

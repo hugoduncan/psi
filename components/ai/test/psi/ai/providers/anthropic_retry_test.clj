@@ -8,7 +8,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
@@ -33,16 +33,18 @@
           events (atom [])
           sse    (str (sse-line "message_start" {:type "message_start"})
                       (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body nil}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body nil}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= 2 (count @calls)))
       (is (re-find #"prompt-caching"
@@ -67,18 +69,20 @@
           events (atom [])
           sse    (str (sse-line "message_start" {:type "message_start"})
                       (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body (stream-body
-                                          (json/generate-string
-                                           {:error {:message "Anthropic rejected the request"}}))}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
-        (anthropic/stream-anthropic convo model {:api-key "sk-ant-oat-test-token"
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "Anthropic rejected the request"}}))}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "sk-ant-oat-test-token"
                                                  :thinking-level :medium}
                                     (fn [e] (swap! events conj e))))
       (is (= 2 (count @calls)))
@@ -142,19 +146,21 @@
           events   (atom [])
           sse      (str (sse-line "message_start" {:type "message_start"})
                         (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body (stream-body
-                                          (json/generate-string
-                                           {:error {:message "Anthropic rejected the request"}}))}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "Anthropic rejected the request"}}))}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
         (anthropic/stream-anthropic
-         convo model {:api-key "test-key"
+         convo model {:http-boundary http-client
+                      :api-key "test-key"
                       :thinking-level :high
                       :on-provider-response #(swap! captures conj %)}
          (fn [e] (swap! events conj e))))
@@ -216,19 +222,21 @@
           events   (atom [])
           sse      (str (sse-line "message_start" {:type "message_start"})
                         (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body (stream-body
-                                          (json/generate-string
-                                           {:error {:message "Anthropic rejected the request"}}))}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "Anthropic rejected the request"}}))}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
         (anthropic/stream-anthropic
-         convo model {:no-auth-header true
+         convo model {:http-boundary http-client
+                      :no-auth-header true
                       :headers {"Authorization" "Bearer local-token"}
                       :speed-mode :fast
                       :on-provider-response #(swap! captures conj %)}
@@ -321,20 +329,22 @@
           events   (atom [])
           sse      (str (sse-line "message_start" {:type "message_start"})
                         (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body (stream-body
-                                          (json/generate-string
-                                           {:error {:message "Anthropic rejected the request"}}))}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "Anthropic rejected the request"}}))}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
         (anthropic/stream-anthropic
          convo model
-         {:no-auth-header true
+         {:http-boundary http-client
+          :no-auth-header true
           ;; The full Claude Code CLI marker set as custom headers — the
           ;; exact reproduction of the OAuth signature review-22 flagged.
           :headers {"Authorization" "Bearer local-token"
@@ -395,19 +405,21 @@
           events   (atom [])
           sse      (str (sse-line "message_start" {:type "message_start"})
                         (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url req]
-                                (swap! calls conj req)
-                                (if (= 1 (count @calls))
-                                  {:status 400
-                                   :headers {"request-id" "req_ant_first"}
-                                   :body (stream-body
-                                          (json/generate-string
-                                           {:error {:message "Anthropic rejected the request"}}))}
-                                  {:status 200
-                                   :headers {}
-                                   :body (stream-body sse)}))]
+      (let [response-fn (fn [{:keys [request]}]
+                          (swap! calls conj request)
+                          (if (= 1 (count @calls))
+                            {:status 400
+                             :headers {"request-id" "req_ant_first"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "Anthropic rejected the request"}}))}
+                            {:status 200
+                             :headers {}
+                             :body (stream-body sse)}))
+            http-client (http-boundary/nullable [response-fn response-fn])]
         (anthropic/stream-anthropic
-         convo model {:api-key "test-key"
+         convo model {:http-boundary http-client
+                      :api-key "test-key"
                       :headers {"anthropic-beta" "custom-beta-1"}
                       :on-provider-response #(swap! captures conj %)}
          (fn [e] (swap! events conj e))))

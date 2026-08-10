@@ -1,10 +1,10 @@
 (ns psi.ai.providers.openai-codex-test
   (:require
+   [clj-http.client :as http]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
-   [psi.ai.conversation :as conv]
    [psi.ai.providers.http-boundary :as http-boundary]
+   [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai]
    [psi.ai.providers.openai.transport :as transport])
@@ -232,15 +232,17 @@
           convo  (-> (conv/create "sys")
                      (conv/add-user-message "hello"))
           events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                {:status 429
-                                 :headers {"x-request-id" "req_oai_429"
-                                           "retry-after"  "5"}
-                                 :body (stream-body
-                                        (json/generate-string
-                                         {:error {:message "rate limit exceeded"}}))})]
+      (let [response-fn (fn [_]
+                          {:status 429
+                           :headers {"x-request-id" "req_oai_429"
+                                     "retry-after"  "5"}
+                           :body (stream-body
+                                  (json/generate-string
+                                   {:error {:message "rate limit exceeded"}}))})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key token}
+         convo model {:http-boundary http-client
+                      :api-key token}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
           "a stream that never produced output emits :start then the :error terminal (review 52)")
@@ -275,10 +277,12 @@
                   "data: " (json/generate-string
                             {:type "response.failed"
                              :response {:error {:message "Overloaded"}}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key token}
+         convo model {:http-boundary http-client
+                      :api-key token}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
           "error-first stream emits :start then the :error terminal")
@@ -316,10 +320,12 @@
                     "data: " (json/generate-string
                               {:type "response.output_text.delta"
                                :delta "trailing"}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key token
+         convo model {:http-boundary http-client
+                      :api-key token
                       :on-provider-response #(swap! captures conj %)}
          (fn [_ev] nil)))
       (is (= 2 (count @captures))
@@ -416,10 +422,12 @@
                            "data: " (json/generate-string
                                      {:type "response.completed"
                                       :response {:status "completed"}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:no-auth-header true
+         convo model {:http-boundary http-client
+                      :no-auth-header true
                       :headers {"chatgpt-account-id" "acc_1234567890"
                                 "ChatGPT-Account-Id" "acc_0987654321"}
                       :on-provider-request #(reset! request-capture %)}

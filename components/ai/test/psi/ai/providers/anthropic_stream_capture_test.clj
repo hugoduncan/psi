@@ -4,7 +4,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic])
@@ -24,14 +24,14 @@
           request-capture (atom nil)
           reply-captures  (atom [])
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:api-key "test-key"
-                      :on-provider-request  #(reset! request-capture %)
-                      :on-provider-response #(swap! reply-captures conj %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "test-key"
+                    :on-provider-request  #(reset! request-capture %)
+                    :on-provider-response #(swap! reply-captures conj %)}
+       (fn [_] nil))
 
       (is (= :anthropic (:provider @request-capture)))
       (is (= :anthropic-messages (:api @request-capture)))
@@ -63,18 +63,17 @@
           convo           (-> (conv/create "sys")
                               (conv/add-user-message "hello"))
           request-capture (atom nil)
-          posted-url      (atom nil)
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [url _req]
-                                (reset! posted-url url)
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:api-key "minimax-inline-key"
-                      :on-provider-request #(reset! request-capture %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "minimax-inline-key"
+                    :on-provider-request #(reset! request-capture %)}
+       (fn [_] nil))
 
-      (is (= "https://api.minimax.io/anthropic/v1/messages" @posted-url))
+      (is (= "https://api.minimax.io/anthropic/v1/messages"
+             (:url (first (http-boundary/requests http)))))
       (is (= :minimax (:provider @request-capture)))
       (is (= :anthropic-messages (:api @request-capture)))
       (is (= "MiniMax-M2.7"
@@ -102,18 +101,17 @@
           convo           (-> (conv/create "sys")
                               (conv/add-user-message "hello"))
           request-capture (atom nil)
-          posted-url      (atom nil)
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [url _req]
-                                (reset! posted-url url)
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:api-key "deepseek-inline-key"
-                      :on-provider-request #(reset! request-capture %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "deepseek-inline-key"
+                    :on-provider-request #(reset! request-capture %)}
+       (fn [_] nil))
 
-      (is (= "https://api.deepseek.com/anthropic/v1/messages" @posted-url)
+      (is (= "https://api.deepseek.com/anthropic/v1/messages"
+             (:url (first (http-boundary/requests http))))
           "request URL must be derived from the configured base-url")
       (is (= :deepseek (:provider @request-capture)))
       (is (= :anthropic-messages (:api @request-capture)))
@@ -146,13 +144,13 @@
                               (conv/add-user-message "hello"))
           request-capture (atom nil)
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:headers {"X-API-Key" "local-key"}
-                      :on-provider-request #(reset! request-capture %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :headers {"X-API-Key" "local-key"}
+                    :on-provider-request #(reset! request-capture %)}
+       (fn [_] nil))
 
       (is (= "***REDACTED***"
              (get-in @request-capture [:request :headers "X-API-Key"]))
@@ -184,13 +182,13 @@
                               (conv/add-user-message "hello"))
           request-capture (atom nil)
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:headers {"authorization" "local-token"}
-                      :on-provider-request #(reset! request-capture %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :headers {"authorization" "local-token"}
+                    :on-provider-request #(reset! request-capture %)}
+       (fn [_] nil))
 
       (is (= "Bearer ***REDACTED***"
              (get-in @request-capture [:request :headers "authorization"]))
@@ -224,14 +222,14 @@
                               (conv/add-user-message "hello"))
           request-capture (atom nil)
           sse             (str (sse-line "message_start" {:type "message_start"})
-                               (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic
-         convo model {:api-key "configured-key"
-                      :headers {"X-API-Key" "secret-custom-key"}
-                      :on-provider-request #(reset! request-capture %)}
-         (fn [_] nil)))
+                               (sse-line "message_stop" {:type "message_stop"}))
+          http            (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic
+       convo model {:http-boundary http
+                    :api-key "configured-key"
+                    :headers {"X-API-Key" "secret-custom-key"}
+                    :on-provider-request #(reset! request-capture %)}
+       (fn [_] nil))
 
       (is (= "***REDACTED***"
              (get-in @request-capture [:request :headers "x-api-key"]))
@@ -245,15 +243,16 @@
           convo           (-> (conv/create "sys")
                               (conv/add-user-message "hello"))
           reply-captures  (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                (throw (ex-info "Error"
-                                                {:status 400
-                                                 :headers {"request-id" "req_ant_456"}
-                                                 :body (stream-body
-                                                        (json/generate-string
-                                                         {:error {:message "prompt is too long"}}))})))]
+      (let [http (http-boundary/nullable
+                  [(ex-info "Error"
+                            {:status 400
+                             :headers {"request-id" "req_ant_456"}
+                             :body (stream-body
+                                    (json/generate-string
+                                     {:error {:message "prompt is too long"}}))})])]
         (anthropic/stream-anthropic
-         convo model {:api-key "test-key"
+         convo model {:http-boundary http
+                      :api-key "test-key"
                       :on-provider-response #(swap! reply-captures conj %)}
          (fn [_] nil)))
       (is (= :anthropic (-> @reply-captures last :provider)))

@@ -9,11 +9,10 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.anthropic :as anthropic]
-   [psi.ai.providers.http-boundary :as http-boundary])
+   [psi.ai.providers.anthropic :as anthropic])
   (:import [java.io ByteArrayInputStream]))
 
 (defn- sse-line [event-type data-map]
@@ -55,9 +54,11 @@
                       ;; NOTE: NO message_stop, NO message_delta-with-
                       ;; stop_reason, NO "error" — the stream just EOFs.
                       )]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (let [dones (filterv #(= :done (:type %)) @events)
             done  (first dones)]
@@ -96,9 +97,11 @@
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])]
       (testing "empty body — EOF with no SSE events at all"
-        (with-redefs [http/post (fn [_url _req]
-                                  {:body (stream-body "")})]
-          (anthropic/stream-anthropic convo model {:api-key "test-key"}
+        (let [response-fn (fn [_]
+                            {:body (stream-body "")})
+              http-client (http-boundary/nullable [response-fn response-fn])]
+          (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                   :api-key "test-key"}
                                       (fn [e] (swap! events conj e))))
         (is (= [:start :done] (mapv :type @events))
             "empty body (EOF before message_start) emits :start then the EOF-flush :done")
@@ -106,11 +109,13 @@
             "exactly one terminal :done"))
       (testing "malformed stream starting with message_stop (no message_start)"
         (reset! events [])
-        (let [sse (sse-line "message_stop" {:type "message_stop"})]
-          (with-redefs [http/post (fn [_url _req]
-                                    {:body (stream-body sse)})]
-            (anthropic/stream-anthropic convo model {:api-key "test-key"}
-                                        (fn [e] (swap! events conj e)))))
+        (let [sse (sse-line "message_stop" {:type "message_stop"})
+              response-fn (fn [_]
+                            {:body (stream-body sse)})
+              http-client (http-boundary/nullable [response-fn response-fn])]
+          (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                   :api-key "test-key"}
+                                      (fn [e] (swap! events conj e))))
         (is (= [:start :done] (mapv :type @events))
             "message_stop-without-message_start emits :start then the terminal :done")
         (is (= 1 (count (filterv #(= :done (:type %)) @events)))
@@ -132,9 +137,11 @@
                             :error {:type "overloaded_error"
                                     :message "Overloaded"
                                     :http_status 529}})]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
           "error-without-message_start emits :start then the :error terminal")
@@ -158,9 +165,11 @@
           sse    (sse-line "message_delta"
                            {:type "message_delta"
                             :delta {:stop_reason "end_turn"}})]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :done] (mapv :type @events))
           "message_delta-first emits :start then the terminal :done")
@@ -184,10 +193,12 @@
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                (throw (ex-info "simulated connection reset"
-                                                {:status 503})))]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          (throw (ex-info "simulated connection reset"
+                                          {:status 503})))
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
@@ -225,11 +236,13 @@
                                 {:type "content_block_stop" :index 0})
                       (sse-line "message_stop" {:type "message_stop"}))
           threw  (atom false)]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         (try
           (anthropic/stream-anthropic
-           convo model {:api-key "test-key"}
+           convo model {:http-boundary http-client
+                        :api-key "test-key"}
            (fn [e]
              (swap! events conj e)
              (when (= :done (:type e))
@@ -287,9 +300,11 @@
                       (sse-line "content_block_stop"
                                 {:type "content_block_stop" :index 0})
                       (sse-line "message_stop" {:type "message_stop"}))]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
-        (anthropic/stream-anthropic convo model {:api-key "test-key"}
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        (anthropic/stream-anthropic convo model {:http-boundary http-client
+                                                 :api-key "test-key"}
                                     (fn [e] (swap! events conj e))))
       (is (not-any? #(= :text-start (:type %)) @events)
           "no :text-start — the redacted_thinking start is skipped, not mislabeled as text")

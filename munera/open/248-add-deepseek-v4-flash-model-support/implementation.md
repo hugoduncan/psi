@@ -2605,3 +2605,9 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 - Test review 61 (2026-08-09): added 1 step to be addressed.
 - addressed 1 review step
 - Test review 62 (2026-08-09): added 3 steps to be addressed.
+
+## Follow-ups test review 62 — HTTP-stub migration (2026-08-09)
+
+- addressed 1 review step
+- Migrated task-added Anthropic retry/capture/termination and OpenAI capture/error/termination stream tests from global `clj-http.client/post` redefinitions to `http-boundary/nullable`; retained pre-task tests unchanged. URL/retry behavior now derives assertions from nullable request state, and unused `clj-http.client` requires were removed where no legacy test still needs them.
+- Affected provider namespaces green; clj-kondo clean apart from three pre-existing redundant-let warnings in migrated files.

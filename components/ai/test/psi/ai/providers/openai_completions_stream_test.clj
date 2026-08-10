@@ -10,10 +10,9 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
-   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.providers.openai :as openai]
    [psi.ai.providers.openai.transport :as transport])
   (:import [java.io ByteArrayInputStream]))
@@ -180,11 +179,13 @@
     (let [model  (models/get-model :gpt-5)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
           events (atom [])]
-      (with-redefs [http/post (fn [_url _req]
-                                (throw (ex-info "simulated connection reset"
-                                                {:status 503})))]
+      (let [response-fn (fn [_]
+                          (throw (ex-info "simulated connection reset"
+                                          {:status 503})))
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
