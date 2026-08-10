@@ -5125,3 +5125,14 @@
       preserves lookup order (including repeated names). This keeps the new
       infrastructure seam locally comprehensible and prevents provider tests
       from carrying sole responsibility for its reusable state-based contract.
+
+## Follow-ups (test review 71, 2026-08-09)
+
+- [ ] Simplify `nullable-function-lookup-records-ordered-reads-test` by removing
+      its test-owned `looked-up` atom and duplicate read-log assertion. The
+      variable-derived return assertions already prove the function receives
+      each requested name, and `environment-boundary/reads` already proves
+      ordered repeated reads through the public boundary contract. Keeping both
+      logs adds incidental setup and redundant failure signals without covering
+      another behavior; use a pure function fixture and retain the returned-value
+      plus public recorded-state assertions.
