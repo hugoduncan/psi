@@ -4916,7 +4916,7 @@
 
 ## Follow-ups (implementation review 58, 2026-08-09)
 
-- [ ] Make Codex terminal tool-call balancing deterministic for multiple open
+- [x] Make Codex terminal tool-call balancing deterministic for multiple open
       calls. `emit-codex-done!` and the review-56 `emit-codex-error!` iterate
       `@open-tool-indexes` directly, but that value is a set and its traversal
       order is not a sequencing contract. Consequently the emitted
@@ -4930,3 +4930,9 @@
       stream tests with at least two simultaneously open tool calls whose
       insertion order differs from content-index order, asserting ordered
       `:toolcall-end` events before the terminal.
+      → Resolved: added shared `balance-open-codex-tools!`; both done/error
+      terminals now sort open content indices before emitting
+      `:toolcall-end`. Done + `response.failed` tests open indices 2 then 100
+      (whose persistent-set traversal is 100 then 2) and assert ends 2, 100
+      before the terminal. Namespace green (16 tests / 54 assertions);
+      clj-kondo clean.

@@ -430,6 +430,87 @@
       (is (nil? (get-in @request-capture [:request :headers "Authorization"]))
           "keyless request sends no Authorization header"))))
 
+(deftest codex-done-balances-multiple-open-tool-calls-in-index-order-test
+  ;; Terminal balancing must be independent of insertion and set traversal order.
+  (testing "response.completed closes multiple open tools in content-index order"
+    (let [model  (models/get-model :gpt-5.3-codex)
+          token  (jwt-with-account-id "acc_test")
+          convo  (-> (conv/create "sys") (conv/add-user-message "run tools"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:type "response.output_item.added"
+                             :output_index 2
+                             :item {:type "function_call"
+                                    :id "fc_2"
+                                    :call_id "call_2"
+                                    :name "second"
+                                    :arguments ""}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.output_item.added"
+                             :output_index 100
+                             :item {:type "function_call"
+                                    :id "fc_100"
+                                    :call_id "call_100"
+                                    :name "hundredth"
+                                    :arguments ""}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.completed"
+                             :response {:status "completed"}}) "\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [[:start nil]
+              [:toolcall-start 2]
+              [:toolcall-start 100]
+              [:toolcall-end 2]
+              [:toolcall-end 100]
+              [:done nil]]
+             (mapv (juxt :type :content-index) @events))))))
+
+(deftest codex-error-balances-multiple-open-tool-calls-in-index-order-test
+  ;; The shared error terminal must preserve the same deterministic order as done.
+  (testing "response.failed closes multiple open tools in content-index order"
+    (let [model  (models/get-model :gpt-5.3-codex)
+          token  (jwt-with-account-id "acc_test")
+          convo  (-> (conv/create "sys") (conv/add-user-message "run tools"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:type "response.output_item.added"
+                             :output_index 2
+                             :item {:type "function_call"
+                                    :id "fc_2"
+                                    :call_id "call_2"
+                                    :name "second"
+                                    :arguments ""}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.output_item.added"
+                             :output_index 100
+                             :item {:type "function_call"
+                                    :id "fc_100"
+                                    :call_id "call_100"
+                                    :name "hundredth"
+                                    :arguments ""}}) "\n\n"
+                  "data: " (json/generate-string
+                            {:type "response.failed"
+                             :response {:error {:message "Overloaded"}
+                                        :status "failed"}}) "\n\n")]
+      (with-redefs [http/post (fn [_url _req]
+                                {:body (stream-body sse)})]
+        ((:stream openai/provider)
+         convo model {:api-key token}
+         (fn [ev] (swap! events conj ev))))
+      (is (= [[:start nil]
+              [:toolcall-start 2]
+              [:toolcall-start 100]
+              [:toolcall-end 2]
+              [:toolcall-end 100]
+              [:error nil]]
+             (mapv (juxt :type :content-index) @events))))))
+
 (deftest codex-error-after-tool-start-balances-open-tool-call-test
   (testing "a response.failed after a function_call output item closes the open tool call before :error"
     ;; Review 56: review-55's open-tool balancing covered only the :done
