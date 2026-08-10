@@ -5093,3 +5093,13 @@
       in the input map. Assert membership in the set of complete expected
       entries (while retaining the no-match assertion) so failures identify a
       broken entry association.
+
+## Follow-ups (test review 68, 2026-08-09)
+
+- [ ] Make `find-header-first-match-test` prove the documented first-match
+      contract rather than accepting either matching entry. Supply an
+      explicitly ordered header collection with two differently-cased matches
+      and assert the exact first `[key value]` pair (plus the existing no-match
+      case); the current set-membership assertion proves association but would
+      pass if `find-header` returned the second match instead of `(first
+      (find-headers ...))`.
