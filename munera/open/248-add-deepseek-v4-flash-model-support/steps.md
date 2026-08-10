@@ -5254,7 +5254,7 @@
 
 ## Follow-ups (test review 81, 2026-08-09)
 
-- [ ] Migrate the task-added `thinking-block-stop-emits-thinking-end-test` and
+- [x] Migrate the task-added `thinking-block-stop-emits-thinking-end-test` and
       `stream-anthropic-message-stop-done-carries-usage-test` away from
       `anthropic_stream_test.clj`'s legacy `run-stream` helper, which globally
       redefines `clj-http.client/post`. Drive their SSE through

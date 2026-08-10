@@ -229,37 +229,42 @@
     ;; accumulator's dedicated :on-thinking-end handler
     ;; (note-last-provider-event! :thinking-end + end-content-block!) dead
     ;; code for the anthropic path.
-    (let [model (models/get-model :sonnet-4.6)
-          sse   (str (sse-line "message_start" {:type "message_start"})
-                     (sse-line "content_block_start"
-                               {:type "content_block_start" :index 0
-                                :content_block {:type "thinking" :thinking "" :signature ""}})
-                     (sse-line "content_block_delta"
-                               {:type "content_block_delta" :index 0
-                                :delta {:type "thinking_delta" :thinking "I think"}})
-                     (sse-line "content_block_stop"
-                               {:type "content_block_stop" :index 0})
-                     (sse-line "content_block_start"
-                               {:type "content_block_start" :index 1
-                                :content_block {:type "text"}})
-                     (sse-line "content_block_delta"
-                               {:type "content_block_delta" :index 1
-                                :delta {:type "text_delta" :text "Hello"}})
-                     (sse-line "content_block_stop"
-                               {:type "content_block_stop" :index 1})
-                     (sse-line "message_stop" {:type "message_stop"}))
-          events (run-stream sse model {:api-key "test-key"})]
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start" {:type "message_start"})
+                      (sse-line "content_block_start"
+                                {:type "content_block_start" :index 0
+                                 :content_block {:type "thinking" :thinking "" :signature ""}})
+                      (sse-line "content_block_delta"
+                                {:type "content_block_delta" :index 0
+                                 :delta {:type "thinking_delta" :thinking "I think"}})
+                      (sse-line "content_block_stop"
+                                {:type "content_block_stop" :index 0})
+                      (sse-line "content_block_start"
+                                {:type "content_block_start" :index 1
+                                 :content_block {:type "text"}})
+                      (sse-line "content_block_delta"
+                                {:type "content_block_delta" :index 1
+                                 :delta {:type "text_delta" :text "Hello"}})
+                      (sse-line "content_block_stop"
+                                {:type "content_block_stop" :index 1})
+                      (sse-line "message_stop" {:type "message_stop"}))
+          http   (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key"
+                                               :http-boundary http}
+                                  (fn [event] (swap! events conj event)))
       (is (some #(and (= :thinking-end (:type %))
                       (= 0 (:content-index %)))
-                events)
+                @events)
           "thinking block stop must emit :thinking-end")
       (is (not-any? #(and (= :text-end (:type %))
                           (= 0 (:content-index %)))
-                    events)
+                    @events)
           "thinking block stop must not be mislabeled :text-end")
       (is (some #(and (= :text-end (:type %))
                       (= 1 (:content-index %)))
-                events)
+                @events)
           "text block stop must still emit :text-end"))))
 
 (deftest stream-anthropic-surfaces-sse-error-event-test
@@ -458,34 +463,39 @@
     ;; Reachable on any Anthropic-compatible endpoint that omits
     ;; message_delta — including the newly shipped DeepSeek provider whose
     ;; streaming path is unverified.
-    (let [model (models/get-model :sonnet-4.6)
-          sse   (str (sse-line "message_start"
-                               {:type    "message_start"
-                                :message {:usage {:input_tokens                  100
-                                                  :cache_read_input_tokens        20
-                                                  :cache_creation_input_tokens    10}}})
-                     (sse-line "content_block_start"
-                               {:type "content_block_start" :index 0
-                                :content_block {:type "text"}})
-                     (sse-line "content_block_delta"
-                               {:type "content_block_delta" :index 0
-                                :delta {:type "text_delta" :text "Hi"}})
-                     (sse-line "content_block_stop"
-                               {:type "content_block_stop" :index 0})
-                     (sse-line "message_stop" {:type "message_stop"}))
-          events (run-stream sse model {:api-key "test-key"})
-          done   (first (filter #(= :done (:type %)) events))
-          usage  (:usage done)]
-      (is (= [:start :text-start :text-delta :text-end :done]
-             (mapv :type events))
-          "message_stop terminates the complete stream with exactly one :done")
-      (is (map? usage) ":done must carry the accumulated usage map (usage-with-cost)")
-      (is (= 100 (:input-tokens usage))  "input-tokens accumulated from message_start")
-      (is (= 20  (:cache-read-tokens usage))  "cache-read-tokens from message_start")
-      (is (= 10  (:cache-write-tokens usage)) "cache-write-tokens from message_start")
-      (is (= 0   (:output-tokens usage)) "output-tokens stays 0 — no message_delta in this flow")
-      (is (= 130 (:total-tokens usage)) "total = input + cache-read + cache-write")
-      (is (map? (:cost usage)) "cost map present"))))
+    (let [model  (models/get-model :sonnet-4.6)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
+          events (atom [])
+          sse    (str (sse-line "message_start"
+                                {:type    "message_start"
+                                 :message {:usage {:input_tokens                  100
+                                                   :cache_read_input_tokens        20
+                                                   :cache_creation_input_tokens    10}}})
+                      (sse-line "content_block_start"
+                                {:type "content_block_start" :index 0
+                                 :content_block {:type "text"}})
+                      (sse-line "content_block_delta"
+                                {:type "content_block_delta" :index 0
+                                 :delta {:type "text_delta" :text "Hi"}})
+                      (sse-line "content_block_stop"
+                                {:type "content_block_stop" :index 0})
+                      (sse-line "message_stop" {:type "message_stop"}))
+          http   (http-boundary/nullable [{:body (stream-body sse)}])]
+      (anthropic/stream-anthropic convo model {:api-key "test-key"
+                                               :http-boundary http}
+                                  (fn [event] (swap! events conj event)))
+      (let [done  (first (filter #(= :done (:type %)) @events))
+            usage (:usage done)]
+        (is (= [:start :text-start :text-delta :text-end :done]
+               (mapv :type @events))
+            "message_stop terminates the complete stream with exactly one :done")
+        (is (map? usage) ":done must carry the accumulated usage map (usage-with-cost)")
+        (is (= 100 (:input-tokens usage))  "input-tokens accumulated from message_start")
+        (is (= 20  (:cache-read-tokens usage))  "cache-read-tokens from message_start")
+        (is (= 10  (:cache-write-tokens usage)) "cache-write-tokens from message_start")
+        (is (= 0   (:output-tokens usage)) "output-tokens stays 0 — no message_delta in this flow")
+        (is (= 130 (:total-tokens usage)) "total = input + cache-read + cache-write")
+        (is (map? (:cost usage)) "cost map present")))))
 
 (deftest stream-anthropic-sse-error-status-key-test
   (testing "a mid-stream SSE error carrying :status (not :http_status) surfaces a numeric http-status"
