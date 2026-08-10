@@ -5355,3 +5355,15 @@
       otherwise update psi's own process environment) and retry. Update the
       exact-message test so the user-facing recovery advice cannot drift back
       to the misleading instruction.
+
+## Follow-ups (documentation review 3, 2026-08-09)
+
+- [ ] Remove the stale DeepSeek example from the `CHANGELOG.md` entry for the
+      Anthropic `message_stop`-without-`message_delta` usage fix. The later live
+      streaming verification established that DeepSeek's normal stream includes
+      `message_delta` with usage before `message_stop`, so saying that this bug
+      affected “including DeepSeek's streaming path” contradicts the verified
+      event sequence in `doc/custom-providers.md` and the completed review-55
+      step. Keep the fix described as defensive support for any
+      Anthropic-compatible endpoint that omits `message_delta`, without naming
+      DeepSeek as an observed/reachable example.
