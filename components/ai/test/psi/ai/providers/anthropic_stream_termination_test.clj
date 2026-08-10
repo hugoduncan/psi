@@ -569,12 +569,12 @@
                                {:type "error"
                                 :error {:type "overloaded_error"
                                         :message "Overloaded"
-                                        :http_status 529}}))]
+                                        :http_status 529}}))
+          events (run-stream sse model {:api-key "test-key"})]
       (is (= [:start :thinking-start :thinking-delta :thinking-end :error]
-             (mapv :type (run-stream sse model {:api-key "test-key"})))
+             (mapv :type events))
           "the open thinking block is balanced with :thinking-end before the :error")
-      (is (= 1 (count (filterv #(= :error (:type %))
-                               (run-stream sse model {:api-key "test-key"}))))
+      (is (= 1 (count (filterv #(= :error (:type %)) events)))
           "exactly one :error terminal"))))
 
 (deftest stream-anthropic-error-after-tool-start-balances-open-block-test

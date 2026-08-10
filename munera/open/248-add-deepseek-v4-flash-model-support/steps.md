@@ -5139,7 +5139,7 @@
 
 ## Follow-ups (test review 72, 2026-08-09)
 
-- [ ] Make `stream-anthropic-error-after-thinking-start-balances-open-block-test`
+- [x] Make `stream-anthropic-error-after-thinking-start-balances-open-block-test`
       execute its scripted stream once and derive both assertions from the
       captured event vector. It currently calls `run-stream` separately for
       the sequence assertion and the exactly-one-`:error` assertion, duplicating
