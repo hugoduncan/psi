@@ -5026,3 +5026,16 @@
       the recorded URL/request (including `:as :text`) so a regression back
       to direct `clj-http` cannot pass through the nullable's standalone
       contract tests.
+
+## Follow-ups (test review 63, 2026-08-09)
+
+- [ ] Migrate the task-added review-57 non-streaming Anthropic behavior proofs
+      (`execute-anthropic-preserves-tool-use-blocks-test` and
+      `execute-anthropic-preserves-thinking-blocks-test`) from global
+      `clj-http.client/post` redefinitions to `http-boundary/nullable`.
+      Test review 62's migration is marked complete, but these two execute
+      tests still stub infrastructure; the separate generic execute-boundary
+      proof does not make these behavior proofs satisfy `injectable ∧
+      nullable ∧ ¬mock ∧ ¬stub`. Assert the mapped content through the
+      nullable and remove the `clj-http.client` test require if no pre-task
+      test in `anthropic_test.clj` still needs it.

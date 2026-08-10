@@ -2621,3 +2621,4 @@ Review 47 (2026-08-09): added 2 steps to be addressed.
 
 - addressed 1 review step
 - Added state-based nullable-boundary tests for `execute-anthropic` and OpenAI chat-completions `:execute`; each asserts the mapped assistant result plus recorded endpoint URL and `:as :text` request state. Targeted namespaces green; clj-kondo clean.
+- Test review 63 (2026-08-09): added 1 step to be addressed.
