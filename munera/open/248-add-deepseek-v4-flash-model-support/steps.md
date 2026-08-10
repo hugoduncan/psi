@@ -5345,3 +5345,13 @@
       only `doc/custom-providers.md` and the changelog expose it, so the primary
       user overview and AI-facing current-capabilities index omit the task's
       headline behavior.
+
+## Follow-ups (documentation review 2, 2026-08-09)
+
+- [ ] Align the unset-`env:` runtime error with the corrected API-key lifecycle
+      documentation. `request-support/resolve-api-key` still says “export it
+      and retry,” but exporting in another shell cannot change psi's running
+      process environment; tell users to relaunch psi with the variable set (or
+      otherwise update psi's own process environment) and retry. Update the
+      exact-message test so the user-facing recovery advice cannot drift back
+      to the misleading instruction.
