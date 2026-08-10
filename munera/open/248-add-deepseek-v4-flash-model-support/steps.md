@@ -5460,3 +5460,17 @@
       function responsible for transport flow and the extracted processor
       responsible for one parsed event, preserving the exact event-sequence,
       usage, balancing, capture, and post-terminal no-op tests.
+
+## Follow-ups (code-shaper review 5, 2026-08-09)
+
+- [ ] Rewrite task-added test comments and namespace descriptions around the
+      behavior each test proves instead of implementation-review chronology.
+      The changed test files still contain 184 `Review N`/`pre-review-N`
+      references across 22 files, including long historical narratives that
+      increase the local working set and stale claims that DeepSeek streaming
+      is unverified in `anthropic_stream_test.clj` and
+      `anthropic_stream_termination_test.clj`, despite this task's completed
+      live streaming verification. Preserve durable fixture rationale,
+      discriminating pre-fix behavior, and invariant explanations; remove
+      review-number provenance and superseded claims, leaving history in git
+      and the task artifacts.
