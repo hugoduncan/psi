@@ -5251,3 +5251,15 @@
       `openai_test.clj`, plus trailing whitespace in `implementation.md`.
       Remove those whitespace errors and rerun `git diff --check` so the
       task-modified tests and artifacts are well formed.
+
+## Follow-ups (test review 81, 2026-08-09)
+
+- [ ] Migrate the task-added `thinking-block-stop-emits-thinking-end-test` and
+      `stream-anthropic-message-stop-done-carries-usage-test` away from
+      `anthropic_stream_test.clj`'s legacy `run-stream` helper, which globally
+      redefines `clj-http.client/post`. Drive their SSE through
+      `http-boundary/nullable` and the real parser, preserving the typed-end
+      and exact event-sequence/usage assertions. These two review-43/47 proofs
+      were missed by test reviews 62–64 and still violate the task-test-review
+      requirement that infrastructure dependencies be injectable, nullable,
+      and neither mocked nor stubbed.
