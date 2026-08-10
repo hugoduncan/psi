@@ -183,19 +183,18 @@
     ;; chunk path.
     (let [model  (models/get-model :gpt-5)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
-          events (atom [])]
-      (let [response-fn (fn [_]
-                          (throw (ex-info "simulated connection reset"
-                                          {:status 503})))
-            http-client (http-boundary/nullable [response-fn response-fn])]
-        ((:stream openai/provider)
-         convo model {:http-boundary http-client
-                      :api-key "sk-test"}
-         (fn [ev] (swap! events conj ev))))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [{:body (throwing-stream-after "")}])]
+      ((:stream openai/provider)
+       convo model {:http-boundary http
+                    :api-key "sk-test"}
+       (fn [ev] (swap! events conj ev)))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
-      (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
-          "the exception surfaces as an :error with a message"))))
+      (is (= "simulated stream read failure (status 503)"
+             (:error-message (second @events)))
+          "the first response-body read failure surfaces on the :error event"))))
 
 (deftest completions-eof-balances-open-tool-call-test
   (testing "a tool_calls delta chunk followed by EOF closes the open tool call before :done"

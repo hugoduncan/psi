@@ -201,18 +201,17 @@
     ;; branch.
     (let [model  (models/get-model :sonnet-4.6)
           convo  (-> (conv/create "sys") (conv/add-user-message "hi"))
-          events (atom [])]
-      (let [response-fn (fn [_]
-                          (throw (ex-info "simulated connection reset"
-                                          {:status 503})))
-            http-client (http-boundary/nullable [response-fn response-fn])]
-        (anthropic/stream-anthropic convo model {:http-boundary http-client
-                                                 :api-key "test-key"}
-                                    (fn [e] (swap! events conj e))))
+          events (atom [])
+          http   (http-boundary/nullable
+                  [{:body (throwing-stream-after "")}])]
+      (anthropic/stream-anthropic convo model {:http-boundary http
+                                               :api-key "test-key"}
+                                  (fn [e] (swap! events conj e)))
       (is (= [:start :error] (mapv :type @events))
           "a first-read exception emits :start then the :error terminal")
-      (is (some? (:error-message (first (filterv #(= :error (:type %)) @events))))
-          "the exception surfaces as an :error with a message"))))
+      (is (= "simulated stream read failure (status 503)"
+             (:error-message (second @events)))
+          "the first response-body read failure surfaces on the :error event"))))
 
 (deftest stream-anthropic-message-stop-done-consumer-exception-no-second-error-test
   (testing "a consume-fn exception on the message_stop :done does not emit a second :error terminal"

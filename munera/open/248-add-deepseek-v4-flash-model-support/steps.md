@@ -5309,7 +5309,7 @@
 
 ## Follow-ups (test review 86, 2026-08-09)
 
-- [ ] Make the two review-53 first-read exception proofs exercise an actual
+- [x] Make the two review-53 first-read exception proofs exercise an actual
       response-body read failure. `stream-anthropic-first-read-exception-emits-start-then-error-test`
       and `completions-first-read-exception-emits-start-then-error-test` currently
       script a nullable HTTP response function that throws from `post!`, before
