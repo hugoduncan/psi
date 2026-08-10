@@ -5263,3 +5263,15 @@
       were missed by test reviews 62–64 and still violate the task-test-review
       requirement that infrastructure dependencies be injectable, nullable,
       and neither mocked nor stubbed.
+
+## Follow-ups (test review 82, 2026-08-09)
+
+- [ ] Migrate the task-modified
+      `stream-anthropic-error-includes-status-and-request-id-test` from its
+      global `clj-http.client/post` redefinition to `http-boundary/nullable`.
+      Review 53 changed this pre-existing test into the first-read HTTP failure
+      proof for the new `:start`-before-`:error` behavior, so it is now part of
+      the task's behavioral test net but still stubs infrastructure. Script the
+      same exception through the nullable boundary and retain the exact
+      `[:start :error]` sequence plus message, status, request-id, body, and
+      body-text assertions.
