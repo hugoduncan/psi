@@ -5275,3 +5275,16 @@
       same exception through the nullable boundary and retain the exact
       `[:start :error]` sequence plus message, status, request-id, body, and
       body-text assertions.
+
+## Follow-ups (test review 83, 2026-08-09)
+
+- [ ] Finish the exact-event-vector cleanup in the three task-added post-error
+      tests still omitted by reviews 73–78 in `openai_test.clj`.
+      `completions-sse-error-then-read-exception-no-second-error-test` should
+      assert its complete `[:start :error]` sequence instead of separate error
+      count and done-absence checks. Remove the redundant done-absence checks
+      from `completions-sse-error-then-trailing-choices-chunk-no-text-delta-test`
+      and `codex-error-then-trailing-output-text-delta-no-text-delta-test`, whose
+      exact `[:start :text-delta :error]` vectors already prove no terminal or
+      content event occurs after `:error`. This preserves discriminating
+      ordering/cardinality coverage while avoiding duplicate failure signals.
