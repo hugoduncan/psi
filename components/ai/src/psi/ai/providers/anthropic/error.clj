@@ -59,12 +59,18 @@
     "Anthropic request failed"))
 
 (defn oauth-auth-request?
+  "True only for the complete Claude Code OAuth request shape.
+
+   A bare Authorization bearer header can be custom-provider auth; it must
+   retain compatibility fallback handling and must not be diagnosed as OAuth."
   [request]
   (let [headers (or (:headers request) {})
         auth    (or (get headers "Authorization")
                     (get headers "authorization"))]
     (and (string? auth)
-         (str/starts-with? auth "Bearer "))))
+         (str/starts-with? auth "Bearer ")
+         (= "cli" (get headers "x-app"))
+         (str/starts-with? (or (get headers "user-agent") "") "claude-cli/"))))
 
 (defn- request-diagnostic-hint
   [request]

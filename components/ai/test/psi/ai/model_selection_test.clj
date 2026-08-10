@@ -1,5 +1,6 @@
 (ns psi.ai.model-selection-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as registry]
    [psi.ai.model-selection :as sut]))
@@ -106,6 +107,103 @@
           (is (false? (get-in candidate [:reference :configured?])))))
       (finally
         (java.io.File/.delete (java.io.File. path))))))
+
+(deftest catalog-view-env-api-key-resolvability-test
+  (let [env-provider-config
+        {:version   1
+         :providers {"deepseek"
+                     {:base-url "https://api.deepseek.com/anthropic"
+                      :api      :anthropic-messages
+                      :auth     {:api-key "env:PSI_UNSET_TEST_VAR_XYZ"}
+                      :models   [{:id "deepseek-v4-flash"}]}}}
+        keyless-provider-config
+        {:version   1
+         :providers {"local-proxy"
+                     {:base-url "http://localhost:8080/v1"
+                      :api      :anthropic-messages
+                      :auth     {:auth-header? false}
+                      :models   [{:id "proxy-model"}]}}}
+        incidental-headers-provider-config
+        {:version   1
+         :providers {"x-client-only"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:headers {"X-Client" "psi"}}
+                      :models   [{:id "incidental-model"}]}}}
+        auth-header-provider-config
+        {:version   1
+         :providers {"auth-header-only"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:headers {"x-api-key" "static-key"}}
+                      :models   [{:id "header-model"}]}}}
+        blank-var-provider-config
+        {:version   1
+         :providers {"blank-var"
+                     {:base-url "https://example.com/v1"
+                      :api      :anthropic-messages
+                      :auth     {:api-key "env:"}
+                      :models   [{:id "blank-var-model"}]}}}
+        path (write-temp-models! env-provider-config)
+        keyless-path (write-temp-models! keyless-provider-config)
+        incidental-path (write-temp-models! incidental-headers-provider-config)
+        auth-header-path (write-temp-models! auth-header-provider-config)
+        blank-var-path (write-temp-models! blank-var-provider-config)]
+    (try
+      (testing "unset env: var reports not configured (request-time resolvability)"
+        (registry/init! {:user-models-path path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :deepseek "deepseek-v4-flash")
+                            [:reference :configured?]))))
+
+      (testing "set env: var reports configured (request-time resolvability)"
+        (let [environment (environment-boundary/nullable
+                           {"PSI_UNSET_TEST_VAR_XYZ" "sk-deepseek-sentinel"})]
+          (registry/init! {:user-models-path path})
+          (is (true? (get-in (sut/find-candidate
+                              (sut/catalog-view {:environment-boundary environment})
+                              :deepseek "deepseek-v4-flash")
+                             [:reference :configured?])))
+          (is (= ["PSI_UNSET_TEST_VAR_XYZ"]
+                 (environment-boundary/reads environment)))))
+
+      (testing "keyless config still counts as configured without a key"
+        (registry/init! {:user-models-path keyless-path})
+        (is (true? (get-in (sut/find-candidate (sut/catalog-view) :local-proxy "proxy-model")
+                           [:reference :configured?]))))
+
+      (testing "incidental custom headers do NOT count as configured"
+        ;; A provider with only incidental headers (no :api-key, :auth-header?
+        ;; default true) fast-fails every request with "Missing API key"
+        ;; (request-support/no-auth? treats incidental headers as NOT keyless,
+        ;; matching request-support/no-auth?) — the picker must not advertise it as configured.
+        (registry/init! {:user-models-path incidental-path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :x-client-only "incidental-model")
+                            [:reference :configured?]))))
+
+      (testing "recognized auth header among custom :headers counts as configured (keyless)"
+        ;; Mirrors request-support/no-auth?: a recognized auth header
+        ;; (x-api-key/authorization) with no configured key is keyless, so the
+        ;; request succeeds — the picker reports configured.
+        (registry/init! {:user-models-path auth-header-path})
+        (is (true? (get-in (sut/find-candidate (sut/catalog-view) :auth-header-only "header-model")
+                           [:reference :configured?]))))
+
+      (testing "blank env: var name reports not configured (config error)"
+        ;; An "env:" spec with a blank variable name is never an environment
+        ;; lookup — resolve-key-spec returns nil for it (a set env cannot
+        ;; rescue the invalid spec), so it reads as not configured, matching
+        ;; the per-request config error "api-key spec \"env:\" names an empty
+        ;; environment variable (use \"env:VAR_NAME\")" (request_support_test
+        ;; locks the message).
+        (registry/init! {:user-models-path blank-var-path})
+        (is (false? (get-in (sut/find-candidate (sut/catalog-view) :blank-var "blank-var-model")
+                            [:reference :configured?]))))
+      (finally
+        (java.io.File/.delete (java.io.File. path))
+        (java.io.File/.delete (java.io.File. keyless-path))
+        (java.io.File/.delete (java.io.File. incidental-path))
+        (java.io.File/.delete (java.io.File. auth-header-path))
+        (java.io.File/.delete (java.io.File. blank-var-path))))))
 
 (deftest role-defaults-test
   (testing "known roles expose default bundles"

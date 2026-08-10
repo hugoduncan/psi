@@ -154,16 +154,65 @@
    (or (ss/get-state-value-in ctx [:agent-session :sessions session-id :persistence :journal])
        [])))
 
+(defn session-model-custom?
+  "True when the session's current model is a custom models.edn provider.
+
+   Persisted session models omit built-in/custom origin, so origin is resolved
+   from the model registry's `:custom?` tag. This distinguishes custom
+   providers named \"anthropic\" or \"openai\" from same-named built-ins.
+   Unknown models resolve as built-in (false)."
+  [session-data]
+  (boolean
+   (:custom?
+    (model-registry/find-model
+     (provider-auth/normalize-provider-id (get-in session-data [:model :provider]))
+     (get-in session-data [:model :id])))))
+
+(defn- session-runtime-api-key
+  "Return the stored runtime API key only when its recorded provider and
+   built-in/custom origin match the session's current model.
+
+   Prompt preparation records the key with `:runtime-api-key-provider` and
+   `:runtime-api-key-custom?`. Matching both prevents provider switches and
+   same-named built-in/custom providers from reusing one another's keys.
+   Unscoped legacy keys are not reused because their provenance is unknown."
+  [session-data]
+  (let [runtime-provider (some-> (:runtime-api-key-provider session-data)
+                                 provider-auth/normalize-provider-id)
+        runtime-custom?  (boolean (:runtime-api-key-custom? session-data))
+        session-provider (provider-auth/normalize-provider-id
+                          (get-in session-data [:model :provider]))
+        session-custom?  (session-model-custom? session-data)]
+    (when (and (:runtime-api-key session-data)
+               (= session-provider runtime-provider)
+               (= session-custom? runtime-custom?))
+      (:runtime-api-key session-data))))
+
 (defn- resolve-api-key
   "Resolve API key in priority order:
-   1. Explicit runtime-opts :api-key
-   2. Session-stored key from prior turn
-   3. Shared provider-scoped auth resolution"
+   1. Explicit `runtime-opts :api-key`.
+   2. A session-stored key scoped to the current provider and built-in/custom
+      origin, provided current provider auth does not contradict it. Current
+      models.edn auth or refreshed OAuth wins over stale session data; nil
+      current auth permits a key supplied only through runtime/session data,
+      while equal current auth preserves OAuth stability.
+   3. Current provider-scoped auth.
+
+   Custom-provider registry auth remains a raw literal or `env:VAR` spec.
+   The transport resolves it per request through
+   `request-support/resolve-key-spec`; callers needing a concrete key must use
+   that shared helper."
   [ctx session-data runtime-opts]
-  (let [provider (:provider (:model session-data))]
+  (let [provider (:provider (:model session-data))
+        custom?  (session-model-custom? session-data)
+        current  (provider-auth/provider-api-key ctx provider custom?)]
     (or (:api-key runtime-opts)
-        (:runtime-api-key session-data)
-        (provider-auth/provider-api-key ctx provider))))
+        (when-let [stored (session-runtime-api-key session-data)]
+          ;; Current auth overrides stale stored data. Nil current auth permits
+          ;; continuation with a key supplied only through runtime/session data.
+          (when (or (nil? current) (= stored current))
+            stored))
+        current)))
 
 (defn- resolve-llm-stream-idle-timeout-ms
   [ctx runtime-opts]
@@ -180,8 +229,10 @@
   [ctx session-data runtime-opts]
   (let [api-key          (resolve-api-key ctx session-data runtime-opts)
         idle-timeout-ms  (resolve-llm-stream-idle-timeout-ms ctx runtime-opts)
-        provider-options (some-> (:provider (:model session-data))
-                                 provider-auth/provider-request-options)]
+        provider-options (when-let [provider (:provider (:model session-data))]
+                           (provider-auth/provider-request-options
+                            provider
+                            (session-model-custom? session-data)))]
     (cond-> {}
       (contains? session-data :thinking-level)
       (assoc :thinking-level (:thinking-level session-data))

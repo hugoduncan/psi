@@ -11,7 +11,6 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]
    [malli.core :as m]
    [psi.ai.schemas :as schemas]
    [psi.ai.structured-output :as structured-output]
@@ -42,8 +41,10 @@
    [:id string?]
    [:name {:optional true} [:maybe string?]]
    [:supports-reasoning {:optional true} [:maybe boolean?]]
+   [:adaptive-thinking {:optional true} [:maybe boolean?]]
    [:supports-images {:optional true} [:maybe boolean?]]
    [:supports-text {:optional true} [:maybe boolean?]]
+   [:supports-mid-conversation-system-messages {:optional true} [:maybe boolean?]]
    [:context-window {:optional true} [:maybe pos-int?]]
    [:max-tokens {:optional true} [:maybe pos-int?]]
    [:parallel-tool-calls {:optional true} [:maybe boolean?]]
@@ -69,26 +70,6 @@
    [:version {:optional true} [:maybe pos-int?]]
    [:providers [:map-of string? ProviderDef]]])
 
-;; ── API key resolution ───────────────────────────────────────────────────────
-
-(defn resolve-api-key-spec
-  "Resolve an api-key spec string to a concrete value.
-
-   - nil / blank → nil
-   - \"env:VAR\" → (System/getenv \"VAR\"), nil if unset
-   - anything else → literal string"
-  [raw]
-  (cond
-    (or (nil? raw) (str/blank? raw))
-    nil
-
-    (str/starts-with? raw "env:")
-    (let [var-name (subs raw 4)]
-      (System/getenv var-name))
-
-    :else
-    raw))
-
 ;; ── Model expansion ─────────────────────────────────────────────────────────
 
 (def ^:private model-defaults
@@ -106,7 +87,13 @@
    :cost-tier          :zero})
 
 (defn- expand-model
-  "Expand a model definition into a fully-formed model map."
+  "Expand a model definition into a fully-formed model map.
+
+   Every custom models.edn model is tagged `:custom? true`. Provider
+   transports use this origin tag together with the provider name when
+   classifying models, so a custom provider literally named
+   \"anthropic\"/\"openai\" cannot receive built-in-only treatment such as
+   environment-key fallback or Claude Code OAuth headers."
   [provider-key base-url api model-def]
   (let [provider-kw (if (keyword? provider-key)
                       provider-key
@@ -114,7 +101,8 @@
     (-> (merge model-defaults
                {:provider provider-kw
                 :api      api
-                :base-url base-url}
+                :base-url base-url
+                :custom?  true}
                (dissoc model-def :name)
                {:name (or (:name model-def) (:id model-def))})
         structured-output/normalize-model)))
@@ -122,10 +110,16 @@
 ;; ── Provider auth ────────────────────────────────────────────────────────────
 
 (defn- extract-provider-auth
-  "Extract resolved auth config for a provider."
+  "Extract auth config for a provider.
+
+   The registry stores `:api-key` as a raw literal or `env:VAR` spec. Shared
+   transport request support resolves `env:` specs from psi's process
+   environment per request. Editing models.edn therefore requires no key-value
+   snapshot refresh, but changing psi's launch environment requires relaunching
+   psi. Blank or nil specs normalize to nil."
   [provider-key provider-def]
   (let [auth     (:auth provider-def)
-        api-key  (resolve-api-key-spec (:api-key auth))
+        api-key  (not-empty (:api-key auth))
         auth-hdr (if (contains? auth :auth-header?)
                    (:auth-header? auth)
                    true)

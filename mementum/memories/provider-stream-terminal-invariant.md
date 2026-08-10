@@ -1,0 +1,5 @@
+🔁 Provider stream adapters need one explicit lifecycle invariant across all transports: emit `:start` exactly once before any content or terminal event; on every terminal path (`:done`, provider error, read exception, or EOF), close all open content/tool blocks, preserve accumulated usage/status/headers, mark the stream done before invoking downstream consumers, then emit exactly one terminal event; after done, emit nothing.
+
+Implement this with shared once/terminal helpers and a top-level `done?` short-circuit around the entire event dispatcher—not guards only around terminal branches. EOF needs a synthetic terminal flush because compatible endpoints may omit documented stop markers. Unknown block indexes should be skipped, while known open blocks must be balanced on both success and error paths.
+
+Tests should cover malformed ordering and truncated streams: error followed by data, exception after error, EOF without stop, terminal-first streams, open blocks at EOF/error, and downstream consumer exceptions. Task 248 needed many review passes because each locally fixed branch left a sibling transport or terminal path inconsistent.

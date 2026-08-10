@@ -2,16 +2,20 @@
   "Shared model capability predicates for session-facing features."
   (:require
    [psi.ai.model-registry :as model-registry]
+   [psi.ai.providers.request-support :as request-support]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]))
 
 (defn supports-mid-system-messages?
   "Return true when a resolved model supports mid-conversation system messages.
 
-   Explicit model metadata wins for providers that declare the feature. OpenAI
-   chat-completions support is also inferred from the runtime API shape so
-   custom/runtime-loaded OpenAI chat models do not need to carry psi-specific
-   metadata."
+   Explicit model metadata wins. Built-in OpenAI chat-completions support is
+   also inferred from the runtime API shape via
+   `request-support/builtin-openai-chat-completions?`, so catalog models need
+   no psi-specific metadata. The predicate gates inference on the `:custom?`
+   origin tag: a custom models.edn provider named \"openai\" must declare
+   `:supports-mid-conversation-system-messages` explicitly. Codex-routed
+   built-ins (`:api :openai-codex-responses`) never match this inference."
   [model]
   (let [explicit-support (:supports-mid-conversation-system-messages model)]
     (boolean
@@ -23,8 +27,7 @@
        false
 
        :else
-       (and (= :openai (:provider model))
-            (= :openai-completions (:api model)))))))
+       (request-support/builtin-openai-chat-completions? model)))))
 
 (defn runtime-active-model
   "Resolve the active runtime model for `session-id`, falling back to the stored

@@ -5,6 +5,7 @@
             [psi.ai.providers.openai.content :as content]
             [psi.ai.providers.openai.reasoning :as reasoning]
             [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.structured-output :as structured-output]))
 
 (defn- extract-reasoning-delta
@@ -137,6 +138,19 @@
   [conversation model options]
   (let [structured-request (structured-output/structured-output-request options)
         strategy           (structured-output/select-strategy model structured-request)
+        ;; No auth key is required when the request is explicitly keyless
+        ;; (:no-auth-header, e.g. :auth-header? false local servers) or when
+        ;; custom :headers supply a recognized auth header (x-api-key /
+        ;; authorization) without a configured :api-key. Incidental custom
+        ;; headers (e.g. X-Client) do NOT imply keyless: with a blank
+        ;; configured key such a request fast-fails with the clear
+        ;; "Missing API key" error instead of silently sending the global
+        ;; OPENAI_API_KEY to a custom endpoint — consistent with the
+        ;; :anthropic-messages transport.
+        no-auth?           (request-support/no-auth? options)
+        api-key            (when-not no-auth?
+                             (request-support/resolve-api-key
+                              model options request-support/openai-api-key-config))
         fallback-request   (when (= :prompted-json (:strategy strategy))
                              structured-request)
         base-messages      (transform-messages conversation fallback-request)
@@ -180,12 +194,11 @@
                                  :strict (not (false? (:strict? structured-request)))
                                  :schema (:json-schema structured-request)}}))]
     {:headers (cond-> {"Content-Type" "application/json"}
-                ;; Skip Authorization when :no-auth-header is set
-                ;; (e.g. local servers that reject auth headers)
-                (not (:no-auth-header options))
-                (assoc "Authorization"
-                       (str "Bearer " (or (:api-key options)
-                                          (System/getenv "OPENAI_API_KEY"))))
+                ;; Skip Authorization when no key is resolved: explicit
+                ;; :no-auth-header (e.g. local servers that reject auth
+                ;; headers) or keyless custom-header auth.
+                (not no-auth?)
+                (assoc "Authorization" (str "Bearer " api-key))
                 (:headers options)
                 (merge (:headers options)))
      :body    (json/generate-string body)}))
@@ -205,8 +218,7 @@
   [consume-fn stream-started? done? reason usage]
   (when-not @done?
     (reset! done? true)
-    (when (compare-and-set! stream-started? false true)
-      (consume-fn {:type :start}))
+    (request-support/emit-start! consume-fn stream-started?)
     (consume-fn (cond-> {:type :done
                          :reason reason}
                   usage (assoc :usage usage)))))
@@ -222,6 +234,7 @@
   {:stream-started?            (atom false)
    :done?                      (atom false)
    :pending-finish-reason      (atom nil)
+   :last-usage                  (atom nil)
    :structured-result-emitted? (atom false)
    :text-buffer                (atom "")
    :next-tool-index            (atom 0)
@@ -229,9 +242,9 @@
    :tool-state                 (atom {})})
 
 (defn- emit-stream-start!
+  "Emit :start exactly once before the first output or terminal event."
   [consume-fn stream-started?]
-  (when (compare-and-set! stream-started? false true)
-    (consume-fn {:type :start})))
+  (request-support/emit-start! consume-fn stream-started?))
 
 (defn- emit-started-event!
   [consume-fn stream-started? event]
@@ -410,6 +423,7 @@
                                         (if (= :provider-native (:strategy strategy))
                                           :openai/message-json
                                           :prompted-json/text))
+        (reset! (:last-usage stream-state) (completions-usage-map model (:usage chunk)))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
@@ -436,20 +450,49 @@
                                       (if (= :provider-native (:strategy strategy))
                                         :openai/message-json
                                         :prompted-json/text))
-      (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
+      (emit-chat-completion-finish! consume-fn stream-started? done? reason
+                                    @(:last-usage stream-state))
       (reset! pending-finish-reason nil))))
+
+(defn- emit-terminal-error!
+  [stream-state consume-fn emit-error!]
+  (let [{:keys [done? stream-started?]} stream-state]
+    (when-not @done?
+      (reset! done? true)
+      (emit-stream-start! consume-fn stream-started?)
+      (force-start-pending-chat-tools! stream-state consume-fn)
+      (emit-chat-tool-ends! stream-state consume-fn)
+      (emit-error!))))
+
+(defn- emit-chat-error!
+  "Surface a mid-stream SSE error as the sole terminal event. The chunk is
+   captured before this call; open tools are balanced before the error and
+   the done guard suppresses every trailing chunk."
+  [stream-state consume-fn chunk]
+  (let [status (some (fn [s] (and (number? s) (>= s 400) s))
+                     [(:status chunk)
+                      (get-in chunk [:error :status])
+                      (get-in chunk [:error :http_status])
+                      (:http_status chunk)])
+        err    (transport/response->error {:status  status
+                                           :headers nil
+                                           :body    (json/generate-string chunk)})]
+    (emit-terminal-error! stream-state consume-fn #(consume-fn err))))
 
 (defn- process-chat-sse-line!
   [stream-state consume-fn model options url strategy line]
-  (if-let [chunk (transport/parse-sse-line line)]
-    (do
-      (transport/capture-response! model options :openai-completions url chunk)
-      (let [choice (first (:choices chunk))
-            delta  (:delta choice)]
-        (emit-chat-chunk! stream-state consume-fn choice delta)
-        (finish-chat-chunk! stream-state consume-fn model chunk choice strategy)))
-    (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
-      (flush-pending-chat-finish! stream-state consume-fn strategy))))
+  (when-not @(:done? stream-state)
+    (if-let [chunk (transport/parse-sse-line line)]
+      (do
+        (transport/capture-response! model options :openai-completions url chunk)
+        (if (:error chunk)
+          (emit-chat-error! stream-state consume-fn chunk)
+          (let [choice (first (:choices chunk))
+                delta  (:delta choice)]
+            (emit-chat-chunk! stream-state consume-fn choice delta)
+            (finish-chat-chunk! stream-state consume-fn model chunk choice strategy))))
+      (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
+        (flush-pending-chat-finish! stream-state consume-fn strategy)))))
 
 (defn- non-streaming-request
   [conversation model options]
@@ -509,7 +552,7 @@
         request            (non-streaming-request conversation model options)]
     (try
       (transport/capture-request! model options :openai-completions url request)
-      (let [response (transport/execute-response url request)]
+      (let [response (transport/execute-response options url request)]
         (if (transport/error-status? (:status response))
           (transport/response->error response)
           (let [body (json/parse-string (:body response) true)
@@ -530,21 +573,45 @@
       (when strategy
         (consume-fn {:type :structured-output-strategy
                      :structured-output strategy}))
-      (let [response (transport/stream-response url request)]
+      (let [response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
-          (transport/emit-error! model
+          (emit-terminal-error!
+           stream-state
+           consume-fn
+           #(transport/emit-error! model
+                                   options
+                                   :openai-completions
+                                   url
+                                   consume-fn
+                                   (transport/response->error response)))
+          (do
+            (with-open [reader (io/reader (:body response))]
+              (doseq [line (line-seq reader)]
+                (process-chat-sse-line! stream-state consume-fn model options url strategy line)))
+            (when-not @(:done? stream-state)
+              (flush-pending-chat-finish! stream-state consume-fn strategy)
+              (when-not @(:done? stream-state)
+                (force-start-pending-chat-tools! stream-state consume-fn)
+                (emit-chat-tool-ends! stream-state consume-fn)
+                (emit-structured-output-result! stream-state
+                                                consume-fn
+                                                strategy
+                                                (if (= :provider-native (:strategy strategy))
+                                                  :openai/message-json
+                                                  :prompted-json/text))
+                (emit-chat-completion-finish! consume-fn
+                                              (:stream-started? stream-state)
+                                              (:done? stream-state)
+                                              :stop
+                                              @(:last-usage stream-state)))
+              nil))))
+      (catch Exception e
+        (emit-terminal-error!
+         stream-state
+         consume-fn
+         #(transport/emit-error! model
                                  options
                                  :openai-completions
                                  url
                                  consume-fn
-                                 (transport/response->error response))
-          (with-open [reader (io/reader (:body response))]
-            (doseq [line (line-seq reader)]
-              (process-chat-sse-line! stream-state consume-fn model options url strategy line)))))
-      (catch Exception e
-        (transport/emit-error! model
-                               options
-                               :openai-completions
-                               url
-                               consume-fn
-                               (transport/exception->error e))))))
+                                 (transport/exception->error e)))))))

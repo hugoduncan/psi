@@ -13,6 +13,7 @@
    [psi.turn-runtime.request :as turn-request]
    [psi.workflow-coordination.cancellation-entry :as cancellation-entry]
    [psi.workflow-coordination.stop-signal :as stop-signal]
+   [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.workflow-cancellation-guard :as workflow-guard]
    [psi.agent-session.turn.augmentation-lifecycle :as augmentation-lifecycle]))
 
@@ -167,13 +168,22 @@
                                                       :runtime-opts runtime-opts
                                                       :commands (command-registry/command-names-in (:extension-registry ctx))})
                   api-key            (get-in prepared-request [:prepared-request/ai-options :api-key])
+                  ;; Record key provenance so reuse is restricted to this
+                  ;; provider across continuation turns.
+                  api-key-provider   (get-in session-data [:model :provider])
+                  ;; Persisted models omit built-in/custom origin, so record
+                  ;; it separately. Reuse requires both provider and origin to
+                  ;; match, including for custom providers with built-in names.
+                  api-key-custom?    (prompt-request/session-model-custom? session-data)
                   steering-consumed? (seq (:prepared-request/queued-steering-messages prepared-request))]
               (cond-> {:root-state-update
                        (session/session-update
                         session-id
                         #(cond-> (assoc % :last-prepared-request-summary
                                         (prepared-request-state-summary turn-id prepared-request))
-                           api-key            (assoc :runtime-api-key api-key)
+                           api-key            (assoc :runtime-api-key api-key
+                                                     :runtime-api-key-provider api-key-provider
+                                                     :runtime-api-key-custom? api-key-custom?)
                            steering-consumed? (assoc :steering-messages [])))
                        :effects (prompt-prepare-request-effects prepared-request progress-queue steering-consumed? return-execution-result? run-id)
                        :return-effect-result? true}

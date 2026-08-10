@@ -17,7 +17,10 @@ value ApiKeySpec {
     -- Resolution order:
     --   1. "env:VAR_NAME"  → System/getenv("VAR_NAME")
     --   2. literal string  → used as-is
-    -- nil / absent → no auth
+    -- nil / absent → no key; whether that is an error depends on the
+    --   provider: built-in Anthropic models fall back to ANTHROPIC_API_KEY;
+    --   custom providers fail fast with a provider-scoped missing-key error
+    --   unless the request is explicitly keyless (see ResolveRequestApiKey).
     raw: String?
 }
 
@@ -35,12 +38,47 @@ value CustomModelDef {
     supports_reasoning: Boolean = false
     supports_images: Boolean = false
     supports_text: Boolean = true
+    adaptive_thinking: Boolean = false
+    -- adaptive_thinking true → transport sends the adaptive request shape
+    -- (thinking type "adaptive" + output_config.effort) instead of the classic
+    -- extended-thinking shape (budget_tokens). Only meaningful for
+    -- :api anthropic_messages custom providers (and built-in Anthropic
+    -- catalog models); ignored for OpenAI-compatible providers.
+    supports_mid_conversation_system_messages: Boolean = false
+    -- explicit declaration of per-turn system-message support for
+    -- the agent-session mid-conversation system-message capability
+    -- (session-supports-mid-system-messages? in agent-session
+    -- model_capabilities.clj). Omitted → false for :anthropic-messages custom
+    -- providers (only :openai / :openai-completions models are inferred);
+    -- set true only after verifying the endpoint honours per-turn system
+    -- changes. Schema gate only — flows through expand-model's verbatim
+    -- model-def merge like adaptive_thinking (slice 1).
     context_window: PositiveInt = 128000
     max_tokens: PositiveInt = 16384
     input_cost: Number = 0.0
     output_cost: Number = 0.0
     cache_read_cost: Number = 0.0
     cache_write_cost: Number = 0.0
+    parallel_tool_calls: Boolean?
+    -- pass-through of the closed ModelDef schema's
+    -- :parallel-tool-calls field. Sent as :parallel_tool_calls by the OpenAI
+    -- transports when tool defs are present and the model declares it; the
+    -- Anthropic transport does not read it. Optional — the expanded model map
+    -- carries the key only when the models.edn entry declares it.
+    locality: local | cloud = local
+    latency_tier: low | medium | high = low
+    cost_tier: zero | low | medium | high = zero
+    -- model-defaults (expand-model) are :locality :local /
+    -- :latency-tier :low / :cost-tier :zero; the documented DeepSeek example
+    -- sets :locality :cloud / :latency-tier :low / :cost-tier :low explicitly
+    -- (locked by parse-documented-deepseek-example-test). These drive
+    -- local-helper selection (context-manager requires :latency-tier :low +
+    -- :cost-tier #{:zero :low}, strong :locality :local).
+    capabilities: ModelCapabilities?
+    -- optional :capabilities map matching
+    -- schemas/ModelCapabilities (:structured-output / :textual-tool-calls),
+    -- carried through expand-model's verbatim merge like every other
+    -- model-def key.
 }
 
 value CustomProviderDef {
@@ -55,6 +93,26 @@ value ModelsConfig {
     providers: Map<String, CustomProviderDef>
 }
 
+value ModelCapabilities {
+    -- Mirrors schemas/ModelCapabilities in user_models.clj: a closed map with
+    -- optional :structured-output and :textual-tool-calls keys .
+    structured_output: StructuredOutputCapability?
+    textual_tool_calls: Set<TextualToolCallFormat>?
+}
+
+value StructuredOutputCapability {
+    -- Mirrors schemas/StructuredOutputCapability.
+    supported: Boolean
+    strategies: List<String>
+    native_mechanism: String?
+    defaulted: Boolean?
+    notes: String?
+}
+
+value TextualToolCallFormat {
+    format: xml
+}
+
 value ResolvedCustomModel {
     -- A fully-formed model map, ready to merge into the catalog.
     -- Carries all fields of a built-in model plus origin metadata.
@@ -63,23 +121,63 @@ value ResolvedCustomModel {
     provider: String                           -- the custom provider key, e.g. "local"
     api: ApiProtocol
     base_url: String
+    custom: Boolean = true                     -- origin tag — custom models are never classified built-in;
+                                                -- set by psi at parse time (expand-model), never declared in models.edn
+                                                -- (the closed ModelDef schema rejects a user-supplied :custom? key)
     supports_reasoning: Boolean
     supports_images: Boolean
     supports_text: Boolean
+    adaptive_thinking: Boolean
+    supports_mid_conversation_system_messages: Boolean
     context_window: PositiveInt
     max_tokens: PositiveInt
     input_cost: Number
     output_cost: Number
     cache_read_cost: Number
     cache_write_cost: Number
+    parallel_tool_calls: Boolean?
+    locality: local | cloud
+    latency_tier: low | medium | high
+    cost_tier: zero | low | medium | high
+    capabilities: ModelCapabilities?
 }
 
 value ProviderAuth {
     provider: String
     api_key: String?
+    -- the RAW api-key spec (literal or "env:VAR") — NOT resolved
+    -- at parse time. The transports' ResolveRequestApiKey applies the
+    -- mechanical ResolveApiKey resolution per request.
     auth_header: Boolean
     headers: Map<String, String>?
 }
+
+-- ── Primitives ──────────────────────────────────────────────────────────────
+
+-- SystemGetenv(name) / Environment(name): read an environment variable by
+--   name (System/getenv); nil when unset. The two names are synonyms; specs
+--   use SystemGetenv for the mechanical env:VAR resolution in ApiKeySpec and
+--   Environment for the provider fallback reads.
+-- BlankOrNil(x): x is nil or a blank/whitespace-only string
+--   (clojure.string/blank? semantics; nil counts as blank).
+-- HeaderName(header): the header's name as a string. A header is a
+--   [name value] pair or map entry; keyword and string names are accepted
+--   (name of the header key).
+-- LowerCase(s): lower-case a string (clojure.string/lower-case).
+
+-- ── External interface ───────────────────────────────────────────────────────
+
+-- BuildPreparedRequest(session, model, options): the request-preparation step
+--   at which the session, resolved model, and assembled request options
+--   (RequestOptions) are available (cf. providers/*/build-request). A
+--   runtime-supplied event; declared on the CustomProviderApi surface below.
+-- LookupProviderAuth(provider): read the provider's :auth config
+--   (extract-provider-auth in user_models.clj) → ProviderAuth, or null when
+--   the provider has no auth block. A runtime-supplied function.
+-- RequestUnderConstruction(model, options): the narrower request-shaping step
+--   at which a prepared request's model and options are being finalized
+--   (same model/options pair BuildPreparedRequest carries). A runtime-supplied
+--   event; declared on the CustomProviderApi surface below.
 
 -- ── Config files ─────────────────────────────────────────────────────────────
 
@@ -122,26 +220,115 @@ rule ParseModelsConfig {
                 provider: provider_key,
                 api: provider_def.api,
                 base_url: provider_def.base_url,
+                custom: true,                        -- every models.edn model is tagged custom
                 supports_reasoning: model_def.supports_reasoning,
                 supports_images: model_def.supports_images,
                 supports_text: model_def.supports_text,
+                adaptive_thinking: model_def.adaptive_thinking,
+                supports_mid_conversation_system_messages: model_def.supports_mid_conversation_system_messages,
                 context_window: model_def.context_window,
                 max_tokens: model_def.max_tokens,
                 input_cost: model_def.input_cost,
                 output_cost: model_def.output_cost,
                 cache_read_cost: model_def.cache_read_cost,
-                cache_write_cost: model_def.cache_write_cost
+                cache_write_cost: model_def.cache_write_cost,
+                parallel_tool_calls: model_def.parallel_tool_calls,
+                locality: model_def.locality,
+                latency_tier: model_def.latency_tier,
+                cost_tier: model_def.cost_tier,
+                capabilities: model_def.capabilities
             }
 }
 
 rule ResolveApiKey {
     -- Resolve raw api-key spec to concrete string or nil.
+    -- This is the mechanical resolution only; provider-scoped fallback and
+    -- keyless exemptions are applied by ResolveRequestApiKey below.
+    --
+    -- applied at REQUEST time, not models.edn parse time. The
+    -- registry stores the raw spec (extract-provider-auth), and the
+    -- transports' shared request-support/resolve-key-spec re-resolves
+    -- "env:VAR" through getenv per request — matching the built-in env
+    -- fallback's live semantics (a var exported after psi loaded models.edn
+    -- is picked up without a reload).
 
     when: ApiKeySpec(raw)
 
     ensures: raw == null implies resolved = null
     ensures: StartsWith(raw, "env:") implies resolved = SystemGetenv(Substring(raw, 4))
     ensures: not StartsWith(raw, "env:") implies resolved = raw
+}
+
+value RequestOptions {
+    api_key: String?
+    no_auth_header: Boolean = false
+    headers: Map<String, String>?
+    thinking_level: off | minimal | low | medium | high | xhigh | null
+    temperature: Number?
+    speed_mode: fast | normal | null
+    effort_override: low | medium | high | xhigh | null
+    -- extended to mirror the transport StreamOptions values —
+    -- session->request-options (prompt_request.clj) carries :temperature,
+    -- :speed-mode and :effort-override alongside the key/auth fields.
+    -- :logprobs-enabled/:top-logprobs and :structured-output stay out of
+    -- scope: no rule in this spec references them.
+}
+
+rule ResolveRequestApiKey {
+    -- Provider-scoped API-key resolution for a request, matching the shared
+    -- request-support/resolve-api-key used by all three transports:
+    --   * built-in models (not tagged custom, and provider nil or the
+    --     built-in provider kw) fall back to the built-in env var when no
+    --     key is configured;
+    --   * custom providers NEVER fall back to the built-in env var — a
+    --     nil/blank configured key is an error naming the provider and the
+    --     models.edn :auth remedy, so the built-in key can never be silently
+    --     sent to a third-party endpoint (current contract: the custom tag closes
+    --     the provider-NAME gap — a custom provider literally named
+    --     "anthropic"/"openai" is tagged custom and never classified
+    --     built-in);
+    --   * keyless requests (see KeylessRequestDefined: explicit
+    --     no_auth_header, or a recognized auth header among custom :headers
+    --     with no configured key) require no key at all.
+    --
+    -- options.api_key may be a RAW "env:VAR" spec (the registry
+    -- stores the spec, not a parse-time snapshot); ResolveApiKey re-resolves
+    -- it per request. A custom provider whose env:VAR is unset at request
+    -- time errors naming the variable ("environment variable VAR is unset —
+    -- env: keys are re-read per request").
+
+    when: BuildPreparedRequest(session, model, options)
+    requires: LookupProviderAuth(model.provider) != null
+
+    ensures: KeylessRequest(model, options) implies resolved_key = null
+    ensures: not KeylessRequest(model, options)
+        and not model.custom and (model.provider == null or model.provider == "anthropic")
+        implies resolved_key = ResolveApiKey(options.api_key) ?? SystemGetenv("ANTHROPIC_API_KEY")
+    ensures: not KeylessRequest(model, options)
+        and (model.custom or (model.provider != null and model.provider != "anthropic"))
+        and BlankOrNil(ResolveApiKey(options.api_key))
+        implies Error("Missing API key for provider {model.provider}; configure :auth {:api-key ...} in models.edn"
+                      + (if StartsWith(options.api_key, "env:")
+                          then " (environment variable " + Substring(options.api_key, 4) + " is unset — env: keys are re-read per request)"
+                          else ""))
+}
+
+rule KeylessRequestDefined {
+    -- Defines the KeylessRequest predicate (not a rule invocation — see
+    -- NoAuthHeaderWhenDisabled, which references it as a value): a request is
+    -- keyless when no_auth_header is set, or when custom :headers carry a
+    -- recognized auth header (x-api-key / authorization, case-insensitive)
+    -- with no configured key. Incidental headers (e.g. X-Client) do NOT imply
+    -- keyless — with a blank configured key such a request fast-fails with
+    -- the provider-scoped "Missing API key" error.
+
+    when: RequestUnderConstruction(model, options)
+
+    ensures: KeylessRequest(model, options) iff
+        options.no_auth_header
+        or (non-empty(options.headers)
+            and BlankOrNil(options.api_key)
+            and ∃ header ∈ options.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"})
 }
 
 -- ── Precedence ───────────────────────────────────────────────────────────────
@@ -192,30 +379,66 @@ rule ProviderDispatchByApi {
 rule InjectCustomProviderAuth {
     -- During request preparation, if the model's provider has a custom auth
     -- config, inject the resolved api-key and headers into stream options.
+    -- Keyless configs (auth_header false / no_auth_header, or a recognized
+    -- auth header among custom :headers with no configured key) carry no key.
+    -- This is the auth-config-level keyless determination (mirrors
+    -- extract-provider-auth); the request-level KeylessRequest predicate
+    -- (KeylessRequestDefined) applies the same rule to prepared request
+    -- options.
+    --
+    -- auth.api_key is the RAW spec (literal or "env:VAR") —
+    -- extract-provider-auth stores the spec verbatim; the request-level
+    -- ResolveRequestApiKey applies the mechanical ResolveApiKey resolution
+    -- per request (so ai_options.api_key = auth.api_key carries the raw spec
+    -- into options, resolved at request time).
+    --
+    -- the injection is gated on the model's `:custom?` origin tag.
+    -- Registry auth is keyed by provider NAME and populated only from custom
+    -- models.edn providers — a BUILT-IN same-named model must never inherit a
+    -- custom provider's auth config (headers / :no-auth-header / api-key
+    -- spec), so built-in models resolve only env/OAuth. Symmetrically, a
+    -- custom provider named "anthropic"/"openai" never receives the built-in
+    -- same-named OAuth credential (provider-auth/provider-api-key branches
+    -- on `custom?`).
 
-    when: BuildPreparedRequest(session, model)
+    when: BuildPreparedRequest(session, model, options)
+
+    requires: model.custom
 
     let auth = LookupProviderAuth(model.provider)
+    let keyless = auth != null and (
+        not auth.auth_header
+        or (non-empty(auth.headers)
+            and BlankOrNil(auth.api_key)
+            and ∃ header ∈ auth.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"}))
 
     ensures: auth == null implies ai_options unchanged
-    ensures: auth != null and auth.api_key != null and auth.auth_header implies
+    ensures: auth != null and not keyless and auth.api_key != null and auth.auth_header implies
         ai_options.api_key = auth.api_key
-    ensures: auth != null and auth.api_key != null and not auth.auth_header implies
+    ensures: auth != null and not keyless and auth.api_key != null and not auth.auth_header implies
         ai_options.api_key = null
         -- Provider transport will not send Authorization header
+    ensures: auth != null and keyless implies
+        ai_options.api_key = null
+        -- Keyless request: no key resolved; transport strips auth headers
     ensures: auth != null and auth.headers != null implies
         ai_options.headers = Merge(ai_options.headers or {}, auth.headers)
 }
 
 rule NoAuthHeaderWhenDisabled {
     -- When auth_header is false, the transport must not send Authorization.
-    -- This supports local servers that reject auth headers.
+    -- This supports local servers that reject auth headers. The same applies
+    -- to any keyless custom-provider request (see KeylessRequestDefined): the
+    -- Anthropic transport strips both x-api-key and Authorization when no key
+    -- is resolved.
 
     when: BuildProviderRequest(model, options)
 
     requires: LookupProviderAuth(model.provider).auth_header == false
+              or KeylessRequest(model, options)
 
     ensures: request.headers does not contain "Authorization"
+    ensures: KeylessRequest(model, options) implies request.headers does not contain "x-api-key"
 }
 
 -- ── Validation errors ────────────────────────────────────────────────────────
@@ -240,4 +463,17 @@ rule CustomModelsVisibleInGraph {
     when: QueryAllModels or QueryProviderModels(provider)
 
     ensures: result includes custom models from merged catalog
+}
+
+surface CustomProviderApi {
+    facing executor: AgentExecutor
+
+    provides:
+        BuildPreparedRequest(session, model, options)
+        RequestUnderConstruction(model, options)
+
+    exposes:
+        RequestOptions
+        ProviderAuth
+        ResolvedCustomModel
 }

@@ -2,6 +2,9 @@
 
 - Agent sessions with turn execution, provider-boundary retry/backoff
   observability, speed/effort controls, mid-conversation system messages.
+- Custom providers from user-global or project-local `models.edn`, including
+  the documented DeepSeek `deepseek-v4-flash` setup over its
+  Anthropic-compatible endpoint with adaptive-thinking support.
 - Deterministic workflows in `.psi/workflows/` invoked via `/delegate` and the
   `delegate` tool: `task-lifecycle`, `review-task-design`/`-plan`/
   `-implementation`, `create-task-plan`, `implement-task`, `reduce-incidental-complexity`,

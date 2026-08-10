@@ -51,9 +51,19 @@
    Shared provider-auth resolution keeps runtime-facing helper paths aligned
    with canonical request preparation. `session-id` is accepted for call-path
    symmetry; explicit per-call overrides still belong in runtime-opts passed to
-   prompt preparation."
+   prompt preparation.
+
+   Custom-provider registry auth remains a raw literal or `env:VAR` spec.
+   The transport resolves it per request through
+   `request-support/resolve-key-spec`; callers needing a concrete key must use
+   that shared helper.
+
+   Registry auth is gated on the resolved model's `:custom?` origin tag.
+   This prevents custom providers named \"anthropic\" or \"openai\" from sharing
+   auth with same-named built-ins; `provider-auth/provider-api-key` branches
+   on that tag."
   [ctx _session-id ai-model]
-  (provider-auth/provider-api-key ctx (:provider ai-model)))
+  (provider-auth/provider-api-key ctx (:provider ai-model) (:custom? ai-model)))
 
 (defn- sync->recursion-trigger-type
   [sync]

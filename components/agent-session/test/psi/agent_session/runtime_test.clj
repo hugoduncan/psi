@@ -234,13 +234,34 @@
       (try
         (model-registry/init! {:user-models-path path})
         (is (= "minimax-inline-key"
-               (runtime/resolve-api-key-in {} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
+               (runtime/resolve-api-key-in {} "sid" {:provider :minimax :id "MiniMax-M2.7" :custom? true})))
         (is (= "minimax-inline-key"
-               (runtime/resolve-api-key-in {} "sid" {:provider "minimax" :id "MiniMax-M2.7"})))
+               (runtime/resolve-api-key-in {} "sid" {:provider "minimax" :id "MiniMax-M2.7" :custom? true})))
         (finally
           (java.io.File/.delete (java.io.File. path))))))
 
-  (testing "oauth for selected provider still wins over provider-registry auth"
+  (testing "built-in provider with OAuth credential resolves OAuth (never registry)"
+    (let [path (write-temp-models!
+                {:version   1
+                 :providers {"anthropic"
+                             {:base-url "https://third-party.example/anthropic"
+                              :api      :anthropic-messages
+                              :auth     {:api-key "third-party-registry-key"}
+                              :models   [{:id "my-custom-model"}]}}})
+          oauth-ctx (oauth/create-null-context {:credentials {:anthropic {:type :api-key :key "oauth-key"}}})]
+      (try
+        (model-registry/init! {:user-models-path path})
+        ;; a custom models.edn provider literally named "anthropic"
+        ;; keys the registry :auth by that name — a built-in same-named session
+        ;; must resolve only env/OAuth, never the custom provider's registry key.
+        (is (= "oauth-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider :anthropic :id "claude-sonnet-4-6"})))
+        (is (= "oauth-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider "anthropic" :id "claude-sonnet-4-6"})))
+        (finally
+          (java.io.File/.delete (java.io.File. path))))))
+
+  (testing "custom provider never receives a same-named OAuth credential (origin gate)"
     (let [path (write-temp-models!
                 {:version   1
                  :providers {"minimax"
@@ -251,10 +272,13 @@
           oauth-ctx (oauth/create-null-context {:credentials {:minimax {:type :api-key :key "oauth-key"}}})]
       (try
         (model-registry/init! {:user-models-path path})
-        (is (= "oauth-key"
-               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider :minimax :id "MiniMax-M2.7"})))
-        (is (= "oauth-key"
-               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider "minimax" :id "MiniMax-M2.7"})))
+        ;; a custom provider must never receive an OAuth-store
+        ;; credential for its provider name (OAuth is built-in-only) — the
+        ;; custom provider's own registry auth resolves instead.
+        (is (= "minimax-inline-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider :minimax :id "MiniMax-M2.7" :custom? true})))
+        (is (= "minimax-inline-key"
+               (runtime/resolve-api-key-in {:oauth-ctx oauth-ctx} "sid" {:provider "minimax" :id "MiniMax-M2.7" :custom? true})))
         (finally
           (java.io.File/.delete (java.io.File. path))))))
 

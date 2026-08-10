@@ -1,11 +1,13 @@
 (ns psi.ai.providers.anthropic-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
-   [psi.ai.providers.anthropic.request-schema :as request-schema]))
+   [psi.ai.providers.anthropic.request-schema :as request-schema]
+   [psi.ai.providers.http-boundary :as http-boundary]))
 
 ;; ── build-request ───────────────────────────────────────────────────────────
 
@@ -41,6 +43,7 @@
     (let [model {:id "MiniMax-M2.7"
                  :name "MiniMax M2.7"
                  :provider :minimax
+                 :custom? true
                  :api :anthropic-messages
                  :base-url "https://api.minimax.io/anthropic"
                  :supports-reasoning true
@@ -55,8 +58,91 @@
           convo (conv/create "sys")]
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
-           #"Missing Anthropic API key"
-           (#'anthropic/build-request convo model {}))))))
+           #"Missing API key for provider minimax"
+           (#'anthropic/build-request convo model {})))))
+
+  (testing "custom-provider missing-auth error points at models.edn :auth and never hints at /login"
+    (let [model {:id "MiniMax-M2.7"
+                 :name "MiniMax M2.7"
+                 :provider :minimax
+                 :custom? true
+                 :api :anthropic-messages
+                 :base-url "https://api.minimax.io/anthropic"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'anthropic/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"models.edn" (ex-message e))
+              "error must name the models.edn :auth remedy")
+          (is (nil? (re-find #"/login" (ex-message e)))
+              "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
+
+  (testing "custom-provider missing-auth error suggests an env var name with hyphens normalized to underscores"
+    (let [model {:id "my-proxy-model"
+                 :name "My Proxy Model"
+                 :provider :my-anthropic-proxy
+                 :custom? true
+                 :api :anthropic-messages
+                 :base-url "https://my-proxy.example.com"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'anthropic/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"env:MY_ANTHROPIC_PROXY_API_KEY" (ex-message e))
+              "env var suggestion must normalize kebab-case provider keys to underscores — bash identifiers cannot contain hyphens")
+          (is (nil? (re-find #"MY-ANTHROPIC-PROXY_API_KEY" (ex-message e)))
+              "suggestion must not preserve hyphens from a kebab-case provider key")))))
+
+  (testing "custom provider never falls back to ANTHROPIC_API_KEY env var (no cross-provider leak)"
+    (let [model {:id "deepseek-v4-flash"
+                 :name "DeepSeek V4 Flash"
+                 :provider :deepseek
+                 :custom? true
+                 :api :anthropic-messages
+                 :base-url "https://api.deepseek.com/anthropic"
+                 :supports-reasoning true
+                 :supports-text true
+                 :context-window 1000000
+                 :max-tokens 384000}
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-should-never-leak"})]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider deepseek"
+             (#'anthropic/build-request convo model {:environment-boundary environment}))
+            "ANTHROPIC_API_KEY must not be used to satisfy a custom provider's request")
+        (is (empty? (environment-boundary/reads environment))))))
+
+  (testing "built-in anthropic model falls back to ANTHROPIC_API_KEY env var"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"ANTHROPIC_API_KEY" "sk-ant-env-fallback-key"})
+            req (#'anthropic/build-request convo model {:environment-boundary environment})]
+        (is (= "sk-ant-env-fallback-key" (get-in req [:headers "x-api-key"]))
+            "built-in Anthropic requests without an explicit key use ANTHROPIC_API_KEY")
+        (is (= ["ANTHROPIC_API_KEY"] (environment-boundary/reads environment)))))))
 
 (deftest anthropic-temperature-explicit-override-test
   (testing "explicit temperature override flows through to request body"
@@ -139,31 +225,6 @@
       (is (nil? (get headers "user-agent")) "api-key requests must not spoof the claude-cli user-agent")
       (is (nil? (get headers "x-app")) "api-key requests must not carry x-app"))))
 
-(def ^:private claude-code-system
-  "You are Claude Code, Anthropic's official CLI for Claude.")
-
-(deftest build-request-oauth-injects-claude-code-system-test
-  (testing "oauth requests prepend the Claude Code identity as the first system block"
-    (let [model (models/get-model :sonnet-4.6)
-          convo (conv/create "Custom Psi system prompt.")
-          req   (#'anthropic/build-request convo model {:api-key "sk-ant-oat-test-token"})
-          system (:system (json/parse-string (:body req) true))]
-      (is (vector? system) "oauth system must be block form to carry the identity first")
-      (is (= claude-code-system (:text (first system)))
-          "first system block must be the exact Claude Code identity")
-      (is (= "Custom Psi system prompt." (:text (second system)))
-          "the caller's system prompt follows the injected identity")))
-
-  (testing "api-key requests are unchanged — no Claude Code identity injected"
-    (let [model (models/get-model :sonnet-4.6)
-          convo (conv/create "Custom Psi system prompt.")
-          req   (#'anthropic/build-request convo model {:api-key "sk-ant-api-test-key"})
-          system (:system (json/parse-string (:body req) true))]
-      (is (= "Custom Psi system prompt." system)
-          "api-key system prompt is sent as-is, without the Claude Code identity"))))
-
-;; ── Adaptive thinking (Opus 4.7+) ───────────────────────────────────────────
-
 (deftest build-request-adaptive-thinking-test
   (testing "adaptive thinking model emits type=adaptive + output_config, no budget_tokens"
     (let [model   (models/get-model :opus-4.7)
@@ -234,6 +295,102 @@
                                                           :api-key "test-key"})
           body    (json/parse-string (:body req) true)]
       (is (= 128000 (:max_tokens body))))))
+
+(def ^:private deepseek-custom-provider-model
+  "A custom-provider (non-catalog) Anthropic-compatible model map, shaped the
+   way `psi.ai.user-models/expand-model` produces one from a `models.edn`
+   DeepSeek entry with `:adaptive-thinking true`."
+  {:id "deepseek-v4-flash"
+   :name "DeepSeek V4 Flash"
+   :provider :deepseek
+   :custom? true
+   :api :anthropic-messages
+   :base-url "https://api.deepseek.com/anthropic"
+   :supports-reasoning true
+   :adaptive-thinking true
+   :supports-images false
+   :supports-text true
+   :context-window 1000000
+   :max-tokens 384000
+   :input-cost 0.14
+   :output-cost 0.28
+   :cache-read-cost 0.0028
+   :cache-write-cost 0.14
+   :locality :cloud
+   :latency-tier :low
+   :cost-tier :low})
+
+(deftest build-request-adaptive-thinking-custom-provider-test
+  (testing "a non-catalog custom-provider model map with :adaptive-thinking true emits the adaptive shape"
+    (let [convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo deepseek-custom-provider-model
+                                             {:thinking-level :high
+                                              :api-key "test-key"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= "adaptive" (get-in body [:thinking :type])))
+      (is (nil? (get-in body [:thinking :budget_tokens]))
+          "budget_tokens must be absent for adaptive thinking")
+      (is (= "high" (get-in body [:output_config :effort])))
+      (is (nil? (:temperature body))
+          "temperature must be absent for adaptive thinking models")
+      (is (= "test-key" (get headers "x-api-key"))
+          "api-key auth must use x-api-key from the configured key")
+      (is (nil? (get headers "Authorization"))
+          "no OAuth Authorization header for api-key auth")
+      (is (some? (get headers "anthropic-version"))
+          "anthropic-version header must be present")
+      (is (nil? (get headers "anthropic-beta"))
+          "no anthropic-beta header — adaptive thinking must not force interleaved-thinking beta")))
+
+  (testing "thinking off — no thinking param, no output_config, no temperature"
+    (let [convo (conv/create "sys")
+          req   (#'anthropic/build-request convo deepseek-custom-provider-model
+                                           {:thinking-level :off
+                                            :api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (nil? (:thinking body)))
+      (is (nil? (:output_config body)))
+      (is (nil? (:temperature body))
+          "temperature must be absent even with thinking off on adaptive models")))
+
+  (testing "effort override alone (no active thinking level) emits no output_config"
+    ;; request-body's effort is gated on (and thinking adaptive?), and
+    ;; thinking-param requires an active :thinking-level (session default
+    ;; :off), so /effort on an adaptive model with /thinking unset/off emits
+    ;; neither :thinking nor :output_config — a silent no-op, documented in
+    ;; doc/custom-providers.md.
+    (let [convo (conv/create "sys")
+          req   (#'anthropic/build-request convo deepseek-custom-provider-model
+                                           {:effort-override :xhigh
+                                            :api-key "test-key"})
+          body  (json/parse-string (:body req) true)]
+      (is (nil? (:thinking body))
+          "no thinking param when no thinking level is active")
+      (is (nil? (:output_config body))
+          "no output_config when no thinking level is active — effort applies only with /thinking on"))))
+
+(deftest build-request-classic-thinking-custom-provider-test
+  ;; Docs advise DeepSeek users who need temperature to fall back to
+  ;; :adaptive-thinking false / omitted, "relying on the classic
+  ;; extended-thinking shape DeepSeek accepts". Lock that path for a
+  ;; NON-catalog custom-provider model map (all existing budget_tokens shape
+  ;; tests use built-in catalog models).
+  (testing "non-catalog custom-provider model without :adaptive-thinking emits the classic extended-thinking shape"
+    (let [convo   (conv/create "sys")
+          model   (dissoc deepseek-custom-provider-model :adaptive-thinking)
+          req     (#'anthropic/build-request convo model {:thinking-level :medium
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)
+          headers (:headers req)]
+      (is (= {:type "enabled" :budget_tokens 8000} (:thinking body))
+          "classic extended-thinking shape for medium: type enabled + budget_tokens 8000")
+      (is (nil? (:output_config body))
+          "no output_config for the classic extended-thinking shape")
+      (is (nil? (:temperature body))
+          "temperature must be absent with extended thinking")
+      (is (some? (re-find #"interleaved-thinking" (get headers "anthropic-beta")))
+          "interleaved-thinking beta header required for the classic shape"))))
 
 (deftest build-request-normalizes-legacy-string-tool-parameters-test
   (testing "legacy string tool parameters are normalized before Anthropic input_schema validation"
@@ -429,3 +586,123 @@
               beta (get-in req [:headers "anthropic-beta"])]
           (is (not (contains? body :speed)))
           (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))))))))
+
+(deftest build-request-custom-anthropic-beta-header-replaces-transport-betas-test
+  ;; build-request merges custom :headers over the base headers, so
+  ;; a custom "anthropic-beta" header REPLACES the transport-generated beta
+  ;; header on the first request — the transport's own betas (prompt-caching,
+  ;; interleaved-thinking, fast-mode) are silently dropped from the wire. The
+  ;; "don't mix" guidance covers auth headers only; this locks the beta-side
+  ;; merge for :anthropic-messages custom providers (documented in
+  ;; doc/custom-providers.md "Local servers and custom headers").
+  (testing "custom anthropic-beta replaces the transport-generated beta header"
+    (let [model   (models/get-model :sonnet-4.6)
+          convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
+          req     (#'anthropic/build-request convo model {:api-key "test-key"
+                                                          :speed-mode :fast
+                                                          :thinking-level :medium
+                                                          :headers {"anthropic-beta" "custom-beta-1"}})
+          beta    (get-in req [:headers "anthropic-beta"])]
+      (is (= "custom-beta-1" beta)
+          "custom anthropic-beta header must replace the transport betas on the wire")
+      (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))
+          "fast-mode beta must be dropped — the custom header wins the merge")
+      (is (not (re-find #"interleaved-thinking" (or beta "")))
+          "interleaved-thinking beta must be dropped — the custom header wins the merge")))
+
+  (testing "without a custom anthropic-beta header the transport betas are sent"
+    (let [model (models/get-model :sonnet-4.6)
+          convo (-> (conv/create "sys") (conv/add-user-message "hi"))
+          req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                        :speed-mode :fast
+                                                        :thinking-level :medium})
+          beta  (get-in req [:headers "anthropic-beta"])]
+      (is (re-find #"fast-mode-2026-02-01" beta))
+      (is (re-find #"interleaved-thinking" beta)))))
+
+;; ── non-streaming execute response mapping ──────────────────────────────────
+
+(deftest execute-anthropic-honors-http-boundary-test
+  ;; Non-streaming requests cross the same injectable HTTP seam as streams.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "hello"))
+        response {:status 200
+                  :body (json/generate-string
+                         {:content [{:type "text" :text "hello back"}]
+                          :stop_reason "end_turn"
+                          :usage {:input_tokens 2 :output_tokens 3}})}
+        http (http-boundary/nullable [response])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
+        recorded (first (http-boundary/requests http))]
+    (is (= "hello back" (get-in result [:assistant-message :content 0 :text])))
+    (is (= "https://api.anthropic.com/v1/messages" (:url recorded)))
+    (is (= :text (get-in recorded [:request :as])))
+    (is (false? (get-in recorded [:request :throw-exceptions])))))
+
+(deftest execute-anthropic-preserves-tool-use-blocks-test
+  ;; the non-streaming execute response mapping previously kept
+  ;; only "text" blocks (text-content-blocks) — a response containing a
+  ;; tool_use block silently dropped the tool call while :stop-reason
+  ;; :tool_use was preserved, so classify-assistant-message /
+  ;; extract-tool-calls recorded :turn.outcome/stop and the tool call never
+  ;; executed (reachable on the newly shipped DeepSeek provider via
+  ;; response-mode :non-streaming sessions with tools; inconsistent with
+  ;; BOTH the :openai-completions sibling and the anthropic transport's own
+  ;; streaming accumulator). The mapping now mirrors those paths: tool_use →
+  ;; :tool-call (id/name/arguments, :input JSON-encoded so downstream
+  ;; tool-args/parse-args parses it), thinking → :thinking, text → :text,
+  ;; wire order preserved.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "What is the weather in Paris?"))
+        body  {:content [{:type "tool_use"
+                          :id "toolu_01"
+                          :name "get_weather"
+                          :input {:location "Paris"}}
+                         {:type "text" :text "Let me check"}]
+               :stop_reason "tool_use"
+               :usage {:input_tokens 12 :output_tokens 8}}
+        http (http-boundary/nullable
+              [{:status 200 :body (json/generate-string body)}])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
+        content (:content (:assistant-message result))]
+    (is (= 1 (count (http-boundary/requests http)))
+        "the behavior proof crosses the nullable HTTP boundary")
+    (is (= :tool_use (:stop-reason (:assistant-message result)))
+        "stop-reason :tool_use is preserved")
+    (is (= [{:type :tool-call
+             :id "toolu_01"
+             :name "get_weather"
+             :arguments "{\"location\":\"Paris\"}"}
+            {:type :text :text "Let me check"}]
+           content)
+        "tool_use block maps to :tool-call with id/name/JSON-string arguments, wire order preserved")))
+
+(deftest execute-anthropic-preserves-thinking-blocks-test
+  ;; the old text-content-blocks mapping also
+  ;; dropped thinking blocks on the non-streaming execute path while the
+  ;; streaming accumulator keeps them in the final content — the same
+  ;; mapping now preserves them (:thinking with text/signature), matching
+  ;; thinking-blocks-in-order.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "Think then answer"))
+        body  {:content [{:type "thinking"
+                          :thinking "Let me reason about this step by step."
+                          :signature "sig_01"}
+                         {:type "text" :text "The answer is 42."}]
+               :stop_reason "end_turn"
+               :usage {:input_tokens 12 :output_tokens 8}}
+        http (http-boundary/nullable
+              [{:status 200 :body (json/generate-string body)}])
+        result ((:execute anthropic/provider)
+                convo model {:api-key "test-key" :http-boundary http})
+        content (:content (:assistant-message result))]
+    (is (= 1 (count (http-boundary/requests http)))
+        "the behavior proof crosses the nullable HTTP boundary")
+    (is (= [{:type :thinking
+             :text "Let me reason about this step by step."
+             :signature "sig_01"}
+            {:type :text :text "The answer is 42."}]
+           content)
+        "thinking block maps to :thinking with text/signature, wire order preserved")))

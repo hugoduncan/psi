@@ -7,7 +7,9 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.bootstrap :as bootstrap]
    [psi.ai.models :as models]
+   [psi.ai.providers.request-support :as request-support]
    [psi.agent-session.core :as session]
+   [psi.agent-session.model-capabilities :as model-capabilities]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-persistence.core :as persist]
    [psi.shared-config.project :as project-prefs]
@@ -151,6 +153,45 @@
           (is (= {:ok false :error :invalid-placement :reason :after-assistant}
                  (session/inject-mid-system-message-in! ctx2 session-id2 "late")))
           (is (= n (count (persist/all-entries-in ctx2 session-id2)))))))))
+
+(deftest mid-system-capability-custom-origin-test
+  ;; the mid-system-message inference branch must not classify a
+  ;; custom models.edn provider by NAME. `expand-model` tags every custom
+  ;; model `:custom? true`; a custom provider literally named "openai"
+  ;; (api :openai-completions) previously received the built-in-only
+  ;; inference while every other custom provider had to declare the field
+  ;; explicitly — the same provider-name-collision class guarded against
+  ;; for env-key fallback and OAuth treatment.
+  (testing "a custom provider named \"openai\" (:custom? true) does NOT get the built-in inference"
+    (is (false? (model-capabilities/supports-mid-system-messages?
+                 {:provider :openai :api :openai-completions :custom? true}))))
+
+  (testing "the inference routes through the shared request-support predicate"
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-completions :custom? true}))
+        "custom provider named openai is excluded by the shared predicate")
+    (is (true? (request-support/builtin-openai-chat-completions?
+                {:provider :openai :api :openai-completions}))
+        "built-in OpenAI chat shape matches the shared predicate")
+    (is (false? (request-support/builtin-openai-chat-completions?
+                 {:provider :openai :api :openai-codex-responses}))
+        "codex-routed built-ins never match the shared predicate"))
+
+  (testing "a custom provider named \"deepseek\" (:custom? true) does NOT get the inference"
+    (is (false? (model-capabilities/supports-mid-system-messages?
+                 {:provider :deepseek :api :openai-completions :custom? true}))))
+
+  (testing "an untagged OpenAI chat model (built-in shape) still gets the inference"
+    (is (true? (model-capabilities/supports-mid-system-messages?
+                {:provider :openai :api :openai-completions}))))
+
+  (testing "explicit :supports-mid-conversation-system-messages still wins for custom models"
+    (is (true? (model-capabilities/supports-mid-system-messages?
+                {:provider :openai :api :openai-completions :custom? true
+                 :supports-mid-conversation-system-messages true})))
+    (is (false? (model-capabilities/supports-mid-system-messages?
+                 {:provider :openai :api :openai-completions
+                  :supports-mid-conversation-system-messages false})))))
 
 (deftest model-thinking-dispatch-test
   (testing "set-model-in! routes through dispatch log"

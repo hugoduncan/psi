@@ -7,6 +7,7 @@
             [psi.ai.providers.openai.reasoning :as reasoning]
             [psi.ai.providers.openai.codex-structured-output :as codex-structured-output]
             [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.structured-output :as structured-output]))
 
 (defn- resolve-codex-url
@@ -106,15 +107,20 @@
 
 (defn build-codex-request
   [conversation model options]
-  (let [api-key    (or (:api-key options)
-                       (System/getenv "OPENAI_API_KEY"))
-        account-id (content/extract-chatgpt-account-id api-key)]
-    (when-not (seq api-key)
-      (throw (ex-info "OpenAI API key is required"
-                      {:provider :openai :api :openai-codex-responses})))
-    (when-not (seq account-id)
+  (let [;; No auth key is required when the request is explicitly keyless
+        no-auth?   (request-support/no-auth? options)
+        api-key    (when-not no-auth?
+                     (request-support/resolve-api-key
+                      model options request-support/openai-api-key-config))
+        ;; Codex's ChatGPT/Codex backend requires an OAuth access token to
+        ;; derive chatgpt_account_id. A keyless custom codex-compatible
+        ;; endpoint (local proxy, custom-header auth) legitimately has no key
+        ;; and therefore no account id — omit the header instead of failing.
+        account-id (when api-key
+                     (content/extract-chatgpt-account-id api-key))]
+    (when (and api-key (not (seq account-id)))
       (throw (ex-info "OpenAI Codex requires ChatGPT OAuth access token (missing chatgpt_account_id)"
-                      {:provider :openai :api :openai-codex-responses})))
+                      {:provider (:provider model) :api :openai-codex-responses})))
     (let [structured-request (structured-output/structured-output-request options)
           strategy           (structured-output/select-strategy model structured-request)
           fallback-request   (when (= :prompted-json (:strategy strategy))
@@ -124,10 +130,9 @@
           base-hdrs (cond-> {"Content-Type"       "application/json"
                              "accept"             "text/event-stream"
                              "OpenAI-Beta"        "responses=experimental"
-                             "originator"         "psi"
-                             "chatgpt-account-id" account-id}
-                      (not (:no-auth-header options))
-                      (assoc "Authorization" (str "Bearer " api-key))
+                             "originator"         "psi"}
+                      account-id (assoc "chatgpt-account-id" account-id)
+                      api-key    (assoc "Authorization" (str "Bearer " api-key))
                       (:session-id options)
                       (assoc "session_id"      (:session-id options)
                              "conversation_id" (:session-id options)))
@@ -164,9 +169,9 @@
    :open-tool-indexes         (atom #{})})
 
 (defn- emit-codex-start!
+  "Emit :start exactly once before the first output or terminal event."
   [consume-fn started?]
-  (when (compare-and-set! started? false true)
-    (consume-fn {:type :start})))
+  (request-support/emit-start! consume-fn started?))
 
 (defn- emit-codex-started-event!
   [consume-fn started? event]
@@ -227,14 +232,18 @@
     (codex-structured-output/maybe-emit-prompted-json-result!
      consume-fn structured-result-emitted? strategy raw-text)))
 
+(defn- balance-open-codex-tools!
+  [{:keys [open-tool-indexes tool-args-by-index]} consume-fn]
+  (doseq [idx (sort @open-tool-indexes)]
+    (consume-fn {:type :toolcall-end :content-index idx}))
+  (reset! open-tool-indexes #{})
+  (reset! tool-args-by-index {}))
+
 (defn- emit-codex-done!
-  [{:keys [done? open-tool-indexes tool-args-by-index] :as stream-state} consume-fn model event strategy]
+  [{:keys [done?] :as stream-state} consume-fn model event strategy]
   (when-not @done?
     (reset! done? true)
-    (doseq [idx @open-tool-indexes]
-      (consume-fn {:type :toolcall-end :content-index idx}))
-    (reset! open-tool-indexes #{})
-    (reset! tool-args-by-index {})
+    (balance-open-codex-tools! stream-state consume-fn)
     (emit-codex-structured-output-result! stream-state consume-fn strategy)
     (let [resp      (:response event)
           status    (:status resp)
@@ -249,9 +258,11 @@
 (defn- emit-codex-error!
   ([model stream-state consume-fn options url msg http-status]
    (emit-codex-error! model stream-state consume-fn options url msg http-status nil))
-  ([model {:keys [done?]} consume-fn options url msg http-status headers]
+  ([model {:keys [done? started?] :as stream-state} consume-fn options url msg http-status headers]
    (when-not @done?
      (reset! done? true)
+     (emit-codex-start! consume-fn started?)
+     (balance-open-codex-tools! stream-state consume-fn)
      (let [err (cond-> {:type :error :error-message msg}
                  http-status (assoc :http-status http-status)
                  headers (assoc :headers headers))]
@@ -414,51 +425,54 @@
 
 (defn- handle-codex-event!
   [stream-state consume-fn model options url strategy event]
-  (transport/capture-response! model options :openai-codex-responses url event)
-  (let [event-type (:type event)]
-    (cond
-      (= "response.output_item.added" event-type)
-      (handle-codex-output-item-added! stream-state consume-fn event)
+  (when-not @(:done? stream-state)
+    (let [event-type (:type event)]
+      (when-not (or (= "response.failed" event-type)
+                    (= "error" event-type))
+        (transport/capture-response! model options :openai-codex-responses url event))
+      (cond
+        (= "response.output_item.added" event-type)
+        (handle-codex-output-item-added! stream-state consume-fn event)
 
-      (= "response.function_call_arguments.delta" event-type)
-      (let [idx   (resolve-codex-tool-index stream-state event)
-            delta (:delta event)]
-        (when (and (number? idx) (seq delta))
+        (= "response.function_call_arguments.delta" event-type)
+        (let [idx   (resolve-codex-tool-index stream-state event)
+              delta (:delta event)]
+          (when (and (number? idx) (seq delta))
+            (emit-codex-start! consume-fn (:started? stream-state))
+            (emit-codex-tool-delta! stream-state consume-fn idx delta)))
+
+        (= "response.output_item.done" event-type)
+        (handle-codex-output-item-done! stream-state consume-fn event)
+
+        (= "response.output_text.delta" event-type)
+        (when-let [delta (content/string-fragment (:delta event))]
+          (swap! (:text-buffer stream-state) str delta)
+          (emit-codex-started-event! consume-fn (:started? stream-state)
+                                     {:type :text-delta
+                                      :content-index 0
+                                      :delta delta}))
+
+        (contains? codex-thinking-delta-event-types event-type)
+        (emit-codex-thinking-delta! stream-state consume-fn event)
+
+        (contains? codex-done-event-types event-type)
+        (do
           (emit-codex-start! consume-fn (:started? stream-state))
-          (emit-codex-tool-delta! stream-state consume-fn idx delta)))
+          (emit-codex-done! stream-state consume-fn model event strategy))
 
-      (= "response.output_item.done" event-type)
-      (handle-codex-output-item-done! stream-state consume-fn event)
+        (= "response.failed" event-type)
+        (emit-codex-error! model stream-state consume-fn options url
+                           (codex-error-message event "Codex response failed")
+                           (codex-error-http-status event)
+                           (codex-error-headers event))
 
-      (= "response.output_text.delta" event-type)
-      (when-let [delta (content/string-fragment (:delta event))]
-        (swap! (:text-buffer stream-state) str delta)
-        (emit-codex-started-event! consume-fn (:started? stream-state)
-                                   {:type :text-delta
-                                    :content-index 0
-                                    :delta delta}))
+        (= "error" event-type)
+        (emit-codex-error! model stream-state consume-fn options url
+                           (codex-error-message event "Codex stream error")
+                           (codex-error-http-status event)
+                           (codex-error-headers event))
 
-      (contains? codex-thinking-delta-event-types event-type)
-      (emit-codex-thinking-delta! stream-state consume-fn event)
-
-      (contains? codex-done-event-types event-type)
-      (do
-        (emit-codex-start! consume-fn (:started? stream-state))
-        (emit-codex-done! stream-state consume-fn model event strategy))
-
-      (= "response.failed" event-type)
-      (emit-codex-error! model stream-state consume-fn options url
-                         (codex-error-message event "Codex response failed")
-                         (codex-error-http-status event)
-                         (codex-error-headers event))
-
-      (= "error" event-type)
-      (emit-codex-error! model stream-state consume-fn options url
-                         (codex-error-message event "Codex stream error")
-                         (codex-error-http-status event)
-                         (codex-error-headers event))
-
-      :else nil)))
+        :else nil))))
 
 (defn stream-openai-codex
   [conversation model options consume-fn]
@@ -472,10 +486,10 @@
             _        (when strategy
                        (consume-fn {:type :structured-output-strategy
                                     :structured-output strategy}))
-            response (transport/stream-response url request)]
+            response (transport/stream-response options url request)]
         (if (transport/error-status? (:status response))
-          (let [{:keys [error-message http-status]} (transport/response->error response)]
-            (emit-codex-error! model stream-state consume-fn options url error-message http-status))
+          (let [{:keys [error-message http-status headers]} (transport/response->error response)]
+            (emit-codex-error! model stream-state consume-fn options url error-message http-status headers))
           (do
             (with-open [reader (io/reader (:body response))]
               (doseq [line (line-seq reader)]
@@ -485,5 +499,5 @@
               (emit-codex-start! consume-fn (-> stream-state :started?))
               (emit-codex-done! stream-state consume-fn model {:response {:status "completed"}} strategy)))))
       (catch Exception e
-        (let [{:keys [error-message http-status]} (transport/exception->error e)]
-          (emit-codex-error! model stream-state consume-fn options url error-message http-status))))))
+        (let [{:keys [error-message http-status headers]} (transport/exception->error e)]
+          (emit-codex-error! model stream-state consume-fn options url error-message http-status headers))))))

@@ -68,6 +68,40 @@
       (turn-sc/send-event! ctx :turn/start)
       (is (= :text-accumulating (turn-sc/turn-phase ctx))))))
 
+(deftest terminal-from-idle-test
+  ;; :idle previously accepted only :turn/start — :turn/error and
+  ;; :turn/done were silently DROPPED there (enabled transitions => #{}), so
+  ;; a direct create-turn-context consumer feeding a provider :error/:done as
+  ;; the FIRST event (tests, embeddings, any future turn path that skips the
+  ;; turn-level :turn/start) got a silent drop, done-p never delivered, and
+  ;; only the 20-minute llm-stream-idle-timeout-ms ended the turn (the
+  ;; timeout branch's own :turn/error send was dropped too). The chart now
+  ;; mirrors the :text-accumulating / :tool-accumulating terminal transitions
+  ;; on :idle so terminal events are accepted from ANY state.
+  (testing ":turn/done from :idle transitions to :done and delivers done-p"
+    (let [done-p (promise)
+          ctx    (create-test-ctx done-p)]
+      (turn-sc/send-event! ctx :turn/done {:reason :stop})
+      (is (= :done (turn-sc/turn-phase ctx))
+          "the terminal phase is recorded, not silently dropped")
+      (let [result (deref done-p 1000 ::timeout)]
+        (is (not= ::timeout result)
+            "done-p is delivered from the initial state")
+        (is (= "assistant" (:role result)))
+        (is (= :stop (:stop-reason result))))))
+
+  (testing ":turn/error from :idle transitions to :error and delivers done-p"
+    (let [done-p (promise)
+          ctx    (create-test-ctx done-p)]
+      (turn-sc/send-event! ctx :turn/error {:error-message "Connection failed"})
+      (is (= :error (turn-sc/turn-phase ctx))
+          "the terminal phase is recorded, not silently dropped")
+      (let [result (deref done-p 1000 ::timeout)]
+        (is (not= ::timeout result)
+            "done-p is delivered from the initial state")
+        (is (= :error (:stop-reason result)))
+        (is (= "Connection failed" (:error-message result)))))))
+
 (deftest text-accumulation-test
   (testing "text deltas accumulate in text-buffer"
     (let [ctx (create-test-ctx)]

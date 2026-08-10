@@ -8,14 +8,17 @@ tools:
   - write
 skills:
   - work-independently
+  - clojure-coding-standards
+  - testing-without-mocks
+  - code-shaper
+  - test-shaper
 advertise: false
 ---
 For the Munera task identified by {{input}}, execute any unchecked,
 actionable, follow-up items in steps.md. Work independently.
 
-Only execute follow-up items that were added by the immediately preceding
-review pass. Do not execute older unchecked items that predate the preceding review pass;
-leave them for their owning workflow or human decision.
+Only execute follow-up items that were added by preceding review
+passes.
 
 Read the task's design.md as read-only context as needed. Read and
 update the task's plan.md, steps.md as needed. When a follow-up item

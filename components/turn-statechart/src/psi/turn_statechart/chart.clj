@@ -18,7 +18,17 @@
                     (ele/state {:id :idle}
                                (ele/transition {:event  :turn/start
                                                 :target :text-accumulating}
-                                               (ele/script {:expr (fn [_env data] (dispatch! data :on-stream-start))})))
+                                               (ele/script {:expr (fn [_env data] (dispatch! data :on-stream-start))}))
+                               ;; Accept terminal events from every state. Direct
+                               ;; consumers may receive :done or :error before
+                               ;; :start; both must deliver completion instead of
+                               ;; waiting for the stream idle timeout.
+                               (ele/transition {:event  :turn/done
+                                                :target :done}
+                                               (ele/script {:expr (fn [_env data] (dispatch! data :on-done))}))
+                               (ele/transition {:event  :turn/error
+                                                :target :error}
+                                               (ele/script {:expr (fn [_env data] (dispatch! data :on-error))})))
 
                     (ele/state {:id :text-accumulating}
                                (ele/transition {:event  :turn/text-delta

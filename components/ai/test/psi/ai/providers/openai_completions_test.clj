@@ -1,8 +1,9 @@
 (ns psi.ai.providers.openai-completions-test
   (:require
+   [psi.ai.providers.environment-boundary :as environment-boundary]
    [clojure.test :refer [deftest is testing]]
    [cheshire.core :as json]
-   [clj-http.client :as http]
+   [psi.ai.providers.http-boundary :as http-boundary]
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai])
@@ -39,10 +40,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (is (some #(= :start (:type %)) @events))
       (is (some #(and (= :toolcall-start (:type %))
@@ -80,10 +83,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (let [deltas (->> @events
                         (filter #(= :toolcall-delta (:type %)))
@@ -112,10 +117,12 @@
                                                                            :arguments "{\"path\":\"README.md\"}"}}]}
                                         :finish_reason "tool_calls"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(and (= :toolcall-start (:type %))
@@ -145,10 +152,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "function_call"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(and (= :toolcall-start (:type %))
@@ -197,6 +206,336 @@
         (is (nil? (:reasoning_effort body)))
         (is (nil? (:chat_template_kwargs body)))))))
 
+(deftest openai-completions-adaptive-thinking-ignored-for-custom-providers-test
+  ;; Locks the doc/custom-providers.md claim that :adaptive-thinking "is
+  ;; ignored for OpenAI-compatible custom providers": expand-model carries the
+  ;; field into every custom model map, but the chat-completions transport
+  ;; never reads it — so an :openai-completions custom model with
+  ;; :adaptive-thinking true must produce an unchanged OpenAI body (no
+  ;; output_config/effort/adaptive leakage).
+  (testing "adaptive-thinking on a custom :openai-completions model does not leak into the request body"
+    (let [base-model {:id                 "custom-chat-model"
+                      :name               "Custom Chat Model"
+                      :provider           :custom-chat
+                      :custom? true
+                      :api                :openai-completions
+                      :base-url           "https://example.com/v1"
+                      :supports-reasoning true
+                      :supports-images    false
+                      :supports-text      true
+                      :context-window     128000
+                      :max-tokens         16384
+                      :input-cost         0.0
+                      :output-cost        0.0
+                      :cache-read-cost    0.0
+                      :cache-write-cost   0.0}
+          convo   (-> (conv/create "sys") (conv/add-user-message "hi"))
+          plain   (json/parse-string
+                   (:body (#'openai/build-request convo base-model
+                                                  {:api-key "sk-test" :thinking-level :high}))
+                   true)
+          adaptive (json/parse-string
+                    (:body (#'openai/build-request convo (assoc base-model :adaptive-thinking true)
+                                                   {:api-key "sk-test" :thinking-level :high}))
+                    true)]
+      (is (= plain adaptive)
+          ":adaptive-thinking must not change the OpenAI-compatible request body")
+      (is (nil? (:output_config adaptive)))
+      (is (nil? (:thinking adaptive)))
+      (is (= "high" (:reasoning_effort adaptive))
+          "classic chat-completions reasoning shape is unchanged"))))
+
+(deftest openai-provider-scoped-api-key-resolution-test
+  ;; Mirrors the anthropic transport's provider-scoped resolve-api-key: a
+  ;; custom :openai-completions provider must never silently receive the
+  ;; global OPENAI_API_KEY — the exact cross-provider credential disclosure
+  ;; class guarded against for :anthropic-messages. Custom providers fail
+  ;; fast (or go keyless via :no-auth-header / recognized auth header among
+  ;; custom :headers); only built-in OpenAI models fall back to the env var.
+  (testing "custom provider never falls back to OPENAI_API_KEY env var (no cross-provider leak)"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-chat"
+             (#'openai/build-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider's request")
+        (is (empty? (environment-boundary/reads environment))))))
+
+  (testing "custom-provider missing-auth error points at models.edn :auth and never hints at /login"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'openai/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"models.edn" (ex-message e))
+              "error must name the models.edn :auth remedy")
+          (is (nil? (re-find #"/login" (ex-message e)))
+              "custom-provider error must not hint at /login — OAuth login only exists for built-in providers")))))
+
+  (testing "custom-provider missing-auth error suggests an env var name with hyphens normalized to underscores"
+    (let [model {:id "my-proxy-model"
+                 :name "My Proxy Model"
+                 :provider :my-openai-proxy
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://my-proxy.example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      (try
+        (#'openai/build-request convo model {})
+        (is false "expected build-request to throw")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"env:MY_OPENAI_PROXY_API_KEY" (ex-message e))
+              "env var suggestion must normalize kebab-case provider keys to underscores — bash identifiers cannot contain hyphens")
+          (is (nil? (re-find #"MY-OPENAI-PROXY_API_KEY" (ex-message e)))
+              "suggestion must not preserve hyphens from a kebab-case provider key")))))
+
+  (testing "built-in openai model falls back to OPENAI_API_KEY env var"
+    (let [model (models/get-model :gpt-5)
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-env-fallback-key"})]
+        (let [req (#'openai/build-request convo model {:environment-boundary environment})]
+          (is (= "Bearer sk-env-fallback-key" (get-in req [:headers "Authorization"]))
+              "built-in OpenAI requests without an explicit key use OPENAI_API_KEY")
+          (is (= ["OPENAI_API_KEY"] (environment-boundary/reads environment)))))))
+
+  (testing "keyless custom provider with :no-auth-header true builds a request without Authorization"
+    (let [model {:id "local-chat-model"
+                 :name "Local Chat Model"
+                 :provider :local-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})
+          req   (#'openai/build-request convo model {:no-auth-header true
+                                                     :environment-boundary environment})]
+      (is (nil? (get-in req [:headers "Authorization"]))
+          "no Authorization when :no-auth-header is set — even with OPENAI_API_KEY present")
+      (is (= "application/json" (get-in req [:headers "Content-Type"])))))
+
+  (testing "recognized auth header among custom headers (case-insensitive) implies keyless auth"
+    (let [model {:id "local-chat-model"
+                 :name "Local Chat Model"
+                 :provider :local-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "http://localhost:8080/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})
+          req   (#'openai/build-request convo model
+                                        {:headers {"Authorization" "Bearer local-token"}
+                                         :environment-boundary environment})
+          headers (:headers req)]
+      (is (= "Bearer local-token" (get headers "Authorization"))
+          "custom authorization header auth is preserved")
+      (is (= "Bearer local-token" (get headers "Authorization"))
+          "env key must not replace the custom auth header")))
+
+  (testing "incidental custom headers with a blank key fast-fail (no env fallback)"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider custom-chat"
+             (#'openai/build-request convo model {:headers {"X-Client" "psi"}
+                                                  :environment-boundary environment}))
+            "incidental headers must not imply keyless — a blank key still fast-fails instead of leaking the env key")
+        (is (empty? (environment-boundary/reads environment)))))))
+
+(deftest custom-provider-named-openai-not-builtin-test
+  ;; built-in detection is by provider NAME, so a custom models.edn
+  ;; provider literally named "openai" was classified built-in and defeated
+  ;; the provider-scoped guarantee — an unset configured key silently fell
+  ;; back to OPENAI_API_KEY (sent to the third-party endpoint). Custom models
+  ;; now carry `:custom? true` (set by expand-model at parse time); the shared
+  ;; resolve-api-key refuses them, so a custom provider named "openai" gets
+  ;; the same provider-scoped treatment as any other custom name.
+  (testing "custom provider named \"openai\" never falls back to OPENAI_API_KEY"
+    (let [model {:id "not-a-builtin"
+                 :name "Custom OpenAI-Named Provider"
+                 :provider :openai
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://third-party.example/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")]
+      #_{:clj-kondo/ignore [:redundant-let]}
+      (let [environment (environment-boundary/nullable {"OPENAI_API_KEY" "sk-should-never-leak"})]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Missing API key for provider openai"
+             (#'openai/build-request convo model {:environment-boundary environment}))
+            "OPENAI_API_KEY must not be used to satisfy a custom provider named \"openai\"")
+        (is (empty? (environment-boundary/reads environment)))))))
+
+(deftest configured-key-plus-recognized-auth-header-interplay-test
+  ;; a custom :headers map carrying a recognized auth header name
+  ;; silently replaces/duplicates the configured :api-key — untested for both
+  ;; transports. OpenAI build-request merges custom headers LAST, so a custom
+  ;; Authorization header silently REPLACES the resolved bearer key; a custom
+  ;; X-API-Key header coexists with the configured bearer key (server picks by
+  ;; case-insensitive header merge). Documented in doc/custom-providers.md —
+  ;; don't mix them.
+  (testing "custom Authorization header replaces the resolved bearer key"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"Authorization" "Bearer custom"}})]
+      (is (= "Bearer custom" (get-in req [:headers "Authorization"]))
+          "custom Authorization header replaces the resolved bearer key — the configured key is not sent")))
+
+  (testing "configured key + custom X-API-Key header sends both auth headers"
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"X-API-Key" "other-key"}})]
+      (is (= "Bearer configured-key" (get-in req [:headers "Authorization"]))
+          "configured api-key still sent as the bearer Authorization header")
+      (is (= "other-key" (get-in req [:headers "X-API-Key"]))
+          "custom X-API-Key header merged in as-is — duplicate auth header on the wire")))
+
+  (testing "configured key + lowercase authorization custom header sends BOTH authorization headers"
+    ;; the merge is on equal string keys — a custom header whose
+    ;; name is the exact lowercase "authorization" does NOT collide with the
+    ;; base "Authorization" (capital A), so it DUPLICATES beside the resolved
+    ;; bearer key (the reverse of the anthropic transport's exact-case
+    ;; x-api-key replace). The doc guidance is case-dependent: exact-case
+    ;; replaces on anthropic, duplicates on openai.
+    (let [model {:id "custom-chat-model"
+                 :name "Custom Chat Model"
+                 :provider :custom-chat
+                 :custom? true
+                 :api :openai-completions
+                 :base-url "https://example.com/v1"
+                 :supports-reasoning true
+                 :supports-images false
+                 :supports-text true
+                 :context-window 128000
+                 :max-tokens 16384
+                 :input-cost 0.0
+                 :output-cost 0.0
+                 :cache-read-cost 0.0
+                 :cache-write-cost 0.0}
+          convo (conv/create "sys")
+          req   (#'openai/build-request convo model {:api-key "configured-key"
+                                                     :headers {"authorization" "Bearer custom"}})]
+      (is (= "Bearer configured-key" (get-in req [:headers "Authorization"]))
+          "resolved bearer key still sent as the base Authorization header")
+      (is (= "Bearer custom" (get-in req [:headers "authorization"]))
+          "lowercase authorization custom header merged in as-is — duplicate authorization header on the wire"))))
+
 (deftest openai-completions-parallel-tool-calls-uses-model-setting-test
   (let [convo (-> (conv/create "sys")
                   (conv/add-user-message "hi")
@@ -227,6 +566,7 @@
   (let [model {:id                 "local-completions"
                :name               "Local Completions"
                :provider           :local
+               :custom? true
                :api                :openai-completions
                :base-url           "http://localhost:8080/v1"
                :locality           :local
@@ -241,14 +581,16 @@
                :cache-write-cost   0.0}
         convo (-> (conv/create "sys") (conv/add-user-message "hi"))]
     (testing "thinking off adds chat_template_kwargs enable_thinking false for local models"
-      (let [req  (#'openai/build-request convo model {:thinking-level :off})
+      (let [req  (#'openai/build-request convo model {:thinking-level :off
+                                                      :no-auth-header true})
             body (json/parse-string (:body req) true)]
         (is (nil? (:reasoning_effort body)))
         (is (= {:enable_thinking false}
                (:chat_template_kwargs body)))))
 
     (testing "thinking on leaves chat_template_kwargs unset for local models"
-      (let [req  (#'openai/build-request convo model {:thinking-level :medium})
+      (let [req  (#'openai/build-request convo model {:thinking-level :medium
+                                                      :no-auth-header true})
             body (json/parse-string (:body req) true)]
         (is (= "medium" (:reasoning_effort body)))
         (is (nil? (:chat_template_kwargs body)))))))
@@ -286,41 +628,6 @@
           body  (json/parse-string (:body req) true)]
       (is (not (contains? body :temperature))))))
 
-(deftest local-openai-non-streaming-response-preserves-usage-test
-  (testing "non-streaming local OpenAI-compatible responses keep usage totals"
-    (let [model {:id "qwen-3.6-27b"
-                 :provider :local3
-                 :api :openai-completions
-                 :base-url "http://localhost:8082/v1"
-                 :supports-text true}
-          convo (-> (conv/create "sys")
-                    (conv/add-user-message "Reply with exactly: hi"))
-          body {:choices [{:finish_reason "stop"
-                           :index 0
-                           :message {:role "assistant"
-                                     :content "hi"
-                                     :reasoning_content "internal reasoning"}}]
-                :usage {:prompt_tokens 15
-                        :completion_tokens 152
-                        :total_tokens 167}}]
-      (with-redefs [http/post (fn [_url _req]
-                                {:status 200
-                                 :body (json/generate-string body)})]
-        (let [result ((:execute openai/provider) convo model {:no-auth-header true})]
-          (is (= "hi" (get-in result [:assistant-message :content 0 :text])))
-          (is (= :stop (get-in result [:assistant-message :stop-reason])))
-          (is (= {:input-tokens 15
-                  :output-tokens 152
-                  :cache-read-tokens 0
-                  :cache-write-tokens 0
-                  :total-tokens 167
-                  :cost {:input 0.0
-                         :output 0.0
-                         :cache-read 0.0
-                         :cache-write 0.0
-                         :total 0.0}}
-                 (get-in result [:assistant-message :usage]))))))))
-
 (deftest completions-reasoning-delta-shapes-map-to-thinking-delta-test
   (testing "chat completions reasoning delta variants are emitted as :thinking-delta"
     (let [model  (models/get-model :gpt-5)
@@ -344,10 +651,12 @@
                   "data: " (json/generate-string
                             {:choices [{:finish_reason "stop"}]
                              :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
 
       (is (some #(= :start (:type %)) @events))
@@ -361,6 +670,7 @@
   (testing "chat completions keep trailing usage when finish_reason arrives before usage"
     (let [model {:id "qwen-3.6-27b"
                  :provider :local3
+                 :custom? true
                  :api :openai-completions
                  :base-url "http://localhost:1234"
                  :supports-text true}
@@ -379,10 +689,12 @@
                                   :completion_tokens 128
                                   :total_tokens 170}}) "\n\n"
                "data: [DONE]\n\n")]
-      (with-redefs [http/post (fn [_url _req]
-                                {:body (stream-body sse)})]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
         ((:stream openai/provider)
-         convo model {:api-key "sk-test"}
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
       (let [done-events (filter #(= :done (:type %)) @events)]
         (is (= 1 (count done-events)))
@@ -395,26 +707,66 @@
                 :cost {:input 0.0 :output 0.0 :cache-read 0.0 :cache-write 0.0 :total 0.0}}
                (:usage (first done-events))))))))
 
+(deftest completions-sse-error-event-emits-error-and-terminates-test
+  (testing "a mid-stream OpenAI SSE error chunk emits :error and terminates"
+    ;; an error chunk ({"error": {...}} — no :choices) previously
+    ;; no-oped in process-chat-sse-line!: no :error event, no terminal :done,
+    ;; hanging the turn until the idle timeout — the same silent-drop class
+    ;; fixed for the anthropic transport's "error" SSE event.
+    (let [model  (models/get-model :gpt-5)
+          convo  (-> (conv/create "sys") (conv/add-user-message "hello"))
+          events (atom [])
+          sse    (str
+                  "data: " (json/generate-string
+                            {:choices [{:delta {:role "assistant"}}]}) "\n\n"
+                  "data: " (json/generate-string
+                            {:error {:message "The server had an error while processing your request."
+                                     :type "server_error"
+                                     :code "server_error"}}) "\n\n"
+                  "data: [DONE]\n\n")]
+      (let [response-fn (fn [_]
+                          {:body (stream-body sse)})
+            http-client (http-boundary/nullable [response-fn response-fn])]
+        ((:stream openai/provider)
+         convo model {:http-boundary http-client
+                      :api-key "sk-test"}
+         (fn [ev] (swap! events conj ev))))
+      (let [err (first (filter #(= :error (:type %)) @events))]
+        (is (some? err) "SSE error chunk must surface as an :error event")
+        (is (= "The server had an error while processing your request."
+               (:error-message err))
+            "error message extracted from the chunk's error body")
+        (is (nil? (:http-status err))
+            "no numeric http-status in the chunk → no status suffix")
+        (is (= {:error {:message "The server had an error while processing your request."
+                        :type "server_error"
+                        :code "server_error"}}
+               (:body err))
+            "raw chunk body preserved")
+        (is (not-any? #(= :done (:type %)) @events)
+            "no :done after a mid-stream error — the :error event terminates the turn")))))
+
 (deftest completions-non-2xx-response-map-surfaces-body-message-test
   (let [model  (models/get-model :gpt-5)
         convo  (-> (conv/create "sys")
                    (conv/add-user-message "hello"))
         events (atom [])]
-    (with-redefs [http/post (fn [_url _req]
-                              {:status 400
-                               :headers {"x-request-id" "req_oai_400"}
-                               :body (stream-body
-                                      (json/generate-string
-                                       {:error {:message "invalid request payload"}}))})]
+    (let [response-fn (fn [_]
+                        {:status 400
+                         :headers {"x-request-id" "req_oai_400"}
+                         :body (stream-body
+                                (json/generate-string
+                                 {:error {:message "invalid request payload"}}))})
+          http-client (http-boundary/nullable [response-fn response-fn])]
       ((:stream openai/provider)
-       convo model {:api-key "sk-test"}
+       convo model {:http-boundary http-client
+                    :api-key "sk-test"}
        (fn [ev] (swap! events conj ev))))
-    (is (= 1 (count @events)))
-    (is (= :error (:type (first @events))))
+    (is (= [:start :error] (mapv :type @events)))
     (is (= "invalid request payload (status 400) [request-id req_oai_400]"
-           (:error-message (first @events))))
-    (is (= 400 (:http-status (first @events))))
-    (is (= "req_oai_400" (get-in (first @events) [:headers "x-request-id"])))
+           (:error-message (second @events))))
+    (is (= 400 (:http-status (second @events))))
+    (is (= "req_oai_400" (get-in (second @events) [:headers "x-request-id"])))
     (is (= {:error {:message "invalid request payload"}}
-           (:body (first @events))))
-    (is (string? (:body-text (first @events))))))
+           (:body (second @events))))
+    (is (string? (:body-text (second @events))))))

@@ -1,7 +1,8 @@
 (ns psi.ai.providers.openai.transport
   (:require [clojure.string :as str]
-            [clj-http.client :as http]
             [cheshire.core :as json]
+            [psi.ai.providers.http-boundary :as http-boundary]
+            [psi.ai.providers.request-support :as request-support]
             [psi.ai.proxy :as proxy]))
 
 (defn safe-call!
@@ -13,39 +14,28 @@
         nil))))
 
 (defn stream-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :stream :cookie-policy :none :throw-exceptions false})))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :stream :cookie-policy :none :throw-exceptions false})))
 
 (defn execute-response
-  [url request]
-  (http/post url (merge request
-                        (proxy/request-proxy-options url)
-                        {:as :text :cookie-policy :none :throw-exceptions false})))
-
-(defn redact-authorization
-  [value]
-  (when (string? value)
-    (str "Bearer ***REDACTED***"
-         (when (> (count value) 20)
-           (str " (len=" (count value) ")")))))
-
-(defn mask-chatgpt-account-id
-  [value]
-  (when (string? value)
-    (str (subs value 0 (min 6 (count value))) "...")))
+  [options url request]
+  (http-boundary/post! (http-boundary/boundary options)
+                       url
+                       (merge request
+                              (proxy/request-proxy-options url)
+                              {:as :text :cookie-policy :none :throw-exceptions false})))
 
 (defn redact-request-headers
   [headers]
-  (cond-> headers
-    (contains? headers "Authorization")
-    (assoc "Authorization"
-           (redact-authorization (get headers "Authorization")))
-
-    (contains? headers "chatgpt-account-id")
-    (assoc "chatgpt-account-id"
-           (mask-chatgpt-account-id (get headers "chatgpt-account-id")))))
+  (request-support/redact-headers
+   headers
+   [["Authorization" request-support/redact-authorization]
+    ["chatgpt-account-id" request-support/mask-chatgpt-account-id]
+    ["x-api-key" request-support/redact-secret]]))
 
 (defn parse-json-body-safe
   [body]

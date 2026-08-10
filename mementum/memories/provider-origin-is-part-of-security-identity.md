@@ -1,0 +1,5 @@
+🎯 Provider name is not a security identity. Custom providers may deliberately use built-in names such as `anthropic` or `openai`, so every auth, capability, inference, and cached-credential decision must include the resolved model’s trusted origin (`:custom?`) as well as provider id.
+
+The origin tag must be system-assigned and rejected in user model definitions; otherwise configuration can spoof built-in status. Carry it through resolved model/session projections and use it wherever registry auth, built-in OAuth, capability defaults, or stored runtime credentials are selected. Cached credentials additionally need provider + origin matching, and current registry auth must supersede stale cached specs after reload.
+
+Test both collision directions: built-in models must never inherit same-named custom auth, and custom models must never receive built-in OAuth or inferred built-in capabilities. Test at each projection boundary, not only at the transport, because task 248 repeatedly closed the collision in one layer while it remained open in another.

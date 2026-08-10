@@ -16,7 +16,13 @@
 --     and prompt cache directives
 --   - OAuth vs API-key auth dispatch
 --   - Extended thinking level to budget_tokens mapping
+--   - Adaptive thinking request shaping (thinking type "adaptive" +
+--     output_config.effort) and temperature exclusion for adaptive models
+--   - Provider-scoped api-key resolution and keyless request detection
 --   - Temperature exclusion when extended thinking is active
+--   - Provider request/response capture callbacks with header redaction
+--   - HTTP-400 compatibility retry (fallback step selection and the retried
+--     request/body transforms, including the adaptive-shape interaction)
 --   - SSE streaming and event normalization to executor-facing event types
 --   - Usage accumulation across message_start and message_delta events
 --   - HTTP error handling and API error extraction
@@ -51,8 +57,11 @@ external entity Conversation {
 
 external entity Model {
     id: String
+    provider: String?
     base_url: String
     supports_reasoning: Boolean
+    adaptive_thinking: Boolean = false
+    custom: Boolean = false                  -- true for custom models.edn models (expand-model tag)
     max_tokens: Integer?
 }
 
@@ -60,11 +69,22 @@ external entity Model {
 -- Value Types
 ------------------------------------------------------------
 
+value ProviderCallbackHandle {
+    id: String
+}
+
 value StreamOptions {
     api_key: String?
     thinking_level: off | minimal | low | medium | high | xhigh | null
     temperature: Number?
     max_tokens: Integer?
+    no_auth_header: Boolean = false
+    headers: Map<String, String>?
+    effort_override: low | medium | high | xhigh | null
+    speed_mode: fast | normal | null
+
+    on_provider_request: ProviderCallbackHandle?
+    on_provider_response: ProviderCallbackHandle?
 }
 
 value StreamUsage {
@@ -77,11 +97,15 @@ value StreamUsage {
 }
 
 value StreamEvent {
-    event_type: start | text_start | text_delta | text_end | thinking_delta | toolcall_start | toolcall_delta | toolcall_end | done | error
+    event_type: start | text_start | text_delta | text_end
+              | thinking_start | thinking_delta | thinking_signature_delta | thinking_end
+              | toolcall_start | toolcall_delta | toolcall_end
+              | done | error
     content_index: Integer?
     id: String?
     name: String?
     delta: String?
+    signature: String?
     reason: String?
     usage: StreamUsage?
     error_message: String?
@@ -114,6 +138,12 @@ entity AnthropicStream {
     usage_acc: StreamUsage
     block_types: Map<Integer, String>
     done: Boolean = false
+    keyless: Boolean = false
+    -- whether :start was emitted (the started? atom). Mirrors
+    -- the openai/codex streams' started tracking; set by the first
+    -- emission (message_start, terminal/error/catch, or content-block
+    -- branch — see ContentBlockBranchesEmitStartWhenMessageStartAbsent).
+    started: Boolean = false
 }
 
 ------------------------------------------------------------
@@ -272,14 +302,82 @@ rule ConsecutiveToolResultsMergedIntoSingleUserMessage {
 -- Authentication
 ------------------------------------------------------------
 
+-- Primitives used below (shared vocabulary with spec/custom-providers.allium):
+--   Environment(name) — read an env var by name (System/getenv); nil when
+--     unset. Used for the built-in ANTHROPIC_API_KEY fallback.
+--   ResolveApiKey(spec) — the mechanical api-key spec resolution from
+--     spec/custom-providers.allium (ResolveApiKey rule): nil/blank → nil,
+--     "env:VAR" → Environment("VAR"), literal → as-is. Applied at REQUEST
+--     time : the registry stores the raw spec and the transports
+--     re-resolve env: keys per request.
+--   BlankOrNil(x) — x is nil or a blank/whitespace-only string
+--     (clojure.string/blank? semantics; nil counts as blank).
+--   HeaderName(header) — the header's name as a string (keyword/string names
+--     accepted).
+--   LowerCase(s) — lower-case a string (clojure.string/lower-case).
+--   RedactSecret(value) — redact a secret to "***REDACTED***", with a
+--     (len=N) suffix for values longer than 20 chars .
+--   RedactBearer(value) — redact an Authorization value to "Bearer
+--     ***REDACTED***", stripping a leading "Bearer " before the length count
+--     .
+--   RedactedHeaderValue(header) — the header's value after redaction
+--     (defined per auth-header kind by the RedactRequestHeaders rule).
+
 rule ApiKeyResolved {
     when: AnthropicStreamRequested(stream)
 
-    ensures: stream.resolved_api_key = stream.options.api_key ?? Environment("ANTHROPIC_API_KEY")
+    -- Provider-scoped resolution (see spec/custom-providers.allium
+    -- ResolveRequestApiKey): built-in Anthropic models (not tagged custom,
+    -- provider nil or "anthropic" — origin tagging closes the provider-NAME gap
+    -- where a custom provider literally named "anthropic" was classified
+    -- built-in) fall back to ANTHROPIC_API_KEY; custom providers never do
+    -- (a nil/blank configured key is a provider-scoped missing-key error);
+    -- keyless requests (no_auth_header, or a recognized auth header among
+    -- custom :headers with no configured key) resolve to nil and the
+    -- transport strips x-api-key / Authorization.
+
+    ensures: not stream.model.custom
+        and (stream.model.provider == null or stream.model.provider == "anthropic")
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key) ?? Environment("ANTHROPIC_API_KEY")
+    ensures: (stream.model.custom
+              or (stream.model.provider != null and stream.model.provider != "anthropic"))
+        and not stream.keyless
+        implies stream.resolved_api_key = ResolveApiKey(stream.options.api_key)
+              and not BlankOrNil(stream.resolved_api_key)
+    ensures: stream.keyless implies stream.resolved_api_key = null
+}
+
+rule KeylessRequestDetermined {
+    -- Mirrors build-request's no-auth? computation in
+    -- providers/anthropic.clj: a request is keyless when :no-auth-header is
+    -- set (e.g. :auth-header? false local servers), or when custom :headers
+    -- carry a recognized auth header (x-api-key / authorization,
+    -- case-insensitive) with no configured key. Incidental custom headers
+    -- (e.g. X-Client) do NOT make a request keyless — with a blank configured
+    -- key such a request fast-fails with the provider-scoped "Missing API
+    -- key" error (the OpenAI transports share the same no-auth? predicate
+    -- via providers/request_support.clj, the implementation).
+
+    when: AnthropicStreamRequested(stream)
+
+    ensures: stream.keyless iff
+        stream.options.no_auth_header
+        or (non-empty(stream.options.headers)
+            and BlankOrNil(stream.options.api_key)
+            and ∃ header ∈ stream.options.headers. LowerCase(HeaderName(header)) ∈ {"x-api-key", "authorization"})
 }
 
 rule OAuthDetectedFromApiKey {
+    -- OAuth content-sniffing (sk-ant-oat keys) applies only to
+    -- built-in Anthropic models (not tagged custom, provider nil or
+    -- "anthropic" — a custom provider literally named "anthropic"
+    -- is tagged custom and is never OAuth-treated). A custom
+    -- :anthropic-messages provider whose configured key merely resembles an
+    -- OAuth token must still use x-api-key auth and must never receive the
+    -- Claude Code OAuth headers/system prompt.
     when: AnthropicStreamRequested(stream)
+    requires: not stream.model.custom
+    requires: (stream.model.provider == null or stream.model.provider == "anthropic")
     requires: Contains(stream.resolved_api_key, "sk-ant-oat")
 
     ensures: stream.oauth = true
@@ -309,7 +407,52 @@ rule ThinkingParamPresentForActiveLevel {
     requires: model.supports_reasoning = true
     requires: options.thinking_level ∈ {minimal, low, medium, high, xhigh}
 
-    ensures: ThinkingParam({type: "enabled", budget_tokens: BudgetForLevel(options.thinking_level)})
+    ensures: ThinkingParam(
+        if model.adaptive_thinking:
+            {type: "adaptive", display: "summarized"}
+        else:
+            {type: "enabled", budget_tokens: BudgetForLevel(options.thinking_level)})
+
+    @guidance
+        -- Adaptive thinking (built-in Opus 4.7+ and :adaptive-thinking custom
+        -- models, e.g. the documented deepseek-v4-flash example) uses the
+        -- adaptive shape ({:type "adaptive" :display "summarized"}) paired
+        -- with body output_config.effort, never the classic
+        -- thinking.budget_tokens shape.
+}
+
+rule OutputConfigEffortForAdaptiveThinking {
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.supports_reasoning = true
+    requires: stream.model.adaptive_thinking = true
+    requires: ThinkingParam(stream) != null
+
+    ensures: RequestBodyContains("output_config", {effort: EffortValue(stream.options)})
+
+    @guidance
+        -- Adaptive thinking sends output_config.effort (derived from the
+        -- thinking level — minimal/low → "low", medium → "medium", high →
+        -- "high", xhigh → "highest" — or an explicit effort override) instead
+        -- of the classic thinking.budget_tokens, which DeepSeek's
+        -- Anthropic-compatible endpoint accepts but ignores.
+}
+
+rule NoOutputConfigForClassicThinking {
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.adaptive_thinking = false
+
+    ensures: RequestBodyDoesNotContain("output_config")
+}
+
+rule TemperatureExcludedForAdaptiveModels {
+    -- Adaptive-thinking models never send temperature — even with thinking
+    -- off — because Anthropic rejects temperature on adaptive-thinking models
+    -- (the trade-off doc/custom-providers.md documents). This holds for
+    -- built-in Opus 4.7+ models and :adaptive-thinking custom providers.
+    when: RequestBodyBuilt(stream)
+    requires: stream.model.adaptive_thinking = true
+
+    ensures: RequestBodyDoesNotContain("temperature")
 }
 
 rule LastAssistantThinkingBlocksMustRoundTripDuringToolContinuation {
@@ -355,15 +498,299 @@ rule AnthropicRequestBodyBuilt {
     ensures: RequestBodyContains("stream", true)
     ensures: RequestBodyContains("tools", ToolDefs(stream.conversation)) when stream.conversation.tools non-empty
     ensures: RequestBodyContains("thinking", ThinkingParam(stream)) when ThinkingParam(stream) != null
-    ensures: RequestBodyContains("temperature", stream.options.temperature ?? config.default_temperature) when ThinkingParam(stream) = null
+    ensures: RequestBodyContains("temperature", stream.options.temperature ?? config.default_temperature) when ThinkingParam(stream) = null and not stream.model.adaptive_thinking
+}
+
+------------------------------------------------------------
+-- Fast mode and first-request beta assembly
+------------------------------------------------------------
+
+-- the HTTP-400 retry rules (below) reference the fast-mode beta
+-- header ("fast-mode-2026-02-01") and the "speed" body field by name, but the
+-- FIRST-request construction of both was unmodeled. These rules close that
+-- gap, mirroring request-body / beta-header / request-headers in
+-- providers/anthropic.clj. They also model the fast-mode behavior: a
+-- speed-field 400 retries with the field retained (WithoutAllBetasStepClears
+-- BetasAndOutputFormat) and hard-fails.
+
+rule FastModeBodyAndBetaHeaderForSpeedMode {
+    when: RequestBodyBuilt(stream)
+    requires: stream.options.speed_mode = fast
+
+    ensures: RequestBodyContains("speed", "fast")
+    ensures: AnthropicBetaHeader(stream) contains "fast-mode-2026-02-01"
+}
+
+rule NoFastModeFieldsWhenSpeedModeNotFast {
+    when: RequestBodyBuilt(stream)
+    requires: stream.options.speed_mode != fast
+
+    ensures: RequestBodyDoesNotContain("speed")
+    ensures: AnthropicBetaHeader(stream) does not contain "fast-mode-2026-02-01"
+}
+
+rule BetaHeaderAssembledForRequest {
+    -- Mirrors beta-header/request-headers in providers/anthropic.clj: the
+    -- anthropic-beta header is the distinct join of per-feature beta values.
+    -- Adaptive thinking (adaptive_thinking = true) must NOT add
+    -- interleaved-thinking-beta — only classic extended thinking (thinking
+    -- param non-null and NOT adaptive; beta-header's extended-thinking? =
+    -- thinking and not adaptive?) adds it.
+    -- Vocabulary: ThinkingParam(stream) (defined above);
+    -- PromptCachingActive(stream) = any conversation prompt unit
+    -- (system-prompt-blocks, tools, messages) carries :cache_control
+    -- (prompt-caching? in providers/anthropic.clj);
+    -- StructuredOutputRequested(stream) = the structured-output strategy is
+    -- provider-native with the :anthropic/json-schema-output native mechanism
+    -- (json-schema-output-mechanism? in
+    -- providers/anthropic/structured_output.clj).
+    when: AnthropicStreamRequested(stream)
+
+    ensures: AnthropicBetaHeader(stream) = Join(",", Distinct(concat(
+        stream.oauth = true →
+            ["claude-code-20250219", "oauth-2025-04-20",
+             "context-management-2025-06-27", "prompt-caching-scope-2026-01-05"],
+        ThinkingParam(stream) != null and not stream.model.adaptive_thinking →
+            ["interleaved-thinking-2025-05-14"],
+        PromptCachingActive(stream) → ["prompt-caching-2024-07-31"],
+        stream.options.speed_mode = fast → ["fast-mode-2026-02-01"],
+        StructuredOutputRequested(stream) → ["structured-outputs-2025-11-13"])))
+    ensures: (no beta condition applies) implies AnthropicBetaHeader(stream) = null
+}
+
+------------------------------------------------------------
+-- Capture Callbacks
+------------------------------------------------------------
+
+rule ProviderRequestCaptureEmittedWithRedaction {
+    when: ProviderRequestBuilt(stream, request)
+    requires: stream.options.on_provider_request != null
+
+    ensures: ProviderCallbackInvoked(stream.options.on_provider_request, {
+        provider: stream.model.provider ?? "anthropic",
+        api: "anthropic-messages",
+        url: RequestUrl(stream),
+        request: {
+            headers: RedactRequestHeaders(request.headers),
+            body: ParseJsonOrString(request.body)
+        }
+    })
+}
+
+rule ProviderResponseCaptureEmitted {
+    when: ProviderResponseObserved(stream, event)
+    requires: stream.options.on_provider_response != null
+
+    ensures: ProviderCallbackInvoked(stream.options.on_provider_response, {
+        provider: stream.model.provider ?? "anthropic",
+        api: "anthropic-messages",
+        url: RequestUrl(stream),
+        event: event
+    })
+}
+
+rule RedactRequestHeaders {
+    -- Auth header names are matched case-insensitively (find-headers in
+    -- providers/request_support.clj); the redacted value is written back
+    -- under the original header key casing. EVERY case-insensitive match is
+    -- redacted — a differently-cased duplicate of an auth header name on the
+    -- wire (base "x-api-key" + custom "X-API-Key", or "Authorization" +
+    -- "authorization") must not leak verbatim into the capture .
+    -- Non-auth headers pass through unmodified.
+
+    when: RequestHeadersAvailable(headers)
+
+    ensures: ∀ header ∈ headers:
+        if LowerCase(HeaderName(header)) = "authorization":
+            RedactedHeaderValue(header) = RedactBearer(header.value)
+        else if LowerCase(HeaderName(header)) = "x-api-key":
+            RedactedHeaderValue(header) = RedactSecret(header.value)
+        else:
+            header unchanged
+}
+
+------------------------------------------------------------
+-- HTTP-400 Compatibility Retry
+------------------------------------------------------------
+
+-- Models fallback-request-steps-for-400 / fallback-request-for-400 /
+-- handle-400-response! (providers/anthropic/request_support.clj and
+-- providers/anthropic.clj; the implementation). On an HTTP 400 the STREAMING path
+-- retries ONCE with cumulative compatibility transforms derived from the
+-- request's beta headers/body:
+--   :without-prompt-caching — the prompt-caching beta header
+--                             ("prompt-caching-2024-07-31") is present
+--   :without-thinking       — the interleaved-thinking beta
+--                             ("interleaved-thinking-2025-05-14") OR a
+--                             :thinking body key is present (extended OR
+--                             adaptive thinking)
+--   :without-all-betas      — any beta header value is present and the
+--                             request is NOT OAuth. The OAuth decision is the
+--                             transport's COMPUTED oauth? boolean (built-in
+--                             Anthropic model + OAuth-shaped key, the implementation),
+--                             threaded from build-request via the request
+--                             map's ::oauth? entry — NOT a header
+--                             content-sniff . A keyless custom
+--                             provider whose custom :headers reproduce the
+--                             Claude Code CLI marker set (Authorization
+--                             Bearer + user-agent: claude-cli/… + x-app: cli)
+--                             is therefore NOT OAuth and still gets
+--                             :without-all-betas. The content-sniffing
+--                             oauth-auth-request? predicate
+--                             (providers/anthropic/error.clj) is kept for
+--                             error diagnostics only (the implementation narrows it
+--                             to the full marker set).
+-- If no step applies the request is unchanged and the 400 is surfaced
+-- without a retry. The non-streaming execute-anthropic path has no 400
+-- fallback at all (the streaming/non-streaming asymmetry).
+--
+-- Vocabulary used below (rule-defined triggers/predicates; cf. the
+-- Primitives note — no undefined entity attributes are referenced):
+--   Http400Observed(stream, request)   — the streaming request received HTTP 400
+--   FallbackSteps(stream)              — ordered list of selected step names
+--   FallbackStepApplied(stream, name, request) — a step's transform applied
+--   RetriedRequest(stream)             — the request after applying all steps
+--   RetryPerformedExactlyOnce(stream)  — the retried request is posted once
+--   RetryStatus(stream)                — HTTP status of the retried post
+--   StreamContinues(stream)            — retry succeeded; streaming proceeds
+--   ErrorEmitted(stream)               — a :error StreamEvent is surfaced
+--   PromptCachingBetaPresent(request)  — request headers carry the prompt-caching beta
+--   ThinkingRequest(request)           — interleaved-thinking beta OR :thinking body key
+--   AnyBetaHeaderPresent(request)      — request headers carry a non-empty anthropic-beta
+--   OAuthAuthRequest(request)          — the transport's COMPUTED OAuth
+--                                       decision (stream.oauth from
+--                                       OAuthDetectedFromApiKey: built-in
+--                                       Anthropic model + OAuth-shaped key),
+--                                       carried on the built request as
+--                                       ::oauth? . NOT a header
+--                                       content-sniff: a keyless custom
+--                                       provider whose custom :headers
+--                                       reproduce the Claude Code CLI marker
+--                                       set is not OAuth. (The error-diagnostic
+--                                       oauth-auth-request? predicate still
+--                                       content-sniffs the full marker set;
+--                                       it does not drive fallback selection.)
+--   RemoveBetaValue(headers, beta)     — drop one beta value from anthropic-beta
+--   ClearBetaHeader(headers)           — drop the anthropic-beta header entirely
+--   RemovePromptCachingBetas(headers)  — drop prompt-caching beta values
+
+rule FallbackStepsSelectedFor400 {
+    when: Http400Observed(stream, request)
+
+    ensures: PromptCachingBetaPresent(request)
+        implies FallbackStep("without-prompt-caching") ∈ FallbackSteps(stream)
+    ensures: ThinkingRequest(request)
+        implies FallbackStep("without-thinking") ∈ FallbackSteps(stream)
+    ensures: AnyBetaHeaderPresent(request) and not OAuthAuthRequest(request)
+        implies FallbackStep("without-all-betas") ∈ FallbackSteps(stream)
+}
+
+rule FallbackRetriedOnceOrErrorSurfaced {
+    when: Http400Observed(stream, request)
+
+    ensures:
+        if FallbackSteps(stream) non-empty:
+            RetriedRequest(stream) != request
+            and RetryPerformedExactlyOnce(stream)
+            and (RetryStatus(stream) < 400 implies StreamContinues(stream))
+            and (RetryStatus(stream) >= 400 implies ErrorEmitted(stream))
+        else:
+            ErrorEmitted(stream)
+}
+
+rule WithoutThinkingStepStripsThinkingAndOutputConfig {
+    when: FallbackStepApplied(stream, "without-thinking", request)
+
+    ensures: RetriedRequestBody(stream) = request.body minus {thinking, output_config}
+    ensures: RetriedRequestHeaders(stream) = RemoveBetaValue(request.headers, "interleaved-thinking-2025-05-14")
+
+    @guidance
+        -- :without-thinking strips BOTH the classic extended-thinking
+        -- (thinking.budget_tokens) and the adaptive-thinking
+        -- (thinking.type "adaptive" + output_config.effort) params. For an
+        -- adaptive-shape DeepSeek request this degrades the retry to
+        -- thinking silently ON (DeepSeek's server default for an omitted
+        -- thinking field) at default effort, dropping the user's effort
+        -- setting — the adaptive-shape behavior, documented in
+        -- doc/custom-providers.md and locked by
+        -- stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test.
+}
+
+rule WithoutAllBetasStepClearsBetasAndOutputFormat {
+    when: FallbackStepApplied(stream, "without-all-betas", request)
+
+    ensures: RetriedRequestHeaders(stream) = ClearBetaHeader(request.headers)
+    ensures: RetriedRequestBody(stream) = request.body minus {output_format}
+    ensures: "speed" ∈ RetriedRequestBody(stream) whenever "speed" ∈ request.body
+
+    @guidance
+        -- The Anthropic JSON-Schema output_format is gated by the
+        -- structured-output beta; a compatibility retry with all betas
+        -- removed must also drop the native output field rather than send an
+        -- invalid body/header combination. :speed (fast mode) is deliberately
+        -- retained, so a speed-field 400 retries once with the same field and
+        -- hard-fails — the fast-mode behavior.
+}
+
+rule WithoutPromptCachingStepStripsCacheDirectives {
+    when: FallbackStepApplied(stream, "without-prompt-caching", request)
+
+    ensures: RetriedRequestHeaders(stream) = RemovePromptCachingBetas(request.headers)
+    ensures: RetriedRequestBody(stream) = request.body minus cache-control fields
+    ensures: RetriedRequestBody(stream) = CollapsePlainTextSystemBlocks(request.body)
 }
 
 ------------------------------------------------------------
 -- SSE Parsing and usage
 ------------------------------------------------------------
+-- Vocabulary used below (rule-defined triggers/predicates; cf. the
+-- Primitives note — no undefined entity attributes are referenced):
+--   SseEventReceived(stream, type, event_data) — an SSE event line parsed
+--       into a typed event map ({"type": ..., ...}) reached the stream loop
+--   ProviderTransportClosed(stream)        — the SSE body reached EOF
+--   UsageAccUpdated(stream, deltas)          — usage-acc atom merge
+--   CurrentContentBlockType(stream, index)   — block type at a content index
+--   OpenBlockIndexes(stream)                 — content indices whose start
+--       event was consumed but whose stop was not yet received
+--   BlockEndEventType(block_type)            — tool_use → toolcall_end,
+--       thinking → thinking_end, else text_end ( shaped via
+--       content-block-stop-event, the same helper the in-band stop branch
+--       uses)
+--   StartEmittedOnce(stream)                 — :start surfaced exactly once
+--       (the started? compare-and-set; the implementation)
+--   RedactedThinkingBlockSkipped(stream, index) — a "redacted_thinking"
+--       content-block stop produces no typed end event (block skipped,
+--       the implementation; start/delta skipped symmetrically in the implementation)
+--   DoneEventReady(stream)                   — a terminal :done is ready
+--   FinalizedUsage(acc)                      — StreamUsage totals + cost
+--   Emit(StreamEvent{...})                   — executor-facing event surfaced
+--   ErrorEmitted(stream)                     — a :error StreamEvent is surfaced
+--   EventOrder(stream, first, second)         — first is emitted before second
+--   InitialHttpErrorObserved(stream)          — the initial streaming HTTP
+--       response is an error (including an unrecoverable 400 or failed
+--       compatibility retry), before any SSE line is consumed
+--   TerminalStateSetBeforeError(stream)       — stream.done becomes true
+--       before the consumer receives the terminal :error
+
+rule InitialHttpErrorEmitsStartBeforeError {
+    when: InitialHttpErrorObserved(stream)
+
+    ensures: StartEmittedOnce(stream)
+    ensures: ErrorEmitted(stream)
+    ensures: EventOrder(stream, start, error)
+
+    @guidance
+        -- initial HTTP response errors observe the same
+        -- :start-before-terminal invariant as error-first SSE events and
+        -- first-read exceptions. For a 400 with an applicable compatibility
+        -- fallback, :start is emitted before fallback handling; a successful
+        -- retry's message_start cannot duplicate it because started? uses the
+        -- shared compare-and-set emitter.
+}
 
 rule MessageStartEmitsStartEvent {
     when: SseEventReceived(stream, "message_start", event_data)
+    requires: not stream.done
 
     ensures: UsageAccUpdated(stream, {
         input_tokens: event_data.message.usage.input_tokens ?? 0,
@@ -371,28 +798,400 @@ rule MessageStartEmitsStartEvent {
         cache_write_tokens: event_data.message.usage.cache_creation_input_tokens ?? 0
     })
     ensures: Emit(StreamEvent{event_type: start})
+
+    @guidance
+        -- requires not stream.done — the whole SSE dispatch is
+        -- short-circuited once the stream has terminated, so a post-error
+        -- trailing event is a full no-op (not just the terminal branches).
+        -- the implementation emits :start via a started?
+        -- compare-and-set (started? tracked alongside done?) — exactly once,
+        -- and the TERMINAL emitters (emit-terminal-done! — shared by
+        -- MessageStopEmitsDoneWithUsage and
+        -- AnthropicTransportCloseEmitsDoneIfNotTerminal — and the "error"
+        -- branch, SseErrorEventEmitsErrorAndTerminates) also emit :start
+        -- first when the stream never received message_start, mirroring the
+        -- sibling transports (emit-chat-completion-finish!'s
+        -- stream-started? compare-and-set and the codex EOF flush's
+        -- emit-codex-start!). So a stream that EOFs before message_start
+        -- (empty/truncated body) or a malformed stream starting with
+        -- message_stop/"error" yields [:start :done] / [:start :error]
+        -- instead of [:done] / [:error] — the last three-transport
+        -- asymmetry in the EOF-level flush. Benign for the
+        -- consumer (:start is a no-op handler; the turn statechart is
+        -- already past :idle via the turn-level :turn/start).
 }
 
 rule AnthropicThinkingStreamingIncludesSignatureMaterial {
     when: SseEventReceived(stream, "content_block_delta", event_data)
+    requires: not stream.done
     requires: CurrentContentBlockType(stream, event_data.index) = "thinking"
 
     ensures:
         if event_data.delta.type = "thinking_delta":
             Emit(StreamEvent{event_type: thinking_delta, content_index: event_data.index, delta: event_data.delta.thinking})
         else if event_data.delta.type = "signature_delta":
-            SignatureFragmentObserved(stream, event_data.index, event_data.delta.signature)
+            Emit(StreamEvent{event_type: thinking_signature_delta, content_index: event_data.index, signature: event_data.delta.signature})
 
     @guidance
         -- The provider must preserve enough thinking-block material to round-trip
         -- the final assistant thinking block, including signature, in a later
-        -- tool-use continuation request.
+        -- tool-use continuation request. requires not stream.done —
+        -- a trailing content_block_delta after a mid-stream SSE error must
+        -- not emit :thinking-delta/:thinking-signature-delta post-error.
+}
+
+rule ContentBlockStopEmitsTypedEndEvent {
+    when: SseEventReceived(stream, "content_block_stop", event_data)
+    requires: not stream.done
+
+    ensures:
+        if CurrentContentBlockType(stream, event_data.index) = "thinking":
+            Emit(StreamEvent{event_type: thinking_end, content_index: event_data.index})
+        else if CurrentContentBlockType(stream, event_data.index) = "tool_use":
+            Emit(StreamEvent{event_type: toolcall_end, content_index: event_data.index})
+        else if CurrentContentBlockType(stream, event_data.index) = "redacted_thinking":
+            RedactedThinkingBlockSkipped(stream, event_data.index)
+        else:
+            Emit(StreamEvent{event_type: text_end, content_index: event_data.index})
+
+    @guidance
+        -- a thinking block's stop must be labeled :thinking-end,
+        -- not :text-end, so the turn accumulator's dedicated :on-thinking-end
+        -- handler (note-last-provider-event! :thinking-end +
+        -- end-content-block!) runs instead of mislabeling the
+        -- last-provider-event diagnostic marker as text. DeepSeek returned a
+        -- thinking content block in the live smoke test (2026-08-09), so the
+        -- mislabel was reachable on this task's newly shipped provider.
+        -- "redacted_thinking" blocks (Anthropic's first thinking
+        -- block in extended-thinking streams, carrying opaque base64 :data)
+        -- are SKIPPED — content-block-start-event returns nil for them too,
+        -- so start and stop are skipped symmetrically: no phantom text
+        -- block, no mislabeled :text-end, and no unbalanced :thinking-end
+        -- for a block whose start was skipped (which would create a phantom
+        -- CLOSED block in the accumulator via end-content-block! on an
+        -- unbegun index). redacted_thinking_delta events are skipped by
+        -- content-block-delta-event (no :text in the delta) as well. Not
+        -- reachable on the newly shipped DeepSeek provider (its compat
+        -- table explicitly does not support redacted-thinking blocks) — this
+        -- completes the typing rule for the built-in Anthropic
+        -- path.
+        -- the delta skip is now an EXPLICIT "redacted_thinking"
+        -- branch in content-block-delta-event (returns nil, mirroring the
+        -- start/stop branches), not the implicit fall-through to the default
+        -- text branch that returned nil only because the delta carried no
+        -- :text — the skip is shape-independent: a future
+        -- redacted_thinking_delta with a :text key (or a renamed payload
+        -- field) still emits no :text-delta (no phantom text delta for a
+        -- block whose start/stop are skipped; no unbalanced block events —
+        -- the accumulator's note-content-delta! cannot open a block at an
+        -- unbegun index while start/stop stay nil).
+}
+
+rule ContentBlockBranchesEmitStartWhenMessageStartAbsent {
+    when: SseEventReceived(stream, event_type, event_data)
+    requires: event_type in {"content_block_start", "content_block_delta", "content_block_stop"}
+    requires: not stream.done
+    requires: not stream.started
+
+    ensures: StartEmittedOnce(stream)
+
+    @guidance
+        -- the content-block branches emit :start once before the
+        -- first content event when the stream never received message_start
+        -- (a malformed/non-conforming stream whose FIRST event is a
+        -- content_block_* — the non-terminal half of the contract
+        -- :start-before-first-event class; the implementation fixes the
+        -- terminal/error/catch emitters only). Previously a
+        -- content_block_start-first stream emitted [:text-start :text-delta
+        -- :text-end :start :done] — :start appeared only at the terminal,
+        -- AFTER the content events. Both sibling transports emit :start
+        -- before the first content event (openai emit-started-event!, codex
+        -- emit-codex-started-event!). The once-semantics live in the shared
+        -- request-support/emit-start! (the shared helper replaces the three
+        -- byte-identical per-transport copies); stream.started is set by the
+        -- first emission (compare-and-set), so a later message_start or
+        -- terminal-branch emit is a no-op.
+}
+
+rule UnknownIndexContentBlockEventsSkipped {
+    when: SseEventReceived(stream, event_type, event_data)
+    requires: event_type in {"content_block_delta", "content_block_stop"}
+    requires: not stream.done
+    requires: CurrentContentBlockType(stream, event_data.index) = null
+
+    ensures: no Emit(StreamEvent) for this event
+
+    @guidance
+        -- content_block_delta/stop for an UNKNOWN index (no prior
+        -- content_block_start — a stream that omits start events, reuses
+        -- indices, or reorders deltas/stops ahead of starts) are skipped:
+        -- the delta/stop branches nil-guard on block-info, so no unbalanced
+        -- :text-delta/:text-end is emitted for a block that never had a
+        -- :text-start (the turn accumulator's note-content-delta! previously
+        -- opened a block at an unbegun index — the same
+        -- no-phantom-or-unbalanced-block harm the implementation eliminated for
+        -- skipped redacted_thinking TYPES, still open for MISSING indices).
+        -- Mirrors the codex sibling's skip of an unresolved index
+        -- (response.function_call_arguments.delta guards on (number? idx));
+        -- the structured-output path is unreachable for a null block-info
+        -- (structured-tool-block? is false for null). :start is still
+        -- emitted (the stream IS producing content-block events) — see
+        -- ContentBlockBranchesEmitStartWhenMessageStartAbsent.
+}
+
+rule TerminalEmitsEndEventsForOpenBlocks {
+    when: SseEventReceived(stream, "message_stop", event_data)
+          OR ProviderTransportClosed(stream)
+          OR SseEventReceived(stream, "error", event_data)
+          OR (SseEventReceived(stream, "message_delta", event_data) AND event_data.delta.stop_reason != null)
+    requires: stream.done = false
+
+    ensures: for each index in OpenBlockIndexes(stream):
+                 Emit(StreamEvent{event_type: BlockEndEventType(CurrentContentBlockType(stream, index)), content_index: index})
+
+    @guidance
+        -- the terminal (:done via MessageStopEmitsDoneWithUsage
+        -- and AnthropicTransportCloseEmitsDoneIfNotTerminal, which share the
+        -- emit-terminal-done! helper) emits a typed end event for every OPEN
+        -- block — a content block whose start was consumed but whose stop
+        -- never arrived (a truncated/non-conforming stream that EOFs
+        -- mid-block) — before the :done, so the turn accumulator never
+        -- finalizes with an OPEN block index (no-phantom-or-unbalanced-block
+        -- invariant, the implementation; the codex transport already balances
+        -- open tool indexes at its EOF flush). Probe-verified pre-fix:
+        -- message_start + content_block_start (tool_use) + EOF →
+        -- [:start :toolcall-start :done]; post-fix [:start :toolcall-start
+        -- :toolcall-end :done]. BlockEndEventType maps tool_use →
+        -- toolcall_end, thinking → thinking_end, else text_end — shaped via
+        -- the same content-block-stop-event helper the in-band stop branch
+        -- uses (see ContentBlockStopEmitsTypedEndEvent; consume-event!
+        -- nil-guards a skipped type). OpenBlockIndexes(stream) is the set of
+        -- block indices whose start event was CONSUMED (stream.started via
+        -- the block's start branch) minus those whose stop was received —
+        -- structured-output tool blocks and skipped redacted_thinking blocks
+        -- are never tracked (their start events are never consumed, so an
+        -- end event would be unbalanced); a well-formed stream (every block
+        -- stopped before message_stop) has an empty open set and emits no
+        -- synthetic ends.
+        -- the balancing is extended from the :done/EOF paths to
+        -- EVERY remaining terminal path — the mid-stream "error" branch
+        -- (SseErrorEventEmitsErrorAndTerminates), the
+        -- message_delta-with-stop_reason terminal
+        -- (MessageDeltaStopReasonEmitsDone; its inline :done previously
+        -- disagreed with message_stop — it now balances too, keeping the
+        -- real stop_reason rather than routing through emit-terminal-done!),
+        -- and the outer catch block (a stream-read exception mid-block).
+        -- All four sites use the shared balance-open-blocks! helper
+        -- (extracted from emit-terminal-done!'s inline doseq), so the two
+        -- :done branches and every :error branch balance identically. The
+        -- HTTP-error path needs no balancing (it fires before any SSE line
+        -- has been consumed, so OpenBlockIndexes is empty). The invariant
+        -- now holds at every terminal, :done or :error.
+}
+
+rule HttpErrorEmitsOneTerminalError {
+    when: InitialHttpErrorObserved(stream)
+    requires: stream.done = false
+
+    ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
+
+    @guidance
+        -- Initial non-2xx responses and exhausted HTTP-400 compatibility
+        -- retries share the guarded terminal-error emitter. It marks the
+        -- stream done before invoking the consumer, so a consumer exception
+        -- cannot reach the outer catch with done still false and produce a
+        -- second terminal error.
+}
+
+rule SseErrorEventEmitsErrorAndTerminates {
+    when: SseEventReceived(stream, "error", event_data)
+
+    ensures: stream.done = true
+    ensures: TerminalStateSetBeforeError(stream)
+    ensures: ErrorEmitted(stream)
+
+    @guidance
+        -- Anthropic SSE "error" events
+        -- ({"type":"error","error":{...}} — the documented mid-stream
+        -- overloaded_error/rate-limit shape) previously fell to the stream
+        -- loop's default no-op: the line was captured via
+        -- :on-provider-response but no :error event reached the consumer and
+        -- no terminal :done was emitted, hanging the turn until
+        -- llm-stream-idle-timeout-ms with a misleading timeout. The event's
+        -- error body is now mapped through anthropic-error
+        -- (error_from_response_data: message from parsed-body [:error
+        -- :message], http-status when present, fallback "Anthropic stream
+        -- error") and the stream terminates. http-status
+        -- extraction mirrors the sibling transports' emit-chat-error! /
+        -- codex-error-http-status — checked at :status / [:error :status] /
+        -- [:error :http_status], numeric >= 400 only — so a status-carrying
+        -- error event (e.g. {"error":{"status":529,...}} or a generic
+        -- message plus a status key, or a string status) keeps a NUMERIC
+        -- :http-status when the value is a valid status, and a non-numeric
+        -- status is dropped; without it, downstream retry-error? /
+        -- provider-error-kind (numeric #{429 500 502 503 529} membership +
+        -- message patterns) fell to :unknown and a transient mid-stream
+        -- 5xx/overload error was NOT auto-retried — the contract class the
+        -- openai emit-chat-error! and codex codex-error-http-status already
+        -- handle. The done? guard prevents a trailing SSE event from
+        -- emitting a second terminal event — message_stop  AND,
+        -- now, a message_delta carrying delta.stop_reason (the
+        -- terminal :done emission + usage accumulation +
+        -- structured-output-result emissions in that branch are now guarded
+        -- on done?, so a post-error message_delta is a full no-op) AND a
+        -- post-error stream-read exception (the outer catch block's :error
+        -- emission is guarded on done?, mirroring the codex transport's
+        -- emit-codex-error!). See the OnceDoneNoFurtherEvent invariant
+        -- below. The codex transport already handled "error" SSE events
+        -- (in-repo precedent); the :openai-completions transport received
+        -- the same class fix (for consistency).
+        -- the branch also emits :start first when the stream
+        -- never received message_start (started? tracking — see
+        -- MessageStartEmitsStartEvent), so a malformed stream whose FIRST
+        -- event is the error yields [:start :error] instead of [:error],
+        -- mirroring the terminal emitters.
+        -- the OUTER catch block (a stream-read exception before
+        -- any output — e.g. a connection reset on the first read, http/post
+        -- throwing) is the last :start-before-terminal gap on this
+        -- transport: it emits the same [:start :error] sequence, calling
+        -- the shared top-level emit-start! helper (started? compare-and-set
+        -- — the implementation moved the helper out of the letfn so the catch, which
+        -- is outside the letfn scope, can use it) before the :error
+        -- emission, mirroring this branch's ordering.
+        -- this branch (and the message_delta-with-stop_reason
+        -- terminal and the catch block) also balances OPEN content blocks
+        -- before the terminal — see
+        -- TerminalEmitsEndEventsForOpenBlocks (whose when now includes this
+        -- error event and the message_delta terminal, and whose guidance
+        -- covers the catch) — so a stream that started a thinking/tool_use/
+        -- text block and then received the mid-stream error finalizes the
+        -- accumulator balanced (:toolcall-end/:thinking-end/:text-end before
+        -- the :error) instead of with an OPEN block index.
 }
 
 rule MessageDeltaAccumulatesOutputUsage {
     when: SseEventReceived(stream, "message_delta", event_data)
+    requires: not stream.done
 
     ensures: UsageAccUpdated(stream, {output_tokens: event_data.usage.output_tokens ?? 0})
+
+    @guidance
+        -- guarded on stream.done — a message_delta arriving after
+        -- a mid-stream SSE error has already terminated the stream (done =
+        -- true) is a full no-op: no output-usage accumulation, no
+        -- structured-output-result emissions, and no terminal :done. The
+        -- terminal emission itself is separately modeled by
+        -- MessageDeltaStopReasonEmitsDone (below) under the same guard.
+}
+
+rule MessageDeltaStopReasonEmitsDone {
+    when: SseEventReceived(stream, "message_delta", event_data)
+    requires: not stream.done
+    requires: event_data.delta.stop_reason != null
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword(event_data.delta.stop_reason), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- the terminal :done emission in the message_delta branch
+        -- is guarded on done? like the message_stop branch. Previously a
+        -- trailing message_delta carrying delta.stop_reason after a
+        -- mid-stream SSE error emitted a SECOND terminal :done after the
+        -- :error (verified: events = [:start :error :done] for error →
+        -- message_delta stop_reason end_turn), contradicting the contract
+        -- "trailing message_stop cannot emit a second terminal event" claim
+        -- (which covered only message_stop). The structured-output-result
+        -- emissions for the completed buffers sit inside the same guard —
+        -- a post-error message_delta fires none of them. Emit uses the
+        -- established StreamEvent surface (cf. MessageStartEmitsStartEvent /
+        -- ContentBlockStopEmitsTypedEndEvent); FinalizedUsage is the
+        -- accumulation function defined by FinalUsageTotalsCalculated.
+        -- the branch also ensures StartEmittedOnce — it emits
+        -- :start first when the stream never received message_start (a
+        -- malformed stream whose FIRST event is a message_delta carrying
+        -- stop_reason), mirroring emit-terminal-done!'s ordering (done?
+        -- reset, then :start, then the terminal). the implementation tested
+        -- message_stop-first and empty-body but NOT message_delta-first, so
+        -- this branch emitted [:done] while message_stop-first emits
+        -- [:start :done] — the last :start-before-terminal gap on the
+        -- anthropic transport (see MessageStartEmitsStartEvent's the implementation
+        -- guidance for the started? tracking).
+        -- the branch ALSO balances OPEN content blocks before
+        -- its inline :done (see TerminalEmitsEndEventsForOpenBlocks, whose
+        -- when now includes this message_delta-with-stop_reason terminal) —
+        -- current balancing covered only the message_stop/EOF :done
+        -- paths (emit-terminal-done!), so this branch's inline :done
+        -- previously disagreed with message_stop: a non-conforming stream
+        -- sending message_delta-with-stop_reason while blocks are open
+        -- finalized with OPEN indices. It now balances via the shared
+        -- balance-open-blocks! helper, keeping the real stop_reason
+        -- (Keyword(event_data.delta.stop_reason)) rather than routing
+        -- through emit-terminal-done!'s hardcoded :stop.
+}
+
+rule MessageStopEmitsDoneWithUsage {
+    when: SseEventReceived(stream, "message_stop", event_data)
+    requires: not stream.done
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword("stop"), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- message_stop finalizes accumulated usage even when no preceding
+        -- message_delta carries stop_reason or usage. DeepSeek's verified
+        -- normal stream includes message_delta usage before message_stop;
+        -- this rule also protects truncated or non-conforming
+        -- Anthropic-compatible streams that omit that delta.
+        -- The shared terminal helper sets done before downstream emissions,
+        -- emits :start first when message_start was absent, and therefore
+        -- preserves one ordered terminal sequence without a catch-path
+        -- second error.
+}
+
+rule AnthropicTransportCloseEmitsDoneIfNotTerminal {
+    when: ProviderTransportClosed(stream)
+    requires: stream.done = false
+
+    ensures: stream.done = true
+    ensures: Emit(StreamEvent{event_type: done, reason: Keyword("stop"), usage: FinalizedUsage(stream.usage_acc)})
+
+    @guidance
+        -- EOF without message_stop, message_delta-with-stop_reason, or an
+        -- error is treated as a truncated/non-conforming stream rather than
+        -- left pending until the idle timeout. The flush uses the same
+        -- usage-bearing terminal helper as message_stop, emits :start first
+        -- when needed, and is skipped after any in-band terminal event.
+        -- DeepSeek's verified normal stream terminates with message_delta
+        -- usage followed by message_stop; this EOF rule is defensive.
+}
+
+rule OnceDoneNoFurtherEvent {
+    when: stream.done = true
+
+    ensures: no further Emit(StreamEvent)
+    ensures: no further ProviderResponseCapture(stream)
+
+    @guidance
+        -- the implementation invariant: once the stream is done — whether
+        -- terminated by a mid-stream SSE error, a message_delta stop_reason,
+        -- or message_stop — no subsequent SSE event or stream-read exception
+        -- may emit ANY event, terminal or not. the implementation covered only the
+        -- terminal emissions (:done/:error); the implementation extends the guard to
+        -- the NON-terminal branches too: the whole SSE dispatch is
+        -- short-circuited on done? (stream-anthropic's case is wrapped in
+        -- when-not @done?), so a post-error trailing event — a
+        -- content_block_stop (which previously emitted :text-end and could
+        -- fire maybe-emit-structured-result!), a content_block_delta
+        -- (:text-delta/:thinking-delta), a content_block_start (:text-start),
+        -- a message_delta (usage accumulation), or a message_stop — is a
+        -- full no-op. done? is also set on message_stop, so a malformed
+        -- event after a NORMAL completion is a no-op too. The response
+        -- capture callback is inside the same guard, so post-terminal SSE
+        -- lines are not captured either. A consumer therefore receives at
+        -- most one terminal event (:error or :done) per stream, and nothing
+        -- at all after it.
 }
 
 rule FinalUsageTotalsCalculated {
@@ -408,6 +1207,33 @@ rule FinalUsageTotalsCalculated {
         cost: CalculateCost(stream.model, acc)
     }
 }
+
+-- Non-streaming execute-anthropic response mapping : the
+-- execute path (execute-anthropic → response->assistant-message) is not
+-- modeled as rules here (the spec's scope is streaming completions; the
+-- non-streaming 400-fallback asymmetry is documented the same way above),
+-- but its content-block mapping is task-relevant: the response :content
+-- blocks are mapped to the canonical assistant-message shape in WIRE
+-- ORDER — "text" → {:type :text}, "tool_use" → {:type :tool-call :id
+-- :name :arguments} with :input JSON-encoded (a string, so downstream
+-- tool-args/parse-args, which json/parse-strings :arguments, parses it —
+-- mirroring the streaming accumulator's string :arguments and the
+-- :openai-completions tool-call-block), and "thinking" → {:type :thinking
+-- :text :signature} (mirroring thinking-blocks-in-order). Previously only
+-- "text" blocks survived (text-content-blocks): a non-streaming response
+-- containing a tool_use block silently dropped the tool call while
+-- :stop-reason :tool_use was preserved, so classify-assistant-message /
+-- extract-tool-calls recorded :turn.outcome/stop and the tool call NEVER
+-- executed — silent functional loss reachable on the newly shipped
+-- DeepSeek provider via response-mode :non-streaming sessions with tools,
+-- and inconsistent with BOTH the :openai-completions sibling and the
+-- anthropic transport's own streaming accumulator. The mapping now
+-- preserves tool_use and thinking blocks; :stop-reason was already
+-- preserved (Keyword of the wire string), so the turn runtime now
+-- classifies a tool_use response :turn.outcome/tool-use and executes the
+-- call. Locked by execute-anthropic-preserves-tool-use-blocks-test and
+-- execute-anthropic-preserves-thinking-blocks-test (FAIL pre-fix /
+-- PASS post-fix).
 
 surface AnthropicProviderApi {
     facing executor: AgentExecutor

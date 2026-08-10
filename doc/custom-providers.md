@@ -22,10 +22,62 @@ Built-in models remain available alongside custom ones.
 Each provider entry defines:
 
 - a provider id, such as `"minimax"` or `"ollama"`
-- `:base-url` — the API root for that provider
+- `:base-url` — the API root for that provider, without a trailing slash.
+  Psi concatenates the protocol's path suffix onto it verbatim
+  (`/v1/messages` for `:anthropic-messages`, `/chat/completions` for
+  `:openai-completions`, `/codex/responses` for `:openai-codex-responses`;
+  only the codex transport normalizes a trailing slash away), so a base URL
+  ending in `/` (e.g. `https://api.deepseek.com/anthropic/`) silently
+  produces a double-slash URL (`//v1/messages`)
 - `:api` — which wire protocol psi should use
 - optional `:auth` settings
 - one or more `:models`
+
+Each model definition may carry the selection-classification fields
+`:locality`, `:latency-tier` and `:cost-tier`. They default to
+`:locality :local`, `:latency-tier :low` and `:cost-tier :zero` when a
+model map omits them (the `model-defaults` in `user_models.clj`) — the
+same defaults psi applies to local runners like Ollama. Set them
+explicitly for hosted/cloud providers: `:locality :cloud` in particular
+matters, because psi's local-only helper paths (e.g. the context-manager's
+per-turn local-model helper selection, whose required constraints include
+`:latency-tier :low` + `:cost-tier #{:zero :low}` and a strong
+`:locality :local` preference) treat a `:locality :local` model as a
+candidate for local helper duty — a cloud model with defaulted locality can
+be selected for (and charged as) a "local" helper and receive conversation
+excerpts on the local-only path. `:latency-tier`/`:cost-tier` participate
+in ranking/filtering for model selection (e.g. local helper paths require
+`:cost-tier` `:zero`/`:low`); choose values that describe the provider's
+actual latency and pricing (built-in cloud providers use
+`:latency-tier :low`, with `:cost-tier` derived from the model's input/
+output costs).
+
+A model may also declare `:supports-mid-conversation-system-messages`
+(`true`/`false`) to opt into psi's mid-conversation system-message
+capability: the agent-session `:session/inject-mid-system-message` mutation
+returns `:capability-not-supported` unless the runtime active model supports
+it. The default depends on the transport — for `:anthropic-messages` custom
+providers the field defaults to `false` (omitted → not supported), so
+Anthropic-compatible providers must declare it explicitly. The inference is
+built-in-only: only built-in OpenAI chat-completions catalog models
+(`:openai`/`:openai-completions`, not tagged `:custom?`) get the capability
+inferred from the runtime API shape — a custom models.edn provider named
+"openai" is tagged `:custom? true` and does not, so every custom
+OpenAI-compatible provider must also declare the field explicitly. Set it
+`true` only after verifying the endpoint actually honours per-turn `system`
+changes (see the DeepSeek example notes).
+
+Note on `:custom?`: psi tags every custom models.edn model with an internal
+`:custom? true` origin marker at parse time. It is never declared in
+models.edn — the closed model-definition schema rejects a user-supplied
+`:custom?` key with a generic "Invalid models.edn schema" error — and it is
+what gates built-in classification: provider transports treat a model as
+built-in only when it is NOT tagged `:custom?` (and its provider matches the
+built-in name), so a custom provider literally named "anthropic"/"openai"
+can never receive built-in-only treatment (env-var key fallback, OAuth
+headers, mid-conversation system-message inference). If you see `:custom?
+true` in an introspected model map (resolvers/EQL), it means that model came
+from a custom models.edn provider; leave it out of any models.edn you write.
 
 Supported custom-provider API protocols are:
 
@@ -33,7 +85,16 @@ Supported custom-provider API protocols are:
 - `:anthropic-messages`
 - `:openai-codex-responses`
 
-In practice, most custom hosted providers fit the first two.
+In practice, most custom hosted providers fit the first two. `:openai-codex-responses`
+is hard-coupled to the ChatGPT/Codex backend contract (OAuth
+`chatgpt_account_id` extraction, `/codex/responses` URL suffix, ChatGPT-only
+headers): psi routes a custom provider through it only if your endpoint
+speaks that exact protocol, and an explicit OAuth-shaped access token (or a
+keyless `:auth-header? false`/custom-header setup) is required — a regular
+API key cannot satisfy the `chatgpt_account_id` check. Custom
+`:openai-codex-responses` providers are provider-scoped like the other two
+protocols: their key comes from their own `:auth` configuration and never
+falls back to `OPENAI_API_KEY`.
 
 ## Structured output capability
 
@@ -116,6 +177,7 @@ its own docs, then place a definition like this in `~/.psi/agent/models.edn` or
                :supports-text      true
                :context-window     128000
                :max-tokens         16384
+               :locality           :cloud
                :latency-tier       :medium
                :cost-tier          :medium}]}}}
 ```
@@ -131,6 +193,26 @@ Notes:
 - psi will route requests through its OpenAI-compatible transport because `:api`
   is `:openai-completions`
 - you can define multiple models under the same provider
+- API-key resolution is provider-scoped on the OpenAI-compatible transport
+  too (matching the `:anthropic-messages` transport): a custom
+  `:openai-completions` (or `:openai-codex-responses`) provider's key comes
+  from its own `:auth` configuration (literal or `env:VAR`) — it never falls
+  back to the global `OPENAI_API_KEY`. If the configured key is unset/blank,
+  the request fails with a provider-specific "Missing API key" error instead
+  of silently sending your OpenAI key to the third-party endpoint. Only
+  built-in OpenAI catalog models fall back to the `OPENAI_API_KEY`
+  environment variable.
+  With `:auth-header? false`/`:no-auth-header`, psi sends no auth header of
+  its own. With no configured key and a recognized `x-api-key`/`Authorization`
+  header among custom `:headers`, psi sends that custom auth header but does
+  not generate an `Authorization` header.
+- `env:` keys are re-read from psi's own process environment on **every
+  request**, not snapshotted when psi loads `models.edn`. Set the variable in
+  the environment that launches psi; exporting or changing it later in
+  another shell cannot modify the already-running psi process environment.
+  If the variable is unset when a request is made, the error names the
+  variable (e.g. "environment variable MINIMAX_API_KEY is unset") so it does
+  not look like a config mistake.
 
 ## Anthropic-compatible example
 
@@ -149,11 +231,308 @@ same way but set `:api` to `:anthropic-messages`.
                :supports-reasoning true
                :supports-text      true
                :context-window     200000
-               :max-tokens         8192}]}}}
+               :max-tokens         8192
+               :locality           :cloud
+               :latency-tier       :low
+               :cost-tier          :low}]}}}
 ```
+
+`:locality :cloud` is set explicitly (with `:latency-tier`/`:cost-tier`):
+custom models default to `:locality :local`, `:latency-tier :low`,
+`:cost-tier :zero` when omitted (see "What a provider definition contains"),
+and psi's local-only helper paths treat a `:locality :local` model as a
+candidate for local helper duty — a hosted proxy with defaulted locality can
+be selected for (and charged as) a "local" helper. `example.com` is a
+placeholder: pick tier values that describe your proxy's actual latency and
+pricing (the values shown mirror the DeepSeek example's shape).
 
 For Anthropic-compatible providers, psi uses the Anthropic transport and will
 send the configured key through the compatible auth path.
+
+API-key resolution is provider-scoped: psi resolves a custom provider's key
+from its own `:auth` configuration (literal or `env:VAR`) — it never falls
+back to `ANTHROPIC_API_KEY`. If the configured key is unset/blank, the request
+fails with a provider-specific "Missing API key" error instead of silently
+sending your Anthropic key to the custom provider's endpoint. Only built-in
+Anthropic catalog models fall back to the `ANTHROPIC_API_KEY` environment
+variable. (The same provider-scoped resolution applies to the
+OpenAI-compatible transport — custom `:openai-completions` and
+`:openai-codex-responses` providers never fall back to `OPENAI_API_KEY`; see
+the OpenAI-compatible MiniMax example notes.)
+
+### Adaptive thinking
+
+Anthropic-compatible models may declare `:adaptive-thinking true` to opt into
+Anthropic's adaptive-thinking request shape (the same one used by Claude Opus
+4.7 and later): psi sends `output_config.effort` (derived from
+`/thinking`/`/effort`) instead of the older `thinking.budget_tokens` shape.
+This field is only meaningful for `:api :anthropic-messages` custom providers
+(and built-in Anthropic catalog models) — it is ignored for OpenAI-compatible
+(`:openai-completions` / `:openai-codex-responses`) custom providers. Only set
+it when the compatible provider actually honours `output_config.effort` —
+check its own compatibility docs first. Omitting the field (or setting it
+`false`) keeps the classic extended-thinking shape, which remains the correct
+default for most Anthropic-compatible providers.
+
+`:adaptive-thinking true` is a silent no-op without `:supports-reasoning
+true`: psi gates the thinking parameter on `:supports-reasoning`, so a model
+declaring adaptive-thinking without supports-reasoning sends a plain
+non-thinking request — no `thinking` field and no `output_config.effort`, with
+no schema error or warning. The misconfiguration also forfeits temperature
+control: the adaptive temperature exclusion applies whenever
+`:adaptive-thinking` is set, independent of `:supports-reasoning`, so this
+model never sends `temperature` either (the temperature gate is
+`(and (not thinking) (not adaptive?))`). A user who sets
+`:adaptive-thinking true` without `:supports-reasoning true` therefore loses
+temperature silently alongside the thinking no-op. Set both flags together
+when you want the adaptive shape.
+
+Effort also applies only when a thinking level is active: `output_config.effort`
+is derived from `/thinking`/`/effort`, but psi emits it only when `thinking` is
+on (an active `/thinking` level). `:effort-override` / `/effort` alone — with
+`/thinking` unset or off (the session default is off) — emits neither
+`thinking` nor `output_config.effort`: a silent no-op, no schema error or
+warning. Turn `/thinking` on first, then set the effort.
+
+Trade-off: adaptive-thinking models never send `temperature` — psi omits it
+from the request body even when thinking is off, because Anthropic rejects
+`temperature` on adaptive-thinking models. Declaring `:adaptive-thinking true`
+therefore forfeits temperature control for that model; only set it when the
+provider honours `output_config.effort` and you do not need per-request
+temperature.
+
+## DeepSeek-compatible example
+
+DeepSeek exposes an Anthropic Messages-compatible endpoint at
+`https://api.deepseek.com/anthropic` (see
+[DeepSeek's Anthropic API guide](https://api-docs.deepseek.com/guides/anthropic_api/)),
+so it configures like any other Anthropic-compatible provider. DeepSeek's
+`deepseek-v4-flash` model supports Anthropic's adaptive-thinking
+`output_config.effort` field (its `thinking.budget_tokens` is accepted but
+ignored), so this example sets `:adaptive-thinking true`:
+
+```clojure
+{:version 1
+ :providers
+ {"deepseek"
+  {:base-url "https://api.deepseek.com/anthropic"
+   :api      :anthropic-messages
+   :auth     {:api-key "env:DEEPSEEK_API_KEY"}
+   :models   [{:id                 "deepseek-v4-flash"
+               :name               "DeepSeek V4 Flash"
+               :supports-reasoning true
+               :adaptive-thinking  true
+               :supports-images    false
+               :supports-text      true
+               :context-window     1000000
+               :max-tokens         384000
+               :input-cost         0.14
+               :output-cost        0.28
+               :cache-read-cost    0.0028
+               :cache-write-cost   0.14
+               :locality           :cloud
+               :latency-tier       :low
+               :cost-tier          :low}]}}}
+```
+
+Then export your key:
+
+```bash
+export DEEPSEEK_API_KEY=...
+```
+
+Notes:
+- `:locality :cloud` is set explicitly (with explicit `:latency-tier :low` /
+  `:cost-tier :low`): custom models default to `:locality :local`,
+  `:latency-tier :low`, `:cost-tier :zero` when omitted (see "What a
+  provider definition contains"), and psi's local-only helper paths (e.g.
+  the context-manager's per-turn local-model helper) treat a
+  `:locality :local` model as a candidate for local helper duty — a cloud
+  model with defaulted locality can be selected for (and charged as) a
+  "local" helper and receive conversation excerpts on the local-only path.
+- mid-conversation system messages are NOT enabled in this example:
+  `:supports-mid-conversation-system-messages` defaults to `false` for
+  `:anthropic-messages` custom providers (the capability inference is
+  built-in-only — only built-in OpenAI chat-completions catalog models get
+  it; a custom models.edn provider named "openai" is tagged `:custom? true`
+  and does not, so every custom OpenAI-compatible provider must declare the
+  field explicitly), and DeepSeek's compat table lists `system` as fully
+  supported but per-turn `system` changes (mid-conversation switching) are
+  unverified against a live turn.
+  Set `:supports-mid-conversation-system-messages true` on this model only
+  after verifying DeepSeek's endpoint honours per-turn `system` changes;
+  until then the `:session/inject-mid-system-message` capability returns
+  `:capability-not-supported` for `deepseek-v4-flash`.
+- `:base-url` must not end in a trailing slash: psi concatenates
+  `/v1/messages` onto it verbatim, so
+  `https://api.deepseek.com/anthropic/` would silently produce
+  `https://api.deepseek.com/anthropic//v1/messages` (double slash). Use
+  `https://api.deepseek.com/anthropic` exactly as shown.
+- `env:` keys are re-read from psi's own process environment on **every
+  request**, not snapshotted when psi loads `models.edn`. Set
+  `DEEPSEEK_API_KEY` in the environment that launches psi; exporting or
+  changing it later in another shell cannot modify the already-running psi
+  process environment. If the variable is unset when a request is made, the
+  error names the variable ("environment variable DEEPSEEK_API_KEY is unset
+  — env: keys are re-read per request") so it does not look like a config
+  mistake.
+- pricing/context-window figures above are from DeepSeek's published pricing
+  page as of this writing; confirm current figures in DeepSeek's own docs
+  before relying on them for cost tracking
+- DeepSeek's compat table lists `temperature` as fully supported, but psi
+  sends `:temperature` only when BOTH `:adaptive-thinking` is off AND thinking
+  is off: `:adaptive-thinking true` forfeits temperature control (psi never
+  sends `temperature` for adaptive-thinking models, even with thinking off),
+  and the classic extended-thinking shape (`:adaptive-thinking false` with
+  `/thinking` on — the shape the older note recommended) ALSO omits
+  `temperature` (extended thinking is incompatible with temperature on the
+  Anthropic transport). So `temperature` is sent only with
+  `:adaptive-thinking false` AND `/thinking` off. And on DeepSeek,
+  thinking-off is signaled by OMITTING the `thinking` field (psi never sends
+  an explicit disabled signal), which DeepSeek's endpoint treats as thinking
+  ON (server default) — so whether DeepSeek accepts `temperature` alongside
+  its server-side thinking default is exactly the unverified case (not
+  exercised in the review-1 live smoke test 2026-08-09, which covered the
+  adaptive thinking shape at effort high + cache field names; the smoke
+  test did not exercise temperature — psi never sends it for
+  adaptive-thinking models anyway). If you
+  need temperature control: set `:adaptive-thinking false` (or omit it),
+  keep `/thinking` off, and verify against a live turn that DeepSeek accepts
+  `temperature` with thinking effectively ON before relying on it.
+- `output_config.effort` is confirmed supported (DeepSeek's compat table:
+  "output_config: Only effort is supported"; the Thinking Mode guide
+  documents the Anthropic-format effort control as
+  `{"output_config": {"effort": "low/high/max"}}`), but the `thinking.type
+  "adaptive"` value psi pairs it with is NOT among DeepSeek's documented
+  honored values — the Thinking Mode guide documents the Anthropic-format
+  thinking toggle as `{"thinking": {"type": "enabled/disabled"}}` only, and
+  "adaptive" appears nowhere in DeepSeek's Anthropic API docs (verified
+  2026-08-07), but a live single-turn smoke test (2026-08-09, the task's
+  review-1 smoke test, now unblocked) confirmed DeepSeek ACCEPTS the
+  adaptive shape: psi's exact request (`thinking.type "adaptive"` +
+  `output_config.effort "high"`, x-api-key auth, `/v1/messages`) returned
+  200 with a `thinking` content block in the response — the endpoint does
+  not reject `type: "adaptive"`, and thinking ran with the requested
+  effort. (The 2026-08-07 strict-endpoint-400 / lenient-ignore speculation
+  is superseded by this live result for the tested shape; keep
+  `:adaptive-thinking false` — classic `type: "enabled"` — as the fallback
+  if a future DeepSeek change rejects it.)
+  Also note psi's effort values vs DeepSeek's documented set: the Thinking
+  Mode guide documents Anthropic-format effort as `"low/high/max"`, but
+  psi's adaptive path emits `"low"` (`/thinking minimal` or `/thinking
+  low`), `"medium"` (`/thinking medium`), `"high"` (`/thinking high`) and
+  `"highest"` (`/thinking xhigh`, and `effort-override :xhigh`) — it never
+  emits `"max"`. `"low"` and `"high"` are within DeepSeek's documented set;
+  `"medium"` and `"highest"` are undocumented (a strict endpoint may 400, a
+  lenient one may map them unpredictably), and `"highest"` does not
+  correspond to DeepSeek's `"max"`. `"high"` (via `/thinking high`) was
+  verified live 2026-08-09 (the review-1 smoke test: 200, `thinking` block
+  returned); `"low"` is documented-safe; `"medium"`/`"highest"` remain
+  untested live — prefer `/thinking minimal` / `/thinking low` or
+  `/thinking high` for documented-safe effort values.
+  And `output_config.effort` is only emitted when a thinking level is active:
+  psi gates effort on `thinking` being on, so `/effort` (or
+  `:effort-override`) with `/thinking` unset/off emits neither `thinking` nor
+  `output_config` — while DeepSeek defaults thinking ON server-side, so an
+  effort setting without an active `/thinking` level is silently dropped.
+  Turn `/thinking` on first, then set the effort.
+- HTTP-400 compatibility retry and the adaptive shape: psi's streaming path
+  retries an HTTP 400 once with compatibility fallbacks; for an
+  adaptive-shape request the `:without-thinking` step strips BOTH `thinking`
+  and `output_config` from the retried body (locked by a stream test,
+  `stream-anthropic-retries-adaptive-shape-without-thinking-on-400-test`).
+  The live smoke test (2026-08-09) confirmed DeepSeek does NOT reject the
+  adaptive shape (200 with a `thinking` block returned), so this retry path
+  is not exercised for `type: "adaptive"` today. It remains a general safety
+  net: if a future DeepSeek change (or another Anthropic-compatible
+  provider) rejects the adaptive shape with a 400, the streaming path does
+  NOT hard-fail — it retries with the `thinking` field omitted, which
+  DeepSeek treats as thinking ON (server default) at default effort,
+  silently dropping your effort setting. The non-streaming (`execute`) path
+  has no 400 fallback and hard-fails on the same request
+  (streaming/non-streaming asymmetry). To fail fast instead of silently
+  degrading to thinking-ON, use `:adaptive-thinking false` — the
+  classic shape's `type: "enabled"` is a documented honored value.
+- thinking-off is not honoured through the omitted-field path: psi never sends
+  an explicit thinking-disabled signal — when `/thinking off` is active it
+  simply omits the `thinking` field. On Anthropic's own API omission means
+  thinking disabled, but DeepSeek's Anthropic-compatible endpoint defaults to
+  thinking ON, so an omitted `thinking` field leaves thinking enabled and
+  `/thinking off` on `deepseek-v4-flash` is silently ignored (with or without
+  `:adaptive-thinking`). If you need thinking-off control on DeepSeek, verify
+  against a live turn whether the endpoint honours an explicit
+  `thinking: {:type "disabled"}` (psi does not emit it today) before relying
+  on it.
+- API keys are provider-scoped: a custom `:anthropic-messages` provider never
+  falls back to the `ANTHROPIC_API_KEY` env var. If the provider's configured
+  `:api-key` (e.g. `env:DEEPSEEK_API_KEY`) resolves nil and the provider does
+  not declare `:auth-header? false` (or carry a recognized
+  `x-api-key`/`Authorization` header in custom `:headers`), the request
+  fails fast with a provider-scoped "Missing API key" error — your Anthropic
+  key can never be sent to `https://api.deepseek.com/anthropic/v1/messages`.
+  Only built-in Anthropic models fall back to `ANTHROPIC_API_KEY`. (Keyless
+  exemptions: `:auth-header? false`, or a recognized auth header among
+  custom `:headers` with no configured key — see "Local servers and custom
+  headers".)
+  OAuth content-sniffing is also provider-scoped: psi treats a key containing
+  `sk-ant-oat` as an Anthropic OAuth token (sending the Claude Code CLI
+  headers and system prompt) only for built-in Anthropic models. A custom
+  provider like DeepSeek always uses plain `x-api-key` auth, even if its
+  configured key merely resembles an OAuth token — the Claude Code OAuth
+  headers/system prompt are never sent to a third-party endpoint.
+- cache-cost fields are illustrative: psi bills cache usage from
+  Anthropic-shaped `usage.cache_read_input_tokens` (at `:cache-read-cost`)
+  and `usage.cache_creation_input_tokens` (at `:cache-write-cost`). DeepSeek
+  publishes no separate cache-write price, so `:cache-write-cost 0.14` mirrors
+  the cache-miss/input rate as the effective write-path cost (Anthropic-style
+  accounting reports the write/miss portion separately from `input_tokens`, so
+  this does not double-count the miss). The Anthropic field-name assumption
+  was verified live 2026-08-09 (the review-1 smoke test): DeepSeek's usage
+  JSON carried `cache_read_input_tokens` and `cache_creation_input_tokens`
+  (both 0 in that no-cache turn) alongside `input_tokens`/`output_tokens` —
+  the example costs map onto real payload fields, no adjustment needed.
+- Streaming path verified live (2026-08-09): a live STREAMING turn through
+  `stream-anthropic` with this example config (`:adaptive-thinking true`,
+  `/thinking high`) was accepted and conformed to the Anthropic stream
+  shape — `message_start` → `content_block_start` (thinking, then text) →
+  deltas → `content_block_stop` per block → `message_delta` (with usage) →
+  `message_stop`, with every block balanced (no truncated/open-block or
+  missing-`message_start` stream), so psi's malformed-stream hardening
+  (EOF terminal flush, `:start`-before-first-event, open-block balancing at
+  EOF) is not triggered by DeepSeek's actual streaming path — it remains
+  defensive for non-conforming endpoints only. The adaptive shape
+  (`thinking.type "adaptive"` + `output_config.effort "high"`) was accepted
+  with a `thinking` content block, and the usage payload carried the same
+  Anthropic-shaped `cache_read_input_tokens`/`cache_creation_input_tokens`
+  fields as the non-streaming turn (both 0 in the no-cache run). One
+  observed deviation: DeepSeek emits an extra mid-stream `ping` SSE event
+  (not in Anthropic's event set) between content deltas; psi ignores it
+  harmlessly (no case branch → no-op, no error/hang) — locked by a stream
+  test.
+- DeepSeek's Anthropic-compatible endpoint does not document a
+  JSON-Schema-native structured-output mechanism, so this example omits
+  `:capabilities :structured-output` (defaults to unsupported); add
+  `:strategies [:prompted-json]` if you want prompted-JSON fallback
+- image, document, and search-result content blocks are not supported by
+  DeepSeek's Anthropic-compatible endpoint
+- psi's fast speed mode (`/fast` on) is unverified on `deepseek-v4-flash`:
+  psi sends `"speed": "fast"` in the request body (plus the
+  `fast-mode-2026-02-01` beta header), but DeepSeek's compat table does not
+  list `speed`, and Anthropic-compatible endpoints typically reject unknown
+  body fields (400). Not exercised in the review-1 live smoke test
+  (2026-08-09, which covered the adaptive thinking shape at effort high +
+  cache field names; fast mode was not tested); assume fast
+  mode is unsupported on DeepSeek until verified.
+  And a `speed`-field 400 is not auto-recoverable: psi's compatibility
+  retry for HTTP 400 strips the `fast-mode-2026-02-01` beta header
+  (`:without-all-betas` step) but leaves `"speed": "fast"` in the retried
+  body, so a 400 caused by the unverified `speed` field retries once with
+  the same field and hard-fails. Turn fast mode off (`/fast off`) to avoid
+  it; do not rely on the auto-retry to degrade gracefully. The beta
+  stripping applies to any non-OAuth request — including a keyless custom
+  provider whose auth comes from a custom `Authorization: Bearer` header
+  (only genuine built-in Anthropic OAuth requests keep their betas, and
+  DeepSeek never is one).
 
 Custom providers do not define their own proxy fields. When a custom provider
 uses psi's built-in OpenAI-compatible or Anthropic-compatible transport path, it
@@ -165,18 +544,71 @@ inherits the same environment-driven outbound proxy behavior documented in
 The `:auth` map supports more than just an API key:
 
 ```clojure
-{:auth {:api-key "env:LOCAL_LLM_KEY"
-        :auth-header? false
+{:auth {:auth-header? false
         :headers {"X-Client" "psi"}}}
 ```
 
+With `:auth-header? false`, psi never resolves or sends a configured
+`:api-key` (the `:auth-header?` gate skips it entirely, so the request is
+keyless even if the spec resolves) — omit the key in this configuration; it
+would be a dead key that reads as `:configured? true` in the model picker
+while every request is silently keyless. Use `:api-key` only with the default
+auth-header path (or a custom `:headers` auth header as described below).
+
 Use cases:
-- `:api-key` — literal key or `"env:VAR_NAME"`
+- `:api-key` — literal key or `"env:VAR_NAME"` (`env:` keys are re-read from
+  psi's own process environment on every request, not snapshotted when
+  models.edn loads; set the variable before launching psi, because changes in
+  another shell cannot modify the running process; the `env:` prefix is
+  case-sensitive — lowercase `env:` only, so `ENV:VAR` or `Env:VAR` is sent
+  as a literal key and fails provider-side; a blank variable name after the
+  prefix — `"env:"` or `"env: "` — is a config error naming the literal spec
+  ("api-key spec \"env:\" names an empty environment variable (use
+  \"env:VAR_NAME\")"), never an environment lookup of the empty string, so
+  always use `"env:VAR_NAME"` with a real variable name)
 - `:auth-header? false` — omit the normal auth header for servers that reject it
 - `:headers` — add custom request headers
 
 A common use for `:auth-header? false` is an OpenAI-compatible local server that
 accepts requests without a bearer token and rejects unexpected auth headers.
+The same keyless pattern works for `:anthropic-messages` custom providers:
+with `:auth-header? false`, psi does not require an API key and sends no
+`x-api-key`/`Authorization` header — the configured `:headers` (if any) are
+merged in as-is. Without `:auth-header? false`, a custom `:headers` map still
+exempts the key requirement when it carries a *recognized* auth header —
+`x-api-key` or `Authorization`, matched case-insensitively — with no
+`:api-key` configured: psi treats that header as the auth and sends no auth
+header of its own. Incidental headers (e.g. `X-Client` in the example above)
+do NOT imply keyless: with no `:api-key` configured, the request fails fast
+with a provider-scoped "Missing API key" error rather than silently sending a
+keyless request. Don't mix a configured `:api-key` with a recognized auth
+header among custom `:headers`: psi merges custom headers over its own, so
+whether the custom auth header duplicates or replaces the configured key is
+case-dependent — a mixed-case `X-API-Key` duplicates the lowercase
+`x-api-key` beside it on the `:anthropic-messages` transport, while an
+exact-case `x-api-key` collides with it and silently replaces the configured
+key; on the `:openai-completions` and `:openai-codex-responses` transports a
+custom `Authorization` (exact-case) replaces the resolved bearer key, while
+a lowercase `authorization` duplicates beside it — the server's
+case-insensitive header merge decides. On the `:openai-codex-responses`
+transport the same merge lets a custom `chatgpt-account-id` header replace
+the account id psi derives from the resolved key (and, for keyless codex
+requests, supply one that would otherwise be omitted) — don't mix a
+configured `:api-key` with a custom `chatgpt-account-id` header either. Pick
+one auth mechanism per provider.
+
+The same merge applies to `anthropic-beta`: a custom `"anthropic-beta"`
+header among `:headers` REPLACES the transport-generated beta header on the
+`:anthropic-messages` transport — psi's own betas (prompt-caching,
+interleaved-thinking, fast-mode) are silently dropped from the wire, so
+features gated by those betas (e.g. fast mode) stop working. And on a
+beta-related HTTP 400 the compatibility retry's `:without-all-betas` step
+wipes the custom beta too (`clear-beta-header` drops the whole
+`anthropic-beta` header on the retry), so the retry may then 400 for a
+*different* reason (missing provider-required beta) and hard-fail, masking
+the original error. Avoid a custom `anthropic-beta` header on
+`:anthropic-messages` providers unless you need to override the transport
+betas and accept both consequences.
 
 For local `:openai-completions` models, psi also projects the normal session
 `/thinking` control onto a local-only compatibility extension when thinking is
@@ -217,6 +649,12 @@ or, for the Anthropic-compatible example:
 
 ```text
 /model my-anthropic-proxy proxy-sonnet
+```
+
+or, for the DeepSeek example:
+
+```text
+/model deepseek deepseek-v4-flash
 ```
 
 Once selected, the custom model behaves like any other model in psi.

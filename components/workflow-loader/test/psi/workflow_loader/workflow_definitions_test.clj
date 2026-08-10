@@ -407,7 +407,10 @@
        (is (contains? definitions "review-step")))
      (let [steps (get-in definitions ["review-step" :steps])
            review-step (first (filter #(= "review" (:name %)) steps))
-           follow-up-step (first (filter #(= "follow-up" (:name %)) steps))]
+           follow-up-step (first (filter #(= "follow-up" (:name %)) steps))
+           actor-skills ["work-independently"
+                         "clojure-coding-standards"
+                         "testing-without-mocks"]]
        (testing "has 2 steps with correct names and types"
          (is (= 2 (count steps)))
          (is (= ["review" "follow-up"] (mapv :name steps)))
@@ -415,6 +418,13 @@
        (testing "review-step actor sessions disable thinking so PASS_STATUS is not starved"
          (is (= :off (:thinking-level review-step)))
          (is (= :off (:thinking-level follow-up-step))))
+       (testing "review-step actor sessions use the review implementation skills"
+         (is (= actor-skills (:skills review-step)))
+         ;; The follow-up step additionally carries code-shaper + test-shaper
+         ;; (external commit 5e5e5b1f0 "update review skills"), so its skill
+         ;; vector is the review skill set plus those two.
+         (is (= (conj actor-skills "code-shaper" "test-shaper")
+                (:skills follow-up-step))))
        (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
@@ -448,8 +458,8 @@
                "follow-up uses the steps profile (design.md read-only)")
            (is (not (.contains text "design-steps.md"))
                "follow-up does not target design-steps.md")
-           (is (.contains text "predate the preceding review pass")
-               "follow-up carries the predate-exclusion guard (T1)")
+           (is (.contains text "added by preceding review")
+               "follow-up permits items added by preceding review passes (T1)")
            (is (.contains text "code, tests, and docs")
                "follow-up permits editing referenced code/tests/docs (T2)")))
        (testing "legacy review-status session step is removed"
