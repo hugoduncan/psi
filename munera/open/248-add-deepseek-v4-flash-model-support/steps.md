@@ -4936,3 +4936,17 @@
       (whose persistent-set traversal is 100 then 2) and assert ends 2, 100
       before the terminal. Namespace green (16 tests / 54 assertions);
       clj-kondo clean.
+
+## Follow-ups (implementation review 59, 2026-08-09)
+
+- [ ] Propagate review 58's deterministic Codex terminal-balancing behavior
+      into the authoritative design/spec artifacts. The implementation and
+      tests now require open tool calls to close in ascending content-index
+      order on both `:done` and `:error`, but
+      `spec/openai-provider.allium`'s balancing rules only say "for each
+      index" (no ordering contract), and design.md's review-driven transport
+      inventory/acceptance exception stops at review 57. Add the ordered
+      emission invariant to the Codex done/error rules (or a shared Codex
+      balancing rule) and record review 58 in design.md so future changes
+      cannot satisfy the spec while reintroducing nondeterministic set
+      traversal. Re-run the Allium coherence check after updating them.
