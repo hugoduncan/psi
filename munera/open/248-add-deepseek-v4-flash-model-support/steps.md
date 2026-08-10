@@ -5128,7 +5128,7 @@
 
 ## Follow-ups (test review 71, 2026-08-09)
 
-- [ ] Simplify `nullable-function-lookup-records-ordered-reads-test` by removing
+- [x] Simplify `nullable-function-lookup-records-ordered-reads-test` by removing
       its test-owned `looked-up` atom and duplicate read-log assertion. The
       variable-derived return assertions already prove the function receives
       each requested name, and `environment-boundary/reads` already proves

@@ -5,17 +5,14 @@
 (deftest nullable-function-lookup-records-ordered-reads-test
   ;; Proves the nullable's function-backed lookup and ordered read-state contract.
   (testing "lookups pass variable names through and retain repeated reads"
-    (let [looked-up (atom [])
-          boundary  (environment-boundary/nullable
-                     (fn [variable]
-                       (swap! looked-up conj variable)
-                       (str "value-for-" variable)))]
+    (let [boundary (environment-boundary/nullable
+                    (fn [variable]
+                      (str "value-for-" variable)))]
       (is (= "value-for-FIRST_KEY"
              (environment-boundary/lookup boundary "FIRST_KEY")))
       (is (= "value-for-SECOND_KEY"
              (environment-boundary/lookup boundary "SECOND_KEY")))
       (is (= "value-for-FIRST_KEY"
              (environment-boundary/lookup boundary "FIRST_KEY")))
-      (is (= ["FIRST_KEY" "SECOND_KEY" "FIRST_KEY"] @looked-up))
       (is (= ["FIRST_KEY" "SECOND_KEY" "FIRST_KEY"]
              (environment-boundary/reads boundary))))))
