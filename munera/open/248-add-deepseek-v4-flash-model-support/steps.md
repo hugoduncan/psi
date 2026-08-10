@@ -5150,7 +5150,7 @@
 
 ## Follow-ups (test review 73, 2026-08-09)
 
-- [ ] Remove the redundant exactly-one-`:error` assertion from
+- [x] Remove the redundant exactly-one-`:error` assertion from
       `stream-anthropic-error-after-thinking-start-balances-open-block-test`.
       Its exact event-type vector assertion already proves both that the sole
       terminal is `:error` and that it occurs once, so the count assertion adds

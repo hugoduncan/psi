@@ -573,9 +573,7 @@
           events (run-stream sse model {:api-key "test-key"})]
       (is (= [:start :thinking-start :thinking-delta :thinking-end :error]
              (mapv :type events))
-          "the open thinking block is balanced with :thinking-end before the :error")
-      (is (= 1 (count (filterv #(= :error (:type %)) events)))
-          "exactly one :error terminal"))))
+          "the open thinking block is balanced with :thinking-end before the :error"))))
 
 (deftest stream-anthropic-error-after-tool-start-balances-open-block-test
   (testing "a mid-stream SSE error after a tool_use block started closes the block before :error"
