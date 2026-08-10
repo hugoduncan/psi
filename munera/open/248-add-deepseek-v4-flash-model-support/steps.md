@@ -5509,7 +5509,7 @@
 
 ## Follow-ups (code-shaper review 8, 2026-08-10)
 
-- [ ] Rewrite the task-modified guidance in `spec/anthropic-provider.allium`,
+- [x] Rewrite the task-modified guidance in `spec/anthropic-provider.allium`,
       `spec/openai-provider.allium`, and `spec/custom-providers.allium` around
       current behavior and rationale rather than implementation-review
       chronology. These specifications still contain more than 100 `Review N`,
@@ -5517,7 +5517,7 @@
       superseded mechanisms. Preserve enforceable invariants, inputs, outputs,
       and discriminating rationale; leave provenance in git and the task
       artifacts so each rule is locally comprehensible.
-- [ ] Correct the stale DeepSeek streaming claims in
+- [x] Correct the stale DeepSeek streaming claims in
       `spec/anthropic-provider.allium`'s
       `MessageStopEmitsDoneWithUsage` and
       `AnthropicTransportCloseEmitsDoneIfNotTerminal` guidance. They still say

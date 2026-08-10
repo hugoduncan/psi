@@ -45,7 +45,7 @@ value CustomModelDef {
     -- :api anthropic_messages custom providers (and built-in Anthropic
     -- catalog models); ignored for OpenAI-compatible providers.
     supports_mid_conversation_system_messages: Boolean = false
-    -- Review 22: explicit declaration of per-turn system-message support for
+    -- explicit declaration of per-turn system-message support for
     -- the agent-session mid-conversation system-message capability
     -- (session-supports-mid-system-messages? in agent-session
     -- model_capabilities.clj). Omitted → false for :anthropic-messages custom
@@ -60,7 +60,7 @@ value CustomModelDef {
     cache_read_cost: Number = 0.0
     cache_write_cost: Number = 0.0
     parallel_tool_calls: Boolean?
-    -- Review 23: pass-through of the closed ModelDef schema's
+    -- pass-through of the closed ModelDef schema's
     -- :parallel-tool-calls field. Sent as :parallel_tool_calls by the OpenAI
     -- transports when tool defs are present and the model declares it; the
     -- Anthropic transport does not read it. Optional — the expanded model map
@@ -68,14 +68,14 @@ value CustomModelDef {
     locality: local | cloud = local
     latency_tier: low | medium | high = low
     cost_tier: zero | low | medium | high = zero
-    -- Review 21/23: model-defaults (expand-model) are :locality :local /
+    -- model-defaults (expand-model) are :locality :local /
     -- :latency-tier :low / :cost-tier :zero; the documented DeepSeek example
     -- sets :locality :cloud / :latency-tier :low / :cost-tier :low explicitly
     -- (locked by parse-documented-deepseek-example-test). These drive
     -- local-helper selection (context-manager requires :latency-tier :low +
     -- :cost-tier #{:zero :low}, strong :locality :local).
     capabilities: ModelCapabilities?
-    -- Review 23: optional :capabilities map matching
+    -- optional :capabilities map matching
     -- schemas/ModelCapabilities (:structured-output / :textual-tool-calls),
     -- carried through expand-model's verbatim merge like every other
     -- model-def key.
@@ -95,7 +95,7 @@ value ModelsConfig {
 
 value ModelCapabilities {
     -- Mirrors schemas/ModelCapabilities in user_models.clj: a closed map with
-    -- optional :structured-output and :textual-tool-calls keys (review 23).
+    -- optional :structured-output and :textual-tool-calls keys .
     structured_output: StructuredOutputCapability?
     textual_tool_calls: Set<TextualToolCallFormat>?
 }
@@ -121,7 +121,7 @@ value ResolvedCustomModel {
     provider: String                           -- the custom provider key, e.g. "local"
     api: ApiProtocol
     base_url: String
-    custom: Boolean = true                     -- review 14: origin tag — custom models are never classified built-in;
+    custom: Boolean = true                     -- origin tag — custom models are never classified built-in;
                                                 -- set by psi at parse time (expand-model), never declared in models.edn
                                                 -- (the closed ModelDef schema rejects a user-supplied :custom? key)
     supports_reasoning: Boolean
@@ -145,7 +145,7 @@ value ResolvedCustomModel {
 value ProviderAuth {
     provider: String
     api_key: String?
-    -- Review 26: the RAW api-key spec (literal or "env:VAR") — NOT resolved
+    -- the RAW api-key spec (literal or "env:VAR") — NOT resolved
     -- at parse time. The transports' ResolveRequestApiKey applies the
     -- mechanical ResolveApiKey resolution per request.
     auth_header: Boolean
@@ -220,7 +220,7 @@ rule ParseModelsConfig {
                 provider: provider_key,
                 api: provider_def.api,
                 base_url: provider_def.base_url,
-                custom: true,                        -- review 14: every models.edn model is tagged custom
+                custom: true,                        -- every models.edn model is tagged custom
                 supports_reasoning: model_def.supports_reasoning,
                 supports_images: model_def.supports_images,
                 supports_text: model_def.supports_text,
@@ -245,7 +245,7 @@ rule ResolveApiKey {
     -- This is the mechanical resolution only; provider-scoped fallback and
     -- keyless exemptions are applied by ResolveRequestApiKey below.
     --
-    -- Review 26: applied at REQUEST time, not models.edn parse time. The
+    -- applied at REQUEST time, not models.edn parse time. The
     -- registry stores the raw spec (extract-provider-auth), and the
     -- transports' shared request-support/resolve-key-spec re-resolves
     -- "env:VAR" through getenv per request — matching the built-in env
@@ -267,7 +267,7 @@ value RequestOptions {
     temperature: Number?
     speed_mode: fast | normal | null
     effort_override: low | medium | high | xhigh | null
-    -- Review 23: extended to mirror the transport StreamOptions values —
+    -- extended to mirror the transport StreamOptions values —
     -- session->request-options (prompt_request.clj) carries :temperature,
     -- :speed-mode and :effort-override alongside the key/auth fields.
     -- :logprobs-enabled/:top-logprobs and :structured-output stay out of
@@ -283,7 +283,7 @@ rule ResolveRequestApiKey {
     --   * custom providers NEVER fall back to the built-in env var — a
     --     nil/blank configured key is an error naming the provider and the
     --     models.edn :auth remedy, so the built-in key can never be silently
-    --     sent to a third-party endpoint (review 14: the custom tag closes
+    --     sent to a third-party endpoint (current contract: the custom tag closes
     --     the provider-NAME gap — a custom provider literally named
     --     "anthropic"/"openai" is tagged custom and never classified
     --     built-in);
@@ -291,7 +291,7 @@ rule ResolveRequestApiKey {
     --     no_auth_header, or a recognized auth header among custom :headers
     --     with no configured key) require no key at all.
     --
-    -- Review 26: options.api_key may be a RAW "env:VAR" spec (the registry
+    -- options.api_key may be a RAW "env:VAR" spec (the registry
     -- stores the spec, not a parse-time snapshot); ResolveApiKey re-resolves
     -- it per request. A custom provider whose env:VAR is unset at request
     -- time errors naming the variable ("environment variable VAR is unset —
@@ -386,13 +386,13 @@ rule InjectCustomProviderAuth {
     -- (KeylessRequestDefined) applies the same rule to prepared request
     -- options.
     --
-    -- Review 26: auth.api_key is the RAW spec (literal or "env:VAR") —
+    -- auth.api_key is the RAW spec (literal or "env:VAR") —
     -- extract-provider-auth stores the spec verbatim; the request-level
     -- ResolveRequestApiKey applies the mechanical ResolveApiKey resolution
     -- per request (so ai_options.api_key = auth.api_key carries the raw spec
     -- into options, resolved at request time).
     --
-    -- Review 42: the injection is gated on the model's `:custom?` origin tag.
+    -- the injection is gated on the model's `:custom?` origin tag.
     -- Registry auth is keyed by provider NAME and populated only from custom
     -- models.edn providers — a BUILT-IN same-named model must never inherit a
     -- custom provider's auth config (headers / :no-auth-header / api-key

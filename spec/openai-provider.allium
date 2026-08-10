@@ -39,7 +39,7 @@ external entity Model {
     api: String
     base_url: String?
     supports_reasoning: Boolean
-    custom: Boolean = false                  -- review 14: true for custom models.edn models (expand-model tag)
+    custom: Boolean = false                  -- true for custom models.edn models (expand-model tag)
 }
 
 ------------------------------------------------------------
@@ -83,7 +83,7 @@ value StreamEvent {
     usage: StreamUsage?
     error_message: String?
     http_status: Integer?
-    headers: Map<String, String>?          -- review 51: error events keep response headers (request-id etc.) for diagnostics
+    headers: Map<String, String>?          -- error events keep response headers (request-id etc.) for diagnostics
 }
 
 value ProviderRequest {
@@ -101,7 +101,7 @@ value ProviderRequest {
 -- ResolveApiKey(spec): the mechanical api-key spec resolution from
 --   spec/custom-providers.allium (ResolveApiKey rule): nil/blank → nil,
 --   "env:VAR" → Environment("VAR"), literal → as-is. Applied at REQUEST time
---   (review 26): the registry stores the raw spec and the transports
+--   : the registry stores the raw spec and the transports
 --   re-resolve env: keys per request.
 -- BlankOrNil(x) / IsBlank(x): x is nil or a blank/whitespace-only string
 --   (clojure.string/blank? semantics; nil counts as blank). The two names are
@@ -165,7 +165,7 @@ entity OpenAIStream {
     started: Boolean = false
     done: Boolean = false
 
-    -- Review 48: EOF-level terminal flush state. pending_finish_reason is
+    -- EOF-level terminal flush state. pending_finish_reason is
     -- the finish_reason keyword recorded by the (:finish_reason choice)
     -- branch of finish-chat-chunk! (flushed on a trailing [DONE] or at EOF);
     -- last_seen_usage is the most recent usage chunk normalized via
@@ -199,13 +199,13 @@ rule OpenAIProviderDispatchesByModelApi {
 
 rule OpenAIApiKeyResolved {
     -- Provider-scoped resolution, mirroring the Anthropic transport's
-    -- resolve-api-key (review 3) and the review-10 fix for the OpenAI
+    -- resolve-api-key  and the contract fix for the OpenAI
     -- chat-completions transport: built-in OpenAI models (not tagged custom,
-    -- provider nil or "openai" — review 14 closed the provider-NAME gap
+    -- provider nil or "openai" — origin tagging closes the provider-NAME gap
     -- where a custom provider literally named "openai" was classified
     -- built-in) fall back to the OPENAI_API_KEY env var; custom providers
     -- (any other provider, including custom :openai-codex-responses
-    -- providers — review 13 closed the codex gap) NEVER do (a nil/blank
+    -- providers — origin tagging closes the codex gap) NEVER do (a nil/blank
     -- configured key is a provider-scoped missing-key error, so a custom
     -- provider's request can never silently send the user's OpenAI key to a
     -- third-party endpoint); keyless requests (no_auth_header, or a
@@ -273,7 +273,7 @@ rule CodexRequestRequiresApiKey {
     requires: IsBlank(stream.resolved_api_key)
     requires: not stream.keyless
 
-    -- Review 13: keyless codex requests (:no-auth-header, or a recognized
+    -- keyless codex requests (:no-auth-header, or a recognized
     -- auth header among custom :headers with no configured key) are exempt —
     -- the transport builds the request without Authorization or
     -- chatgpt-account-id instead of failing (mirrors the completions
@@ -299,7 +299,7 @@ rule CodexRequiresChatGptAccountId {
 
     -- Keyless requests never reach this rule (blank resolved key) — the
     -- chatgpt-account-id requirement is waived, matching build-codex-request
-    -- (review 13): a keyless custom codex-compatible endpoint has no key to
+    -- : a keyless custom codex-compatible endpoint has no key to
     -- derive the account id from.
 
     ensures: Emit(StreamEvent{event_type: error, error_message: "OpenAI Codex requires ChatGPT OAuth access token (missing chatgpt_account_id)"})
@@ -507,7 +507,7 @@ rule CompletionsRequestBuilt {
 }
 
 rule KeylessCompletionsRequestBuilt {
-    -- Review 21: a keyless :openai-completions request (:no-auth-header, or a
+    -- a keyless :openai-completions request (:no-auth-header, or a
     -- recognized auth header among custom :headers with no configured key —
     -- the documented "Local servers and custom headers" pattern) had no
     -- request-construction rule: CompletionsRequestBuilt requires a non-blank
@@ -533,7 +533,7 @@ rule KeylessCompletionsRequestBuilt {
 }
 
 rule FastModeServiceTierMappedForCompletions {
-    -- Review 23: :speed-mode :fast → "service_tier": "flex" in the
+    -- :speed-mode :fast → "service_tier": "flex" in the
     -- chat-completions request body (build-request in
     -- providers/openai/chat_completions.clj; locked by
     -- speed-mode-fast-adds-service-tier-flex-test). The codex-responses
@@ -575,9 +575,9 @@ rule CodexRequestBuilt {
 }
 
 rule KeylessCodexRequestBuilt {
-    -- Review 21: a keyless :openai-codex-responses request had no
+    -- a keyless :openai-codex-responses request had no
     -- request-construction rule — CodexRequestBuilt requires a non-blank
-    -- resolved key AND a non-blank chatgpt_account_id, while review 13's
+    -- resolved key AND a non-blank chatgpt_account_id, while current
     -- keyless exemption (KeylessRequestDetermined + the keyless branches of
     -- CodexRequestRequiresApiKey / CodexRequiresChatGptAccountId) builds a
     -- request with NO Authorization and NO chatgpt-account-id. Mirrors the
@@ -595,7 +595,7 @@ rule KeylessCodexRequestBuilt {
 
     @guidance
         -- Keyless codex build (build-codex-request's no-auth? path in
-        -- providers/openai/codex_responses.clj, review 13): the body is
+        -- providers/openai/codex_responses.clj, the implementation): the body is
         -- identical to the authenticated build, but NO Authorization header
         -- and NO chatgpt-account-id header are sent (a custom
         -- chatgpt-account-id header among :headers supplies one if the
@@ -657,14 +657,14 @@ rule ProviderRequestCaptureEmittedWithRedaction {
 
 rule RedactRequestHeaders {
     -- Mirrors redact-request-headers in
-    -- providers/openai/transport.clj (review 11): auth header names are
+    -- providers/openai/transport.clj : auth header names are
     -- matched case-insensitively (shared find-headers helper) — "Authorization"
     -- (redacted to "Bearer ***REDACTED***", with a length suffix for values
     -- longer than 20 chars), "x-api-key" (redacted to "***REDACTED***"), and
     -- "chatgpt-account-id" (masked to its first 6 chars + "..."). Redacted
     -- values are written back under the original header key casing. EVERY
     -- case-insensitive match is redacted — a differently-cased duplicate
-    -- ("Authorization" + "authorization") must not leak verbatim (review 19).
+    -- ("Authorization" + "authorization") must not leak verbatim .
     -- Non-auth headers pass through unmodified.
 
     when: RequestHeadersAvailable(headers)
@@ -732,7 +732,7 @@ rule CompletionsChunksNormalizeToExecutorEvents {
             CompletionsDoneWithoutUsageEmitted(stream, chunk)
 
     @guidance
-        -- Review 46: requires not stream.done — process-chat-sse-line! is
+        -- requires not stream.done — process-chat-sse-line! is
         -- short-circuited on done? (set by emit-chat-error! and
         -- emit-chat-completion-finish!), so a trailing :choices chunk after
         -- a mid-stream SSE error chunk is a full no-op: no :text-delta via
@@ -766,7 +766,7 @@ rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
     ensures: ErrorEmitted(stream)
 
     @guidance
-        -- Review 43: an OpenAI SSE error chunk ({"error": {...}} — no
+        -- an OpenAI SSE error chunk ({"error": {...}} — no
         -- :choices) previously no-oped in process-chat-sse-line!: no :error
         -- event, no terminal :done, hanging the turn until the idle timeout
         -- with a misleading timeout — the same silent-drop class fixed for
@@ -776,33 +776,33 @@ rule CompletionsSseErrorChunkEmitsErrorAndTerminates {
         -- (parsed-body [:error :message]; a numeric http-status from
         -- :status / [:error :status] / [:error :http_status] when present);
         -- the done? guard prevents a trailing [DONE]/finish chunk from
-        -- emitting a second terminal event. Review 44: the stream-openai
+        -- emitting a second terminal event. the stream-openai
         -- catch block's :error emission is now also guarded on done?
         -- (mirroring the codex transport's emit-codex-error!), so a
         -- stream-read exception thrown after this error chunk has terminated
         -- the stream cannot emit a second :error — see the
         -- OnceDoneNoFurtherEvent invariant below.
-        -- Review 51: the status extraction ALSO reads the TOP-LEVEL
+        -- the status extraction ALSO reads the TOP-LEVEL
         -- :http_status key (emit-chat-error!'s `some` locations now include
-        -- (:http_status chunk)) — the review-47-aligned anthropic "error"
+        -- (:http_status chunk)) — the contract-aligned anthropic "error"
         -- branch reads that location too, so an OpenAI-compatible endpoint
         -- emitting the status under a top-level http_status key
         -- ({"http_status": 529, "error": {...}}) keeps its numeric
         -- :http-status on the :error event and downstream retry-error? /
         -- provider-error-kind classify a transient 5xx/overload as
         -- retryable instead of :unknown.
-        -- Review 52: the error emitter also ensures StartEmittedOnce — it
+        -- the error emitter also ensures StartEmittedOnce — it
         -- emits :start first when the stream never emitted it (an
         -- error-FIRST stream: the error chunk arrives before any
         -- role/content chunk), mirroring emit-chat-completion-finish!'s
         -- ordering (done? reset, then :start, then the terminal) and the
-        -- review-50-fixed anthropic "error" branch's [:start :error]. The
+        -- the implementation-fixed anthropic "error" branch's [:start :error]. The
         -- existing error tests never caught the missing :start because they
         -- begin with a role/content chunk that triggers :start via the
         -- non-error path. An error-first stream now yields [:start :error]
         -- like the anthropic transport — the last three-transport asymmetry
-        -- in the review-50 :start-before-terminal class.
-        -- Review 53: the OUTER catch block (a stream-read exception before
+        -- in the contract :start-before-terminal class.
+        -- the OUTER catch block (a stream-read exception before
         -- any output — e.g. a connection reset on the first read) is the
         -- last :start-before-terminal gap on this transport: it routes
         -- through transport/emit-error! (which has no start logic), so the
@@ -818,12 +818,12 @@ rule OnceDoneNoFurtherEvent {
     ensures: no further Emit(StreamEvent)
 
     @guidance
-        -- Review 44 + review 46 invariant (mirrored from the anthropic spec):
+        -- the implementation invariant (mirrored from the anthropic spec):
         -- once the stream is done — whether terminated by a mid-stream SSE
         -- error chunk, a finish chunk, or the transport closing — no
         -- subsequent SSE event or stream-read exception may emit ANY event,
-        -- terminal or not. Review 44 covered only the terminal emissions
-        -- (:done/:error); review 46 extends the guard to the NON-terminal
+        -- terminal or not. the implementation covered only the terminal emissions
+        -- (:done/:error); the implementation extends the guard to the NON-terminal
         -- branches too: process-chat-sse-line! is short-circuited on done?
         -- (set by emit-chat-error! and emit-chat-completion-finish!), so a
         -- trailing :choices chunk after an error chunk is a full no-op (no
@@ -838,7 +838,7 @@ rule OnceDoneNoFurtherEvent {
         -- (emit-chat-completion-finish!, emit-chat-error!) and the codex
         -- terminal emissions (emit-codex-error!/emit-codex-done!) are
         -- done?-guarded, and the stream-openai catch block's :error emission
-        -- is guarded on done? (review 44, mirroring the codex transport's
+        -- is guarded on done? (the implementation, mirroring the codex transport's
         -- emit-codex-error!). A consumer therefore receives at most one
         -- terminal event (:error or :done) per stream, and nothing at all
         -- after it.
@@ -861,19 +861,19 @@ rule CodexEventsNormalizeToExecutorEvents {
             CodexErrorEventEmitted(stream, event)
 
     @guidance
-        -- Review 46: requires not stream.done — handle-codex-event! is
+        -- requires not stream.done — handle-codex-event! is
         -- short-circuited on done? (set by emit-codex-error! and
         -- emit-codex-done!), so a trailing SSE event after
         -- response.failed/error is a full no-op: no :text-delta from a
         -- trailing response.output_text.delta, no output_item/thinking/tool
         -- events, no synthetic :done.
-        -- Review 52: two refinements on the codex error path. (a) The error
+        -- two refinements on the codex error path. (a) The error
         -- emitter (CodexErrorEventEmitted branch) also ensures
         -- StartEmittedOnce — it emits :start first when the stream never
         -- emitted it (an error-FIRST stream: response.failed/error before
         -- any output event, or an HTTP-error response to the stream
         -- request), mirroring emit-codex-start!'s role in the codex EOF
-        -- flush and the review-50-fixed anthropic "error" branch's
+        -- flush and the contract-fixed anthropic "error" branch's
         -- [:start :error]. The existing codex error test never caught the
         -- missing :start because it begins with response.output_text.delta
         -- (which triggers :start via the non-error path). (b) The RAW event
@@ -1003,11 +1003,11 @@ rule StreamErrorsNormalized {
     ensures: ProviderErrorHeadersPreserved(error)
 
     @guidance
-        -- Test review 85: ProviderRequestFailed includes an initial non-2xx
+        -- ProviderRequestFailed includes an initial non-2xx
         -- streaming HTTP response. The chat-completions path now emits
         -- :start once before that terminal :error, matching codex, error-first
         -- SSE chunks, and first-read exceptions.
-        -- Review 51: ProviderErrorHeadersPreserved — the HTTP-error branch
+        -- ProviderErrorHeadersPreserved — the HTTP-error branch
         -- surfaces the FULL error map from response->error (headers,
         -- body-text, body), not just error-message + http-status. The codex
         -- transport previously destructured AWAY :headers/:body-text/:body
@@ -1020,12 +1020,12 @@ rule StreamErrorsNormalized {
         -- now passes the full error map through, mirroring the sibling
         -- transports (and the codex SSE path's ProviderErrorHeadersPreserved
         -- in CodexStreamFailurePreservesRetryMetadata).
-        -- Review 52: the catch block (exception->error from a stream-read
+        -- the catch block (exception->error from a stream-read
         -- exception during the SSE doseq) passes headers through the same
         -- way — see CodexStreamFailurePreservesRetryMetadata — and the
         -- error emitter ensures StartEmittedOnce on every codex error path
         -- (a stream that never produced output emits :start before the
-        -- :error, review 52 — see CodexEventsNormalizeToExecutorEvents).
+        -- :error, the implementation — see CodexEventsNormalizeToExecutorEvents).
 }
 
 rule CodexStreamFailurePreservesRetryMetadata {
@@ -1040,14 +1040,14 @@ rule CodexStreamFailurePreservesRetryMetadata {
     ensures: ProviderErrorHeadersPreserved(event)
 
     @guidance
-        -- Review 51: the codex HTTP-error path (ProviderRequestFailed, see
+        -- the codex HTTP-error path (ProviderRequestFailed, see
         -- StreamErrorsNormalized) now also preserves response headers —
         -- previously the only transport whose HTTP-error branch lost
         -- request-id-style headers (the destructure dropped :headers even
         -- though emit-codex-error!'s 4-arity accepts them, used by this
         -- SSE path). Both codex error paths are now header-preserving,
         -- mirroring the anthropic and openai chat-completions transports.
-        -- Review 52: the catch block (stream-read exception during the SSE
+        -- the catch block (stream-read exception during the SSE
         -- doseq, surfaced via exception->error) now passes headers through
         -- the same way — it previously destructured away
         -- :headers/:body-text/:body from exception->error and called the
@@ -1056,8 +1056,8 @@ rule CodexStreamFailurePreservesRetryMetadata {
         -- lower (non-HTTP stream exceptions rarely carry response headers),
         -- but the fix is the same one-line destructure — the catch now
         -- surfaces them, consistent with this rule's SSE path and the
-        -- review-51-fixed HTTP-error branch. The error emitter also ensures
-        -- StartEmittedOnce on all codex error paths (review 52, see
+        -- the implementation-fixed HTTP-error branch. The error emitter also ensures
+        -- StartEmittedOnce on all codex error paths (the implementation, see
         -- CodexEventsNormalizeToExecutorEvents).
 }
 
@@ -1073,7 +1073,7 @@ rule OpenAITransportCloseEmitsDoneIfNotTerminal {
     })
 
     @guidance
-        -- Review 48: EOF-level terminal flush, mirroring the codex
+        -- EOF-level terminal flush, mirroring the codex
         -- transport's (when-not @(:done? ...) ...) after its SSE doseq. A
         -- stream that EOFs without an in-band terminal event (a usage chunk,
         -- a finish_reason chunk + [DONE], or an error chunk) previously
@@ -1086,7 +1086,7 @@ rule OpenAITransportCloseEmitsDoneIfNotTerminal {
         -- when set (stream.pending_finish_reason, set by
         -- CompletionsChunksNormalizeToExecutorEvents' finish_reason branch),
         -- else :stop, and attaches the last-seen usage chunk when one was
-        -- provided (stream.last_seen_usage — the review-47 zero-usage class
+        -- provided (stream.last_seen_usage — the contract zero-usage class
         -- on the :openai-completions sibling: an endpoint that ignores
         -- stream_options.include_usage sends no usage chunk, so the :done
         -- carries no :usage and handle-done! records ZERO usage/cost, the
@@ -1104,7 +1104,7 @@ rule TerminalEmitsToolCallEndsForOpenToolCalls {
                  Emit(StreamEvent{event_type: toolcall_end, content_index: index})
 
     @guidance
-        -- Review 55: the chat-completions EOF flush closes open tool calls
+        -- the chat-completions EOF flush closes open tool calls
         -- before the terminal :done — a tool_calls delta chunk followed by
         -- EOF (no finish_reason, no [DONE], no usage chunk) previously
         -- emitted :done with no :toolcall-end, leaving the turn accumulator
@@ -1135,11 +1135,11 @@ rule ErrorPathEmitsToolCallEndsForOpenToolCalls {
                  Emit(StreamEvent{event_type: toolcall_end, content_index: index})
 
     @guidance
-        -- Review 56: emit-chat-error! (the mid-stream error-chunk path,
+        -- emit-chat-error! (the mid-stream error-chunk path,
         -- see CompletionsSseErrorChunkEmitsErrorAndTerminates) now calls
         -- force-start-pending-chat-tools! + emit-chat-tool-ends! — the
         -- exact helpers the finish_chunk branches and the EOF flush use —
-        -- before the :error. Review 55's
+        -- before the :error. current
         -- TerminalEmitsToolCallEndsForOpenToolCalls covered only the :done
         -- paths (finish-chunk terminal + EOF flush), so a
         -- tool_calls-delta-then-error-chunk stream previously finalized
@@ -1171,7 +1171,7 @@ rule CodexTerminalEmitsToolCallEndsInAscendingIndexOrder {
     ensures: all emissions above precede the terminal done or error event
 
     @guidance
-        -- Reviews 56/58: balance-open-codex-tools! is shared by the done
+        -- balance-open-codex-tools! is shared by the done
         -- and error emitters. Every codex terminal path closes each open
         -- tool call before :done/:error, and closes multiple calls in
         -- ascending content-index order. The ordering is contractual: the
@@ -1181,7 +1181,7 @@ rule CodexTerminalEmitsToolCallEndsInAscendingIndexOrder {
         -- persistent-set traversal differs from numeric order) and require
         -- :toolcall-end events for 2, then 100, before both a completed
         -- terminal and a response.failed terminal.
-        -- Review 56 established balancing on every error path
+        -- live verification established balancing on every error path
         -- (response.failed/error SSE events, HTTP errors, and stream-read
         -- exceptions), mirroring the existing done/EOF balancing. A no-op
         -- when no tool calls are open, including error-first and HTTP-error
