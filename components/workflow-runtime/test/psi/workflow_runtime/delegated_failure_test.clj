@@ -482,6 +482,10 @@
               "[REDACTED], retry"]
              ["token=abc; retry"
               "[REDACTED]; retry"]
+             ["token=abc\"def denied"
+              "[REDACTED] denied"]
+             ["token=abc'def denied"
+              "[REDACTED] denied"]
              ["Bearer abcdefgh==, retry"
               "[REDACTED_TOKEN], retry"]
              ["Bearer\tabcdefgh retry"

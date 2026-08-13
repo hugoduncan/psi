@@ -58,7 +58,8 @@
 (defn execute-run!
   "Execute a workflow run via the Phase A hierarchical statechart runtime.
 
-   Returns {:run-id ... :status ... :steps-executed [...] :terminal? bool :blocked? bool}."
+   Returns {:run-id ... :status ... :steps-executed [...]
+            :terminal-execution-error map-or-nil :terminal? bool :blocked? bool}."
   [ctx parent-session-id run-id]
   (execute-statechart! ctx parent-session-id run-id :workflow/start))
 

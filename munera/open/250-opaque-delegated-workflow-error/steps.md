@@ -93,5 +93,5 @@
 
 ## Implementation review follow-ups
 
-- [ ] Fix unquoted credential-pair scanning so its value ends only at the specified whitespace or `,;)]}` delimiters, not at apostrophes or double quotes; add positive tests such as `token=abc\"def denied` and `token=abc'def denied` proving no credential suffix remains visible.
-- [ ] Update the public `execute-run!` return-shape docstring in `workflow_execution.clj` to include the always-present private `:terminal-execution-error` handoff (map or nil), keeping the documented facade contract aligned with `execution-result`.
+- [x] Fix unquoted credential-pair scanning so its value ends only at the specified whitespace or `,;)]}` delimiters, not at apostrophes or double quotes; add positive tests such as `token=abc\"def denied` and `token=abc'def denied` proving no credential suffix remains visible.
+- [x] Update the public `execute-run!` return-shape docstring in `workflow_execution.clj` to include the always-present private `:terminal-execution-error` handoff (map or nil), keeping the documented facade contract aligned with `execution-result`.
