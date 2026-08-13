@@ -2,54 +2,74 @@
   (:require
    [psi.workflow-runtime.delegated-failure :as delegated-failure]))
 
-(def ^:private small-run-count 4000)
-(def ^:private large-run-count (* 4 small-run-count))
-(def ^:private maximum-scaling-ratio 8.0)
+(def ^:private delimiter-count 128000)
+(def ^:private sample-count 3)
+(def ^:private maximum-separator-overhead-ratio 1.14)
 
 (defn- late-separator-input
-  [run-count separator]
-  (str (apply str (repeat run-count "x ")) separator "tail"))
+  [suffix]
+  (str (apply str (repeat delimiter-count " ")) suffix))
 
 (defn- elapsed-nanos
-  [input]
+  [input expected]
   (let [started-at (System/nanoTime)
         sanitized (delegated-failure/sanitize-component input)]
-    (when-not (= 512 (delegated-failure/code-point-count sanitized))
-      (throw (ex-info "Unexpected sanitizer output bound"
-                      {:code-point-count
-                       (delegated-failure/code-point-count sanitized)})))
+    (when-not (= expected sanitized)
+      (throw (ex-info "Unexpected sanitizer output"
+                      {:expected expected
+                       :actual sanitized})))
     (- (System/nanoTime) started-at)))
 
-(defn- fastest-elapsed-nanos
-  [input]
-  (apply min (repeatedly 2 #(elapsed-nanos input))))
+(defn- median
+  [values]
+  (nth (sort values) (quot (count values) 2)))
 
-(defn- separator-scaling
-  [separator]
-  (let [small-input (late-separator-input small-run-count separator)
-        large-input (late-separator-input large-run-count separator)
-        small-nanos (fastest-elapsed-nanos small-input)
-        large-nanos (fastest-elapsed-nanos large-input)]
-    {:separator separator
-     :small-ms (/ small-nanos 1e6)
-     :large-ms (/ large-nanos 1e6)
-     :ratio (/ (double large-nanos) small-nanos)}))
+(defn- benchmark-samples
+  []
+  (reduce
+   (fn [samples _]
+     ;; Interleave equal-size inputs so JVM and host variation affects each case
+     ;; similarly. The no-separator control isolates common linear scan cost.
+     (reduce (fn [samples [label suffix expected]]
+               (update samples label conj
+                       (elapsed-nanos (late-separator-input suffix) expected)))
+             samples
+             [[:control "tail" "tail"]
+              [:slash "/tail" "[PATH_REDACTED]"]
+              [:backslash "\\tail" "\\tail"]]))
+   {:control [] :slash [] :backslash []}
+   (range sample-count)))
+
+(defn- separator-results
+  []
+  (let [medians (update-vals (benchmark-samples) median)
+        control-nanos (:control medians)]
+    (mapv (fn [label]
+            {:separator label
+             :control-ms (/ control-nanos 1e6)
+             :separator-ms (/ (get medians label) 1e6)
+             :overhead-ratio (/ (double (get medians label)) control-nanos)})
+          [:slash :backslash])))
 
 (defn -main
   [& _]
-  ;; Warm the complete public sanitizer path before comparing 4x input growth.
-  (dotimes [_ 2]
+  ;; Warm the complete public sanitizer path before collecting interleaved
+  ;; medians. This opt-in benchmark is intentionally absent from unit suites.
+  (dotimes [_ 3]
     (delegated-failure/sanitize-component
-     (late-separator-input 1000 "/")))
-  (let [results (mapv separator-scaling ["/" "\\"])]
-    (doseq [{:keys [separator small-ms large-ms ratio]} results]
-      (println (format "%s: %.1f ms -> %.1f ms (%.2fx)"
-                       (pr-str separator)
-                       small-ms
-                       large-ms
-                       ratio)))
-    (when-let [failures (seq (filter #(> (:ratio %) maximum-scaling-ratio)
-                                     results))]
-      (throw (ex-info "Delegated-failure sanitizer scaling exceeded calibrated bound"
-                      {:maximum-ratio maximum-scaling-ratio
-                       :failures failures})))))
+     (str (apply str (repeat 2000 " ")) "/tail")))
+  (let [results (separator-results)]
+    (doseq [{:keys [separator control-ms separator-ms overhead-ratio]} results]
+      (println (format "%s: control %.1f ms, separator %.1f ms (%.3fx)"
+                       (name separator)
+                       control-ms
+                       separator-ms
+                       overhead-ratio)))
+    (when-let [failures
+               (seq (filter #(> (:overhead-ratio %)
+                                maximum-separator-overhead-ratio)
+                            results))]
+      (throw
+       (ex-info "Delegated-failure sanitizer separator overhead exceeded calibrated bound"
+                {:maximum-overhead-ratio maximum-separator-overhead-ratio
+                 :failures failures})))))
