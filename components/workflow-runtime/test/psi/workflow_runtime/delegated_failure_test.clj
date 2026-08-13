@@ -481,6 +481,60 @@
     (is (not (delegated-failure/actionable? "[PATH_REDACTED] [STACKTRACE_REDACTED]")))
     (is (true? (delegated-failure/actionable? "[REDACTED] request rejected")))))
 
+(deftest control-split-placeholder-actionability-test
+  ;; Control removal cannot turn a placeholder into actionable public text.
+  (testing "recognizes placeholders through the virtual control-stripped view"
+    (doseq [[input expected]
+            [["[REDAC\u0000TED]" "[REDACTED]"]
+             ["[PATH_REDAC\u0000TED]" "[PATH_REDACTED]"]
+             ["[STACKTRACE_REDAC\u0000TED]" "[STACKTRACE_REDACTED]"]
+             ["[REDACTED_TOK\u0000EN]" "[REDACTED_TOKEN]"]]]
+      (is (= expected (delegated-failure/sanitize-component input)) input)))
+
+  (testing "applies placeholder-only fallback and step omission after control removal"
+    (let [control-split-placeholder "[REDAC\u0000TED]"
+          run-with-cause (workflow-run
+                          {:step-order ["build"]
+                           :current-step-id "build"
+                           :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                                            :status :execution-failed
+                                                            :execution-error
+                                                            {:message control-split-placeholder}}]}}
+                           :terminal-outcome {:step-id "build"}})
+          run-with-step (workflow-run
+                         {:step-order [control-split-placeholder]
+                          :current-step-id control-split-placeholder
+                          :step-runs {control-split-placeholder
+                                      {:attempts [{:attempt-id "attempt-2"
+                                                   :status :execution-failed
+                                                   :execution-error {:message "request rejected"}}]}}
+                          :terminal-outcome {:step-id control-split-placeholder}})]
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow failed"
+              :delegate-failure {:source :fallback
+                                 :run-id "cause-run"
+                                 :target "child"
+                                 :step-id "build"
+                                 :attempt-id "attempt-1"}}
+             (delegated-failure/delegated-failure run-with-cause "cause-run" "child")))
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow failed"
+              :delegate-failure {:source :fallback
+                                 :run-id "target-run"
+                                 :target control-split-placeholder
+                                 :step-id control-split-placeholder
+                                 :attempt-id "attempt-2"}}
+             (delegated-failure/delegated-failure
+              run-with-step "target-run" control-split-placeholder)))
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow 'child' failed: request rejected"
+              :delegate-failure {:source :execution-error
+                                 :run-id "step-run"
+                                 :target "child"
+                                 :step-id control-split-placeholder
+                                 :attempt-id "attempt-2"}}
+             (delegated-failure/delegated-failure run-with-step "step-run" "child"))))))
+
 (deftest delegated-failure-non-actionable-step-message-test
   ;; Public composition omits unusable step text without discarding valid raw
   ;; location identity from the canonical envelope.

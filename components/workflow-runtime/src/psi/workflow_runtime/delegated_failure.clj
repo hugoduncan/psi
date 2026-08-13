@@ -530,8 +530,11 @@
               prefixed-token (when (left-boundary? text index token-character?)
                                (prefixed-token-end text index))
               path (path-span index)
-              literal-placeholder (some #(when (.startsWith ^String text % index) %)
-                                        placeholders)
+              [literal-placeholder placeholder-end]
+              (some (fn [placeholder]
+                      (when-let [end (visible-starts-with-end text index placeholder)]
+                        [placeholder end]))
+                    placeholders)
               [span-end replacement redact?] (cond
                                                stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
                                                credential [credential "[REDACTED]" true]
@@ -539,9 +542,7 @@
                                                prefixed-token [prefixed-token "[REDACTED_TOKEN]" true]
                                                path [path "[PATH_REDACTED]" true]
                                                literal-placeholder
-                                               [(+ index (.length ^String literal-placeholder))
-                                                literal-placeholder
-                                                false])]
+                                               [placeholder-end literal-placeholder false])]
           (if span-end
             (do
               (append-normalized-text! builder output-count pending-space replacement)
