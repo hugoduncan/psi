@@ -16,3 +16,4 @@
 - architectural review at design baseline `8edb9fca2` found no new feedback
 - ambiguity review at design baseline `8edb9fca2` added 2 new design steps
 - inconsistency review at design baseline `8edb9fca2` found no new feedback
+- ambiguity-step handoff: distinguish the outer failure classification from the selected underlying cause when defining `:delegate-failure :reason`: operation reasons originate in `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`, terminal reasons in `statechart_runtime.clj`, and nested delegated errors have outer `:delegated-workflow-failed` plus inner metadata. For redaction, `components/agent-session/src/psi/agent_session/ui_capabilities.clj` is precedent only, not a drop-in contract: it retains credential/Bearer labels where this design requires replacing the entire expression. Keep normalization in workflow-runtime and define boundary examples/tests before implementation regexes.
