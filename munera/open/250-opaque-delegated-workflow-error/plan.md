@@ -161,3 +161,8 @@ table-tested without sessions or adapters.
 - Slice 2 now proves target-forced fallback through the real nested statechart
   path. A direct `/secret` target retains only selected child location in the
   parent envelope; outer cause and nested identity are deliberately omitted.
+
+- Final regression confirmation passed all focused workflow surfaces and the full
+  unit suite (2,671 tests / 19,024 assertions). Existing non-delegated
+  terminal-outcome projection remains unchanged; all planned slices are now
+  complete and ready for implementation review.

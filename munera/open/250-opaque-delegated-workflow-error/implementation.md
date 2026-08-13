@@ -95,3 +95,10 @@
   child location; it deliberately omits both reason and nested cause even
   though the immediate child failure is canonical. Focused Scry passed 5 tests /
   24 assertions; clj-paren-repair and clj-kondo are clean.
+- 2026-08-13 Final regression and coherence: completed the remaining
+  non-delegated terminal-outcome regression check and re-ran all affected
+  boundaries. Focused Scry passed lower runtime (13/93), delegate boundary
+  (5/24), facade handoff (2/5), delegated mutations (3/20), canonical mutation
+  regression (12/137), and registered tool (6/14); the full unit suite passed
+  2,671 tests / 19,024 assertions. The task has no remaining implementation
+  checklist items and is ready for implementation review.

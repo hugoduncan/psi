@@ -57,7 +57,8 @@
   - `canonical_workflows_delegated_failure_test` proves the returned message after immediate removal.
 - [x] Add resume mutation tests where a blocked run terminalizes at a delegate step, including superseded pre-resume/retry errors and retention zero; assert the canonical terminal message and absence of `:psi.workflow/result`.
   - The resume projection proof carries pre-resume and superseded public errors, retention zero, and the no-result response shape.
-- [ ] Preserve and run existing non-delegated terminal-outcome message tests to prove unrelated top-level failure wording is unchanged.
+- [x] Preserve and run existing non-delegated terminal-outcome message tests to prove unrelated top-level failure wording is unchanged.
+  - Existing `canonical-workflows-test` terminal-outcome projection tests passed unchanged (12 tests, 137 assertions), including iteration-limit, judge no-match, nil-reason, and step-error precedence behavior.
 - [x] Run `clj-paren-repair` and focused canonical-workflow execute/resume Scry namespaces; inspect structured results and make the slice green.
   - `clj-paren-repair` and `clj-kondo` passed for the changed projection test. Scry passed for `psi.agent-session.mutations.canonical-workflows-delegated-failure-test` (3 tests, 20 assertions) and the existing `psi.agent-session.mutations.canonical-workflows-test` (12 tests, 137 assertions).
 
@@ -82,10 +83,10 @@
 - [x] Run `clj-kondo` on every changed Clojure source and test path and fix all findings rather than suppressing them.
   - The changed runtime source/test paths report 0 errors and 0 warnings.
 - [x] Run the focused workflow-runtime, workflow-execution, canonical mutation, registered delegate tool, and async projection Scry namespaces with CLI exit verification and inspect `.scry-results` on failure.
-  - Focused namespaces pass: lower runtime 7/47; delegate boundary 3/14; facade handoff 2/5; canonical mutation 3/20; registered tool 6/14; async path 8/38.
+  - Final focused namespaces pass: lower runtime 13/93; delegate boundary 5/24; facade handoff 2/5; canonical mutation 3/20; existing canonical mutation regression 12/137; registered tool 6/14; async path 8/38.
 - [x] Run the relevant broader workflow-runtime and agent-session unit suites and confirm successful, blocked, cancelled, removed, retry, resume, retention, async, and result regressions remain green.
-  - `bb clojure:test:unit` passed on the confirmation run: 2,663 tests and 19,675 assertions. The immediately preceding randomized run had one unrelated retry test failure (`psi.turn-runtime.response-mode-retry-test`, 53 attempts instead of 2) that passed unchanged on rerun, so it is recorded as a pre-existing flake signal rather than changed here.
+  - Final `bb clojure:test:unit` passed: 2,671 tests and 19,024 assertions. Focused canonical mutation, registered-tool, facade-handoff, delegate-boundary, and lower-runtime Scry namespaces also passed; no flaky outcome occurred in this confirmation run.
 - [x] Re-read design.md, plan.md, changed tests/code, and user-facing changelog; verify all ten acceptance criteria, ownership boundaries, exact-map examples, and out-of-scope invariants are coherent.
   - Re-read after the selector/message matrix expansion confirms the only child-failure construction is lower-runtime `delegated-failure/delegated-failure`; facade, mutations, tool, and async paths only carry or render its message. Exact-map examples and fallback location retention match the focused proof. Remaining unchecked acceptance bullets are explicitly enumerated regression/matrix proof gaps, not ownership or scope deviations.
 - [x] Record implementation decisions, test evidence, and any discovered trade-offs in `implementation.md`, then check completed items and prepare the task for implementation review.
-  - Recorded the 2026-08-13 pure-contract expansion. Task remains open because the remaining targeted regression/matrix proof items need completion before implementation review.
+  - Final pass completed the remaining lexical, unsafe-target integration, and non-delegated terminal-outcome regression proof. All implementation checklist items are complete; task is ready for implementation review.
