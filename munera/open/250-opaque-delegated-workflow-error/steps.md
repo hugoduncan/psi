@@ -189,3 +189,7 @@
 
 - [x] Make `delegated-failure/redact-spans` locally linear or bound its raw input before scanning. The current per-code-point loop repeatedly calls `(subs text index)` for `str/starts-with?` and each regex recognizer, materializing and rescanning the remaining suffix several times; an unbounded child `:execution-error :message` can therefore consume superlinear CPU/allocation before the 512-code-point public-message bound is applied. Preserve the exact lexical precedence and redaction contract with the existing table-driven tests, and add a large-input regression that exercises the chosen bound or single-pass scanner shape.
   - Regex recognizers now use matcher regions and stack-prefix detection uses indexed `String.startsWith`, eliminating remaining-suffix allocation while preserving precedence. A 50,000-character prefix regression proves scanning reaches and redacts a trailing credential.
+
+## Code-shaper re-review follow-ups
+
+- [ ] Eliminate or bound the remaining superlinear credential-candidate scan in `delegated-failure/redact-spans`. Matcher regions avoid suffix allocation but `credential-pattern` still greedily scans the full remaining suffix at every eligible position before failing; dot-only inputs reproduce roughly quadratic growth (about 0.4s/1.3s/5.1s for 5k/10k/20k characters). Make candidate recognition locally bounded/linear across adversarial inputs and replace or extend the large-input regression so it exercises this failing candidate shape rather than only a long letter prefix that left-boundary gating skips.
