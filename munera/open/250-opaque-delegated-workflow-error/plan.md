@@ -152,3 +152,8 @@ table-tested without sessions or adapters.
   selector and terminal-contract proofs cover retry selection and delegated
   yield/handoff behavior, so diagnostics normalization remains exclusive to
   failed children.
+
+- Slice 1 lexical matrix is complete. The pure state-based tests now make the
+  scanner's remaining delimiter/punctuation decisions and output idempotence
+  explicit, including complete stack-frame negatives and credential/token/path
+  tails. No sanitizer mechanism changed.

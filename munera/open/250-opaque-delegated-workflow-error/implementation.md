@@ -84,3 +84,8 @@
   and delegated result/handoff coverage. Verified with focused Scry (delegated
   failure 12/76; terminal contract 1/5; cancellation dispatch 9/63) and clean
   clj-kondo.
+- 2026-08-13 Slice 1 lexical completion: expanded the pure contract matrix with
+  remaining POSIX/dot-relative/secret path, credential-tail, token-padding, and
+  stack-frame boundary cases, plus sanitizer idempotence. This was proof only;
+  no runtime mechanism changed. Focused Scry passed 13 tests / 93 assertions and
+  clj-kondo is clean.
