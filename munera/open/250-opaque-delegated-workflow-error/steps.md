@@ -204,3 +204,7 @@
 
 - [x] Eliminate or bound the remaining superlinear path-candidate scan in `delegated-failure/redact-spans`. `path-span` calls `path-end-index` at every path-left delimiter before establishing that a supported path prefix or secret-bearing relative path can exist, so colon-only input repeatedly scans the full remaining suffix (approximately 0.4s/1.2s/4.2s/17.2s for 500/1,000/2,000/4,000 characters). Preserve the exact path-family and precedence contract while making adversarial delimiter-heavy input locally linear or bounded, and extend the large-input regression with this failing candidate shape.
   - Rejected delimiter-bounded runs now cache their end and exact sensitive suffix starts, so each run is scanned once while later candidates use constant-time prefix/suffix checks. A 50,000-colon regression protects the adversarial shape and confirms scanning still reaches the trailing credential.
+
+## Path-cache code-shaper review follow-ups
+
+- [ ] Replace the input-sized `exact-sensitive-suffix-starts` persistent set in `delegated-failure/path-span-scanner` with constant-size or lazy state. A rejected run containing many colon-exposed `.ssh` or `id_rsa` suffixes (for example, repeated `:.ssh/` segments) allocates one set entry per suffix before the bounded public message is produced, although the left-to-right scanner can use only the earliest eligible suffix because that match consumes the remainder of the run. Preserve linear scanning and exact path semantics, and extend the large-input regression with this candidate-heavy rejected-run shape.
