@@ -100,3 +100,8 @@ table-tested without sessions or adapters.
   retention cleanup before its canonical run read, so the retention-zero proof
   confirms that this handoff—not `:steps-executed` or a subsequent run read—is
   the durable public-error source for both execute and resume.
+- Slice 4 proof now table-drives all canonical envelope sources
+  (`:execution-error`, `:terminal-outcome`, and `:fallback`) through the execute
+  mutation with retention zero. Projection is intentionally source-agnostic: it
+  returns the handed-off message verbatim while lower-runtime tests remain the
+  authority for source selection and envelope construction.

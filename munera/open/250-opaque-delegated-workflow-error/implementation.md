@@ -50,3 +50,11 @@
   `:psi.workflow/result`. Tests use immutable façade-result values and assert
   returned state/output only. Remaining Slice 4 work is real runtime coverage
   for execution-error, terminal-outcome, and fallback source variants.
+- 2026-08-09 Slice 4 source matrix: expanded the retention-zero execute proof to
+  table-drive canonical `:execution-error`, `:terminal-outcome`, and `:fallback`
+  envelopes. The mutation is deliberately source-agnostic: after cleanup it
+  returns each private handoff message verbatim, with nil result, rather than
+  reading the intentionally lossy public attempt projection. Source construction
+  stays owned and proven at the lower workflow-runtime boundary. Focused Scry:
+  delegated mutation test 3/20; existing canonical mutation regression 12/137;
+  clj-kondo clean.

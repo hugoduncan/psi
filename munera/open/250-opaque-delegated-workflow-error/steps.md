@@ -50,14 +50,15 @@
   - The delegated private handoff now wins before the lossy public `:steps-executed` string projection; non-delegated behavior is unchanged.
 - [x] Update execute and resume mutation paths to pass the private handoff into failure projection without re-reading child state, reselecting from `:steps-executed`, or reconstructing an envelope.
   - Existing mutation calls already carry the facade result through retention cleanup; `run-failure-error` consumes only its private handoff.
-- [ ] Add execute mutation proof for actionable attempt failure, terminal-outcome-only failure, and exact fallback, asserting `:failed`, nil `:psi.workflow/result`, and the canonical message.
-  - Added the canonical-envelope/retention proof; real runtime cases for each lower-runtime source remain open.
+- [x] Add execute mutation proof for actionable attempt failure, terminal-outcome-only failure, and exact fallback, asserting `:failed`, nil `:psi.workflow/result`, and the canonical message.
+  - `canonical_workflows_delegated_failure_test` table-drives the canonical execution-error, terminal-outcome, and fallback envelopes through retention-zero cleanup. Each returns `:failed`, nil result, and the exact handed-off message rather than a lossy public attempt error. Lower-runtime source construction remains covered by the focused runtime/delegate tests.
 - [x] Add execute mutation tests with completed-run retention zero proving the run is unavailable after cleanup while the handed-off delegated message still survives.
   - `canonical_workflows_delegated_failure_test` proves the returned message after immediate removal.
 - [x] Add resume mutation tests where a blocked run terminalizes at a delegate step, including superseded pre-resume/retry errors and retention zero; assert the canonical terminal message and absence of `:psi.workflow/result`.
   - The resume projection proof carries pre-resume and superseded public errors, retention zero, and the no-result response shape.
 - [ ] Preserve and run existing non-delegated terminal-outcome message tests to prove unrelated top-level failure wording is unchanged.
-- [ ] Run `clj-paren-repair` and focused canonical-workflow execute/resume Scry namespaces; inspect structured results and make the slice green.
+- [x] Run `clj-paren-repair` and focused canonical-workflow execute/resume Scry namespaces; inspect structured results and make the slice green.
+  - `clj-paren-repair` and `clj-kondo` passed for the changed projection test. Scry passed for `psi.agent-session.mutations.canonical-workflows-delegated-failure-test` (3 tests, 20 assertions) and the existing `psi.agent-session.mutations.canonical-workflows-test` (12 tests, 137 assertions).
 
 ## Slice 5 — Registered tool and async surfaces
 

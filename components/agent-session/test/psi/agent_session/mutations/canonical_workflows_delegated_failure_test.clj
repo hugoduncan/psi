@@ -16,12 +16,12 @@
                       :attempt-id "build-2"}})
 
 (defn- failed-execution-result
-  [steps-executed]
+  [envelope steps-executed]
   {:status :failed
    :terminal? true
    :blocked? false
    :steps-executed steps-executed
-   :terminal-execution-error delegated-envelope})
+   :terminal-execution-error envelope})
 
 (defn- create-parent-run!
   [ctx run-id]
@@ -55,6 +55,7 @@
                      (fn [ctx* _session-id run-id]
                        (terminalize-failed-run! ctx* run-id)
                        (failed-execution-result
+                        delegated-envelope
                         [{:step-id "build" :error "superseded failure"}
                          {:step-id "build" :error (:message delegated-envelope)}])))
           parent-id (create-parent-run! ctx "execute-failed")
@@ -77,6 +78,7 @@
                      (fn [ctx* _session-id run-id]
                        (terminalize-failed-run! ctx* run-id)
                        (failed-execution-result
+                        delegated-envelope
                         [{:step-id "prepare" :error "pre-resume failure"}
                          {:step-id "build" :error "superseded retry failure"}
                          {:step-id "build" :error (:message delegated-envelope)}])))
@@ -90,3 +92,35 @@
       (is (= (:message delegated-envelope) (:psi.workflow/error result)))
       (is (not (contains? result :psi.workflow/result)))
       (is (nil? (get-in @(:state* ctx) [:workflows :runs "resume-failed"]))))))
+
+(deftest execute-workflow-run-projects-every-canonical-delegated-source-test
+  ;; The mutation owns only pass-through projection: all source selection and
+  ;; message normalization have already happened in the terminal envelope.
+  (testing "execution-error, terminal-outcome, and fallback envelopes survive retention unchanged"
+    (doseq [[source message]
+            [[:execution-error "Delegated workflow 'child' failed at step 'build': tool timed out"]
+             [:terminal-outcome "Delegated workflow 'child' failed at step 'loop': terminal outcome :iteration-limit-reached (iteration 4 of 4)"]
+             [:fallback "Delegated workflow failed"]]]
+      (let [envelope {:reason :delegated-workflow-failed
+                      :message message
+                      :delegate-failure {:source source
+                                         :run-id "child-run"
+                                         :target "child"}}
+            ctx (assoc (core-test/make-test-ctx)
+                       :config {:completed-workflow-run-retention-count 0}
+                       :execute-workflow-run-fn
+                       (fn [ctx* _session-id run-id]
+                         (terminalize-failed-run! ctx* run-id)
+                         (failed-execution-result envelope
+                                                  [{:step-id "delegate"
+                                                    :error "lossy public projection"}])))
+            parent-id (create-parent-run! ctx (str (name source) "-failed"))
+            result (mutations/execute-workflow-run
+                    {} {:psi/agent-session-ctx ctx
+                        :session-id parent-id
+                        :run-id (str (name source) "-failed")})]
+        (is (= :failed (:psi.workflow/status result)))
+        (is (nil? (:psi.workflow/result result)))
+        (is (= message (:psi.workflow/error result)))
+        (is (nil? (get-in @(:state* ctx)
+                          [:workflows :runs (str (name source) "-failed")])))))))
