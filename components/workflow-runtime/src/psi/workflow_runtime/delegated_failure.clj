@@ -267,7 +267,8 @@
                   :else fallback-step-id)
         attempts (get-in step-runs [step-id :attempts])
         terminal-attempt-id (get-in workflow-run [:terminal-outcome :attempt-id])
-        attempt (or (some #(when (= terminal-attempt-id (:attempt-id %)) %) attempts)
+        attempt (or (when (some? terminal-attempt-id)
+                      (some #(when (= terminal-attempt-id (:attempt-id %)) %) attempts))
                     (last attempts))]
     {:step-id step-id
      :attempt attempt}))

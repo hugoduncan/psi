@@ -119,3 +119,8 @@ table-tested without sessions or adapters.
   a path span. Focused runtime, delegate, handoff, mutation, tool, and async
   Scry namespaces are green; broader regression and the remaining exhaustive
   acceptance matrix remain open.
+- Slice 6 follow-up corrects terminal attempt selection when a terminal outcome
+  omits `:attempt-id`: a historical attempt with a nil id no longer matches that
+  absent id, so selection deterministically uses the latest ordered attempt as
+  required. The pure contract now also proves negative lexical boundaries and
+  control removal before whitespace normalization.

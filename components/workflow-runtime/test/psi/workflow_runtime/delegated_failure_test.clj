@@ -72,6 +72,20 @@
               "[STACKTRACE_REDACTED] [REDACTED]"]]]
       (is (= expected (delegated-failure/sanitize-component input)) input))))
 
+(deftest sanitize-component-lexical-boundaries-test
+  ;; Only complete, delimited sensitive spans are replaced.
+  (testing "preserves negative boundaries and removes controls before whitespace normalization"
+    (doseq [[input expected]
+            [["fooat child.core/run(child.clj:42)" "fooat child.core/run(child.clj:42)"]
+             ["xBearer abcdefgh" "xBearer abcdefgh"]
+             ["ask-abcdefgh" "ask-abcdefgh"]
+             ["prefix/home/alice/private.edn" "prefix/home/alice/private.edn"]
+             ["open=/home/alice/private.edn" "open=[PATH_REDACTED]"]
+             ["token=abc\u0000\nrequest rejected" "[REDACTED] request rejected"]
+             ["at child.core/run(child.clj:42), token=secret"
+              "[STACKTRACE_REDACTED], [REDACTED]"]]]
+      (is (= expected (delegated-failure/sanitize-component input)) input))))
+
 (deftest delegated-failure-selection-test
   ;; A terminal attempt, rather than historical map order, owns the diagnostic.
   (testing "selects an actionable terminal execution error"
@@ -96,6 +110,23 @@
                                  :step-id "build"
                                  :attempt-id "latest"}}
              (delegated-failure/delegated-failure run "run-1" "child")))))
+
+  (testing "uses the latest attempt when the terminal outcome names no attempt"
+    (let [run (workflow-run
+               {:step-order ["build"]
+                :current-step-id "build"
+                :step-runs {"build" {:attempts [{:attempt-id nil
+                                                 :status :execution-failed
+                                                 :execution-error {:message "historical failure"}}
+                                                {:attempt-id "latest"
+                                                 :status :execution-failed
+                                                 :execution-error {:message "terminal failure"}}]}}
+                :terminal-outcome {:step-id "build"}})]
+      (is (= {:step-id "build"
+              :attempt {:attempt-id "latest"
+                        :status :execution-failed
+                        :execution-error {:message "terminal failure"}}}
+             (delegated-failure/terminal-step-attempt run)))))
 
   (testing "falls through an ineligible execution message to terminal outcome"
     (let [run (workflow-run
