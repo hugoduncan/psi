@@ -21,8 +21,8 @@ The authoritative path is:
 
 1. The persisted child workflow run supplies canonical failure state through its ordered step attempts and `:terminal-outcome`.
 2. The workflow-runtime delegate-step boundary normalizes that state into one delegated-failure envelope and records it as the parent delegate attempt's `:execution-error`.
-3. The agent-session workflow execution facade selects the parent run's terminal step/latest terminal attempt and forwards its canonical envelope without reconstructing or inspecting child state.
-4. `psi.workflow/execute-run` renders the envelope's `:message` as `:psi.workflow/error`. The synchronous registered `delegate` tool projects the same string as provider-visible `Error: ...` text; asynchronous completion surfaces carry the same error.
+3. Before workflow-run retention can remove the parent run, the agent-session workflow execution facade selects the parent run's terminal step and attempt and returns that attempt's exact `:execution-error` map on the private `:terminal-execution-error` field. It does not reconstruct the map or inspect child state.
+4. `psi.workflow/execute-run` and `psi.workflow/resume-run` derive a delegated failure's `:psi.workflow/error` from the handed-off `:terminal-execution-error :message`, without re-reading the run or reconstructing an envelope. The synchronous registered `delegate` tool projects the same string as provider-visible `Error: ...` text; asynchronous completion surfaces carry the same error.
 
 The workflow-runtime delegate-step boundary is the sole owner of child-failure selection and normalization. Agent-session mutations, the registered tool, RPC, TUI, and other adapters may project or render the envelope, but must not inspect child sessions, transcripts, provider payloads, or child runs to create competing failure semantics.
 
@@ -143,7 +143,11 @@ For a child whose status is `:failed`:
 
 If the selected execution error is a canonical delegated-failure envelope, re-sanitize its bounded message and copy only its immediate allowlisted identity into `:nested-cause`. Do not recursively unwrap envelopes or traverse descendant runs. This keeps selection deterministic and bounded while preserving actionable nested context.
 
-## Parent-visible failure contract
+## Agent-session handoff and parent-visible failure contract
+
+The facade result always has one private handoff field, `:terminal-execution-error`, alongside its existing public execution summary. When the selected terminal parent attempt has an `:execution-error`, this field is that complete persisted map, including the canonical delegated-failure envelope; otherwise its value is nil. The selector applies deterministic cause-selection steps 1–2 above to the parent run itself, then reads only the selected attempt's `:execution-error`. Selection occurs while the canonical run is available, before control returns to the execute/resume mutation and before retention cleanup. The facade's existing `:steps-executed` vector remains a public projection containing its current fields and string `:error`; this task does not add the envelope to an attempt entry or otherwise change that shape.
+
+For a failed run, execute and resume first use the handed-off `:terminal-execution-error :message` when its reason is `:delegated-workflow-failed`; they do not select from `:steps-executed`, re-read the run after retention, or reconstruct a delegated-failure envelope. Existing non-delegated terminal-outcome projection may continue to use canonical run state where available. Tests must prove the facade selects the terminal step/latest applicable attempt rather than an earlier retry, preserves the exact envelope on the private field while leaving `:steps-executed` unchanged, and that both mutations return the handed-off message when completed-run retention is zero and the run has already been removed.
 
 After propagation:
 
@@ -151,8 +155,8 @@ After propagation:
 - The parent delegate attempt remains `:execution-failed`, and the parent workflow remains `:failed` after retries are exhausted.
 - Existing retry policy still decides whether the parent delegate step is attempted again; a superseded attempt's error is not selected as the terminal public cause.
 - Failure produces no accepted result. `psi.workflow/execute-run` continues to return `:psi.workflow/result nil`.
-- `:psi.workflow/error` equals the canonical terminal parent attempt envelope's `:message`; projection must select the terminal step/latest terminal attempt rather than the first historical step error.
-- If `psi.workflow/resume-run` resumes a blocked run that then fails at a delegate step, it returns that same terminal-attempt message in `:psi.workflow/error`, using the same terminal step/latest terminal attempt selection so pre-resume and superseded retry history cannot win. The resume mutation retains its existing response shape and does not acquire a `:psi.workflow/result` field.
+- `:psi.workflow/error` equals the canonical terminal parent attempt envelope's `:message`; the facade performs the singular terminal step/attempt selection and the mutation projects its private handoff rather than choosing the first historical `:steps-executed` error.
+- If `psi.workflow/resume-run` resumes a blocked run that then fails at a delegate step, it returns that same handed-off terminal-attempt message in `:psi.workflow/error`, so pre-resume and superseded retry history cannot win. The resume mutation retains its existing response shape and does not acquire a `:psi.workflow/result` field.
 - The synchronous registered `delegate` tool renders `Error: <same message>` and does not synthesize a success result.
 - The async completion record's `:error` and background-job payload's `:error` each equal the canonical message. Notification text embeds that message unchanged exactly once as `Workflow '<workflow-name>' <status>: <message> (run <run-id>)`; append-entry text embeds it unchanged exactly once in the heading `Workflow '<workflow-name>' — <status>: <message> (run <run-id>)`, before any existing optional result section. The wrapper text is not itself subject to the 512-character envelope bound, and no projection re-sanitizes or otherwise normalizes the message.
 - Blocked children remain blocked delegation outcomes, and cancelled or removed children retain their existing cancellation/removal messages. This task does not reclassify those outcomes as failed-child diagnostics.
@@ -162,7 +166,7 @@ After propagation:
 ### In scope
 
 - Normalize failed-child diagnostics at the workflow-runtime delegate-step boundary.
-- Preserve the envelope on the canonical parent attempt and project its message through execute/resume and registered-delegate surfaces.
+- Preserve the envelope on the canonical parent attempt, carry that exact map through the facade's private `:terminal-execution-error` handoff without changing public `:steps-executed`, and project its message through execute/resume and registered-delegate surfaces.
 - Cover both currently distinct diagnostic-loss paths.
 - Add boundedness, redaction, deterministic selection, nested-failure, and fallback proof.
 
@@ -183,4 +187,5 @@ After propagation:
 6. Public messages follow the exact prefix, terminal rendering, allowlists, redaction order, lexical match boundaries, fallback rule, and ` ... [truncated]` bound above. Table-driven tests cover positive and negative delimiter cases, adjacent punctuation, quoted and unquoted credentials, token minimum lengths, every named path family (including raw one-backslash drive, forward-slash drive, two-backslash UNC, backslash-relative, and drive-relative negative inputs), secret-bearing relative paths, stack frames, placeholder-only fallback, and the 512-code-point boundary. Disallowed exception, operation, provider, session, transcript, judge-output, and last-result fields are absent from the parent envelope.
 7. The registered synchronous `delegate` tool exposes `Error: <the same actionable message>` at its provider-facing result boundary. Async completion/background-job `:error` fields equal that message; notification and append-entry text embed it unchanged in their existing context wrappers.
 8. Existing successful, blocked, cancelled, removed, retry, and result behavior remains unchanged; focused regression tests and the relevant workflow/agent-session suites pass.
-9. When a blocked run is resumed and then terminalizes with a delegated failure, `psi.workflow/resume-run` returns `:failed` and the selected canonical terminal-attempt message in `:psi.workflow/error`; pre-resume or superseded retry errors cannot win, and the mutation still has no `:psi.workflow/result` field.
+9. When a blocked run is resumed and then terminalizes with a delegated failure, `psi.workflow/resume-run` returns `:failed` and the facade's handed-off canonical terminal-attempt message in `:psi.workflow/error`; pre-resume or superseded retry errors cannot win, and the mutation still has no `:psi.workflow/result` field.
+10. The workflow-execution facade returns the selected attempt's exact persisted `:execution-error` map on private `:terminal-execution-error` while preserving the existing `:steps-executed` vector shape. Execute and resume prove that this one handoff supplies delegated `:psi.workflow/error` even with completed-run retention set to zero, after cleanup makes the canonical run unavailable; neither mutation reselects an error from attempt projections or reconstructs the envelope.

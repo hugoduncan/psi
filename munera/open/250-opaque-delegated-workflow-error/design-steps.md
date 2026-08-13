@@ -175,7 +175,7 @@
 
 # Design steps — ambiguity re-review (design-review session, turn 2; baseline `8a3a9f913`)
 
-- [ ] Define the exact agent-session facade-to-mutation handoff for the selected
+- [x] Define the exact agent-session facade-to-mutation handoff for the selected
       canonical terminal parent-attempt envelope. The design says the facade
       forwards that envelope, but the current `workflow-execution/execution-result`
       projects each attempt to an `:error` string and execute/resume publish the
