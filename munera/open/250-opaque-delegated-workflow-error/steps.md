@@ -170,3 +170,7 @@
   - The integration proof now reads the persisted `:custom-message` entry from canonical session journal state. This exposed and corrected the append mutation's internal dispatch origin, which had caused the permission interceptor to reject the journal update as an unknown extension.
 - [x] Ensure `async-delegated-failure-return-record-preserves-canonical-message-test` always calls `context/shutdown-context!` for its created context in a `finally` block, including assertion-failure and timeout paths, so executor/runtime resources cannot leak into later tests or make the focused suite nondeterministic.
   - All context-dependent setup, execution, and assertions now run inside `try` with unconditional context shutdown in `finally`.
+
+## Delegated retry test review follow-ups
+
+- [ ] Add a state-based delegated-step regression test with a real retry-enabled child or parent delegate attempt where the first attempt fails with one actionable error and the terminal retry fails with another. Assert the final parent attempt envelope, public mutation error, failed statuses, and attempt count so the terminal retry wins and existing retry semantics remain intact. The current pure selector and facade-handoff fixtures fabricate ordered attempts, while `terminal_contract_execution_test.clj` exercises successful delegation without retries; together they do not prove acceptance criteria 4 and 8 through the changed delegate normalization/progression path.
