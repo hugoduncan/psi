@@ -26,3 +26,4 @@
 - design follow-up completed all 3 items attributable to baseline `6e7745c82`: every source retains valid deterministically selected location identity, while target-forced fallback drops cause reason/nesting; nested-envelope required fields control recognition and optional fields copy independently; Windows path examples denote literal U+005C input characters. Implementation tests need exact maps for iteration-limit selection, cause-less fallback, target-forced nested fallback, and mixed-validity nested metadata.
 - architectural review at design baseline `8a3a9f913` found no new feedback
 - ambiguity review at design baseline `8a3a9f913` added 1 new design step
+- inconsistency review at design baseline `8a3a9f913` found no new feedback
