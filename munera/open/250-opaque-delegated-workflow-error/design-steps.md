@@ -159,3 +159,16 @@
       the semantic separator/count rules and give raw-input-to-sanitized-output
       examples for a one-backslash drive path, a forward-slash drive path, UNC,
       a secret-bearing relative Windows path, and a drive-relative negative case.
+
+# Design steps — inconsistency re-review (design-review session, turn 3; baseline `6e7745c82`)
+
+- [ ] Reconcile immediate nested-envelope recognition for invalid optional
+      metadata. The canonicality paragraph says `:step-id` and `:attempt-id` must
+      be nonblank strings and `:reason` must be safe when present, which makes an
+      invalid optional field fail recognition; the following paragraph instead
+      says an invalid optional identity is omitted without invalidating otherwise
+      canonical metadata, consistent with the earlier parent-envelope omission
+      rule. Define one rule for each optional field (`:reason`, `:step-id`, and
+      `:attempt-id`) and use it consistently for recognition and copied
+      `:nested-cause` output, so malformed-input tests cannot validly expect both
+      nested metadata rejection and partial retention.

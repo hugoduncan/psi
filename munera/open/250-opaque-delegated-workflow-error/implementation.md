@@ -21,3 +21,4 @@
 - architectural review at design baseline `6e7745c82` found no new feedback
 - ambiguity review at design baseline `6e7745c82` added 2 new design steps
 - ambiguity-step handoff: settle identity retention when fallback is caused by an unsafe target separately from source-candidate selection; tests need exact envelope maps. Express Windows/backslash path rules as semantic input code points with examples rather than source-literal escaping.
+- inconsistency review at design baseline `6e7745c82` added 1 new design step
