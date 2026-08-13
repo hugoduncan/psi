@@ -55,6 +55,8 @@
              ["token=abc123 request rejected" "[REDACTED] request rejected"]
              ["password: \"abc\\\" 123\", denied" "[REDACTED], denied"]
              ["token=" "token="]
+             ["token=\"\"" "token=\"\""]
+             ["credential=''" "credential=''"]
              ["tokenish=abc" "[REDACTED]"]
              ["x-token=abc" "[REDACTED]"]
              ["sk-abcdefgh, denied" "[REDACTED_TOKEN], denied"]

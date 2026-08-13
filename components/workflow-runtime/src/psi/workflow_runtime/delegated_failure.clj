@@ -105,7 +105,7 @@
   #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
 
 (def ^:private credential-pattern
-  #"(?U)(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\[\s\S]|[^\"\\])*\"|'(?:\\[\s\S]|[^'\\])*'|[^\s,;\)\]\}'\"]+)")
+  #"(?U)(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\[\s\S]|[^\"\\])+\"|'(?:\\[\s\S]|[^'\\])+'|[^\s,;\)\]\}'\"]+)")
 
 (def ^:private bearer-pattern
   #"(?i)^Bearer[ \t]+[A-Za-z0-9._~+/-]{8,}={0,2}")

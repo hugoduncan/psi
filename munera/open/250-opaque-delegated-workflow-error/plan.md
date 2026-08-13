@@ -130,3 +130,7 @@ table-tested without sessions or adapters.
   and support escaped line breaks inside quoted credentials. Terminal reason
   rendering now explicitly follows the safe-keyword grammar, avoiding Clojure's
   namespace auto-resolution syntax in public text.
+- Slice 6 credential-boundary correction rejects empty quoted values as required:
+  `token=\"\"` and `credential=''` remain unchanged rather than becoming a
+  redaction placeholder. The scanner now requires at least one quote-body unit,
+  while retaining escaped-content support and existing nonempty-value behavior.
