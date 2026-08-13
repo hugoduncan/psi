@@ -172,3 +172,16 @@
       `:attempt-id`) and use it consistently for recognition and copied
       `:nested-cause` output, so malformed-input tests cannot validly expect both
       nested metadata rejection and partial retention.
+
+# Design steps — ambiguity re-review (design-review session, turn 2; baseline `8a3a9f913`)
+
+- [ ] Define the exact agent-session facade-to-mutation handoff for the selected
+      canonical terminal parent-attempt envelope. The design says the facade
+      forwards that envelope, but the current `workflow-execution/execution-result`
+      projects each attempt to an `:error` string and execute/resume publish the
+      same `:steps-executed` vector. State whether the facade carries the envelope
+      on a separate internal field while preserving the public steps-executed
+      shape, or whether that public shape changes; then require execute/resume to
+      derive `:psi.workflow/error` from that singular handoff without re-reading
+      or reconstructing canonical run state. This prevents both competing
+      envelope-selection owners and an accidental unspecified API-shape change.
