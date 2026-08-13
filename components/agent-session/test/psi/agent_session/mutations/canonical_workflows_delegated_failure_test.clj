@@ -46,29 +46,6 @@
                (assoc-in [:workflows :runs run-id :finished-at]
                          (java.time.Instant/parse "2026-08-09T12:00:00Z"))))))
 
-(deftest execute-workflow-run-projects-terminal-delegated-error-through-retention-test
-  ;; The terminal facade handoff, rather than the first public attempt error or
-  ;; a retained run read, is authoritative after immediate cleanup.
-  (testing "execute returns the canonical delegated message after retention removes the run"
-    (let [ctx (assoc (core-test/make-test-ctx)
-                     :config {:completed-workflow-run-retention-count 0}
-                     :execute-workflow-run-fn
-                     (fn [ctx* _session-id run-id]
-                       (terminalize-failed-run! ctx* run-id)
-                       (failed-execution-result
-                        delegated-envelope
-                        [{:step-id "build" :error "superseded failure"}
-                         {:step-id "build" :error (:message delegated-envelope)}])))
-          parent-id (create-parent-run! ctx "execute-failed")
-          result (mutations/execute-workflow-run
-                  {} {:psi/agent-session-ctx ctx
-                      :session-id parent-id
-                      :run-id "execute-failed"})]
-      (is (= :failed (:psi.workflow/status result)))
-      (is (nil? (:psi.workflow/result result)))
-      (is (= (:message delegated-envelope) (:psi.workflow/error result)))
-      (is (nil? (get-in @(:state* ctx) [:workflows :runs "execute-failed"]))))))
-
 (def resumable-child-definition
   {:definition-id "resumable-child"
    :name "resumable-child"
@@ -109,6 +86,36 @@
    :failure (when (= :error status)
               {:reason :provider-unavailable
                :message message})})
+
+(deftest execute-workflow-run-projects-terminal-delegated-error-through-retention-test
+  ;; A real parent/child statechart execution must select the persisted terminal
+  ;; envelope before retention removes the canonical parent run.
+  (testing "execute returns the canonical delegated message after retention removes the run"
+    (let [[base-ctx parent-id] (support/create-session-context {:persist? false})
+          ctx (assoc base-ctx
+                     :config {:completed-workflow-run-retention-count 0}
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx session-id _prompt & _]
+                       (workflow-turn session-id :error "upstream request rejected")))]
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-child-definition})
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-parent-definition})
+      (mutations/create-workflow-run
+       {} {:psi/agent-session-ctx ctx
+           :session-id parent-id
+           :definition-id "resumable-parent"
+           :workflow-input "execute proof"
+           :run-id "execute-failed"})
+      (let [result (mutations/execute-workflow-run
+                    {} {:psi/agent-session-ctx ctx
+                        :session-id parent-id
+                        :run-id "execute-failed"})]
+        (is (= :failed (:psi.workflow/status result)))
+        (is (nil? (:psi.workflow/result result)))
+        (is (= "Delegated workflow 'resumable-child' failed at step 'child-step': upstream request rejected"
+               (:psi.workflow/error result)))
+        (is (nil? (get-in @(:state* ctx) [:workflows :runs "execute-failed"])))))))
 
 (deftest resume-workflow-run-projects-terminal-delegated-error-through-retention-test
   ;; The real facade/runtime first blocks the parent through a blocked delegated
