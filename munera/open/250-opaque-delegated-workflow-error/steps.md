@@ -254,3 +254,7 @@
 
 - [x] Replace the hard one-second `System/nanoTime` assertion in `sanitize-component-large-input-test` with deterministic complexity proof that is safe in the default unit suite, or isolate a calibrated performance check in an explicit slow/benchmark layer. Preserve coverage for both slash and backslash late-separator regressions, but do not make correctness depend on host speed or concurrent load; prefer an observable bounded-work invariant or representative end-to-end cases that fail for the quadratic scanner without calling the private `path-separator-scanner` implementation directly.
   - The scanner now caches each separator family's final occurrence once, making every candidate lookahead constant-time by construction. Symmetric slash/backslash tests exercise the adversarial shape through `sanitize-component` and assert bounded output without private calls or wall-clock thresholds.
+
+## Latest test-shaper re-review follow-ups
+
+- [ ] Add executable regression proof that distinguishes bounded late-separator scanning from the previous quadratic implementation. The current 16,000-run slash/backslash cases assert only sanitized output, which both implementations produce, so reverting the constant-time `lastIndexOf` cache would leave the suite green. Use a deterministic observable work bound through a public test seam, or place a calibrated scaling check in an explicit slow/benchmark layer; retain the end-to-end output cases separately.
