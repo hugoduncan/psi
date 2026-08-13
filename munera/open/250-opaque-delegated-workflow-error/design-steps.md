@@ -138,3 +138,24 @@
       delimiter rules and adjacent punctuation. The ordering and placeholders
       are exact, but these unresolved match boundaries still allow both
       under-redacting and over-redacting implementations to satisfy the prose.
+
+# Design steps — ambiguity re-review (design-review session, turn 2; baseline `6e7745c82`)
+
+- [ ] Define the exact inclusion rule for valid selected `:step-id` and
+      `:attempt-id` fields in the persisted envelope for each `:source`; “present
+      only for valid” currently constrains invalid values but does not say whether
+      valid values are required or discretionary. In particular, define exact
+      envelope examples for terminal-outcome selection, fallback with no
+      actionable cause, and fallback forced by a non-actionable target after an
+      execution error was selected, including whether recognized immediate
+      `:nested-cause` metadata survives that target-triggered fallback. This keeps
+      exact-map tests and downstream identity semantics deterministic.
+
+- [ ] Make backslash-bearing path syntax code-point exact. The current prose uses
+      inline forms such as drive `:\\`, relative `\\`, and “two leading
+      backslashes” without saying when backslashes are literal input characters
+      versus escaped notation, so implementations can disagree about ordinary
+      `C:` drive paths, UNC paths, and backslash-separated relative paths. State
+      the semantic separator/count rules and give raw-input-to-sanitized-output
+      examples for a one-backslash drive path, a forward-slash drive path, UNC,
+      a secret-bearing relative Windows path, and a drive-relative negative case.
