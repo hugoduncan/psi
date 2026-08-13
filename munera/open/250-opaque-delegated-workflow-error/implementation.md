@@ -31,3 +31,4 @@
 - design follow-up completed the sole item attributable to baseline `8a3a9f913`: carry the exact selected attempt `:execution-error` on private facade field `:terminal-execution-error`, preserve public `:steps-executed`, and project delegated execute/resume errors from that field before retention-zero cleanup can erase the run. Existing non-delegated terminal-outcome projection remains outside this singular delegated-envelope handoff.
 - architectural review at design baseline `3e4c08d13` found no new feedback
 - ambiguity review at design baseline `3e4c08d13` found no new feedback
+- inconsistency review at design baseline `3e4c08d13` found no new feedback
