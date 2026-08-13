@@ -140,3 +140,8 @@ table-tested without sessions or adapters.
   `token=\"\"` and `credential=''` remain unchanged rather than becoming a
   redaction placeholder. The scanner now requires at least one quote-body unit,
   while retaining escaped-content support and existing nonempty-value behavior.
+- Slice 6 boundary integration closes the terminal-outcome-only delegate path
+  with a real iteration-exhausted child workflow. Its terminal outcome has no
+  attempt id, and normalization correctly retains the latest ordered `loop`
+  attempt while allowing only the iteration reason/counts into the parent
+  envelope; judge session and last-result text remain excluded.

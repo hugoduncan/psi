@@ -1,5 +1,6 @@
 (ns psi.agent-session.workflow-delegate-failure-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
@@ -23,6 +24,21 @@
             :contributions [{:type :template
                              :text "Do {{input}}"
                              :vars {"input" {:from :workflow-input}}}]}]})
+
+(def iteration-limited-child-definition
+  {:definition-id "iteration-limited-child"
+   :name "iteration-limited-child"
+   :steps [{:name "loop"
+            :type :session
+            :contributions [{:type :template
+                             :text "Do {{input}}"
+                             :vars {"input" {:from :workflow-input}}}]
+            :judge {:type :llm
+                    :contributions [{:type :template
+                                     :text "REPEAT or DONE?"
+                                     :vars {}}]}
+            :on {"REPEAT" {:goto "loop" :max-iterations 1}
+                 "DONE" {:goto :done}}}]})
 
 (def delegating-child-definition
   {:definition-id "delegating-child"
@@ -70,16 +86,31 @@
    :failure {:reason :provider-unavailable
              :message message}})
 
+(defn- successful-turn
+  [session-id message]
+  {:status :ok
+   :session-id session-id
+   :assistant-message {:role "assistant"
+                       :content [{:type :text :text message}]}
+   :assistant-text message
+   :execution-result {}})
+
 (defn- execute-failing-parent!
-  [definitions child-name failure-message]
-  (let [[base-ctx session-id] (support/create-session-context {:persist? false})
-        ctx (assoc base-ctx
-                   :workflow-execute-actor-turn-fn
-                   (fn [_ctx child-session-id _prompt]
-                     (failed-turn child-session-id failure-message)))]
-    (install-parent-run! ctx definitions child-name)
-    {:ctx ctx
-     :result (workflow-execution/execute-run! ctx session-id "parent-run")}))
+  ([definitions child-name failure-message]
+   (execute-failing-parent! definitions child-name failure-message {}))
+  ([definitions child-name failure-message {:keys [actor-turn-fn judge-fn]}]
+   (let [[base-ctx session-id]
+         (support/create-session-context
+          (cond-> {:persist? false}
+            judge-fn (assoc :execute-workflow-judge-fn judge-fn)))
+         ctx (assoc base-ctx
+                    :workflow-execute-actor-turn-fn
+                    (or actor-turn-fn
+                        (fn [_ctx child-session-id _prompt]
+                          (failed-turn child-session-id failure-message))))]
+     (install-parent-run! ctx definitions child-name)
+     {:ctx ctx
+      :result (workflow-execution/execute-run! ctx session-id "parent-run")})))
 
 (defn- parent-error
   [ctx]
@@ -130,6 +161,46 @@
                                                       :attempts 0 :attempt-id])}}
              error))
       (is (nil? (get-in parent-run [:step-runs "delegate-child" :accepted-result]))))))
+
+(deftest iteration-limit-child-delegation-persists-terminal-outcome-envelope-test
+  ;; A real exhausted child loop has no terminal attempt id, so normalization
+  ;; chooses its ordered latest attempt and permits only terminal counts.
+  (testing "iteration exhaustion reaches the parent as a terminal-outcome envelope"
+    (let [judge-result {:judge-session-id "judge-loop"
+                        :judge-output "REPEAT"
+                        :judge-event "REPEAT"
+                        :routing-result {:action :goto :target "loop"}}
+          {:keys [ctx result]}
+          (execute-failing-parent!
+           [iteration-limited-child-definition] "iteration-limited-child" "unused failure"
+           {:actor-turn-fn (fn [_ctx session-id _prompt]
+                             (successful-turn session-id "loop output"))
+            :judge-fn (fn [& _] judge-result)})
+          error (parent-error ctx)
+          child-run-id (get-in error [:delegate-failure :run-id])
+          child-run (workflow-runtime/workflow-run-in @(:state* ctx) child-run-id)
+          attempt-id (get-in child-run [:step-runs "loop" :attempts 0 :attempt-id])]
+      (is (= :failed (:status result)))
+      (is (= :failed (:status child-run)))
+      (is (= {:outcome :failed
+              :reason :iteration-limit-reached
+              :step-id "loop"
+              :iteration-count 1
+              :max-iterations 1
+              :last-judge-signal "REPEAT"
+              :last-result-text "loop output"}
+             (:terminal-outcome child-run)))
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow 'iteration-limited-child' failed at step 'loop': terminal outcome :iteration-limit-reached (iteration 1 of 1)"
+              :delegate-failure {:source :terminal-outcome
+                                 :run-id child-run-id
+                                 :target "iteration-limited-child"
+                                 :reason :iteration-limit-reached
+                                 :step-id "loop"
+                                 :attempt-id attempt-id}}
+             error))
+      (is (not (str/includes? (pr-str error) "last-result-text")))
+      (is (not (str/includes? (pr-str error) "judge-loop"))))))
 
 (deftest nested-delegated-failure-persists-one-allowlisted-cause-test
   ;; A child delegate failure is normalized once more at its direct parent;

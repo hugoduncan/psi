@@ -27,11 +27,11 @@
   - `workflow-delegate-failure-test` drives real parent and child statechart runs and observes the exact lower-runtime envelope on the parent attempt; no progression-recording change was needed.
 - [x] Add an end-to-end delegated-step boundary test where the child's terminal attempt has an actionable execution error and assert the exact parent attempt envelope, failed statuses, nil accepted result, and selected identities.
   - Added narrow state-based proof in `psi.agent-session.workflow-delegate-failure-test`.
-- [ ] Add delegated-step boundary tests for terminal-outcome-only failure, non-actionable target after a recognized nested error, and terminal/latest retry selection.
-  - Added real statechart proofs for no-actionable-cause fallback and one-level nested delegated failure in `workflow_delegate_failure_test.clj`. Target-authored workflow compilation does not preserve arbitrary authored `:retry-policy`, so retry selection remains a focused pure run-map proof rather than an invalid authored-definition integration fixture.
+- [ ] Add delegated-step boundary tests for non-actionable target after a recognized nested error and terminal/latest retry selection.
+  - Added real statechart proofs for no-actionable-cause fallback, terminal-outcome-only iteration exhaustion, and one-level nested delegated failure in `workflow_delegate_failure_test.clj`. The iteration proof confirms a child outcome without `:attempt-id` selects its latest ordered attempt and excludes judge/last-result data. Target-authored workflow compilation does not preserve arbitrary authored `:retry-policy`, so retry selection remains a focused pure run-map proof rather than an invalid authored-definition integration fixture.
 - [ ] Add regression assertions that successful, blocked, cancelled, removed, retry, and yield/result delegation semantics retain their current status and payload shapes.
 - [ ] Run `clj-paren-repair`, the focused delegate boundary/runtime Scry tests, and relevant workflow-runtime regression namespaces; inspect structured results and make the slice green.
-  - Latest boundary proof: `clj-paren-repair` passed; `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-failure-test` passed (3 tests, 14 assertions); `clj-kondo --lint` reported 0 errors and 0 warnings.
+  - Latest boundary proof: `clj-paren-repair` passed; `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-failure-test` passed (4 tests, 20 assertions); `clj-kondo --lint` reported 0 errors and 0 warnings.
 
 ## Slice 3 — Facade terminal-error handoff
 
