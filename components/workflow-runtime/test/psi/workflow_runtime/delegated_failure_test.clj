@@ -415,6 +415,130 @@
              (:message result)))
       (is (not (contains? (:delegate-failure result) :nested-cause))))))
 
+(deftest terminal-outcome-numeric-metadata-test
+  ;; Iteration metadata is public only for the exact reason and bounded integer pair.
+  (testing "renders only a complete, nonnegative, Long-bounded iteration pair"
+    (doseq [{:keys [label reason iteration-count max-iterations expected-cause]}
+            [{:label "zero bounds"
+              :reason :iteration-limit-reached
+              :iteration-count 0
+              :max-iterations 0
+              :expected-cause "terminal outcome :iteration-limit-reached (iteration 0 of 0)"}
+             {:label "maximum bounds"
+              :reason :iteration-limit-reached
+              :iteration-count Long/MAX_VALUE
+              :max-iterations Long/MAX_VALUE
+              :expected-cause (str "terminal outcome :iteration-limit-reached (iteration "
+                                   Long/MAX_VALUE " of " Long/MAX_VALUE ")")}
+             {:label "negative count"
+              :reason :iteration-limit-reached
+              :iteration-count -1
+              :max-iterations 4
+              :expected-cause "terminal outcome :iteration-limit-reached"}
+             {:label "over-range bigint"
+              :reason :iteration-limit-reached
+              :iteration-count 4
+              :max-iterations (inc (bigint Long/MAX_VALUE))
+              :expected-cause "terminal outcome :iteration-limit-reached"}
+             {:label "non-integer count"
+              :reason :iteration-limit-reached
+              :iteration-count 1.5
+              :max-iterations 4
+              :expected-cause "terminal outcome :iteration-limit-reached"}
+             {:label "missing maximum"
+              :reason :iteration-limit-reached
+              :iteration-count 4
+              :expected-cause "terminal outcome :iteration-limit-reached"}
+             {:label "missing iteration count"
+              :reason :iteration-limit-reached
+              :max-iterations 4
+              :expected-cause "terminal outcome :iteration-limit-reached"}
+             {:label "different safe reason"
+              :reason :judge-no-match
+              :iteration-count 4
+              :max-iterations 4
+              :expected-cause "terminal outcome :judge-no-match"}]]
+      (let [terminal-outcome (cond-> {:reason reason :step-id "loop"}
+                               (some? iteration-count) (assoc :iteration-count iteration-count)
+                               (some? max-iterations) (assoc :max-iterations max-iterations))
+            run (workflow-run
+                 {:step-order ["loop"]
+                  :current-step-id "loop"
+                  :step-runs {"loop" {:attempts [{:attempt-id "attempt-1"
+                                                  :status :execution-failed}]}}
+                  :terminal-outcome terminal-outcome})]
+        (is (= (str "Delegated workflow 'child' failed at step 'loop': " expected-cause)
+               (:message (delegated-failure/delegated-failure run "child-run" "child")))
+            label)))))
+
+(deftest nested-envelope-recognition-boundary-test
+  ;; Every required nested-envelope field must be valid before identity is copied.
+  (testing "treats each malformed required condition as ordinary untrusted error text"
+    (let [valid-failure {:source :execution-error
+                         :run-id "grandchild-run"
+                         :target "grandchild"}
+          ordinary-message "nested token=secret rejected"
+          overlong-message (apply str (repeat 513 "a"))]
+      (doseq [{:keys [label error expected-source expected-message]}
+              [{:label "outer reason"
+                :error {:reason :tool-timeout
+                        :message ordinary-message
+                        :delegate-failure valid-failure}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "blank message"
+                :error {:reason :delegated-workflow-failed
+                        :message "   "
+                        :delegate-failure valid-failure}
+                :expected-source :fallback
+                :expected-message nil}
+               {:label "over-512 message"
+                :error {:reason :delegated-workflow-failed
+                        :message overlong-message
+                        :delegate-failure valid-failure}
+                :expected-source :execution-error
+                :expected-message (apply str (repeat 32 "a"))}
+               {:label "non-map delegate failure"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure "invalid"}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "invalid source"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (assoc valid-failure :source :unknown)}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "blank run id"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (assoc valid-failure :run-id " ")}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "blank target"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (assoc valid-failure :target "")}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}]]
+        (let [run (workflow-run
+                   {:step-order ["delegate"]
+                    :current-step-id "delegate"
+                    :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                        :status :execution-failed
+                                                        :execution-error error}]}}
+                    :terminal-outcome {:step-id "delegate"}})
+              result (delegated-failure/delegated-failure run "child-run" "child")
+              failure (:delegate-failure result)]
+          (is (= expected-source (:source failure)) label)
+          (is (not (contains? failure :nested-cause)) label)
+          (if expected-message
+            (is (str/includes? (:message result)
+                               (delegated-failure/sanitize-component expected-message))
+                label)
+            (is (= delegated-failure/fallback-message (:message result)) label)))))))
+
 (deftest delegate-boundary-nonfailed-regression-test
   ;; Delegated-failure normalization changes only failed-child diagnostics;
   ;; existing child outcomes keep their established parent payloads.
