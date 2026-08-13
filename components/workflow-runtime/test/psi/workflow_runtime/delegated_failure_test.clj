@@ -516,10 +516,34 @@
                         :delegate-failure (assoc valid-failure :run-id " ")}
                 :expected-source :execution-error
                 :expected-message "nested [REDACTED] rejected"}
+               {:label "non-string run id"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (assoc valid-failure :run-id 42)}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "absent run id"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (dissoc valid-failure :run-id)}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
                {:label "blank target"
                 :error {:reason :delegated-workflow-failed
                         :message ordinary-message
                         :delegate-failure (assoc valid-failure :target "")}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "non-string target"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (assoc valid-failure :target :grandchild)}
+                :expected-source :execution-error
+                :expected-message "nested [REDACTED] rejected"}
+               {:label "absent target"
+                :error {:reason :delegated-workflow-failed
+                        :message ordinary-message
+                        :delegate-failure (dissoc valid-failure :target)}
                 :expected-source :execution-error
                 :expected-message "nested [REDACTED] rejected"}]]
         (let [run (workflow-run
