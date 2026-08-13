@@ -48,7 +48,9 @@ table-tested without sessions or adapters.
 - Regex-only implementation may be difficult to make precedence-aware and exact
   for quoted credentials, token punctuation, Windows/UNC paths, and Unicode
   boundaries. Prefer a deterministic left-to-right scanner with small pure span
-  recognizers where that is clearer than a compound expression.
+  recognizers where that is clearer than a compound expression. Scanner
+  boundary/actionability traversal must use Unicode code points, not Clojure
+  `char` coercion, so supplementary letters cannot throw or evade actionability.
 - Retry and terminal selection can accidentally depend on map iteration or pick
   historical failures. Derive candidates only from effective `:step-order` and
   ordered attempt vectors, and assert exact selected identities with deliberately

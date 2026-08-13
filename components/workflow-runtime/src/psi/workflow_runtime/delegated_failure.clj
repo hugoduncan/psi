@@ -79,15 +79,20 @@
 
 (defn- token-character?
   [code-point]
-  (boolean (re-matches #"[A-Za-z0-9._~+/-]" (str (char code-point)))))
+  (or (<= (int \A) code-point (int \Z))
+      (<= (int \a) code-point (int \z))
+      (<= (int \0) code-point (int \9))
+      (contains? #{(int \.) (int \_) (int \~) (int \+) (int \/) (int \-)}
+                 code-point)))
 
 (defn- path-left-delimiter?
   [text index]
   (or (zero? index)
-      (contains? #{(int \space) (int \tab) (int \newline) (int \return)
-                   (int \() (int \[) (int \{) (int \=) (int \:)
-                   (int \,) (int \;)}
-                 (.codePointBefore ^String text index))))
+      (let [code-point (.codePointBefore ^String text index)]
+        (or (whitespace-code-point? code-point)
+            (contains? #{(int \() (int \[) (int \{) (int \=) (int \:)
+                         (int \,) (int \;)}
+                       code-point)))))
 
 (defn- span-match
   [pattern text index]
@@ -98,7 +103,7 @@
   #"^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
 
 (def ^:private credential-pattern
-  #"(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^\s,;\)\]\}]+)")
+  #"(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^\s,;\)\]\}'\"]+)")
 
 (def ^:private bearer-pattern
   #"(?i)^Bearer[ \t]+[A-Za-z0-9._~+/-]{8,}={0,2}")
@@ -218,8 +223,11 @@
   [text]
   (and (string? text)
        (let [remaining (reduce #(str/replace %1 %2 "") text placeholders)]
-         (boolean (some #(Character/isLetterOrDigit ^Character %)
-                        remaining)))))
+         (loop [index 0]
+           (when (< index (.length ^String remaining))
+             (let [code-point (.codePointAt ^String remaining index)]
+               (or (Character/isLetterOrDigit code-point)
+                   (recur (+ index (Character/charCount code-point))))))))))
 
 (defn- valid-step-id?
   [value]

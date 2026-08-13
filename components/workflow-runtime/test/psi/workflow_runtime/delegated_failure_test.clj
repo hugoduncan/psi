@@ -1,5 +1,6 @@
 (ns psi.workflow-runtime.delegated-failure-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.delegated-failure :as delegated-failure]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]))
@@ -31,6 +32,28 @@
            (delegated-failure/sanitize-component "open C:private\\file.edn")))
     (is (= "read [PATH_REDACTED]."
            (delegated-failure/sanitize-component "read config\\secret-store.edn.")))))
+
+(deftest sanitize-component-boundary-test
+  ;; The lexical sanitizer honours the public boundary's precedence and delimiters.
+  (testing "redacts every supported span family without consuming adjacent punctuation"
+    (is (= "[REDACTED]; denied"
+           (delegated-failure/sanitize-component "api_key => 'secret value'; denied")))
+    (is (= "[REDACTED] request rejected"
+           (delegated-failure/sanitize-component "token=abc123 request rejected")))
+    (is (= "token="
+           (delegated-failure/sanitize-component "token=")))
+    (is (= "[REDACTED_TOKEN], denied"
+           (delegated-failure/sanitize-component "sk-abcdefgh, denied")))
+    (is (= "pk-short"
+           (delegated-failure/sanitize-component "pk-short")))
+    (is (= "open [PATH_REDACTED]"
+           (delegated-failure/sanitize-component "open C:/private/file.edn")))
+    (is (= "open [PATH_REDACTED]"
+           (delegated-failure/sanitize-component "open ~/private/file.edn")))
+    (is (= "read [PATH_REDACTED]"
+           (delegated-failure/sanitize-component "read ./.ssh/id_rsa")))
+    (is (= "read public/file.edn"
+           (delegated-failure/sanitize-component "read public/file.edn")))))
 
 (deftest delegated-failure-selection-test
   ;; A terminal attempt, rather than historical map order, owns the diagnostic.
@@ -94,6 +117,44 @@
                                  :step-id "build"
                                  :attempt-id "attempt-2"}}
              (delegated-failure/delegated-failure run "run-3" "child"))))))
+
+(deftest delegated-failure-fallback-and-boundary-test
+  ;; The envelope never exposes an unsafe cause and stays bounded by code points.
+  (testing "falls back when target is non-actionable after selecting a nested error"
+    (let [nested {:reason :delegated-workflow-failed
+                  :message "Delegated workflow 'grandchild' failed: tool timed out"
+                  :delegate-failure {:source :execution-error
+                                     :run-id "grandchild-run"
+                                     :target "grandchild"
+                                     :reason :tool-timeout}}
+          run (workflow-run
+               {:step-order ["delegate"]
+                :current-step-id "delegate"
+                :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                    :status :execution-failed
+                                                    :execution-error nested}]}}
+                :terminal-outcome {:step-id "delegate"}})]
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow failed"
+              :delegate-failure {:source :fallback
+                                 :run-id "run-4"
+                                 :target "/secret"
+                                 :step-id "delegate"
+                                 :attempt-id "attempt-1"}}
+             (delegated-failure/delegated-failure run "run-4" "/secret")))))
+
+  (testing "bounds a Unicode cause by code points rather than UTF-16 units"
+    (let [cause (apply str (repeat 600 "𐐀"))
+          run (workflow-run
+               {:step-order ["build"]
+                :current-step-id "build"
+                :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                                 :status :execution-failed
+                                                 :execution-error {:message cause}}]}}
+                :terminal-outcome {:step-id "build"}})
+          result (delegated-failure/delegated-failure run "run-5" "child")]
+      (is (= 512 (delegated-failure/code-point-count (:message result))))
+      (is (str/ends-with? (:message result) " ... [truncated]")))))
 
 (deftest delegate-boundary-failed-child-test
   ;; The runtime persists the lower-runtime envelope as the parent failure payload.

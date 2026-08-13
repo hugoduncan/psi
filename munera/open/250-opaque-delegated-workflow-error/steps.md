@@ -11,13 +11,13 @@
 - [x] Implement execution-error eligibility with terminal-outcome fallthrough, source-specific outer reason selection, and exact fallback behavior when no cause or target is actionable.
 - [x] Implement immediate nested-envelope recognition and independent allowlisted optional-field copying without recursive metadata or descendant-run traversal.
 - [ ] Add table-driven pure tests for safe/unsafe reasons, controls/whitespace, all redaction categories and precedence, positive/negative boundaries, adjacent punctuation, quoted/unquoted credentials, token minimum lengths, and every specified path family including raw Windows/UNC cases.
-  - Initial state-based coverage proves controls/whitespace, stack frames, quoted credentials, bearer tokens, Windows/UNC paths, secret-bearing relative paths, and drive-relative negative input; expand to the remaining exact lexical boundary matrix.
+  - Expanded state-based coverage adds quoted credentials, unquoted redactable credentials, missing-value and short-token negatives, punctuation preservation, forward-slash drive/home/dot-relative paths, and ordinary-relative-path negative cases; the remaining exact lexical-boundary matrix is open.
 - [ ] Add pure tests for placeholder-only fallback, redactable-but-actionable messages, actionable terminal fallthrough, target/step escaping, exact 512-code-point boundaries, Unicode code points, and idempotent nested-message sanitization.
-  - Initial proof covers terminal fallthrough and a recognized immediate nested envelope; expand the remaining boundary matrix.
+  - Initial proof covers terminal fallthrough and a recognized immediate nested envelope; this pass adds non-actionable-target fallback and supplementary-Unicode code-point truncation. Expand the remaining boundary matrix.
 - [ ] Add exact-map selection/envelope tests for execution errors, iteration-limit terminal outcomes with latest-attempt identity, cause-less fallback, non-actionable-target fallback, scrambled step maps, terminal retries, mixed-validity nested metadata, invalid nested required fields, and forbidden-field exclusion.
-  - Initial proof covers terminal/latest retry selection, iteration-limit latest identity, cause-less fallback, and one-level allowlisted nesting.
+  - Initial proof covers terminal/latest retry selection, iteration-limit latest identity, cause-less fallback, non-actionable-target fallback, and one-level allowlisted nesting. Expand the remaining exact-map cases.
 - [x] Run `clj-paren-repair` on changed Clojure files and the focused workflow-runtime Scry namespace; inspect structured failures and make the slice green.
-  - `clojure -M:test-paths -m scry.cli --namespace psi.workflow-runtime.delegated-failure-test` passed: 4 tests, 15 assertions.
+  - Latest focused verification: `clj-paren-repair` passed for source and test; `clojure -M:test-paths -m scry.cli --namespace psi.workflow-runtime.delegated-failure-test` passed: 6 tests, 27 assertions; `clj-kondo --lint` on both paths reported 0 errors and 0 warnings.
 
 ## Slice 2 — Delegate-step normalization
 
