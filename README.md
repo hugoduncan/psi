@@ -173,12 +173,12 @@ Project workflows include:
   incidental complexity and `/delegate reduce-architectural-complexity` for
   namespace/family/pair/community architecture targets selected by Gordian.
 
-When a delegated child workflow fails, psi reports a bounded, safely redacted
-actionable cause when one is available and otherwise retains the generic
-`Delegated workflow failed` fallback. That parent delegate attempt is
-execution-failed and produces no accepted result. Authored retry policy may
-supersede the failed attempt and let the parent step and workflow succeed; the
-parent remains failed only when retries are exhausted. Completed workflow runs
+When a failed child makes a parent delegate attempt execution-failed, authored
+retry policy may supersede that attempt and let the parent step and workflow
+succeed. If retries are exhausted and the parent delegate failure becomes
+terminal, psi reports a bounded, safely redacted actionable cause when one is
+available and otherwise retains the generic `Delegated workflow failed`
+fallback. The failed attempt produces no accepted result. Completed workflow runs
 are retained per originating session and older runs are cleaned up automatically;
 retention is configurable. See
 [`doc/workflows.md`](doc/workflows.md).
