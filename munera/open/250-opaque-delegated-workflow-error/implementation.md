@@ -11,3 +11,4 @@
 - architectural review at design baseline `6b3af4475` found no new feedback
 - ambiguity review at design baseline `6b3af4475` added 2 new design steps
 - inconsistency review at design baseline `6b3af4475` added 1 new design step
+- new design-step handoff: `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj` routes both execute and resume failures through `run-failure-error`, while resume intentionally has no `:psi.workflow/result`; preserve that surface. `components/workflow-runtime/src/psi/workflow_runtime/progression_recording.clj` persists attempt `:execution-error` maps verbatim and `model.clj` permits an optional map, so settle message eligibility and nil-versus-omission in one lower-runtime constructor/recognizer contract rather than in projections.
