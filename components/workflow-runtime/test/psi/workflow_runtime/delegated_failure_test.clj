@@ -12,6 +12,17 @@
    :terminal-outcome terminal-outcome
    :current-step-id current-step-id})
 
+(deftest safe-reason-test
+  ;; Only bounded keyword reasons in the public grammar cross the boundary.
+  (testing "accepts public reason keywords and rejects other values"
+    (is (true? (delegated-failure/safe-reason? :iteration-limit-reached)))
+    (is (true? (delegated-failure/safe-reason? :workflow/step-failed)))
+    (is (false? (delegated-failure/safe-reason? (keyword "unsafe/reason/value"))))
+    (is (false? (delegated-failure/safe-reason? :bad!reason)))
+    (is (false? (delegated-failure/safe-reason? "tool-timeout")))
+    (is (false? (delegated-failure/safe-reason?
+                 (keyword (apply str (repeat 65 "a"))))))))
+
 (deftest sanitize-component-test
   ;; The failure boundary removes unsafe detail before assembling public text.
   (testing "normalizes controls, whitespace, and sensitive lexical spans"
@@ -34,26 +45,32 @@
            (delegated-failure/sanitize-component "read config\\secret-store.edn.")))))
 
 (deftest sanitize-component-boundary-test
-  ;; The lexical sanitizer honours the public boundary's precedence and delimiters.
-  (testing "redacts every supported span family without consuming adjacent punctuation"
-    (is (= "[REDACTED]; denied"
-           (delegated-failure/sanitize-component "api_key => 'secret value'; denied")))
-    (is (= "[REDACTED] request rejected"
-           (delegated-failure/sanitize-component "token=abc123 request rejected")))
-    (is (= "token="
-           (delegated-failure/sanitize-component "token=")))
-    (is (= "[REDACTED_TOKEN], denied"
-           (delegated-failure/sanitize-component "sk-abcdefgh, denied")))
-    (is (= "pk-short"
-           (delegated-failure/sanitize-component "pk-short")))
-    (is (= "open [PATH_REDACTED]"
-           (delegated-failure/sanitize-component "open C:/private/file.edn")))
-    (is (= "open [PATH_REDACTED]"
-           (delegated-failure/sanitize-component "open ~/private/file.edn")))
-    (is (= "read [PATH_REDACTED]"
-           (delegated-failure/sanitize-component "read ./.ssh/id_rsa")))
-    (is (= "read public/file.edn"
-           (delegated-failure/sanitize-component "read public/file.edn")))))
+  ;; The lexical scanner honours precedence, token minima, and span boundaries.
+  (testing "redacts supported spans without consuming adjacent punctuation"
+    (doseq [[input expected]
+            [["api_key => 'secret value'; denied" "[REDACTED]; denied"]
+             ["token=abc123 request rejected" "[REDACTED] request rejected"]
+             ["password: \"abc\\\" 123\", denied" "[REDACTED], denied"]
+             ["token=" "token="]
+             ["tokenish=abc" "[REDACTED]"]
+             ["x-token=abc" "[REDACTED]"]
+             ["sk-abcdefgh, denied" "[REDACTED_TOKEN], denied"]
+             ["pk-1234567 denied" "pk-1234567 denied"]
+             ["Bearer 12345678=." "[REDACTED_TOKEN]."]
+             ["Bearer 1234567=" "Bearer 1234567="]
+             ["Bearer 1234567." "Bearer 1234567."]
+             ["sk-1234567." "sk-1234567."]
+             ["ask-abcdefgh" "ask-abcdefgh"]
+             ["open C:/private/file.edn" "open [PATH_REDACTED]"]
+             ["open ~/private/file.edn" "open [PATH_REDACTED]"]
+             ["read ./.ssh/id_rsa" "read [PATH_REDACTED]"]
+             ["open ../private/file.edn!" "open [PATH_REDACTED]!"]
+             ["read config\\secret-store.edn." "read [PATH_REDACTED]."]
+             ["read public/file.edn" "read public/file.edn"]
+             ["read config/Secret-store.edn" "read [PATH_REDACTED]"]
+             ["at child.core/run(child.clj:42) token=secret"
+              "[STACKTRACE_REDACTED] [REDACTED]"]]]
+      (is (= expected (delegated-failure/sanitize-component input)) input))))
 
 (deftest delegated-failure-selection-test
   ;; A terminal attempt, rather than historical map order, owns the diagnostic.
@@ -182,7 +199,7 @@
 
 (deftest nested-delegated-failure-test
   ;; Nested metadata is one-level, allowlisted identity only.
-  (testing "copies valid immediate nested identity without recursive metadata"
+  (testing "copies independently valid immediate nested fields without recursion"
     (let [nested {:reason :delegated-workflow-failed
                   :message "Delegated workflow 'grandchild' failed: tool timed out"
                   :delegate-failure {:source :execution-error
@@ -206,4 +223,23 @@
               :step-id "work"}
              (get-in result [:delegate-failure :nested-cause])))
       (is (= "Delegated workflow 'child' failed at step 'delegate': Delegated workflow 'grandchild' failed: tool timed out"
-             (:message result))))))
+             (:message result)))))
+
+  (testing "rejects malformed required nested identity while sanitizing its message normally"
+    (let [nested {:reason :delegated-workflow-failed
+                  :message "nested token=secret rejected"
+                  :delegate-failure {:source :execution-error
+                                     :run-id ""
+                                     :target "grandchild"
+                                     :step-id "work"}}
+          run (workflow-run
+               {:step-order ["delegate"]
+                :current-step-id "delegate"
+                :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                    :status :execution-failed
+                                                    :execution-error nested}]}}
+                :terminal-outcome {:step-id "delegate"}})
+          result (delegated-failure/delegated-failure run "child-run" "child")]
+      (is (= "Delegated workflow 'child' failed at step 'delegate': nested [REDACTED] rejected"
+             (:message result)))
+      (is (not (contains? (:delegate-failure result) :nested-cause))))))

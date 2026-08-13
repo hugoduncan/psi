@@ -11,11 +11,11 @@
 - [x] Implement execution-error eligibility with terminal-outcome fallthrough, source-specific outer reason selection, and exact fallback behavior when no cause or target is actionable.
 - [x] Implement immediate nested-envelope recognition and independent allowlisted optional-field copying without recursive metadata or descendant-run traversal.
 - [ ] Add table-driven pure tests for safe/unsafe reasons, controls/whitespace, all redaction categories and precedence, positive/negative boundaries, adjacent punctuation, quoted/unquoted credentials, token minimum lengths, and every specified path family including raw Windows/UNC cases.
-  - Expanded state-based coverage adds quoted credentials, unquoted redactable credentials, missing-value and short-token negatives, punctuation preservation, forward-slash drive/home/dot-relative paths, and ordinary-relative-path negative cases; the remaining exact lexical-boundary matrix is open.
+  - Expanded state-based coverage adds safe-reason validation, quoted and unquoted credentials, missing-value and short-token negatives, punctuation preservation, stack-frame precedence, forward-slash drive/home/dot-relative paths, raw Windows/UNC cases, secret-bearing backslash-relative paths, and ordinary-relative-path negative cases. The remaining exact lexical-boundary matrix is open.
 - [ ] Add pure tests for placeholder-only fallback, redactable-but-actionable messages, actionable terminal fallthrough, target/step escaping, exact 512-code-point boundaries, Unicode code points, and idempotent nested-message sanitization.
-  - Initial proof covers terminal fallthrough and a recognized immediate nested envelope; this pass adds non-actionable-target fallback and supplementary-Unicode code-point truncation. Expand the remaining boundary matrix.
+  - Proof covers terminal fallthrough, redactable-but-actionable messages, non-actionable-target fallback, supplementary-Unicode code-point truncation, and malformed-nested ordinary-message sanitization. Expand the remaining boundary matrix.
 - [ ] Add exact-map selection/envelope tests for execution errors, iteration-limit terminal outcomes with latest-attempt identity, cause-less fallback, non-actionable-target fallback, scrambled step maps, terminal retries, mixed-validity nested metadata, invalid nested required fields, and forbidden-field exclusion.
-  - Initial proof covers terminal/latest retry selection, iteration-limit latest identity, cause-less fallback, non-actionable-target fallback, and one-level allowlisted nesting. Expand the remaining exact-map cases.
+  - Proof covers terminal/latest retry selection, iteration-limit latest identity, cause-less fallback, non-actionable-target fallback, one-level allowlisted nesting, and invalid nested required identity. Expand the remaining exact-map cases.
 - [x] Run `clj-paren-repair` on changed Clojure files and the focused workflow-runtime Scry namespace; inspect structured failures and make the slice green.
   - Latest focused verification: `clj-paren-repair` passed for source and test; `clojure -M:test-paths -m scry.cli --namespace psi.workflow-runtime.delegated-failure-test` passed: 6 tests, 27 assertions; `clj-kondo --lint` on both paths reported 0 errors and 0 warnings.
 
@@ -75,10 +75,14 @@
 
 ## Slice 6 — Regression, coherence, and user-facing record
 
-- [ ] Add an `[Unreleased]` `Fixed` changelog entry describing actionable, safely redacted delegated-workflow failure messages.
-- [ ] Grep the final envelope construction and projections to verify no exception data, operation details/results, provider/session/transcript fields, judge output, last-result text, or candidate payloads cross the child-parent boundary.
-- [ ] Run `clj-kondo` on every changed Clojure source and test path and fix all findings rather than suppressing them.
-- [ ] Run the focused workflow-runtime, workflow-execution, canonical mutation, registered delegate tool, and async projection Scry namespaces with CLI exit verification and inspect `.scry-results` on failure.
-- [ ] Run the relevant broader workflow-runtime and agent-session unit suites and confirm successful, blocked, cancelled, removed, retry, resume, retention, async, and result regressions remain green.
+- [x] Add an `[Unreleased]` `Fixed` changelog entry describing actionable, safely redacted delegated-workflow failure messages.
+- [x] Grep the final envelope construction and projections to verify no exception data, operation details/results, provider/session/transcript fields, judge output, last-result text, or candidate payloads cross the child-parent boundary.
+  - The failed-child branch delegates solely to `delegated-failure/delegated-failure`; its constructor allowlists direct run/target, selected location, safe reason, and one immediate nested identity. The grep hits in cancellation/removal and non-delegated terminal projection remain outside this failure-envelope boundary.
+- [x] Run `clj-kondo` on every changed Clojure source and test path and fix all findings rather than suppressing them.
+  - The changed runtime source/test paths report 0 errors and 0 warnings.
+- [x] Run the focused workflow-runtime, workflow-execution, canonical mutation, registered delegate tool, and async projection Scry namespaces with CLI exit verification and inspect `.scry-results` on failure.
+  - Focused namespaces pass: lower runtime 7/47; delegate boundary 3/14; facade handoff 2/5; canonical mutation 3/20; registered tool 6/14; async path 8/38.
+- [x] Run the relevant broader workflow-runtime and agent-session unit suites and confirm successful, blocked, cancelled, removed, retry, resume, retention, async, and result regressions remain green.
+  - `bb clojure:test:unit` passed on the confirmation run: 2,663 tests and 19,675 assertions. The immediately preceding randomized run had one unrelated retry test failure (`psi.turn-runtime.response-mode-retry-test`, 53 attempts instead of 2) that passed unchanged on rerun, so it is recorded as a pre-existing flake signal rather than changed here.
 - [ ] Re-read design.md, plan.md, changed tests/code, and user-facing changelog; verify all ten acceptance criteria, ownership boundaries, exact-map examples, and out-of-scope invariants are coherent.
 - [ ] Record implementation decisions, test evidence, and any discovered trade-offs in `implementation.md`, then check completed items and prepare the task for implementation review.

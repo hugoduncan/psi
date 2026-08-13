@@ -112,3 +112,10 @@ table-tested without sessions or adapters.
   sync wait had been reading only namespaced mutation keys while its async future
   returns unqualified keys; it now supports both equivalent internal result
   shapes without changing the provider-facing contract.
+- Slice 6 hardens lower-runtime lexical proof with safe-reason rejection,
+  token-length boundaries, quoted credentials, scanner precedence, Windows/UNC,
+  and secret-bearing relative paths. Bearer padding is excluded before its
+  eight-character minimum is applied, and all Unicode whitespace now terminates
+  a path span. Focused runtime, delegate, handoff, mutation, tool, and async
+  Scry namespaces are green; broader regression and the remaining exhaustive
+  acceptance matrix remain open.

@@ -35,12 +35,13 @@
 (defn safe-reason?
   "True when reason is a bounded keyword safe to render publicly."
   [reason]
-  (when (keyword? reason)
-    (let [body (if-let [namespace (namespace reason)]
-                 (str namespace "/" (name reason))
-                 (name reason))]
-      (and (<= (code-point-count body) 64)
-           (boolean (re-matches safe-reason-pattern body))))))
+  (boolean
+   (when (keyword? reason)
+     (let [body (if-let [namespace (namespace reason)]
+                  (str namespace "/" (name reason))
+                  (name reason))]
+       (and (<= (code-point-count body) 64)
+            (re-matches safe-reason-pattern body))))))
 
 (defn- whitespace-code-point?
   [code-point]
@@ -115,16 +116,33 @@
   [token]
   (str/replace token #"\.+$" ""))
 
+(defn- bearer-token-span
+  [text index]
+  (let [span (some-> (span-match bearer-pattern text index)
+                     trim-token-periods)
+        token (some-> span
+                      (str/replace #"(?i)^Bearer[ \t]+" "")
+                      (str/replace #"=+$" ""))]
+    (when (and span (>= (count token) 8))
+      span)))
+
+(defn- prefixed-token-span
+  [text index]
+  (let [span (some-> (span-match prefixed-token-pattern text index)
+                     trim-token-periods)]
+    (when (and span (>= (count (subs span 3)) 8))
+      span)))
+
 (defn- path-end-index
   [text start]
   (loop [index start]
     (if (>= index (.length ^String text))
       index
       (let [code-point (.codePointAt ^String text index)]
-        (if (contains? #{(int \space) (int \tab) (int \newline) (int \return)
-                         (int \,) (int \;) (int \)) (int \]) (int \})
-                         (int \') (int \")}
-                       code-point)
+        (if (or (whitespace-code-point? code-point)
+                (contains? #{(int \,) (int \;) (int \)) (int \]) (int \})
+                             (int \') (int \")}
+                           code-point))
           index
           (recur (+ index (Character/charCount code-point))))))))
 
@@ -177,11 +195,9 @@
               credential (when (left-boundary? text index ascii-key-delimiter?)
                            (span-match credential-pattern text index))
               bearer (when (left-boundary? text index ascii-key-delimiter?)
-                       (some-> (span-match bearer-pattern text index)
-                               trim-token-periods))
+                       (bearer-token-span text index))
               prefixed-token (when (left-boundary? text index token-character?)
-                               (some-> (span-match prefixed-token-pattern text index)
-                                       trim-token-periods))
+                               (prefixed-token-span text index))
               path (path-span text index)
               [span replacement] (cond
                                    stack-frame [stack-frame "[STACKTRACE_REDACTED]"]
