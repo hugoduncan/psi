@@ -125,3 +125,7 @@
 
 - [x] Add table-driven deterministic-selection tests for invalid terminal identities: an unknown/invalid `:terminal-outcome :step-id` must fall through to a valid current step and then effective failed-step order, and a terminal `:attempt-id` absent from the selected step (including an id belonging only to another step) must select that step's latest ordered attempt. Assert the resulting exact envelope identities and cause so malformed terminal metadata cannot override the canonical terminal failure. Existing tests cover omitted IDs and valid explicit IDs, but not these specified invalid-identity fallthrough branches.
   - Exact-envelope cases prove unknown/non-string terminal steps fall through current/effective order, while unknown and cross-step attempt ids select the chosen step's latest attempt.
+
+## Further test review follow-ups
+
+- [ ] Extend the invalid-identity selection matrix with invalid values that are present in persisted state: a non-string terminal/current step key that exists in `:step-runs` must be ignored in favor of a valid current/effective-order step, and a non-string terminal attempt id matching a historical attempt's non-string id must be ignored in favor of the selected step's latest ordered attempt. Assert the exact canonical envelope cause and valid location identity. The current invalid cases are absent from their maps/vectors, so they pass without proving that selection itself enforces the required nonblank-string identity boundary.
