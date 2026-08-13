@@ -66,4 +66,10 @@
 (defn resume-and-execute-run!
   "Resume a blocked run and continue execution via the Phase A statechart runtime."
   [ctx parent-session-id run-id]
-  (execute-statechart! ctx parent-session-id run-id :workflow/resume))
+  (swap! (:state* ctx)
+         (fn [state]
+           (first (workflow-runtime/resume-run state run-id))))
+  ;; Each facade invocation creates a fresh chart in its initial pending state.
+  ;; The canonical run update above records the resume and clears its blocked
+  ;; payload; starting the fresh chart then creates the resumed step attempt.
+  (execute-statechart! ctx parent-session-id run-id :workflow/start))

@@ -41,11 +41,12 @@
                                                                    :run-id "run-resume"
                                                                    :workflow-input {:input "plan it"}})]
                        (-> s
-                           (assoc-in [:workflows :runs "run-resume" :status] :completed)
-                           (assoc-in [:workflows :runs "run-resume" :current-step-id] nil)
+                           (assoc-in [:workflows :runs "run-resume" :status] :blocked)
+                           (assoc-in [:workflows :runs "run-resume" :blocked]
+                                     {:step-id "step-1"})
                            (assoc-in [:workflows :runs "run-resume" :step-runs "step-1" :attempts]
                                      [{:attempt-id "a1"
-                                       :status :succeeded
+                                       :status :blocked
                                        :execution-session-id "child-1"}])))))
           seen* (atom [])]
       (with-redefs [psi.workflow-runtime.statechart-runtime/create-workflow-context
@@ -55,11 +56,16 @@
                     psi.workflow-runtime.statechart-runtime/send-and-drain!
                     (fn [_wf-ctx _wm event _data]
                       (swap! seen* conj [:event event])
+                      (swap! (:state* ctx)
+                             (fn [state]
+                               (-> state
+                                   (assoc-in [:workflows :runs "run-resume" :status] :completed)
+                                   (assoc-in [:workflows :runs "run-resume" :current-step-id] nil))))
                       :stubbed)]
         (let [result (workflow-execution/resume-and-execute-run! ctx session-id "run-resume")]
           (is (= :completed (:status result)))
           (is (true? (:terminal? result)))
           (is (false? (:blocked? result)))
           (is (= [[:create "run-resume" session-id]
-                  [:event :workflow/resume]]
+                  [:event :workflow/start]]
                  @seen*)))))))

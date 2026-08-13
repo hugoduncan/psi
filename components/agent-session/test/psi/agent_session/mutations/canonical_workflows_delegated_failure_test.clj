@@ -4,7 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations.canonical-workflows :as mutations]
-   [psi.agent-session.mutations.canonical-workflows-test :as core-test]))
+   [psi.agent-session.mutations.canonical-workflows-test :as core-test]
+   [psi.agent-session.workflow-execution-test-support :as support]))
 
 (def delegated-envelope
   {:reason :delegated-workflow-failed
@@ -68,30 +69,93 @@
       (is (= (:message delegated-envelope) (:psi.workflow/error result)))
       (is (nil? (get-in @(:state* ctx) [:workflows :runs "execute-failed"]))))))
 
+(def resumable-child-definition
+  {:definition-id "resumable-child"
+   :name "resumable-child"
+   :steps [{:name "child-step"
+            :type :session
+            :outputs {:final-llm-reply {:source :session/final-llm-reply}
+                      :decision {:source :session/structured-output
+                                 :mode :structured
+                                 :schema-id :psi.workflow/test-decision
+                                 :schema-version 1
+                                 :schema [:map [:decision [:enum :approve]]]
+                                 :json-schema {:type "object"
+                                               :required ["decision"]
+                                               :properties {"decision" {:type "string"}}}}}
+            :contributions [{:type :template
+                             :text "Decide {{input}}"
+                             :vars {"input" {:from :workflow-input}}}]}]})
+
+(def resumable-parent-definition
+  {:definition-id "resumable-parent"
+   :name "resumable-parent"
+   :steps [{:name "delegate-child"
+            :type :delegate
+            :target "resumable-child"
+            :prompt-string "Carry out the child workflow."
+            :context []}]})
+
+(defn- workflow-turn
+  [session-id status message]
+  {:status status
+   :session-id session-id
+   :assistant-message {:role "assistant"
+                       :error-message (when (= :error status) message)
+                       :content [{:type (if (= :error status) :error :text)
+                                  :text message}]}
+   :assistant-text (if (= :error status) "" message)
+   :execution-result {}
+   :failure (when (= :error status)
+              {:reason :provider-unavailable
+               :message message})})
+
 (deftest resume-workflow-run-projects-terminal-delegated-error-through-retention-test
-  ;; Resume has the same private handoff, but its established response contract
-  ;; deliberately does not expose a result field.
-  (testing "resume ignores pre-resume attempt history and retains no result field"
-    (let [ctx (assoc (core-test/make-test-ctx)
+  ;; The real facade/runtime first blocks the parent through a blocked delegated
+  ;; child, then resumes the delegate step and records a terminal child failure.
+  (testing "resume selects the new terminal attempt before retention and exposes no result"
+    (let [[base-ctx parent-id] (support/create-session-context {:persist? false})
+          turn-count* (atom 0)
+          ctx (assoc base-ctx
                      :config {:completed-workflow-run-retention-count 0}
-                     :resume-and-execute-workflow-run-fn
-                     (fn [ctx* _session-id run-id]
-                       (terminalize-failed-run! ctx* run-id)
-                       (failed-execution-result
-                        delegated-envelope
-                        [{:step-id "prepare" :error "pre-resume failure"}
-                         {:step-id "build" :error "superseded retry failure"}
-                         {:step-id "build" :error (:message delegated-envelope)}])))
-          parent-id (create-parent-run! ctx "resume-failed")
-          _ (swap! (:state* ctx) assoc-in [:workflows :runs "resume-failed" :status] :blocked)
-          result (mutations/resume-workflow-run
-                  {} {:psi/agent-session-ctx ctx
-                      :session-id parent-id
-                      :run-id "resume-failed"})]
-      (is (= :failed (:psi.workflow/status result)))
-      (is (= (:message delegated-envelope) (:psi.workflow/error result)))
-      (is (not (contains? result :psi.workflow/result)))
-      (is (nil? (get-in @(:state* ctx) [:workflows :runs "resume-failed"]))))))
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx session-id _prompt & _]
+                       (if (= 1 (swap! turn-count* inc))
+                         (workflow-turn session-id :ok "not valid structured output")
+                         (workflow-turn session-id :error "upstream request rejected"))))]
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-child-definition})
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-parent-definition})
+      (mutations/create-workflow-run
+       {} {:psi/agent-session-ctx ctx
+           :session-id parent-id
+           :definition-id "resumable-parent"
+           :workflow-input "resume proof"
+           :run-id "resume-failed"})
+      (let [blocked (mutations/execute-workflow-run
+                     {} {:psi/agent-session-ctx ctx
+                         :session-id parent-id
+                         :run-id "resume-failed"})]
+        (is (= :blocked (:psi.workflow/status blocked))))
+      (swap! (:state* ctx)
+             assoc-in
+             [:workflows :runs "resume-failed" :step-runs "delegate-child"
+              :attempts 0 :execution-error]
+             {:reason :delegated-workflow-failed
+              :message "superseded pre-resume failure"
+              :delegate-failure {:source :fallback
+                                 :run-id "stale-child"
+                                 :target "resumable-child"}})
+      (let [result (mutations/resume-workflow-run
+                    {} {:psi/agent-session-ctx ctx
+                        :session-id parent-id
+                        :run-id "resume-failed"})]
+        (is (= :failed (:psi.workflow/status result)))
+        (is (= "Delegated workflow 'resumable-child' failed at step 'child-step': upstream request rejected"
+               (:psi.workflow/error result)))
+        (is (not (contains? result :psi.workflow/result)))
+        (is (nil? (get-in @(:state* ctx) [:workflows :runs "resume-failed"])))))))
 
 (deftest execute-workflow-run-projects-every-canonical-delegated-source-test
   ;; The mutation owns only pass-through projection: all source selection and

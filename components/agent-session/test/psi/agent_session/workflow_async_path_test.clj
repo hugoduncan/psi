@@ -123,6 +123,36 @@
       (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) notification))))
       (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) entry)))))))
 
+(deftest delegated-failure-publication-preserves-bounded-message-before-result-test
+  (testing "512-code-point messages remain byte-exact before the optional result section"
+    (let [message (str "Delegated workflow failed: "
+                       (apply str (repeat (- 512 (count "Delegated workflow failed: ")) "x")))
+          result-text "optional result"
+          publication (orchestration/delegated-result-publication
+                       {:run-id "parent-run"
+                        :workflow-name "parent"
+                        :parent-session-id "session-1"
+                        :include-result? true
+                        :exec-result {:psi.workflow/status :failed
+                                      :psi.workflow/result result-text
+                                      :psi.workflow/error message}})
+          notification (get-in publication [:notification :message])
+          entry (get-in publication [:append-entry :data])
+          occurrence-count (fn [text]
+                             (count (re-seq (re-pattern (java.util.regex.Pattern/quote message))
+                                            text)))]
+      (is (= 512 (.codePointCount message 0 (.length message))))
+      (is (= message (get-in publication [:completion :error])))
+      (is (= message (get-in publication [:background-job :payload :error])))
+      (is (= 1 (occurrence-count notification)))
+      (is (= 1 (occurrence-count entry)))
+      (is (= (str "Workflow 'parent' failed: " message " (run parent-run)")
+             notification))
+      (is (= (str "Workflow 'parent' — failed: " message " (run parent-run)")
+             entry))
+      (is (not (str/includes? notification result-text)))
+      (is (not (str/includes? entry result-text))))))
+
 (deftest async-delegated-failure-return-record-preserves-canonical-message-test
   ;; The asynchronous worker's returned record and completion callback share the
   ;; mutation's canonical error instead of deriving a second error projection.
