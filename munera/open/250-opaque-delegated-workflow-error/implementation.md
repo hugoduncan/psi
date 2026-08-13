@@ -27,3 +27,4 @@
 - architectural review at design baseline `8a3a9f913` found no new feedback
 - ambiguity review at design baseline `8a3a9f913` added 1 new design step
 - inconsistency review at design baseline `8a3a9f913` found no new feedback
+- handoff for the open design step: `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj` applies `workflow_run_retention.clj` cleanup after `workflow-execution.clj` returns but before re-reading `final-run` (which may be nil at retention count 0), so select and carry the canonical terminal envelope in the facade result before cleanup; preserve the existing public `:steps-executed` shape unless the design explicitly changes it. Prove the internal handoff in `workflow_execution_test.clj` and execute/resume projection after cleanup in `mutations/canonical_workflows_test.clj`.
