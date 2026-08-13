@@ -100,6 +100,59 @@
                (:psi.workflow/error result)))
         (is (nil? (get-in @(:state* ctx) [:workflows :runs "execute-failed"])))))))
 
+(deftest execute-workflow-run-selects-terminal-delegated-retry-failure-test
+  ;; A retry-enabled parent delegate step records both real child failures while
+  ;; the terminal retry alone supplies the persisted envelope and public error.
+  (testing "the terminal delegated retry wins without changing failure semantics"
+    (let [[base-ctx parent-id] (support/create-session-context {:persist? false})
+          turn-count* (atom 0)
+          ctx (assoc base-ctx
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx session-id _prompt & _]
+                       (let [attempt-number (swap! turn-count* inc)]
+                         (workflow-turn session-id
+                                        :error
+                                        (if (= 1 attempt-number)
+                                          "first child failure"
+                                          "terminal child failure")))))]
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-child-definition})
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-parent-definition})
+      (mutations/create-workflow-run
+       {} {:psi/agent-session-ctx ctx
+           :session-id parent-id
+           :definition-id "resumable-parent"
+           :workflow-input "retry proof"
+           :run-id "retry-failed"})
+      ;; Target-authored compilation does not expose retry policy, so install
+      ;; the valid policy directly on the persisted canonical step definition.
+      (swap! (:state* ctx)
+             assoc-in
+             [:workflows :runs "retry-failed" :effective-definition :canonical-ir
+              :steps 0 :retry-policy]
+             {:max-attempts 2 :retry-on #{:execution-failed}})
+      (let [result (mutations/execute-workflow-run
+                    {} {:psi/agent-session-ctx ctx
+                        :session-id parent-id
+                        :run-id "retry-failed"})
+            parent-run (get-in @(:state* ctx) [:workflows :runs "retry-failed"])
+            attempts (get-in parent-run [:step-runs "delegate-child" :attempts])
+            child-run-ids (mapv #(get-in % [:execution-error :delegate-failure :run-id])
+                                attempts)]
+        (is (= :failed (:psi.workflow/status result)))
+        (is (nil? (:psi.workflow/result result)))
+        (is (= "Delegated workflow 'resumable-child' failed at step 'child-step': terminal child failure"
+               (:psi.workflow/error result)))
+        (is (= :failed (:status parent-run)))
+        (is (= 2 (count attempts)))
+        (is (= [:execution-failed :execution-failed] (mapv :status attempts)))
+        (is (= ["Delegated workflow 'resumable-child' failed at step 'child-step': first child failure"
+                "Delegated workflow 'resumable-child' failed at step 'child-step': terminal child failure"]
+               (mapv #(get-in % [:execution-error :message]) attempts)))
+        (is (= [:failed :failed]
+               (mapv #(get-in @(:state* ctx) [:workflows :runs % :status]) child-run-ids)))))))
+
 (deftest resume-workflow-run-projects-terminal-delegated-error-through-retention-test
   ;; The real facade/runtime first blocks the parent through a blocked delegated
   ;; child, then resumes the delegate step and records a terminal child failure.
