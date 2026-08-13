@@ -268,7 +268,7 @@
   (dispatch/dispatch! agent-session-ctx :session/append-journal-entry
                       {:session-id session-id
                        :entry (persist/custom-message-entry custom-type (str data) nil false)}
-                      {:origin :extension})
+                      {:origin :mutations})
   {:psi.agent-session/session-entry-count
    (count (ss/get-state-value-in agent-session-ctx (ss/state-path :journal session-id)))})
 

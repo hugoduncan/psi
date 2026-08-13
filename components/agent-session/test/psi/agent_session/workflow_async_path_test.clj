@@ -196,12 +196,7 @@
                                   :message "upstream request rejected"}}))
           runtime (runtime-fns/make-extension-runtime-fns
                    ctx session-id wl/built-in-workflow-path)
-          real-mutate! (:mutate-fn runtime)
-          appended* (atom [])
-          mutate! (fn [operation params]
-                    (when (= 'psi.extension/append-entry operation)
-                      (swap! appended* conj params))
-                    (real-mutate! operation params))
+          mutate! (:mutate-fn runtime)
           inflight* (atom {})
           notifications* (atom [])
           refresh! (fn [] nil)
@@ -217,45 +212,53 @@
                           :refresh-widgets! refresh!
                           :inflight-runs inflight*}
                          run-id workflow-name parent-session-id include-result? exec-result))]
-      (mutate! 'psi.workflow/register-definition {:definition child-definition})
-      (mutate! 'psi.workflow/register-definition {:definition parent-definition})
-      (mutate! 'psi.workflow/create-run
-               {:definition-id "async-failing-parent"
-                :workflow-input "async proof"
-                :run-id "async-parent-run"})
-      (let [run-id (orchestration/execute-async!
-                    {:mutate! mutate!
-                     :start-background-job! (partial orchestration/start-background-job! mutate!)
-                     :mark-background-job-terminal! mark-terminal!
-                     :notify! notify!
-                     :refresh-widgets! refresh!
-                     :inflight-runs inflight*
-                     :on-async-completion-fn completion!}
-                    "async-parent-run" session-id "async-failing-parent" false)
-            _ (deliver actor-release true)
-            result (orchestration/await-run-completion inflight* run-id 3000)
-            message "Delegated workflow 'async-failing-child' failed at step 'child-step': upstream request rejected"
-            job (->> (ss/get-state-value-in ctx (ss/state-path :background-jobs))
-                     :jobs-by-id
-                     vals
-                     (filter #(= "async-parent-run" (:workflow-id %)))
-                     first)
-            entry (last @appended*)]
-        (is (= {:run-id "async-parent-run"
-                :workflow "async-failing-parent"
-                :status :failed
-                :error message}
-               result))
-        (is (= :failed (:status job)))
-        (is (= message (get-in job [:terminal-payload :error])))
-        (is (= [{:message (str "Workflow 'async-failing-parent' failed: " message
-                               " (run async-parent-run)")
-                 :level :warn}]
-               @notifications*))
-        (is (= "delegate-result" (:custom-type entry)))
-        (is (= (str "Workflow 'async-failing-parent' — failed: " message
-                    " (run async-parent-run)")
-               (:data entry)))))))
+      (try
+        (mutate! 'psi.workflow/register-definition {:definition child-definition})
+        (mutate! 'psi.workflow/register-definition {:definition parent-definition})
+        (mutate! 'psi.workflow/create-run
+                 {:definition-id "async-failing-parent"
+                  :workflow-input "async proof"
+                  :run-id "async-parent-run"})
+        (let [run-id (orchestration/execute-async!
+                      {:mutate! mutate!
+                       :start-background-job! (partial orchestration/start-background-job! mutate!)
+                       :mark-background-job-terminal! mark-terminal!
+                       :notify! notify!
+                       :refresh-widgets! refresh!
+                       :inflight-runs inflight*
+                       :on-async-completion-fn completion!}
+                      "async-parent-run" session-id "async-failing-parent" false)
+              _ (deliver actor-release true)
+              result (orchestration/await-run-completion inflight* run-id 3000)
+              message "Delegated workflow 'async-failing-child' failed at step 'child-step': upstream request rejected"
+              job (->> (ss/get-state-value-in ctx (ss/state-path :background-jobs))
+                       :jobs-by-id
+                       vals
+                       (filter #(= "async-parent-run" (:workflow-id %)))
+                       first)
+              journal (ss/get-state-value-in ctx (ss/state-path :journal session-id))
+              entry (->> journal
+                         (filter #(and (= :custom-message (:kind %))
+                                       (= "delegate-result" (get-in % [:data :custom-type]))))
+                         last)]
+          (is (= {:run-id "async-parent-run"
+                  :workflow "async-failing-parent"
+                  :status :failed
+                  :error message}
+                 result))
+          (is (= :failed (:status job)))
+          (is (= message (get-in job [:terminal-payload :error])))
+          (is (= [{:message (str "Workflow 'async-failing-parent' failed: " message
+                                 " (run async-parent-run)")
+                   :level :warn}]
+                 @notifications*))
+          (is (some? entry) (str "journal: " (pr-str journal)))
+          (is (= "delegate-result" (get-in entry [:data :custom-type])))
+          (is (= (str "Workflow 'async-failing-parent' — failed: " message
+                      " (run async-parent-run)")
+                 (get-in entry [:data :content]))))
+        (finally
+          (context/shutdown-context! ctx))))))
 
 (deftest top-level-worker-cancel-wakes-parked-wait-and-terminalizes-cleanly-test
   ;; Tests the acceptance path with real futures and dispatch effects: cancelling
