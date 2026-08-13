@@ -89,3 +89,9 @@
   stack-frame boundary cases, plus sanitizer idempotence. This was proof only;
   no runtime mechanism changed. Focused Scry passed 13 tests / 93 assertions and
   clj-kondo is clean.
+- 2026-08-13 Slice 2 target-fallback integration: added a real nested
+  parent/child/grandchild fixture whose direct child target is `/secret`. The
+  outer parent envelope is exactly the generic fallback with selected direct
+  child location; it deliberately omits both reason and nested cause even
+  though the immediate child failure is canonical. Focused Scry passed 5 tests /
+  24 assertions; clj-paren-repair and clj-kondo are clean.

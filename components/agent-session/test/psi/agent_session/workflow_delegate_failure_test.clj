@@ -49,6 +49,15 @@
             :prompt-string "Carry out the grandchild workflow."
             :context []}]})
 
+(def secret-delegating-child-definition
+  {:definition-id "/secret"
+   :name "/secret"
+   :steps [{:name "delegate-grandchild"
+            :type :delegate
+            :target "grandchild"
+            :prompt-string "Carry out the grandchild workflow."
+            :context []}]})
+
 (defn- parent-definition
   [child-name]
   {:definition-id "parent"
@@ -223,3 +232,27 @@
              (get-in error [:delegate-failure :nested-cause])))
       (is (= "Delegated workflow 'delegating-child' failed at step 'delegate-grandchild': Delegated workflow 'grandchild' failed at step 'grandchild-step': grandchild request rejected"
              (:message error))))))
+
+(deftest nonactionable-direct-target-forces-nested-failure-fallback-test
+  ;; A real nested child error cannot make an unsafe direct target actionable;
+  ;; only selected location survives in the persisted fallback envelope.
+  (testing "a direct path target drops nested cause identity and message"
+    (let [{:keys [ctx result]}
+          (execute-failing-parent! [grandchild-definition secret-delegating-child-definition]
+                                   "/secret"
+                                   "grandchild request rejected")
+          error (parent-error ctx)
+          child-run-id (get-in error [:delegate-failure :run-id])
+          child-run (workflow-runtime/workflow-run-in @(:state* ctx) child-run-id)
+          attempt-id (get-in child-run [:step-runs "delegate-grandchild" :attempts 0 :attempt-id])]
+      (is (= :failed (:status result)))
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow failed"
+              :delegate-failure {:source :fallback
+                                 :run-id child-run-id
+                                 :target "/secret"
+                                 :step-id "delegate-grandchild"
+                                 :attempt-id attempt-id}}
+             error))
+      (is (not (contains? (:delegate-failure error) :reason)))
+      (is (not (contains? (:delegate-failure error) :nested-cause))))))

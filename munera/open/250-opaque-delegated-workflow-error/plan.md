@@ -157,3 +157,7 @@ table-tested without sessions or adapters.
   scanner's remaining delimiter/punctuation decisions and output idempotence
   explicit, including complete stack-frame negatives and credential/token/path
   tails. No sanitizer mechanism changed.
+
+- Slice 2 now proves target-forced fallback through the real nested statechart
+  path. A direct `/secret` target retains only selected child location in the
+  parent envelope; outer cause and nested identity are deliberately omitted.
