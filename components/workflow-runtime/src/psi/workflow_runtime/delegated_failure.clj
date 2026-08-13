@@ -452,22 +452,14 @@
 
 (defn- path-separator-scanner
   [text]
-  ;; Advance slash and backslash lookahead independently. Combining them would
-  ;; repeatedly rescan toward a late separator of one kind while passing many
-  ;; nearby separators of the other kind.
-  (let [next-slash (int-array 1 -2)
-        next-backslash (int-array 1 -2)]
+  ;; A candidate needs only to know whether either separator occurs at or after
+  ;; its index. Cache each final occurrence once so every query is constant-time
+  ;; and cannot repeatedly rescan toward an unrelated late separator.
+  (let [last-slash (.lastIndexOf ^String text "/")
+        last-backslash (.lastIndexOf ^String text "\\")]
     (fn [index]
-      (when (or (= -2 (aget next-slash 0))
-                (and (not (neg? (aget next-slash 0)))
-                     (< (aget next-slash 0) index)))
-        (aset-int next-slash 0 (.indexOf ^String text "/" index)))
-      (when (or (= -2 (aget next-backslash 0))
-                (and (not (neg? (aget next-backslash 0)))
-                     (< (aget next-backslash 0) index)))
-        (aset-int next-backslash 0 (.indexOf ^String text "\\" index)))
-      (or (>= (aget next-slash 0) index)
-          (>= (aget next-backslash 0) index)))))
+      (or (>= last-slash index)
+          (>= last-backslash index)))))
 
 (defn- path-span-scanner
   [text]
