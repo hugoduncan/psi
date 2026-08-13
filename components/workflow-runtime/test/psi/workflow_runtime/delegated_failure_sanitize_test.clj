@@ -182,6 +182,12 @@
   (let [rejected-prefix (apply str (repeat 2000 ":.ssh/"))]
     (is (= ":[PATH_REDACTED]"
            (delegated-failure/sanitize-component rejected-prefix))))
+  (let [delimiter-runs-before-late-path (str (apply str (repeat 16000 "x "))
+                                             "/tail")
+        sanitized (delegated-failure/sanitize-component
+                   delimiter-runs-before-late-path)]
+    (is (= 512 (delegated-failure/code-point-count sanitized)))
+    (is (= (apply str (take 512 (cycle "x "))) sanitized)))
   (let [late-actionable-message (str (apply str (repeat 5000 "token=secret "))
                                      "request denied")
         run (workflow-run

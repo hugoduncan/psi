@@ -450,10 +450,24 @@
         index
         (recur (next-visible-index text index))))))
 
-(defn- path-separator-at-or-after?
-  [text index]
-  (or (not= -1 (.indexOf ^String text "/" index))
-      (not= -1 (.indexOf ^String text "\\" index))))
+(defn- path-separator-scanner
+  [text]
+  ;; Advance slash and backslash lookahead independently. Combining them would
+  ;; repeatedly rescan toward a late separator of one kind while passing many
+  ;; nearby separators of the other kind.
+  (let [next-slash (int-array 1 -2)
+        next-backslash (int-array 1 -2)]
+    (fn [index]
+      (when (or (= -2 (aget next-slash 0))
+                (and (not (neg? (aget next-slash 0)))
+                     (< (aget next-slash 0) index)))
+        (aset-int next-slash 0 (.indexOf ^String text "/" index)))
+      (when (or (= -2 (aget next-backslash 0))
+                (and (not (neg? (aget next-backslash 0)))
+                     (< (aget next-backslash 0) index)))
+        (aset-int next-backslash 0 (.indexOf ^String text "\\" index)))
+      (or (>= (aget next-slash 0) index)
+          (>= (aget next-backslash 0) index)))))
 
 (defn- path-span-scanner
   [text]
@@ -462,12 +476,13 @@
   ;; such candidate consumes the rest of the run, so no later starts are needed.
   ;; Cache a separator-free remainder immediately: no supported absolute or
   ;; relative path can begin there, and repeatedly scanning it adds no evidence.
-  (let [cached-run (volatile! nil)]
+  (let [cached-run (volatile! nil)
+        separator-at-or-after? (path-separator-scanner text)]
     (fn [index]
       (when (path-left-delimiter? text index)
         (let [{:keys [end exact-suffix-start] :as cached} @cached-run
               same-run? (and cached (< index end))
-              separator? (or same-run? (path-separator-at-or-after? text index))
+              separator? (or same-run? (separator-at-or-after? index))
               end (cond
                     same-run? end
                     separator? (path-end-index text index)
