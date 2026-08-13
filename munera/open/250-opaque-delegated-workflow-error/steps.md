@@ -274,3 +274,7 @@
 
 - [x] Replace the direct `#'delegated-failure/path-separator-scanner` test and `CharSequence.charAt` interaction count with proof at a behavior-bearing boundary. The current assertion exercises a private helper independently of `sanitize-component`, required changing that helper's production signature for the test double, and remains green if the sanitizer stops using the helper or acquires quadratic work elsewhere. Keep the slash/backslash public output cases, and put calibrated scaling protection in an explicit slow/benchmark layer unless a deterministic public work invariant can cover the complete sanitizer path without asserting implementation interactions.
   - Removed the private helper test and restored its String-only production boundary. Public slash/backslash output cases remain in the default suite; opt-in `bb benchmark:delegated-failure-sanitizer` measures the complete public sanitizer at 4× growth and rejects quadratic scaling.
+
+## Benchmark test-shaper review follow-ups
+
+- [ ] Calibrate `benchmark:delegated-failure-sanitizer` so it fails for the late-separator quadratic implementation it is intended to guard. Running the new benchmark against pre-fix commit `4d4818ddb` reports only 3.56× slash and 4.00× backslash growth for 4× input, below the current 8× failure threshold, so the regression passes. Use input sizes, repetitions/statistics, and a threshold that distinguish the known-bad and current implementations reliably on the complete public sanitizer path while remaining isolated from the default suite.
