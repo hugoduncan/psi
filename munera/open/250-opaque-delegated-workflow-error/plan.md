@@ -35,9 +35,10 @@ table-tested without sessions or adapters.
 - Treat projection code as pass-through. Change registered-tool or async code
   only if end-to-end tests show that it alters or replaces the canonical message.
 - Add an `[Unreleased]` `Fixed` changelog entry because actionable delegated
-  workflow failures are user-visible behavior. No broader workflow documentation
-  change is expected unless implementation discovers an existing statement that
-  becomes inaccurate.
+  workflow failures are user-visible behavior. Documentation review additionally
+  requires README, workflow-guide, and Ramora boundary updates describing the
+  implemented diagnostic behavior without exposing the internal envelope as an
+  authoring contract.
 
 ## Risks
 

@@ -135,3 +135,4 @@
 - task test review added 0 steps to be addressed
 - test-shaper review added 0 steps to be addressed
 - documentation review added 2 steps to be addressed
+- addressed 2 documentation review steps

@@ -173,8 +173,11 @@ Project workflows include:
   incidental complexity and `/delegate reduce-architectural-complexity` for
   namespace/family/pair/community architecture targets selected by Gordian.
 
-Completed workflow runs are retained per originating session and older runs are
-cleaned up automatically; retention is configurable. See
+When a delegated child workflow fails, psi reports a bounded, safely redacted
+actionable cause when one is available and otherwise retains the generic
+`Delegated workflow failed` fallback. The workflow remains failed and no success
+result is produced. Completed workflow runs are retained per originating session
+and older runs are cleaned up automatically; retention is configurable. See
 [`doc/workflows.md`](doc/workflows.md).
 
 ## Extensions
