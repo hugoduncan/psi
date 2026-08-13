@@ -93,3 +93,10 @@ table-tested without sessions or adapters.
    suites, lint/format changed Clojure files, verify forbidden child data cannot
    cross the envelope boundary, update the changelog, and re-check all acceptance
    criteria and scope invariants.
+## Implementation progress
+
+- Slice 4 now projects a `:delegated-workflow-failed` envelope exclusively from
+  the facade's private `:terminal-execution-error` handoff. The mutation applies
+  retention cleanup before its canonical run read, so the retention-zero proof
+  confirms that this handoff—not `:steps-executed` or a subsequent run read—is
+  the durable public-error source for both execute and resume.

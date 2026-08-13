@@ -41,3 +41,12 @@
 - 2026-08-09 Slice 2 boundary proof: added `psi.agent-session.workflow-delegate-failure-test`, a real statechart parent/child run proof using the existing nullable actor-turn seam. It verifies the failed child and parent statuses, exact parent `:execution-error` envelope (including generated child attempt identity), no `:details` leakage, and nil parent accepted result. `progression-recording/record-attempt-execution-failure` already persists the delegate payload verbatim, so no mechanism change was needed. Focused Scry: 1 test / 6 assertions.
 - 2026-08-09 Slice 2 follow-up: expanded the same real statechart proof with redact-only fallback and one-level nested delegation cases (3 tests / 14 assertions). The target compiler intentionally does not retain arbitrary authored `:retry-policy`, so an integration fixture cannot create a child retry from target syntax; terminal-retry selection stays covered at the pure persisted-run boundary until compiler/runtime retry policy is separately in scope. `clj-paren-repair` and focused `clj-kondo` passed.
 - 2026-08-09 Slice 3: `workflow-execution/execution-result` now exposes the selected persisted parent attempt error only on private `:terminal-execution-error`, using the lower-runtime deterministic selector. Public `:steps-executed` is unchanged and still holds string `:error` projections. Narrow state-based proof uses scrambled step maps and a superseded retry to establish exact terminal-envelope handoff (2 tests / 5 assertions); projection through execute/resume and retention cleanup remains Slice 4.
+
+- 2026-08-09 Slice 4 projection: `run-failure-error` now gives a terminal private
+  handoff whose reason is `:delegated-workflow-failed` precedence over public
+  attempt strings, then preserves the existing non-delegated projection. Added
+  mutation-level execute/resume retention-zero proofs: both return the exact
+  canonical envelope message after cleanup removes the run; resume still omits
+  `:psi.workflow/result`. Tests use immutable façade-result values and assert
+  returned state/output only. Remaining Slice 4 work is real runtime coverage
+  for execution-error, terminal-outcome, and fallback source variants.
