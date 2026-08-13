@@ -279,3 +279,8 @@
 
 - [x] Calibrate `benchmark:delegated-failure-sanitizer` so it fails for the late-separator quadratic implementation it is intended to guard. Running the new benchmark against pre-fix commit `4d4818ddb` reports only 3.56× slash and 4.00× backslash growth for 4× input, below the current 8× failure threshold, so the regression passes. Use input sizes, repetitions/statistics, and a threshold that distinguish the known-bad and current implementations reliably on the complete public sanitizer path while remaining isolated from the default suite.
   - The opt-in benchmark now compares interleaved median separator timings against an equal-size no-separator control at 128,000 delimiter candidates. Current code passes repeatedly at 1.07–1.09× overhead; known-bad `4d4818ddb` fails the 1.14× bound at 1.20× slash and 1.31× backslash overhead.
+
+## Final documentation review follow-ups
+
+- [ ] Qualify the public diagnostic claims in `README.md`, `doc/workflows.md`, and `CHANGELOG.md` so they state that the canonical child-failure message is publicly surfaced when the parent delegate failure is terminal after authored retries are exhausted. The current wording says psi reports/surfaces every failed child attempt, although a later successful parent retry supersedes that attempt and the workflow can complete without publishing it as the final workflow/tool/async error.
+- [ ] Correct `doc/workflows.md`'s redaction summary so it does not imply that every path is replaced. The implemented contract redacts absolute, home-relative, dot-relative, drive, and UNC paths, but redacts other relative paths only when they contain a specified sensitive segment; ordinary relative paths remain visible.
