@@ -87,6 +87,14 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
+- [ ] Reconcile the canonical envelope's nil-versus-omitted optional fields. The
+      envelope shape currently shows `:reason`, `:step-id`, and `:attempt-id`
+      present with nil when unavailable, while immediate-envelope recognition
+      says those fields are optional nonblank values and nil optional fields are
+      omitted. Define one persisted parent `:delegate-failure` shape and use the
+      same rule when recognizing it as an immediate nested envelope, so exact-map
+      tests and nested metadata validation agree.
+
 - [x] Reconcile the parent-visible claim that async completion, background-job,
       notification, and append-entry projections "reuse the same error string"
       with their current public shapes. Completion/background-job payloads carry

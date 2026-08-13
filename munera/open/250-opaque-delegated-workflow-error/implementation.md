@@ -10,3 +10,4 @@
 - design follow-up completed the 3 attributable items from baseline `7f075258d`: the canonical message now has exact source allowlists, rendering, redaction/fallback/truncation behavior, nested identity validation, and per-async-surface projection semantics. Implementation must preserve the 512-code-point envelope unchanged in projection wrappers; malformed nested envelopes contribute no identity but their message may still pass through ordinary untrusted-message sanitization.
 - architectural review at design baseline `6b3af4475` found no new feedback
 - ambiguity review at design baseline `6b3af4475` added 2 new design steps
+- inconsistency review at design baseline `6b3af4475` added 1 new design step
