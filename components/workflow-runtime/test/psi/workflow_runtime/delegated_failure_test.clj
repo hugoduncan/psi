@@ -515,6 +515,57 @@
     (is (not (delegated-failure/actionable? "[PATH_REDACTED] [STACKTRACE_REDACTED]")))
     (is (true? (delegated-failure/actionable? "[REDACTED] request rejected")))))
 
+(deftest delegated-failure-non-actionable-step-message-test
+  ;; Public composition omits unusable step text without discarding valid raw
+  ;; location identity from the canonical envelope.
+  (doseq [{:keys [label run expected]}
+          [{:label "path-only selected step"
+            :run (workflow-run
+                  {:step-order ["/secret"]
+                   :current-step-id "/secret"
+                   :step-runs {"/secret" {:attempts [{:attempt-id "attempt-path"
+                                                      :status :execution-failed
+                                                      :execution-error {:reason :tool-failed
+                                                                        :message "request rejected"}}]}}
+                   :terminal-outcome {:step-id "/secret"}})
+            :expected {:reason :delegated-workflow-failed
+                       :message "Delegated workflow 'child' failed: request rejected"
+                       :delegate-failure {:source :execution-error
+                                          :run-id "child-run"
+                                          :target "child"
+                                          :reason :tool-failed
+                                          :step-id "/secret"
+                                          :attempt-id "attempt-path"}}}
+           {:label "credential-only selected step"
+            :run (workflow-run
+                  {:step-order ["token=secret"]
+                   :current-step-id "token=secret"
+                   :step-runs {"token=secret" {:attempts [{:attempt-id "attempt-token"
+                                                           :status :execution-failed
+                                                           :execution-error {:message "request rejected"}}]}}
+                   :terminal-outcome {:step-id "token=secret"}})
+            :expected {:reason :delegated-workflow-failed
+                       :message "Delegated workflow 'child' failed: request rejected"
+                       :delegate-failure {:source :execution-error
+                                          :run-id "child-run"
+                                          :target "child"
+                                          :step-id "token=secret"
+                                          :attempt-id "attempt-token"}}}
+           {:label "no selected step"
+            :run (workflow-run
+                  {:step-order []
+                   :step-runs {}
+                   :terminal-outcome {:reason :child-failed}})
+            :expected {:reason :delegated-workflow-failed
+                       :message "Delegated workflow 'child' failed: terminal outcome :child-failed"
+                       :delegate-failure {:source :terminal-outcome
+                                          :run-id "child-run"
+                                          :target "child"
+                                          :reason :child-failed}}}]]
+    (is (= expected
+           (delegated-failure/delegated-failure run "child-run" "child"))
+        label)))
+
 (deftest nested-delegated-failure-allowlist-test
   ;; Recognized nesting copies only immediate safe identity and reuses normal sanitization.
   (testing "copies valid optional identity independently and excludes unallowlisted child data"
