@@ -280,46 +280,46 @@
         (and (.startsWith ^String text "\\\\" index)
              (not (.startsWith ^String text "\\\\\\" index))))))
 
-(defn- exact-sensitive-suffix-starts
+(defn- first-exact-sensitive-suffix-start
   [text start end]
-  (loop [index start
-         starts #{}]
-    (if (>= index end)
-      starts
-      (let [separator? (contains? #{\\ \/} (.charAt ^String text index))
-            starts (if separator?
-                     (reduce (fn [result suffix]
-                               (let [suffix-start (- index (count suffix))]
-                                 (if (and (>= suffix-start start)
-                                          (.regionMatches ^String text true suffix-start suffix 0 (count suffix)))
-                                   (conj result suffix-start)
-                                   result)))
-                             starts
-                             [".ssh" "id_rsa"])
-                     starts)]
-        (recur (inc index) starts)))))
+  (loop [index start]
+    (when (< index end)
+      (if (contains? #{\\ \/} (.charAt ^String text index))
+        (if-let [suffix-start
+                 (some (fn [suffix]
+                         (let [suffix-start (- index (count suffix))]
+                           (when (and (>= suffix-start start)
+                                      (path-left-delimiter? text suffix-start)
+                                      (.regionMatches ^String text true suffix-start suffix 0 (count suffix)))
+                             suffix-start)))
+                       [".ssh" "id_rsa"])]
+          suffix-start
+          (recur (inc index)))
+        (recur (inc index))))))
 
 (defn- path-span-scanner
   [text]
   ;; A rejected run can only become sensitive at a later candidate when dropping
-  ;; its first-segment prefix exposes an exact .ssh or id_rsa segment.
+  ;; its first-segment prefix exposes an exact .ssh or id_rsa segment. The first
+  ;; such candidate consumes the rest of the run, so no later starts are needed.
   (let [cached-run (volatile! nil)]
     (fn [index]
       (when (path-left-delimiter? text index)
-        (let [{:keys [end exact-suffix-starts] :as cached} @cached-run
+        (let [{:keys [end exact-suffix-start] :as cached} @cached-run
               same-run? (and cached (< index end))
               end (if same-run? end (path-end-index text index))
               absolute? (absolute-path-prefix-at? text index)
               relative? (if same-run?
-                          (contains? exact-suffix-starts index)
+                          (= exact-suffix-start index)
                           (secret-bearing-relative-path?
                            (trim-path-punctuation (subs text index end))))
               candidate? (or absolute? relative?)]
           (when-not same-run?
             (vreset! cached-run
                      {:end end
-                      :exact-suffix-starts (when-not candidate?
-                                             (exact-sensitive-suffix-starts text index end))}))
+                      :exact-suffix-start (when-not candidate?
+                                            (first-exact-sensitive-suffix-start
+                                             text index end))}))
           (when candidate?
             (let [path (trim-path-punctuation (subs text index end))]
               (when (seq path) path))))))))

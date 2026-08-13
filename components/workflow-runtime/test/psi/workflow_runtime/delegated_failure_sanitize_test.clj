@@ -173,7 +173,10 @@
   (let [prefix (apply str (repeat 50000 ":"))
         input (str prefix " token=secret denied")]
     (is (= (str prefix " [REDACTED] denied")
-           (delegated-failure/sanitize-component input)))))
+           (delegated-failure/sanitize-component input))))
+  (let [rejected-prefix (apply str (repeat 10000 ":.ssh/"))]
+    (is (= ":[PATH_REDACTED]"
+           (delegated-failure/sanitize-component rejected-prefix)))))
 
 (deftest sanitize-component-boundary-test
   ;; The lexical scanner honours precedence, token minima, and span boundaries.
