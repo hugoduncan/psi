@@ -564,14 +564,11 @@
     (:text (sanitized-component text))))
 
 (defn actionable?
+  "True when sanitized public text retains a letter or digit outside placeholders."
   [text]
-  (and (string? text)
-       (let [remaining (reduce #(str/replace %1 %2 "") text placeholders)]
-         (loop [index 0]
-           (when (< index (.length ^String remaining))
-             (let [code-point (.codePointAt ^String remaining index)]
-               (or (Character/isLetterOrDigit code-point)
-                   (recur (+ index (Character/charCount code-point))))))))))
+  (boolean
+   (when (string? text)
+     (:actionable? (sanitized-component text)))))
 
 (defn- valid-step-id?
   [value]

@@ -476,10 +476,16 @@
       (is (= 512 (delegated-failure/code-point-count message)))
       (is (not (str/ends-with? message " ... [truncated]")))))
 
-  (testing "treats placeholder-only target, step, and cause text as non-actionable"
-    (is (not (delegated-failure/actionable? "[REDACTED_TOKEN]")))
-    (is (not (delegated-failure/actionable? "[PATH_REDACTED] [STACKTRACE_REDACTED]")))
-    (is (true? (delegated-failure/actionable? "[REDACTED] request rejected")))))
+  (testing "derives actionability from the same sanitized text used by production"
+    (doseq [[input expected]
+            [["[REDACTED_TOKEN]" false]
+             ["[PATH_REDACTED] [STACKTRACE_REDACTED]" false]
+             ["token=secret" false]
+             ["/secret" false]
+             ["[REDAC\u0000TED]" false]
+             ["token=secret request rejected" true]
+             ["[REDACTED] request rejected" true]]]
+      (is (= expected (delegated-failure/actionable? input)) input))))
 
 (deftest control-split-placeholder-actionability-test
   ;; Control removal cannot turn a placeholder into actionable public text.
