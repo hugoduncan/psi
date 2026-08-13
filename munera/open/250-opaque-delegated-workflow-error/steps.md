@@ -184,3 +184,7 @@
 ## Documentation re-review follow-ups
 
 - [x] Qualify the delegated-failure status claims in `README.md`, `doc/workflows.md`, and `ramora/workflow-ir/step-forms.md`: a failed child makes that parent delegate attempt execution-failed, but authored retry policy may supersede it and let the parent step/workflow succeed; the parent remains failed only when retries are exhausted. The current unconditional claims that the workflow, parent, or step "remains failed" contradict the preserved retry semantics.
+
+## Code-shaper review follow-ups
+
+- [ ] Make `delegated-failure/redact-spans` locally linear or bound its raw input before scanning. The current per-code-point loop repeatedly calls `(subs text index)` for `str/starts-with?` and each regex recognizer, materializing and rescanning the remaining suffix several times; an unbounded child `:execution-error :message` can therefore consume superlinear CPU/allocation before the 512-code-point public-message bound is applied. Preserve the exact lexical precedence and redaction contract with the existing table-driven tests, and add a large-input regression that exercises the chosen bound or single-pass scanner shape.
