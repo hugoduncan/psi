@@ -37,15 +37,17 @@ A failed child run produces this parent attempt `:execution-error` shape:
  :message <bounded public message>
  :delegate-failure
  {:source <one of :execution-error, :terminal-outcome, :fallback>
-  :reason <safe keyword or nil>
   :run-id <direct child run id>
   :target <delegated workflow name>
-  :step-id <selected child step id or nil>
-  :attempt-id <selected child attempt id or nil>
+  :reason <optional safe keyword>
+  :step-id <optional selected child step id>
+  :attempt-id <optional selected child attempt id>
   :nested-cause <optional immediate delegated-failure identity>}}
 ```
 
-`:nested-cause`, when present, contains only the immediate nested envelope's allowlisted `:reason`, `:run-id`, `:target`, `:step-id`, and `:attempt-id`. It never embeds another `:nested-cause` or causes traversal of another run.
+`:source`, `:run-id`, and `:target` are required in every persisted `:delegate-failure`. `:reason` is present only for a safe reason keyword, `:step-id` and `:attempt-id` are present only for valid nonblank string identities, and `:nested-cause` is present only for a recognized immediate envelope. An unavailable or invalid optional value is represented by omission; these keys are never persisted with nil values.
+
+`:nested-cause`, when present, contains only the immediate nested envelope's allowlisted `:run-id` and `:target`, plus `:reason`, `:step-id`, and `:attempt-id` only when each value satisfies the same rule as the parent envelope. It never embeds another `:nested-cause` or causes traversal of another run.
 
 A selected execution error is a canonical immediate nested envelope only when its outer `:reason` is exactly `:delegated-workflow-failed`, its `:message` is a nonblank string no longer than 512 Unicode code points, and its `:delegate-failure` is a map containing a valid `:source` plus nonblank string `:run-id` and `:target`. A valid `:source` is one of `:execution-error`, `:terminal-outcome`, or `:fallback`; `:step-id` and `:attempt-id` are optional nonblank strings, and `:reason` is an optional safe reason keyword as defined below. For a canonical immediate envelope, `:nested-cause :reason` comes from the inner `:delegate-failure :reason`, never from the outer `:execution-error :reason`; all identity fields likewise come from that same immediate inner map. Nil optional fields are omitted, its `:nested-cause` and every non-identity field are ignored, and no descendant run is read.
 
@@ -59,14 +61,16 @@ The envelope's `:message` is produced once at normalization time and is the only
 
 A **safe reason keyword** is a keyword read only from the selected execution error's `:reason`, the child `:terminal-outcome :reason`, or a recognized immediate `:delegate-failure :reason`. Its body (`name` or `namespace/name`, without the leading colon) must match `[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?` and contain at most 64 characters; rendering prepends exactly one colon (for example, `:iteration-limit-reached`). Other values are omitted rather than stringified. The only terminal numeric metadata permitted is `:iteration-count` and `:max-iterations`; each is rendered only when it is an integer from 0 through `Long/MAX_VALUE`. No other terminal-outcome field contributes text.
 
-For an execution-error source, the cause text is its string `:message`. For a terminal-outcome source, the exact cause text is `terminal outcome <printed-reason>` followed by ` (iteration <iteration-count> of <max-iterations>)` only when the reason is `:iteration-limit-reached` and both permitted counts are present. A terminal outcome without a safe reason is not actionable and falls back.
+An execution-error message is eligible only when its raw `:message` is a nonblank string and its result after steps 1–4 is actionable. Non-string and blank messages are ineligible. A redactable message remains eligible when safe letters or digits remain outside the placeholders (for example, `token=abc123 request rejected`); a message that becomes placeholders only is ineligible. An ineligible execution-error message does not force the generic fallback: selection continues to an actionable terminal outcome before falling back. For an eligible execution-error source, the sanitized message is the cause text.
 
-Sanitize the target, selected step, and cause separately with steps 1–4 below, then assemble and bound the public message with steps 5–6:
+For a terminal-outcome source, the exact cause text is `terminal outcome <printed-reason>` followed by ` (iteration <iteration-count> of <max-iterations>)` only when the reason is `:iteration-limit-reached` and both permitted counts are present. A terminal outcome without a safe reason is not actionable and falls back.
+
+Sanitize the target, selected step, and candidate cause separately with steps 1–4 below, using the resulting cause actionability to determine execution-error eligibility, then assemble and bound the public message with steps 5–6:
 
 1. Remove NUL and non-whitespace control characters. Replace each Java/Clojure-style stack-frame fragment (`at namespace-or-class(method-or-file:line)`) with `[STACKTRACE_REDACTED]`. Replace POSIX absolute or home-relative paths, Windows drive/UNC paths, `./` or `../` relative paths, and other relative paths having a segment that contains `secret`, `token`, `password`, `credential`, `.ssh`, or `id_rsa` (case-insensitive) with `[PATH_REDACTED]`.
 2. Replace an entire credential-looking key/value pair whose key contains `token`, `secret`, `password`, `credential`, or `api-key`/`api_key` with `[REDACTED]`; replace an entire bearer-token expression or standalone `sk-`/`pk-` token-looking value with `[REDACTED_TOKEN]`. Only the placeholder remains; neither the matched label nor secret value is observable.
 3. Convert every whitespace run, including line breaks and tabs, to one ASCII space and trim leading/trailing whitespace.
-4. A sanitized component is actionable only if text outside the four placeholders `[STACKTRACE_REDACTED]`, `[PATH_REDACTED]`, `[REDACTED]`, and `[REDACTED_TOKEN]` contains a Unicode letter or digit. If the cause is not actionable, use the fallback and `:source :fallback`.
+4. A sanitized component is actionable only if text outside the four placeholders `[STACKTRACE_REDACTED]`, `[PATH_REDACTED]`, `[REDACTED]`, and `[REDACTED_TOKEN]` contains a Unicode letter or digit. A non-actionable execution-error candidate is ineligible and selection continues to the terminal outcome; use the fallback and `:source :fallback` only if no actionable candidate remains.
 5. Escape each backslash and apostrophe in the sanitized target and step with a preceding backslash. Format an actionable cause exactly as `Delegated workflow '<target>' failed at step '<step>': <cause>` when the sanitized step is actionable under step 4, or `Delegated workflow '<target>' failed: <cause>` otherwise. The direct delegated target is required by this boundary; if it is not actionable under step 4, use the fallback.
 6. If the formatted message exceeds 512 Unicode code points, retain its first 496 code points and append the exact 16-character marker ` ... [truncated]`. Thus the persisted canonical message, including its marker, is never longer than 512 code points. Redaction and whitespace normalization always precede truncation, so truncation cannot reveal a partial secret or create a second normalization result.
 
@@ -82,9 +86,9 @@ For a child whose status is `:failed`:
 
 1. Select the terminal child step by `:terminal-outcome :step-id` when it names a real child step; otherwise use the child's `:current-step-id` when valid; otherwise choose the last step in effective `:step-order` whose latest attempt has `:status :execution-failed`. Do not depend on map iteration order.
 2. Within that step, select the attempt named by `:terminal-outcome :attempt-id` when it belongs to the step; otherwise select the latest attempt in its ordered attempt vector.
-3. If that selected attempt has a safe nonblank `:execution-error :message`, choose it and set `:source :execution-error`. Earlier failed retry attempts are history and cannot override the terminal attempt.
-4. Otherwise, if `:terminal-outcome` has a safe reason, render its allowlisted fields and set `:source :terminal-outcome`.
-5. Otherwise use `:source :fallback` and the generic fallback message.
+3. If that selected attempt's `:execution-error :message` is a nonblank string, sanitize it through public-message steps 1–4. Choose it and set `:source :execution-error` only when the sanitized result is actionable. Non-string, blank, and sanitized-nonactionable messages are ineligible; redactable messages with remaining actionable text are eligible. Earlier failed retry attempts are history and cannot override the terminal attempt.
+4. When the selected execution-error message is ineligible or absent, if `:terminal-outcome` has a safe reason, render its allowlisted fields and set `:source :terminal-outcome`.
+5. Only when neither candidate is actionable, or when the required target is non-actionable after sanitization, use `:source :fallback` and the generic fallback message.
 
 If the selected execution error is a canonical delegated-failure envelope, re-sanitize its bounded message and copy only its immediate allowlisted identity into `:nested-cause`. Do not recursively unwrap envelopes or traverse descendant runs. This keeps selection deterministic and bounded while preserving actionable nested context.
 
@@ -97,6 +101,7 @@ After propagation:
 - Existing retry policy still decides whether the parent delegate step is attempted again; a superseded attempt's error is not selected as the terminal public cause.
 - Failure produces no accepted result. `psi.workflow/execute-run` continues to return `:psi.workflow/result nil`.
 - `:psi.workflow/error` equals the canonical terminal parent attempt envelope's `:message`; projection must select the terminal step/latest terminal attempt rather than the first historical step error.
+- If `psi.workflow/resume-run` resumes a blocked run that then fails at a delegate step, it returns that same terminal-attempt message in `:psi.workflow/error`, using the same terminal step/latest terminal attempt selection so pre-resume and superseded retry history cannot win. The resume mutation retains its existing response shape and does not acquire a `:psi.workflow/result` field.
 - The synchronous registered `delegate` tool renders `Error: <same message>` and does not synthesize a success result.
 - The async completion record's `:error` and background-job payload's `:error` each equal the canonical message. Notification text embeds that message unchanged exactly once as `Workflow '<workflow-name>' <status>: <message> (run <run-id>)`; append-entry text embeds it unchanged exactly once in the heading `Workflow '<workflow-name>' — <status>: <message> (run <run-id>)`, before any existing optional result section. The wrapper text is not itself subject to the 512-character envelope bound, and no projection re-sanitizes or otherwise normalizes the message.
 - Blocked children remain blocked delegation outcomes, and cancelled or removed children retain their existing cancellation/removal messages. This task does not reclassify those outcomes as failed-child diagnostics.
@@ -127,3 +132,4 @@ After propagation:
 6. Public messages follow the exact prefix, terminal rendering, allowlists, redaction order, fallback rule, and ` ... [truncated]` bound above. Tests cover stack frames, local and secret-bearing paths, credentials, bearer/API tokens, placeholder-only fallback, and the 512-code-point boundary. Disallowed exception, operation, provider, session, transcript, judge-output, and last-result fields are absent from the parent envelope.
 7. The registered synchronous `delegate` tool exposes `Error: <the same actionable message>` at its provider-facing result boundary. Async completion/background-job `:error` fields equal that message; notification and append-entry text embed it unchanged in their existing context wrappers.
 8. Existing successful, blocked, cancelled, removed, retry, and result behavior remains unchanged; focused regression tests and the relevant workflow/agent-session suites pass.
+9. When a blocked run is resumed and then terminalizes with a delegated failure, `psi.workflow/resume-run` returns `:failed` and the selected canonical terminal-attempt message in `:psi.workflow/error`; pre-resume or superseded retry errors cannot win, and the mutation still has no `:psi.workflow/result` field.

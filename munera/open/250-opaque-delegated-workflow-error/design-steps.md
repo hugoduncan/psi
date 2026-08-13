@@ -66,7 +66,7 @@
       or malformed immediate envelope. This avoids two valid interpretations of
       the one-level non-recursive nesting contract.
 
-- [ ] Define execution-error eligibility and fallback precedence around
+- [x] Define execution-error eligibility and fallback precedence around
       sanitization. "Safe nonblank `:execution-error :message`" is undefined and
       can mean either that any nonblank string is selected before sanitization or
       that safety/actionability is tested first. Those readings differ when a raw
@@ -76,7 +76,7 @@
       non-string, blank, redactable-but-actionable, and sanitized-nonactionable
       messages.
 
-- [ ] Specify the observable delegated-failure contract for the in-scope
+- [x] Specify the observable delegated-failure contract for the in-scope
       `psi.workflow/resume-run` path. Scope requires projection through
       execute/resume, but the parent-visible contract and acceptance criteria
       prove only `psi.workflow/execute-run`. State whether a resumed run that
@@ -87,7 +87,7 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
-- [ ] Reconcile the canonical envelope's nil-versus-omitted optional fields. The
+- [x] Reconcile the canonical envelope's nil-versus-omitted optional fields. The
       envelope shape currently shows `:reason`, `:step-id`, and `:attempt-id`
       present with nil when unavailable, while immediate-envelope recognition
       says those fields are optional nonblank values and nil optional fields are
