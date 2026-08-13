@@ -160,11 +160,12 @@
       (is (= sanitized (delegated-failure/sanitize-component sanitized))))))
 
 (deftest sanitize-component-large-input-test
-  ;; Scanning a large ordinary prefix remains practical without suffix copies.
-  (let [prefix (apply str (repeat 50000 "x"))
-        input (str prefix " token=secret denied")]
-    (is (= (str prefix " [REDACTED] denied")
-           (delegated-failure/sanitize-component input)))))
+  ;; Large prefixes remain practical, including credential-key characters at every position.
+  (doseq [prefix [(apply str (repeat 50000 "x"))
+                  (apply str (repeat 50000 "."))]]
+    (let [input (str prefix " token=secret denied")]
+      (is (= (str prefix " [REDACTED] denied")
+             (delegated-failure/sanitize-component input))))))
 
 (deftest sanitize-component-boundary-test
   ;; The lexical scanner honours precedence, token minima, and span boundaries.

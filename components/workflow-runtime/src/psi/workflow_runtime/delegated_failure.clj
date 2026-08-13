@@ -106,8 +106,93 @@
 (def ^:private stack-frame-pattern
   #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
 
-(def ^:private credential-pattern
-  #"(?U)(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\[\s\S]|[^\"\\])+\"|'(?:\\[\s\S]|[^'\\])+'|[^\s,;\)\]\}'\"][^\s,;\)\]\}]*)")
+(def ^:private credential-key-fragments
+  ["token" "secret" "password" "credential" "api-key" "api_key"])
+
+(defn- credential-key-character?
+  [character]
+  (let [code-point (int character)]
+    (or (<= (int \A) code-point (int \Z))
+        (<= (int \a) code-point (int \z))
+        (<= (int \0) code-point (int \9))
+        (contains? #{(int \_) (int \.) (int \-)} code-point))))
+
+(defn- credential-key-end
+  [text start]
+  (loop [index start]
+    (if (and (< index (.length ^String text))
+             (credential-key-character? (.charAt ^String text index)))
+      (recur (inc index))
+      index)))
+
+(defn- credential-key?
+  [text start end]
+  (let [key (str/lower-case (subs text start end))]
+    (some #(str/includes? key %) credential-key-fragments)))
+
+(defn- skip-ascii-space
+  [text start]
+  (loop [index start]
+    (if (and (< index (.length ^String text))
+             (contains? #{\space \tab} (.charAt ^String text index)))
+      (recur (inc index))
+      index)))
+
+(defn- separator-end
+  [text index]
+  (cond
+    (.startsWith ^String text "=>" index) (+ index 2)
+    (.startsWith ^String text "=" index) (inc index)
+    (.startsWith ^String text ":" index) (inc index)))
+
+(defn- quote-end-indexes
+  [text quote]
+  (let [length (.length ^String text)
+        unescaped-quotes (boolean-array length)
+        indexes (int-array (inc length))]
+    (loop [index 0
+           backslashes 0]
+      (when (< index length)
+        (let [character (.charAt ^String text index)]
+          (when (and (= quote character) (even? backslashes))
+            (aset-boolean unescaped-quotes index true))
+          (recur (inc index)
+                 (if (= \\ character) (inc backslashes) 0)))))
+    (loop [index (dec length)
+           next-index -1]
+      (if (neg? index)
+        indexes
+        (let [next-index (if (aget unescaped-quotes index) index next-index)]
+          (aset-int indexes index next-index)
+          (recur (dec index) next-index))))))
+
+(defn- unquoted-credential-end
+  [text start]
+  (loop [index start]
+    (if (>= index (.length ^String text))
+      index
+      (let [code-point (.codePointAt ^String text index)]
+        (if (or (whitespace-code-point? code-point)
+                (contains? #{(int \,) (int \;) (int \)) (int \]) (int \})}
+                           code-point))
+          index
+          (recur (+ index (Character/charCount code-point))))))))
+
+(defn- credential-span
+  [text start key-end quote-indexes]
+  (when (credential-key? text start key-end)
+    (let [separator-start (skip-ascii-space text key-end)]
+      (when-let [separator-end (separator-end text separator-start)]
+        (let [value-start (skip-ascii-space text separator-end)]
+          (when (< value-start (.length ^String text))
+            (let [quote (.charAt ^String text value-start)]
+              (if (contains? #{\' \"} quote)
+                (let [quote-end (aget ^ints (get quote-indexes quote) (inc value-start))]
+                  (when (> quote-end (inc value-start))
+                    (subs text start (inc quote-end))))
+                (let [value-end (unquoted-credential-end text value-start)]
+                  (when (> value-end value-start)
+                    (subs text start value-end)))))))))))
 
 (def ^:private bearer-pattern
   #"(?i)^Bearer[ \t]+[A-Za-z0-9._~+/-]{8,}={0,2}")
@@ -189,15 +274,23 @@
 
 (defn- redact-spans
   [text]
-  (let [builder (StringBuilder.)]
-    (loop [index 0]
+  (let [builder (StringBuilder.)
+        quote-indexes {\' (quote-end-indexes text \')
+                       \" (quote-end-indexes text \")}]
+    (loop [index 0
+           checked-credential-key-end 0]
       (if (>= index (.length ^String text))
         (str builder)
         (let [stack-frame (when (and (left-boundary? text index unicode-word-or-underscore?)
                                      (.startsWith ^String text "at" index))
                             (span-match stack-frame-pattern text index))
-              credential (when (left-boundary? text index ascii-key-delimiter?)
-                           (span-match credential-pattern text index))
+              credential-start? (and (>= index checked-credential-key-end)
+                                     (left-boundary? text index ascii-key-delimiter?))
+              credential-key-end (if credential-start?
+                                   (credential-key-end text index)
+                                   checked-credential-key-end)
+              credential (when credential-start?
+                           (credential-span text index credential-key-end quote-indexes))
               bearer (when (left-boundary? text index ascii-key-delimiter?)
                        (bearer-token-span text index))
               prefixed-token (when (left-boundary? text index token-character?)
@@ -212,10 +305,11 @@
           (if span
             (do
               (.append builder replacement)
-              (recur (+ index (.length ^String span))))
+              (recur (+ index (.length ^String span)) credential-key-end))
             (let [code-point (.codePointAt ^String text index)]
               (.appendCodePoint builder code-point)
-              (recur (+ index (Character/charCount code-point))))))))))
+              (recur (+ index (Character/charCount code-point))
+                     credential-key-end))))))))
 
 (defn- normalize-whitespace
   [text]
