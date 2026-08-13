@@ -142,3 +142,8 @@
 
 - [x] Replace the sampled `safe-reason-test` assertions with or supplement them by a table-driven exact grammar and length-boundary matrix for safe reason keywords. Prove that a 64-character body is accepted and a 65-character body is rejected; cover valid leading letters/digits, allowed interior `.`, `_`, and `-`, one optional namespace slash, and invalid empty components, leading punctuation, disallowed characters, and multiple slashes. Assert both `safe-reason?` and the resulting envelope reason/message behavior so acceptance criterion 6's public reason allowlist cannot regress while the helper alone remains green.
   - The exact matrix now asserts helper validity and complete terminal-outcome/fallback envelopes for all requested grammar partitions and both length boundaries.
+
+## Current test re-review follow-ups
+
+- [ ] Add credential-pair sanitizer cases for unterminated single- and double-quoted values, including escaped trailing content, and assert the complete input remains unredacted. The design explicitly makes unterminated quoted values non-matches, but the current matrix covers empty and valid escaped quoted values only.
+- [ ] Strengthen the over-512 public-message test to assert the exact output equals the first 496 Unicode code points of the fully assembled message plus ` ... [truncated]`, including a supplementary-code-point boundary case. The current assertions check only total code-point count and suffix, so an incorrect retained-prefix length or content could still pass acceptance criterion 6's exact truncation rule.
