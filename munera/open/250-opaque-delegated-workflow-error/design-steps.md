@@ -68,6 +68,17 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
+- [ ] Reconcile the parent-visible claim that async completion, background-job,
+      notification, and append-entry projections "reuse the same error string"
+      with their current public shapes. Completion/background-job payloads carry
+      the canonical string as an `:error` value, but notification and append-entry
+      text embed it inside workflow/status/run context via
+      `completion-notification-text` and `completion-entry-content`; they cannot
+      all be exactly equal to the 512-character envelope message. State per
+      surface whether equality applies to a structured `:error` field or whether
+      the canonical message is embedded unchanged in surrounding projection text,
+      and make the acceptance wording match without introducing new normalization.
+
 - [x] Reconcile the design's blanket claim that delegated failure details are
       "swallowed" with the current two-path behavior. For a failed child run,
       `delegate-run-runtime-result` preserves `:terminal-outcome` under the parent

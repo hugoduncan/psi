@@ -5,3 +5,4 @@
 - design follow-up completed all 6 items from baseline `7b34cbc9d`: `sync delegate tool → psi.workflow/execute-run → workflow execution → delegate-step normalization`. Important implementation detail: `workflow-execution/execution-result` currently emits every attempt and `run-failure-error` uses the first non-nil error, so propagation must select the terminal step/attempt explicitly or a superseded retry error can win. The reusable redaction precedent is `ui-capabilities/redact-diagnostic-text`, but workflow-runtime cannot depend on agent-session; keep the new normalizer in the lower runtime boundary.
 - no new architectural review feedback
 - ambiguity review added 2 new design steps
+- inconsistency review added 1 new design step
