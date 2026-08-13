@@ -330,6 +330,97 @@
                                  :target "child"}}
              (delegated-failure/delegated-failure run "run-absent" "child"))))))
 
+(deftest delegated-failure-invalid-terminal-identities-test
+  ;; Malformed terminal metadata cannot override canonical step and attempt selection.
+  (testing "falls through invalid terminal identities deterministically"
+    (doseq [{:keys [label run expected]}
+            [{:label "unknown terminal step selects the valid current step"
+              :run (workflow-run
+                    {:step-order ["first" "current"]
+                     :current-step-id "current"
+                     :step-runs {"current" {:attempts [{:attempt-id "current-latest"
+                                                        :status :execution-failed
+                                                        :execution-error {:reason :current-failure
+                                                                          :message "current failure"}}]}
+                                 "first" {:attempts [{:attempt-id "first-attempt"
+                                                      :status :execution-failed
+                                                      :execution-error {:message "first failure"}}]}}
+                     :terminal-outcome {:step-id "unknown"}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'current': current failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :current-failure
+                                            :step-id "current"
+                                            :attempt-id "current-latest"}}}
+             {:label "invalid terminal and current steps select the last failed effective step"
+              :run (workflow-run
+                    {:step-order ["first" "last"]
+                     :current-step-id 42
+                     :step-runs {"last" {:attempts [{:attempt-id "last-latest"
+                                                     :status :execution-failed
+                                                     :execution-error {:reason :last-failure
+                                                                       :message "last failure"}}]}
+                                 "first" {:attempts [{:attempt-id "first-attempt"
+                                                      :status :execution-failed
+                                                      :execution-error {:message "first failure"}}]}}
+                     :terminal-outcome {:step-id [:invalid]}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'last': last failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :last-failure
+                                            :step-id "last"
+                                            :attempt-id "last-latest"}}}
+             {:label "unknown terminal attempt selects the selected step's latest attempt"
+              :run (workflow-run
+                    {:step-order ["build"]
+                     :current-step-id "build"
+                     :step-runs {"build" {:attempts [{:attempt-id "build-old"
+                                                      :status :execution-failed
+                                                      :execution-error {:message "old failure"}}
+                                                     {:attempt-id "build-latest"
+                                                      :status :execution-failed
+                                                      :execution-error {:reason :latest-failure
+                                                                        :message "latest failure"}}]}}
+                     :terminal-outcome {:step-id "build" :attempt-id "unknown"}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'build': latest failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :latest-failure
+                                            :step-id "build"
+                                            :attempt-id "build-latest"}}}
+             {:label "another step's terminal attempt cannot override the selected step"
+              :run (workflow-run
+                    {:step-order ["build" "publish"]
+                     :current-step-id "build"
+                     :step-runs {"publish" {:attempts [{:attempt-id "publish-only"
+                                                        :status :execution-failed
+                                                        :execution-error {:message "publish failure"}}]}
+                                 "build" {:attempts [{:attempt-id "build-old"
+                                                      :status :execution-failed
+                                                      :execution-error {:message "old failure"}}
+                                                     {:attempt-id "build-latest"
+                                                      :status :execution-failed
+                                                      :execution-error {:reason :latest-failure
+                                                                        :message "latest failure"}}]}}
+                     :terminal-outcome {:step-id "build" :attempt-id "publish-only"}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'build': latest failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :latest-failure
+                                            :step-id "build"
+                                            :attempt-id "build-latest"}}}]]
+      (is (= expected
+             (delegated-failure/delegated-failure run "child-run" "child"))
+          label))))
+
 (deftest delegated-failure-message-contract-test
   ;; Public assembly keeps useful text while preserving the exact bounded grammar.
   (testing "uses an actionable redacted cause and escapes target and step identities"
