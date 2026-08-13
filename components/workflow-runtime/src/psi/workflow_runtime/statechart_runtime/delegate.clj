@@ -3,6 +3,7 @@
    [psi.workflow-coordination.stop-signal :as stop-signal]
    [psi.workflow-step-materialization.source-resolution :as workflow-source-resolution]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.delegated-failure :as delegated-failure]
    [psi.workflow-runtime.terminal-contract :as workflow-terminal-contract]
    [psi.workflow-registry.registry :as registry]))
 
@@ -60,11 +61,7 @@
 
       :failed
       {:pending-kind :failure
-       :payload {:message "Delegated workflow failed"
-                 :delegate-run-id delegate-run-id
-                 :target target-name
-                 :details (or (:terminal-outcome delegate-run)
-                              {:status (:status delegate-run)})}}
+       :payload (delegated-failure/delegated-failure delegate-run delegate-run-id target-name)}
 
       :cancelled
       {:pending-kind :failure
