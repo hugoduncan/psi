@@ -189,10 +189,16 @@
     (doseq [separator ["/" "\\"]]
       (let [delimiter-runs-before-late-path
             (str (apply str (repeat 16000 "x ")) separator "tail")
-            sanitized (delegated-failure/sanitize-component
-                       delimiter-runs-before-late-path)]
-        (is (= 512 (delegated-failure/code-point-count sanitized)))
-        (is (= (apply str (take 512 (cycle "x "))) sanitized)))))
+            {:keys [text path-separator-scan-steps
+                    path-separator-query-count]}
+            (delegated-failure/sanitize-component-analysis
+             delimiter-runs-before-late-path)]
+        (is (= 512 (delegated-failure/code-point-count text)))
+        (is (= (apply str (take 512 (cycle "x "))) text))
+        (is (= (count delimiter-runs-before-late-path)
+               path-separator-scan-steps))
+        (is (<= path-separator-query-count
+                (count delimiter-runs-before-late-path))))))
   (let [late-actionable-message (str (apply str (repeat 5000 "token=secret "))
                                      "request denied")
         run (workflow-run
