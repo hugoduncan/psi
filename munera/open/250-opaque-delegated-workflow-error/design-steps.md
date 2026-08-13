@@ -48,6 +48,24 @@
       with no safe actionable cause). The current design mentions both `:error`
       and `:result nil` but only explicitly proposes changing `:error`.
 
+- [ ] Make the canonical public-message normalization contract testable and
+      singular. Define the exact target/step prefix and terminal-outcome rendering,
+      the allowlist behind "safe keyword" and "bounded numeric/count metadata",
+      the observable treatment of stack frames and local/secret-bearing paths,
+      the normalization/redaction/truncation order, and the exact truncation marker
+      (including how it fits within 512 characters). Behavioural examples may
+      define the contract without prescribing implementation regexes. As written,
+      conforming implementations can persist different messages or disagree on
+      whether unsafe input falls back.
+
+- [ ] Define the exact source and shape of `:nested-cause` identity. A delegated
+      execution error has both outer `:execution-error :reason`
+      (`:delegated-workflow-failed`) and inner `:delegate-failure :reason`; state
+      which one is copied, confirm that run/target/step/attempt fields come from
+      the immediate inner `:delegate-failure`, and define behaviour for a partial
+      or malformed immediate envelope. This avoids two valid interpretations of
+      the one-level non-recursive nesting contract.
+
 # Design steps — inconsistency review (design-review session, turn 3)
 
 - [x] Reconcile the design's blanket claim that delegated failure details are
