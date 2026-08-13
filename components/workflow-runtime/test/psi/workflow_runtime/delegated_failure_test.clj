@@ -311,6 +311,33 @@
                                  :attempt-id "attempt-1"}}
              (:payload result))))))
 
+(deftest execution-error-reason-source-isolation-test
+  ;; An actionable execution error owns its source without borrowing terminal metadata.
+  (testing "omits unsafe or absent execution reasons despite a safe terminal reason"
+    (doseq [{:keys [label execution-error]}
+            [{:label "unsafe execution reason"
+              :execution-error {:reason (keyword "!unsafe")
+                                :message "tool timed out"}}
+             {:label "absent execution reason"
+              :execution-error {:message "tool timed out"}}]]
+      (let [run (workflow-run
+                 {:step-order ["build"]
+                  :current-step-id "build"
+                  :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                                   :status :execution-failed
+                                                   :execution-error execution-error}]}}
+                  :terminal-outcome {:reason :iteration-limit-reached
+                                     :step-id "build"}})]
+        (is (= {:reason :delegated-workflow-failed
+                :message "Delegated workflow 'child' failed at step 'build': tool timed out"
+                :delegate-failure {:source :execution-error
+                                   :run-id "child-run"
+                                   :target "child"
+                                   :step-id "build"
+                                   :attempt-id "attempt-1"}}
+               (delegated-failure/delegated-failure run "child-run" "child"))
+            label)))))
+
 (deftest nested-delegated-failure-test
   ;; Nested metadata is one-level, allowlisted identity only.
   (testing "copies independently valid immediate nested fields without recursion"
@@ -701,6 +728,26 @@
 
 (deftest nested-envelope-recognition-boundary-test
   ;; Every required nested-envelope field must be valid before identity is copied.
+  (testing "recognizes the inclusive 512-code-point message boundary"
+    (let [nested-message (apply str (repeat 512 "a"))
+          nested {:reason :delegated-workflow-failed
+                  :message nested-message
+                  :delegate-failure {:source :execution-error
+                                     :run-id "grandchild-run"
+                                     :target "grandchild"}}
+          run (workflow-run
+               {:step-order ["delegate"]
+                :current-step-id "delegate"
+                :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                    :status :execution-failed
+                                                    :execution-error nested}]}}
+                :terminal-outcome {:step-id "delegate"}})
+          result (delegated-failure/delegated-failure run "child-run" "child")]
+      (is (= {:run-id "grandchild-run"
+              :target "grandchild"}
+             (get-in result [:delegate-failure :nested-cause])))
+      (is (= :execution-error (get-in result [:delegate-failure :source])))))
+
   (testing "treats each malformed required condition as ordinary untrusted error text"
     (let [valid-failure {:source :execution-error
                          :run-id "grandchild-run"
