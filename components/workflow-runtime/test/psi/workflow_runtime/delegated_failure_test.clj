@@ -121,6 +121,10 @@
              ["token=" "token="]
              ["token=\"\"" "token=\"\""]
              ["credential=''" "credential=''"]
+             ["token=\"abc" "token=\"abc"]
+             ["credential='abc" "credential='abc"]
+             ["token=\"abc\\\"def" "token=\"abc\\\"def"]
+             ["credential='abc\\'def" "credential='abc\\'def"]
              ["tokenish=abc" "[REDACTED]"]
              ["x-token=abc" "[REDACTED]"]
              ["sk-abcdefgh, denied" "[REDACTED_TOKEN], denied"]
@@ -264,8 +268,14 @@
                                  :attempt-id "attempt-1"}}
              (delegated-failure/delegated-failure run "run-4" "/secret")))))
 
-  (testing "bounds a Unicode cause by code points rather than UTF-16 units"
-    (let [cause (apply str (repeat 600 "𐐀"))
+  (testing "retains exactly the first 496 Unicode code points before truncation"
+    (let [prefix "Delegated workflow 'child' failed at step 'build': "
+          supplementary "𐐀"
+          cause (apply str (repeat 600 supplementary))
+          expected (str prefix
+                        (apply str (repeat (- 496 (delegated-failure/code-point-count prefix))
+                                           supplementary))
+                        " ... [truncated]")
           run (workflow-run
                {:step-order ["build"]
                 :current-step-id "build"
@@ -274,8 +284,8 @@
                                                  :execution-error {:message cause}}]}}
                 :terminal-outcome {:step-id "build"}})
           result (delegated-failure/delegated-failure run "run-5" "child")]
-      (is (= 512 (delegated-failure/code-point-count (:message result))))
-      (is (str/ends-with? (:message result) " ... [truncated]")))))
+      (is (= expected (:message result)))
+      (is (= 512 (delegated-failure/code-point-count (:message result)))))))
 
 (deftest delegate-boundary-failed-child-test
   ;; The runtime persists the lower-runtime envelope as the parent failure payload.

@@ -145,5 +145,7 @@
 
 ## Current test re-review follow-ups
 
-- [ ] Add credential-pair sanitizer cases for unterminated single- and double-quoted values, including escaped trailing content, and assert the complete input remains unredacted. The design explicitly makes unterminated quoted values non-matches, but the current matrix covers empty and valid escaped quoted values only.
-- [ ] Strengthen the over-512 public-message test to assert the exact output equals the first 496 Unicode code points of the fully assembled message plus ` ... [truncated]`, including a supplementary-code-point boundary case. The current assertions check only total code-point count and suffix, so an incorrect retained-prefix length or content could still pass acceptance criterion 6's exact truncation rule.
+- [x] Add credential-pair sanitizer cases for unterminated single- and double-quoted values, including escaped trailing content, and assert the complete input remains unredacted. The design explicitly makes unterminated quoted values non-matches, but the current matrix covers empty and valid escaped quoted values only.
+  - The sanitizer matrix now preserves complete unterminated single- and double-quoted inputs, including escaped quote content without a closing delimiter.
+- [x] Strengthen the over-512 public-message test to assert the exact output equals the first 496 Unicode code points of the fully assembled message plus ` ... [truncated]`, including a supplementary-code-point boundary case. The current assertions check only total code-point count and suffix, so an incorrect retained-prefix length or content could still pass acceptance criterion 6's exact truncation rule.
+  - The boundary proof now compares the exact assembled prefix plus supplementary-code-point content through code point 496 and the exact truncation marker.
