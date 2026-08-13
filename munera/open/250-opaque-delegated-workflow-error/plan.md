@@ -147,6 +147,11 @@ table-tested without sessions or adapters.
   attempt while allowing only the iteration reason/counts into the parent
   envelope; judge session and last-result text remain excluded.
 
+- Final test-shaper follow-up removes the private separator-scanner interaction
+  assertion from the default suite. Public slash/backslash sanitizer outputs remain
+  covered there, while `bb benchmark:delegated-failure-sanitizer` now guards the
+  complete public path against quadratic scaling in an explicit opt-in layer.
+
 - Slice 2 regression proof now establishes that nonfailed child outcomes retain
   their exact boundary contracts: completed output/diagnostics merge, blocked
   payload, and cancelled/removed failures remain unchanged. Existing state-based

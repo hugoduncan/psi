@@ -451,7 +451,7 @@
         (recur (next-visible-index text index))))))
 
 (defn- path-separator-scanner
-  [^CharSequence text]
+  [^String text]
   ;; Index both separator families while examining each raw input position once.
   ;; Queries compare cached indexes and therefore examine no additional input.
   (let [[last-slash last-backslash]
