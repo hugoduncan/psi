@@ -160,7 +160,11 @@
       (is (= sanitized (delegated-failure/sanitize-component sanitized))))))
 
 (deftest sanitize-component-large-input-test
-  ;; Large prefixes remain practical, including credential-key characters at every position.
+  ;; Large unquoted inputs avoid eager quote metadata while candidate-heavy
+  ;; prefixes retain linear scanning and reach a trailing credential.
+  (let [plain-input (apply str (repeat 250000 "x"))]
+    (is (= plain-input
+           (delegated-failure/sanitize-component plain-input))))
   (doseq [prefix [(apply str (repeat 50000 "x"))
                   (apply str (repeat 50000 "."))]]
     (let [input (str prefix " token=secret denied")]

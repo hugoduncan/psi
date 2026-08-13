@@ -145,26 +145,34 @@
     (.startsWith ^String text "=" index) (inc index)
     (.startsWith ^String text ":" index) (inc index)))
 
-(defn- quote-end-indexes
+(defn- quote-end-scanner
   [text quote]
-  (let [length (.length ^String text)
-        unescaped-quotes (boolean-array length)
-        indexes (int-array (inc length))]
-    (loop [index 0
-           backslashes 0]
-      (when (< index length)
-        (let [character (.charAt ^String text index)]
-          (when (and (= quote character) (even? backslashes))
-            (aset-boolean unescaped-quotes index true))
-          (recur (inc index)
-                 (if (= \\ character) (inc backslashes) 0)))))
-    (loop [index (dec length)
-           next-index -1]
-      (if (neg? index)
-        indexes
-        (let [next-index (if (aget unescaped-quotes index) index next-index)]
-          (aset-int indexes index next-index)
-          (recur (dec index) next-index))))))
+  ;; Credential candidates arrive left-to-right, so a constant-size cursor can
+  ;; find each requested closing quote while traversing the input at most once.
+  (let [cursor (int-array 1)
+        backslashes (int-array 1)]
+    (fn [opening-index]
+      (loop [index (aget cursor 0)
+             backslash-count (aget backslashes 0)]
+        (if (>= index (.length ^String text))
+          (do
+            (aset-int cursor 0 index)
+            (aset-int backslashes 0 backslash-count)
+            -1)
+          (let [character (.charAt ^String text index)
+                unescaped-closing? (and (> index opening-index)
+                                        (= quote character)
+                                        (even? backslash-count))
+                next-backslash-count (if (= \\ character)
+                                       (inc backslash-count)
+                                       0)
+                next-index (inc index)]
+            (if unescaped-closing?
+              (do
+                (aset-int cursor 0 next-index)
+                (aset-int backslashes 0 next-backslash-count)
+                index)
+              (recur next-index next-backslash-count))))))))
 
 (defn- unquoted-credential-end
   [text start]
@@ -179,7 +187,7 @@
           (recur (+ index (Character/charCount code-point))))))))
 
 (defn- credential-span
-  [text start key-end quote-indexes]
+  [text start key-end quote-end-scanners]
   (when (credential-key? text start key-end)
     (let [separator-start (skip-ascii-space text key-end)]
       (when-let [separator-end (separator-end text separator-start)]
@@ -187,7 +195,7 @@
           (when (< value-start (.length ^String text))
             (let [quote (.charAt ^String text value-start)]
               (if (contains? #{\' \"} quote)
-                (let [quote-end (aget ^ints (get quote-indexes quote) (inc value-start))]
+                (let [quote-end ((get quote-end-scanners quote) value-start)]
                   (when (> quote-end (inc value-start))
                     (subs text start (inc quote-end))))
                 (let [value-end (unquoted-credential-end text value-start)]
@@ -275,8 +283,8 @@
 (defn- redact-spans
   [text]
   (let [builder (StringBuilder.)
-        quote-indexes {\' (quote-end-indexes text \')
-                       \" (quote-end-indexes text \")}]
+        quote-end-scanners {\' (quote-end-scanner text \')
+                            \" (quote-end-scanner text \")}]
     (loop [index 0
            checked-credential-key-end 0]
       (if (>= index (.length ^String text))
@@ -290,7 +298,7 @@
                                    (credential-key-end text index)
                                    checked-credential-key-end)
               credential (when credential-start?
-                           (credential-span text index credential-key-end quote-indexes))
+                           (credential-span text index credential-key-end quote-end-scanners))
               bearer (when (left-boundary? text index ascii-key-delimiter?)
                        (bearer-token-span text index))
               prefixed-token (when (left-boundary? text index token-character?)
