@@ -17,7 +17,7 @@
 - [ ] Add exact-map selection/envelope tests for execution errors, iteration-limit terminal outcomes with latest-attempt identity, cause-less fallback, non-actionable-target fallback, scrambled step maps, terminal retries, mixed-validity nested metadata, invalid nested required fields, and forbidden-field exclusion.
   - Proof covers explicit terminal-attempt selection, effective-step-order fallback under scrambled step maps, terminal/latest retry selection, iteration-limit latest identity, cause-less fallback with omitted unavailable identity, non-actionable-target fallback, one-level allowlisted nesting with independently copied valid optional fields, invalid nested required identity/source, forbidden-field exclusion, and a terminal outcome with no `:attempt-id` (which must select the latest attempt rather than a nil-id historical attempt). Expand the remaining exact-map cases.
 - [x] Run `clj-paren-repair` on changed Clojure files and the focused workflow-runtime Scry namespace; inspect structured failures and make the slice green.
-  - Latest focused verification: `clj-paren-repair` passed for source and test; `bb clojure:test:scry --namespace psi.workflow-runtime.delegated-failure-test` passed: 8 tests, 57 assertions; `clj-kondo --lint` on both paths reported 0 errors and 0 warnings.
+  - Latest focused verification: `clj-paren-repair` passed for source and test; `bb clojure:test:scry --namespace psi.workflow-runtime.delegated-failure-test` passed: 11 tests, 72 assertions; `clj-kondo --lint` on both paths reported 0 errors and 0 warnings.
 
 ## Slice 2 — Delegate-step normalization
 
@@ -84,5 +84,7 @@
   - Focused namespaces pass: lower runtime 7/47; delegate boundary 3/14; facade handoff 2/5; canonical mutation 3/20; registered tool 6/14; async path 8/38.
 - [x] Run the relevant broader workflow-runtime and agent-session unit suites and confirm successful, blocked, cancelled, removed, retry, resume, retention, async, and result regressions remain green.
   - `bb clojure:test:unit` passed on the confirmation run: 2,663 tests and 19,675 assertions. The immediately preceding randomized run had one unrelated retry test failure (`psi.turn-runtime.response-mode-retry-test`, 53 attempts instead of 2) that passed unchanged on rerun, so it is recorded as a pre-existing flake signal rather than changed here.
-- [ ] Re-read design.md, plan.md, changed tests/code, and user-facing changelog; verify all ten acceptance criteria, ownership boundaries, exact-map examples, and out-of-scope invariants are coherent.
-- [ ] Record implementation decisions, test evidence, and any discovered trade-offs in `implementation.md`, then check completed items and prepare the task for implementation review.
+- [x] Re-read design.md, plan.md, changed tests/code, and user-facing changelog; verify all ten acceptance criteria, ownership boundaries, exact-map examples, and out-of-scope invariants are coherent.
+  - Re-read after the selector/message matrix expansion confirms the only child-failure construction is lower-runtime `delegated-failure/delegated-failure`; facade, mutations, tool, and async paths only carry or render its message. Exact-map examples and fallback location retention match the focused proof. Remaining unchecked acceptance bullets are explicitly enumerated regression/matrix proof gaps, not ownership or scope deviations.
+- [x] Record implementation decisions, test evidence, and any discovered trade-offs in `implementation.md`, then check completed items and prepare the task for implementation review.
+  - Recorded the 2026-08-13 pure-contract expansion. Task remains open because the remaining targeted regression/matrix proof items need completion before implementation review.
