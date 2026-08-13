@@ -13,15 +13,79 @@
    :current-step-id current-step-id})
 
 (deftest safe-reason-test
-  ;; Only bounded keyword reasons in the public grammar cross the boundary.
-  (testing "accepts public reason keywords and rejects other values"
-    (is (true? (delegated-failure/safe-reason? :iteration-limit-reached)))
-    (is (true? (delegated-failure/safe-reason? :workflow/step-failed)))
-    (is (false? (delegated-failure/safe-reason? (keyword "unsafe/reason/value"))))
-    (is (false? (delegated-failure/safe-reason? :bad!reason)))
-    (is (false? (delegated-failure/safe-reason? "tool-timeout")))
-    (is (false? (delegated-failure/safe-reason?
-                 (keyword (apply str (repeat 65 "a"))))))))
+  ;; The exact public keyword grammar and bound govern both validation and envelopes.
+  (let [body-64 (apply str (repeat 64 "a"))
+        body-65 (apply str (repeat 65 "a"))
+        cases [{:label "leading letter"
+                :reason :a
+                :safe? true}
+               {:label "leading digit"
+                :reason :0reason
+                :safe? true}
+               {:label "allowed interior punctuation"
+                :reason :a.b_c-d
+                :safe? true}
+               {:label "one namespace slash"
+                :reason :n.s/name_1-x
+                :safe? true}
+               {:label "64-character body"
+                :reason (keyword body-64)
+                :safe? true}
+               {:label "65-character body"
+                :reason (keyword body-65)
+                :safe? false}
+               {:label "empty body"
+                :reason (keyword "")
+                :safe? false}
+               {:label "empty namespace component"
+                :reason (keyword "/reason")
+                :safe? false}
+               {:label "empty name component"
+                :reason (keyword "namespace/")
+                :safe? false}
+               {:label "leading dot"
+                :reason (keyword ".reason")
+                :safe? false}
+               {:label "leading underscore"
+                :reason (keyword "_reason")
+                :safe? false}
+               {:label "leading hyphen"
+                :reason (keyword "-reason")
+                :safe? false}
+               {:label "disallowed character"
+                :reason (keyword "reason!bad")
+                :safe? false}
+               {:label "multiple slashes"
+                :reason (keyword "a/b/c")
+                :safe? false}
+               {:label "non-keyword"
+                :reason "tool-timeout"
+                :safe? false}]]
+    (doseq [{:keys [label reason safe?]} cases]
+      (testing label
+        (let [run (workflow-run {:step-order []
+                                 :step-runs {}
+                                 :terminal-outcome {:reason reason}})
+              result (delegated-failure/delegated-failure run "run-reason" "child")
+              reason-body (when safe?
+                            (if-let [reason-namespace (namespace reason)]
+                              (str reason-namespace "/" (name reason))
+                              (name reason)))
+              expected (if safe?
+                         {:reason :delegated-workflow-failed
+                          :message (str "Delegated workflow 'child' failed: "
+                                        "terminal outcome :" reason-body)
+                          :delegate-failure {:source :terminal-outcome
+                                             :run-id "run-reason"
+                                             :target "child"
+                                             :reason reason}}
+                         {:reason :delegated-workflow-failed
+                          :message delegated-failure/fallback-message
+                          :delegate-failure {:source :fallback
+                                             :run-id "run-reason"
+                                             :target "child"}})]
+          (is (= safe? (delegated-failure/safe-reason? reason)))
+          (is (= expected result)))))))
 
 (deftest sanitize-component-test
   ;; The failure boundary removes unsafe detail before assembling public text.
