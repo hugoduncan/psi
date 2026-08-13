@@ -137,3 +137,7 @@
   - Real execute-mutation tests now drive iteration-exhausted and redact-only child workflows through child normalization, parent persistence, facade selection, and retention-zero projection.
 - [x] Add table-driven delegated-failure tests where the selected attempt's `:execution-error :message` is non-string (and absent), with an actionable terminal outcome and without one. Assert terminal-outcome fallthrough in the former cases and exact fallback in the latter so the explicit non-string/ineligible execution-message boundary is executable proof rather than inferred from blank-string coverage.
   - Absent and non-string messages now prove terminal-outcome fallthrough and exact fallback while retaining selected location identity.
+
+## Latest test re-review follow-ups
+
+- [ ] Replace the sampled `safe-reason-test` assertions with or supplement them by a table-driven exact grammar and length-boundary matrix for safe reason keywords. Prove that a 64-character body is accepted and a 65-character body is rejected; cover valid leading letters/digits, allowed interior `.`, `_`, and `-`, one optional namespace slash, and invalid empty components, leading punctuation, disallowed characters, and multiple slashes. Assert both `safe-reason?` and the resulting envelope reason/message behavior so acceptance criterion 6's public reason allowlist cannot regress while the helper alone remains green.
