@@ -29,9 +29,10 @@
   - Added narrow state-based proof in `psi.agent-session.workflow-delegate-failure-test`.
 - [ ] Add delegated-step boundary tests for non-actionable target after a recognized nested error and terminal/latest retry selection.
   - Added real statechart proofs for no-actionable-cause fallback, terminal-outcome-only iteration exhaustion, and one-level nested delegated failure in `workflow_delegate_failure_test.clj`. The iteration proof confirms a child outcome without `:attempt-id` selects its latest ordered attempt and excludes judge/last-result data. Target-authored workflow compilation does not preserve arbitrary authored `:retry-policy`, so retry selection remains a focused pure run-map proof rather than an invalid authored-definition integration fixture.
-- [ ] Add regression assertions that successful, blocked, cancelled, removed, retry, and yield/result delegation semantics retain their current status and payload shapes.
-- [ ] Run `clj-paren-repair`, the focused delegate boundary/runtime Scry tests, and relevant workflow-runtime regression namespaces; inspect structured results and make the slice green.
-  - Latest boundary proof: `clj-paren-repair` passed; `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-failure-test` passed (4 tests, 20 assertions); `clj-kondo --lint` reported 0 errors and 0 warnings.
+- [x] Add regression assertions that successful, blocked, cancelled, removed, retry, and yield/result delegation semantics retain their current status and payload shapes.
+  - `delegate-boundary-nonfailed-regression-test` asserts exact completed, blocked, cancelled, and removed boundary payloads. Existing pure terminal/latest retry selection proof and `terminal-contract-execution-test` retain retry selection and completed delegated text/handoff behavior without mocks.
+- [x] Run `clj-paren-repair`, the focused delegate boundary/runtime Scry tests, and relevant workflow-runtime regression namespaces; inspect structured results and make the slice green.
+  - `clj-paren-repair` formatted the changed pure test. Scry passed: delegated failure 12/76, delegate boundary 4/20, terminal contract execution 1/5, and cancellation dispatch 9/63. `clj-kondo` reported 0 errors and 0 warnings across changed runtime paths.
 
 ## Slice 3 — Facade terminal-error handoff
 

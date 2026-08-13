@@ -414,3 +414,46 @@
       (is (= "Delegated workflow 'child' failed at step 'delegate': nested failure"
              (:message result)))
       (is (not (contains? (:delegate-failure result) :nested-cause))))))
+
+(deftest delegate-boundary-nonfailed-regression-test
+  ;; Delegated-failure normalization changes only failed-child diagnostics;
+  ;; existing child outcomes keep their established parent payloads.
+  (testing "completed, blocked, cancelled, and removed child outcomes are unchanged"
+    (let [completed {:status :completed
+                     :effective-definition {:step-order ["done"]}
+                     :step-runs {"done" {:accepted-result
+                                         {:outcome :ok
+                                          :outputs {:final-llm-reply "child result"}
+                                          :diagnostics {:child :complete}}}}}
+          boundary {:delegate {:target "child"
+                               :resolved-target "child"
+                               :run-id "child-run"
+                               :step-id "delegate-child"}}
+          result (fn [run]
+                   (#'delegate/delegate-run-runtime-result run "child-run" "child" boundary))]
+      (is (= {:pending-kind :success
+              :payload {:outcome :ok
+                        :outputs {:final-llm-reply "child result"}
+                        :diagnostics {:delegate (:delegate boundary)
+                                      :child :complete}}}
+             (result completed)))
+      (is (= {:pending-kind :blocked
+              :payload {:outcome :blocked
+                        :blocked {:delegate-run-id "child-run"
+                                  :target "child"
+                                  :step-id "child-step"}
+                        :diagnostics boundary}}
+             (result {:status :blocked
+                      :blocked {:step-id "child-step"}})))
+      (is (= {:pending-kind :failure
+              :payload {:message "Delegated workflow cancelled"
+                        :delegate-run-id "child-run"
+                        :target "child"
+                        :details {:status :cancelled}}}
+             (result {:status :cancelled})))
+      (is (= {:pending-kind :failure
+              :payload {:message "Delegated workflow cancelled or removed"
+                        :delegate-run-id "child-run"
+                        :target "child"
+                        :details {:status :removed}}}
+             (result nil))))))

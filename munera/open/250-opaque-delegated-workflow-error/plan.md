@@ -145,3 +145,10 @@ table-tested without sessions or adapters.
   attempt id, and normalization correctly retains the latest ordered `loop`
   attempt while allowing only the iteration reason/counts into the parent
   envelope; judge session and last-result text remain excluded.
+
+- Slice 2 regression proof now establishes that nonfailed child outcomes retain
+  their exact boundary contracts: completed output/diagnostics merge, blocked
+  payload, and cancelled/removed failures remain unchanged. Existing state-based
+  selector and terminal-contract proofs cover retry selection and delegated
+  yield/handoff behavior, so diagnostics normalization remains exclusive to
+  failed children.

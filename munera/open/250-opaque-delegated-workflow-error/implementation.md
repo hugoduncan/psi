@@ -76,3 +76,11 @@
 - 2026-08-13 Slice 6 credential-value boundary: quoted credential values now require nonempty bodies, so `token=\"\"` and `credential=''` are not redacted. This closes the contract's empty-value negative case without changing nonempty or escaped quoted-value matching. Focused pure Scry, `clj-paren-repair`, and clj-kondo are green (8 tests/60 assertions).
 - 2026-08-13 Slice 6 selector/message matrix: expanded only the pure state-based contract proof; no production mechanism changed. The new cases establish that an explicit terminal attempt wins, effective `:step-order` selects fallback failures independently of map order, unavailable selected identity is omitted, escaping and exact 512-code-point non-truncation are stable, and recognized nested envelopes copy only immediate allowlisted identity. Focused Scry is green (11 tests / 72 assertions) and clj-kondo is clean. A final read confirms lower runtime remains the only child-envelope owner; facade/mutation/tool/async layers merely hand off or render the canonical message. The remaining work is the targeted uncompleted regression/matrix proof items, not a new runtime behavior change.
 - 2026-08-13 Slice 6 terminal-outcome integration: added a real parent/child statechart proof for a child judge loop exhausting its iteration limit. The child terminal outcome omits `:attempt-id`; the parent envelope correctly selects the latest `loop` attempt and renders only the allowlisted reason and counts. The test uses the existing nullable actor/judge seams and asserts persisted state/output, including that `:last-result-text` and judge-session data never cross the parent boundary. Focused Scry: 4 tests / 20 assertions; targeted matrix/regression gaps remain.
+- 2026-08-13 Slice 2 nonfailed regression: added a narrow lower-runtime
+  boundary test with immutable run maps for completed, blocked, cancelled, and
+  removed children. It proves exact pre-existing payloads remain intact while
+  the failed-child branch alone delegates to canonical diagnostics. Existing
+  pure retry and terminal-contract execution proof supplies the unchanged retry
+  and delegated result/handoff coverage. Verified with focused Scry (delegated
+  failure 12/76; terminal contract 1/5; cancellation dispatch 9/63) and clean
+  clj-kondo.
