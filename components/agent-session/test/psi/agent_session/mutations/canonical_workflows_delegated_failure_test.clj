@@ -2,49 +2,8 @@
   "Public delegated-failure projection tests for canonical workflow mutations."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.core :as session]
    [psi.agent-session.mutations.canonical-workflows :as mutations]
-   [psi.agent-session.mutations.canonical-workflows-test :as core-test]
    [psi.agent-session.workflow-execution-test-support :as support]))
-
-(def delegated-envelope
-  {:reason :delegated-workflow-failed
-   :message "Delegated workflow 'child' failed at step 'build': tool timed out"
-   :delegate-failure {:source :execution-error
-                      :run-id "child-run"
-                      :target "child"
-                      :step-id "build"
-                      :attempt-id "build-2"}})
-
-(defn- failed-execution-result
-  [envelope steps-executed]
-  {:status :failed
-   :terminal? true
-   :blocked? false
-   :steps-executed steps-executed
-   :terminal-execution-error envelope})
-
-(defn- create-parent-run!
-  [ctx run-id]
-  (let [parent-id (:session-id (session/new-session-in! ctx nil {}))]
-    (mutations/register-workflow-definition
-     {} {:psi/agent-session-ctx ctx :definition core-test/sample-definition})
-    (mutations/create-workflow-run
-     {} {:psi/agent-session-ctx ctx
-         :session-id parent-id
-         :definition-id "test-workflow"
-         :workflow-input {:input "delegate"}
-         :run-id run-id})
-    parent-id))
-
-(defn- terminalize-failed-run!
-  [ctx run-id]
-  (swap! (:state* ctx)
-         (fn [state]
-           (-> state
-               (assoc-in [:workflows :runs run-id :status] :failed)
-               (assoc-in [:workflows :runs run-id :finished-at]
-                         (java.time.Instant/parse "2026-08-09T12:00:00Z"))))))
 
 (def resumable-child-definition
   {:definition-id "resumable-child"
@@ -70,6 +29,30 @@
    :steps [{:name "delegate-child"
             :type :delegate
             :target "resumable-child"
+            :prompt-string "Carry out the child workflow."
+            :context []}]})
+
+(def iteration-limited-child-definition
+  {:definition-id "iteration-limited-child"
+   :name "iteration-limited-child"
+   :steps [{:name "loop"
+            :type :session
+            :contributions [{:type :template
+                             :text "Do {{input}}"
+                             :vars {"input" {:from :workflow-input}}}]
+            :judge {:type :llm
+                    :contributions [{:type :template
+                                     :text "REPEAT or DONE?"
+                                     :vars {}}]}
+            :on {"REPEAT" {:goto "loop" :max-iterations 1}
+                 "DONE" {:goto :done}}}]})
+
+(def iteration-limited-parent-definition
+  {:definition-id "iteration-limited-parent"
+   :name "iteration-limited-parent"
+   :steps [{:name "delegate-child"
+            :type :delegate
+            :target "iteration-limited-child"
             :prompt-string "Carry out the child workflow."
             :context []}]})
 
@@ -164,34 +147,70 @@
         (is (not (contains? result :psi.workflow/result)))
         (is (nil? (get-in @(:state* ctx) [:workflows :runs "resume-failed"])))))))
 
-(deftest execute-workflow-run-projects-every-canonical-delegated-source-test
-  ;; The mutation owns only pass-through projection: all source selection and
-  ;; message normalization have already happened in the terminal envelope.
-  (testing "execution-error, terminal-outcome, and fallback envelopes survive retention unchanged"
-    (doseq [[source message]
-            [[:execution-error "Delegated workflow 'child' failed at step 'build': tool timed out"]
-             [:terminal-outcome "Delegated workflow 'child' failed at step 'loop': terminal outcome :iteration-limit-reached (iteration 4 of 4)"]
-             [:fallback "Delegated workflow failed"]]]
-      (let [envelope {:reason :delegated-workflow-failed
-                      :message message
-                      :delegate-failure {:source source
-                                         :run-id "child-run"
-                                         :target "child"}}
-            ctx (assoc (core-test/make-test-ctx)
-                       :config {:completed-workflow-run-retention-count 0}
-                       :execute-workflow-run-fn
-                       (fn [ctx* _session-id run-id]
-                         (terminalize-failed-run! ctx* run-id)
-                         (failed-execution-result envelope
-                                                  [{:step-id "delegate"
-                                                    :error "lossy public projection"}])))
-            parent-id (create-parent-run! ctx (str (name source) "-failed"))
-            result (mutations/execute-workflow-run
+(deftest execute-workflow-run-projects-terminal-outcome-through-retention-test
+  ;; A real iteration-exhausted child must be normalized, persisted, selected by
+  ;; the facade, and projected after retention removes the parent run.
+  (testing "execute carries a terminal-outcome delegated failure through retention"
+    (let [judge-fn (fn [& _]
+                     {:judge-session-id "judge-loop"
+                      :judge-output "REPEAT"
+                      :judge-event "REPEAT"
+                      :routing-result {:action :goto :target "loop"}})
+          [base-ctx parent-id] (support/create-session-context
+                                {:persist? false
+                                 :execute-workflow-judge-fn judge-fn})
+          ctx (assoc base-ctx
+                     :config {:completed-workflow-run-retention-count 0}
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx session-id _prompt & _]
+                       (workflow-turn session-id :ok "loop output")))]
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition iteration-limited-child-definition})
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition iteration-limited-parent-definition})
+      (mutations/create-workflow-run
+       {} {:psi/agent-session-ctx ctx
+           :session-id parent-id
+           :definition-id "iteration-limited-parent"
+           :workflow-input "terminal outcome proof"
+           :run-id "terminal-outcome-failed"})
+      (let [result (mutations/execute-workflow-run
                     {} {:psi/agent-session-ctx ctx
                         :session-id parent-id
-                        :run-id (str (name source) "-failed")})]
+                        :run-id "terminal-outcome-failed"})]
         (is (= :failed (:psi.workflow/status result)))
         (is (nil? (:psi.workflow/result result)))
-        (is (= message (:psi.workflow/error result)))
+        (is (= "Delegated workflow 'iteration-limited-child' failed at step 'loop': terminal outcome :iteration-limit-reached (iteration 1 of 1)"
+               (:psi.workflow/error result)))
         (is (nil? (get-in @(:state* ctx)
-                          [:workflows :runs (str (name source) "-failed")])))))))
+                          [:workflows :runs "terminal-outcome-failed"])))))))
+
+(deftest execute-workflow-run-projects-fallback-through-retention-test
+  ;; A real redact-only child failure must become the exact generic envelope and
+  ;; survive facade selection plus retention-zero cleanup without fabrication.
+  (testing "execute carries a fallback delegated failure through retention"
+    (let [[base-ctx parent-id] (support/create-session-context {:persist? false})
+          ctx (assoc base-ctx
+                     :config {:completed-workflow-run-retention-count 0}
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx session-id _prompt & _]
+                       (workflow-turn session-id :error "token=secret")))]
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-child-definition})
+      (mutations/register-workflow-definition
+       {} {:psi/agent-session-ctx ctx :definition resumable-parent-definition})
+      (mutations/create-workflow-run
+       {} {:psi/agent-session-ctx ctx
+           :session-id parent-id
+           :definition-id "resumable-parent"
+           :workflow-input "fallback proof"
+           :run-id "fallback-failed"})
+      (let [result (mutations/execute-workflow-run
+                    {} {:psi/agent-session-ctx ctx
+                        :session-id parent-id
+                        :run-id "fallback-failed"})]
+        (is (= :failed (:psi.workflow/status result)))
+        (is (nil? (:psi.workflow/result result)))
+        (is (= "Delegated workflow failed" (:psi.workflow/error result)))
+        (is (nil? (get-in @(:state* ctx)
+                          [:workflows :runs "fallback-failed"])))))))
