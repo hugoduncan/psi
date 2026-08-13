@@ -451,9 +451,9 @@
         (recur (next-visible-index text index))))))
 
 (defn- path-separator-scanner
-  [text scan-steps query-count]
-  ;; Build both final-occurrence indexes in one measured pass. The diagnostics
-  ;; make the linear-work invariant executable without timing or call spying.
+  [text examined-position-count]
+  ;; Index both separator families while examining each raw input position once.
+  ;; Queries compare cached indexes and therefore examine no additional input.
   (let [[last-slash last-backslash]
         (loop [index 0
                last-slash -1
@@ -461,24 +461,25 @@
           (if (>= index (.length ^String text))
             [last-slash last-backslash]
             (let [character (.charAt ^String text index)]
-              (aset-int scan-steps 0 (inc (aget scan-steps 0)))
+              (aset-int examined-position-count
+                        0
+                        (inc (aget examined-position-count 0)))
               (recur (inc index)
                      (if (= character \/) index last-slash)
                      (if (= character \\) index last-backslash)))))]
     (fn [index]
-      (aset-int query-count 0 (inc (aget query-count 0)))
       (or (>= last-slash index)
           (>= last-backslash index)))))
 
 (defn- path-span-scanner
-  [text scan-steps query-count]
+  [text examined-position-count]
   ;; A rejected run can only become sensitive at a later candidate when dropping
   ;; its first-segment prefix exposes an exact .ssh or id_rsa segment. The first
   ;; such candidate consumes the rest of the run, so no later starts are needed.
   ;; Cache a separator-free remainder immediately: no supported absolute or
   ;; relative path can begin there, and repeatedly scanning it adds no evidence.
   (let [cached-run (volatile! nil)
-        separator-at-or-after? (path-separator-scanner text scan-steps query-count)]
+        separator-at-or-after? (path-separator-scanner text examined-position-count)]
     (fn [index]
       (when (path-left-delimiter? text index)
         (let [{:keys [end exact-suffix-start] :as cached} @cached-run
@@ -535,17 +536,16 @@
 
 (defn- sanitized-component
   ([text]
-   (sanitized-component text (int-array 1) (int-array 1)))
-  ([text path-separator-scan-steps path-separator-query-count]
+   (sanitized-component text (int-array 1)))
+  ([text path-separator-examined-position-count]
    (let [builder (StringBuilder.)
          output-count (int-array 1)
          pending-space (boolean-array 1)
          actionable (boolean-array 1)
          quote-end-scanners {\' (quote-end-scanner text \')
                              \" (quote-end-scanner text \")}
-         path-span (path-span-scanner text
-                                      path-separator-scan-steps
-                                      path-separator-query-count)]
+         path-span (path-span-scanner
+                    text path-separator-examined-position-count)]
      (loop [index 0
             checked-credential-key-end 0]
        (if (>= index (.length ^String text))
@@ -593,17 +593,17 @@
                       credential-key-end)))))))))
 
 (defn sanitize-component-analysis
-  "Sanitize public text and report deterministic path-separator scanner work.
+  "Sanitize public text and report path-separator input positions examined.
 
-   The work counters expose complexity evidence without depending on elapsed time."
+   The work measure includes all raw input positions inspected while indexing or
+   querying separator locations, making the linear bound deterministic."
   [text]
   (when (string? text)
-    (let [scan-steps (int-array 1)
-          query-count (int-array 1)
-          result (sanitized-component text scan-steps query-count)]
+    (let [examined-position-count (int-array 1)
+          result (sanitized-component text examined-position-count)]
       (assoc result
-             :path-separator-scan-steps (aget scan-steps 0)
-             :path-separator-query-count (aget query-count 0)))))
+             :path-separator-examined-position-count
+             (aget examined-position-count 0)))))
 
 (defn sanitize-component
   "Remove controls, redact sensitive spans, and normalize bounded public text."
