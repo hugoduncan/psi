@@ -66,6 +66,25 @@
       or malformed immediate envelope. This avoids two valid interpretations of
       the one-level non-recursive nesting contract.
 
+- [ ] Define execution-error eligibility and fallback precedence around
+      sanitization. "Safe nonblank `:execution-error :message`" is undefined and
+      can mean either that any nonblank string is selected before sanitization or
+      that safety/actionability is tested first. Those readings differ when a raw
+      message contains redactable credentials or sanitizes to placeholders only:
+      the design can either fall back immediately or continue to an actionable
+      terminal outcome. State the singular selection/normalization order for
+      non-string, blank, redactable-but-actionable, and sanitized-nonactionable
+      messages.
+
+- [ ] Specify the observable delegated-failure contract for the in-scope
+      `psi.workflow/resume-run` path. Scope requires projection through
+      execute/resume, but the parent-visible contract and acceptance criteria
+      prove only `psi.workflow/execute-run`. State whether a resumed run that
+      terminalizes with a delegated failure returns the same canonical terminal
+      attempt message in `:psi.workflow/error`, including retry-history
+      selection, without implying a new result field on the existing resume
+      mutation.
+
 # Design steps — inconsistency review (design-review session, turn 3)
 
 - [x] Reconcile the parent-visible claim that async completion, background-job,
