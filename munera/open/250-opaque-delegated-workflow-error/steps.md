@@ -95,3 +95,8 @@
 
 - [x] Fix unquoted credential-pair scanning so its value ends only at the specified whitespace or `,;)]}` delimiters, not at apostrophes or double quotes; add positive tests such as `token=abc\"def denied` and `token=abc'def denied` proving no credential suffix remains visible.
 - [x] Update the public `execute-run!` return-shape docstring in `workflow_execution.clj` to include the always-present private `:terminal-execution-error` handoff (map or nil), keeping the documented facade contract aligned with `execution-result`.
+
+## Test review follow-ups
+
+- [ ] Replace or supplement the fabricated `:resume-and-execute-workflow-run-fn` result in `resume-workflow-run-projects-terminal-delegated-error-through-retention-test` with a state-based test that resumes a genuinely blocked workflow through the real facade/delegate runtime, terminalizes it with a delegated failure, and proves terminal-attempt selection, retention-zero handoff, and the result-free resume response together. The current test substitutes the logic under review and cannot detect a broken resume-to-facade integration.
+- [ ] Extend delegated publication coverage with an already-normalized 512-code-point canonical message and `:include-result? true`; assert notification and append-entry wrappers preserve the message byte-for-byte exactly once, do not truncate or re-normalize it, and place it before the optional result section. The current short-message/`false` case does not prove those specified boundaries.
