@@ -246,16 +246,6 @@
   [path]
   (str/replace path #"[\.:!?]+$" ""))
 
-(defn- absolute-path?
-  [path]
-  (or (str/starts-with? path "/")
-      (str/starts-with? path "~/")
-      (str/starts-with? path "./")
-      (str/starts-with? path "../")
-      (boolean (re-find #"^[A-Za-z]:[\\/]" path))
-      (and (str/starts-with? path "\\\\")
-           (not (str/starts-with? path "\\\\\\")))))
-
 (defn- secret-bearing-relative-path?
   [path]
   (and (or (str/includes? path "/")
@@ -270,21 +260,76 @@
                      (= segment "id_rsa"))))
              (str/split path #"[\\/]"))))
 
-(defn- path-span
+(defn- ascii-drive-letter?
+  [character]
+  (let [code-point (int character)]
+    (or (<= (int \A) code-point (int \Z))
+        (<= (int \a) code-point (int \z)))))
+
+(defn- absolute-path-prefix-at?
   [text index]
-  (when (path-left-delimiter? text index)
-    (let [end (path-end-index text index)
-          path (trim-path-punctuation (subs text index end))]
-      (when (and (seq path)
-                 (or (absolute-path? path)
-                     (secret-bearing-relative-path? path)))
-        path))))
+  (let [length (.length ^String text)]
+    (or (.startsWith ^String text "/" index)
+        (.startsWith ^String text "~/" index)
+        (.startsWith ^String text "./" index)
+        (.startsWith ^String text "../" index)
+        (and (<= (+ index 3) length)
+             (ascii-drive-letter? (.charAt ^String text index))
+             (= \: (.charAt ^String text (inc index)))
+             (contains? #{\\ \/} (.charAt ^String text (+ index 2))))
+        (and (.startsWith ^String text "\\\\" index)
+             (not (.startsWith ^String text "\\\\\\" index))))))
+
+(defn- exact-sensitive-suffix-starts
+  [text start end]
+  (loop [index start
+         starts #{}]
+    (if (>= index end)
+      starts
+      (let [separator? (contains? #{\\ \/} (.charAt ^String text index))
+            starts (if separator?
+                     (reduce (fn [result suffix]
+                               (let [suffix-start (- index (count suffix))]
+                                 (if (and (>= suffix-start start)
+                                          (.regionMatches ^String text true suffix-start suffix 0 (count suffix)))
+                                   (conj result suffix-start)
+                                   result)))
+                             starts
+                             [".ssh" "id_rsa"])
+                     starts)]
+        (recur (inc index) starts)))))
+
+(defn- path-span-scanner
+  [text]
+  ;; A rejected run can only become sensitive at a later candidate when dropping
+  ;; its first-segment prefix exposes an exact .ssh or id_rsa segment.
+  (let [cached-run (volatile! nil)]
+    (fn [index]
+      (when (path-left-delimiter? text index)
+        (let [{:keys [end exact-suffix-starts] :as cached} @cached-run
+              same-run? (and cached (< index end))
+              end (if same-run? end (path-end-index text index))
+              absolute? (absolute-path-prefix-at? text index)
+              relative? (if same-run?
+                          (contains? exact-suffix-starts index)
+                          (secret-bearing-relative-path?
+                           (trim-path-punctuation (subs text index end))))
+              candidate? (or absolute? relative?)]
+          (when-not same-run?
+            (vreset! cached-run
+                     {:end end
+                      :exact-suffix-starts (when-not candidate?
+                                             (exact-sensitive-suffix-starts text index end))}))
+          (when candidate?
+            (let [path (trim-path-punctuation (subs text index end))]
+              (when (seq path) path))))))))
 
 (defn- redact-spans
   [text]
   (let [builder (StringBuilder.)
         quote-end-scanners {\' (quote-end-scanner text \')
-                            \" (quote-end-scanner text \")}]
+                            \" (quote-end-scanner text \")}
+        path-span (path-span-scanner text)]
     (loop [index 0
            checked-credential-key-end 0]
       (if (>= index (.length ^String text))
@@ -303,7 +348,7 @@
                        (bearer-token-span text index))
               prefixed-token (when (left-boundary? text index token-character?)
                                (prefixed-token-span text index))
-              path (path-span text index)
+              path (path-span index)
               [span replacement] (cond
                                    stack-frame [stack-frame "[STACKTRACE_REDACTED]"]
                                    credential [credential "[REDACTED]"]

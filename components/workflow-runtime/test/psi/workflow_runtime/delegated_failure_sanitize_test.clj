@@ -160,8 +160,8 @@
       (is (= sanitized (delegated-failure/sanitize-component sanitized))))))
 
 (deftest sanitize-component-large-input-test
-  ;; Large unquoted inputs avoid eager quote metadata while candidate-heavy
-  ;; prefixes retain linear scanning and reach a trailing credential.
+  ;; Large unquoted and delimiter-heavy inputs retain linear scanning while
+  ;; still reaching sensitive spans at the end of the input.
   (let [plain-input (apply str (repeat 250000 "x"))]
     (is (= plain-input
            (delegated-failure/sanitize-component plain-input))))
@@ -169,7 +169,11 @@
                   (apply str (repeat 50000 "."))]]
     (let [input (str prefix " token=secret denied")]
       (is (= (str prefix " [REDACTED] denied")
-             (delegated-failure/sanitize-component input))))))
+             (delegated-failure/sanitize-component input)))))
+  (let [prefix (apply str (repeat 50000 ":"))
+        input (str prefix " token=secret denied")]
+    (is (= (str prefix " [REDACTED] denied")
+           (delegated-failure/sanitize-component input)))))
 
 (deftest sanitize-component-boundary-test
   ;; The lexical scanner honours precedence, token minima, and span boundaries.
