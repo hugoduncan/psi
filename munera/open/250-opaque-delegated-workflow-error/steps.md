@@ -120,3 +120,7 @@
   - Every required recognition condition is independently invalidated; actionable messages remain ordinary sanitized execution errors, blank text falls back, and no malformed case contributes nested identity.
 - [x] Extend `nested-envelope-recognition-boundary-test` with non-string (and preferably absent) `:run-id` and `:target` cases, asserting ordinary sanitized execution-error handling and no `:nested-cause`. The current blank-string cases prove nonblank validation but do not prove the required identity fields' string-type boundary.
   - Added non-string and absent cases for both required identity fields; each remains an ordinary sanitized execution error without `:nested-cause`.
+
+## Latest test review follow-ups
+
+- [ ] Add table-driven deterministic-selection tests for invalid terminal identities: an unknown/invalid `:terminal-outcome :step-id` must fall through to a valid current step and then effective failed-step order, and a terminal `:attempt-id` absent from the selected step (including an id belonging only to another step) must select that step's latest ordered attempt. Assert the resulting exact envelope identities and cause so malformed terminal metadata cannot override the canonical terminal failure. Existing tests cover omitted IDs and valid explicit IDs, but not these specified invalid-identity fallthrough branches.
