@@ -56,10 +56,69 @@
   (and (Character/isISOControl code-point)
        (not (whitespace-code-point? code-point))))
 
+(defn- skip-removable-controls
+  [text start]
+  (loop [index start]
+    (if (< index (.length ^String text))
+      (let [code-point (.codePointAt ^String text index)]
+        (if (removable-control? code-point)
+          (recur (+ index (Character/charCount code-point)))
+          index))
+      index)))
+
+(defn- previous-visible-code-point
+  [text start]
+  (loop [index start]
+    (when (pos? index)
+      (let [code-point (.codePointBefore ^String text index)
+            previous-index (- index (Character/charCount code-point))]
+        (if (removable-control? code-point)
+          (recur previous-index)
+          code-point)))))
+
+(defn- next-visible-index
+  [text index]
+  (let [code-point (.codePointAt ^String text index)]
+    (skip-removable-controls
+     text (+ index (Character/charCount code-point)))))
+
 (defn- left-boundary?
   [text index predicate]
-  (or (zero? index)
-      (not (predicate (.codePointBefore ^String text index)))))
+  (if-let [code-point (previous-visible-code-point text index)]
+    (not (predicate code-point))
+    true))
+
+(defn- visible-region-matches-ignore-case?
+  [text start literal]
+  (loop [index start
+         literal-index 0]
+    (if (= literal-index (count literal))
+      index
+      (let [index (skip-removable-controls text index)]
+        (when (and (< index (.length ^String text))
+                   (= (Character/toLowerCase (int (.charAt ^String text index)))
+                      (Character/toLowerCase (int (.charAt ^String literal literal-index)))))
+          (recur (inc index) (inc literal-index)))))))
+
+(defn- visible-starts-with-end
+  [text start literal]
+  (loop [index start
+         literal-index 0]
+    (if (= literal-index (count literal))
+      index
+      (let [index (skip-removable-controls text index)]
+        (when (and (< index (.length ^String text))
+                   (= (.charAt ^String text index)
+                      (.charAt ^String literal literal-index)))
+          (recur (inc index) (inc literal-index)))))))
+
+(defn- visible-character-count
+  [text start end]
+  (loop [index (skip-removable-controls text start)
+         count 0]
+    (if (>= index end)
+      count
+      (recur (next-visible-index text index) (inc count)))))
 
 (defn- unicode-word-or-underscore?
   [code-point]
@@ -84,22 +143,56 @@
 
 (defn- path-left-delimiter?
   [text index]
-  (or (zero? index)
-      (let [code-point (.codePointBefore ^String text index)]
-        (or (whitespace-code-point? code-point)
-            (contains? #{(int \() (int \[) (int \{) (int \=) (int \:)
-                         (int \,) (int \;)}
-                       code-point)))))
+  (if-let [code-point (previous-visible-code-point text index)]
+    (or (whitespace-code-point? code-point)
+        (contains? #{(int \() (int \[) (int \{) (int \=) (int \:)
+                     (int \,) (int \;)}
+                   code-point))
+    true))
 
-(defn- match-end
-  [pattern text index]
-  (let [matcher (.matcher ^java.util.regex.Pattern pattern text)]
-    (.region matcher index (.length ^String text))
-    (when (.lookingAt matcher)
-      (.end matcher))))
+(defn- stack-symbol-code-point?
+  [code-point]
+  (or (Character/isLetterOrDigit code-point)
+      (contains? #{(int \.) (int \_) (int \$) (int \/) (int \-)}
+                 code-point)))
 
-(def ^:private stack-frame-pattern
-  #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
+(defn- scan-visible-while
+  [text start predicate]
+  (loop [index (skip-removable-controls text start)]
+    (if (and (< index (.length ^String text))
+             (predicate (.codePointAt ^String text index)))
+      (recur (next-visible-index text index))
+      index)))
+
+(defn- stack-frame-end
+  [text start]
+  (when-let [after-at (visible-starts-with-end text start "at")]
+    (let [space-end (scan-visible-while text after-at #{(int \space) (int \tab)})]
+      (when (> space-end (skip-removable-controls text after-at))
+        (let [symbol-start space-end
+              symbol-end (scan-visible-while text symbol-start stack-symbol-code-point?)]
+          (when-let [location-start (and (> symbol-end symbol-start)
+                                         (visible-starts-with-end text symbol-end "("))]
+            (loop [index (skip-removable-controls text location-start)
+                   colon? false
+                   digit-after-colon? false]
+              (when (< index (.length ^String text))
+                (let [code-point (.codePointAt ^String text index)]
+                  (cond
+                    (= code-point 41)
+                    (when (and colon? digit-after-colon?)
+                      (next-visible-index text index))
+
+                    (or (whitespace-code-point? code-point)
+                        (= code-point 40)) nil
+
+                    (= code-point (int \:))
+                    (recur (next-visible-index text index) true false)
+
+                    :else
+                    (recur (next-visible-index text index)
+                           (and colon? (Character/isDigit code-point))
+                           (and colon? (Character/isDigit code-point)))))))))))))
 
 (def ^:private credential-key-fragments
   ["token" "secret" "password" "credential" "api-key" "api_key"])
@@ -115,19 +208,19 @@
 (defn- credential-key-end
   [text start]
   (loop [index start]
-    (if (and (< index (.length ^String text))
-             (credential-key-character? (.charAt ^String text index)))
-      (recur (inc index))
-      index)))
+    (let [index (skip-removable-controls text index)]
+      (if (and (< index (.length ^String text))
+               (credential-key-character? (.charAt ^String text index)))
+        (recur (inc index))
+        index))))
 
 (defn- region-contains-ignore-case?
   [text start end fragment]
-  (let [fragment-length (count fragment)
-        last-start (- end fragment-length)]
-    (loop [index start]
-      (when (<= index last-start)
-        (or (.regionMatches ^String text true index fragment 0 fragment-length)
-            (recur (inc index)))))))
+  (loop [index (skip-removable-controls text start)]
+    (when (< index end)
+      (let [match-end (visible-region-matches-ignore-case? text index fragment)]
+        (or (when (and match-end (<= match-end end)) match-end)
+            (recur (next-visible-index text index)))))))
 
 (defn- credential-key?
   [text start end]
@@ -136,18 +229,17 @@
 
 (defn- skip-ascii-space
   [text start]
-  (loop [index start]
+  (loop [index (skip-removable-controls text start)]
     (if (and (< index (.length ^String text))
              (contains? #{\space \tab} (.charAt ^String text index)))
-      (recur (inc index))
+      (recur (skip-removable-controls text (inc index)))
       index)))
 
 (defn- separator-end
   [text index]
-  (cond
-    (.startsWith ^String text "=>" index) (+ index 2)
-    (.startsWith ^String text "=" index) (inc index)
-    (.startsWith ^String text ":" index) (inc index)))
+  (or (visible-starts-with-end text index "=>")
+      (visible-starts-with-end text index "=")
+      (visible-starts-with-end text index ":")))
 
 (defn- quote-end-scanner
   [text quote]
@@ -156,7 +248,7 @@
   (let [cursor (int-array 1)
         backslashes (int-array 1)]
     (fn [opening-index]
-      (loop [index (aget cursor 0)
+      (loop [index (skip-removable-controls text (aget cursor 0))
              backslash-count (aget backslashes 0)]
         (if (>= index (.length ^String text))
           (do
@@ -170,7 +262,7 @@
                 next-backslash-count (if (= \\ character)
                                        (inc backslash-count)
                                        0)
-                next-index (inc index)]
+                next-index (skip-removable-controls text (inc index))]
             (if unescaped-closing?
               (do
                 (aset-int cursor 0 next-index)
@@ -180,7 +272,7 @@
 
 (defn- unquoted-credential-end
   [text start]
-  (loop [index start]
+  (loop [index (skip-removable-controls text start)]
     (if (>= index (.length ^String text))
       index
       (let [code-point (.codePointAt ^String text index)]
@@ -188,7 +280,7 @@
                 (contains? #{(int \,) (int \;) (int \)) (int \]) (int \})}
                            code-point))
           index
-          (recur (+ index (Character/charCount code-point))))))))
+          (recur (next-visible-index text index)))))))
 
 (defn- credential-span
   [text start key-end quote-end-scanners]
@@ -200,63 +292,67 @@
             (let [quote (.charAt ^String text value-start)]
               (if (contains? #{\' \"} quote)
                 (let [quote-end ((get quote-end-scanners quote) value-start)]
-                  (when (> quote-end (inc value-start))
+                  (when (pos? (visible-character-count text (inc value-start) quote-end))
                     (inc quote-end)))
                 (let [value-end (unquoted-credential-end text value-start)]
                   (when (> value-end value-start)
                     value-end))))))))))
 
-(defn- ascii-region-matches-ignore-case?
-  [text index literal]
-  (and (<= (+ index (count literal)) (.length ^String text))
-       (.regionMatches ^String text true index literal 0 (count literal))))
-
 (defn- token-run-end
   [text start]
-  (loop [index start]
+  (loop [index (skip-removable-controls text start)]
     (if (and (< index (.length ^String text))
              (token-character? (int (.charAt ^String text index))))
-      (recur (inc index))
+      (recur (skip-removable-controls text (inc index)))
       index)))
 
 (defn- trim-period-end
   [text start end]
   (loop [end end]
-    (if (and (> end start) (= \. (.charAt ^String text (dec end))))
-      (recur (dec end))
-      end)))
+    (let [period-index (loop [index end]
+                         (when (pos? index)
+                           (let [code-point (.codePointBefore ^String text index)
+                                 previous-index (- index (Character/charCount code-point))]
+                             (if (removable-control? code-point)
+                               (recur previous-index)
+                               (when (= code-point (int \.)) previous-index)))))]
+      (if (and period-index (>= period-index start))
+        (recur period-index)
+        end))))
 
 (defn- bearer-token-end
   [text index]
-  (when (ascii-region-matches-ignore-case? text index "Bearer")
-    (let [token-start (skip-ascii-space text (+ index 6))]
-      (when (> token-start (+ index 6))
+  (when-let [after-bearer (visible-region-matches-ignore-case? text index "Bearer")]
+    (let [token-start (skip-ascii-space text after-bearer)]
+      (when (> token-start (skip-removable-controls text after-bearer))
         (let [run-end (token-run-end text token-start)
-              padding-end (loop [padding-end run-end padding-count 0]
+              padding-end (loop [padding-end (skip-removable-controls text run-end)
+                                 padding-count 0]
                             (if (and (< padding-end (.length ^String text))
                                      (< padding-count 2)
                                      (= \= (.charAt ^String text padding-end)))
-                              (recur (inc padding-end) (inc padding-count))
+                              (recur (skip-removable-controls text (inc padding-end))
+                                     (inc padding-count))
                               padding-end))
               token-end (trim-period-end text token-start run-end)]
-          (when (>= (- token-end token-start) 8)
+          (when (>= (visible-character-count text token-start token-end) 8)
             (if (> padding-end run-end)
               padding-end
               token-end)))))))
 
 (defn- prefixed-token-end
   [text index]
-  (when (or (ascii-region-matches-ignore-case? text index "sk-")
-            (ascii-region-matches-ignore-case? text index "pk-"))
-    (let [token-start (+ index 3)
+  (when-let [token-start (or (visible-region-matches-ignore-case? text index "sk-")
+                             (visible-region-matches-ignore-case? text index "pk-"))]
+    (let [token-start token-start
           run-end (token-run-end text token-start)
           token-end (trim-period-end text token-start run-end)]
-      (when (>= (- token-end token-start) 8)
+      (when (>= (visible-character-count text token-start token-end) 8)
         token-end))))
 
 (defn- path-end-index
   [text start]
-  (loop [index start]
+  (loop [index (skip-removable-controls text start)]
     (if (>= index (.length ^String text))
       index
       (let [code-point (.codePointAt ^String text index)]
@@ -265,15 +361,23 @@
                              (int \') (int \")}
                            code-point))
           index
-          (recur (+ index (Character/charCount code-point))))))))
+          (recur (next-visible-index text index)))))))
 
 (defn- trim-path-punctuation-end
   [text start end]
   (loop [end end]
-    (if (and (> end start)
-             (contains? #{\. \: \! \?} (.charAt ^String text (dec end))))
-      (recur (dec end))
-      end)))
+    (let [punctuation-index (loop [index end]
+                              (when (> index start)
+                                (let [code-point (.codePointBefore ^String text index)
+                                      previous-index (- index (Character/charCount code-point))]
+                                  (if (removable-control? code-point)
+                                    (recur previous-index)
+                                    (when (contains? #{(int \.) (int \:) (int \!) (int \?)}
+                                                     code-point)
+                                      previous-index)))))]
+      (if punctuation-index
+        (recur punctuation-index)
+        end))))
 
 (defn- sensitive-path-segment?
   [text start end]
@@ -281,14 +385,14 @@
       (region-contains-ignore-case? text start end "token")
       (region-contains-ignore-case? text start end "password")
       (region-contains-ignore-case? text start end "credential")
-      (and (= (- end start) 4)
-           (.regionMatches ^String text true start ".ssh" 0 4))
-      (and (= (- end start) 6)
-           (.regionMatches ^String text true start "id_rsa" 0 6))))
+      (and (= (visible-character-count text start end) 4)
+           (= end (visible-region-matches-ignore-case? text start ".ssh")))
+      (and (= (visible-character-count text start end) 6)
+           (= end (visible-region-matches-ignore-case? text start "id_rsa")))))
 
 (defn- secret-bearing-relative-path?
   [text start end]
-  (loop [index start
+  (loop [index (skip-removable-controls text start)
          segment-start start
          has-separator? false
          sensitive? false]
@@ -296,12 +400,14 @@
       (and has-separator?
            (or sensitive? (sensitive-path-segment? text segment-start end)))
       (if (contains? #{\\ \/} (.charAt ^String text index))
-        (recur (inc index)
-               (inc index)
-               true
-               (or sensitive?
-                   (sensitive-path-segment? text segment-start index)))
-        (recur (inc index) segment-start has-separator? sensitive?)))))
+        (let [next-index (skip-removable-controls text (inc index))]
+          (recur next-index
+                 next-index
+                 true
+                 (or sensitive?
+                     (sensitive-path-segment? text segment-start index))))
+        (recur (skip-removable-controls text (inc index))
+               segment-start has-separator? sensitive?)))))
 
 (defn- ascii-drive-letter?
   [character]
@@ -311,34 +417,37 @@
 
 (defn- absolute-path-prefix-at?
   [text index]
-  (let [length (.length ^String text)]
-    (or (.startsWith ^String text "/" index)
-        (.startsWith ^String text "~/" index)
-        (.startsWith ^String text "./" index)
-        (.startsWith ^String text "../" index)
-        (and (<= (+ index 3) length)
-             (ascii-drive-letter? (.charAt ^String text index))
-             (= \: (.charAt ^String text (inc index)))
-             (contains? #{\\ \/} (.charAt ^String text (+ index 2))))
-        (and (.startsWith ^String text "\\\\" index)
-             (not (.startsWith ^String text "\\\\\\" index))))))
+  (let [slash (visible-starts-with-end text index "/")
+        home (visible-starts-with-end text index "~/")
+        dot (visible-starts-with-end text index "./")
+        parent (visible-starts-with-end text index "../")
+        drive-colon (when (and (< index (.length ^String text))
+                               (ascii-drive-letter? (.charAt ^String text index)))
+                      (visible-starts-with-end text (inc index) ":"))
+        drive (when drive-colon
+                (or (visible-starts-with-end text drive-colon "\\")
+                    (visible-starts-with-end text drive-colon "/")))
+        unc (visible-starts-with-end text index "\\\\")
+        third-backslash (when unc (visible-starts-with-end text unc "\\"))]
+    (or slash home dot parent drive (and unc (not third-backslash)))))
 
 (defn- first-exact-sensitive-suffix-start
   [text start end]
-  (loop [index start]
+  (loop [index (skip-removable-controls text start)
+         segment-start start]
     (when (< index end)
       (if (contains? #{\\ \/} (.charAt ^String text index))
-        (if-let [suffix-start
-                 (some (fn [suffix]
-                         (let [suffix-start (- index (count suffix))]
-                           (when (and (>= suffix-start start)
-                                      (path-left-delimiter? text suffix-start)
-                                      (.regionMatches ^String text true suffix-start suffix 0 (count suffix)))
-                             suffix-start)))
-                       [".ssh" "id_rsa"])]
-          suffix-start
-          (recur (inc index)))
-        (recur (inc index))))))
+        (if (and (path-left-delimiter? text segment-start)
+                 (or (and (= 4 (visible-character-count text segment-start index))
+                          (= index (visible-region-matches-ignore-case?
+                                    text segment-start ".ssh")))
+                     (and (= 6 (visible-character-count text segment-start index))
+                          (= index (visible-region-matches-ignore-case?
+                                    text segment-start "id_rsa")))))
+          segment-start
+          (let [next-index (skip-removable-controls text (inc index))]
+            (recur next-index next-index)))
+        (recur (skip-removable-controls text (inc index)) segment-start)))))
 
 (defn- path-span-scanner
   [text]
@@ -407,9 +516,8 @@
       (if (>= index (.length ^String text))
         {:text (str builder)
          :actionable? (aget actionable 0)}
-        (let [stack-frame (when (and (left-boundary? text index unicode-word-or-underscore?)
-                                     (.startsWith ^String text "at" index))
-                            (match-end stack-frame-pattern text index))
+        (let [stack-frame (when (left-boundary? text index unicode-word-or-underscore?)
+                            (stack-frame-end text index))
               credential-start? (and (>= index checked-credential-key-end)
                                      (left-boundary? text index ascii-key-delimiter?))
               credential-key-end (if credential-start?
