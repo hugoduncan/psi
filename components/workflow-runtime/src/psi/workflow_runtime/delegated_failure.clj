@@ -98,8 +98,10 @@
 
 (defn- span-match
   [pattern text index]
-  (let [match (re-find pattern (subs text index))]
-    (if (vector? match) (first match) match)))
+  (let [matcher (.matcher ^java.util.regex.Pattern pattern text)]
+    (.region matcher index (.length ^String text))
+    (when (.lookingAt matcher)
+      (.group matcher))))
 
 (def ^:private stack-frame-pattern
   #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
@@ -192,7 +194,7 @@
       (if (>= index (.length ^String text))
         (str builder)
         (let [stack-frame (when (and (left-boundary? text index unicode-word-or-underscore?)
-                                     (str/starts-with? (subs text index) "at"))
+                                     (.startsWith ^String text "at" index))
                             (span-match stack-frame-pattern text index))
               credential (when (left-boundary? text index ascii-key-delimiter?)
                            (span-match credential-pattern text index))

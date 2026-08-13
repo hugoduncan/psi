@@ -158,3 +158,44 @@
     (let [raw " token=secret at child.core/run(child.clj:42) open /private/file.edn "
           sanitized (delegated-failure/sanitize-component raw)]
       (is (= sanitized (delegated-failure/sanitize-component sanitized))))))
+
+(deftest sanitize-component-large-input-test
+  ;; Scanning a large ordinary prefix remains practical without suffix copies.
+  (let [prefix (apply str (repeat 50000 "x"))
+        input (str prefix " token=secret denied")]
+    (is (= (str prefix " [REDACTED] denied")
+           (delegated-failure/sanitize-component input)))))
+
+(deftest sanitize-component-boundary-test
+  ;; The lexical scanner honours precedence, token minima, and span boundaries.
+  (testing "redacts supported spans without consuming adjacent punctuation"
+    (doseq [[input expected]
+            [["api_key => 'secret value'; denied" "[REDACTED]; denied"]
+             ["token=abc123 request rejected" "[REDACTED] request rejected"]
+             ["password: \"abc\\\" 123\", denied" "[REDACTED], denied"]
+             ["token=" "token="]
+             ["token=\"\"" "token=\"\""]
+             ["credential=''" "credential=''"]
+             ["token=\"abc" "token=\"abc"]
+             ["credential='abc" "credential='abc"]
+             ["token=\"abc\\\"def" "token=\"abc\\\"def"]
+             ["credential='abc\\'def" "credential='abc\\'def"]
+             ["tokenish=abc" "[REDACTED]"]
+             ["x-token=abc" "[REDACTED]"]
+             ["sk-abcdefgh, denied" "[REDACTED_TOKEN], denied"]
+             ["pk-1234567 denied" "pk-1234567 denied"]
+             ["Bearer 12345678=." "[REDACTED_TOKEN]."]
+             ["Bearer 1234567=" "Bearer 1234567="]
+             ["Bearer 1234567." "Bearer 1234567."]
+             ["sk-1234567." "sk-1234567."]
+             ["ask-abcdefgh" "ask-abcdefgh"]
+             ["open C:/private/file.edn" "open [PATH_REDACTED]"]
+             ["open ~/private/file.edn" "open [PATH_REDACTED]"]
+             ["read ./.ssh/id_rsa" "read [PATH_REDACTED]"]
+             ["open ../private/file.edn!" "open [PATH_REDACTED]!"]
+             ["read config\\secret-store.edn." "read [PATH_REDACTED]."]
+             ["read public/file.edn" "read public/file.edn"]
+             ["read config/Secret-store.edn" "read [PATH_REDACTED]"]
+             ["at child.core/run(child.clj:42) token=secret"
+              "[STACKTRACE_REDACTED] [REDACTED]"]]]
+      (is (= expected (delegated-failure/sanitize-component input)) input))))
