@@ -1,3 +1,4 @@
 - architectural review added 2 new design steps
 - ambiguity review added 3 new design steps
 - inconsistency review added 1 new design step
+- design-step handoff: preserve delegated run status, retry, blocking, and cancellation semantics; change only deterministic failure diagnostics along `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/delegate.clj` → `progression_recording.clj` → `components/agent-session/src/psi/agent_session/workflow_execution.clj` → `mutations/canonical_workflows.clj`. Keep child-run state canonical and avoid child-session/transcript scraping. Likely focused proof homes are `components/agent-session/test/psi/agent_session/mutations/canonical_workflows_test.clj` and an end-to-end delegated-step boundary test adjacent to `workflow_delegate_result_boundary_test.clj`.
