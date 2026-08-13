@@ -62,11 +62,16 @@
 
 ## Slice 5 — Registered tool and async surfaces
 
-- [ ] Extend the registered synchronous delegate tool boundary test to execute a real failing delegated workflow and assert provider-facing text is exactly `Error: <canonical message>` with no success result synthesis.
-- [ ] Add publication tests asserting async completion and background-job payload `:error` fields equal the canonical message unchanged.
-- [ ] Add notification and append-entry tests asserting each existing context wrapper embeds the canonical message exactly once, before any optional result section, without re-sanitization or truncation.
-- [ ] Verify asynchronous returned failure records preserve the same `:error` value and existing status/result behavior.
-- [ ] Run `clj-paren-repair` and focused registered-tool, workflow orchestration/text, and async-path Scry namespaces; inspect structured results and make the slice green.
+- [x] Extend the registered synchronous delegate tool boundary test to execute a real failing delegated workflow and assert provider-facing text is exactly `Error: <canonical message>` with no success result synthesis.
+  - The registered `delegate` tool now runs a real parent/child failing statechart fixture through its provider-facing adapter boundary; it returns the canonical envelope message with the existing semantic-error transport behavior.
+- [x] Add publication tests asserting async completion and background-job payload `:error` fields equal the canonical message unchanged.
+  - `delegated-result-publication` proof asserts both completion and canonical background-job payload retain the same string; the async worker proof verifies its returned failure record and completion callback share it.
+- [x] Add notification and append-entry tests asserting each existing context wrapper embeds the canonical message exactly once, before any optional result section, without re-sanitization or truncation.
+  - Publication proof checks the exact wrapper text and occurrence count.
+- [x] Verify asynchronous returned failure records preserve the same `:error` value and existing status/result behavior.
+  - `execute-async!` is exercised with its real future and nullable mutation seam; its returned failure record remains `{:status :failed :error <canonical>}`.
+- [x] Run `clj-paren-repair` and focused registered-tool, workflow orchestration/text, and async-path Scry namespaces; inspect structured results and make the slice green.
+  - `clj-paren-repair` and `clj-kondo` passed for all changed paths. Focused Scry passed: registered tool + delegate boundary + canonical mutation tests (12 tests / 48 assertions), and async path (8 tests / 38 assertions).
 
 ## Slice 6 — Regression, coherence, and user-facing record
 

@@ -98,6 +98,63 @@
       (is (= :completed (get-in publication [:background-job :payload :delegate-status])))
       (is (= :info (get-in publication [:notification :level]))))))
 
+(deftest delegated-failure-publication-preserves-canonical-message-test
+  ;; Projection receives an already normalized envelope message and must preserve
+  ;; it exactly in every asynchronous result surface and wrapper.
+  (testing "failed delegate publication neither replaces nor re-sanitizes the canonical message"
+    (let [message "Delegated workflow 'child' failed at step 'build': tool timed out"
+          publication (orchestration/delegated-result-publication
+                       {:run-id "parent-run"
+                        :workflow-name "parent"
+                        :parent-session-id "session-1"
+                        :include-result? false
+                        :exec-result {:psi.workflow/status :failed
+                                      :psi.workflow/result nil
+                                      :psi.workflow/error message}})
+          notification (get-in publication [:notification :message])
+          entry (get-in publication [:append-entry :data])]
+      (is (= message (get-in publication [:completion :error])))
+      (is (= message (get-in publication [:background-job :payload :error])))
+      (is (= :failed (get-in publication [:background-job :status])))
+      (is (= "Workflow 'parent' failed: Delegated workflow 'child' failed at step 'build': tool timed out (run parent-run)"
+             notification))
+      (is (= "Workflow 'parent' — failed: Delegated workflow 'child' failed at step 'build': tool timed out (run parent-run)"
+             entry))
+      (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) notification))))
+      (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) entry)))))))
+
+(deftest async-delegated-failure-return-record-preserves-canonical-message-test
+  ;; The asynchronous worker's returned record and completion callback share the
+  ;; mutation's canonical error instead of deriving a second error projection.
+  (testing "async execution returns and publishes the delegated error verbatim"
+    (let [message "Delegated workflow 'child' failed at step 'build': tool timed out"
+          inflight* (atom {})
+          published* (atom [])
+          run-id (orchestration/execute-async!
+                  {:mutate! (fn [operation _args]
+                              (case operation
+                                psi.workflow/execute-run
+                                {:psi.workflow/status :failed
+                                 :psi.workflow/error message}))
+                   :start-background-job! (fn [_session-id _run-id _workflow-name]
+                                            {:job-id "job-1"})
+                   :mark-background-job-terminal! (fn [& _] nil)
+                   :notify! (fn [& _] nil)
+                   :refresh-widgets! (fn [] nil)
+                   :inflight-runs inflight*
+                   :on-async-completion-fn (fn [& args]
+                                             (swap! published* conj (last args)))}
+                  "parent-run" "session-1" "parent" false)
+          result (orchestration/await-run-completion inflight* run-id 1000)]
+      (is (= {:run-id "parent-run"
+              :workflow "parent"
+              :status :failed
+              :error message}
+             result))
+      (is (= [{:psi.workflow/status :failed
+               :psi.workflow/error message}]
+             @published*)))))
+
 (deftest top-level-worker-cancel-wakes-parked-wait-and-terminalizes-cleanly-test
   ;; Tests the acceptance path with real futures and dispatch effects: cancelling
   ;; a top-level run interrupts the parked worker future, then terminalizes the

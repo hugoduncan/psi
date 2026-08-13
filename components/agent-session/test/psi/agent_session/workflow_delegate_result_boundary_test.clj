@@ -7,7 +7,8 @@
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
    [psi.agent-session.workflow.core :as workflow-core]
-   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]))
+   [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.workflow-registry.registry :as workflow-registry]))
 
 (defn- clean-workflow-runtime-state
   [f]
@@ -23,13 +24,60 @@
 
 (use-fixtures :each clean-workflow-runtime-state)
 
+(def child-definition
+  {:definition-id "child"
+   :name "child"
+   :steps [{:name "child-step"
+            :type :session
+            :contributions [{:type :template
+                             :text "Do {{input}}"
+                             :vars {"input" {:from :workflow-input}}}]}]})
+
+(def parent-definition
+  {:definition-id "parent"
+   :name "parent"
+   :steps [{:name "delegate-child"
+            :type :delegate
+            :target "child"
+            :prompt-string "Carry out the child workflow."
+            :context []}]})
+
+(defn- failing-actor-turn
+  [session-id]
+  {:status :error
+   :session-id session-id
+   :assistant-message {:role "assistant"
+                       :error-message "upstream request rejected"
+                       :content [{:type :error :text "upstream request rejected"}]}
+   :assistant-text ""
+   :execution-result {}
+   :failure {:reason :provider-unavailable
+             :message "upstream request rejected"}})
+
 (defn- create-delegate-boundary-context
-  []
-  (let [[ctx session-id] (test-support/create-test-session
-                          {:persist? false
-                           :mutations mutations/all-mutations})]
-    (workflow-bootstrap/init-built-in! ctx session-id)
-    [ctx session-id]))
+  ([]
+   (create-delegate-boundary-context {}))
+  ([opts]
+   (let [[base-ctx session-id] (test-support/create-test-session
+                                {:persist? false
+                                 :mutations mutations/all-mutations})
+         ctx (merge base-ctx opts)
+         workflow-ctx (assoc ctx :workflow-execute-actor-turn-fn
+                             (:workflow-execute-actor-turn-fn opts))]
+     (workflow-bootstrap/init-built-in! workflow-ctx session-id)
+     [workflow-ctx session-id])))
+
+(defn- register-workflow-definitions!
+  [ctx definitions]
+  (swap! (:state* ctx)
+         (fn [state]
+           (reduce (fn [next-state definition]
+                     (first (workflow-registry/register-definition next-state definition)))
+                   state
+                   definitions)))
+  (workflow-runtime-state/assoc-state!
+   :loaded-definitions
+   (into {} (map (juxt :name identity) definitions))))
 
 (defn- run-delegate-tool-call!
   [ctx session-id arguments]
@@ -80,6 +128,25 @@
           "the tool invocation transport remains successful")
       (is (= "Error: Unknown workflow 'agent'. Use action=list to see available workflows."
              text)))))
+
+(deftest delegate-run-failed-child-workflow-is-visible-at-tool-boundary-test
+  ;; Exercises the registered synchronous delegate tool and the real parent/child
+  ;; statechart path rather than an adapter-specific failure substitute.
+  (testing "canonical delegated failure is rendered once as provider-facing error text"
+    (let [[ctx session-id]
+          (create-delegate-boundary-context
+           {:workflow-execute-actor-turn-fn
+            (fn [_ctx child-session-id _prompt]
+              (failing-actor-turn child-session-id))})
+          _ (register-workflow-definitions! ctx [child-definition parent-definition])
+          result (run-delegate-tool-call!
+                  ctx
+                  session-id
+                  {:action "run" :workflow "parent" :prompt "hello" :mode "sync"})]
+      (is (false? (:is-error result))
+          "the provider transport remains successful for a semantic workflow failure")
+      (is (= "Error: Delegated workflow 'child' failed at step 'child-step': upstream request rejected"
+             (visible-result-text result))))))
 
 (deftest delegate-list-empty-registry-is-visible-at-tool-boundary-test
   ;; Empty delegate list output is meaningful content, not absence of content.

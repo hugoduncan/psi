@@ -105,3 +105,10 @@ table-tested without sessions or adapters.
   mutation with retention zero. Projection is intentionally source-agnostic: it
   returns the handed-off message verbatim while lower-runtime tests remain the
   authority for source selection and envelope construction.
+- Slice 5 proves the registered synchronous tool through a real parent/child
+  statechart failure and proves all asynchronous output surfaces are pass-through:
+  completion/background-job fields contain the canonical message unchanged, while
+  notification and append-entry add their existing wrappers exactly once. The
+  sync wait had been reading only namespaced mutation keys while its async future
+  returns unqualified keys; it now supports both equivalent internal result
+  shapes without changing the provider-facing contract.

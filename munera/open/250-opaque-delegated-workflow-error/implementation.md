@@ -58,3 +58,14 @@
   stays owned and proven at the lower workflow-runtime boundary. Focused Scry:
   delegated mutation test 3/20; existing canonical mutation regression 12/137;
   clj-kondo clean.
+- 2026-08-13 Slice 5: registered the real parent/child failed-statechart fixture
+  at the provider-facing `delegate` tool boundary. It renders exactly `Error:
+  <canonical delegated message>` without changing the semantic-error transport
+  convention. Added state-based publication tests: completion and background-job
+  payloads retain the canonical error; notification and append-entry wrap it once
+  unchanged; the async future returns the same error record delivered to its
+  completion callback. Discovered that synchronous delegate waits receive the
+  unqualified internal async record, while direct mutations return namespaced
+  keys; `delegate-run` now accepts both equivalent key shapes, preventing an
+  `unknown` success projection from hiding any synchronous workflow failure.
+  Focused Scry: 20 tests / 86 assertions; clj-kondo and clj-paren-repair clean.
