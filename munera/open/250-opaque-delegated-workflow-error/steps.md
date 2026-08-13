@@ -286,3 +286,7 @@
   - Public docs now distinguish an execution-failed parent attempt from the terminal failure published after retries are exhausted, and explicitly note that a successful retry supersedes the failed attempt.
 - [x] Correct `doc/workflows.md`'s redaction summary so it does not imply that every path is replaced. The implemented contract redacts absolute, home-relative, dot-relative, drive, and UNC paths, but redacts other relative paths only when they contain a specified sensitive segment; ordinary relative paths remain visible.
   - The workflow guide now enumerates the redacted path families and states that ordinary relative paths remain visible.
+
+## Latest code-shaper review follow-ups
+
+- [ ] Make `sanitized-component` evaluate span recognizers in lexical-precedence order and stop after the first match instead of eagerly computing stack-frame, credential, token, and path candidates before the precedence `cond`. The current coordinator obscures its first-match contract, performs lower-priority scans even when a higher-priority span already wins, and can advance stateful quote/path scanners for candidates whose results are discarded. Preserve the exact redaction behavior and add an overlap/precedence regression that would detect lower-priority recognizer evaluation affecting subsequent scanning.
