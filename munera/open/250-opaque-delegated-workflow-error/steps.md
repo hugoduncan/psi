@@ -229,3 +229,7 @@
 
 - [x] Make literal-placeholder recognition operate on the same virtual control-stripped view as sensitive-span recognition, without reintroducing unbounded allocation. A removable control inside an existing placeholder (for example, `[REDAC\u0000TED]`) currently yields sanitized text `[REDACTED]` but marks the component actionable because the raw placeholder is emitted in fragments; placeholder-only targets and execution-error causes can therefore bypass the specified fallback/actionability rule. Add exact sanitizer and envelope tests for control-split placeholders in target, step, and cause positions.
   - Literal placeholders now use the existing virtual-view matcher and its raw end offset. Exact sanitizer and envelope tests prove control-split placeholders remain non-actionable in cause, target, and step positions.
+
+## Actionability consistency code-shaper follow-ups
+
+- [ ] Remove the competing public `delegated-failure/actionable?` implementation or make the sanitizer's scanner-derived actionability the singular locally comprehensible API. Production decisions use `sanitized-component`'s control-aware, redaction-aware flag, while `actionable?` independently strips only literal placeholders and therefore reports raw sensitive or control-split inputs such as `token=secret`, `/secret`, and `[REDAC\u0000TED]` as actionable. Consolidate the implementations and update tests to exercise the same actionability path production uses, so future callers cannot silently select different semantics.
