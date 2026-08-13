@@ -10,6 +10,14 @@
    :terminal-outcome terminal-outcome
    :current-step-id current-step-id})
 
+(deftype CountingCharSequence [^String text examined-position-count]
+  CharSequence
+  (length [_] (.length text))
+  (charAt [_ index]
+    (aset-int examined-position-count 0 (inc (aget examined-position-count 0)))
+    (.charAt text index))
+  (subSequence [_ start end] (.subSequence text start end)))
+
 (deftest safe-reason-test
   ;; The exact public keyword grammar and bound govern both validation and envelopes.
   (let [body-64 (apply str (repeat 64 "a"))
@@ -191,17 +199,25 @@
                        delimiter-runs-before-late-path)]
         (is (= 512 (delegated-failure/code-point-count sanitized)))
         (is (= (apply str (take 512 (cycle "x "))) sanitized)))))
-  (testing "late separator lookup examines each input position only once"
-    ;; This deterministic work measure includes positions examined inside each
-    ;; lookup, unlike a query-call count that can hide a linear suffix search.
+  (testing "late separator lookup examines no input after indexing"
+    ;; A counting CharSequence observes every character inspection performed by
+    ;; the scanner. Replacing cached queries with suffix searches increases this
+    ;; count, without relying on production-maintained counters or elapsed time.
     (doseq [separator ["/" "\\"]]
       (let [delimiter-runs-before-late-path
             (str (apply str (repeat 16000 "x ")) separator "tail")
-            {:keys [path-separator-examined-position-count]}
-            (delegated-failure/sanitize-component-analysis
-             delimiter-runs-before-late-path)]
+            examined-position-count (int-array 1)
+            counting-text (CountingCharSequence.
+                           delimiter-runs-before-late-path
+                           examined-position-count)
+            separator-at-or-after?
+            (#'delegated-failure/path-separator-scanner counting-text)]
         (is (= (count delimiter-runs-before-late-path)
-               path-separator-examined-position-count)))))
+               (aget examined-position-count 0)))
+        (doseq [index (range 0 (count delimiter-runs-before-late-path) 2)]
+          (separator-at-or-after? index))
+        (is (= (count delimiter-runs-before-late-path)
+               (aget examined-position-count 0))))))
   (let [late-actionable-message (str (apply str (repeat 5000 "token=secret "))
                                      "request denied")
         run (workflow-run

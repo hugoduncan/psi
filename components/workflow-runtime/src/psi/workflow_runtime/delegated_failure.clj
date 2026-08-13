@@ -451,19 +451,16 @@
         (recur (next-visible-index text index))))))
 
 (defn- path-separator-scanner
-  [text examined-position-count]
+  [^CharSequence text]
   ;; Index both separator families while examining each raw input position once.
   ;; Queries compare cached indexes and therefore examine no additional input.
   (let [[last-slash last-backslash]
         (loop [index 0
                last-slash -1
                last-backslash -1]
-          (if (>= index (.length ^String text))
+          (if (>= index (.length text))
             [last-slash last-backslash]
-            (let [character (.charAt ^String text index)]
-              (aset-int examined-position-count
-                        0
-                        (inc (aget examined-position-count 0)))
+            (let [character (.charAt text index)]
               (recur (inc index)
                      (if (= character \/) index last-slash)
                      (if (= character \\) index last-backslash)))))]
@@ -472,14 +469,14 @@
           (>= last-backslash index)))))
 
 (defn- path-span-scanner
-  [text examined-position-count]
+  [text]
   ;; A rejected run can only become sensitive at a later candidate when dropping
   ;; its first-segment prefix exposes an exact .ssh or id_rsa segment. The first
   ;; such candidate consumes the rest of the run, so no later starts are needed.
   ;; Cache a separator-free remainder immediately: no supported absolute or
   ;; relative path can begin there, and repeatedly scanning it adds no evidence.
   (let [cached-run (volatile! nil)
-        separator-at-or-after? (path-separator-scanner text examined-position-count)]
+        separator-at-or-after? (path-separator-scanner text)]
     (fn [index]
       (when (path-left-delimiter? text index)
         (let [{:keys [end exact-suffix-start] :as cached} @cached-run
@@ -535,80 +532,64 @@
         (recur (+ index (Character/charCount code-point)))))))
 
 (defn- sanitized-component
-  ([text]
-   (sanitized-component text (int-array 1)))
-  ([text path-separator-examined-position-count]
-   (let [builder (StringBuilder.)
-         output-count (int-array 1)
-         pending-space (boolean-array 1)
-         actionable (boolean-array 1)
-         quote-end-scanners {\' (quote-end-scanner text \')
-                             \" (quote-end-scanner text \")}
-         path-span (path-span-scanner
-                    text path-separator-examined-position-count)]
-     (loop [index 0
-            checked-credential-key-end 0]
-       (if (>= index (.length ^String text))
-         {:text (str builder)
-          :actionable? (aget actionable 0)}
-         (let [stack-frame (when (left-boundary? text index unicode-word-or-underscore?)
-                             (stack-frame-end text index))
-               credential-start? (and (>= index checked-credential-key-end)
-                                      (left-boundary? text index ascii-key-delimiter?))
-               credential-key-end (if credential-start?
-                                    (credential-key-end text index)
-                                    checked-credential-key-end)
-               credential (when credential-start?
-                            (credential-span text index credential-key-end quote-end-scanners))
-               bearer (when (left-boundary? text index ascii-key-delimiter?)
-                        (bearer-token-end text index))
-               prefixed-token (when (left-boundary? text index token-character?)
-                                (prefixed-token-end text index))
-               path (path-span index)
-               [literal-placeholder placeholder-end]
-               (some (fn [placeholder]
-                       (when-let [end (visible-starts-with-end text index placeholder)]
-                         [placeholder end]))
-                     placeholders)
-               [span-end replacement redact?] (cond
-                                                stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
-                                                credential [credential "[REDACTED]" true]
-                                                bearer [bearer "[REDACTED_TOKEN]" true]
-                                                prefixed-token [prefixed-token "[REDACTED_TOKEN]" true]
-                                                path [path "[PATH_REDACTED]" true]
-                                                literal-placeholder
-                                                [placeholder-end literal-placeholder false])]
-           (if span-end
-             (do
-               (append-normalized-text! builder output-count pending-space replacement)
-               (recur span-end
-                      (if redact? credential-key-end checked-credential-key-end)))
-             (let [code-point (.codePointAt ^String text index)]
-               (when-not (removable-control? code-point)
-                 (when (Character/isLetterOrDigit code-point)
-                   (aset-boolean actionable 0 true))
-                 (append-normalized-code-point!
-                  builder output-count pending-space code-point))
-               (recur (+ index (Character/charCount code-point))
-                      credential-key-end)))))))))
-
-(defn sanitize-component-analysis
-  "Sanitize public text and report path-separator input positions examined.
-
-   The work measure includes all raw input positions inspected while indexing or
-   querying separator locations, making the linear bound deterministic."
   [text]
-  (when (string? text)
-    (let [examined-position-count (int-array 1)
-          result (sanitized-component text examined-position-count)]
-      (assoc result
-             :path-separator-examined-position-count
-             (aget examined-position-count 0)))))
+  (let [builder (StringBuilder.)
+        output-count (int-array 1)
+        pending-space (boolean-array 1)
+        actionable (boolean-array 1)
+        quote-end-scanners {\' (quote-end-scanner text \')
+                            \" (quote-end-scanner text \")}
+        path-span (path-span-scanner text)]
+    (loop [index 0
+           checked-credential-key-end 0]
+      (if (>= index (.length ^String text))
+        {:text (str builder)
+         :actionable? (aget actionable 0)}
+        (let [stack-frame (when (left-boundary? text index unicode-word-or-underscore?)
+                            (stack-frame-end text index))
+              credential-start? (and (>= index checked-credential-key-end)
+                                     (left-boundary? text index ascii-key-delimiter?))
+              credential-key-end (if credential-start?
+                                   (credential-key-end text index)
+                                   checked-credential-key-end)
+              credential (when credential-start?
+                           (credential-span text index credential-key-end quote-end-scanners))
+              bearer (when (left-boundary? text index ascii-key-delimiter?)
+                       (bearer-token-end text index))
+              prefixed-token (when (left-boundary? text index token-character?)
+                               (prefixed-token-end text index))
+              path (path-span index)
+              [literal-placeholder placeholder-end]
+              (some (fn [placeholder]
+                      (when-let [end (visible-starts-with-end text index placeholder)]
+                        [placeholder end]))
+                    placeholders)
+              [span-end replacement redact?] (cond
+                                               stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
+                                               credential [credential "[REDACTED]" true]
+                                               bearer [bearer "[REDACTED_TOKEN]" true]
+                                               prefixed-token [prefixed-token "[REDACTED_TOKEN]" true]
+                                               path [path "[PATH_REDACTED]" true]
+                                               literal-placeholder
+                                               [placeholder-end literal-placeholder false])]
+          (if span-end
+            (do
+              (append-normalized-text! builder output-count pending-space replacement)
+              (recur span-end
+                     (if redact? credential-key-end checked-credential-key-end)))
+            (let [code-point (.codePointAt ^String text index)]
+              (when-not (removable-control? code-point)
+                (when (Character/isLetterOrDigit code-point)
+                  (aset-boolean actionable 0 true))
+                (append-normalized-code-point!
+                 builder output-count pending-space code-point))
+              (recur (+ index (Character/charCount code-point))
+                     credential-key-end))))))))
 
 (defn sanitize-component
   "Remove controls, redact sensitive spans, and normalize bounded public text."
   [text]
-  (:text (sanitize-component-analysis text)))
+  (:text (when (string? text) (sanitized-component text))))
 
 (defn actionable?
   "True when sanitized public text retains a letter or digit outside placeholders."
