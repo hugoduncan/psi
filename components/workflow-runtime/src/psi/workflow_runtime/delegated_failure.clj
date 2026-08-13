@@ -264,12 +264,14 @@
                                (reverse (workflow-statechart/effective-step-order
                                          (:effective-definition workflow-run))))
         step-id (cond
-                  (contains? step-runs terminal-step-id) terminal-step-id
-                  (contains? step-runs current-step-id) current-step-id
+                  (and (valid-step-id? terminal-step-id)
+                       (contains? step-runs terminal-step-id)) terminal-step-id
+                  (and (valid-step-id? current-step-id)
+                       (contains? step-runs current-step-id)) current-step-id
                   :else fallback-step-id)
         attempts (get-in step-runs [step-id :attempts])
         terminal-attempt-id (get-in workflow-run [:terminal-outcome :attempt-id])
-        attempt (or (when (some? terminal-attempt-id)
+        attempt (or (when (valid-step-id? terminal-attempt-id)
                       (some #(when (= terminal-attempt-id (:attempt-id %)) %) attempts))
                     (last attempts))]
     {:step-id step-id

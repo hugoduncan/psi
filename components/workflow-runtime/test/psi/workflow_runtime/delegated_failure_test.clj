@@ -374,6 +374,49 @@
                                             :reason :last-failure
                                             :step-id "last"
                                             :attempt-id "last-latest"}}}
+             {:label "persisted non-string terminal step selects the valid current step"
+              :run (workflow-run
+                    {:step-order ["current"]
+                     :current-step-id "current"
+                     :step-runs {42 {:attempts [{:attempt-id "invalid-step-attempt"
+                                                 :status :execution-failed
+                                                 :execution-error {:message "invalid step failure"}}]}
+                                 "current" {:attempts [{:attempt-id "current-latest"
+                                                        :status :execution-failed
+                                                        :execution-error {:reason :current-failure
+                                                                          :message "current failure"}}]}}
+                     :terminal-outcome {:step-id 42}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'current': current failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :current-failure
+                                            :step-id "current"
+                                            :attempt-id "current-latest"}}}
+             {:label "persisted non-string current step selects the last failed effective step"
+              :run (workflow-run
+                    {:step-order ["first" "last"]
+                     :current-step-id 42
+                     :step-runs {42 {:attempts [{:attempt-id "invalid-step-attempt"
+                                                 :status :execution-failed
+                                                 :execution-error {:message "invalid step failure"}}]}
+                                 "last" {:attempts [{:attempt-id "last-latest"
+                                                     :status :execution-failed
+                                                     :execution-error {:reason :last-failure
+                                                                       :message "last failure"}}]}
+                                 "first" {:attempts [{:attempt-id "first-attempt"
+                                                      :status :execution-failed
+                                                      :execution-error {:message "first failure"}}]}}
+                     :terminal-outcome {:step-id "unknown"}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'last': last failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :last-failure
+                                            :step-id "last"
+                                            :attempt-id "last-latest"}}}
              {:label "unknown terminal attempt selects the selected step's latest attempt"
               :run (workflow-run
                     {:step-order ["build"]
@@ -386,6 +429,26 @@
                                                       :execution-error {:reason :latest-failure
                                                                         :message "latest failure"}}]}}
                      :terminal-outcome {:step-id "build" :attempt-id "unknown"}})
+              :expected {:reason :delegated-workflow-failed
+                         :message "Delegated workflow 'child' failed at step 'build': latest failure"
+                         :delegate-failure {:source :execution-error
+                                            :run-id "child-run"
+                                            :target "child"
+                                            :reason :latest-failure
+                                            :step-id "build"
+                                            :attempt-id "build-latest"}}}
+             {:label "persisted non-string terminal attempt selects the selected step's latest attempt"
+              :run (workflow-run
+                    {:step-order ["build"]
+                     :current-step-id "build"
+                     :step-runs {"build" {:attempts [{:attempt-id 42
+                                                      :status :execution-failed
+                                                      :execution-error {:message "invalid identity failure"}}
+                                                     {:attempt-id "build-latest"
+                                                      :status :execution-failed
+                                                      :execution-error {:reason :latest-failure
+                                                                        :message "latest failure"}}]}}
+                     :terminal-outcome {:step-id "build" :attempt-id 42}})
               :expected {:reason :delegated-workflow-failed
                          :message "Delegated workflow 'child' failed at step 'build': latest failure"
                          :delegate-failure {:source :execution-error
