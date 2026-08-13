@@ -124,6 +124,12 @@ table-tested without sessions or adapters.
   absent id, so selection deterministically uses the latest ordered attempt as
   required. The pure contract now also proves negative lexical boundaries and
   control removal before whitespace normalization.
+- Slice 6 matrix expansion proves the remaining high-risk deterministic selector
+  branches without implementation changes: an explicitly named terminal attempt
+  wins, effective step order—not map order—selects a fallback failed step, and
+  absent selected identity is omitted. It also proves exact 512-code-point
+  non-truncation, escaped target/step rendering, placeholder actionability, and
+  nested allowlist exclusion of child data.
 - Slice 6 lexical completion treats U+0085 (NEXT LINE) as whitespace despite its
   JVM control classification, so it delimits paths and normalizes safely instead
   of being silently removed. Scanner regexes now use Unicode whitespace semantics

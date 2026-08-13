@@ -283,3 +283,134 @@
       (is (= "Delegated workflow 'child' failed at step 'delegate': nested [REDACTED] rejected"
              (:message result)))
       (is (not (contains? (:delegate-failure result) :nested-cause))))))
+
+(deftest delegated-failure-selection-invariants-test
+  ;; Ordered run state, rather than map order or unallowlisted child data, defines the envelope.
+  (testing "uses the effective step order and an explicitly named terminal attempt"
+    (let [run (workflow-run
+               {:step-order ["compile" "publish"]
+                :step-runs {"publish" {:attempts [{:attempt-id "publish-1"
+                                                   :status :execution-failed
+                                                   :execution-error {:message "publish failed"}}]}
+                            "compile" {:attempts [{:attempt-id "compile-1"
+                                                   :status :execution-failed
+                                                   :execution-error {:message "compile failed"}}
+                                                  {:attempt-id "compile-2"
+                                                   :status :execution-failed
+                                                   :execution-error {:message "terminal compile failure"}}]}}
+                :terminal-outcome {:step-id "compile" :attempt-id "compile-1"}})]
+      (is (= {:step-id "compile"
+              :attempt {:attempt-id "compile-1"
+                        :status :execution-failed
+                        :execution-error {:message "compile failed"}}}
+             (delegated-failure/terminal-step-attempt run)))))
+
+  (testing "uses the last failed effective step when terminal and current identities are unavailable"
+    (let [run (workflow-run
+               {:step-order ["first" "last"]
+                :step-runs {"last" {:attempts [{:attempt-id "last-attempt"
+                                                :status :execution-failed
+                                                :execution-error {:message "last failure"}}]}
+                            "first" {:attempts [{:attempt-id "first-attempt"
+                                                 :status :execution-failed
+                                                 :execution-error {:message "first failure"}}]}}
+                :terminal-outcome {}})]
+      (is (= {:step-id "last"
+              :attempt {:attempt-id "last-attempt"
+                        :status :execution-failed
+                        :execution-error {:message "last failure"}}}
+             (delegated-failure/terminal-step-attempt run)))))
+
+  (testing "omits all unavailable location and cause fields in a source fallback"
+    (let [run (workflow-run {:step-order [] :step-runs {} :terminal-outcome {}})]
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow failed"
+              :delegate-failure {:source :fallback
+                                 :run-id "run-absent"
+                                 :target "child"}}
+             (delegated-failure/delegated-failure run "run-absent" "child"))))))
+
+(deftest delegated-failure-message-contract-test
+  ;; Public assembly keeps useful text while preserving the exact bounded grammar.
+  (testing "uses an actionable redacted cause and escapes target and step identities"
+    (let [run (workflow-run
+               {:step-order ["build's\\step"]
+                :current-step-id "build's\\step"
+                :step-runs {"build's\\step" {:attempts [{:attempt-id "attempt-1"
+                                                         :status :execution-failed
+                                                         :execution-error {:message "token=secret request rejected"}}]}}
+                :terminal-outcome {:step-id "build's\\step"}})]
+      (is (= "Delegated workflow 'child\\'s\\\\flow' failed at step 'build\\'s\\\\step': [REDACTED] request rejected"
+             (:message (delegated-failure/delegated-failure run "run-escape" "child's\\flow"))))))
+
+  (testing "does not truncate a message already at the 512-code-point boundary"
+    (let [prefix "Delegated workflow 'child' failed at step 'build': "
+          cause (apply str (repeat (- 512 (delegated-failure/code-point-count prefix)) "a"))
+          run (workflow-run
+               {:step-order ["build"]
+                :current-step-id "build"
+                :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                                 :status :execution-failed
+                                                 :execution-error {:message cause}}]}}
+                :terminal-outcome {:step-id "build"}})
+          message (:message (delegated-failure/delegated-failure run "run-boundary" "child"))]
+      (is (= 512 (delegated-failure/code-point-count message)))
+      (is (not (str/ends-with? message " ... [truncated]")))))
+
+  (testing "treats placeholder-only target, step, and cause text as non-actionable"
+    (is (not (delegated-failure/actionable? "[REDACTED_TOKEN]")))
+    (is (not (delegated-failure/actionable? "[PATH_REDACTED] [STACKTRACE_REDACTED]")))
+    (is (true? (delegated-failure/actionable? "[REDACTED] request rejected")))))
+
+(deftest nested-delegated-failure-allowlist-test
+  ;; Recognized nesting copies only immediate safe identity and reuses normal sanitization.
+  (testing "copies valid optional identity independently and excludes unallowlisted child data"
+    (let [nested {:reason :delegated-workflow-failed
+                  :message "nested token=secret rejected"
+                  :delegate-failure {:source :fallback
+                                     :run-id "grandchild-run"
+                                     :target "grandchild"
+                                     :reason :unsafe!reason
+                                     :step-id ""
+                                     :attempt-id "grandchild-attempt"
+                                     :nested-cause {:run-id "ignored"}
+                                     :details {:provider-response "must not cross"}}
+                  :data {:exception "must not cross"}
+                  :result "must not cross"}
+          run (workflow-run
+               {:step-order ["delegate"]
+                :current-step-id "delegate"
+                :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                    :status :execution-failed
+                                                    :execution-error nested}]}}
+                :terminal-outcome {:step-id "delegate"}})]
+      (is (= {:reason :delegated-workflow-failed
+              :message "Delegated workflow 'child' failed at step 'delegate': nested [REDACTED] rejected"
+              :delegate-failure {:source :execution-error
+                                 :run-id "child-run"
+                                 :target "child"
+                                 :reason :delegated-workflow-failed
+                                 :step-id "delegate"
+                                 :attempt-id "attempt-1"
+                                 :nested-cause {:run-id "grandchild-run"
+                                                :target "grandchild"
+                                                :attempt-id "grandchild-attempt"}}}
+             (delegated-failure/delegated-failure run "child-run" "child")))))
+
+  (testing "rejects a nested envelope with an invalid source without changing ordinary cause selection"
+    (let [nested {:reason :delegated-workflow-failed
+                  :message "nested failure"
+                  :delegate-failure {:source :unknown
+                                     :run-id "grandchild-run"
+                                     :target "grandchild"}}
+          run (workflow-run
+               {:step-order ["delegate"]
+                :current-step-id "delegate"
+                :step-runs {"delegate" {:attempts [{:attempt-id "attempt-1"
+                                                    :status :execution-failed
+                                                    :execution-error nested}]}}
+                :terminal-outcome {:step-id "delegate"}})
+          result (delegated-failure/delegated-failure run "child-run" "child")]
+      (is (= "Delegated workflow 'child' failed at step 'delegate': nested failure"
+             (:message result)))
+      (is (not (contains? (:delegate-failure result) :nested-cause))))))
