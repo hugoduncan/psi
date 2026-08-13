@@ -48,7 +48,7 @@
       with no safe actionable cause). The current design mentions both `:error`
       and `:result nil` but only explicitly proposes changing `:error`.
 
-- [ ] Make the canonical public-message normalization contract testable and
+- [x] Make the canonical public-message normalization contract testable and
       singular. Define the exact target/step prefix and terminal-outcome rendering,
       the allowlist behind "safe keyword" and "bounded numeric/count metadata",
       the observable treatment of stack frames and local/secret-bearing paths,
@@ -58,7 +58,7 @@
       conforming implementations can persist different messages or disagree on
       whether unsafe input falls back.
 
-- [ ] Define the exact source and shape of `:nested-cause` identity. A delegated
+- [x] Define the exact source and shape of `:nested-cause` identity. A delegated
       execution error has both outer `:execution-error :reason`
       (`:delegated-workflow-failed`) and inner `:delegate-failure :reason`; state
       which one is copied, confirm that run/target/step/attempt fields come from
@@ -68,7 +68,7 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
-- [ ] Reconcile the parent-visible claim that async completion, background-job,
+- [x] Reconcile the parent-visible claim that async completion, background-job,
       notification, and append-entry projections "reuse the same error string"
       with their current public shapes. Completion/background-job payloads carry
       the canonical string as an `:error` value, but notification and append-entry
