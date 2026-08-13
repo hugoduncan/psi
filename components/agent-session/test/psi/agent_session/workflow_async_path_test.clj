@@ -132,7 +132,7 @@
                        {:run-id "parent-run"
                         :workflow-name "parent"
                         :parent-session-id "session-1"
-                        :include-result? true
+                        :include-result? false
                         :exec-result {:psi.workflow/status :failed
                                       :psi.workflow/result result-text
                                       :psi.workflow/error message}})
@@ -148,10 +148,13 @@
       (is (= 1 (occurrence-count entry)))
       (is (= (str "Workflow 'parent' failed: " message " (run parent-run)")
              notification))
-      (is (= (str "Workflow 'parent' — failed: " message " (run parent-run)")
+      (is (= (str "Workflow 'parent' — failed: " message " (run parent-run)"
+                  "\n\nResult:\n" result-text)
              entry))
+      (is (true? (get-in publication [:append-entry :enabled?])))
       (is (not (str/includes? notification result-text)))
-      (is (not (str/includes? entry result-text))))))
+      (is (< (str/index-of entry message)
+             (str/index-of entry "Result:"))))))
 
 (deftest async-delegated-failure-return-record-preserves-canonical-message-test
   ;; The asynchronous worker's returned record and completion callback share the
