@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.context :as context]
+   [psi.agent-session.core :as session]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.workflow.core :as wl]
@@ -157,36 +158,104 @@
              (str/index-of entry "Result:"))))))
 
 (deftest async-delegated-failure-return-record-preserves-canonical-message-test
-  ;; The asynchronous worker's returned record and completion callback share the
-  ;; mutation's canonical error instead of deriving a second error projection.
-  (testing "async execution returns and publishes the delegated error verbatim"
-    (let [message "Delegated workflow 'child' failed at step 'build': tool timed out"
+  ;; Real workflow mutation and publication logic carry the normalized child
+  ;; failure through canonical job state, notification, and session append entry.
+  (testing "async execution returns and publishes a real delegated error verbatim"
+    (let [child-definition {:definition-id "async-failing-child"
+                            :name "async-failing-child"
+                            :steps [{:name "child-step"
+                                     :type :session
+                                     :contributions [{:type :template
+                                                      :text "Do {{input}}"
+                                                      :vars {"input" {:from :workflow-input}}}]}]}
+          parent-definition {:definition-id "async-failing-parent"
+                             :name "async-failing-parent"
+                             :steps [{:name "delegate-child"
+                                      :type :delegate
+                                      :target "async-failing-child"
+                                      :prompt-string "Carry out the child workflow."
+                                      :context []}]}
+          actor-release (promise)
+          base-ctx (session/create-context {:persist? false
+                                            :mutations mutations/all-mutations
+                                            :ui-type :tui})
+          session-id (:session-id (session/new-session-in! base-ctx nil {}))
+          ctx (assoc base-ctx
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx child-session-id _prompt & _]
+                       @actor-release
+                       {:status :error
+                        :session-id child-session-id
+                        :assistant-message {:role "assistant"
+                                            :error-message "upstream request rejected"
+                                            :content [{:type :error
+                                                       :text "upstream request rejected"}]}
+                        :assistant-text ""
+                        :execution-result {}
+                        :failure {:reason :provider-unavailable
+                                  :message "upstream request rejected"}}))
+          runtime (runtime-fns/make-extension-runtime-fns
+                   ctx session-id wl/built-in-workflow-path)
+          real-mutate! (:mutate-fn runtime)
+          appended* (atom [])
+          mutate! (fn [operation params]
+                    (when (= 'psi.extension/append-entry operation)
+                      (swap! appended* conj params))
+                    (real-mutate! operation params))
           inflight* (atom {})
-          published* (atom [])
-          run-id (orchestration/execute-async!
-                  {:mutate! (fn [operation _args]
-                              (case operation
-                                psi.workflow/execute-run
-                                {:psi.workflow/status :failed
-                                 :psi.workflow/error message}))
-                   :start-background-job! (fn [_session-id _run-id _workflow-name]
-                                            {:job-id "job-1"})
-                   :mark-background-job-terminal! (fn [& _] nil)
-                   :notify! (fn [& _] nil)
-                   :refresh-widgets! (fn [] nil)
-                   :inflight-runs inflight*
-                   :on-async-completion-fn (fn [& args]
-                                             (swap! published* conj (last args)))}
-                  "parent-run" "session-1" "parent" false)
-          result (orchestration/await-run-completion inflight* run-id 1000)]
-      (is (= {:run-id "parent-run"
-              :workflow "parent"
-              :status :failed
-              :error message}
-             result))
-      (is (= [{:psi.workflow/status :failed
-               :psi.workflow/error message}]
-             @published*)))))
+          notifications* (atom [])
+          refresh! (fn [] nil)
+          notify! (fn [message level]
+                    (swap! notifications* conj {:message message :level level}))
+          mark-terminal! (partial orchestration/mark-background-job-terminal! mutate!)
+          completion! (fn [run-id workflow-name parent-session-id include-result? exec-result]
+                        (orchestration/on-async-completion!
+                         {:mutate! mutate!
+                          :notify! notify!
+                          :mark-background-job-terminal! mark-terminal!
+                          :inject-result-into-context! (fn [& _] nil)
+                          :refresh-widgets! refresh!
+                          :inflight-runs inflight*}
+                         run-id workflow-name parent-session-id include-result? exec-result))]
+      (mutate! 'psi.workflow/register-definition {:definition child-definition})
+      (mutate! 'psi.workflow/register-definition {:definition parent-definition})
+      (mutate! 'psi.workflow/create-run
+               {:definition-id "async-failing-parent"
+                :workflow-input "async proof"
+                :run-id "async-parent-run"})
+      (let [run-id (orchestration/execute-async!
+                    {:mutate! mutate!
+                     :start-background-job! (partial orchestration/start-background-job! mutate!)
+                     :mark-background-job-terminal! mark-terminal!
+                     :notify! notify!
+                     :refresh-widgets! refresh!
+                     :inflight-runs inflight*
+                     :on-async-completion-fn completion!}
+                    "async-parent-run" session-id "async-failing-parent" false)
+            _ (deliver actor-release true)
+            result (orchestration/await-run-completion inflight* run-id 3000)
+            message "Delegated workflow 'async-failing-child' failed at step 'child-step': upstream request rejected"
+            job (->> (ss/get-state-value-in ctx (ss/state-path :background-jobs))
+                     :jobs-by-id
+                     vals
+                     (filter #(= "async-parent-run" (:workflow-id %)))
+                     first)
+            entry (last @appended*)]
+        (is (= {:run-id "async-parent-run"
+                :workflow "async-failing-parent"
+                :status :failed
+                :error message}
+               result))
+        (is (= :failed (:status job)))
+        (is (= message (get-in job [:terminal-payload :error])))
+        (is (= [{:message (str "Workflow 'async-failing-parent' failed: " message
+                               " (run async-parent-run)")
+                 :level :warn}]
+               @notifications*))
+        (is (= "delegate-result" (:custom-type entry)))
+        (is (= (str "Workflow 'async-failing-parent' — failed: " message
+                    " (run async-parent-run)")
+               (:data entry)))))))
 
 (deftest top-level-worker-cancel-wakes-parked-wait-and-terminalizes-cleanly-test
   ;; Tests the acceptance path with real futures and dispatch effects: cancelling
