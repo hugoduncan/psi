@@ -39,6 +39,9 @@
            (delegated-failure/sanitize-component "open C:\\private\\file.edn")))
     (is (= "open [PATH_REDACTED]"
            (delegated-failure/sanitize-component "open \\\\server\\share\\file.edn")))
+    (let [three-backslashes (apply str (repeat 3 "\\"))
+          input (str "open " three-backslashes "server\\share\\file.edn")]
+      (is (= input (delegated-failure/sanitize-component input))))
     (is (= "open C:private\\file.edn"
            (delegated-failure/sanitize-component "open C:private\\file.edn")))
     (is (= "read [PATH_REDACTED]."

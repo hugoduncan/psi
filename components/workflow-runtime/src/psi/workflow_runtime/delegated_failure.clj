@@ -158,7 +158,8 @@
       (str/starts-with? path "./")
       (str/starts-with? path "../")
       (boolean (re-find #"^[A-Za-z]:[\\/]" path))
-      (str/starts-with? path "\\\\")))
+      (and (str/starts-with? path "\\\\")
+           (not (str/starts-with? path "\\\\\\")))))
 
 (defn- secret-bearing-relative-path?
   [path]
