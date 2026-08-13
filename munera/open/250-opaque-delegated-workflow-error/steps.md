@@ -175,3 +175,8 @@
 
 - [x] Add a state-based delegated-step regression test with a real retry-enabled child or parent delegate attempt where the first attempt fails with one actionable error and the terminal retry fails with another. Assert the final parent attempt envelope, public mutation error, failed statuses, and attempt count so the terminal retry wins and existing retry semantics remain intact. The current pure selector and facade-handoff fixtures fabricate ordered attempts, while `terminal_contract_execution_test.clj` exercises successful delegation without retries; together they do not prove acceptance criteria 4 and 8 through the changed delegate normalization/progression path.
   - The mutation-level regression installs a valid two-attempt retry policy on the canonical parent delegate step, drives two real failed child runs through delegate normalization and progression recording, and proves the second envelope wins while both parent attempts and child runs remain failed.
+
+## Documentation review follow-ups
+
+- [ ] Update `README.md` and `doc/workflows.md` to describe the user-visible delegated-failure behavior: failed child workflows now surface a bounded, safely redacted actionable message when available, retain the generic fallback otherwise, and do not change failed status or failure-result semantics. The changelog is currently the only user-facing documentation of this behavior.
+- [ ] Update the relevant `ramora/` workflow delegation documentation to record the implemented failure-diagnostic boundary: delegate failures expose the canonical sanitized message while arbitrary callee internals remain runtime/debug-only and successful delegated yield/handoff contracts remain unchanged.
