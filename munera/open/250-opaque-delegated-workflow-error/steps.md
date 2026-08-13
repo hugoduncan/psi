@@ -35,11 +35,14 @@
 
 ## Slice 3 — Facade terminal-error handoff
 
-- [ ] Reuse the deterministic terminal step/attempt selector in `workflow_execution.clj` to read the selected parent attempt's exact persisted `:execution-error` before returning from execute or resume.
-- [ ] Add private `:terminal-execution-error` to the facade result with nil when no selected attempt error exists, without changing terminal/blocked/status semantics.
-- [ ] Add workflow-execution tests proving the handoff selects the terminal/latest applicable attempt rather than an earlier retry and preserves exact map identity/value.
-- [ ] Add exact-shape assertions proving every public `:steps-executed` entry retains its existing keys and string `:error` projection and does not expose the envelope.
-- [ ] Run `clj-paren-repair` and the focused workflow-execution Scry namespaces; inspect structured results and make the slice green.
+- [x] Reuse the deterministic terminal step/attempt selector in `workflow_execution.clj` to read the selected parent attempt's exact persisted `:execution-error` before returning from execute or resume.
+  - `execution-result` reuses `delegated-failure/terminal-step-attempt`; no second selector or child-run inspection was added.
+- [x] Add private `:terminal-execution-error` to the facade result with nil when no selected attempt error exists, without changing terminal/blocked/status semantics.
+- [x] Add workflow-execution tests proving the handoff selects the terminal/latest applicable attempt rather than an earlier retry and preserves exact map identity/value.
+  - The narrow test uses scrambled `:step-runs` plus an earlier retry and verifies the terminal envelope value exactly.
+- [x] Add exact-shape assertions proving every public `:steps-executed` entry retains its existing keys and string `:error` projection and does not expose the envelope.
+- [x] Run `clj-paren-repair` and the focused workflow-execution Scry namespaces; inspect structured results and make the slice green.
+  - `clojure -M:test-paths -m scry.cli --namespace psi.agent-session.workflow-execution-handoff-test` passed: 2 tests, 5 assertions; focused `clj-kondo` reported 0 errors and 0 warnings.
 
 ## Slice 4 — Execute/resume projection through retention
 
