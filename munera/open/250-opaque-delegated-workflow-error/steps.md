@@ -180,3 +180,7 @@
 
 - [x] Update `README.md` and `doc/workflows.md` to describe the user-visible delegated-failure behavior: failed child workflows now surface a bounded, safely redacted actionable message when available, retain the generic fallback otherwise, and do not change failed status or failure-result semantics. The changelog is currently the only user-facing documentation of this behavior.
 - [x] Update the relevant `ramora/` workflow delegation documentation to record the implemented failure-diagnostic boundary: delegate failures expose the canonical sanitized message while arbitrary callee internals remain runtime/debug-only and successful delegated yield/handoff contracts remain unchanged.
+
+## Documentation re-review follow-ups
+
+- [ ] Qualify the delegated-failure status claims in `README.md`, `doc/workflows.md`, and `ramora/workflow-ir/step-forms.md`: a failed child makes that parent delegate attempt execution-failed, but authored retry policy may supersede it and let the parent step/workflow succeed; the parent remains failed only when retries are exhausted. The current unconditional claims that the workflow, parent, or step "remains failed" contradict the preserved retry semantics.
