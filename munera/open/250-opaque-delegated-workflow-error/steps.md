@@ -90,3 +90,8 @@
   - Re-read after the selector/message matrix expansion confirms the only child-failure construction is lower-runtime `delegated-failure/delegated-failure`; facade, mutations, tool, and async paths only carry or render its message. Exact-map examples and fallback location retention match the focused proof. Remaining unchecked acceptance bullets are explicitly enumerated regression/matrix proof gaps, not ownership or scope deviations.
 - [x] Record implementation decisions, test evidence, and any discovered trade-offs in `implementation.md`, then check completed items and prepare the task for implementation review.
   - Final pass completed the remaining lexical, unsafe-target integration, and non-delegated terminal-outcome regression proof. All implementation checklist items are complete; task is ready for implementation review.
+
+## Implementation review follow-ups
+
+- [ ] Fix unquoted credential-pair scanning so its value ends only at the specified whitespace or `,;)]}` delimiters, not at apostrophes or double quotes; add positive tests such as `token=abc\"def denied` and `token=abc'def denied` proving no credential suffix remains visible.
+- [ ] Update the public `execute-run!` return-shape docstring in `workflow_execution.clj` to include the always-present private `:terminal-execution-error` handoff (map or nil), keeping the documented facade contract aligned with `execution-result`.
