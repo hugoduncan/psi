@@ -6,6 +6,8 @@
 
 (def fallback-message "Delegated workflow failed")
 
+(def ^:private max-component-code-points 512)
+
 (def ^:private placeholders
   ["[STACKTRACE_REDACTED]"
    "[PATH_REDACTED]"
@@ -49,17 +51,33 @@
       (Character/isWhitespace code-point)
       (Character/isSpaceChar code-point)))
 
+(defn- removable-control?
+  [code-point]
+  (and (Character/isISOControl code-point)
+       (not (whitespace-code-point? code-point))))
+
+(defn- contains-removable-control?
+  [text]
+  (loop [index 0]
+    (when (< index (.length ^String text))
+      (let [code-point (.codePointAt ^String text index)]
+        (or (removable-control? code-point)
+            (recur (+ index (Character/charCount code-point))))))))
+
 (defn- remove-controls
   [text]
-  (let [builder (StringBuilder.)]
-    (loop [index 0]
-      (if (>= index (.length ^String text))
-        (str builder)
-        (let [code-point (.codePointAt ^String text index)]
-          (when (or (not (Character/isISOControl code-point))
-                    (whitespace-code-point? code-point))
-            (.appendCodePoint builder code-point))
-          (recur (+ index (Character/charCount code-point))))))))
+  ;; Preserve the original string in the overwhelmingly common no-control case.
+  ;; A filtered copy remains necessary when deletion can join lexical spans.
+  (if-not (contains-removable-control? text)
+    text
+    (let [builder (StringBuilder.)]
+      (loop [index 0]
+        (if (>= index (.length ^String text))
+          (str builder)
+          (let [code-point (.codePointAt ^String text index)]
+            (when-not (removable-control? code-point)
+              (.appendCodePoint builder code-point))
+            (recur (+ index (Character/charCount code-point)))))))))
 
 (defn- left-boundary?
   [text index predicate]
@@ -324,16 +342,48 @@
             (let [path (trim-path-punctuation (subs text index end))]
               (when (seq path) path))))))))
 
-(defn- redact-spans
+(defn- append-bounded-code-point!
+  [builder output-count code-point]
+  (when (< (aget output-count 0) max-component-code-points)
+    (.appendCodePoint ^StringBuilder builder code-point)
+    (aset-int output-count 0 (inc (aget output-count 0)))))
+
+(defn- append-normalized-code-point!
+  [builder output-count pending-space code-point]
+  (if (whitespace-code-point? code-point)
+    (when (pos? (aget output-count 0))
+      (aset-boolean pending-space 0 true))
+    (do
+      (when (and (aget pending-space 0)
+                 (< (aget output-count 0) max-component-code-points))
+        (append-bounded-code-point! builder output-count (int \space)))
+      (aset-boolean pending-space 0 false)
+      (append-bounded-code-point! builder output-count code-point))))
+
+(defn- append-normalized-text!
+  [builder output-count pending-space text]
+  (loop [index 0]
+    (when (< index (.length ^String text))
+      (let [code-point (.codePointAt ^String text index)]
+        (append-normalized-code-point!
+         builder output-count pending-space code-point)
+        (recur (+ index (Character/charCount code-point)))))))
+
+(defn- sanitized-component
   [text]
-  (let [builder (StringBuilder.)
+  (let [text (remove-controls text)
+        builder (StringBuilder.)
+        output-count (int-array 1)
+        pending-space (boolean-array 1)
+        actionable (boolean-array 1)
         quote-end-scanners {\' (quote-end-scanner text \')
                             \" (quote-end-scanner text \")}
         path-span (path-span-scanner text)]
     (loop [index 0
            checked-credential-key-end 0]
       (if (>= index (.length ^String text))
-        (str builder)
+        {:text (str builder)
+         :actionable? (aget actionable 0)}
         (let [stack-frame (when (and (left-boundary? text index unicode-word-or-underscore?)
                                      (.startsWith ^String text "at" index))
                             (span-match stack-frame-pattern text index))
@@ -349,42 +399,34 @@
               prefixed-token (when (left-boundary? text index token-character?)
                                (prefixed-token-span text index))
               path (path-span index)
-              [span replacement] (cond
-                                   stack-frame [stack-frame "[STACKTRACE_REDACTED]"]
-                                   credential [credential "[REDACTED]"]
-                                   bearer [bearer "[REDACTED_TOKEN]"]
-                                   (seq prefixed-token) [prefixed-token "[REDACTED_TOKEN]"]
-                                   path [path "[PATH_REDACTED]"])]
+              literal-placeholder (some #(when (.startsWith ^String text % index) %)
+                                        placeholders)
+              [span replacement redact?] (cond
+                                           stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
+                                           credential [credential "[REDACTED]" true]
+                                           bearer [bearer "[REDACTED_TOKEN]" true]
+                                           (seq prefixed-token) [prefixed-token "[REDACTED_TOKEN]" true]
+                                           path [path "[PATH_REDACTED]" true]
+                                           literal-placeholder
+                                           [literal-placeholder literal-placeholder false])]
           (if span
             (do
-              (.append builder replacement)
-              (recur (+ index (.length ^String span)) credential-key-end))
+              (append-normalized-text! builder output-count pending-space replacement)
+              (recur (+ index (.length ^String span))
+                     (if redact? credential-key-end checked-credential-key-end)))
             (let [code-point (.codePointAt ^String text index)]
-              (.appendCodePoint builder code-point)
+              (when (Character/isLetterOrDigit code-point)
+                (aset-boolean actionable 0 true))
+              (append-normalized-code-point!
+               builder output-count pending-space code-point)
               (recur (+ index (Character/charCount code-point))
                      credential-key-end))))))))
 
-(defn- normalize-whitespace
-  [text]
-  (let [builder (StringBuilder.)]
-    (loop [index 0 whitespace? false]
-      (if (>= index (.length ^String text))
-        (str/trim (str builder))
-        (let [code-point (.codePointAt ^String text index)]
-          (if (whitespace-code-point? code-point)
-            (do
-              (when-not whitespace?
-                (.append builder " "))
-              (recur (+ index (Character/charCount code-point)) true))
-            (do
-              (.appendCodePoint builder code-point)
-              (recur (+ index (Character/charCount code-point)) false))))))))
-
 (defn sanitize-component
-  "Remove controls, redact sensitive spans, and normalize whitespace in text."
+  "Remove controls, redact sensitive spans, and normalize bounded public text."
   [text]
   (when (string? text)
-    (-> text remove-controls redact-spans normalize-whitespace)))
+    (:text (sanitized-component text))))
 
 (defn actionable?
   [text]
@@ -487,10 +529,10 @@
     message))
 
 (defn- public-message
-  [target step cause]
+  [target step step-actionable? cause]
   (bounded-message
    (str "Delegated workflow '" (escape-component target) "' failed"
-        (when (actionable? step)
+        (when step-actionable?
           (str " at step '" (escape-component step) "'"))
         ": " cause)))
 
@@ -500,12 +542,15 @@
   (let [selection (terminal-step-attempt delegate-run)
         error (get-in selection [:attempt :execution-error])
         sanitized-error (when (nonblank-string? (:message error))
-                          (sanitize-component (:message error)))
-        execution-cause (when (actionable? sanitized-error) sanitized-error)
+                          (sanitized-component (:message error)))
+        execution-cause (when (:actionable? sanitized-error) (:text sanitized-error))
         terminal-outcome (:terminal-outcome delegate-run)
         terminal-cause-text (terminal-cause terminal-outcome)
-        target-text (sanitize-component target)
-        step-text (sanitize-component (:step-id selection))
+        target-component (when (string? target) (sanitized-component target))
+        step-component (when (string? (:step-id selection))
+                         (sanitized-component (:step-id selection)))
+        target-text (:text target-component)
+        step-text (:text step-component)
         [source cause reason nested] (cond
                                        execution-cause
                                        [:execution-error execution-cause
@@ -518,7 +563,7 @@
 
                                        :else
                                        [:fallback nil nil nil])
-        actionable-target? (actionable? target-text)
+        actionable-target? (:actionable? target-component)
         [source cause reason nested] (if actionable-target?
                                        [source cause reason nested]
                                        [:fallback nil nil nil])
@@ -530,6 +575,6 @@
                   nested (assoc :nested-cause nested))]
     {:reason :delegated-workflow-failed
      :message (if cause
-                (public-message target-text step-text cause)
+                (public-message target-text step-text (:actionable? step-component) cause)
                 fallback-message)
      :delegate-failure failure}))

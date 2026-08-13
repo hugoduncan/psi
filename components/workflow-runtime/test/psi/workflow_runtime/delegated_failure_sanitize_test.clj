@@ -160,23 +160,33 @@
       (is (= sanitized (delegated-failure/sanitize-component sanitized))))))
 
 (deftest sanitize-component-large-input-test
-  ;; Large unquoted and delimiter-heavy inputs retain linear scanning while
-  ;; still reaching sensitive spans at the end of the input.
-  (let [plain-input (apply str (repeat 250000 "x"))]
-    (is (= plain-input
-           (delegated-failure/sanitize-component plain-input))))
-  (doseq [prefix [(apply str (repeat 50000 "x"))
-                  (apply str (repeat 50000 "."))]]
-    (let [input (str prefix " token=secret denied")]
-      (is (= (str prefix " [REDACTED] denied")
-             (delegated-failure/sanitize-component input)))))
-  (let [prefix (apply str (repeat 50000 ":"))
-        input (str prefix " token=secret denied")]
-    (is (= (str prefix " [REDACTED] denied")
-           (delegated-failure/sanitize-component input))))
+  ;; Full input is scanned for redaction/actionability while retained normalized
+  ;; output stays bounded independently of raw message size.
+  (let [plain-input (apply str (repeat 250000 "x"))
+        sanitized (delegated-failure/sanitize-component plain-input)]
+    (is (= 512 (delegated-failure/code-point-count sanitized)))
+    (is (every? #(= \x %) sanitized)))
+  (doseq [prefix-character ["x" "." ":"]]
+    (let [input (str (apply str (repeat 50000 prefix-character))
+                     " token=secret denied")
+          sanitized (delegated-failure/sanitize-component input)]
+      (is (= 512 (delegated-failure/code-point-count sanitized)))
+      (is (every? #(= (first prefix-character) %) sanitized))))
   (let [rejected-prefix (apply str (repeat 10000 ":.ssh/"))]
     (is (= ":[PATH_REDACTED]"
-           (delegated-failure/sanitize-component rejected-prefix)))))
+           (delegated-failure/sanitize-component rejected-prefix))))
+  (let [late-actionable-message (str (apply str (repeat 50000 "token=secret "))
+                                     "request denied")
+        run (workflow-run
+             {:step-order ["build"]
+              :current-step-id "build"
+              :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                               :status :execution-failed
+                                               :execution-error
+                                               {:message late-actionable-message}}]}}})
+        result (delegated-failure/delegated-failure run "child-run" "child")]
+    (is (= :execution-error (get-in result [:delegate-failure :source])))
+    (is (= 512 (delegated-failure/code-point-count (:message result))))))
 
 (deftest sanitize-component-boundary-test
   ;; The lexical scanner honours precedence, token minima, and span boundaries.
