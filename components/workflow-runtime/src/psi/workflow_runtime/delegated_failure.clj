@@ -431,45 +431,60 @@
         third-backslash (when unc (visible-starts-with-end text unc "\\"))]
     (or slash home dot parent drive (and unc (not third-backslash)))))
 
+(defn- exact-sensitive-segment-end
+  [text index end]
+  (some (fn [segment]
+          (when-let [segment-end (visible-region-matches-ignore-case? text index segment)]
+            (let [separator-index (skip-removable-controls text segment-end)]
+              (when (and (< separator-index end)
+                         (contains? #{\\ \/} (.charAt ^String text separator-index)))
+                separator-index))))
+        [".ssh" "id_rsa"]))
+
 (defn- first-exact-sensitive-suffix-start
   [text start end]
-  (loop [index (skip-removable-controls text start)
-         segment-start start]
+  (loop [index (skip-removable-controls text start)]
     (when (< index end)
-      (if (contains? #{\\ \/} (.charAt ^String text index))
-        (if (and (path-left-delimiter? text segment-start)
-                 (or (and (= 4 (visible-character-count text segment-start index))
-                          (= index (visible-region-matches-ignore-case?
-                                    text segment-start ".ssh")))
-                     (and (= 6 (visible-character-count text segment-start index))
-                          (= index (visible-region-matches-ignore-case?
-                                    text segment-start "id_rsa")))))
-          segment-start
-          (let [next-index (skip-removable-controls text (inc index))]
-            (recur next-index next-index)))
-        (recur (skip-removable-controls text (inc index)) segment-start)))))
+      (if (and (path-left-delimiter? text index)
+               (exact-sensitive-segment-end text index end))
+        index
+        (recur (next-visible-index text index))))))
+
+(defn- path-separator-at-or-after?
+  [text index]
+  (or (not= -1 (.indexOf ^String text "/" index))
+      (not= -1 (.indexOf ^String text "\\" index))))
 
 (defn- path-span-scanner
   [text]
   ;; A rejected run can only become sensitive at a later candidate when dropping
   ;; its first-segment prefix exposes an exact .ssh or id_rsa segment. The first
   ;; such candidate consumes the rest of the run, so no later starts are needed.
+  ;; Cache a separator-free remainder immediately: no supported absolute or
+  ;; relative path can begin there, and repeatedly scanning it adds no evidence.
   (let [cached-run (volatile! nil)]
     (fn [index]
       (when (path-left-delimiter? text index)
         (let [{:keys [end exact-suffix-start] :as cached} @cached-run
               same-run? (and cached (< index end))
-              end (if same-run? end (path-end-index text index))
-              absolute? (absolute-path-prefix-at? text index)
-              trimmed-end (trim-path-punctuation-end text index end)
-              relative? (if same-run?
-                          (= exact-suffix-start index)
-                          (secret-bearing-relative-path? text index trimmed-end))
+              separator? (or same-run? (path-separator-at-or-after? text index))
+              end (cond
+                    same-run? end
+                    separator? (path-end-index text index)
+                    :else (.length ^String text))
+              absolute? (and separator? (absolute-path-prefix-at? text index))
+              trimmed-end (if separator?
+                            (trim-path-punctuation-end text index end)
+                            end)
+              relative? (and separator?
+                             (if same-run?
+                               (= exact-suffix-start index)
+                               (secret-bearing-relative-path? text index trimmed-end)))
               candidate? (or absolute? relative?)]
           (when-not same-run?
             (vreset! cached-run
                      {:end end
-                      :exact-suffix-start (when-not candidate?
+                      :exact-suffix-start (when (and separator? (not candidate?))
                                             (first-exact-sensitive-suffix-start
                                              text index end))}))
           (when (and candidate? (> trimmed-end index))

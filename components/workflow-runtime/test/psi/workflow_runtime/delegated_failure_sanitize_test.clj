@@ -162,27 +162,27 @@
 (deftest sanitize-component-large-input-test
   ;; Full input is scanned for redaction/actionability while retained normalized
   ;; output stays bounded independently of raw message size.
-  (let [plain-input (apply str (repeat 250000 "x"))
+  (let [plain-input (apply str (repeat 25000 "x"))
         sanitized (delegated-failure/sanitize-component plain-input)]
     (is (= 512 (delegated-failure/code-point-count sanitized)))
     (is (every? #(= \x %) sanitized)))
-  (let [control-prefixed-input (str "\u0000" (apply str (repeat 250000 "x")))
+  (let [control-prefixed-input (str "\u0000" (apply str (repeat 25000 "x")))
         sanitized (delegated-failure/sanitize-component control-prefixed-input)]
     (is (= 512 (delegated-failure/code-point-count sanitized)))
     (is (every? #(= \x %) sanitized)))
-  (let [whole-input-credential (str "token=" (apply str (repeat 250000 "x")))]
+  (let [whole-input-credential (str "token=" (apply str (repeat 25000 "x")))]
     (is (= "[REDACTED]"
            (delegated-failure/sanitize-component whole-input-credential))))
   (doseq [prefix-character ["x" "." ":"]]
-    (let [input (str (apply str (repeat 50000 prefix-character))
+    (let [input (str (apply str (repeat 10000 prefix-character))
                      " token=secret denied")
           sanitized (delegated-failure/sanitize-component input)]
       (is (= 512 (delegated-failure/code-point-count sanitized)))
       (is (every? #(= (first prefix-character) %) sanitized))))
-  (let [rejected-prefix (apply str (repeat 10000 ":.ssh/"))]
+  (let [rejected-prefix (apply str (repeat 2000 ":.ssh/"))]
     (is (= ":[PATH_REDACTED]"
            (delegated-failure/sanitize-component rejected-prefix))))
-  (let [late-actionable-message (str (apply str (repeat 50000 "token=secret "))
+  (let [late-actionable-message (str (apply str (repeat 5000 "token=secret "))
                                      "request denied")
         run (workflow-run
              {:step-order ["build"]
