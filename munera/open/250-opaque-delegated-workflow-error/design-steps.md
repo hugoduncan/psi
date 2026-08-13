@@ -47,3 +47,18 @@
       attempt execution error, a terminal-outcome-only failure, and a failure
       with no safe actionable cause). The current design mentions both `:error`
       and `:result nil` but only explicitly proposes changing `:error`.
+
+# Design steps — inconsistency review (design-review session, turn 3)
+
+- [ ] Reconcile the design's blanket claim that delegated failure details are
+      "swallowed" with the current two-path behavior. For a failed child run,
+      `delegate-run-runtime-result` preserves `:terminal-outcome` under the parent
+      failure payload's `:details`, but falls back to only `{:status :failed}`
+      when the child has attempt-level `:execution-error`; later,
+      `workflow-execution/execution-result` and `run-failure-error` render only
+      the parent attempt's generic `:message`, so even retained terminal details
+      do not reach public `:error`. Update the problem/root-cause description to
+      distinguish (a) attempt diagnostics lost at delegate normalization from
+      (b) terminal diagnostics retained canonically but lost at public
+      projection, and require proof for both paths. This aligns the design with
+      the referenced runtime artifacts without changing its scope.

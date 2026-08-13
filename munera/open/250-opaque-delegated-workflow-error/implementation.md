@@ -1,2 +1,3 @@
 - architectural review added 2 new design steps
 - ambiguity review added 3 new design steps
+- inconsistency review added 1 new design step
