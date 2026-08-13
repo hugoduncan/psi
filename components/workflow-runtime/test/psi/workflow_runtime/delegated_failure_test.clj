@@ -82,6 +82,10 @@
              ["prefix/home/alice/private.edn" "prefix/home/alice/private.edn"]
              ["open=/home/alice/private.edn" "open=[PATH_REDACTED]"]
              ["token=abc\u0000\nrequest rejected" "[REDACTED] request rejected"]
+             ["token=\"abc\\\n123\", request rejected"
+              "[REDACTED], request rejected"]
+             ["open /private/file.edn\u0085then retry"
+              "open [PATH_REDACTED] then retry"]
              ["at child.core/run(child.clj:42), token=secret"
               "[STACKTRACE_REDACTED], [REDACTED]"]]]
       (is (= expected (delegated-failure/sanitize-component input)) input))))

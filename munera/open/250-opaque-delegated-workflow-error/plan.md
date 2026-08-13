@@ -124,3 +124,9 @@ table-tested without sessions or adapters.
   absent id, so selection deterministically uses the latest ordered attempt as
   required. The pure contract now also proves negative lexical boundaries and
   control removal before whitespace normalization.
+- Slice 6 lexical completion treats U+0085 (NEXT LINE) as whitespace despite its
+  JVM control classification, so it delimits paths and normalizes safely instead
+  of being silently removed. Scanner regexes now use Unicode whitespace semantics
+  and support escaped line breaks inside quoted credentials. Terminal reason
+  rendering now explicitly follows the safe-keyword grammar, avoiding Clojure's
+  namespace auto-resolution syntax in public text.

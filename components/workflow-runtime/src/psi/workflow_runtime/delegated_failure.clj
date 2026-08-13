@@ -45,7 +45,8 @@
 
 (defn- whitespace-code-point?
   [code-point]
-  (or (Character/isWhitespace code-point)
+  (or (= code-point 0x0085)
+      (Character/isWhitespace code-point)
       (Character/isSpaceChar code-point)))
 
 (defn- remove-controls
@@ -101,10 +102,10 @@
     (if (vector? match) (first match) match)))
 
 (def ^:private stack-frame-pattern
-  #"^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
+  #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
 
 (def ^:private credential-pattern
-  #"(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^\s,;\)\]\}'\"]+)")
+  #"(?U)(?i)^[A-Za-z0-9_.-]*(?:token|secret|password|credential|api-key|api_key)[A-Za-z0-9_.-]*[ \t]*(?:=>|=|:)[ \t]*(?:\"(?:\\[\s\S]|[^\"\\])*\"|'(?:\\[\s\S]|[^'\\])*'|[^\s,;\)\]\}'\"]+)")
 
 (def ^:private bearer-pattern
   #"(?i)^Bearer[ \t]+[A-Za-z0-9._~+/-]{8,}={0,2}")
@@ -283,10 +284,17 @@
   [value]
   (and (integer? value) (<= 0 value Long/MAX_VALUE)))
 
+(defn- render-reason
+  [reason]
+  (let [body (if-let [namespace (namespace reason)]
+               (str namespace "/" (name reason))
+               (name reason))]
+    (str ":" body)))
+
 (defn- terminal-cause
   [terminal-outcome]
   (when (safe-reason? (:reason terminal-outcome))
-    (str "terminal outcome " (:reason terminal-outcome)
+    (str "terminal outcome " (render-reason (:reason terminal-outcome))
          (when (and (= :iteration-limit-reached (:reason terminal-outcome))
                     (valid-terminal-count? (:iteration-count terminal-outcome))
                     (valid-terminal-count? (:max-iterations terminal-outcome)))
