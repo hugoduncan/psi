@@ -1,6 +1,6 @@
 # Design steps — architectural review (design-review session, turn 1)
 
-- [ ] Define one canonical owner for delegated-child failure normalization at the
+- [x] Define one canonical owner for delegated-child failure normalization at the
       workflow-runtime delegate-step boundary. The parent workflow attempt should
       receive one structured failure envelope derived from the persisted child
       run's canonical failure surfaces (including step attempt
@@ -10,7 +10,7 @@
       preserves the single-source/one-way architecture and keeps generic workflow
       execution semantics in workflow runtime rather than in an adapter.
 
-- [ ] Replace the suggested raw stack-trace propagation with a bounded, redacted,
+- [x] Replace the suggested raw stack-trace propagation with a bounded, redacted,
       deterministic delegated-failure diagnostic contract. Preserve an actionable
       human-readable message plus stable structured cause metadata (for example
       reason and child run/step/attempt identity), retain a generic fallback when
@@ -21,7 +21,7 @@
 
 # Design steps — ambiguity review (design-review session, turn 2)
 
-- [ ] Identify the exact observed execution and caller-visible boundary behind
+- [x] Identify the exact observed execution and caller-visible boundary behind
       `:error "Delegated workflow failed"` and `:result nil`. The literal generic
       message currently originates when a workflow `:delegate` step normalizes a
       failed child run, but the design's phrase "delegation runner/tool" does not
@@ -31,7 +31,7 @@
       proof must inspect the result, without moving failure semantics into that
       adapter.
 
-- [ ] Define deterministic cause-selection precedence when a failed delegated run
+- [x] Define deterministic cause-selection precedence when a failed delegated run
       exposes more than one candidate diagnostic: child step-attempt
       `:execution-error`, child `:terminal-outcome`, and a nested delegated-child
       failure. State which attempt/terminal step is selected, whether nested
@@ -39,7 +39,7 @@
       metadata, and when the generic fallback is used. "Propagate the specific
       error" is otherwise not singular for common failed-run shapes.
 
-- [ ] Specify the exact parent-visible failure contract after propagation. State
+- [x] Specify the exact parent-visible failure contract after propagation. State
       whether the parent workflow/delegate operation remains `:failed`, whether
       `:result` intentionally remains nil/absent on failure, which part of the
       canonical structured failure envelope is rendered into the public `:error`
@@ -50,7 +50,7 @@
 
 # Design steps — inconsistency review (design-review session, turn 3)
 
-- [ ] Reconcile the design's blanket claim that delegated failure details are
+- [x] Reconcile the design's blanket claim that delegated failure details are
       "swallowed" with the current two-path behavior. For a failed child run,
       `delegate-run-runtime-result` preserves `:terminal-outcome` under the parent
       failure payload's `:details`, but falls back to only `{:status :failed}`
