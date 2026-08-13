@@ -15,3 +15,4 @@
 - design follow-up completed the 3 attributable items from baseline `6b3af4475`: execution-error eligibility is decided after sanitization and falls through to terminal outcome when non-actionable; resume shares terminal-attempt error selection without adding a result field; unavailable optional envelope identity is always omitted, never nil.
 - architectural review at design baseline `8edb9fca2` found no new feedback
 - ambiguity review at design baseline `8edb9fca2` added 2 new design steps
+- inconsistency review at design baseline `8edb9fca2` found no new feedback
