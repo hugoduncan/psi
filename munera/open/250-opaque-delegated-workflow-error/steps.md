@@ -183,4 +183,4 @@
 
 ## Documentation re-review follow-ups
 
-- [ ] Qualify the delegated-failure status claims in `README.md`, `doc/workflows.md`, and `ramora/workflow-ir/step-forms.md`: a failed child makes that parent delegate attempt execution-failed, but authored retry policy may supersede it and let the parent step/workflow succeed; the parent remains failed only when retries are exhausted. The current unconditional claims that the workflow, parent, or step "remains failed" contradict the preserved retry semantics.
+- [x] Qualify the delegated-failure status claims in `README.md`, `doc/workflows.md`, and `ramora/workflow-ir/step-forms.md`: a failed child makes that parent delegate attempt execution-failed, but authored retry policy may supersede it and let the parent step/workflow succeed; the parent remains failed only when retries are exhausted. The current unconditional claims that the workflow, parent, or step "remains failed" contradict the preserved retry semantics.

@@ -182,7 +182,7 @@ Illustrative shape:
 - the delegated workflow's local `:workflow-original` is rebound for the delegated invocation
 - by default, a successful step yields the delegated workflow's yielded value unchanged
 - when the delegated workflow fails, the step exposes the canonical bounded and safely redacted failure message; arbitrary callee execution details, results, provider/session data, and transcripts remain runtime/debug-only
-- delegated failure remains a failed step and produces no accepted result; successful delegated yield and handoff contracts are unchanged
+- a delegated child failure makes that parent delegate attempt execution-failed and produces no accepted result; authored retry policy may supersede the attempt and let the parent step and workflow succeed, while exhausted retries leave the parent failed; successful delegated yield and handoff contracts are unchanged
 - first cut does not re-export the callee workflow's step-local output surfaces through downstream `{:step ... :output ...}` refs against the delegate step itself
 - optional `[:delegate :session]` config contains only `:session-profile`, `:model`, and `:thinking-level` in the current IR
 - delegate session config shapes the concrete `:inherited-defaults` snapshot passed to the delegated run; it does not construct a delegate actor session for the delegate step itself

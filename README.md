@@ -175,9 +175,12 @@ Project workflows include:
 
 When a delegated child workflow fails, psi reports a bounded, safely redacted
 actionable cause when one is available and otherwise retains the generic
-`Delegated workflow failed` fallback. The workflow remains failed and no success
-result is produced. Completed workflow runs are retained per originating session
-and older runs are cleaned up automatically; retention is configurable. See
+`Delegated workflow failed` fallback. That parent delegate attempt is
+execution-failed and produces no accepted result. Authored retry policy may
+supersede the failed attempt and let the parent step and workflow succeed; the
+parent remains failed only when retries are exhausted. Completed workflow runs
+are retained per originating session and older runs are cleaned up automatically;
+retention is configurable. See
 [`doc/workflows.md`](doc/workflows.md).
 
 ## Extensions

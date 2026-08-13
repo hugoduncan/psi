@@ -111,10 +111,11 @@ If a child workflow called by a `:delegate` step fails, psi surfaces a bounded,
 safely redacted actionable message when the child has one. Sensitive spans such
 as credentials, tokens, paths, and stack frames are replaced before publication.
 When no safe actionable cause is available, the message remains exactly
-`Delegated workflow failed`. In either case, the child and parent retain their
-failed statuses, retries still follow the authored retry policy, and failure does
-not produce an accepted workflow result. Successful delegated yield and handoff
-behavior is unchanged.
+`Delegated workflow failed`. In either case, the child remains failed and that
+parent delegate attempt is execution-failed and produces no accepted result.
+Authored retry policy may supersede the failed attempt and let the parent step
+and workflow succeed; the parent remains failed only when retries are exhausted.
+Successful delegated yield and handoff behavior is unchanged.
 
 If you want a workflow to continue from a narrow request, put that request after
 the workflow name as the prompt text.
