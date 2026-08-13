@@ -54,7 +54,9 @@ table-tested without sessions or adapters.
 - Retry and terminal selection can accidentally depend on map iteration or pick
   historical failures. Derive candidates only from effective `:step-order` and
   ordered attempt vectors, and assert exact selected identities with deliberately
-  scrambled step maps.
+  scrambled step maps. Target-authored workflow compilation does not preserve an
+  arbitrary `:retry-policy`, so prove a child retry's persisted shape with a
+  state-based run map rather than assuming an authored test definition can set it.
 - Retention cleanup can remove the canonical parent run before mutations project
   its error. Select and return the exact envelope in `workflow-execution` before
   cleanup, then test execute and resume with completed-run retention zero.
