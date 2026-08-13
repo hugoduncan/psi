@@ -259,3 +259,7 @@
 
 - [x] Add executable regression proof that distinguishes bounded late-separator scanning from the previous quadratic implementation. The current 16,000-run slash/backslash cases assert only sanitized output, which both implementations produce, so reverting the constant-time `lastIndexOf` cache would leave the suite green. Use a deterministic observable work bound through a public test seam, or place a calibrated scaling check in an explicit slow/benchmark layer; retain the end-to-end output cases separately.
   - `sanitize-component-analysis` exposes deterministic separator scan/query work alongside the public sanitized result. Symmetric late-slash/backslash cases retain exact end-to-end output assertions and prove one indexing scan step per input position with no more than one constant-time separator query per position.
+
+## Current test-shaper re-review follow-ups
+
+- [ ] Replace the separator scan/query counter assertions with proof that accounts for the work performed inside each separator query. `sanitize-component-analysis` counts only the eager indexing pass and the number of query invocations, so changing each query back to a linear suffix search while retaining those counter increments would leave the regression green even though total work is quadratic. Use a deterministic work measure that includes examined input positions, or isolate a calibrated scaling check in an explicit slow/benchmark layer; keep the public output assertions independent of the complexity mechanism.
