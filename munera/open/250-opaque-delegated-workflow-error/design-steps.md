@@ -141,7 +141,7 @@
 
 # Design steps — ambiguity re-review (design-review session, turn 2; baseline `6e7745c82`)
 
-- [ ] Define the exact inclusion rule for valid selected `:step-id` and
+- [x] Define the exact inclusion rule for valid selected `:step-id` and
       `:attempt-id` fields in the persisted envelope for each `:source`; “present
       only for valid” currently constrains invalid values but does not say whether
       valid values are required or discretionary. In particular, define exact
@@ -151,7 +151,7 @@
       `:nested-cause` metadata survives that target-triggered fallback. This keeps
       exact-map tests and downstream identity semantics deterministic.
 
-- [ ] Make backslash-bearing path syntax code-point exact. The current prose uses
+- [x] Make backslash-bearing path syntax code-point exact. The current prose uses
       inline forms such as drive `:\\`, relative `\\`, and “two leading
       backslashes” without saying when backslashes are literal input characters
       versus escaped notation, so implementations can disagree about ordinary
@@ -162,7 +162,7 @@
 
 # Design steps — inconsistency re-review (design-review session, turn 3; baseline `6e7745c82`)
 
-- [ ] Reconcile immediate nested-envelope recognition for invalid optional
+- [x] Reconcile immediate nested-envelope recognition for invalid optional
       metadata. The canonicality paragraph says `:step-id` and `:attempt-id` must
       be nonblank strings and `:reason` must be safe when present, which makes an
       invalid optional field fail recognition; the following paragraph instead
