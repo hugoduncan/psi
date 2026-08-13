@@ -3,6 +3,115 @@
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.delegated-failure :as delegated-failure]))
 
+(defn- workflow-run
+  [{:keys [step-order step-runs terminal-outcome current-step-id]}]
+  {:effective-definition {:step-order step-order}
+   :step-runs step-runs
+   :terminal-outcome terminal-outcome
+   :current-step-id current-step-id})
+
+(deftest safe-reason-test
+  ;; The exact public keyword grammar and bound govern both validation and envelopes.
+  (let [body-64 (apply str (repeat 64 "a"))
+        body-65 (apply str (repeat 65 "a"))
+        cases [{:label "leading letter"
+                :reason :a
+                :safe? true}
+               {:label "leading digit"
+                :reason :0reason
+                :safe? true}
+               {:label "allowed interior punctuation"
+                :reason :a.b_c-d
+                :safe? true}
+               {:label "one namespace slash"
+                :reason :n.s/name_1-x
+                :safe? true}
+               {:label "64-character body"
+                :reason (keyword body-64)
+                :safe? true}
+               {:label "65-character body"
+                :reason (keyword body-65)
+                :safe? false}
+               {:label "empty body"
+                :reason (keyword "")
+                :safe? false}
+               {:label "empty namespace component"
+                :reason (keyword "/reason")
+                :safe? false}
+               {:label "empty name component"
+                :reason (keyword "namespace/")
+                :safe? false}
+               {:label "leading dot"
+                :reason (keyword ".reason")
+                :safe? false}
+               {:label "leading underscore"
+                :reason (keyword "_reason")
+                :safe? false}
+               {:label "leading hyphen"
+                :reason (keyword "-reason")
+                :safe? false}
+               {:label "disallowed character"
+                :reason (keyword "reason!bad")
+                :safe? false}
+               {:label "multiple slashes"
+                :reason (keyword "a/b/c")
+                :safe? false}
+               {:label "non-keyword"
+                :reason "tool-timeout"
+                :safe? false}]]
+    (doseq [{:keys [label reason safe?]} cases]
+      (testing label
+        (let [run (workflow-run {:step-order []
+                                 :step-runs {}
+                                 :terminal-outcome {:reason reason}})
+              result (delegated-failure/delegated-failure run "run-reason" "child")
+              reason-body (when safe?
+                            (if-let [reason-namespace (namespace reason)]
+                              (str reason-namespace "/" (name reason))
+                              (name reason)))
+              expected (if safe?
+                         {:reason :delegated-workflow-failed
+                          :message (str "Delegated workflow 'child' failed: "
+                                        "terminal outcome :" reason-body)
+                          :delegate-failure {:source :terminal-outcome
+                                             :run-id "run-reason"
+                                             :target "child"
+                                             :reason reason}}
+                         {:reason :delegated-workflow-failed
+                          :message delegated-failure/fallback-message
+                          :delegate-failure {:source :fallback
+                                             :run-id "run-reason"
+                                             :target "child"}})]
+          (is (= safe? (delegated-failure/safe-reason? reason)))
+          (is (= expected result)))))))
+
+(deftest execution-error-reason-source-isolation-test
+  ;; An actionable execution error owns its source without borrowing terminal metadata.
+  (testing "omits unsafe or absent execution reasons despite a safe terminal reason"
+    (doseq [{:keys [label execution-error]}
+            [{:label "unsafe execution reason"
+              :execution-error {:reason (keyword "!unsafe")
+                                :message "tool timed out"}}
+             {:label "absent execution reason"
+              :execution-error {:message "tool timed out"}}]]
+      (let [run (workflow-run
+                 {:step-order ["build"]
+                  :current-step-id "build"
+                  :step-runs {"build" {:attempts [{:attempt-id "attempt-1"
+                                                   :status :execution-failed
+                                                   :execution-error execution-error}]}}
+                  :terminal-outcome {:reason :iteration-limit-reached
+                                     :step-id "build"}})]
+        (is (= {:reason :delegated-workflow-failed
+                :message "Delegated workflow 'child' failed at step 'build': tool timed out"
+                :delegate-failure {:source :execution-error
+                                   :run-id "child-run"
+                                   :target "child"
+                                   :step-id "build"
+                                   :attempt-id "attempt-1"}}
+               (delegated-failure/delegated-failure run "child-run" "child"))
+            label)))))
+
 (deftest sanitize-component-remaining-contract-matrix-test
   ;; Each scanner family retains its exact delimiter and punctuation contract.
   (testing "redacts all remaining positive families and rejects partial spans"
