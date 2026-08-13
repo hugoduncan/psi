@@ -149,3 +149,8 @@
   - The sanitizer matrix now preserves complete unterminated single- and double-quoted inputs, including escaped quote content without a closing delimiter.
 - [x] Strengthen the over-512 public-message test to assert the exact output equals the first 496 Unicode code points of the fully assembled message plus ` ... [truncated]`, including a supplementary-code-point boundary case. The current assertions check only total code-point count and suffix, so an incorrect retained-prefix length or content could still pass acceptance criterion 6's exact truncation rule.
   - The boundary proof now compares the exact assembled prefix plus supplementary-code-point content through code point 496 and the exact truncation marker.
+
+## Newest test review follow-ups
+
+- [ ] Add a nested-envelope recognition boundary test with an exactly 512-code-point nonblank message and assert that it remains recognized and contributes the expected immediate `:nested-cause`. The current recognition matrix proves a 513-code-point message is rejected, while the separate 512-code-point public-message test does not exercise nested recognition, so the inclusive upper bound in acceptance criterion 5 is unproved.
+- [ ] Add an exact-envelope execution-error test whose actionable message has an unsafe or missing outer `:reason` while the terminal outcome has a different safe reason. Assert that the source remains `:execution-error`, the envelope omits `:delegate-failure :reason`, and it does not borrow the terminal reason. Existing tests prove safe execution reasons and unsafe nested optional reasons, but not the source-specific no-fallback/no-merge rule for an ordinary selected execution error.
