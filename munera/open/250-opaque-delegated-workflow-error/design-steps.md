@@ -121,7 +121,7 @@
 
 # Design steps — ambiguity re-review (design-review session, turn 2; baseline `8edb9fca2`)
 
-- [ ] Define the source and precedence for the new outer
+- [x] Define the source and precedence for the new outer
       `:delegate-failure :reason` for each `:source`, especially when the selected
       execution error is itself a canonical delegated-failure envelope. The safe
       reason allowlist currently permits both the selected execution error's
@@ -130,7 +130,7 @@
       outer reason is the selected error's reason, the immediate inner reason, or
       omitted, and state the terminal-outcome and fallback rules as well.
 
-- [ ] Make the redaction match boundaries observable rather than relying on the
+- [x] Make the redaction match boundaries observable rather than relying on the
       undefined categories “credential-looking”, “token-looking”, and “path”.
       Define enough lexical behavior to determine what complete span is replaced
       for key/value credentials, bearer and `sk-`/`pk-` values, stack-frame
