@@ -206,6 +206,10 @@
 
 (deftest sanitize-component-boundary-test
   ;; The lexical scanner honours precedence, token minima, and span boundaries.
+  (testing "stops at the first overlapping recognizer without disturbing later spans"
+    (is (= "[REDACTED_TOKEN]:[PATH_REDACTED]"
+           (delegated-failure/sanitize-component
+            "sk-abcdefgh/okay:config/secret/file"))))
   (testing "redacts supported spans without consuming adjacent punctuation"
     (doseq [[input expected]
             [["api_key => 'secret value'; denied" "[REDACTED]; denied"]
