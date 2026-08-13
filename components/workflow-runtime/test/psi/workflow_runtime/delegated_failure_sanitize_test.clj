@@ -166,6 +166,13 @@
         sanitized (delegated-failure/sanitize-component plain-input)]
     (is (= 512 (delegated-failure/code-point-count sanitized)))
     (is (every? #(= \x %) sanitized)))
+  (let [control-prefixed-input (str "\u0000" (apply str (repeat 250000 "x")))
+        sanitized (delegated-failure/sanitize-component control-prefixed-input)]
+    (is (= 512 (delegated-failure/code-point-count sanitized)))
+    (is (every? #(= \x %) sanitized)))
+  (let [whole-input-credential (str "token=" (apply str (repeat 250000 "x")))]
+    (is (= "[REDACTED]"
+           (delegated-failure/sanitize-component whole-input-credential))))
   (doseq [prefix-character ["x" "." ":"]]
     (let [input (str (apply str (repeat 50000 prefix-character))
                      " token=secret denied")

@@ -56,29 +56,6 @@
   (and (Character/isISOControl code-point)
        (not (whitespace-code-point? code-point))))
 
-(defn- contains-removable-control?
-  [text]
-  (loop [index 0]
-    (when (< index (.length ^String text))
-      (let [code-point (.codePointAt ^String text index)]
-        (or (removable-control? code-point)
-            (recur (+ index (Character/charCount code-point))))))))
-
-(defn- remove-controls
-  [text]
-  ;; Preserve the original string in the overwhelmingly common no-control case.
-  ;; A filtered copy remains necessary when deletion can join lexical spans.
-  (if-not (contains-removable-control? text)
-    text
-    (let [builder (StringBuilder.)]
-      (loop [index 0]
-        (if (>= index (.length ^String text))
-          (str builder)
-          (let [code-point (.codePointAt ^String text index)]
-            (when-not (removable-control? code-point)
-              (.appendCodePoint builder code-point))
-            (recur (+ index (Character/charCount code-point)))))))))
-
 (defn- left-boundary?
   [text index predicate]
   (or (zero? index)
@@ -114,12 +91,12 @@
                          (int \,) (int \;)}
                        code-point)))))
 
-(defn- span-match
+(defn- match-end
   [pattern text index]
   (let [matcher (.matcher ^java.util.regex.Pattern pattern text)]
     (.region matcher index (.length ^String text))
     (when (.lookingAt matcher)
-      (.group matcher))))
+      (.end matcher))))
 
 (def ^:private stack-frame-pattern
   #"(?U)^at[ \t]+[\p{L}\p{N}._$/-]+\([^\s()]*:[0-9]+\)")
@@ -143,10 +120,19 @@
       (recur (inc index))
       index)))
 
+(defn- region-contains-ignore-case?
+  [text start end fragment]
+  (let [fragment-length (count fragment)
+        last-start (- end fragment-length)]
+    (loop [index start]
+      (when (<= index last-start)
+        (or (.regionMatches ^String text true index fragment 0 fragment-length)
+            (recur (inc index)))))))
+
 (defn- credential-key?
   [text start end]
-  (let [key (str/lower-case (subs text start end))]
-    (some #(str/includes? key %) credential-key-fragments)))
+  (some #(region-contains-ignore-case? text start end %)
+        credential-key-fragments))
 
 (defn- skip-ascii-space
   [text start]
@@ -215,37 +201,58 @@
               (if (contains? #{\' \"} quote)
                 (let [quote-end ((get quote-end-scanners quote) value-start)]
                   (when (> quote-end (inc value-start))
-                    (subs text start (inc quote-end))))
+                    (inc quote-end)))
                 (let [value-end (unquoted-credential-end text value-start)]
                   (when (> value-end value-start)
-                    (subs text start value-end)))))))))))
+                    value-end))))))))))
 
-(def ^:private bearer-pattern
-  #"(?i)^Bearer[ \t]+[A-Za-z0-9._~+/-]{8,}={0,2}")
+(defn- ascii-region-matches-ignore-case?
+  [text index literal]
+  (and (<= (+ index (count literal)) (.length ^String text))
+       (.regionMatches ^String text true index literal 0 (count literal))))
 
-(def ^:private prefixed-token-pattern
-  #"(?i)^(?:sk-|pk-)[A-Za-z0-9._~+/-]{8,}")
+(defn- token-run-end
+  [text start]
+  (loop [index start]
+    (if (and (< index (.length ^String text))
+             (token-character? (int (.charAt ^String text index))))
+      (recur (inc index))
+      index)))
 
-(defn- trim-token-periods
-  [token]
-  (str/replace token #"\.+$" ""))
+(defn- trim-period-end
+  [text start end]
+  (loop [end end]
+    (if (and (> end start) (= \. (.charAt ^String text (dec end))))
+      (recur (dec end))
+      end)))
 
-(defn- bearer-token-span
+(defn- bearer-token-end
   [text index]
-  (let [span (some-> (span-match bearer-pattern text index)
-                     trim-token-periods)
-        token (some-> span
-                      (str/replace #"(?i)^Bearer[ \t]+" "")
-                      (str/replace #"=+$" ""))]
-    (when (and span (>= (count token) 8))
-      span)))
+  (when (ascii-region-matches-ignore-case? text index "Bearer")
+    (let [token-start (skip-ascii-space text (+ index 6))]
+      (when (> token-start (+ index 6))
+        (let [run-end (token-run-end text token-start)
+              padding-end (loop [padding-end run-end padding-count 0]
+                            (if (and (< padding-end (.length ^String text))
+                                     (< padding-count 2)
+                                     (= \= (.charAt ^String text padding-end)))
+                              (recur (inc padding-end) (inc padding-count))
+                              padding-end))
+              token-end (trim-period-end text token-start run-end)]
+          (when (>= (- token-end token-start) 8)
+            (if (> padding-end run-end)
+              padding-end
+              token-end)))))))
 
-(defn- prefixed-token-span
+(defn- prefixed-token-end
   [text index]
-  (let [span (some-> (span-match prefixed-token-pattern text index)
-                     trim-token-periods)]
-    (when (and span (>= (count (subs span 3)) 8))
-      span)))
+  (when (or (ascii-region-matches-ignore-case? text index "sk-")
+            (ascii-region-matches-ignore-case? text index "pk-"))
+    (let [token-start (+ index 3)
+          run-end (token-run-end text token-start)
+          token-end (trim-period-end text token-start run-end)]
+      (when (>= (- token-end token-start) 8)
+        token-end))))
 
 (defn- path-end-index
   [text start]
@@ -260,23 +267,41 @@
           index
           (recur (+ index (Character/charCount code-point))))))))
 
-(defn- trim-path-punctuation
-  [path]
-  (str/replace path #"[\.:!?]+$" ""))
+(defn- trim-path-punctuation-end
+  [text start end]
+  (loop [end end]
+    (if (and (> end start)
+             (contains? #{\. \: \! \?} (.charAt ^String text (dec end))))
+      (recur (dec end))
+      end)))
+
+(defn- sensitive-path-segment?
+  [text start end]
+  (or (region-contains-ignore-case? text start end "secret")
+      (region-contains-ignore-case? text start end "token")
+      (region-contains-ignore-case? text start end "password")
+      (region-contains-ignore-case? text start end "credential")
+      (and (= (- end start) 4)
+           (.regionMatches ^String text true start ".ssh" 0 4))
+      (and (= (- end start) 6)
+           (.regionMatches ^String text true start "id_rsa" 0 6))))
 
 (defn- secret-bearing-relative-path?
-  [path]
-  (and (or (str/includes? path "/")
-           (str/includes? path "\\"))
-       (some (fn [segment]
-               (let [segment (str/lower-case segment)]
-                 (or (str/includes? segment "secret")
-                     (str/includes? segment "token")
-                     (str/includes? segment "password")
-                     (str/includes? segment "credential")
-                     (= segment ".ssh")
-                     (= segment "id_rsa"))))
-             (str/split path #"[\\/]"))))
+  [text start end]
+  (loop [index start
+         segment-start start
+         has-separator? false
+         sensitive? false]
+    (if (>= index end)
+      (and has-separator?
+           (or sensitive? (sensitive-path-segment? text segment-start end)))
+      (if (contains? #{\\ \/} (.charAt ^String text index))
+        (recur (inc index)
+               (inc index)
+               true
+               (or sensitive?
+                   (sensitive-path-segment? text segment-start index)))
+        (recur (inc index) segment-start has-separator? sensitive?)))))
 
 (defn- ascii-drive-letter?
   [character]
@@ -327,10 +352,10 @@
               same-run? (and cached (< index end))
               end (if same-run? end (path-end-index text index))
               absolute? (absolute-path-prefix-at? text index)
+              trimmed-end (trim-path-punctuation-end text index end)
               relative? (if same-run?
                           (= exact-suffix-start index)
-                          (secret-bearing-relative-path?
-                           (trim-path-punctuation (subs text index end))))
+                          (secret-bearing-relative-path? text index trimmed-end))
               candidate? (or absolute? relative?)]
           (when-not same-run?
             (vreset! cached-run
@@ -338,9 +363,8 @@
                       :exact-suffix-start (when-not candidate?
                                             (first-exact-sensitive-suffix-start
                                              text index end))}))
-          (when candidate?
-            (let [path (trim-path-punctuation (subs text index end))]
-              (when (seq path) path))))))))
+          (when (and candidate? (> trimmed-end index))
+            trimmed-end))))))
 
 (defn- append-bounded-code-point!
   [builder output-count code-point]
@@ -371,8 +395,7 @@
 
 (defn- sanitized-component
   [text]
-  (let [text (remove-controls text)
-        builder (StringBuilder.)
+  (let [builder (StringBuilder.)
         output-count (int-array 1)
         pending-space (boolean-array 1)
         actionable (boolean-array 1)
@@ -386,7 +409,7 @@
          :actionable? (aget actionable 0)}
         (let [stack-frame (when (and (left-boundary? text index unicode-word-or-underscore?)
                                      (.startsWith ^String text "at" index))
-                            (span-match stack-frame-pattern text index))
+                            (match-end stack-frame-pattern text index))
               credential-start? (and (>= index checked-credential-key-end)
                                      (left-boundary? text index ascii-key-delimiter?))
               credential-key-end (if credential-start?
@@ -395,30 +418,33 @@
               credential (when credential-start?
                            (credential-span text index credential-key-end quote-end-scanners))
               bearer (when (left-boundary? text index ascii-key-delimiter?)
-                       (bearer-token-span text index))
+                       (bearer-token-end text index))
               prefixed-token (when (left-boundary? text index token-character?)
-                               (prefixed-token-span text index))
+                               (prefixed-token-end text index))
               path (path-span index)
               literal-placeholder (some #(when (.startsWith ^String text % index) %)
                                         placeholders)
-              [span replacement redact?] (cond
-                                           stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
-                                           credential [credential "[REDACTED]" true]
-                                           bearer [bearer "[REDACTED_TOKEN]" true]
-                                           (seq prefixed-token) [prefixed-token "[REDACTED_TOKEN]" true]
-                                           path [path "[PATH_REDACTED]" true]
-                                           literal-placeholder
-                                           [literal-placeholder literal-placeholder false])]
-          (if span
+              [span-end replacement redact?] (cond
+                                               stack-frame [stack-frame "[STACKTRACE_REDACTED]" true]
+                                               credential [credential "[REDACTED]" true]
+                                               bearer [bearer "[REDACTED_TOKEN]" true]
+                                               prefixed-token [prefixed-token "[REDACTED_TOKEN]" true]
+                                               path [path "[PATH_REDACTED]" true]
+                                               literal-placeholder
+                                               [(+ index (.length ^String literal-placeholder))
+                                                literal-placeholder
+                                                false])]
+          (if span-end
             (do
               (append-normalized-text! builder output-count pending-space replacement)
-              (recur (+ index (.length ^String span))
+              (recur span-end
                      (if redact? credential-key-end checked-credential-key-end)))
             (let [code-point (.codePointAt ^String text index)]
-              (when (Character/isLetterOrDigit code-point)
-                (aset-boolean actionable 0 true))
-              (append-normalized-code-point!
-               builder output-count pending-space code-point)
+              (when-not (removable-control? code-point)
+                (when (Character/isLetterOrDigit code-point)
+                  (aset-boolean actionable 0 true))
+                (append-normalized-code-point!
+                 builder output-count pending-space code-point))
               (recur (+ index (Character/charCount code-point))
                      credential-key-end))))))))
 
