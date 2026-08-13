@@ -234,3 +234,7 @@
 
 - [x] Remove the competing public `delegated-failure/actionable?` implementation or make the sanitizer's scanner-derived actionability the singular locally comprehensible API. Production decisions use `sanitized-component`'s control-aware, redaction-aware flag, while `actionable?` independently strips only literal placeholders and therefore reports raw sensitive or control-split inputs such as `token=secret`, `/secret`, and `[REDAC\u0000TED]` as actionable. Consolidate the implementations and update tests to exercise the same actionability path production uses, so future callers cannot silently select different semantics.
   - `actionable?` now delegates to the scanner-derived `sanitized-component` result; focused cases prove raw credentials, paths, and control-split placeholders use the same production semantics.
+
+## Current task-test review follow-ups
+
+- [ ] Restore bounded execution of `sanitize-component-large-input-test`. The focused `psi.workflow-runtime.delegated-failure-sanitize-test` namespace did not complete within 300 seconds, and the isolated large-input var remained CPU-bound on the first 250,000-character plain input; a thread dump located the scan in `first-exact-sensitive-suffix-start` via `path-span-scanner`. Fix the scanner so this no-path input is locally linear as required by the completed allocation/complexity follow-ups, retain a practical adversarial regression, and verify the focused namespace completes.
