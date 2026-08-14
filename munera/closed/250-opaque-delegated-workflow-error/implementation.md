@@ -1,0 +1,189 @@
+- architectural review added 2 new design steps
+- ambiguity review added 3 new design steps
+- inconsistency review added 1 new design step
+- follow-up handoff: projection facts live in `components/agent-session/src/psi/agent_session/workflow/orchestration.clj` (`delegated-result-publication`) and `workflow/text.clj` (`completion-notification-text`, `completion-entry-content`): completion/background-job preserve the canonical `:error` value, while notification/append-entry wrap it with display context. Treat malformed nested metadata as untrusted: never recurse into runs or let it weaken the sanitized parent message; omission/fallback must be deterministic.
+- design-step handoff: preserve delegated run status, retry, blocking, and cancellation semantics; change only deterministic failure diagnostics along `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/delegate.clj` → `progression_recording.clj` → `components/agent-session/src/psi/agent_session/workflow_execution.clj` → `mutations/canonical_workflows.clj`. Keep child-run state canonical and avoid child-session/transcript scraping. Likely focused proof homes are `components/agent-session/test/psi/agent_session/mutations/canonical_workflows_test.clj` and an end-to-end delegated-step boundary test adjacent to `workflow_delegate_result_boundary_test.clj`.
+- design follow-up completed all 6 items from baseline `7b34cbc9d`: `sync delegate tool → psi.workflow/execute-run → workflow execution → delegate-step normalization`. Important implementation detail: `workflow-execution/execution-result` currently emits every attempt and `run-failure-error` uses the first non-nil error, so propagation must select the terminal step/attempt explicitly or a superseded retry error can win. The reusable redaction precedent is `ui-capabilities/redact-diagnostic-text`, but workflow-runtime cannot depend on agent-session; keep the new normalizer in the lower runtime boundary.
+- no new architectural review feedback
+- ambiguity review added 2 new design steps
+- inconsistency review added 1 new design step
+- design follow-up completed the 3 attributable items from baseline `7f075258d`: the canonical message now has exact source allowlists, rendering, redaction/fallback/truncation behavior, nested identity validation, and per-async-surface projection semantics. Implementation must preserve the 512-code-point envelope unchanged in projection wrappers; malformed nested envelopes contribute no identity but their message may still pass through ordinary untrusted-message sanitization.
+- architectural review at design baseline `6b3af4475` found no new feedback
+- ambiguity review at design baseline `6b3af4475` added 2 new design steps
+- inconsistency review at design baseline `6b3af4475` added 1 new design step
+- new design-step handoff: `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj` routes both execute and resume failures through `run-failure-error`, while resume intentionally has no `:psi.workflow/result`; preserve that surface. `components/workflow-runtime/src/psi/workflow_runtime/progression_recording.clj` persists attempt `:execution-error` maps verbatim and `model.clj` permits an optional map, so settle message eligibility and nil-versus-omission in one lower-runtime constructor/recognizer contract rather than in projections.
+- design follow-up completed the 3 attributable items from baseline `6b3af4475`: execution-error eligibility is decided after sanitization and falls through to terminal outcome when non-actionable; resume shares terminal-attempt error selection without adding a result field; unavailable optional envelope identity is always omitted, never nil.
+- architectural review at design baseline `8edb9fca2` found no new feedback
+- ambiguity review at design baseline `8edb9fca2` added 2 new design steps
+- inconsistency review at design baseline `8edb9fca2` found no new feedback
+- ambiguity-step handoff: distinguish the outer failure classification from the selected underlying cause when defining `:delegate-failure :reason`: operation reasons originate in `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/step_execution.clj`, terminal reasons in `statechart_runtime.clj`, and nested delegated errors have outer `:delegated-workflow-failed` plus inner metadata. For redaction, `components/agent-session/src/psi/agent_session/ui_capabilities.clj` is precedent only, not a drop-in contract: it retains credential/Bearer labels where this design requires replacing the entire expression. Keep normalization in workflow-runtime and define boundary examples/tests before implementation regexes.
+- design follow-up completed both items attributable to baseline `8edb9fca2`: implement outer reasons as a source-specific matrix and redaction as ordered lexical spans; table-test delimiters, quoted credentials, token minimum length/punctuation, path families, and placeholder-only fallback.
+- architectural review at design baseline `6e7745c82` found no new feedback
+- ambiguity review at design baseline `6e7745c82` added 2 new design steps
+- ambiguity-step handoff: settle identity retention when fallback is caused by an unsafe target separately from source-candidate selection; tests need exact envelope maps. Express Windows/backslash path rules as semantic input code points with examples rather than source-literal escaping.
+- inconsistency review at design baseline `6e7745c82` added 1 new design step
+- design-step resolution handoff: use persisted variants when defining exact envelope maps: `components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj` records judge failures with terminal `:step-id` + `:attempt-id`, but iteration-limit failures with `:step-id` and no terminal attempt id; `components/workflow-runtime/src/psi/workflow_runtime/model.clj` defines IDs as unrestricted strings, so nonblank filtering is boundary hardening rather than a model guarantee. Keep nested-envelope recognition validity separate from optional-field copying, and write path examples as raw message code points rather than Clojure/regex literals.
+- design follow-up completed all 3 items attributable to baseline `6e7745c82`: every source retains valid deterministically selected location identity, while target-forced fallback drops cause reason/nesting; nested-envelope required fields control recognition and optional fields copy independently; Windows path examples denote literal U+005C input characters. Implementation tests need exact maps for iteration-limit selection, cause-less fallback, target-forced nested fallback, and mixed-validity nested metadata.
+- architectural review at design baseline `8a3a9f913` found no new feedback
+- ambiguity review at design baseline `8a3a9f913` added 1 new design step
+- inconsistency review at design baseline `8a3a9f913` found no new feedback
+- handoff for the open design step: `components/agent-session/src/psi/agent_session/mutations/canonical_workflows.clj` applies `workflow_run_retention.clj` cleanup after `workflow-execution.clj` returns but before re-reading `final-run` (which may be nil at retention count 0), so select and carry the canonical terminal envelope in the facade result before cleanup; preserve the existing public `:steps-executed` shape unless the design explicitly changes it. Prove the internal handoff in `workflow_execution_test.clj` and execute/resume projection after cleanup in `mutations/canonical_workflows_test.clj`.
+- design follow-up completed the sole item attributable to baseline `8a3a9f913`: carry the exact selected attempt `:execution-error` on private facade field `:terminal-execution-error`, preserve public `:steps-executed`, and project delegated execute/resume errors from that field before retention-zero cleanup can erase the run. Existing non-delegated terminal-outcome projection remains outside this singular delegated-envelope handoff.
+- architectural review at design baseline `3e4c08d13` found no new feedback
+- ambiguity review at design baseline `3e4c08d13` found no new feedback
+- inconsistency review at design baseline `3e4c08d13` found no new feedback
+- next-slice handoff: all design steps are resolved and the final architecture, ambiguity, and inconsistency passes found no new feedback; treat `design.md` as stable planning input, preserving its frozen scope and singular normalization/handoff ownership unless implementation evidence disproves a referenced runtime fact.
+- no plan ambiguity review feedback
+- no plan inconsistency review feedback
+- plan-review handoff: `components/agent-session/deps.edn` already declares the `workflow-runtime` dependency, so `workflow_execution.clj` can reuse the lower-runtime terminal selector directly; preserve that dependency direction and do not add an adapter or `requiring-resolve` indirection.
+- 2026-08-09 Slice 1–2 start: added `psi.workflow-runtime.delegated-failure` as the pure owner of terminal step/attempt selection and canonical delegated-failure construction. It sanitizes before eligibility, falls through from placeholder-only execution errors to terminal outcomes, bounds public messages by Unicode code points, and copies only one nested envelope's allowlisted identity. `delegate-run-runtime-result` now returns this envelope directly for failed children, so `progression-recording` persists it verbatim. Initial Scry proof: 4 tests / 15 assertions; remaining Slice 1 lexical-boundary matrix and all facade/projection slices are still open.
+- 2026-08-09 Slice 1 hardening: expanded narrow state-based pure-contract proof to credential/token/path delimiter cases, target-forced fallback, and supplementary-Unicode truncation (6 tests / 27 assertions). Discovered and corrected Unicode handling in the scanner: token-boundary recognition must operate on code points rather than coerce a supplementary code point to a Clojure `char`; `actionable?` now similarly scans code points. Path left-delimiters now accept all normalized Unicode whitespace. No API/schema changes; remaining Slice 1 matrix and integration/facade slices stay open.
+- 2026-08-09 Slice 2 boundary proof: added `psi.agent-session.workflow-delegate-failure-test`, a real statechart parent/child run proof using the existing nullable actor-turn seam. It verifies the failed child and parent statuses, exact parent `:execution-error` envelope (including generated child attempt identity), no `:details` leakage, and nil parent accepted result. `progression-recording/record-attempt-execution-failure` already persists the delegate payload verbatim, so no mechanism change was needed. Focused Scry: 1 test / 6 assertions.
+- 2026-08-09 Slice 2 follow-up: expanded the same real statechart proof with redact-only fallback and one-level nested delegation cases (3 tests / 14 assertions). The target compiler intentionally does not retain arbitrary authored `:retry-policy`, so an integration fixture cannot create a child retry from target syntax; terminal-retry selection stays covered at the pure persisted-run boundary until compiler/runtime retry policy is separately in scope. `clj-paren-repair` and focused `clj-kondo` passed.
+- 2026-08-09 Slice 3: `workflow-execution/execution-result` now exposes the selected persisted parent attempt error only on private `:terminal-execution-error`, using the lower-runtime deterministic selector. Public `:steps-executed` is unchanged and still holds string `:error` projections. Narrow state-based proof uses scrambled step maps and a superseded retry to establish exact terminal-envelope handoff (2 tests / 5 assertions); projection through execute/resume and retention cleanup remains Slice 4.
+
+- 2026-08-09 Slice 4 projection: `run-failure-error` now gives a terminal private
+  handoff whose reason is `:delegated-workflow-failed` precedence over public
+  attempt strings, then preserves the existing non-delegated projection. Added
+  mutation-level execute/resume retention-zero proofs: both return the exact
+  canonical envelope message after cleanup removes the run; resume still omits
+  `:psi.workflow/result`. Tests use immutable façade-result values and assert
+  returned state/output only. Remaining Slice 4 work is real runtime coverage
+  for execution-error, terminal-outcome, and fallback source variants.
+- 2026-08-09 Slice 4 source matrix: expanded the retention-zero execute proof to
+  table-drive canonical `:execution-error`, `:terminal-outcome`, and `:fallback`
+  envelopes. The mutation is deliberately source-agnostic: after cleanup it
+  returns each private handoff message verbatim, with nil result, rather than
+  reading the intentionally lossy public attempt projection. Source construction
+  stays owned and proven at the lower workflow-runtime boundary. Focused Scry:
+  delegated mutation test 3/20; existing canonical mutation regression 12/137;
+  clj-kondo clean.
+- 2026-08-13 Slice 5: registered the real parent/child failed-statechart fixture
+  at the provider-facing `delegate` tool boundary. It renders exactly `Error:
+  <canonical delegated message>` without changing the semantic-error transport
+  convention. Added state-based publication tests: completion and background-job
+  payloads retain the canonical error; notification and append-entry wrap it once
+  unchanged; the async future returns the same error record delivered to its
+  completion callback. Discovered that synchronous delegate waits receive the
+  unqualified internal async record, while direct mutations return namespaced
+  keys; `delegate-run` now accepts both equivalent key shapes, preventing an
+  `unknown` success projection from hiding any synchronous workflow failure.
+  Focused Scry: 20 tests / 86 assertions; clj-kondo and clj-paren-repair clean.
+- 2026-08-13 Slice 6 lexical hardening: bearer padding is excluded before enforcing the eight-character token minimum, preventing short padded bearer values from being redacted as valid tokens; Unicode whitespace now consistently ends path spans. Added narrow state-based proof for safe-reason rejection, escaped quoted credentials, token boundary/minimum cases, stack-frame precedence, secret-bearing paths, malformed nested required identity, and public-message redaction. Focused Scry is green: runtime 7/47; delegate boundary 3/14; facade handoff 2/5; canonical mutation 3/20; registered tool 6/14; async path 8/38. The changelog now records the user-visible safe diagnostics. `bb clojure:test:unit` confirms 2,663 tests / 19,675 assertions. One immediately prior randomized run failed an unrelated retry-count assertion (53 rather than 2) then passed unchanged on rerun; treat it as a pre-existing flake signal. The exhaustive lexical/acceptance matrix and final coherence review remain for the next slice.
+- 2026-08-13 Slice 6 selection correction: `terminal-step-attempt` now considers a terminal outcome attempt id only when it is present. Without this guard, an omitted id could match an older attempt whose persisted `:attempt-id` was nil instead of selecting the latest ordered attempt. Added state-based proof for this case plus negative scanner left-boundaries and NUL removal before whitespace normalization. Focused Scry passed: runtime 8/55; delegate boundary 3/14; facade handoff 2/5; canonical mutation 3/20; async 8/38. Remaining work is the exhaustive acceptance matrix and final coherence review.
+- 2026-08-13 Slice 6 Unicode lexical follow-up: U+0085 (NEXT LINE) needs explicit whitespace handling because the JVM classifies it as an ISO control but not `Character/isWhitespace` or `isSpaceChar`; otherwise it is removed before it can terminate a path. The lower-runtime sanitizer now retains/normalizes it as whitespace, and its regex recognizers use Unicode whitespace semantics so escaped line breaks within quoted credential values remain a single redacted span. Terminal reason text is now rendered from the validated keyword's namespace/name instead of `str`, preventing alias-dependent Clojure keyword printing. Narrow pure proof is green (8 tests/57 assertions); related delegate, handoff, and retention tests also pass. The exhaustive matrix and coherence review remain.
+- 2026-08-13 Slice 6 UNC boundary: the path recognizer now accepts a UNC path only when it starts with exactly two literal U+005C code points, as the design requires; a triple-backslash input is retained unchanged. Added a state-based pure boundary proof. `clj-paren-repair`, focused Scry, and clj-kondo are green (8 tests/58 assertions); the remaining lexical matrix and final coherence review are still open.
+- 2026-08-13 Slice 6 credential-value boundary: quoted credential values now require nonempty bodies, so `token=\"\"` and `credential=''` are not redacted. This closes the contract's empty-value negative case without changing nonempty or escaped quoted-value matching. Focused pure Scry, `clj-paren-repair`, and clj-kondo are green (8 tests/60 assertions).
+- 2026-08-13 Slice 6 selector/message matrix: expanded only the pure state-based contract proof; no production mechanism changed. The new cases establish that an explicit terminal attempt wins, effective `:step-order` selects fallback failures independently of map order, unavailable selected identity is omitted, escaping and exact 512-code-point non-truncation are stable, and recognized nested envelopes copy only immediate allowlisted identity. Focused Scry is green (11 tests / 72 assertions) and clj-kondo is clean. A final read confirms lower runtime remains the only child-envelope owner; facade/mutation/tool/async layers merely hand off or render the canonical message. The remaining work is the targeted uncompleted regression/matrix proof items, not a new runtime behavior change.
+- 2026-08-13 Slice 6 terminal-outcome integration: added a real parent/child statechart proof for a child judge loop exhausting its iteration limit. The child terminal outcome omits `:attempt-id`; the parent envelope correctly selects the latest `loop` attempt and renders only the allowlisted reason and counts. The test uses the existing nullable actor/judge seams and asserts persisted state/output, including that `:last-result-text` and judge-session data never cross the parent boundary. Focused Scry: 4 tests / 20 assertions; targeted matrix/regression gaps remain.
+- 2026-08-13 Slice 2 nonfailed regression: added a narrow lower-runtime
+  boundary test with immutable run maps for completed, blocked, cancelled, and
+  removed children. It proves exact pre-existing payloads remain intact while
+  the failed-child branch alone delegates to canonical diagnostics. Existing
+  pure retry and terminal-contract execution proof supplies the unchanged retry
+  and delegated result/handoff coverage. Verified with focused Scry (delegated
+  failure 12/76; terminal contract 1/5; cancellation dispatch 9/63) and clean
+  clj-kondo.
+- 2026-08-13 Slice 1 lexical completion: expanded the pure contract matrix with
+  remaining POSIX/dot-relative/secret path, credential-tail, token-padding, and
+  stack-frame boundary cases, plus sanitizer idempotence. This was proof only;
+  no runtime mechanism changed. Focused Scry passed 13 tests / 93 assertions and
+  clj-kondo is clean.
+- 2026-08-13 Slice 2 target-fallback integration: added a real nested
+  parent/child/grandchild fixture whose direct child target is `/secret`. The
+  outer parent envelope is exactly the generic fallback with selected direct
+  child location; it deliberately omits both reason and nested cause even
+  though the immediate child failure is canonical. Focused Scry passed 5 tests /
+  24 assertions; clj-paren-repair and clj-kondo are clean.
+- 2026-08-13 Final regression and coherence: completed the remaining
+  non-delegated terminal-outcome regression check and re-ran all affected
+  boundaries. Focused Scry passed lower runtime (13/93), delegate boundary
+  (5/24), facade handoff (2/5), delegated mutations (3/20), canonical mutation
+  regression (12/137), and registered tool (6/14); the full unit suite passed
+  2,671 tests / 19,024 assertions. The task has no remaining implementation
+  checklist items and is ready for implementation review.
+- implementation review added 2 steps to be addressed
+- addressed 2 review steps
+- implementation review added 0 steps to be addressed
+- test review added 2 steps to be addressed
+- addressed 2 test review steps
+- test re-review added 3 steps to be addressed
+- addressed 3 test re-review steps
+- final test review added 2 steps to be addressed
+- addressed 2 final test review steps
+- test review added 1 step to be addressed
+- addressed 1 test review step
+- addressed 2 review steps
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- addressed 1 test review step
+- added 2 test review steps to be addressed
+- current test re-review added 2 steps to be addressed
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- addressed 2 current test re-review steps
+- added 2 steps to be addressed
+- addressed 2 review steps
+- implementation re-review added 0 steps to be addressed
+- test review added 2 steps to be addressed
+- addressed 2 review steps
+- test re-review added 2 steps to be addressed
+- addressed 2 review steps
+- test review added 1 step to be addressed
+- addressed 1 test review step
+- task test review added 0 steps to be addressed
+- test-shaper review added 0 steps to be addressed
+- documentation review added 2 steps to be addressed
+- addressed 2 documentation review steps
+- documentation re-review added 1 step to be addressed
+- addressed 1 documentation re-review step
+- documentation re-review added 0 steps to be addressed
+- code-shaper review added 1 step to be addressed
+- addressed 1 code-shaper review step
+- code-shaper re-review added 1 step to be addressed
+- addressed 1 code-shaper re-review step
+- added 1 step to be addressed
+- addressed 1 post-allocation code-shaper review step
+- addressed 1 review step
+- code-shaper review added 1 step to be addressed
+- addressed 1 code-shaper review step
+- code-shaper review added 1 step to be addressed
+- addressed 1 code-shaper review step
+- added 1 code-shaper review step to be addressed
+- addressed 1 code-shaper review step
+- final code-shaper review added 1 step to be addressed
+- addressed 1 final code-shaper review step
+- added 1 step to be addressed
+- code-shaper re-review added 1 step to be addressed
+- addressed 1 code-shaper re-review step
+- added 1 code-shaper step to be addressed
+- addressed 1 code-shaper review step
+- implementation review added 0 steps to be addressed
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- added 1 test review step to be addressed
+- addressed 1 test review step
+- latest task test review added 0 steps to be addressed
+- test-shaper review added 1 step to be addressed
+- addressed 1 test-shaper review step
+- latest test-shaper re-review added 1 step to be addressed
+- addressed 1 latest test-shaper re-review step
+- current test-shaper re-review added 1 step to be addressed
+- addressed 1 review step
+- latest test-shaper review added 1 step to be addressed
+- addressed 1 review step
+- final test-shaper re-review added 1 step to be addressed
+- addressed 1 final test-shaper re-review step
+- benchmark test-shaper review added 1 step to be addressed
+- addressed 1 benchmark test-shaper review step
+- benchmark test-shaper re-review added 0 steps to be addressed
+- final documentation review added 2 steps to be addressed
+- addressed 2 final documentation review steps
+- final documentation re-review added 0 steps to be addressed
+- code-shaper review added 1 step to be addressed
+- addressed 1 code-shaper review step
+- code-shaper re-review added 0 steps to be addressed

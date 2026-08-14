@@ -75,7 +75,7 @@
             :judge {:type :invoke
                     :operation "workflow/pass-status-routing"
                     :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
-            :on {"REPEAT" {:goto "implement-pass" :max-iterations 8}
+            :on {"REPEAT" {:goto "implement-pass" :max-iterations 20}
                  "DONE" {:goto "final-summary"}}}
            {:name "final-summary"
             :type :session

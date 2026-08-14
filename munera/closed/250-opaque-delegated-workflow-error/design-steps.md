@@ -1,0 +1,187 @@
+# Design steps — architectural review (design-review session, turn 1)
+
+- [x] Define one canonical owner for delegated-child failure normalization at the
+      workflow-runtime delegate-step boundary. The parent workflow attempt should
+      receive one structured failure envelope derived from the persisted child
+      run's canonical failure surfaces (including step attempt
+      `:execution-error` and `:terminal-outcome`), while agent-session/tool/API
+      layers only project or render that envelope. Do not let each caller inspect
+      child sessions or independently synthesize competing error semantics. This
+      preserves the single-source/one-way architecture and keeps generic workflow
+      execution semantics in workflow runtime rather than in an adapter.
+
+- [x] Replace the suggested raw stack-trace propagation with a bounded, redacted,
+      deterministic delegated-failure diagnostic contract. Preserve an actionable
+      human-readable message plus stable structured cause metadata (for example
+      reason and child run/step/attempt identity), retain a generic fallback when
+      no safe cause is available, and do not expose arbitrary exception data,
+      transcripts, provider payloads, or session internals through the parent
+      `:error` surface. Raw stack traces are unstable implementation detail and
+      may leak sensitive/runtime-local data across the child-parent boundary.
+
+# Design steps — ambiguity review (design-review session, turn 2)
+
+- [x] Identify the exact observed execution and caller-visible boundary behind
+      `:error "Delegated workflow failed"` and `:result nil`. The literal generic
+      message currently originates when a workflow `:delegate` step normalizes a
+      failed child run, but the design's phrase "delegation runner/tool" does not
+      name whether acceptance is observed at the parent workflow execution
+      mutation, the registered `delegate` tool result, or another API projection.
+      Name the authoritative end-to-end path and the boundary at which regression
+      proof must inspect the result, without moving failure semantics into that
+      adapter.
+
+- [x] Define deterministic cause-selection precedence when a failed delegated run
+      exposes more than one candidate diagnostic: child step-attempt
+      `:execution-error`, child `:terminal-outcome`, and a nested delegated-child
+      failure. State which attempt/terminal step is selected, whether nested
+      delegate failures are recursively unwrapped or retained as immediate cause
+      metadata, and when the generic fallback is used. "Propagate the specific
+      error" is otherwise not singular for common failed-run shapes.
+
+- [x] Specify the exact parent-visible failure contract after propagation. State
+      whether the parent workflow/delegate operation remains `:failed`, whether
+      `:result` intentionally remains nil/absent on failure, which part of the
+      canonical structured failure envelope is rendered into the public `:error`
+      string, and which representative cases must be proven (at minimum an
+      attempt execution error, a terminal-outcome-only failure, and a failure
+      with no safe actionable cause). The current design mentions both `:error`
+      and `:result nil` but only explicitly proposes changing `:error`.
+
+- [x] Make the canonical public-message normalization contract testable and
+      singular. Define the exact target/step prefix and terminal-outcome rendering,
+      the allowlist behind "safe keyword" and "bounded numeric/count metadata",
+      the observable treatment of stack frames and local/secret-bearing paths,
+      the normalization/redaction/truncation order, and the exact truncation marker
+      (including how it fits within 512 characters). Behavioural examples may
+      define the contract without prescribing implementation regexes. As written,
+      conforming implementations can persist different messages or disagree on
+      whether unsafe input falls back.
+
+- [x] Define the exact source and shape of `:nested-cause` identity. A delegated
+      execution error has both outer `:execution-error :reason`
+      (`:delegated-workflow-failed`) and inner `:delegate-failure :reason`; state
+      which one is copied, confirm that run/target/step/attempt fields come from
+      the immediate inner `:delegate-failure`, and define behaviour for a partial
+      or malformed immediate envelope. This avoids two valid interpretations of
+      the one-level non-recursive nesting contract.
+
+- [x] Define execution-error eligibility and fallback precedence around
+      sanitization. "Safe nonblank `:execution-error :message`" is undefined and
+      can mean either that any nonblank string is selected before sanitization or
+      that safety/actionability is tested first. Those readings differ when a raw
+      message contains redactable credentials or sanitizes to placeholders only:
+      the design can either fall back immediately or continue to an actionable
+      terminal outcome. State the singular selection/normalization order for
+      non-string, blank, redactable-but-actionable, and sanitized-nonactionable
+      messages.
+
+- [x] Specify the observable delegated-failure contract for the in-scope
+      `psi.workflow/resume-run` path. Scope requires projection through
+      execute/resume, but the parent-visible contract and acceptance criteria
+      prove only `psi.workflow/execute-run`. State whether a resumed run that
+      terminalizes with a delegated failure returns the same canonical terminal
+      attempt message in `:psi.workflow/error`, including retry-history
+      selection, without implying a new result field on the existing resume
+      mutation.
+
+# Design steps — inconsistency review (design-review session, turn 3)
+
+- [x] Reconcile the canonical envelope's nil-versus-omitted optional fields. The
+      envelope shape currently shows `:reason`, `:step-id`, and `:attempt-id`
+      present with nil when unavailable, while immediate-envelope recognition
+      says those fields are optional nonblank values and nil optional fields are
+      omitted. Define one persisted parent `:delegate-failure` shape and use the
+      same rule when recognizing it as an immediate nested envelope, so exact-map
+      tests and nested metadata validation agree.
+
+- [x] Reconcile the parent-visible claim that async completion, background-job,
+      notification, and append-entry projections "reuse the same error string"
+      with their current public shapes. Completion/background-job payloads carry
+      the canonical string as an `:error` value, but notification and append-entry
+      text embed it inside workflow/status/run context via
+      `completion-notification-text` and `completion-entry-content`; they cannot
+      all be exactly equal to the 512-character envelope message. State per
+      surface whether equality applies to a structured `:error` field or whether
+      the canonical message is embedded unchanged in surrounding projection text,
+      and make the acceptance wording match without introducing new normalization.
+
+- [x] Reconcile the design's blanket claim that delegated failure details are
+      "swallowed" with the current two-path behavior. For a failed child run,
+      `delegate-run-runtime-result` preserves `:terminal-outcome` under the parent
+      failure payload's `:details`, but falls back to only `{:status :failed}`
+      when the child has attempt-level `:execution-error`; later,
+      `workflow-execution/execution-result` and `run-failure-error` render only
+      the parent attempt's generic `:message`, so even retained terminal details
+      do not reach public `:error`. Update the problem/root-cause description to
+      distinguish (a) attempt diagnostics lost at delegate normalization from
+      (b) terminal diagnostics retained canonically but lost at public
+      projection, and require proof for both paths. This aligns the design with
+      the referenced runtime artifacts without changing its scope.
+
+# Design steps — ambiguity re-review (design-review session, turn 2; baseline `8edb9fca2`)
+
+- [x] Define the source and precedence for the new outer
+      `:delegate-failure :reason` for each `:source`, especially when the selected
+      execution error is itself a canonical delegated-failure envelope. The safe
+      reason allowlist currently permits both the selected execution error's
+      outer `:reason` and the recognized inner `:delegate-failure :reason`, while
+      only `:nested-cause :reason` has a singular source. State whether the new
+      outer reason is the selected error's reason, the immediate inner reason, or
+      omitted, and state the terminal-outcome and fallback rules as well.
+
+- [x] Make the redaction match boundaries observable rather than relying on the
+      undefined categories “credential-looking”, “token-looking”, and “path”.
+      Define enough lexical behavior to determine what complete span is replaced
+      for key/value credentials, bearer and `sk-`/`pk-` values, stack-frame
+      fragments, and each supported path family, including token length or
+      delimiter rules and adjacent punctuation. The ordering and placeholders
+      are exact, but these unresolved match boundaries still allow both
+      under-redacting and over-redacting implementations to satisfy the prose.
+
+# Design steps — ambiguity re-review (design-review session, turn 2; baseline `6e7745c82`)
+
+- [x] Define the exact inclusion rule for valid selected `:step-id` and
+      `:attempt-id` fields in the persisted envelope for each `:source`; “present
+      only for valid” currently constrains invalid values but does not say whether
+      valid values are required or discretionary. In particular, define exact
+      envelope examples for terminal-outcome selection, fallback with no
+      actionable cause, and fallback forced by a non-actionable target after an
+      execution error was selected, including whether recognized immediate
+      `:nested-cause` metadata survives that target-triggered fallback. This keeps
+      exact-map tests and downstream identity semantics deterministic.
+
+- [x] Make backslash-bearing path syntax code-point exact. The current prose uses
+      inline forms such as drive `:\\`, relative `\\`, and “two leading
+      backslashes” without saying when backslashes are literal input characters
+      versus escaped notation, so implementations can disagree about ordinary
+      `C:` drive paths, UNC paths, and backslash-separated relative paths. State
+      the semantic separator/count rules and give raw-input-to-sanitized-output
+      examples for a one-backslash drive path, a forward-slash drive path, UNC,
+      a secret-bearing relative Windows path, and a drive-relative negative case.
+
+# Design steps — inconsistency re-review (design-review session, turn 3; baseline `6e7745c82`)
+
+- [x] Reconcile immediate nested-envelope recognition for invalid optional
+      metadata. The canonicality paragraph says `:step-id` and `:attempt-id` must
+      be nonblank strings and `:reason` must be safe when present, which makes an
+      invalid optional field fail recognition; the following paragraph instead
+      says an invalid optional identity is omitted without invalidating otherwise
+      canonical metadata, consistent with the earlier parent-envelope omission
+      rule. Define one rule for each optional field (`:reason`, `:step-id`, and
+      `:attempt-id`) and use it consistently for recognition and copied
+      `:nested-cause` output, so malformed-input tests cannot validly expect both
+      nested metadata rejection and partial retention.
+
+# Design steps — ambiguity re-review (design-review session, turn 2; baseline `8a3a9f913`)
+
+- [x] Define the exact agent-session facade-to-mutation handoff for the selected
+      canonical terminal parent-attempt envelope. The design says the facade
+      forwards that envelope, but the current `workflow-execution/execution-result`
+      projects each attempt to an `:error` string and execute/resume publish the
+      same `:steps-executed` vector. State whether the facade carries the envelope
+      on a separate internal field while preserving the public steps-executed
+      shape, or whether that public shape changes; then require execute/resume to
+      derive `:psi.workflow/error` from that singular handoff without re-reading
+      or reconstructing canonical run state. This prevents both competing
+      envelope-selection owners and an accidental unspecified API-shape change.

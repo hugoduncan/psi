@@ -312,6 +312,10 @@
   {:doc  "Run focused clojure.test tests with Scry structured results. On failures/errors, inspect .scry-results/*.edn."
    :task (System/exit (run-scry-cli! *command-line-args*))}
 
+  benchmark:delegated-failure-sanitizer
+  {:doc  "Run the opt-in delegated-failure sanitizer scaling guard."
+   :task (shell "clojure -M:dev -m psi.benchmarks.delegated-failure-sanitizer")}
+
   smoke:test
   {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
    :task (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))}

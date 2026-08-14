@@ -1,0 +1,5 @@
+🔁 If retention or cleanup can delete canonical workflow state before a public mutation projects its result, select terminal data before cleanup and carry the exact value across the facade on a private handoff.
+
+For terminal errors, reuse the deterministic selector over declared step order and ordered attempts. Do not re-read removed state, choose the first error from a lossy public attempt projection, or reconstruct a lower-runtime envelope in an adapter. Downstream surfaces should only project the canonical message.
+
+The regression must set retention to zero and exercise the real execute/resume path through child normalization, parent persistence, facade selection, cleanup, and public output. A fabricated facade result proves only final projection; it cannot prove that terminal selection and handoff survive cleanup.

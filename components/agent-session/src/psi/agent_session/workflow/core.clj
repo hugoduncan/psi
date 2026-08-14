@@ -393,15 +393,18 @@
             (do
               ;; Launch async then await completion
               (execute-async! run-id session-id workflow-name include?)
-              (let [exec-result (await-run-completion run-id timeout)]
+              (let [exec-result (await-run-completion run-id timeout)
+                    status (or (:psi.workflow/status exec-result) (:status exec-result))
+                    error (or (:psi.workflow/error exec-result) (:error exec-result))
+                    result (or (:psi.workflow/result exec-result) (:result exec-result))]
                 (cond
-                  (= :timeout (:psi.workflow/status exec-result))
+                  (= :timeout status)
                   {:error (str "Timed out waiting for workflow '" workflow-name "' after " timeout "ms")
                    :run-id run-id
                    :mode :sync}
 
-                  (:psi.workflow/error exec-result)
-                  {:error (:psi.workflow/error exec-result)
+                  error
+                  {:error error
                    :run-id run-id
                    :mode :sync}
 
@@ -409,8 +412,8 @@
                   {:ok true
                    :run-id run-id
                    :mode :sync
-                   :status (:psi.workflow/status exec-result)
-                   :result (:psi.workflow/result exec-result)})))))))))
+                   :status status
+                   :result result})))))))))
 
 (defn- find-run-summary
   [run-id]

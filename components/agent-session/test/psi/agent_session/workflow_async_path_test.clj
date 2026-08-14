@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.context :as context]
+   [psi.agent-session.core :as session]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.workflow.core :as wl]
@@ -97,6 +98,167 @@
       (is (= :blocked (get-in publication [:background-job :payload :status])))
       (is (= :completed (get-in publication [:background-job :payload :delegate-status])))
       (is (= :info (get-in publication [:notification :level]))))))
+
+(deftest delegated-failure-publication-preserves-canonical-message-test
+  ;; Projection receives an already normalized envelope message and must preserve
+  ;; it exactly in every asynchronous result surface and wrapper.
+  (testing "failed delegate publication neither replaces nor re-sanitizes the canonical message"
+    (let [message "Delegated workflow 'child' failed at step 'build': tool timed out"
+          publication (orchestration/delegated-result-publication
+                       {:run-id "parent-run"
+                        :workflow-name "parent"
+                        :parent-session-id "session-1"
+                        :include-result? false
+                        :exec-result {:psi.workflow/status :failed
+                                      :psi.workflow/result nil
+                                      :psi.workflow/error message}})
+          notification (get-in publication [:notification :message])
+          entry (get-in publication [:append-entry :data])]
+      (is (= message (get-in publication [:completion :error])))
+      (is (= message (get-in publication [:background-job :payload :error])))
+      (is (= :failed (get-in publication [:background-job :status])))
+      (is (= "Workflow 'parent' failed: Delegated workflow 'child' failed at step 'build': tool timed out (run parent-run)"
+             notification))
+      (is (= "Workflow 'parent' — failed: Delegated workflow 'child' failed at step 'build': tool timed out (run parent-run)"
+             entry))
+      (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) notification))))
+      (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote message)) entry)))))))
+
+(deftest delegated-failure-publication-preserves-bounded-message-before-result-test
+  (testing "512-code-point messages remain byte-exact before the optional result section"
+    (let [message (str "Delegated workflow failed: "
+                       (apply str (repeat (- 512 (count "Delegated workflow failed: ")) "x")))
+          result-text "optional result"
+          publication (orchestration/delegated-result-publication
+                       {:run-id "parent-run"
+                        :workflow-name "parent"
+                        :parent-session-id "session-1"
+                        :include-result? false
+                        :exec-result {:psi.workflow/status :failed
+                                      :psi.workflow/result result-text
+                                      :psi.workflow/error message}})
+          notification (get-in publication [:notification :message])
+          entry (get-in publication [:append-entry :data])
+          occurrence-count (fn [text]
+                             (count (re-seq (re-pattern (java.util.regex.Pattern/quote message))
+                                            text)))]
+      (is (= 512 (.codePointCount message 0 (.length message))))
+      (is (= message (get-in publication [:completion :error])))
+      (is (= message (get-in publication [:background-job :payload :error])))
+      (is (= 1 (occurrence-count notification)))
+      (is (= 1 (occurrence-count entry)))
+      (is (= (str "Workflow 'parent' failed: " message " (run parent-run)")
+             notification))
+      (is (= (str "Workflow 'parent' — failed: " message " (run parent-run)"
+                  "\n\nResult:\n" result-text)
+             entry))
+      (is (true? (get-in publication [:append-entry :enabled?])))
+      (is (not (str/includes? notification result-text)))
+      (is (< (str/index-of entry message)
+             (str/index-of entry "Result:"))))))
+
+(deftest async-delegated-failure-return-record-preserves-canonical-message-test
+  ;; Real workflow mutation and publication logic carry the normalized child
+  ;; failure through canonical job state, notification, and session append entry.
+  (testing "async execution returns and publishes a real delegated error verbatim"
+    (let [child-definition {:definition-id "async-failing-child"
+                            :name "async-failing-child"
+                            :steps [{:name "child-step"
+                                     :type :session
+                                     :contributions [{:type :template
+                                                      :text "Do {{input}}"
+                                                      :vars {"input" {:from :workflow-input}}}]}]}
+          parent-definition {:definition-id "async-failing-parent"
+                             :name "async-failing-parent"
+                             :steps [{:name "delegate-child"
+                                      :type :delegate
+                                      :target "async-failing-child"
+                                      :prompt-string "Carry out the child workflow."
+                                      :context []}]}
+          actor-release (promise)
+          base-ctx (session/create-context {:persist? false
+                                            :mutations mutations/all-mutations
+                                            :ui-type :tui})
+          session-id (:session-id (session/new-session-in! base-ctx nil {}))
+          ctx (assoc base-ctx
+                     :workflow-execute-actor-turn-fn
+                     (fn [_ctx child-session-id _prompt & _]
+                       @actor-release
+                       {:status :error
+                        :session-id child-session-id
+                        :assistant-message {:role "assistant"
+                                            :error-message "upstream request rejected"
+                                            :content [{:type :error
+                                                       :text "upstream request rejected"}]}
+                        :assistant-text ""
+                        :execution-result {}
+                        :failure {:reason :provider-unavailable
+                                  :message "upstream request rejected"}}))
+          runtime (runtime-fns/make-extension-runtime-fns
+                   ctx session-id wl/built-in-workflow-path)
+          mutate! (:mutate-fn runtime)
+          inflight* (atom {})
+          notifications* (atom [])
+          refresh! (fn [] nil)
+          notify! (fn [message level]
+                    (swap! notifications* conj {:message message :level level}))
+          mark-terminal! (partial orchestration/mark-background-job-terminal! mutate!)
+          completion! (fn [run-id workflow-name parent-session-id include-result? exec-result]
+                        (orchestration/on-async-completion!
+                         {:mutate! mutate!
+                          :notify! notify!
+                          :mark-background-job-terminal! mark-terminal!
+                          :inject-result-into-context! (fn [& _] nil)
+                          :refresh-widgets! refresh!
+                          :inflight-runs inflight*}
+                         run-id workflow-name parent-session-id include-result? exec-result))]
+      (try
+        (mutate! 'psi.workflow/register-definition {:definition child-definition})
+        (mutate! 'psi.workflow/register-definition {:definition parent-definition})
+        (mutate! 'psi.workflow/create-run
+                 {:definition-id "async-failing-parent"
+                  :workflow-input "async proof"
+                  :run-id "async-parent-run"})
+        (let [run-id (orchestration/execute-async!
+                      {:mutate! mutate!
+                       :start-background-job! (partial orchestration/start-background-job! mutate!)
+                       :mark-background-job-terminal! mark-terminal!
+                       :notify! notify!
+                       :refresh-widgets! refresh!
+                       :inflight-runs inflight*
+                       :on-async-completion-fn completion!}
+                      "async-parent-run" session-id "async-failing-parent" false)
+              _ (deliver actor-release true)
+              result (orchestration/await-run-completion inflight* run-id 3000)
+              message "Delegated workflow 'async-failing-child' failed at step 'child-step': upstream request rejected"
+              job (->> (ss/get-state-value-in ctx (ss/state-path :background-jobs))
+                       :jobs-by-id
+                       vals
+                       (filter #(= "async-parent-run" (:workflow-id %)))
+                       first)
+              journal (ss/get-state-value-in ctx (ss/state-path :journal session-id))
+              entry (->> journal
+                         (filter #(and (= :custom-message (:kind %))
+                                       (= "delegate-result" (get-in % [:data :custom-type]))))
+                         last)]
+          (is (= {:run-id "async-parent-run"
+                  :workflow "async-failing-parent"
+                  :status :failed
+                  :error message}
+                 result))
+          (is (= :failed (:status job)))
+          (is (= message (get-in job [:terminal-payload :error])))
+          (is (= [{:message (str "Workflow 'async-failing-parent' failed: " message
+                                 " (run async-parent-run)")
+                   :level :warn}]
+                 @notifications*))
+          (is (some? entry) (str "journal: " (pr-str journal)))
+          (is (= "delegate-result" (get-in entry [:data :custom-type])))
+          (is (= (str "Workflow 'async-failing-parent' — failed: " message
+                      " (run async-parent-run)")
+                 (get-in entry [:data :content]))))
+        (finally
+          (context/shutdown-context! ctx))))))
 
 (deftest top-level-worker-cancel-wakes-parked-wait-and-terminalizes-cleanly-test
   ;; Tests the acceptance path with real futures and dispatch effects: cancelling

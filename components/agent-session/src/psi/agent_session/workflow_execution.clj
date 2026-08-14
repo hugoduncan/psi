@@ -7,7 +7,13 @@
    and `psi.workflow-step-session-config.core`."
   (:require
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.delegated-failure :as delegated-failure]
    [psi.workflow-runtime.statechart-runtime :as workflow-statechart-runtime]))
+
+(defn- terminal-execution-error
+  [workflow-run]
+  (get-in (delegated-failure/terminal-step-attempt workflow-run)
+          [:attempt :execution-error]))
 
 (defn- execution-result
   [run-id workflow-run]
@@ -26,6 +32,8 @@
                                            (get-in workflow-run [:step-runs step-id :attempts]))))
                             vec)
                        [])
+     :terminal-execution-error (when workflow-run
+                                 (terminal-execution-error workflow-run))
      :terminal? (or (nil? workflow-run) (contains? #{:completed :failed :cancelled} status))
      :blocked? (= :blocked status)}))
 
@@ -50,11 +58,18 @@
 (defn execute-run!
   "Execute a workflow run via the Phase A hierarchical statechart runtime.
 
-   Returns {:run-id ... :status ... :steps-executed [...] :terminal? bool :blocked? bool}."
+   Returns {:run-id ... :status ... :steps-executed [...]
+            :terminal-execution-error map-or-nil :terminal? bool :blocked? bool}."
   [ctx parent-session-id run-id]
   (execute-statechart! ctx parent-session-id run-id :workflow/start))
 
 (defn resume-and-execute-run!
   "Resume a blocked run and continue execution via the Phase A statechart runtime."
   [ctx parent-session-id run-id]
-  (execute-statechart! ctx parent-session-id run-id :workflow/resume))
+  (swap! (:state* ctx)
+         (fn [state]
+           (first (workflow-runtime/resume-run state run-id))))
+  ;; Each facade invocation creates a fresh chart in its initial pending state.
+  ;; The canonical run update above records the resume and clears its blocked
+  ;; payload; starting the fresh chart then creates the resumed step attempt.
+  (execute-statechart! ctx parent-session-id run-id :workflow/start))

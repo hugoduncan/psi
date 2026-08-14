@@ -41,10 +41,17 @@
            " at step '" (:step-id terminal-outcome) "'"))))
 
 (defn- run-failure-error
-  "Extract an error message for a failed workflow run, checking step errors first,
-   then terminal-outcome."
+  "Extract an error message for a failed workflow run.
+
+   A delegated failure is normalized and selected by workflow runtime before
+   retention cleanup, so its exact canonical message takes precedence over the
+   lossy public step projection. Other failures retain their existing
+   projection and terminal-outcome behavior."
   [exec-result final-run]
-  (or (some :error (:steps-executed exec-result))
+  (or (when (= :delegated-workflow-failed
+               (get-in exec-result [:terminal-execution-error :reason]))
+        (get-in exec-result [:terminal-execution-error :message]))
+      (some :error (:steps-executed exec-result))
       (terminal-outcome-error-message (:terminal-outcome final-run))))
 
 (defn- session-profile-snapshot
