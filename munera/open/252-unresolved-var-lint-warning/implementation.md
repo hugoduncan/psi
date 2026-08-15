@@ -1,5 +1,10 @@
 - architectural review added 3 new design steps
 - ambiguity review added 2 new design steps
+- no inconsistency review feedback
+
+## Design review context (turn 3 — inconsistency)
+
+- No new actionable items: every candidate contradiction in design.md (Evidence `errors: 0`/`warnings: 2` vs Friction's missing-declaration claim and singular `post` focus; `.clj-kondo/config.edn` target vs per-library import layout; false-negative attribution) is already consumed by existing design-steps 1-3 with the same remedy — do not re-file in later passes.
 
 ## Design review context (turn 2 — ambiguity)
 
