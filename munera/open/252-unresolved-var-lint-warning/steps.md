@@ -324,7 +324,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 11 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Guard the with-channel hook implementation file — the committed change set
+- [x] Guard the with-channel hook implementation file — the committed change set
       (slice-4 list) and the design mechanism ("keep the existing server-side
       hook") include `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`,
       and `http-kit-import-registration-test` asserts config.edn's `:hooks
@@ -340,7 +340,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       httpkit.with-channel)` + `(defn with-channel …)` match the config.edn
       `:hooks :analyze-call` reference (read as text/EDN — no subprocess, runs
       anywhere; do not put assertion code in the import dir itself — AC2)
-- [ ] Guard the `extensions/dev-http/deps.edn` http-kit pin: design.md Context
+      — done: `with-channel-hook-impl-guard-test` — asserts the config.edn
+      `:analyze-call` value is exactly `httpkit.with-channel/with-channel`,
+      the impl file exists, and the file's parsed forms contain `(ns
+      httpkit.with-channel …)` and `(defn with-channel …)` (read-string of the
+      impl wrapped in a vector — no subprocess); unit suite → 6 tests / 18
+      assertions pass
+- [x] Guard the `extensions/dev-http/deps.edn` http-kit pin: design.md Context
       cites "http-kit 2.8.0 (root `deps.edn` + `extensions/dev-http/deps.edn`)"
       as the R4 re-verification set, but `http-kit-pin-sourced-from-deps-edn-test`
       derives the version from ROOT deps.edn only — a drift in the extension pin
@@ -348,7 +354,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       to 2.9.0 while root stays 2.8.0) yields zero signal from any test. Extend
       the pin test to read `extensions/dev-http/deps.edn` and assert its
       `http-kit/http-kit :mvn/version` equals the root-derived `http-kit-version`
-- [ ] Make the clojure CLI infra dep injectable (slice-8 residue — skill
+      — done: `http-kit-pin-sourced-from-deps-edn-test` gained a second
+      testing block — reads `extensions/dev-http/deps.edn` `[:deps
+      'http-kit/http-kit]`, asserts the pin exists and equals the
+      root-derived `http-kit-version` (2.8.0)
+- [x] Make the clojure CLI infra dep injectable (slice-8 residue — skill
       infra-dep criterion `injectable(d) ∧ nullable(d)`): slice-8 made the
       subprocess NULLABLE (skip when `clojure` absent via the `clojure-bin`
       `which` guard) but `clj-kondo-main` still hardcodes `"clojure"` in the
@@ -361,3 +371,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `clojure-bin` in the ProcessBuilder command vector (nil-safe given the
       skip guard), or mirror the `psi.lint-config-test.repo-root` property
       override pattern for the binary
+      — done (both branches): `clojure-bin` is now overridable via the
+      `psi.lint-config-test.clojure-bin` system property (injectable, mirror of
+      the repo-root override) and otherwise derived from PATH via `which`
+      (nullable); `clj-kondo-main`'s ProcessBuilder vector uses the SAME
+      resolved `clojure-bin` value that feeds the skip guard, so the guard can
+      never prove a binary other than the one executed; a defensive nil guard
+      throws a clear ex-info instead of a ProcessBuilder NPE (verified via
+      alter-var-root → clear ex-info; `ns-unmap`+`intern` creates a NEW var so
+      the compiled fn still sees the old value — the alter-var-root check is
+      the valid one). Verified: default `which`-derived
+      `/opt/homebrew/bin/clojure`; property override `/nonexistent/clojure`
+      observed at ns-load; override with the real binary → integration suite
+      31 tests / 168 assertions pass (no SKIP line — proof ran)

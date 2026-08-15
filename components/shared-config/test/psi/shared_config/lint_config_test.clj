@@ -97,12 +97,32 @@
   repo lint gate (see clj-kondo-version; derived, never hardcoded separately)."
   (format "{:deps {clj-kondo/clj-kondo {:mvn/version \"%s\"}}}" clj-kondo-version))
 
-(def clojure-bin
-  "Path to the clojure CLI binary, or nil when not on PATH (mirrors the
-  jar-absent skip: a missing binary would otherwise error the ^:integration
-  test rather than skip)."
+(def ^:private clojure-bin-prop
+  "System property that overrides the clojure CLI binary (mirror of
+  psi.lint-config-test.repo-root), making the infra dep injectable per the
+  skill infra-dep criterion — e.g. from an editor/nrepl runner whose PATH
+  differs from the invoking shell's."
+  "psi.lint-config-test.clojure-bin")
+
+(defn- which-clojure-bin
+  "Resolve the clojure CLI binary from PATH, or nil when not on PATH."
+  []
   (some-> (shell/sh "which" "clojure")
           (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+
+(def clojure-bin
+  "Path to the clojure CLI binary used by the analysis-level proof, or nil when
+  unavailable. Overridable via the psi.lint-config-test.clojure-bin system
+  property (injectable — mirror of the repo-root override); otherwise derived
+  from PATH via `which clojure` (nullable — a missing binary skips the
+  ^:integration test instead of erroring). The SAME resolved value feeds both
+  the skip guard and the executed subprocess, so the guard can never prove a
+  binary other than the one executed (slice-11 follow-up: previously the guard
+  resolved PATH at ns-load while the ProcessBuilder re-resolved the literal
+  \"clojure\" from PATH at run time, so a PATH mutation or shell function
+  shadowing between load and run made the guard prove a different binary)."
+  (or (not-empty (System/getProperty clojure-bin-prop))
+      (which-clojure-bin)))
 
 (def ^:private process-timeout-ms
   "Upper bound (ms) for the pinned-clj-kondo subprocess. clojure.java.shell/sh
@@ -117,7 +137,12 @@
   via ProcessBuilder + waitFor(ms) (see process-timeout-ms); on timeout the
   process is killed and the test fails loudly rather than hanging the suite."
   [& args]
-  (let [pb (doto (ProcessBuilder. (into ["clojure" "-Sdeps" clj-kondo-deps
+  (when (nil? clojure-bin)
+    (throw (ex-info (str "clojure-bin is nil — cannot run the clj-kondo "
+                         "subprocess. Put clojure on PATH or set the "
+                         clojure-bin-prop " system property.")
+                    {})))
+  (let [pb (doto (ProcessBuilder. (into [clojure-bin "-Sdeps" clj-kondo-deps
                                          "-M" "-m" "clj-kondo.main"] args))
              (.directory (io/file repo-root)))
         proc (.start pb)
@@ -144,6 +169,34 @@
         (is (= '{:analyze-call {org.httpkit.server/with-channel
                                 httpkit.with-channel/with-channel}}
                (:hooks cfg)))))))
+
+(deftest with-channel-hook-impl-guard-test
+  (testing "the with-channel hook implementation file exists and matches the
+            config.edn :hooks :analyze-call reference (slice-11 follow-up):
+            the repo has zero with-channel call sites and neither bb lint nor
+            the ^:integration proof ever loads the httpkit.with-channel
+            namespace (the jar arm never fires analyze-call — no calls are
+            analyzed), so a deleted or renamed hook impl is otherwise
+            undetectable by bb test/CI. Reads the impl as text/EDN — no
+            subprocess — and the assertion code lives outside the import dir
+            (AC2 confinement)."
+    (let [impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
+          impl-file (io/file repo-root impl-rel)
+          cfg       (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")
+          ref       (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])
+          forms     (read-string (str "[" (slurp impl-file) "]"))]
+      (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
+        (is (= 'httpkit.with-channel/with-channel ref)))
+      (testing "impl file exists (member of the slice-4 tracked change set)"
+        (is (.exists impl-file) (str impl-rel " exists")))
+      (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
+        (is (some (fn [f] (and (seq? f) (= 'ns (first f))
+                               (= 'httpkit.with-channel (second f))))
+                  forms)))
+      (testing "impl defines (defn with-channel …) — matches the reference's var"
+        (is (some (fn [f] (and (seq? f) (= 'defn (first f))
+                               (= 'with-channel (second f))))
+                  forms))))))
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"
@@ -179,7 +232,19 @@
             clj-kondo pin derivation)"
     (let [pin (get-in (read-edn "deps.edn") [:deps 'http-kit/http-kit])]
       (is (some? pin) "deps.edn :deps pins http-kit/http-kit")
-      (is (some? (:mvn/version pin))))))
+      (is (some? (:mvn/version pin))))
+    (testing "the extension pin — the classpath dev-http actually runs against —
+              matches the root-derived pin (slice-11 follow-up): a drift in
+              extensions/dev-http/deps.edn (e.g. a bump to 2.9.0 while root
+              stays 2.8.0) otherwise yields zero signal from any test, since
+              http-kit-pin-sourced-from-deps-edn-test and the ^:integration
+              proof both derive from ROOT deps.edn only"
+      (let [ext-pin (get-in (read-edn "extensions/dev-http/deps.edn")
+                            [:deps 'http-kit/http-kit])]
+        (is (some? ext-pin) "extensions/dev-http/deps.edn pins http-kit/http-kit")
+        (is (= http-kit-version (:mvn/version ext-pin))
+            (str "extension pin " (:mvn/version ext-pin)
+                 " equals root-derived http-kit-version " http-kit-version))))))
 
 (deftest gitignore-http-kit-import-tracking-test
   (testing ".gitignore keeps the http-kit import dir TRACKED (plan.md decision 2
