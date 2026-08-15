@@ -402,3 +402,58 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       — done: `^:integration` `gitignore-http-kit-tracking-ground-truth-test` added — runs `git check-ignore -v` from the repo root (via `shell/sh` `:dir`; git-absent → visible SKIP, mirroring the clojure-bin nullable pattern): http-kit config.edn exits non-zero (NOT ignored — the negation works), malli sibling exits zero and its `-v` output carries `.gitignore:` (the ignore-all rule still applies); verifies git's own interpretation matches the text test, so a pattern-semantics drift or shadowing re-ignore fails loudly. Verified: integration run → both assertions pass (no SKIP)
 - [x] Correct the overstated real-file-arm claim in `http-kit-defreq-analysis-level-resolution-test`'s docstring ("an added http-client/delete call … fails here") and the identical slice-10 steps.md note: `delete` is part of the defreq-registered full verb set (`:lint-as org.httpkit.client/defreq clojure.core/def` registers get/delete/head/post/put/options/patch/propfind/proppatch/lock/unlock/report/acl/copy/move; verified: local cache transit carries `~$delete` alongside `~$get`/`~$post`/`~$request`), so an added `http-client/delete` call RESOLVES and the arm does NOT fail — the arm actually guards require/alias changes and calls to vars OUTSIDE the registered set (e.g. `definitely-not-a-var`). Restate the claim so future readers don't trust a false safety property
       — done: the real-file testing string now states the arm guards require/alias changes and calls to vars OUTSIDE the registered defreq set (e.g. `definitely-not-a-var`), and explicitly notes an added `http-client/delete` call does NOT fail here (delete is registered; `~$delete` present in the local cache transit alongside `~$get`/`~$post`/`~$request`); the identical slice-10 steps.md note was corrected in place (same restated claim)
+
+## Slice 14 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Make the git binary infra dep injectable + guard/exec-agreed (skill
+      infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
+      slice-11 clojure-bin fix): `^:integration
+      gitignore-http-kit-tracking-ground-truth-test` skips when `which git`
+      fails (nullable ✓) but has no `psi.lint-config-test.git-bin` property
+      override (injectable ✗ — clojure-bin/repo-root/http-kit-jar all gained
+      overrides), and the exec re-resolves the literal `"git"` from PATH at run
+      time while the guard resolved `which git` at test time — a PATH mutation
+      or shell-function shadowing between guard and exec makes the guard prove
+      a binary other than the one executed (the exact disagreement slice 11
+      eliminated for clojure-bin). Derive `git-bin` once (property override +
+      `which`), use the SAME value in the skip guard and the `check-ignore`
+      invocation; optionally bound the subprocess (shell/sh has no :timeout,
+      the same gap slice 8 closed for clj-kondo-main)
+- [ ] Make the pinned clj-kondo jar infra dep nullable + injectable (skill
+      infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
+      slice-9/12 http-kit jar pattern): `http-kit-defreq-analysis-level-resolution-test`
+      skips when `clojure` is off PATH or the http-kit jar is absent, but the
+      clj-kondo jar resolved via `-Sdeps` (`clj-kondo-deps`, version derived
+      from deps.edn) is never checked — if `clj-kondo-<version>.jar` is absent
+      from m2 (fresh machine, offline run, non-standard `:mvn/local-repo`),
+      the subprocess attempts a network download and fails loudly (or hangs up
+      to the 120s timeout) instead of a visible SKIP, and no property points
+      the proof at an alternative jar/coordinates. Derive the jar path from
+      `clj-kondo-version` + user.home (mirror of `http-kit-jar`), add a
+      `psi.lint-config-test.clj-kondo-jar` property override, and add an
+      existence check to the skip guard (visible SKIP, mirroring the http-kit
+      jar arm)
+- [ ] Guard the bb.edn `lint` task wrapper (AC1's local proof surface): AC1
+      verification is `bb lint` ≡ `clojure -M:lint`, and
+      `lint-alias-lints-extensions-test` guards only deps.edn's `:lint
+      :main-opts` — nothing guards bb.edn's `lint` task (`:task (shell
+      "clojure -M:lint")`, bb.edn:242-244). If the wrapper drifts — e.g. adds
+      `--cache false` (with no cache the two warnings vanish — exactly
+      design-step 9's masking), adds `--config` overrides, or switches to the
+      native clj-kondo binary — the local AC1 gate becomes trivially clean
+      while every test still passes. Add a unit test (same `lint_config_test.clj`
+      ns; read bb.edn as EDN — no subprocess, runs anywhere) asserting the
+      `lint` task's shell command invokes `clojure -M:lint` without
+      `--cache false`/`--config` overrides
+- [ ] Guard the tests.edn suite wiring that makes the `^:integration` tests
+      RUN (the entire CI-detectable regression surface for this task): the two
+      proofs (analysis-level + git ground truth) execute only because
+      tests.edn's `:integration` suite lists `components/shared-config/test`
+      with `:focus-meta [:integration]`, and the 7 unit invariants run only
+      because the `:unit` suite lists it too — nothing tests tests.edn, so
+      dropping the path (or changing `:focus-meta`/`:skip-meta`) silently
+      disables every guard with zero signal, the same silent-drift class the
+      task already guards for `.gitignore`/lint-alias/pins. Add a unit test
+      reading tests.edn as EDN asserting `components/shared-config/test` ∈
+      `:unit` `:test-paths` ∧ `:integration` `:test-paths`, and `:integration`
+      `:focus-meta` retains `[:integration]`
