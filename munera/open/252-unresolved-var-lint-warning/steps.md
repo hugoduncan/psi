@@ -321,3 +321,43 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 - [x] Guard the `.gitignore` negation that keeps the http-kit import dir TRACKED (plan.md decision 2 / slice 1 / slice-4 change set) — nothing tests it: `http-kit-import-registration-test` reads config.edn from disk, so if the negation lines are removed (restoring `**/.clj-kondo/imports/`) the file still exists locally, the unit test passes, and the registration silently drops out of future commits. Add a unit assertion (same `lint_config_test.clj` ns; read `.gitignore` as text — no subprocess, runs anywhere) that `.gitignore` contains the negation set `**/.clj-kondo/imports/*`, `!.clj-kondo/imports/http-kit/`, `!.clj-kondo/imports/http-kit/**` (verified present, lines 4-6, 2026-08-15)
       — done: `gitignore-http-kit-import-tracking-test` added — splits `.gitignore` into lines and asserts each of the three negation lines is present verbatim (no subprocess; runs anywhere); unit suite → 5 tests / 12 assertions pass
+
+## Slice 11 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Guard the with-channel hook implementation file — the committed change set
+      (slice-4 list) and the design mechanism ("keep the existing server-side
+      hook") include `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`,
+      and `http-kit-import-registration-test` asserts config.edn's `:hooks
+      :analyze-call` reference exactly, but NO test asserts the impl file exists
+      or that its ns/var match the config reference. The repo has zero
+      `with-channel` call sites (rg: only lint_config_test.clj and the
+      .clj-kondo config mention the symbol), so neither `bb lint` nor the
+      `^:integration` proof (jar arm never fires analyze-call — no calls
+      analyzed; probe/real-file have no with-channel calls) ever loads the
+      `httpkit.with-channel` namespace — a deleted or renamed hook impl is
+      undetectable by `bb test`/CI. Add a unit assertion (same
+      `lint_config_test.clj` ns) that the file exists and its `(ns
+      httpkit.with-channel)` + `(defn with-channel …)` match the config.edn
+      `:hooks :analyze-call` reference (read as text/EDN — no subprocess, runs
+      anywhere; do not put assertion code in the import dir itself — AC2)
+- [ ] Guard the `extensions/dev-http/deps.edn` http-kit pin: design.md Context
+      cites "http-kit 2.8.0 (root `deps.edn` + `extensions/dev-http/deps.edn`)"
+      as the R4 re-verification set, but `http-kit-pin-sourced-from-deps-edn-test`
+      derives the version from ROOT deps.edn only — a drift in the extension pin
+      (the classpath the dev-http extension actually runs against, e.g. a bump
+      to 2.9.0 while root stays 2.8.0) yields zero signal from any test. Extend
+      the pin test to read `extensions/dev-http/deps.edn` and assert its
+      `http-kit/http-kit :mvn/version` equals the root-derived `http-kit-version`
+- [ ] Make the clojure CLI infra dep injectable (slice-8 residue — skill
+      infra-dep criterion `injectable(d) ∧ nullable(d)`): slice-8 made the
+      subprocess NULLABLE (skip when `clojure` absent via the `clojure-bin`
+      `which` guard) but `clj-kondo-main` still hardcodes `"clojure"` in the
+      ProcessBuilder vector, so (a) the binary is not injectable/overridable
+      (unlike repo-root, which gained a property override) and (b) the guard and
+      the executed binary can disagree — `clojure-bin` is resolved at ns-load
+      via `which`, the exec resolves `"clojure"` from PATH at run time, so a
+      PATH mutation between load and run (or a shell function shadowing) makes
+      the guard prove a binary other than the one executed. Use the derived
+      `clojure-bin` in the ProcessBuilder command vector (nil-safe given the
+      skip guard), or mirror the `psi.lint-config-test.repo-root` property
+      override pattern for the binary
