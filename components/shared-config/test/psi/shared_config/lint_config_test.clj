@@ -56,9 +56,12 @@
                       {:user.dir (System/getProperty "user.dir")}))))
 
 (defn- read-edn
-  "Read a repo-relative EDN file."
-  [rel-path]
-  (edn/read-string (slurp (io/file repo-root rel-path))))
+  "Read a repo-relative EDN file, optionally with edn/read-string opts (e.g.
+  {:readers {'kaocha/v1 identity}} for tests.edn's tagged literal)."
+  ([rel-path]
+   (edn/read-string (slurp (io/file repo-root rel-path))))
+  ([rel-path opts]
+   (edn/read-string opts (slurp (io/file repo-root rel-path)))))
 
 (def http-kit-version
   "Pinned http-kit version for the analysis-level proof: derived from deps.edn
@@ -110,6 +113,27 @@
   repo lint gate (see clj-kondo-version; derived, never hardcoded separately)."
   (format "{:deps {clj-kondo/clj-kondo {:mvn/version \"%s\"}}}" clj-kondo-version))
 
+(def ^:private clj-kondo-jar-prop
+  "System property that overrides the pinned clj-kondo jar path (mirror of
+  psi.lint-config-test.http-kit-jar), making the m2-repo dependency injectable
+  per the skill infra-dep criterion — e.g. a non-standard m2 layout
+  (-Dmaven.repo.local) or a CI home that keeps the pinned artifact at a
+  different path."
+  "psi.lint-config-test.clj-kondo-jar")
+
+(def clj-kondo-jar
+  "Pinned clj-kondo jar at the standard m2 path — the artifact the -Sdeps proof
+  executes (formatted from clj-kondo-version so a bump re-targets the jar).
+  Overridable via the psi.lint-config-test.clj-kondo-jar system property
+  (injectable — mirror of the http-kit-jar override); otherwise derived from
+  user.home + clj-kondo-version (nullable — a jar absent at the derived path
+  skips the ^:integration test via the skip guard instead of attempting a
+  network download or hanging up to the subprocess timeout)."
+  (or (not-empty (System/getProperty clj-kondo-jar-prop))
+      (str (System/getProperty "user.home")
+           "/.m2/repository/clj-kondo/clj-kondo/" clj-kondo-version
+           "/clj-kondo-" clj-kondo-version ".jar")))
+
 (def ^:private clojure-bin-prop
   "System property that overrides the clojure CLI binary (mirror of
   psi.lint-config-test.repo-root), making the infra dep injectable per the
@@ -137,6 +161,35 @@
   (or (not-empty (System/getProperty clojure-bin-prop))
       (which-clojure-bin)))
 
+(def ^:private git-bin-prop
+  "System property that overrides the git binary (mirror of
+  psi.lint-config-test.clojure-bin), making the infra dep injectable per the
+  skill infra-dep criterion — e.g. from an editor/nrepl runner whose PATH
+  differs from the invoking shell's."
+  "psi.lint-config-test.git-bin")
+
+(defn- which-git-bin
+  "Resolve the git binary from PATH, or nil when not on PATH."
+  []
+  (some-> (shell/sh "which" "git")
+          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+
+(def git-bin
+  "Path to the git binary used by the git check-ignore ground-truth proof, or
+  nil when unavailable. Overridable via the psi.lint-config-test.git-bin system
+  property (injectable — mirror of the repo-root/clojure-bin overrides);
+  otherwise derived from PATH via `which git` (nullable — a missing binary
+  skips the ^:integration test instead of erroring). The SAME resolved value
+  feeds both the skip guard and the executed subprocess, so the guard can never
+  prove a binary other than the one executed (slice-14 follow-up: previously
+  the guard resolved PATH at test time via `which git` while shell/sh
+  re-resolved the literal \"git\" from PATH at run time — a PATH mutation or
+  shell-function shadowing between guard and exec made the guard prove a
+  different binary, the exact disagreement slice 11 eliminated for
+  clojure-bin)."
+  (or (not-empty (System/getProperty git-bin-prop))
+      (which-git-bin)))
+
 (def ^:private process-timeout-ms
   "Upper bound (ms) for the pinned-clj-kondo subprocess. clojure.java.shell/sh
   has NO :timeout support (unknown opts silently ignored — verified in the 1.12
@@ -144,34 +197,42 @@
   dep download stall) would block the suite indefinitely."
   120000)
 
-(defn- clj-kondo-main
-  "Run the pinned clj-kondo as a subprocess from the repo root with the given
-  clj-kondo args; returns shell/sh-shaped {:exit :out :err}. Timeout-bounded
-  via ProcessBuilder + waitFor(ms) (see process-timeout-ms); on timeout the
-  process is killed and the test fails loudly rather than hanging the suite."
-  [& args]
-  (when (nil? clojure-bin)
-    (throw (ex-info (str "clojure-bin is nil — cannot run the clj-kondo "
-                         "subprocess. Put clojure on PATH or set the "
-                         clojure-bin-prop " system property.")
-                    {})))
-  (let [pb (doto (ProcessBuilder. (into [clojure-bin "-Sdeps" clj-kondo-deps
-                                         "-M" "-m" "clj-kondo.main"] args))
+(defn- run-bounded
+  "Run a subprocess with the given command vector from the repo root; returns
+  shell/sh-shaped {:exit :out :err}. Timeout-bounded via ProcessBuilder +
+  waitFor(ms) (see process-timeout-ms); on timeout the process is killed and
+  the test fails loudly rather than hanging the suite (shell/sh has no
+  :timeout — unknown opts silently ignored, verified in the 1.12 source)."
+  [cmd]
+  (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
         proc (.start pb)
         out-f (future (slurp (.getInputStream proc)))
         err-f (future (slurp (.getErrorStream proc)))]
     (try
       (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
-        (throw (ex-info (str "clj-kondo subprocess exceeded " process-timeout-ms
-                             " ms and was killed: " (pr-str args))
-                        {:args args}))
+        (throw (ex-info (str "subprocess exceeded " process-timeout-ms
+                             " ms and was killed: " (pr-str cmd))
+                        {:cmd cmd}))
         {:exit (.exitValue proc) :out @out-f :err @err-f})
       (finally
         (when (.isAlive proc)
           (.destroyForcibly proc)
           ;; drain the streams so the (non-daemon) future threads terminate
           @out-f @err-f)))))
+
+(defn- clj-kondo-main
+  "Run the pinned clj-kondo as a subprocess from the repo root with the given
+  clj-kondo args; returns shell/sh-shaped {:exit :out :err} (see run-bounded
+  for the timeout bound)."
+  [& args]
+  (when (nil? clojure-bin)
+    (throw (ex-info (str "clojure-bin is nil — cannot run the clj-kondo "
+                         "subprocess. Put clojure on PATH or set the "
+                         clojure-bin-prop " system property.")
+                    {})))
+  (run-bounded (into [clojure-bin "-Sdeps" clj-kondo-deps
+                      "-M" "-m" "clj-kondo.main"] args)))
 
 (deftest http-kit-import-registration-test
   (testing "http-kit import config retains the defreq :lint-as registration"
@@ -310,6 +371,59 @@
                   (str ignore-all " (line " (inc ignore-idx) ") precedes "
                        negation " (line " (inc neg-idx) ")")))))))))
 
+(deftest bb-edn-lint-task-wrapper-test
+  (testing "bb.edn's lint task remains the plain `clojure -M:lint` wrapper
+            (slice-14 follow-up): AC1's local proof surface is `bb lint` ≡
+            `clojure -M:lint`, and lint-alias-lints-extensions-test guards only
+            deps.edn's :lint :main-opts — nothing guards bb.edn's lint task
+            (:tasks lint, bb.edn:242-244). If the wrapper drifts — e.g. adds
+            --cache false (with no cache the two warnings vanish — exactly
+            design-step 9's masking), adds --config overrides, or switches to
+            the native clj-kondo binary — the local AC1 gate becomes trivially
+            clean while every other test still passes. Read bb.edn as EDN — no
+            subprocess, runs anywhere. (bb.edn task names are symbols, so the
+            entry's key is `lint`, not :lint.)"
+    (let [bb   (read-edn "bb.edn")
+          task (:task (get-in bb [:tasks 'lint]))]
+      (is (some? task) "bb.edn defines a :tasks lint entry")
+      (testing "the task is the exact trivial shell wrapper (no --cache false,
+                no --config override, no native-binary switch)"
+        (is (= '(shell "clojure -M:lint") task)
+            (str "lint task drifts from `(shell \"clojure -M:lint\")`: "
+                 (pr-str task)))))))
+
+(deftest tests-edn-suite-wiring-test
+  (testing "tests.edn keeps the shared-config test dir wired into the suites
+            that RUN the task-252 guards (slice-14 follow-up): the
+            ^:integration proofs (analysis-level + git ground truth) execute
+            only because the :integration suite lists
+            components/shared-config/test with :focus-meta [:integration], and
+            the unit invariants run only because the :unit suite lists it too
+            (and skips the ^:integration tests via :skip-meta) — nothing tests
+            tests.edn, so dropping the path (or changing :focus-meta/
+            :skip-meta) silently disables every guard with zero signal, the
+            same silent-drift class the task already guards for .gitignore /
+            lint-alias / pins. Read tests.edn as EDN with the #kaocha/v1 tag
+            reader — no subprocess, runs anywhere."
+    (let [suites (:tests (read-edn "tests.edn" {:readers {'kaocha/v1 identity}}))
+          by-id  (fn [id] (first (filter #(= id (:id %)) suites)))
+          unit   (by-id :unit)
+          intg   (by-id :integration)]
+      (is (some? unit) "tests.edn has a :unit suite")
+      (is (some? intg) "tests.edn has an :integration suite")
+      (testing ":unit suite lists components/shared-config/test (runs the unit
+                invariants) and skips the ^:integration tests"
+        (is (some #{"components/shared-config/test"} (:test-paths unit))
+            ":unit :test-paths contains components/shared-config/test")
+        (is (= [:integration] (:skip-meta unit))
+            ":unit :skip-meta retains [:integration] — the ^:integration proofs stay out of bb test"))
+      (testing ":integration suite lists components/shared-config/test with
+                :focus-meta [:integration] (the ^:integration proofs actually run)"
+        (is (some #{"components/shared-config/test"} (:test-paths intg))
+            ":integration :test-paths contains components/shared-config/test")
+        (is (= [:integration] (:focus-meta intg))
+            ":integration :focus-meta retains [:integration]")))))
+
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
   (testing "git's own interpretation of the tracking negation matches the text
             test (slice-13 follow-up): gitignore-http-kit-import-tracking-test
@@ -319,16 +433,18 @@
             differently than the text test) passes while the import dir silently
             drops out of commits. Ground truth — the slice-1 manual check:
             http-kit config.edn must NOT be ignored (exit 1) and the malli
-            sibling must be ignored (exit 0)."
-    (if-let [reason (when-not (zero? (:exit (shell/sh "which" "git")))
-                      "git not on PATH")]
+            sibling must be ignored (exit 0). Slice-14: the git binary is an
+            injectable/nullable infra dep (psi.lint-config-test.git-bin
+            override, else `which git`) and the SAME resolved git-bin feeds
+            both the skip guard and the executed subprocess (bounded via
+            run-bounded — shell/sh has no :timeout)."
+    (if-let [reason (when (nil? git-bin) "git not on PATH")]
       (do (println "SKIP task-252 git check-ignore ground truth:" reason)
           (is (str "skipped: " reason)))
       (let [http-kit-rel ".clj-kondo/imports/http-kit/http-kit/config.edn"
             malli-rel    ".clj-kondo/imports/metosin/malli/config.edn"
             check        (fn [rel]
-                           (shell/sh "git" "check-ignore" "-v" rel
-                                     :dir repo-root))]
+                           (run-bounded [git-bin "check-ignore" "-v" rel]))]
         (testing "http-kit import config is NOT ignored (tracked — the negation works)"
           (let [{:keys [exit out err]} (check http-kit-rel)]
             (is (not (zero? exit))
@@ -366,6 +482,9 @@
 
                       (not (.exists (io/file http-kit-jar)))
                       (str http-kit-jar " not present")
+
+                      (not (.exists (io/file clj-kondo-jar)))
+                      (str clj-kondo-jar " not present (pinned clj-kondo artifact)")
 
                       :else nil)]
       (do (println "SKIP task-252 analysis-level proof:" reason)

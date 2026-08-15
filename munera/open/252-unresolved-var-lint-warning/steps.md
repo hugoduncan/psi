@@ -405,7 +405,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 14 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Make the git binary infra dep injectable + guard/exec-agreed (skill
+- [x] Make the git binary infra dep injectable + guard/exec-agreed (skill
       infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
       slice-11 clojure-bin fix): `^:integration
       gitignore-http-kit-tracking-ground-truth-test` skips when `which git`
@@ -419,7 +419,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `which`), use the SAME value in the skip guard and the `check-ignore`
       invocation; optionally bound the subprocess (shell/sh has no :timeout,
       the same gap slice 8 closed for clj-kondo-main)
-- [ ] Make the pinned clj-kondo jar infra dep nullable + injectable (skill
+      — done: `git-bin` derived once (`psi.lint-config-test.git-bin` property
+      override, mirror of the clojure-bin override; else `which git`); the same
+      resolved `git-bin` feeds the skip guard and the `check-ignore` invocation;
+      the subprocess is bounded via a shared `run-bounded` helper (ProcessBuilder
+      + waitFor(120s) — refactored out of clj-kondo-main, so clj-kondo and git
+      both use the timeout-capable runner; shell/sh has no :timeout). Verified:
+      default `which`-derived git → ground-truth test passes (no SKIP);
+      `psi.lint-config-test.git-bin` override with the real binary → 171
+      assertions, both proofs ran
+- [x] Make the pinned clj-kondo jar infra dep nullable + injectable (skill
       infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
       slice-9/12 http-kit jar pattern): `http-kit-defreq-analysis-level-resolution-test`
       skips when `clojure` is off PATH or the http-kit jar is absent, but the
@@ -433,7 +442,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `psi.lint-config-test.clj-kondo-jar` property override, and add an
       existence check to the skip guard (visible SKIP, mirroring the http-kit
       jar arm)
-- [ ] Guard the bb.edn `lint` task wrapper (AC1's local proof surface): AC1
+      — done: `clj-kondo-jar` derived from user.home + `clj-kondo-version`
+      (mirror of `http-kit-jar`), overridable via
+      `psi.lint-config-test.clj-kondo-jar`, and an existence check added to the
+      proof's skip guard (visible SKIP, mirroring the http-kit jar arm).
+      Verified: default derivation resolves
+      `~/.m2/repository/clj-kondo/clj-kondo/2025.09.19/clj-kondo-2025.09.19.jar`
+      (present); override to a nonexistent path → proof skips (integration
+      suite 171 → 155 assertions — the 17-assertion proof collapsed to the
+      1-assertion skip); no override → 171 assertions, no SKIP
+- [x] Guard the bb.edn `lint` task wrapper (AC1's local proof surface): AC1
       verification is `bb lint` ≡ `clojure -M:lint`, and
       `lint-alias-lints-extensions-test` guards only deps.edn's `:lint
       :main-opts` — nothing guards bb.edn's `lint` task (`:task (shell
@@ -445,7 +463,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       ns; read bb.edn as EDN — no subprocess, runs anywhere) asserting the
       `lint` task's shell command invokes `clojure -M:lint` without
       `--cache false`/`--config` overrides
-- [ ] Guard the tests.edn suite wiring that makes the `^:integration` tests
+      — done: `bb-edn-lint-task-wrapper-test` added — reads bb.edn as EDN and
+      asserts the `lint` task (keyed by the symbol `lint`, bb.edn task names
+      are symbols) is EXACTLY `(shell "clojure -M:lint")`, so any drift (cache
+      disabling, config override, native-binary switch) fails loudly in `:unit`
+- [x] Guard the tests.edn suite wiring that makes the `^:integration` tests
       RUN (the entire CI-detectable regression surface for this task): the two
       proofs (analysis-level + git ground truth) execute only because
       tests.edn's `:integration` suite lists `components/shared-config/test`
@@ -457,3 +479,9 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       reading tests.edn as EDN asserting `components/shared-config/test` ∈
       `:unit` `:test-paths` ∧ `:integration` `:test-paths`, and `:integration`
       `:focus-meta` retains `[:integration]`
+      — done: `tests-edn-suite-wiring-test` added — reads tests.edn as EDN via
+      the `#kaocha/v1` tag reader (extended `read-edn` with opts), asserts
+      `components/shared-config/test` ∈ `:unit` `:test-paths` ∧ `:integration`
+      `:test-paths`, `:integration` `:focus-meta` = `[:integration]`, and
+      `:unit` `:skip-meta` = `[:integration]` (named in the follow-up's
+      rationale — the ^:integration proofs stay out of `bb test`)
