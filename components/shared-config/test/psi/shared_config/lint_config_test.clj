@@ -247,7 +247,17 @@
   timeout ex-info carries the partial stdout/stderr drained after the kill, so
   a hung subprocess (e.g. a cold -Sdeps dep download stall) surfaces where it
   stalled instead of reporting zero context (slice-20 follow-up: the ex-info
-  previously carried {:cmd cmd} only and discarded the drained streams)."
+  previously carried {:cmd cmd} only and discarded the drained streams).
+
+  The stream drain is bounded on EVERY path — success included (slice-21
+  follow-up): the waitFor bound covers the process LIFETIME only, so a
+  subprocess that exits while a descendant still holds the stdout/stderr pipe
+  open (classic grandchild scenario — e.g. the clojure CLI spawning a JVM that
+  spawns a helper) never EOFs the slurp; an unbounded deref on the success
+  path (or in the finally) would then hang the suite indefinitely despite the
+  documented bound. The success path therefore uses the same bounded deref
+  and fails loudly — with the undrained :out/:err marked :unavailable — when
+  the streams do not close within the drain bound."
   [cmd]
   (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
@@ -275,12 +285,26 @@
                                   :unavailable partial-out)
                            :err (if (= ::unavailable partial-err)
                                   :unavailable partial-err)})))
-        {:exit (.exitValue proc) :out @out-f :err @err-f})
+        (let [out (drain out-f "stdout")
+              err (drain err-f "stderr")]
+          (when (or (= ::unavailable out) (= ::unavailable err))
+            (throw (ex-info (str "subprocess exited but its stdout/stderr did "
+                                 "not close within the drain bound — a "
+                                 "descendant process is holding the pipe open: "
+                                 (pr-str cmd))
+                            {:cmd cmd
+                             :out (if (= ::unavailable out) :unavailable out)
+                             :err (if (= ::unavailable err) :unavailable err)})))
+          {:exit (.exitValue proc) :out out :err err}))
       (finally
         (when (.isAlive proc)
-          (.destroyForcibly proc)
-          ;; drain the streams so the (non-daemon) future threads terminate
-          @out-f @err-f)))))
+          (.destroyForcibly proc))
+        ;; bounded drain so the finally can never hang the suite either
+        ;; (slice-21: the previously-unbounded @out-f/@err-f here would block
+        ;; forever on the pipe-holding-descendant path; a completed future
+        ;; returns instantly, so the bound only bites in the pathological case)
+        (drain out-f "stdout")
+        (drain err-f "stderr")))))
 
 (defn- clj-kondo-main
   "Run the pinned clj-kondo as a subprocess from the repo root with the given
@@ -326,14 +350,17 @@
             the ^:integration proof ever loads the httpkit.with-channel
             namespace (the jar arm never fires analyze-call — no calls are
             analyzed), so a deleted or renamed hook impl is otherwise
-            undetectable by bb test/CI. Reads the impl as text/EDN — no
-            subprocess — and the assertion code lives outside the import dir
-            (AC2 confinement)."
+            undetectable by bb test/CI. Reads the impl as text with
+            *read-eval* false (a `#=` reader-eval form throws instead of
+            evaluating — slice-21) — no subprocess — and the assertion code
+            lives outside the import dir (AC2 confinement)."
     (let [impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
           impl-file (io/file repo-root impl-rel)
           cfg       (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")
           ref       (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])
-          forms     (read-string (str "[" (slurp impl-file) "]"))]
+          forms     (binding [*read-eval* false]
+                      (read-string {:read-cond :preserve}
+                                   (str "[" (slurp impl-file) "]")))]
       (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
         (is (= 'httpkit.with-channel/with-channel ref)))
       (testing "impl file exists (member of the slice-4 tracked change set)"
@@ -357,9 +384,20 @@
   path), while every semantic difference survives — including string-literal
   contents, which read-string preserves exactly (a spacing change inside a
   string literal is a different parsed value, unlike a whitespace-collapsing
-  text compare)."
+  text compare).
+
+  Binds *read-eval* false (slice-21 follow-up): a drifted/malicious `#=`
+  reader-eval form on either side of the compare would otherwise EXECUTE
+  during the read instead of being compared — this guard's purpose is to
+  detect semantic drift in the tracked impl vs the pinned jar export, so `#=`
+  now throws loudly instead of evaluating. Passes :read-cond :preserve so
+  reader conditionals (`#?`/`#?@`) COMPARE structurally on all branches
+  rather than erroring with \"Conditional read not allowed\" — :allow would
+  read only the current platform's branch and silently drop the others from
+  the compare, a blind spot of the exact class this guard exists to close."
   [s]
-  (read-string (str "[" s "]")))
+  (binding [*read-eval* false]
+    (read-string {:read-cond :preserve} (str "[" s "]"))))
 
 (deftest ^:integration with-channel-hook-semantics-guard-test
   (testing "the tracked with-channel hook impl is semantically identical to the

@@ -304,3 +304,19 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - implementation review 2026-08-15: added 3 steps to be addressed
 - addressed 3 review steps (slice 20): (1) semantics guard's whitespace blind spot closed — `normalize-whitespace` (collapsed whitespace INSIDE string literals, so a literal-spacing change passed) replaced by `parse-forms` (read-string both sides, vector-wrapped — indentation/whitespace vanishes by construction, string-literal contents survive exactly); verified indentation-insensitive / literal-spacing-sensitive / token-change-sensitive. (2) missing-jar-entry NPE fixed — the equality is nil-guarded (`when (some? jar-export)` after the outer `some?` assertion), so a jar without the clj-kondo.exports entry fails as a plain assertion FAIL, not an ERROR (verified with a fabricated entry-less jar via `psi.lint-config-test.http-kit-jar`). (3) `run-bounded` timeout ex-info now carries partial output — destroy process first (closes pipes so drain futures complete), then bounded 500 ms deref of `@out-f`/`@err-f` into `{:cmd … :out … :err …}` (verified: `echo partial-output-here; sleep 30` → ex-data `:out "partial-output-here\n"`). Integration 33 tests / 176 assertions (was 177 — redundant inner `some?` assert dropped), no SKIP; unit 9 / 39; `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.
 - implementation review 2026-08-15: added 2 steps to be addressed
+- addressed 2 review steps (slice 21): (1) run-bounded success-path + finally
+  stream drains bounded (bounded 3-arg deref, loud ex-info with :unavailable
+  markers when a pipe-holding descendant keeps the streams open past the
+  bound — previously the success branch's unbounded @out-f/@err-f hung the
+  suite indefinitely on the grandchild scenario); verified: pipe-holding
+  grandchild (`sh -c "sleep 300 & echo done"`) fails loudly in ~2s (no hang),
+  timeout path still captures partial output, normal path unchanged. (2)
+  *read-eval* false bound in both read-string compare sites (parse-forms +
+  with-channel-hook-impl-guard-test) — `#=` throws instead of evaluating; +
+  `:read-cond :preserve` (over the follow-up's `:allow`: :allow drops
+  non-platform branches from the structural compare, a guard blind spot;
+  :preserve compares all branches). Verified: `#=(+ 1 2)` throws
+  "EvalReader not allowed"; `#?(:clj 1 :cljs 2)` parses structurally.
+  Focused unit+integration run 12 tests / 64 assertions; full integration
+  suite 33 tests / 176 assertions, no SKIP; `bb lint` errors: 0, warnings: 0;
+  `bb fmt:check` clean.

@@ -834,7 +834,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 21 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Bound the success-path stream drain in `run-bounded`
+- [x] Bound the success-path stream drain in `run-bounded`
       (`components/shared-config/test/psi/shared_config/lint_config_test.clj`):
       the 120s bound covers `(.waitFor proc process-timeout-ms …)` ONLY — the
       success branch returns `{:exit … :out @out-f :err @err-f}` with unbounded
@@ -851,7 +851,23 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Verify: simulate a pipe-holding grandchild (e.g.
       `sh -c "echo out; (sleep 300) & wait"` with a reduced
       process-timeout-ms) → suite fails loudly instead of hanging.
-- [ ] Bind `*read-eval*` false in the read-string-based compares
+      — done: the success path now uses the same bounded 3-arg deref
+      (`drain`, 500 ms) and throws a loud ex-info — distinct message
+      "subprocess exited but its stdout/stderr did not close within the drain
+      bound — a descendant process is holding the pipe open" — with the
+      undrained `:out`/`:err` marked `:unavailable`, when the streams do not
+      close past the bound; the `finally` drain is bounded too (previously
+      unbounded `@out-f`/`@err-f` guarded by `.isAlive` — a completed future
+      returns instantly, so the bound only bites on the pathological path).
+      Verified 2026-08-15 via scratch (process-timeout-ms alter-var-root'd to
+      5 s): `sh -c "sleep 300 & echo done"` (parent exits, descendant holds
+      the pipe — the success-path case the unbounded deref hung on) → loud
+      ex-info in ~2 s (`:out :unavailable`), NO hang; `sh -c "echo
+      partial-out; sleep 30"` → timeout path still fails loudly at the bound
+      with `:out "partial-out\n"` captured (slice-20 behavior intact); normal
+      `echo hello` → `{:exit 0 :out "hello\n"}` in 7 ms. Stray `sleep 300`
+      cleaned up after verification.
+- [x] Bind `*read-eval*` false in the read-string-based compares
       (`parse-forms` in `with-channel-hook-semantics-guard-test` and the
       `read-string` in `with-channel-hook-impl-guard-test`): verified
       2026-08-15 that `*read-eval*` defaults to `true` and
@@ -868,3 +884,15 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       throws; a fabricated `#=`-bearing jar export (via the
       `psi.lint-config-test.http-kit-jar` override) fails loudly with no
       evaluation side effect.
+      — done (both sites): `parse-forms` and the impl-guard read both wrap
+      `(binding [*read-eval* false] (read-string {:read-cond :preserve} …))`.
+      `:read-cond :preserve` chosen over the follow-up's suggested `:allow`:
+      `:allow` reads only the current platform's branch, silently dropping the
+      others from the compare — a blind spot of the exact class this guard
+      exists to close — while `:preserve` keeps the full conditional as a
+      reader-conditional form, so all branches compare structurally and a
+      conditional introduction reads instead of erroring. Verified 2026-08-15:
+      `(binding [*read-eval* false] (read-string "#=(+ 1 2)"))` throws
+      "EvalReader not allowed when *read-eval* is false" (no evaluation);
+      `(parse-forms "#?(:clj 1 :cljs 2)")` → `[#?(:clj 1 :cljs 2)]` (parsed
+      structurally).
