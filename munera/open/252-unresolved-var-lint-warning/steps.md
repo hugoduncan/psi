@@ -720,3 +720,30 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       normalized content, so semantic drift fails loudly while the documented
       indentation drift stays green; `bb lint` errors: 0, warnings: 0;
       `bb fmt:check` clean
+
+## Slice 19 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Reconcile implementation.md's stale AC1 CI-framing with the realized
+      option (a)-via-test-vehicle (slices 7-17): (1) the "Design review context
+      (re-pass — architectural fit)" note still claims "AC1 proof surface is
+      CI-enforced" — self-flagged as superseded ("correct or strike it") in the
+      design-step-9 amendment note and confirmed overstated there, but never
+      corrected/struck: CI's `bb lint` is trivially clean (no cache, no
+      `--dependencies` → the http-kit jar is never analyzed), so the claim
+      misleads about what CI exercises. (2) the "Implementation slice —
+      executed (slices 0-4 complete)" entry still records "AC1 scoped
+      local-only (option b — no CI workflow change; committed config + local
+      verification accepted)" — the opposite of the committed `^:integration`
+      test vehicle (http-kit-defreq-analysis-level-resolution-test +
+      gitignore-http-kit-tracking-ground-truth-test, run via
+      `bb clojure:test:integration` in CI). Slice 17 reconciled design.md and
+      plan.md only; implementation.md's own two records were never touched.
+- [ ] Amend design.md AC1's "slices 7-16" range / two-test enumeration:
+      "design-step 9 option (a) realized in slices 7-16: [the two named
+      `^:integration` tests] … are `^:integration`" is now a non-exhaustive
+      enumeration — slice 18 added a third `^:integration` test
+      (`with-channel-hook-semantics-guard-test`) to the same
+      `lint_config_test.clj` file, so the range (7-16) and the "are
+      `^:integration`" framing predate the file's current shape. Extend the
+      range or re-scope the enumeration as non-exhaustive (mirrored in
+      plan.md decision 3 / R3's "slices 7-16" references).

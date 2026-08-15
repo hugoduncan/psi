@@ -278,3 +278,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   integration 33 tests / 177 assertions (was 32/174), no SKIP; unit 9 / 39;
   negative no-op-rewrite check discriminates; bb lint errors: 0, warnings: 0;
   bb fmt:check clean
+- implementation review 2026-08-15: added 2 steps to be addressed
