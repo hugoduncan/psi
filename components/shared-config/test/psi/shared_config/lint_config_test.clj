@@ -181,8 +181,28 @@
       (is (some? pin) "deps.edn :deps pins http-kit/http-kit")
       (is (some? (:mvn/version pin))))))
 
+(deftest gitignore-http-kit-import-tracking-test
+  (testing ".gitignore keeps the http-kit import dir TRACKED (plan.md decision 2
+            / slice 1 / slice-4 change set): the negation lines that exempt
+            `.clj-kondo/imports/http-kit/**` from the ignore-all rule.
+            Nothing else tests this — `http-kit-import-registration-test` reads
+            config.edn from disk, so if the negation is removed (restoring
+            `**/.clj-kondo/imports/`) the file still exists locally, the unit
+            suite passes, and the registration silently drops out of future
+            commits. Read as text — no subprocess — so it runs anywhere."
+    (let [patterns ["**/.clj-kondo/imports/*"
+                    "!.clj-kondo/imports/http-kit/"
+                    "!.clj-kondo/imports/http-kit/**"]
+          lines    (str/split-lines (slurp (io/file repo-root ".gitignore")))]
+      (doseq [pattern patterns]
+        (is (some #{pattern} lines)
+            (str ".gitignore contains the tracking-negation line " pattern))))))
+
 (deftest ^:integration http-kit-defreq-analysis-level-resolution-test
-  (testing "defreq verbs resolve and a bogus var still warns via cache-driven analysis"
+  (testing "defreq verbs resolve via cache-driven analysis: probe + real AC1 file
+            (extensions/dev-http/test/extensions/dev_http_test.clj, lines 572/737)
+            clean with the registration cache; real file warns against a
+            no-registration cache (discriminating control, slice-10 follow-up)"
     (if-let [reason (cond
                       (nil? clojure-bin)
                       "clojure CLI binary not on PATH (clj-kondo subprocess cannot run)"
@@ -193,11 +213,16 @@
                       :else nil)]
       (do (println "SKIP task-252 analysis-level proof:" reason)
           (is (str "skipped: " reason)))
-      (let [tmp       (doto (java.io.File/createTempFile "ck252" "")
-                        (.delete)
-                        (.mkdirs))
-            cache-dir (str (io/file tmp "cache"))
-            probe     (io/file tmp "probe.clj")]
+      (let [tmp          (doto (java.io.File/createTempFile "ck252" "")
+                           (.delete)
+                           (.mkdirs))
+            cache-dir    (str (io/file tmp "cache"))
+            no-reg-dir   (str (io/file tmp "no-reg-cache"))
+            empty-config (doto (io/file tmp "empty-config") (.mkdirs))
+            probe        (io/file tmp "probe.clj")
+            ;; AC1's literal acceptance surface (design.md AC1 / design-step 9):
+            ;; the ACTUAL dev-http test file, not just a synthetic probe.
+            real-file    "extensions/dev-http/test/extensions/dev_http_test.clj"]
         (spit probe
               (str "(ns probe\n"
                    "  (:require [org.httpkit.client :as http-client]))\n"
@@ -206,7 +231,7 @@
                    "  @(http-client/get \"http://example.com\")\n"
                    "  @(http-client/post \"http://example.com\")\n"
                    "  @(http-client/definitely-not-a-var))\n"))
-        (testing "jar analysis populates a hermetic cache"
+        (testing "jar analysis populates a hermetic cache (repo imports config active)"
           (let [{:keys [exit]} (clj-kondo-main "--lint" http-kit-jar
                                                "--dependencies"
                                                "--cache-dir" cache-dir)]
@@ -218,4 +243,43 @@
             (is (not (zero? exit)) "findings present ⇒ non-zero exit")
             (is (not (str/includes? out "Unresolved var: http-client/get")))
             (is (not (str/includes? out "Unresolved var: http-client/post")))
-            (is (str/includes? out "Unresolved var: http-client/definitely-not-a-var"))))))))
+            (is (str/includes? out "Unresolved var: http-client/definitely-not-a-var"))))
+        (testing "real AC1 file lints clean against the registration cache
+                  (a regression in the real file — an added http-client/delete
+                  call, a changed alias, a removed require — fails here)"
+          (let [{:keys [exit out]}
+                (clj-kondo-main "--lint" real-file "--cache-dir" cache-dir)]
+            (is (zero? exit) (str "real-file lint clean: " out))
+            (is (not (str/includes? out "Unresolved var: http-client/get")))
+            (is (not (str/includes? out "Unresolved var: http-client/post")))))
+        (testing "discriminating control: no-reg cache (--config-dir empty, so the
+                  repo imports config is NOT merged; clj-kondo 2025.09.19 NPEs
+                  config_dir is null without --config-dir) carries the slice-2
+                  verb-set proxy — ~$request but not ~$get/~$post"
+          (let [{:keys [exit]} (clj-kondo-main "--lint" http-kit-jar
+                                               "--dependencies"
+                                               "--config-dir" (str empty-config)
+                                               "--cache-dir" no-reg-dir)]
+            (is (zero? exit))
+            (let [transit (slurp (io/file no-reg-dir
+                                          "v1/clj/org.httpkit.client.transit.json"))]
+              (is (str/includes? transit "~$request")
+                  "no-reg cache still carries the plain defn request")
+              (is (not (str/includes? transit "~$get"))
+                  "no-reg cache carries NO defreq-generated get")
+              (is (not (str/includes? transit "~$post"))
+                  "no-reg cache carries NO defreq-generated post"))))
+        (testing "real AC1 file reports the two warnings against the no-reg cache
+                  (proves the clean arm above is registration-driven, not
+                  trivially clean — an empty cache is trivially clean per
+                  design-step 9, and --config '{:lint-as {}}' auto-merges the
+                  imports config regardless)"
+          (let [{:keys [exit out]}
+                (clj-kondo-main "--lint" real-file "--cache-dir" no-reg-dir)]
+            (is (not (zero? exit)) "findings present ⇒ non-zero exit")
+            (is (str/includes? out "Unresolved var: http-client/get")
+                "no-reg cache ⇒ line 572 get warning")
+            (is (str/includes? out "Unresolved var: http-client/post")
+                "no-reg cache ⇒ line 737 post warning")
+            (is (str/includes? out "errors: 0, warnings: 2")
+                "no-reg cache ⇒ exactly the two warnings (AC1 baseline shape)")))))))
