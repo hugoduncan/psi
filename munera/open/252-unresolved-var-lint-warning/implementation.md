@@ -5,6 +5,19 @@
 - ambiguity review (re-pass): no new actionable ambiguity feedback — prior ambiguity items 1-2 resolved in current design.md (committed mechanism = analysis-level registration in the http-kit import dir; AC1 pins repo-wide lint as proof surface). The remaining facility "or" (analyze-call/namespace hook vs `:namespaces` `:defined-by` declaration) is an explicitly declared implementation choice with acceptance closure, not a fresh ambiguity — do not re-file.
 - inconsistency review (re-pass): no new actionable inconsistency feedback — design.md line/version/mechanism claims verified consistent against deps.edn, .clj-kondo artifacts, and task 251; remaining candidates already consumed by prior passes.
 
+## Implementation slice — relevant non-task files
+
+All 5 design-steps are resolved; design.md (Mechanism/Constraints/Acceptance) is the contract for the implementation slice. Non-task paths the slice touches:
+- Target: `.clj-kondo/imports/http-kit/http-kit/config.edn` — extend (currently only the server-side `:hooks {:analyze-call ...}`)
+- Hook impl dir (only if hook route chosen): `.clj-kondo/imports/http-kit/http-kit/httpkit/` — mirror `with_channel.clj`
+- Forbidden to change (AC2): `.clj-kondo/config.edn` — root `:unresolved-symbol :exclude` stays exactly `[(malli.core/=>)]`
+- Facility examples: `.clj-kondo/imports/metosin/malli/config.edn` (per-library `:linters`), `.clj-kondo/imports/funcool/promesa/config.edn` (`:lint-as`)
+- Proof surface: `bb.edn` `lint` task (line ~242); `deps.edn` `:lint` alias (line ~229, clj-kondo 2025.09.19); `.github/workflows/ci.yml` "Lint" step (`bb lint`)
+- Warning site: `extensions/dev-http/test/extensions/dev_http_test.clj` lines 572 (`http-client/get`) and 737 (`http-client/post`)
+- Version pins: `deps.edn` + `extensions/dev-http/deps.edn` — http-kit 2.8.0
+
+Maintain design.md Constraints when implementing: λ lint(f) fix hierarchy (fix > suppress(inline) > exclude ≫ suppress(global)) and λ fix(bug) (no workaround ⇝ complexity) — analysis-level resolution only, never exclusion/ignore; small (one rule cluster confined to the http-kit import dir); localization (root config untouched, per AC2).
+
 ## Design review context (re-pass — inconsistency)
 
 - Verified design.md cross-references: (1) `:lint` alias has no `--copy-configs`/classpath wiring — `.clj-kondo/imports/**/config.edn` auto-merges (proven by the working with-channel hook), so a `:namespaces` addition there applies without extra wiring; (2) task 251's 800-line limit lives in `bb.edn` (`commit-check:file-lengths`, `file-length-legacy-max-lines`) — design.md's "bb.edn change disjoint from this `.clj-kondo` change" holds.
