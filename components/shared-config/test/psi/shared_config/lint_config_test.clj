@@ -19,7 +19,8 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]])
   (:import
-   [java.util.concurrent TimeUnit]))
+   [java.util.concurrent TimeUnit]
+   [java.util.zip ZipFile]))
 
 (def ^:private repo-root-prop
   "System property that overrides repo-root (e.g. when running from an
@@ -325,6 +326,54 @@
         (is (some (fn [f] (and (seq? f) (= 'defn (first f))
                                (= 'with-channel (second f))))
                   forms))))))
+
+(defn- normalize-whitespace
+  "Collapse runs of whitespace to a single space (and trim). Used to compare the
+  tracked with-channel hook impl against the jar export modulo the documented
+  cljfmt indentation drift (slice 5: the repo's pre-commit hook reformats
+  continuation indentation to repo style — 2-space vs the jar's 3-space — so a
+  byte compare can never pass through the repo's own commit path). Collapsing
+  (not removing) whitespace preserves token boundaries, so distinct token
+  sequences still compare as different."
+  [s]
+  (str/trim (str/replace s #"\s+" " ")))
+
+(deftest ^:integration with-channel-hook-semantics-guard-test
+  (testing "the tracked with-channel hook impl is semantically identical to the
+            pinned 2.8.0 jar's clj-kondo.exports export (slice-18 follow-up):
+            with-channel-hook-impl-guard-test asserts the impl file exists and
+            carries (ns httpkit.with-channel) + (defn with-channel …), but a
+            semantically-changed transformation body (still a valid ns/defn —
+            e.g. a no-op rewrite returning the node unchanged) passes every
+            guard while silently mis-analyzing with-channel calls; the repo has
+            zero with-channel call sites (slice-11 fact), so nothing exercises
+            the hook and the drift is undetectable. This test reads the export
+            from the pinned http-kit jar (the source of truth — same artifact
+            the analysis-level proof lints) and compares it whitespace-normalized
+            against the tracked impl, so the documented cljfmt indentation drift
+            (slice 5) stays green while any semantic change fails loudly.
+            Jar-absent → visible SKIP via report-skip!, mirroring the existing
+            skip arms (http-kit jar is already injectable/nullable via
+            psi.lint-config-test.http-kit-jar / the derived m2 path)."
+    (if-let [reason (when-not (.exists (io/file http-kit-jar))
+                      (str http-kit-jar " not present"))]
+      (do (report-skip! "with-channel hook semantics" reason)
+          (is (str "skipped: " reason)))
+      (let [jar-entry "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
+            tracked   (slurp (io/file repo-root
+                                      ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"))
+            jar-export (with-open [zf (ZipFile. (io/file http-kit-jar))]
+                         (when-let [entry (.getEntry zf jar-entry)]
+                           (slurp (.getInputStream zf entry))))]
+        (is (some? jar-export)
+            (str "the pinned http-kit jar contains the clj-kondo.exports export "
+                 jar-entry))
+        (testing "tracked impl is semantically identical to the jar export
+                  (whitespace/indentation-normalized — see normalize-whitespace)"
+          (is (some? jar-export))
+          (is (= (normalize-whitespace jar-export)
+                 (normalize-whitespace tracked))
+              "tracked with_channel.clj differs from the pinned jar export beyond whitespace"))))))
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"

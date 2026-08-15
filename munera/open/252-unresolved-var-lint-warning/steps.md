@@ -667,7 +667,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 18 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Reconcile design.md Context's "used in exactly one repo file (rg over
+- [x] Reconcile design.md Context's "used in exactly one repo file (rg over
       components/ + extensions/)" claim (Context, "used in exactly one repo
       file" bullet) with the committed test file: slices 7-16 committed
       `components/shared-config/test/psi/shared_config/lint_config_test.clj`,
@@ -682,7 +682,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Amend to scope the claim to call sites / runtime usage, noting the
       committed test file references the symbols as config-assertion data,
       not usage
-- [ ] Guard the with-channel hook's transformation SEMANTICS, not just its
+      — done: design.md Context bullet amended — the claim now reads "used at
+      exactly one runtime call site in the repo" (require @16, get/post @572/
+      @737), and explicitly notes the committed regression test references
+      `org.httpkit.client` symbols only as config-assertion data (the `:lint-as`
+      registration assertion, the `http-client-entries` EDN-walk predicate, the
+      probe ns), never as runtime usage
+- [x] Guard the with-channel hook's transformation SEMANTICS, not just its
       existence/signature: `with-channel-hook-impl-guard-test` (slice 11)
       asserts the impl file exists and carries `(ns httpkit.with-channel)` +
       `(defn with-channel …)`, but a semantically-changed transformation body
@@ -699,3 +705,18 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       the current tracked impl is semantically identical to the jar export
       modulo whitespace (whitespace-stripped diff clean), so the guard passes
       today
+      — done: new `^:integration` `with-channel-hook-semantics-guard-test` —
+      reads `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj`
+      from the pinned http-kit jar (ZipFile in-process, entry absent → fails
+      loudly) and compares it against the tracked impl with
+      `normalize-whitespace` (collapse runs to a single space — preserves token
+      boundaries, unlike full whitespace removal, while tolerating the
+      slice-5 cljfmt indentation drift; jar-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms; jar path already
+      injectable/nullable via `psi.lint-config-test.http-kit-jar` / the
+      derived m2 path). Verified: integration suite 33 tests / 177 assertions
+      pass (was 32/174; +1 test +3 assertions); negative check — a simulated
+      no-op rewrite (`{:node node}` early return) produces different
+      normalized content, so semantic drift fails loudly while the documented
+      indentation drift stays green; `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean

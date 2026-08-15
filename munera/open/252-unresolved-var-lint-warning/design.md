@@ -38,11 +38,17 @@ exist), with zero new warnings anywhere in the repo.
 
 ## Context
 
-- `org.httpkit.client` is used in exactly one repo file (rg over components/ +
-  extensions/): `extensions/dev-http/test/extensions/dev_http_test.clj`, and
-  only `get`/`post` of the `defreq`-generated verb set; `request` is a plain
-  defn and already resolves. Registration is ns-scoped to
-  `org.httpkit.client`, so other namespaces/aliases are unaffected.
+- `org.httpkit.client` is used at exactly one runtime call site in the repo (rg
+  over components/ + extensions/): `extensions/dev-http/test/extensions/dev_http_test.clj`
+  (require @16; `get`/`post` calls @572/@737), using only `get`/`post` of the
+  `defreq`-generated verb set; `request` is a plain defn and already resolves.
+  The committed regression test
+  (`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+  slices 7-16) also references `org.httpkit.client` symbols — in the `:lint-as`
+  registration assertion, the `http-client-entries` EDN-walk predicate, and the
+  probe ns — but only as config-assertion data, never as runtime usage of the
+  client. Registration is ns-scoped to `org.httpkit.client`, so other
+  namespaces/aliases are unaffected.
 - The repo already has a per-library clj-kondo import mechanism for http-kit:
   `.clj-kondo/imports/http-kit/http-kit/config.edn` declares the server-side
   `with-channel` hook

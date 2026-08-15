@@ -267,3 +267,14 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   test-vehicle option (a) recorded while keeping the `bb lint`-surface claim.
 
 - implementation review 2026-08-15: added 2 steps to be addressed
+
+- addressed 2 review steps (slice 18): design.md "exactly one repo file" claim
+  scoped to call sites/runtime usage (lint_config_test references
+  org.httpkit.client symbols as config-assertion data only); new
+  ^:integration with-channel-hook-semantics-guard-test compares the tracked
+  hook impl against the pinned 2.8.0 jar's clj-kondo.exports export
+  whitespace-normalized (slice-5 cljfmt indentation drift stays green; any
+  semantic change fails loudly; jar-absent → visible SKIP). Verified:
+  integration 33 tests / 177 assertions (was 32/174), no SKIP; unit 9 / 39;
+  negative no-op-rewrite check discriminates; bb lint errors: 0, warnings: 0;
+  bb fmt:check clean
