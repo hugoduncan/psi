@@ -256,3 +256,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   SKIP; custom-path jar override → 174 no SKIP (-Spath arm would fail on
   disagreement); local-repo property override → 174; non-m2-layout jar →
   clear ex-info error; `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.
+
+- implementation review 2026-08-15: added 2 steps to be addressed
