@@ -378,3 +378,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - implementation review 2026-08-15: added 2 steps to be addressed
 
 - addressed 2 review steps (slice 24): impl-guard slurp-before-exists ERROR → clean FAIL via `when (.exists …)` guard after the exists assertion (mirror of slice-20 jar-entry nil-guard; verified 1 passed/1 failed/0 errored on deleted impl, no ERROR); gitignore order assertion now uses the LAST ignore-all occurrence (last-index-of) so a duplicate ignore-all below the negations fails the unit guard (verified 2 failed pre-fix-blind-spot case, 8 passed clean). Deliberately NOT hardened: `http-kit-import-registration-test`'s read-edn whole-file-deletion ERROR — reviewer-flagged lower priority, covered by the ^:integration `git ls-files --error-unmatch` index arm (gitignore-http-kit-tracking-ground-truth-test). Verified: shared-config unit 9/39, integration 33/176 (no SKIP), `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean; full `bb test` failures (2) are pre-existing live delegate tests (reproduced on pristine tree, unrelated namespaces).
+
+- implementation review 2026-08-15: added 2 steps to be addressed

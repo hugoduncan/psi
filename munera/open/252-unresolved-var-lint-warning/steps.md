@@ -1006,3 +1006,36 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (was 8 passed pre-fix — the blind spot); safe duplicate above the
       negations still passes (last occurrence precedes the negations); clean
       .gitignore → 8 passed
+
+## Slice 25 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Reconcile design.md/plan.md test-file references with the slice-23 split:
+      design.md Context ("The committed regression test
+      (`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      slices 7-18)"), design.md AC1 ("… in
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`
+      are `^:integration` and run in CI via `bb clojure:test:integration`"),
+      and plan.md decision 3 ("`^:integration` in
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`")
+      all name the single pre-split file, but slice 23 (e2deda747) split it
+      into `lint_config_test.clj` (9 unit invariants),
+      `lint_config_test_support.clj` (shared fixtures — incl. the
+      `http-client-entries` EDN-walk predicate), and
+      `lint_config_integration_test.clj` (the three `^:integration` proofs).
+      The last design.md/plan.md doc reconciliation (slice 19, d58d26d93)
+      predates the split, so the references are stale doc drift of the exact
+      class slices 17-19 existed to reconcile; they were never updated.
+      Update the three references to the actual files (the named
+      `^:integration` tests live in `lint_config_integration_test.clj`; the
+      EDN-walk predicate lives in `lint_config_test_support.clj`).
+- [ ] Reconcile design.md AC1's mechanism description for
+      `with-channel-hook-semantics-guard-test`: AC1 describes it as "tracked
+      hook impl vs pinned 2.8.0 jar export, whitespace-normalized", but slice
+      20 (50d37873b) replaced `normalize-whitespace` with `parse-forms`
+      (parsed-form structural compare — whitespace/indentation-insensitive by
+      construction, string-literal-spacing-sensitive; verified in
+      `lint_config_integration_test.clj`). The wording describes the REMOVED
+      mechanism and misleads about the guard's actual blind-spot profile (a
+      literal-spacing change now FAILS loudly, whereas the whitespace-
+      collapsing compare was blind to it — slice-20's rationale). Update AC1
+      to name the parsed-form compare.
