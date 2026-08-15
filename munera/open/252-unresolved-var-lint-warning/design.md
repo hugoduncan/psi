@@ -62,7 +62,18 @@ exist), with zero new warnings anywhere in the repo.
   (2.5.3 / 2.8.0-beta3 / 2.9.0-beta1 also sit in ~/.m2). clj-kondo cache entries
   are ns-keyed, not version-keyed, so a version-mismatched cache lint is
   silently clean — the slice-2 rebuild re-lints the pinned 2.8.0 jar explicitly,
-  guaranteeing provenance.
+  guaranteeing provenance. **Adopted provenance guard** (design-step 8 closure,
+  2026-08-15): clj-kondo 2025.09.19 `--dependencies`-built caches record only the
+  internal path `org/httpkit/client.clj` in `~:filename` — no jar path/version —
+  so the originally mandated `grep ~:filename` for the 2.8.0 jar cannot succeed.
+  The guard is therefore (a) the explicit pinned-jar rebuild command
+  `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar --dependencies`
+  (from repo root, findings suppressed) and (b) the slice-2 verb-set grep as
+  functional proxy: `grep -o '~\$\(get\|post\|request\)'
+  .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` must contain
+  `~$get` and `~$post` (present since 2026-08-15 rebuild; the pre-fix cache had
+  neither). The explicit 2.8.0 rebuild command is the provenance anchor; the
+  verb-set grep proves the rebuilt cache reflects the registered `defreq` vars.
 - Verification surface: `bb lint` ≡ `clojure -M:lint` (deps.edn `:lint` alias)
   lints bb.edn, deps.edn, .lsp/config.edn, .psi/startup-prompts.edn, bases/,
   components/, extensions/, spec/, tests.edn, extensions/tests.edn — the
@@ -120,7 +131,13 @@ is the chosen implementation, confined to the http-kit import directory.
   it depends on the slice-2 cache rebuild (gitignored `.clj-kondo/.cache`), so CI
   `bb lint` (no cache, no `--dependencies` → the http-kit jar is never analyzed)
   is trivially clean with or without the fix and cannot exercise the
-  registration. The negative-control probe (analysis-level proof) is inherently a
+  registration. Same for the pre-commit surface
+  (`.pre-commit-hooks/clj-kondo-lint.sh`, verified 2026-08-15): it lints
+  individual staged files with the native (unpinned) clj-kondo binary,
+  `--cache false`, and no `--dependencies`, so the http-kit jar is never
+  analyzed there either — the dev-http test file lints clean with **and**
+  without the `:lint-as` config, i.e. pre-commit can neither exercise the fix
+  nor regress it. The negative-control probe (analysis-level proof) is inherently a
   temporary local source edit, never run in CI. This local-only scope is accepted
   because the committed registration keeps local dev lint clean and guards local
   cache regressions; the pinned JVM clj-kondo 2025.09.19 is the effective gate.

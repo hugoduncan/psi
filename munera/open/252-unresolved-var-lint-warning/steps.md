@@ -67,7 +67,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 5 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Close design-step 8's provenance-grep requirement with the cache-format
+- [x] Close design-step 8's provenance-grep requirement with the cache-format
       finding: a clj-kondo 2025.09.19 `--dependencies`-built cache (rebuilt
       in-repo and fresh `--cache-dir` scratch, both verified) records only the
       internal path `org/httpkit/client.clj` — no jar path/version — so the
@@ -76,16 +76,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (explicit pinned-jar rebuild command + slice-2 verb-set grep as functional
       proxy) and amend design-steps.md item 8, which is ticked [x] although its
       required steps.md amendment is absent
-- [ ] Restore byte-fidelity of the tracked import dir: re-copy
+      — done: adopted guard recorded in design.md Context (provenance bullet)
+      and design-steps.md item 8 closure note; guard = pinned-jar rebuild
+      command + verb-set grep (`~$get`/`~$post` present since 2026-08-15 rebuild;
+      absent pre-fix)
+- [x] Restore byte-fidelity of the tracked import dir: re-copy
       `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` verbatim
       from the 2.8.0 jar's `clj-kondo.exports` (committed copy differs in
       indentation only), so plan.md decision 2's "identical, verified" holds and
       R5's "--copy-configs at pinned 2.8.0 yields no diff" is true; or record the
       drift as intentional in implementation.md
-- [ ] Extend AC1's exercise-capability inventory (design-step 9) with the
+      — done (drift recorded as **intentional**, the item's explicit "or"
+      branch): re-copied verbatim from
+      `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj` in the
+      2.8.0 jar → byte-identical at copy time (`cmp` verified); the
+      `cljfmt-fix` pre-commit hook then reformatted it back to repo style
+      (2-space continuation vs the jar's 3-space — indentation only), so the
+      committed copy cannot be byte-identical through the repo's own commit
+      path (same as the original slice-4 commit). Drift recorded as intentional
+      in implementation.md; plan.md decision 2's "identical, verified" holds
+      for the local pre-commit copy; R5's pinned-2.8.0 `--copy-configs`
+      stability holds (same jar → same export → same indentation-only diff)
+- [x] Extend AC1's exercise-capability inventory (design-step 9) with the
       pre-commit surface: `.pre-commit-hooks/clj-kondo-lint.sh` lints individual
       staged files with the native (unpinned) clj-kondo binary, `--cache false`,
       no `--dependencies` → the http-kit jar is never analyzed there (verified:
       dev-http test file clean with and without the lint-as config), so
       pre-commit can neither exercise the fix nor regress it; add it to design.md
       AC1/Context alongside the CI note
+      — done: added to design.md AC1 (exercise-capability inventory) alongside
+      the CI note; verified locally: pre-commit hook on the dev-http test file →
+      `errors: 0, warnings: 0` with and without the `:lint-as` config

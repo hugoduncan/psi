@@ -197,3 +197,9 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - Sibling task 251's `munera/open/251-…/` untracked dir left untouched (no coupling).
 
 - implementation review 2026-08-15: added 3 steps to be addressed
+
+## Implementation-review follow-ups — addressed 3 review steps (2026-08-15)
+
+- design-step 8 provenance-grep closure recorded (design.md Context guard + design-steps.md item 8 closure note): cache records internal path only, no jar path → guard = pinned-jar rebuild command + verb-set grep proxy
+- with_channel.clj drift recorded as **intentional** (follow-up item's "or" branch): re-copying from the 2.8.0 jar `clj-kondo.exports` is byte-identical at copy time (cmp verified), but the `cljfmt-fix` pre-commit hook unconditionally reformats `.clj` files to repo style (2-space continuation) — the committed copy therefore differs from the jar's 3-space export in indentation only, exactly as at the original slice-4 commit (6c56d1b32). Byte-fidelity cannot survive the repo's own commit hygiene hook; plan.md decision 2's "identical, verified" holds for the local pre-commit copy, and R5's pinned-2.8.0 stability holds across `--copy-configs` regenerations (same jar → same export → same indentation-only diff vs the cljfmt-formatted committed copy)
+- pre-commit surface added to design.md AC1 exercise-capability inventory (verified: clean with and without lint-as; native binary, --cache false, no --dependencies)
