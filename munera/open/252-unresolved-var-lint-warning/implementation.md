@@ -103,6 +103,14 @@ Maintain design.md Constraints when implementing: λ lint(f) fix hierarchy (fix 
 
 ## Plan review → design-steps amendment slice (turn 3)
 
+## Plan review → design-steps amendment slice (design-step 9 — CI-enforceability gap)
+
+CI facts verified this pass (`.github/workflows/ci.yml`):
+- "Cache Maven + Clojure deps" caches `~/.m2/repository` (keyed on deps.edn/bb.edn) → the http-kit 2.8.0 jar is present in CI at the standard m2 path. `.clj-kondo/.cache` is **not** cached/persisted → option (a) must populate the cache fresh each run, before the "Lint" step.
+- Option (a) concrete shape (AC2-compatible — a workflow step is not lint config; the confined set stays the import dir): add before "Lint": `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar --dependencies` — identical to steps.md slice 2, writes workspace `.clj-kondo/.cache`, findings suppressed; then `bb lint` consumes it. Use the pinned JVM clj-kondo via `clojure -M:lint`, **not** the CI-installed native binary (latest, only `--version`-checked — its analysis could differ from 2025.09.19).
+- Option (b) trade-off to record in the amendment: committed config still keeps local dev lint clean and guards future dev-cache regressions, but CI cannot detect a broken registration (config typo, key mismatch); if (b), the earlier "AC1 proof surface is CI-enforced" implementation.md note (design-review context) is superseded — correct or strike it.
+- Principle for either option: never degrade to suppression; the negative-control (bogus var) probe stays the proof of analysis-level resolution, and AC2's root-config invariant (`:unresolved-symbol :exclude [(malli.core/=>)]`) is untouched.
+
 ## Plan review context (turn 1 re-pass — ambiguity)
 
 - New actionable item: design-step 9 — AC1's executable proof surface is local-cache-dependent. plan.md decision 3 already states CI is trivially clean (no cache, no `--dependencies` → http-kit jar never analyzed). Re-confirmed empirically this pass: `clojure -M:lint --cache false` → `errors: 0, warnings: 0` (the two http-client warnings disappear without the cache). Consequence for later turns/steps: the committed registration (slice 1) can never be exercised by CI; AC1's "repo-wide lint" gate is meaningful only locally after the slice-2 cache rebuild, and implementation.md's design-review note ("AC1 proof surface is CI-enforced") overstates CI's role. The inconsistency turn should treat the "CI-enforced" note vs decision 3's trivially-clean claim as consumed by design-step 9 (do not re-file).
