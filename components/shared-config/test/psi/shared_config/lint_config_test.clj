@@ -50,22 +50,32 @@
     (let [impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
           impl-file (io/file repo-root impl-rel)
           cfg       (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")
-          ref       (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])
-          forms     (binding [*read-eval* false]
-                      (read-string {:read-cond :preserve}
-                                   (str "[" (slurp impl-file) "]")))]
+          ref       (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])]
       (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
         (is (= 'httpkit.with-channel/with-channel ref)))
       (testing "impl file exists (member of the slice-4 tracked change set)"
         (is (.exists impl-file) (str impl-rel " exists")))
-      (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
-        (is (some (fn [f] (and (seq? f) (= 'ns (first f))
-                               (= 'httpkit.with-channel (second f))))
-                  forms)))
-      (testing "impl defines (defn with-channel …) — matches the reference's var"
-        (is (some (fn [f] (and (seq? f) (= 'defn (first f))
-                               (= 'with-channel (second f))))
-                  forms))))))
+      ;; slice-24 follow-up: the slurp must NOT run in a let binding before the
+      ;; exists assertion — a deleted/renamed impl would otherwise throw
+      ;; FileNotFoundException at read time and surface as a clojure.test ERROR
+      ;; with the exists assertion unreachable (same class of defect slice 20
+      ;; fixed in the ^:integration semantics guard: missing-jar-entry nil →
+      ;; NPE → ERROR, nil-guarded to a plain assertion failure). The exists
+      ;; check above fails cleanly; the parse (and the ns/defn assertions that
+      ;; depend on it) is guarded by `when`, so the deletion case reports
+      ;; exactly ONE plain assertion FAIL with its message, never an ERROR.
+      (when (.exists impl-file)
+        (let [forms (binding [*read-eval* false]
+                      (read-string {:read-cond :preserve}
+                                   (str "[" (slurp impl-file) "]")))]
+          (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
+            (is (some (fn [f] (and (seq? f) (= 'ns (first f))
+                                   (= 'httpkit.with-channel (second f))))
+                      forms)))
+          (testing "impl defines (defn with-channel …) — matches the reference's var"
+            (is (some (fn [f] (and (seq? f) (= 'defn (first f))
+                                   (= 'with-channel (second f))))
+                      forms))))))))
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"
@@ -159,7 +169,10 @@
           lines      (str/split-lines (slurp (io/file repo-root ".gitignore")))
           index-of   (fn [pattern] (first (keep-indexed
                                            (fn [i l] (when (= pattern l) i))
-                                           lines)))]
+                                           lines)))
+          last-index-of (fn [pattern] (last (keep-indexed
+                                             (fn [i l] (when (= pattern l) i))
+                                             lines)))]
       (testing "all three tracking lines are present verbatim"
         (doseq [pattern (into [ignore-all] negations)]
           (is (some #{pattern} lines)
@@ -168,15 +181,20 @@
                 if `**/.clj-kondo/imports/*` moved BELOW the negation lines, git
                 would re-ignore the http-kit import dir — the registration
                 silently drops out of future commits — while all three lines
-                still exist and a presence-only test passes)"
-        (let [ignore-idx (index-of ignore-all)]
+                still exist and a presence-only test passes). Slice-24: the
+                ordering uses the LAST ignore-all occurrence — a duplicate
+                `**/.clj-kondo/imports/*` added BELOW the negations re-ignores
+                the http-kit dir under last-match-wins while the FIRST
+                occurrence is still above them, so a first-occurrence compare
+                passes the guard while git silently drops the registration"
+        (let [ignore-idx (last-index-of ignore-all)]
           (is (some? ignore-idx) "ignore-all pattern present (index found)")
           (doseq [negation negations]
             (let [neg-idx (index-of negation)]
               (is (some? neg-idx) (str "negation line present (index found): " negation))
               (is (< ignore-idx neg-idx)
-                  (str ignore-all " (line " (inc ignore-idx) ") precedes "
-                       negation " (line " (inc neg-idx) ")")))))))))
+                  (str ignore-all " (last occurrence, line " (inc ignore-idx)
+                       ") precedes " negation " (line " (inc neg-idx) ")")))))))))
 
 (deftest bb-edn-lint-task-wrapper-test
   (testing "bb.edn's lint task remains the plain `clojure -M:lint` wrapper

@@ -956,7 +956,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 24 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Make `with-channel-hook-impl-guard-test` fail cleanly on a deleted impl
+- [x] Make `with-channel-hook-impl-guard-test` fail cleanly on a deleted impl
       file: the guard's stated purpose is detecting "a deleted or renamed hook
       impl", but `(slurp impl-file)` runs in the let binding BEFORE any
       assertion — including `(is (.exists impl-file) …)` — so the deletion case
@@ -972,7 +972,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       ls-files index arm): `http-kit-import-registration-test`'s `read-edn`
       slurp on config.edn would likewise ERROR on whole-file deletion before
       any assertion; entry-removal (file present) already fails cleanly
-- [ ] Fix the `.gitignore` order assertion's first-occurrence blind spot:
+      — done: the slurp/parse moved OUT of the let binding into a
+      `(when (.exists impl-file) …)` guard placed AFTER the exists assertion
+      (mirror of slice 20's `when (some? jar-export)` — the exists check fails
+      cleanly first, the dependent ns/defn assertions run only when the file
+      is present). Verified 2026-08-15 with the impl moved aside: focused run
+      → `1 passed, 1 failed, 0 errored` — the ref assertion still passes, the
+      exists assertion fails cleanly with its message, NO ERROR/FileNotFound
+      (was "0 passed, 0 failed, 1 errored" pre-fix). The read-edn parallel
+      shape was deliberately NOT hardened (reviewer's own lower-priority
+      framing): whole-file deletion of config.edn is covered by the
+      ^:integration `git ls-files --error-unmatch` index arm
+      (gitignore-http-kit-tracking-ground-truth-test) — recorded in
+      implementation.md
+- [x] Fix the `.gitignore` order assertion's first-occurrence blind spot:
       `gitignore-http-kit-import-tracking-test`'s `index-of` uses
       `(first (keep-indexed …))` — the FIRST matching line — so a duplicate
       `**/.clj-kondo/imports/*` line added BELOW the negation lines (gitignore
@@ -983,3 +996,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       the unit guard's own order property is incomplete. Use the LAST index for
       the ignore-all pattern (or assert no occurrence after the negations) so
       the ordering invariant is complete in `:unit`
+      — done (LAST-index branch): the let now binds both `index-of` (first,
+      used for the negations) and `last-index-of`; the ordering check uses
+      `(last-index-of ignore-all)` against each negation's first occurrence,
+      so any ignore-all line after the first negation fails the unit guard.
+      Verified 2026-08-15: duplicate `**/.clj-kondo/imports/*` appended below
+      the negations → focused run `6 passed, 2 failed, 0 errored` with
+      "**/.clj-kondo/imports/* (last occurrence, line N) precedes …" messages
+      (was 8 passed pre-fix — the blind spot); safe duplicate above the
+      negations still passes (last occurrence precedes the negations); clean
+      .gitignore → 8 passed
