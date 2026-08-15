@@ -30,7 +30,7 @@ Maintain design.md Constraints when implementing: λ lint(f) fix hierarchy (fix 
 
 ## Design review context (re-pass — architectural fit)
 
-- AC1 proof surface is CI-enforced: `.github/workflows/ci.yml` check job "Lint" step runs `bb lint` (≡ `clojure -M:lint`, pinned clj-kondo 2025.09.19). The CI-installed latest clj-kondo binary is only `--version`-checked, never invoked by the lint gate — effective acceptance surface is the pinned JVM clj-kondo only; design.md's "re-verify the hook against both on any version bump" is overcautious for the lint gate.
+- AC1 proof surface is CI-enforced — **corrected/struck (slice 19, 2026-08-15)**: overstated. CI's `bb lint` runs with no cache and no `--dependencies` → the http-kit jar is never analyzed → trivially clean with or without the fix; the lint surface itself is **not** CI-enforced. The CI-enforceable regression surface is the committed `^:integration` test vehicle (slices 7-18: `http-kit-defreq-analysis-level-resolution-test`, `gitignore-http-kit-tracking-ground-truth-test`, `with-channel-hook-semantics-guard-test`, run via `bb clojure:test:integration`). Retained true part: the CI-installed latest clj-kondo binary is only `--version`-checked, never invoked by the lint gate — effective lint-gate analyzer is the pinned JVM clj-kondo 2025.09.19 only; design.md's "re-verify the hook against both on any version bump" is overcautious for the lint gate.
 
 ## Design review context (turn 3 — inconsistency)
 
@@ -178,7 +178,9 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   --dependencies` (findings suppressed; mtime refreshed; `get`/`post`/`request` now in
   cache). Note: the transit cache stores the internal path `org/httpkit/client.clj`,
   not the jar path — provenance is guaranteed by the explicit 2.8.0 rebuild command.
-- **AC1 (local-only, design-step 9):** `bb lint` and `clojure -M:lint` both report
+- **AC1 (design-step 9; lint surface itself local/cache-dependent — regression surface
+  CI-enforceable via committed `^:integration` tests, corrected slice 19, see the
+  Design-steps 6-9 note below):** `bb lint` and `clojure -M:lint` both report
   `errors: 0, warnings: 0`; both pre-fix warnings (572 `get`, 737 `post`) gone, no new
   warnings anywhere. Negative control passed: a temporary probe `(defn- bogus []
   @(http-client/definitely-not-a-var))` is flagged `Unresolved var` at line 572,
@@ -190,7 +192,13 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`.
 - **Design-steps 6-9** resolved by doc amendment: design.md Mechanism names `:lint-as`
   (dropping the nonexistent `:namespaces` alternative), AC1 scoped local-only (option b —
-  no CI workflow change; committed config + local verification accepted), AC2 explicitly
+  no CI workflow change; committed config + local verification accepted) — **corrected
+  (slice 19, 2026-08-15)**: design-step 9 option (a) was realized via a test vehicle —
+  the committed `^:integration` tests (`http-kit-defreq-analysis-level-resolution-test`
+  + `gitignore-http-kit-tracking-ground-truth-test` +
+  `with-channel-hook-semantics-guard-test`, slices 7-18, run via
+  `bb clojure:test:integration` in CI) make the regression surface CI-enforceable;
+  local-only scope remains only for the cache-dependent `bb lint` surface itself. AC2 explicitly
   permits the `.gitignore` enabling edit, Context records the 2.9.0-beta1 stale-cache
   provenance. plan.md R3 updated accordingly.
 - **No CHANGELOG entry** (tooling/lint config, not user-facing per AGENTS.md).
@@ -279,3 +287,17 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   negative no-op-rewrite check discriminates; bb lint errors: 0, warnings: 0;
   bb fmt:check clean
 - implementation review 2026-08-15: added 2 steps to be addressed
+
+- addressed 2 review steps (slice 19): (1) implementation.md's two stale AC1
+  CI-framing records corrected in place — the architectural-fit note's "AC1 proof
+  surface is CI-enforced" claim struck/corrected (CI `bb lint` is trivially clean —
+  no cache, no `--dependencies` → jar never analyzed; the CI-enforceable surface is
+  the committed `^:integration` test vehicle), and the "Implementation slice —
+  executed" record's "AC1 scoped local-only (option b …)" corrected to the realized
+  option (a)-via-test-vehicle (three named `^:integration` tests, run via
+  `bb clojure:test:integration` in CI), with local-only scope retained only for the
+  cache-dependent `bb lint` surface itself; (2) design.md AC1's "slices 7-16" range /
+  two-test enumeration re-scoped to "slices 7-18; non-exhaustive" with
+  `with-channel-hook-semantics-guard-test` named, mirrored in design.md Context and
+  plan.md decision 3 / R3. Doc-only reconciliation; no code/test changes, no lint
+  surface touched.

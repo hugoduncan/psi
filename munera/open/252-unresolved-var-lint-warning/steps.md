@@ -723,7 +723,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 19 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Reconcile implementation.md's stale AC1 CI-framing with the realized
+- [x] Reconcile implementation.md's stale AC1 CI-framing with the realized
       option (a)-via-test-vehicle (slices 7-17): (1) the "Design review context
       (re-pass — architectural fit)" note still claims "AC1 proof surface is
       CI-enforced" — self-flagged as superseded ("correct or strike it") in the
@@ -738,7 +738,22 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       gitignore-http-kit-tracking-ground-truth-test, run via
       `bb clojure:test:integration` in CI). Slice 17 reconciled design.md and
       plan.md only; implementation.md's own two records were never touched.
-- [ ] Amend design.md AC1's "slices 7-16" range / two-test enumeration:
+      — done: both implementation.md records corrected in place — (1) the
+      architectural-fit note's "AC1 proof surface is CI-enforced" claim
+      struck/corrected: CI `bb lint` is trivially clean (no cache, no
+      `--dependencies` → the http-kit jar is never analyzed), so the lint
+      surface itself is NOT CI-enforced; the CI-enforceable regression surface
+      is the committed `^:integration` test vehicle (slices 7-18, three tests);
+      the retained true part (CI clj-kondo binary only `--version`-checked;
+      pinned JVM clj-kondo is the effective lint-gate analyzer) kept; (2) the
+      "Implementation slice — executed" record's "AC1 scoped local-only (option
+      b — no CI workflow change; committed config + local verification
+      accepted)" corrected to the realized option (a)-via-test-vehicle (three
+      named `^:integration` tests, run via `bb clojure:test:integration` in
+      CI), local-only scope retained only for the cache-dependent `bb lint`
+      surface itself; the AC1 bullet header's "(local-only, design-step 9)"
+      reframed to match. Doc-only reconciliation — no code/test changes
+- [x] Amend design.md AC1's "slices 7-16" range / two-test enumeration:
       "design-step 9 option (a) realized in slices 7-16: [the two named
       `^:integration` tests] … are `^:integration`" is now a non-exhaustive
       enumeration — slice 18 added a third `^:integration` test
@@ -747,3 +762,9 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `^:integration`" framing predate the file's current shape. Extend the
       range or re-scope the enumeration as non-exhaustive (mirrored in
       plan.md decision 3 / R3's "slices 7-16" references).
+      — done: design.md AC1's enumeration re-scoped — "slices 7-18;
+      non-exhaustive (the file's `^:integration` set may grow with later
+      review slices)" with `with-channel-hook-semantics-guard-test` added to
+      the named list; design.md Context's "slices 7-16" reference and plan.md
+      decision 3 / R3's "slices 7-16" references mirrored (slices 7-18, with
+      the third test named in decision 3). Doc-only reconciliation

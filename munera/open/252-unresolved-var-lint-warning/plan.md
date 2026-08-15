@@ -64,8 +64,9 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
    the ns is not analyzed → trivially clean; the pinned JVM clj-kondo 2025.09.19 is the
    effective gate (consistent with implementation.md). The CI-enforceable regression
    surface is the committed test vehicle (design-step 9 option (a) via tests, slices
-   7-16): `http-kit-defreq-analysis-level-resolution-test` +
-   `gitignore-http-kit-tracking-ground-truth-test` (`^:integration` in
+   7-18, non-exhaustive): `http-kit-defreq-analysis-level-resolution-test` +
+   `gitignore-http-kit-tracking-ground-truth-test` +
+   `with-channel-hook-semantics-guard-test` (`^:integration` in
    `components/shared-config/test/psi/shared_config/lint_config_test.clj`) run via
    `bb clojure:test:integration`.
 
@@ -91,7 +92,7 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
   rebuild re-lints the pinned 2.8.0 jar explicitly. CI scope (design-step 9): the `bb
   lint` surface itself is local/cache-dependent — CI `bb lint` has no cache and never
   analyzes the jar, so it is trivially clean with or without the fix. The analysis-level
-  proof is committed as `^:integration` tests (slices 7-16, option (a) via a test
+  proof is committed as `^:integration` tests (slices 7-18, option (a) via a test
   vehicle) run in CI via `bb clojure:test:integration` — no CI workflow change, but the
   regression surface is CI-enforceable (committed config + committed integration proof,
   not merely local verification).
