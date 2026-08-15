@@ -107,3 +107,27 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       — done: added to design.md AC1 (exercise-capability inventory) alongside
       the CI note; verified locally: pre-commit hook on the dev-http test file →
       `errors: 0, warnings: 0` with and without the `:lint-as` config
+
+## Slice 6 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Harden the slice-2 provenance rebuild against clj-kondo's jar skip marker:
+      `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
+      --dependencies` prints "http-kit-2.8.0.jar was already linted, skipping" and
+      does NOT re-analyze when `.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`
+      exists — verified 2026-08-15: after a no-lint-as run rewrote the ns cache
+      without verbs, re-running the documented rebuild with the correct config
+      skipped and the wrong cache persisted (`bb lint` still showed the two
+      warnings); the cache only recovered after clearing the skip marker + ns
+      transit file and rebuilding. The design.md "provenance anchor" claim
+      overstates the command's re-runnability. Fix: `rm -f
+      .clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*` (and the ns transit file)
+      before the rebuild; assert `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+      exists before the verb-set grep (grep on the absent file fails loudly —
+      the effective guard); record in design.md Context that the rebuild command
+      is not idempotently re-runnable without clearing the skip marker
+- [ ] Make slice-3's negative-control precondition explicit (executes the
+      plan-review note recorded in implementation.md, still unexecuted in
+      steps.md): the bogus-var probe must run AFTER a successful slice-2 rebuild
+      — with no/absent cache the http-kit ns is never analyzed and the probe is
+      silently unflagged, proving nothing (verified 2026-08-15: deleting the ns
+      cache → `bb lint` trivially `errors: 0, warnings: 0`)
