@@ -1,0 +1,4 @@
+
+{:lint-as {org.httpkit.client/defreq clojure.core/def}
+ :hooks
+ {:analyze-call {org.httpkit.server/with-channel httpkit.with-channel/with-channel}}}

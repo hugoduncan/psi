@@ -160,3 +160,38 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - When amending steps.md in the same slice: make the slice-3 negative-control precondition explicit — it must run AFTER the slice-2 rebuild, else it silently passes (no-cache ⇒ http-kit ns never analyzed ⇒ bogus var un-flagged) and proves nothing. Currently only implicit via checklist order.
 - Principles already recorded in the earlier "Principles to hold" entry (amend design.md first, then plan.md/steps.md; single-facility discipline; AC2 text ↔ slice-4 gate verbatim agreement) still govern; this session adds no new principles.
 - Project paths: no new ones beyond "Additional non-task paths" above (.gitignore, import config.edn, cache transit, m2 jar, promesa/malli configs, bb.edn/deps.edn/ci.yml).
+
+## Implementation slice — executed 2026-08-15 (slices 0-4 complete)
+
+- **Facility (design-step 6):** `.clj-kondo/imports/http-kit/http-kit/config.edn`
+  now carries `:lint-as {org.httpkit.client/defreq clojure.core/def}` alongside the
+  existing server-side `:hooks {:analyze-call {org.httpkit.server/with-channel …}}`.
+  Confirmed end-to-end in-repo: jar `--dependencies` analysis registers the full
+  `defreq` verb set (`~$get`/`~$post`/`~$request` + others) in the ns cache.
+- **Gitignore (design-step 7):** `.gitignore` replaces `**/.clj-kondo/imports/` with
+  `**/.clj-kondo/imports/*` + `!.clj-kondo/imports/http-kit/` +
+  `!.clj-kondo/imports/http-kit/**`, making the http-kit import dir tracked
+  (config.edn + `httpkit/with_channel.clj`); sibling imports (e.g. metosin/malli)
+  stay ignored — verified via `git check-ignore -v`.
+- **Cache rebuild (design-step 8):** regenerated from the pinned 2.8.0 jar via
+  `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
+  --dependencies` (findings suppressed; mtime refreshed; `get`/`post`/`request` now in
+  cache). Note: the transit cache stores the internal path `org/httpkit/client.clj`,
+  not the jar path — provenance is guaranteed by the explicit 2.8.0 rebuild command.
+- **AC1 (local-only, design-step 9):** `bb lint` and `clojure -M:lint` both report
+  `errors: 0, warnings: 0`; both pre-fix warnings (572 `get`, 737 `post`) gone, no new
+  warnings anywhere. Negative control passed: a temporary probe `(defn- bogus []
+  @(http-client/definitely-not-a-var))` is flagged `Unresolved var` at line 572,
+  proving analysis-level resolution rather than suppression; probe removed, lint clean
+  again.
+- **AC2:** root `.clj-kondo/config.edn` has no diff; `:unresolved-symbol :exclude`
+  remains exactly `[(malli.core/=>)]`. Change set = `.gitignore` +
+  `.clj-kondo/imports/http-kit/http-kit/config.edn` +
+  `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`.
+- **Design-steps 6-9** resolved by doc amendment: design.md Mechanism names `:lint-as`
+  (dropping the nonexistent `:namespaces` alternative), AC1 scoped local-only (option b —
+  no CI workflow change; committed config + local verification accepted), AC2 explicitly
+  permits the `.gitignore` enabling edit, Context records the 2.9.0-beta1 stale-cache
+  provenance. plan.md R3 updated accordingly.
+- **No CHANGELOG entry** (tooling/lint config, not user-facing per AGENTS.md).
+- Sibling task 251's `munera/open/251-…/` untracked dir left untouched (no coupling).

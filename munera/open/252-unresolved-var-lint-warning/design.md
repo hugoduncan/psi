@@ -56,6 +56,13 @@ exist), with zero new warnings anywhere in the repo.
 - Version pins: http-kit 2.8.0 (root `deps.edn` + `extensions/dev-http/deps.edn`);
   clj-kondo 2025.09.19 (the `:lint` alias). Re-verify the hook against both on
   any version bump.
+- Stale-cache provenance (design-step 8): the pre-fix cache entry
+  (`.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`, built 2026-06-29)
+  was analyzed from the non-pinned `http-kit-2.9.0-beta1.jar`, not 2.8.0
+  (2.5.3 / 2.8.0-beta3 / 2.9.0-beta1 also sit in ~/.m2). clj-kondo cache entries
+  are ns-keyed, not version-keyed, so a version-mismatched cache lint is
+  silently clean — the slice-2 rebuild re-lints the pinned 2.8.0 jar explicitly,
+  guaranteeing provenance.
 - Verification surface: `bb lint` ≡ `clojure -M:lint` (deps.edn `:lint` alias)
   lints bb.edn, deps.edn, .lsp/config.edn, .psi/startup-prompts.edn, bases/,
   components/, extensions/, spec/, tests.edn, extensions/tests.edn — the
@@ -92,28 +99,37 @@ Extend the existing per-library http-kit import —
 registration of the `defreq`-generated vars in `org.httpkit.client` (at minimum
 `get` and `post`; registering the full verb set is acceptable since `defreq`
 generates them uniformly), mirroring the placement of the existing server-side
-`with-channel` hook in the same import config. The concrete clj-kondo facility
-(an `analyze-call`/namespace hook implementation under
-`.clj-kondo/imports/http-kit/http-kit/`, or a `:namespaces` var declaration in
-`config.edn` with `:defined-by clojure.core/defn`) is an implementation choice
-confined to the http-kit import directory; either registers the vars in
-clj-kondo's analysis so the symbols resolve. The two disjoint 'or'-joined
-remedies of the original Suggested change (global config update vs "ensure the
-dependency is properly declared") are rejected: the dependency is already
-declared, and the fix is the per-library analysis-level registration above.
+`with-channel` hook in the same import config. The concrete clj-kondo facility is **`:lint-as`** (design-step 6): the http-kit
+import `config.edn` gains `:lint-as {org.httpkit.client/defreq clojure.core/def}`,
+teaching clj-kondo to analyze each jar-internal `(defreq verb)` as `(def verb)`,
+registering the full generated verb set (`get`/`post`/…) in its namespace
+analysis. The `:namespaces {ns {var {:defined-by …}}}` var-declaration facility
+originally suggested does **not** exist in clj-kondo 2025.09.19 (verified in the
+jar source: `:defined-by` is analysis output, not config input), so `:lint-as`
+is the chosen implementation, confined to the http-kit import directory.
 
 ## Acceptance
 
-- **AC1 — executable proof surface (repo-wide lint).** `bb lint` (i.e.
-  `clojure -M:lint`) reports zero `Unresolved var` warnings for
+- **AC1 — executable proof surface (repo-wide lint, local-only; design-step 9).**
+  `bb lint` (i.e. `clojure -M:lint`) reports zero `Unresolved var` warnings for
   `extensions/dev-http/test/extensions/dev_http_test.clj` — covering **both**
   `http-client/get` (line 572) and `http-client/post` (line 737) — with
   `errors: 0` and no new warnings elsewhere. Before the fix this command reports
   exactly those two warnings; after the fix it must be clean for the file with
-  the repo-wide warning count not increased.
-- **AC2 — localization.** The change is confined to
-  `.clj-kondo/imports/http-kit/http-kit/` (config.edn and any hook/export file
-  beneath it). Root `.clj-kondo/config.edn` gains no http-client entries (its
+  the repo-wide warning count not increased. AC1 verification is **local-only**:
+  it depends on the slice-2 cache rebuild (gitignored `.clj-kondo/.cache`), so CI
+  `bb lint` (no cache, no `--dependencies` → the http-kit jar is never analyzed)
+  is trivially clean with or without the fix and cannot exercise the
+  registration. The negative-control probe (analysis-level proof) is inherently a
+  temporary local source edit, never run in CI. This local-only scope is accepted
+  because the committed registration keeps local dev lint clean and guards local
+  cache regressions; the pinned JVM clj-kondo 2025.09.19 is the effective gate.
+- **AC2 — localization.** The lint-config change is confined to
+  `.clj-kondo/imports/http-kit/http-kit/` (config.edn and the `httpkit/`
+  export dir beneath it). The `.gitignore` negation edit that enables tracking
+  the http-kit import dir is explicitly permitted (design-step 7): it is
+  enabling metadata only — the lint-config mechanism stays confined to the
+  import dir, and root `.clj-kondo/config.edn` gains no http-client entries (its
   `:unresolved-symbol :exclude` remains exactly `[(malli.core/=>)]`).
 
 ## Evidence

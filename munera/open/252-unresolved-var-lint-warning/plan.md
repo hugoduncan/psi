@@ -81,7 +81,12 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
   blocking impact; design's facility "or" is resolved by evidence.
 - R3 — **Stale cache.** Without the rebuild (decision 3), `bb lint` keeps reporting the
   two warnings locally. Rebuild is a local, gitignored step; must be repeated on
-  version bumps.
+  version bumps. Provenance (design-step 8): the pre-fix cache was analyzed from the
+  non-pinned `http-kit-2.9.0-beta1.jar` (built 2026-06-29), not 2.8.0; the slice-2
+  rebuild re-lints the pinned 2.8.0 jar explicitly. CI scope (design-step 9): AC1 is
+  local-only — CI `bb lint` has no cache and never analyzes the jar, so it is trivially
+  clean with or without the fix (option (b) chosen; committed config + local verification,
+  no CI workflow change).
 - R4 — **Version bumps.** http-kit (2.8.0) or clj-kondo (2025.09.19) changes require
   re-verifying the registration + cache (standing design note).
 - R5 — **`--copy-configs` regeneration** would overwrite the committed http-kit
