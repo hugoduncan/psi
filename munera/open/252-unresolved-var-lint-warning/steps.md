@@ -1009,7 +1009,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 25 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Reconcile design.md/plan.md test-file references with the slice-23 split:
+- [x] Reconcile design.md/plan.md test-file references with the slice-23 split:
       design.md Context ("The committed regression test
       (`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
       slices 7-18)"), design.md AC1 ("… in
@@ -1028,7 +1028,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Update the three references to the actual files (the named
       `^:integration` tests live in `lint_config_integration_test.clj`; the
       EDN-walk predicate lives in `lint_config_test_support.clj`).
-- [ ] Reconcile design.md AC1's mechanism description for
+      — done: design.md Context now names the split file set
+      (`lint_config_test.clj` — unit invariants,
+      `lint_config_test_support.clj` — shared fixtures incl. the
+      `http-client-entries` EDN-walk predicate,
+      `lint_config_integration_test.clj` — the `^:integration` proofs incl.
+      the probe ns); design.md AC1 and plan.md decision 3 now point the three
+      `^:integration` tests at
+      `lint_config_integration_test.clj`; AC1's "the file's `^:integration`
+      set" non-exhaustive note disambiguated to "the integration test file's"
+- [x] Reconcile design.md AC1's mechanism description for
       `with-channel-hook-semantics-guard-test`: AC1 describes it as "tracked
       hook impl vs pinned 2.8.0 jar export, whitespace-normalized", but slice
       20 (50d37873b) replaced `normalize-whitespace` with `parse-forms`
@@ -1039,3 +1048,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       literal-spacing change now FAILS loudly, whereas the whitespace-
       collapsing compare was blind to it — slice-20's rationale). Update AC1
       to name the parsed-form compare.
+      — done: design.md AC1 now reads "parsed-form structural compare" (the
+      slice-20 `parse-forms` mechanism) instead of "whitespace-normalized";
+      the slice-5 cljfmt indentation-drift tolerance is implied by the
+      parsed-form compare (indentation-insensitive by construction)

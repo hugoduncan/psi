@@ -67,7 +67,7 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
    7-18, non-exhaustive): `http-kit-defreq-analysis-level-resolution-test` +
    `gitignore-http-kit-tracking-ground-truth-test` +
    `with-channel-hook-semantics-guard-test` (`^:integration` in
-   `components/shared-config/test/psi/shared_config/lint_config_test.clj`) run via
+   `components/shared-config/test/psi/shared_config/lint_config_integration_test.clj`) run via
    `bb clojure:test:integration`.
 
 4. **No suppression, no CHANGELOG.** AC1 is analysis-level resolution; the negative

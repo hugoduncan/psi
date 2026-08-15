@@ -42,9 +42,12 @@ exist), with zero new warnings anywhere in the repo.
   over components/ + extensions/): `extensions/dev-http/test/extensions/dev_http_test.clj`
   (require @16; `get`/`post` calls @572/@737), using only `get`/`post` of the
   `defreq`-generated verb set; `request` is a plain defn and already resolves.
-  The committed regression test
-  (`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
-  slices 7-18) also references `org.httpkit.client` symbols — in the `:lint-as`
+  The committed regression tests
+  (`components/shared-config/test/psi/shared_config/`, slices 7-18; split into
+  `lint_config_test.clj` — unit invariants, `lint_config_test_support.clj` —
+  shared fixtures incl. the `http-client-entries` EDN-walk predicate, and
+  `lint_config_integration_test.clj` — the `^:integration` proofs incl. the
+  probe ns) also reference `org.httpkit.client` symbols — in the `:lint-as`
   registration assertion, the `http-client-entries` EDN-walk predicate, and the
   probe ns — but only as config-assertion data, never as runtime usage of the
   client. Registration is ns-scoped to `org.httpkit.client`, so other
@@ -158,15 +161,15 @@ is the chosen implementation, confined to the http-kit import directory.
   without the `:lint-as` config, i.e. pre-commit can neither exercise the fix
   nor regress it. However, the regression surface is **CI-enforceable via a
   committed test vehicle** — design-step 9 option (a) realized as committed
-  `^:integration` tests (slices 7-18; **non-exhaustive** — the file's
-  `^:integration` set may grow with later review slices):
+  `^:integration` tests (slices 7-18; **non-exhaustive** — the integration
+  test file's `^:integration` set may grow with later review slices):
   `http-kit-defreq-analysis-level-resolution-test` (analysis-level proof:
   hermetic temp cache, real dev-http test file resolves `get`/`post`, no-reg
   cache reproduces the two warnings, bogus vars still warn),
   `gitignore-http-kit-tracking-ground-truth-test` (git index/ignore ground
   truth), and `with-channel-hook-semantics-guard-test` (tracked hook impl vs
-  pinned 2.8.0 jar export, whitespace-normalized) in
-  `components/shared-config/test/psi/shared_config/lint_config_test.clj`
+  pinned 2.8.0 jar export, parsed-form structural compare) in
+  `components/shared-config/test/psi/shared_config/lint_config_integration_test.clj`
   are `^:integration` and run in CI via `bb clojure:test:integration` (ci.yml).
   The negative-control probe is no longer an uncommitted temporary local edit:
   it is committed as `^:integration`, and its skip (jar/clojure/git absent) is
