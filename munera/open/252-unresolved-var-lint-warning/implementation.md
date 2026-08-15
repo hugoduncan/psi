@@ -83,3 +83,11 @@ Maintain design.md Constraints when implementing: λ lint(f) fix hierarchy (fix 
   macros; either is confined to the http-kit import dir.
 - Root `.clj-kondo/config.edn` `:unresolved-symbol :exclude` is exactly
   `[(malli.core/=>)]`; AC2 guards that it stays that way.
+- plan ambiguity review added 2 new design steps
+
+## Plan review context (turn 1 — ambiguity)
+
+- Two new actionable ambiguities filed in design-steps.md (6-7): (6) plan.md decision 1's `:lint-as` is a third facility outside design.md Mechanism's closed "either/or" (hook | `:namespaces`), and the `:namespaces` alternative provably does not exist in clj-kondo 2025.09.19 — verified in the jar (config.clj/config.types.edn: no top-level `:namespaces` var-registration key; `:defined-by` is analysis output, not config input) — so design.md should name the chosen facility to avoid mechanism-drift rejection at the design gate. (7) AC2's literal confinement ("change confined to `.clj-kondo/imports/http-kit/http-kit/`") vs the plan's `.gitignore` enabling edit listed in slice 4's intended change set — amend AC2 or the slice-4 gate and the acceptance text disagree.
+- Cache discrepancy (for the later inconsistency turn): `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` records `~:filename .../http-kit-2.9.0-beta1.jar:org/httpkit/client.clj` — the stale cache was written from 2.9.0-beta1, not the pinned 2.8.0 (contradicts the earlier "2.9.0-beta1 unused" note). Not blocking: slice 2's rebuild lints the 2.8.0 jar explicitly, rewriting the cache from the pinned version; relevant to R4 (version-bump re-verification).
+- Slice-2 `--dependencies` claim verified: clj-kondo 2025.09.19 `--help` documents `--dependencies` as "don't report any findings. Useful for populating cache while linting dependencies" — invocation-wide, so the combined alias-paths + jar command prints no findings; the plan's "findings suppressed" is accurate.
+- implementation.md's earlier design-review note claiming `:namespaces {ns {var {:defined-by ...}}}` is "supported in config.edn" is superseded by plan.md decision 1 (verified above); the later inconsistency turn need not re-litigate it.
