@@ -200,3 +200,38 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `:skip-meta [:integration]`) and runs in `bb clojure:test:integration` (CI
       runs both); verified integration run → test passes (hermetic, never touches
       repo `.clj-kondo/.cache`)
+
+## Slice 8 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Strengthen `http-kit-import-registration-test`'s hook assertion: the
+      server-side with-channel preservation check is only
+      `(is (contains? (:hooks cfg) :analyze-call))` — a removed or changed
+      `:analyze-call` mapping passes. The design's mechanism explicitly requires
+      the existing server-side hook to be kept alongside the lint-as entry.
+      Assert exact match:
+      `(= {:analyze-call {org.httpkit.server/with-channel httpkit.with-channel/with-channel}} (:hooks cfg))`
+      (current config.edn matches this shape exactly)
+- [ ] Extend the AC2 guard to root `:lint-as`: `root-config-ac2-invariant-test`
+      asserts only `:unresolved-symbol :exclude` stays exactly
+      `[(malli.core/=>)]` — plan.md decision 1's no-root-mirror choice (unlike
+      the malli/promesa convention the root config's own comment documents)
+      would be silently violated if `org.httpkit.client/defreq` were added to
+      root `:lint-as`; that drift is undetectable today. Assert
+      `org.httpkit.client/defreq` ∉ (keys (:lint-as root-config))
+- [ ] Harden the `clj-kondo-main` subprocess (skill infra-dep criterion —
+      injectable/nullable, no hang): (a) the `clojure` CLI binary is neither
+      injectable nor nullable — a missing binary errors the `^:integration`
+      test, unlike the jar-absent path which skips; skip (passing) when
+      `clojure` is not on PATH (e.g. `shell/sh "which" "clojure"`), mirroring
+      the jar check; (b) `clojure.java.shell/sh` has NO `:timeout` support
+      (verified in the 1.12 source — unknown opts silently ignored), so a hung
+      subprocess (e.g. cold `-Sdeps` dep download stall) blocks the suite
+      indefinitely — switch to a timeout-capable runner (e.g.
+      `clojure.java.process` or `Process/waitFor` with a timeout) or record the
+      accepted hang risk explicitly
+- [ ] Guard clj-kondo version-pin drift: `clj-kondo-deps` hardcodes
+      "2025.09.19" while deps.edn `:lint` `:extra-deps` pins it; on a clj-kondo
+      bump the integration test silently keeps proving the OLD analyzer (R4's
+      manual re-verification gives no failure signal). Assert the test's pinned
+      version equals deps.edn's `:lint :extra-deps` clj-kondo version (or
+      derive it), so the drift fails loudly instead of re-proving a stale pin
