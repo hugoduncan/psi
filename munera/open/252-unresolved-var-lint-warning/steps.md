@@ -150,3 +150,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       cache → `bb lint` trivially `errors: 0, warnings: 0`)
       — done: slice-3 negative-control step now states the AFTER-slice-2-rebuild
       precondition explicitly
+
+## Slice 7 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Add a committed, CI-runnable regression test guarding the registration —
+      the task currently has no committed tests: AC1's lint proof, the negative
+      control, and the AC2 root-config check are all manual/local/cache-dependent,
+      so a removed or typo'd `:lint-as` entry and an AC2 root-config drift are
+      undetectable by `bb test`/CI (the exact regressions design-step 9 option (b)
+      accepted as undetectable for the lint surface). Read the two config.edn
+      files as EDN (no jar analysis, no cache — runs anywhere) and assert:
+      - `.clj-kondo/imports/http-kit/http-kit/config.edn` retains
+        `:lint-as {org.httpkit.client/defreq clojure.core/def}`
+      - root `.clj-kondo/config.edn` `:linters :unresolved-symbol :exclude`
+        remains exactly `[(malli.core/=>)]` (AC2 invariant, currently only a
+        manual `git diff` gate in slice 4)
+      Placement is a decision (no component owns lint config): an existing
+      tests.edn component test dir or a `spec/`-adjacent test; keep the assertion
+      code out of the import dir itself (AC2 confinement)
+- [ ] Decide and record whether to commit the analysis-level proof (negative
+      control) as a test: a test that runs
+      `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
+      --dependencies --cache-dir <tmp>` then lints a probe ns (get/post resolve,
+      bogus var still warns) makes the slice-3 negative control CI-runnable and
+      enforces "analysis-level, not suppression" — realizing design-step 9's
+      option (a) via a test rather than a CI workflow change (the (a)/(b) decision
+      framed the gap only as lint-surface exercise and never considered a test
+      vehicle). Depends on the 2.8.0 jar at the standard m2 path (present in CI
+      per design-step 9's m2-cache fact; skip when absent) and seconds of jar
+      analysis — mark `^:integration` or accept the runtime if filed. Accept or
+      decline explicitly; do not leave the proof as an uncommitted manual probe
+      only

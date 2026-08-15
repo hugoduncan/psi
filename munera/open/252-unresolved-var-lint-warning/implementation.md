@@ -209,3 +209,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - addressed 2 review steps (slice-2 skip-marker hardening + slice-3 negative-control precondition); hardened rebuild validated end-to-end (rm skip+transit → rebuild → verbs present → `bb lint` errors: 0, warnings: 0)
 
 - implementation review 2026-08-15: no new actionable follow-ups
+- task-test-review 2026-08-15: added 2 steps to be addressed
