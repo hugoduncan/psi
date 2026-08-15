@@ -108,11 +108,6 @@
   (get-in (read-edn "deps.edn")
           [:aliases :lint :extra-deps 'clj-kondo/clj-kondo :mvn/version]))
 
-(def clj-kondo-deps
-  "Pinned JVM clj-kondo via -Sdeps, so the proof uses the same analyzer as the
-  repo lint gate (see clj-kondo-version; derived, never hardcoded separately)."
-  (format "{:deps {clj-kondo/clj-kondo {:mvn/version \"%s\"}}}" clj-kondo-version))
-
 (def ^:private clj-kondo-jar-prop
   "System property that overrides the pinned clj-kondo jar path (mirror of
   psi.lint-config-test.http-kit-jar), making the m2-repo dependency injectable
@@ -133,6 +128,51 @@
       (str (System/getProperty "user.home")
            "/.m2/repository/clj-kondo/clj-kondo/" clj-kondo-version
            "/clj-kondo-" clj-kondo-version ".jar")))
+
+(def ^:private clj-kondo-local-repo-prop
+  "System property that overrides the m2 local-repo root used to resolve the
+  pinned clj-kondo artifact (mirror of psi.lint-config-test.clj-kondo-jar),
+  for a non-standard m2 layout the suffix-strip derivation cannot handle."
+  "psi.lint-config-test.clj-kondo-local-repo")
+
+(defn- clj-kondo-local-repo
+  "m2 local-repo root for the -Sdeps map. Overridable via the
+  psi.lint-config-test.clj-kondo-local-repo system property; otherwise derived
+  from the guarded clj-kondo-jar path by stripping the
+  `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix (the standard
+  m2 layout the jar derivation/override follows), so the -Sdeps subprocess
+  resolves the EXACT guarded artifact — guard and exec agree (slice-16
+  follow-up: previously the subprocess resolved the artifact from the Clojure
+  CLI's own local repo while the skip guard checked clj-kondo-jar, a path
+  never passed to the subprocess, so a custom-path override could pass the
+  guard yet execute a different artifact or trigger a network download).
+  Throws a clear ex-info when the jar path is not in the standard m2 layout
+  and no property override is set — such a path cannot be resolved by mvn
+  coordinates anyway, so a loud failure beats a silent wrong-artifact or
+  download."
+  []
+  (or (not-empty (System/getProperty clj-kondo-local-repo-prop))
+      (let [jar    clj-kondo-jar
+            suffix (str "/clj-kondo/clj-kondo/" clj-kondo-version
+                        "/clj-kondo-" clj-kondo-version ".jar")]
+        (if (str/ends-with? jar suffix)
+          (subs jar 0 (- (count jar) (count suffix)))
+          (throw (ex-info (str "Cannot derive the m2 local-repo root from "
+                               "clj-kondo-jar " jar ": expected the standard "
+                               "m2 layout …" suffix ". Set the "
+                               clj-kondo-local-repo-prop " system property "
+                               "for a non-standard layout.")
+                          {:clj-kondo-jar jar :expected-suffix suffix}))))))
+
+(defn- clj-kondo-deps
+  "Pinned JVM clj-kondo via -Sdeps — with :mvn/local-repo derived from the
+  guarded clj-kondo-jar path (see clj-kondo-local-repo), so the subprocess
+  executes the exact artifact the skip guard checked; the proof therefore uses
+  the same analyzer as the repo lint gate (see clj-kondo-version; derived,
+  never hardcoded separately)."
+  []
+  (format "{:deps {clj-kondo/clj-kondo {:mvn/version \"%s\"}} :mvn/local-repo \"%s\"}"
+          clj-kondo-version (clj-kondo-local-repo)))
 
 (def ^:private clojure-bin-prop
   "System property that overrides the clojure CLI binary (mirror of
@@ -231,7 +271,7 @@
                          "subprocess. Put clojure on PATH or set the "
                          clojure-bin-prop " system property.")
                     {})))
-  (run-bounded (into [clojure-bin "-Sdeps" clj-kondo-deps
+  (run-bounded (into [clojure-bin "-Sdeps" (clj-kondo-deps)
                       "-M" "-m" "clj-kondo.main"] args)))
 
 (defn- report-skip!
@@ -504,7 +544,23 @@
                 (str "git check-ignore " malli-rel " exits zero (ignored)"
                      "; out: " (str/trim out)))
             (is (str/includes? out ".gitignore:")
-                "match comes from .gitignore (matched rule reported in -v output)")))))))
+                "match comes from .gitignore (matched rule reported in -v output)")))
+        (testing "the http-kit import files are TRACKED in the git index, not
+                  just not-ignored (slice-16 follow-up): the text test proves
+                  the negation lines and the check-ignore arm above prove git
+                  does not ignore them, but \"not ignored\" ≠ \"tracked\" — a
+                  `git rm --cached` of the import config.edn (+ the hook impl)
+                  keeps every existing guard green (all read from disk;
+                  check-ignore still exits 1) while silently dropping the
+                  registration from future commits. git ls-files --error-unmatch
+                  exits 0 only when every listed path is in the index."
+          (let [{:keys [exit out err]}
+                (run-bounded [git-bin "ls-files" "--error-unmatch"
+                              ".clj-kondo/imports/http-kit/http-kit/config.edn"
+                              ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"])]
+            (is (zero? exit)
+                (str "both http-kit import files are tracked in the git index"
+                     "; out: " (str/trim out) " err: " (str/trim err)))))))))
 
 (defn- delete-recursively!
   "Recursively delete a file/dir tree. clojure.java.io offers no recursive
@@ -548,6 +604,21 @@
             ;; the ACTUAL dev-http test file, not just a synthetic probe.
             real-file    "extensions/dev-http/test/extensions/dev_http_test.clj"]
         (try
+          (testing "the -Sdeps map resolves the EXACT guarded clj-kondo jar
+                    (slice-16 guard/exec agreement): clj-kondo-main resolves the
+                    artifact via the -Sdeps map, which now carries
+                    :mvn/local-repo derived from the guarded clj-kondo-jar path
+                    (see clj-kondo-local-repo) — previously the subprocess used
+                    the Clojure CLI's own local repo while the skip guard
+                    checked a path never passed to it, so a custom-path
+                    override could pass the guard yet execute a different
+                    artifact or trigger a download. -Spath must therefore
+                    contain the guarded jar."
+            (let [{:keys [exit out]}
+                  (run-bounded [clojure-bin "-Sdeps" (clj-kondo-deps) "-Spath"])]
+              (is (zero? exit) (str "-Spath succeeds: " out))
+              (is (str/includes? out clj-kondo-jar)
+                  (str "-Spath resolves the guarded jar " clj-kondo-jar))))
           (spit probe
                 (str "(ns probe\n"
                      "  (:require [org.httpkit.client :as http-client]))\n"

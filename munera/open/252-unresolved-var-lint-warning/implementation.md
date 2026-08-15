@@ -243,3 +243,16 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - addressed 2 review steps (slice 15): (1) visible-skip restored — tests.edn top-level `:capture-output? false` (kaocha honors it root-only) + two additional discoveries required for the primary scry runner path: scry's in-process adapter binds *out* to a discarding writer around api/run (scry/kaocha.clj), so the skip reasons now write to System/out via `report-skip!` (reaches runner stdout on scry + fallback paths); git ground-truth guard gained a nonexistent-binary skip arm (mirror of jar arms). Verified: forced-skip scry run prints both SKIP lines; integration 32/171 exit 0, no SKIP (proofs ran); unit 2693 pass (1 pre-existing environmental deepseek-model failure, fails identically with capture on); extensions 364 pass (1 pre-existing scry "unknown" artifact); scry .scry-results still recorded; guard: tests-edn-suite-wiring-test asserts top-level `:capture-output?` false. (2) `lint-alias-lints-extensions-test` now asserts `:main-opts` contains none of `--cache`/`--config`/`--config-dir`/`--dependencies`. Unit 9 tests / 39 assertions; `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.
 
 - task-test-review 2026-08-15: added 2 steps to be addressed
+- addressed 2 review steps (slice 16): (1) clj-kondo jar guard/exec agreement
+  — `clj-kondo-deps` now emits `:mvn/local-repo` derived from the guarded
+  `clj-kondo-jar` path (suffix-strip; `psi.lint-config-test.clj-kondo-local-repo`
+  property escape hatch; non-m2-layout jar path without override → loud ex-info,
+  no silent wrong-artifact/download); the `^:integration` proof gained a `-Spath`
+  arm asserting the resolved classpath contains the guarded jar. (2) http-kit
+  import files TRACKED-in-index guard — `git ls-files --error-unmatch` on
+  config.edn + with_channel.clj added to the git ground-truth test (a
+  `git rm --cached` now fails loudly). Verified: unit 9 tests / 39 assertions;
+  integration 32 tests / 174 assertions (was 171 — +2 -Spath, +1 ls-files), no
+  SKIP; custom-path jar override → 174 no SKIP (-Spath arm would fail on
+  disagreement); local-repo property override → 174; non-m2-layout jar →
+  clear ex-info error; `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.

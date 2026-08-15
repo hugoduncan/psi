@@ -567,7 +567,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 16 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Close the clj-kondo jar guard/exec disagreement (skill infra-dep
+- [x] Close the clj-kondo jar guard/exec disagreement (skill infra-dep
       criterion — the clj-kondo artifact is only guard-injectable, not
       exec-injectable): `clj-kondo-main` executes
       `clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version …}}} -M -m
@@ -588,7 +588,21 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       override-to-custom-path case and the default case both resolve the
       guarded jar (e.g. assert the subprocess `-Spath` output contains the
       guarded jar path)
-- [ ] Assert the http-kit import files are TRACKED in the git index, not just
+      — done: `clj-kondo-deps` (now a fn) emits `:mvn/local-repo` derived by
+      `clj-kondo-local-repo` from the guarded `clj-kondo-jar` (strip the
+      standard-m2 suffix; `psi.lint-config-test.clj-kondo-local-repo` property
+      escape hatch for layouts the strip can't handle; a non-m2-layout jar
+      path with no override throws a clear ex-info naming the property —
+      verified: `/tmp/ck252-nonm2-layout.jar` → loud ExceptionInfo, no silent
+      wrong-artifact/download). The `^:integration` proof gained a `-Spath`
+      arm asserting the resolved classpath contains the guarded `clj-kondo-jar`
+      (guard/exec agreement on the EXACT artifact). Verified: default case →
+      integration 32 tests / 174 assertions, no SKIP; override to a custom
+      m2-layout path (`/tmp/ck252-localrepo/...jar`) → 174 assertions, no SKIP
+      (the -Spath arm would fail if the subprocess still resolved from default
+      m2); consistent local-repo property + jar override → 174 assertions;
+      non-m2-layout jar → 1 error, the clear ex-info
+- [x] Assert the http-kit import files are TRACKED in the git index, not just
       not-ignored: `gitignore-http-kit-import-tracking-test` (text lines) and
       `^:integration gitignore-http-kit-tracking-ground-truth-test`
       (`git check-ignore` exit 1 = not ignored) prove the negation rules
@@ -602,3 +616,10 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       .clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` from
       repo root → exit 0 (tracked); git-absent → visible SKIP via
       `report-skip!`, mirroring the existing skip arms
+      — done: `gitignore-http-kit-tracking-ground-truth-test` gained a third
+      arm — `git ls-files --error-unmatch` on config.edn + with_channel.clj
+      from repo root (run-bounded, git-bin-resolved, existing skip arms
+      unchanged) → exit 0 only when BOTH are in the index, so a
+      `git rm --cached` fails loudly in `:integration` instead of silently
+      dropping the registration from future commits. Verified: both files
+      tracked (exit 0); integration 32 tests / 174 assertions, no SKIP
