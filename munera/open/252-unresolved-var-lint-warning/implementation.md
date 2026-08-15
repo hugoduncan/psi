@@ -1,4 +1,10 @@
 - architectural review added 3 new design steps
+- ambiguity review added 2 new design steps
+
+## Design review context (turn 2 — ambiguity)
+
+- Both new items stem from the Suggested change's wording, which the turn-1 items do not fully pin down: (1) the 'or'-joined fix remedies + multi-reading "include the correct namespace" leave the mechanism ambiguous; (2) the design never names the lint invocation that counts as done, so the acceptance surface (repo-wide lint where the friction occurred vs targeted single-file lint) is under-specified.
+
 
 ## Design review context (turn 1 — architectural fit)
 
