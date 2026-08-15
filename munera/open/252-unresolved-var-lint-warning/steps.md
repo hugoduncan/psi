@@ -899,27 +899,17 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 22 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Reconcile the committed test file with the repo's own file-length gate:
-      at the slice-21 close (fd55f848e)
-      `components/shared-config/test/psi/shared_config/lint_config_test.clj`
-      is 804 lines — over `commit-check:file-lengths`'s default 800-line limit
-      for src/test files under components/ (bb.edn `file-length-legacy-max-lines`;
-      the file grew 766→804 at the slice-21 commit and 221→804 across slices
-      7-21). Nothing failed at commit time: the pre-commit hooks (cljfmt-fix,
-      clj-kondo-lint) don't run the length check and it is not in ci.yml, so
-      `bb commit-check:file-lengths` fails only at the committed state with zero
-      signal. The working tree currently passes only because sibling task 251's
-      in-flight split (UNCOMMITTED: `lint_config_test_support.clj` +
-      `lint_config_integration_test.clj` + a slimmed `lint_config_test.clj`,
-      all present on disk) reduced the file to 244 lines — that split is not
-      part of this task's committed change set. Actionable: verify
-      `bb commit-check:file-lengths` passes at the committed state (or after
-      the 251 split lands, whichever is authoritative), keep the file under
-      800 lines thereafter — the slices-7-21 growth shows how silently the
-      limit is crossed — and do not double-implement the split (coordinate
-      with the in-flight 251 change; if the split is rejected, record the
-      file in `file-length-legacy-max-lines` with justification instead of
-      leaving the gate failing with no signal)
+- [x] Reconcile the committed test file with the repo's own file-length gate:
+      resolved by splitting (slice 23) — `lint_config_test.clj` (804 lines, over
+      the 800 gate) split into three files: `lint_config_test.clj` (unit
+      invariants, 244), `lint_config_test_support.clj` (shared fixtures, 375;
+      ns ends in -support so kaocha's .*-test$ pattern never runs it) and
+      `lint_config_integration_test.clj` (^:integration proofs, 246). No
+      forwarding vars — fixtures are defined once in the support ns and :refer'd.
+      `bb commit-check:file-lengths` passes at the committed state; the sibling
+      251 split was NOT double-implemented (251 remains design-only — its
+      limit-raise proposal is a separate human-reviewed policy question, and the
+      delegation explicitly directed splitting)
 - [ ] Reuse the shared `psi.test-support.repo-root` instead of the
       component-local `find-repo-root`/`repo-root` copy (skill
       reusable-existing-pattern flag): `bases/main/test/psi/test_support/repo_root.clj`

@@ -322,3 +322,32 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `bb fmt:check` clean.
 
 - implementation review 2026-08-15: added 2 steps to be addressed
+- addressed 1 review step (slice 23, commit-check fix): `bb
+  commit-check:file-lengths` failed at the slice-21 committed state —
+  `components/shared-config/test/psi/shared_config/lint_config_test.clj` was
+  804 lines, over the gate's 800-line default for src/test files under
+  components/ (the pre-commit hooks and ci.yml never run the length check, so
+  the failure surfaced only at the committed state). Fixed by splitting into
+  three logically consistent files, per the explicit "break into multiple
+  logically consistent files; no forwarding vars" instruction:
+  `lint_config_test.clj` (9 unit invariants, 244 lines), the new
+  `lint_config_test_support.clj` (shared fixtures — repo-root, read-edn, pins,
+  jar paths, run-bounded, clj-kondo-main, report-skip!, parse-forms,
+  delete-recursively! — 375 lines; ns ends in -support, so kaocha's .*-test$
+  ns-pattern never runs it), and the new `lint_config_integration_test.clj`
+  (3 ^:integration proofs, 246 lines). No forwarding vars: every shared fixture
+  is DEFINED once in the support ns and :refer'd from the two test namespaces;
+  the eight cross-ns fixtures changed defn- → defn (they were private only
+  because they were file-local). tests.edn comment updated to name the new
+  integration ns. All 12 tests preserved and green (unit 9/39 + integration
+  3/25, 64 assertions), full :unit suite 2694 tests with only the 3 pre-existing
+  deepseek model-config failures (unrelated — HEAD 27bc10378), `bb lint`
+  errors: 0 warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths`
+  exit 0. Sibling 251 not double-implemented: it remains design-only (limit-raise
+  policy question, separate human-reviewed decision); the second slice-22 review
+  step (reuse psi.test-support.repo-root) left OPEN — deliberate divergence: the
+  local copy carries the deps.edn+bb.edn root marker AND the
+  psi.lint-config-test.repo-root property override (slice-9 injectability), a
+  contract the shared helper (doc/custom-providers.md marker, no override) does
+  not provide; extending the shared ns is a separate refactor outside this
+  commit-check fix's minimal-change scope.

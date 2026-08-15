@@ -82,8 +82,8 @@
   ;; Task 252 slice-15: :capture-output? must stay false at TOP level — kaocha
   ;; 1.91.1392 honors it root-config only, and with capture on the capture-output
   ;; plugin swallows passing-test printlns (incl. the ^:integration SKIP lines in
-  ;; psi.shared-config.lint-config-test), so a jar/clojure/git-absent skip is
-  ;; indistinguishable from a real pass in runner output.
+  ;; psi.shared-config.lint-config-integration-test), so a jar/clojure/git-absent
+  ;; skip is indistinguishable from a real pass in runner output.
   :capture-output? false
 
  ;; Reporters

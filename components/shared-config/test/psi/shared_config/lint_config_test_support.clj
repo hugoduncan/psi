@@ -1,0 +1,376 @@
+(ns psi.shared-config.lint-config-test-support
+  "Shared fixtures for the task-252 clj-kondo lint-config regression tests
+  (task 252, split from lint-config-test to keep every file under the
+  file-length gate).
+
+  Single-sources every fixture the lint-config test namespaces share: repo-root
+  discovery (with the psi.lint-config-test.repo-root override), EDN reading,
+  the pinned http-kit/clj-kondo versions and jar paths (each overridable via
+  its own system property, mirroring repo-root), the pinned-JVM-clj-kondo
+  subprocess runner (timeout-bounded, see run-bounded), the visible SKIP
+  reporter for jar/clojure/git-absent ^:integration arms, the parsed-form
+  compare used by both hook guards, and the recursive temp-dir cleanup used by
+  the analysis-level proof. Kept outside the .clj-kondo/imports/ dir (AC2
+  confinement); the ns ends in -support, not -test, so kaocha's .*-test$
+  ns-pattern never runs it as a suite.
+
+  No forwarding vars: each fixture is DEFINED here once and :refer'd into the
+  test namespaces (lint-config-test — unit invariants, and
+  lint-config-integration-test — ^:integration proofs)."
+  (:require
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.java.shell :as shell]
+   [clojure.string :as str])
+  (:import
+   [java.util.concurrent TimeUnit]))
+
+(def ^:private repo-root-prop
+  "System property that overrides repo-root (e.g. when running from an
+  editor/nrepl CWD that is not under the repo)."
+  "psi.lint-config-test.repo-root")
+
+(defn- find-repo-root
+  "Walk up from `start` (a dir path string) until the psi project root is
+  found — a directory containing BOTH deps.edn and bb.edn. Components and
+  extensions carry their own deps.edn, so plain deps.edn presence is not a
+  root marker (walking up from a nested CWD would stop at the component);
+  bb.edn lives only at the repo root. Return the canonical path, or nil."
+  [start]
+  (loop [dir (io/file start)]
+    (when dir
+      (if (and (.exists (io/file dir "deps.edn"))
+               (.exists (io/file dir "bb.edn")))
+        (.getCanonicalPath dir)
+        (recur (.getParentFile dir))))))
+
+(def repo-root
+  "Canonical repo root. Derived by walking up from user.dir until the psi
+  project root is found (deps.edn + bb.edn, see find-repo-root), so the tests
+  run correctly from the repo root (bb test / CI) and from nested CWDs
+  (editor/nrepl runner in a component dir); overridable via the
+  psi.lint-config-test.repo-root system property; fails with a clear message
+  when no root is found."
+  (or (not-empty (System/getProperty repo-root-prop))
+      (find-repo-root (System/getProperty "user.dir"))
+      (throw (ex-info (str "Could not locate the repo root: no deps.edn+bb.edn "
+                           "pair found walking up from user.dir. Run from the "
+                           "repo root or set the psi.lint-config-test.repo-root "
+                           "system property.")
+                      {:user.dir (System/getProperty "user.dir")}))))
+
+(defn read-edn
+  "Read a repo-relative EDN file, optionally with edn/read-string opts (e.g.
+  {:readers {'kaocha/v1 identity}} for tests.edn's tagged literal)."
+  ([rel-path]
+   (edn/read-string (slurp (io/file repo-root rel-path))))
+  ([rel-path opts]
+   (edn/read-string opts (slurp (io/file repo-root rel-path)))))
+
+(def http-kit-version
+  "Pinned http-kit version for the analysis-level proof: derived from deps.edn
+  :deps (the pin source; currently 2.8.0), so an http-kit bump fails loudly
+  instead of silently re-proving a stale jar (R4's re-verification gap)."
+  (get-in (read-edn "deps.edn") [:deps 'http-kit/http-kit :mvn/version]))
+
+(def ^:private http-kit-jar-prop
+  "System property that overrides the http-kit jar path (mirror of
+  psi.lint-config-test.repo-root and psi.lint-config-test.clojure-bin), making
+  the m2-repo dependency injectable per the skill infra-dep criterion — e.g. a
+  non-standard m2 layout (-Dmaven.repo.local) or a CI home that keeps the
+  pinned jar at a different path."
+  "psi.lint-config-test.http-kit-jar")
+
+(def http-kit-jar
+  "Pinned http-kit jar at the standard m2 path (present in CI per the m2 cache;
+  the design-step 9 m2-cache fact). Formatted from http-kit-version so a bump
+  re-targets the jar; a removed/renamed pin fails loudly in :unit instead of
+  silently re-proving the old jar or silently skipping. Overridable via the
+  psi.lint-config-test.http-kit-jar system property (injectable — mirror of the
+  clojure-bin override, slice-12 follow-up); otherwise derived from user.home +
+  http-kit-version (nullable — a jar absent at the derived path skips the
+  ^:integration test via the existing skip guard)."
+  (or (not-empty (System/getProperty http-kit-jar-prop))
+      (str (System/getProperty "user.home")
+           "/.m2/repository/http-kit/http-kit/" http-kit-version
+           "/http-kit-" http-kit-version ".jar")))
+
+(defn http-client-entries
+  "Every symbol/keyword in the parsed EDN whose namespace is
+  org.httpkit.client — AC2's \"root config gains no http-client entries\" clause,
+  walked over the whole tree (:lint-as, :hooks, :namespaces, …)."
+  [form]
+  (filter (fn [x]
+            (and (or (symbol? x) (keyword? x))
+                 (= "org.httpkit.client" (namespace x))))
+          (tree-seq coll? seq form)))
+
+(def clj-kondo-version
+  "Pinned clj-kondo version for the analysis-level proof: derived from deps.edn
+  `:lint :extra-deps` (the source of truth for the lint gate's analyzer), so a
+  clj-kondo bump fails loudly here instead of silently re-proving a stale pin."
+  (get-in (read-edn "deps.edn")
+          [:aliases :lint :extra-deps 'clj-kondo/clj-kondo :mvn/version]))
+
+(def ^:private clj-kondo-jar-prop
+  "System property that overrides the pinned clj-kondo jar path (mirror of
+  psi.lint-config-test.http-kit-jar), making the m2-repo dependency injectable
+  per the skill infra-dep criterion — e.g. a non-standard m2 layout
+  (-Dmaven.repo.local) or a CI home that keeps the pinned artifact at a
+  different path."
+  "psi.lint-config-test.clj-kondo-jar")
+
+(def clj-kondo-jar
+  "Pinned clj-kondo jar at the standard m2 path — the artifact the -Sdeps proof
+  executes (formatted from clj-kondo-version so a bump re-targets the jar).
+  Overridable via the psi.lint-config-test.clj-kondo-jar system property
+  (injectable — mirror of the http-kit-jar override); otherwise derived from
+  user.home + clj-kondo-version (nullable — a jar absent at the derived path
+  skips the ^:integration test via the skip guard instead of attempting a
+  network download or hanging up to the subprocess timeout)."
+  (or (not-empty (System/getProperty clj-kondo-jar-prop))
+      (str (System/getProperty "user.home")
+           "/.m2/repository/clj-kondo/clj-kondo/" clj-kondo-version
+           "/clj-kondo-" clj-kondo-version ".jar")))
+
+(def ^:private clj-kondo-local-repo-prop
+  "System property that overrides the m2 local-repo root used to resolve the
+  pinned clj-kondo artifact (mirror of psi.lint-config-test.clj-kondo-jar),
+  for a non-standard m2 layout the suffix-strip derivation cannot handle."
+  "psi.lint-config-test.clj-kondo-local-repo")
+
+(defn- clj-kondo-local-repo
+  "m2 local-repo root for the -Sdeps map. Overridable via the
+  psi.lint-config-test.clj-kondo-local-repo system property; otherwise derived
+  from the guarded clj-kondo-jar path by stripping the
+  `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix (the standard
+  m2 layout the jar derivation/override follows), so the -Sdeps subprocess
+  resolves the EXACT guarded artifact — guard and exec agree (slice-16
+  follow-up: previously the subprocess resolved the artifact from the Clojure
+  CLI's own local repo while the skip guard checked clj-kondo-jar, a path
+  never passed to the subprocess, so a custom-path override could pass the
+  guard yet execute a different artifact or trigger a network download).
+  Throws a clear ex-info when the jar path is not in the standard m2 layout
+  and no property override is set — such a path cannot be resolved by mvn
+  coordinates anyway, so a loud failure beats a silent wrong-artifact or
+  download."
+  []
+  (or (not-empty (System/getProperty clj-kondo-local-repo-prop))
+      (let [jar    clj-kondo-jar
+            suffix (str "/clj-kondo/clj-kondo/" clj-kondo-version
+                        "/clj-kondo-" clj-kondo-version ".jar")]
+        (if (str/ends-with? jar suffix)
+          (subs jar 0 (- (count jar) (count suffix)))
+          (throw (ex-info (str "Cannot derive the m2 local-repo root from "
+                               "clj-kondo-jar " jar ": expected the standard "
+                               "m2 layout …" suffix ". Set the "
+                               clj-kondo-local-repo-prop " system property "
+                               "for a non-standard layout.")
+                          {:clj-kondo-jar jar :expected-suffix suffix}))))))
+
+(defn clj-kondo-deps
+  "Pinned JVM clj-kondo via -Sdeps — with :mvn/local-repo derived from the
+  guarded clj-kondo-jar path (see clj-kondo-local-repo), so the subprocess
+  executes the exact artifact the skip guard checked; the proof therefore uses
+  the same analyzer as the repo lint gate (see clj-kondo-version; derived,
+  never hardcoded separately)."
+  []
+  (format "{:deps {clj-kondo/clj-kondo {:mvn/version \"%s\"}} :mvn/local-repo \"%s\"}"
+          clj-kondo-version (clj-kondo-local-repo)))
+
+(def ^:private clojure-bin-prop
+  "System property that overrides the clojure CLI binary (mirror of
+  psi.lint-config-test.repo-root), making the infra dep injectable per the
+  skill infra-dep criterion — e.g. from an editor/nrepl runner whose PATH
+  differs from the invoking shell's."
+  "psi.lint-config-test.clojure-bin")
+
+(defn- which-clojure-bin
+  "Resolve the clojure CLI binary from PATH, or nil when not on PATH."
+  []
+  (some-> (shell/sh "which" "clojure")
+          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+
+(def clojure-bin
+  "Path to the clojure CLI binary used by the analysis-level proof, or nil when
+  unavailable. Overridable via the psi.lint-config-test.clojure-bin system
+  property (injectable — mirror of the repo-root override); otherwise derived
+  from PATH via `which clojure` (nullable — a missing binary skips the
+  ^:integration test instead of erroring). The SAME resolved value feeds both
+  the skip guard and the executed subprocess, so the guard can never prove a
+  binary other than the one executed (slice-11 follow-up: previously the guard
+  resolved PATH at ns-load while the ProcessBuilder re-resolved the literal
+  \"clojure\" from PATH at run time, so a PATH mutation or shell function
+  shadowing between load and run made the guard prove a different binary)."
+  (or (not-empty (System/getProperty clojure-bin-prop))
+      (which-clojure-bin)))
+
+(def ^:private git-bin-prop
+  "System property that overrides the git binary (mirror of
+  psi.lint-config-test.clojure-bin), making the infra dep injectable per the
+  skill infra-dep criterion — e.g. from an editor/nrepl runner whose PATH
+  differs from the invoking shell's."
+  "psi.lint-config-test.git-bin")
+
+(defn- which-git-bin
+  "Resolve the git binary from PATH, or nil when not on PATH."
+  []
+  (some-> (shell/sh "which" "git")
+          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+
+(def git-bin
+  "Path to the git binary used by the git check-ignore ground-truth proof, or
+  nil when unavailable. Overridable via the psi.lint-config-test.git-bin system
+  property (injectable — mirror of the repo-root/clojure-bin overrides);
+  otherwise derived from PATH via `which git` (nullable — a missing binary
+  skips the ^:integration test instead of erroring). The SAME resolved value
+  feeds both the skip guard and the executed subprocess, so the guard can never
+  prove a binary other than the one executed (slice-14 follow-up: previously
+  the guard resolved PATH at test time via `which git` while shell/sh
+  re-resolved the literal \"git\" from PATH at run time — a PATH mutation or
+  shell-function shadowing between guard and exec made the guard prove a
+  different binary, the exact disagreement slice 11 eliminated for
+  clojure-bin)."
+  (or (not-empty (System/getProperty git-bin-prop))
+      (which-git-bin)))
+
+(def ^:private process-timeout-ms
+  "Upper bound (ms) for the pinned-clj-kondo subprocess. clojure.java.shell/sh
+  has NO :timeout support (unknown opts silently ignored — verified in the 1.12
+  source), so without a bounded runner a hung subprocess (e.g. a cold -Sdeps
+  dep download stall) would block the suite indefinitely."
+  120000)
+
+(defn run-bounded
+  "Run a subprocess with the given command vector from the repo root; returns
+  shell/sh-shaped {:exit :out :err}. Timeout-bounded via ProcessBuilder +
+  waitFor(ms) (see process-timeout-ms); on timeout the process is killed and
+  the test fails loudly rather than hanging the suite (shell/sh has no
+  :timeout — unknown opts silently ignored, verified in the 1.12 source). The
+  timeout ex-info carries the partial stdout/stderr drained after the kill, so
+  a hung subprocess (e.g. a cold -Sdeps dep download stall) surfaces where it
+  stalled instead of reporting zero context (slice-20 follow-up: the ex-info
+  previously carried {:cmd cmd} only and discarded the drained streams).
+
+  The stream drain is bounded on EVERY path — success included (slice-21
+  follow-up): the waitFor bound covers the process LIFETIME only, so a
+  subprocess that exits while a descendant still holds the stdout/stderr pipe
+  open (classic grandchild scenario — e.g. the clojure CLI spawning a JVM that
+  spawns a helper) never EOFs the slurp; an unbounded deref on the success
+  path (or in the finally) would then hang the suite indefinitely despite the
+  documented bound. The success path therefore uses the same bounded deref
+  and fails loudly — with the undrained :out/:err marked :unavailable — when
+  the streams do not close within the drain bound."
+  [cmd]
+  (let [pb (doto (ProcessBuilder. cmd)
+             (.directory (io/file repo-root)))
+        proc (.start pb)
+        out-f (future (slurp (.getInputStream proc)))
+        err-f (future (slurp (.getErrorStream proc)))
+        drain (fn [f label]
+                (try (deref f 500 ::unavailable)
+                     (catch InterruptedException _
+                       (str "<" label " interrupted>"))))]
+    (try
+      (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
+        (let [;; kill the process first so the pipe streams close and the
+              ;; draining futures complete; then capture whatever partial
+              ;; output was produced before the bound was hit. (Derefing
+              ;; before the kill would block — the streams stay open while
+              ;; the process lives.)
+              _           (when (.isAlive proc) (.destroyForcibly proc))
+              partial-out (drain out-f "stdout")
+              partial-err (drain err-f "stderr")]
+          (throw (ex-info (str "subprocess exceeded " process-timeout-ms
+                               " ms and was killed: " (pr-str cmd))
+                          {:cmd cmd
+                           :out (if (= ::unavailable partial-out)
+                                  :unavailable partial-out)
+                           :err (if (= ::unavailable partial-err)
+                                  :unavailable partial-err)})))
+        (let [out (drain out-f "stdout")
+              err (drain err-f "stderr")]
+          (when (or (= ::unavailable out) (= ::unavailable err))
+            (throw (ex-info (str "subprocess exited but its stdout/stderr did "
+                                 "not close within the drain bound — a "
+                                 "descendant process is holding the pipe open: "
+                                 (pr-str cmd))
+                            {:cmd cmd
+                             :out (if (= ::unavailable out) :unavailable out)
+                             :err (if (= ::unavailable err) :unavailable err)})))
+          {:exit (.exitValue proc) :out out :err err}))
+      (finally
+        (when (.isAlive proc)
+          (.destroyForcibly proc))
+        ;; bounded drain so the finally can never hang the suite either
+        ;; (slice-21: the previously-unbounded @out-f/@err-f here would block
+        ;; forever on the pipe-holding-descendant path; a completed future
+        ;; returns instantly, so the bound only bites in the pathological case)
+        (drain out-f "stdout")
+        (drain err-f "stderr")))))
+
+(defn clj-kondo-main
+  "Run the pinned clj-kondo as a subprocess from the repo root with the given
+  clj-kondo args; returns shell/sh-shaped {:exit :out :err} (see run-bounded
+  for the timeout bound)."
+  [& args]
+  (when (nil? clojure-bin)
+    (throw (ex-info (str "clojure-bin is nil — cannot run the clj-kondo "
+                         "subprocess. Put clojure on PATH or set the "
+                         clojure-bin-prop " system property.")
+                    {})))
+  (run-bounded (into [clojure-bin "-Sdeps" (clj-kondo-deps)
+                      "-M" "-m" "clj-kondo.main"] args)))
+
+(defn report-skip!
+  "Report a skipped ^:integration proof visibly in runner output.
+
+  A plain (println …) is swallowed on every runner path when the proof
+  skip-passes: kaocha's capture-output plugin buffers per-test output (shown
+  only in the failure report) and scry's in-process runner additionally binds
+  *out* to a discarding writer around api/run. Writing directly to System/out
+  reaches the runner's captured process stdout on both paths — it is untouched
+  while tests.edn keeps top-level :capture-output? false (slice-15 fix) — so a
+  jar/clojure/git-absent skip is distinguishable from a real pass in runner
+  output (slice-9's visible-skip mechanism, restored)."
+  [label reason]
+  (.println System/out (str "SKIP task-252 " label ": " reason)))
+
+(defn parse-forms
+  "Parse a Clojure source string into a vector of its top-level forms. Used to
+  compare the tracked with-channel hook impl against the jar export
+  structurally: whitespace/indentation differences vanish by construction (the
+  documented cljfmt indentation drift, slice 5 — the repo's pre-commit hook
+  reformats continuation indentation to repo style, 2-space vs the jar's
+  3-space, so a byte compare can never pass through the repo's own commit
+  path), while every semantic difference survives — including string-literal
+  contents, which read-string preserves exactly (a spacing change inside a
+  string literal is a different parsed value, unlike a whitespace-collapsing
+  text compare).
+
+  Binds *read-eval* false (slice-21 follow-up): a drifted/malicious `#=`
+  reader-eval form on either side of the compare would otherwise EXECUTE
+  during the read instead of being compared — this guard's purpose is to
+  detect semantic drift in the tracked impl vs the pinned jar export, so `#=`
+  now throws loudly instead of evaluating. Passes :read-cond :preserve so
+  reader conditionals (`#?`/`#?@`) COMPARE structurally on all branches
+  rather than erroring with \"Conditional read not allowed\" — :allow would
+  read only the current platform's branch and silently drop the others from
+  the compare, a blind spot of the exact class this guard exists to close."
+  [s]
+  (binding [*read-eval* false]
+    (read-string {:read-cond :preserve} (str "[" s "]"))))
+
+(defn delete-recursively!
+  "Recursively delete a file/dir tree. clojure.java.io offers no recursive
+  delete and `.deleteOnExit` only removes empty dirs, so without this every
+  integration run leaks the temp cache tree under /tmp (slice-12 follow-up).
+  Returns nil."
+  [f]
+  (when (.exists f)
+    (when (.isDirectory f)
+      (doseq [child (.listFiles f)]
+        (delete-recursively! child)))
+    (.delete f))
+  nil)
+
