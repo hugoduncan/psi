@@ -119,3 +119,11 @@ clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version "2025.09.19"}}}' \
 ```
 
 Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`**/.clj-kondo/imports/` — the exact negation target), `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` (provenance check target), `~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar` (slice-2 lint source; other m2 http-kit versions present: 2.5.3, 2.8.0-beta3, 2.9.0-beta1).
+
+## Plan-review follow-up (steps) — executed 2026-08-15
+
+- Batch = f10e76415 (ambiguity) + 2c16bc0c7 (inconsistency), back-to-back; e52befd39 is the turn-3 notes commit, not a pass.
+- Baseline = ffbff6258 (parent of f10e76415, the plan/steps creation commit).
+- `git diff ffbff6258..HEAD -- munera/open/252-unresolved-var-lint-warning/steps.md` is **empty** → the batch added zero checklist lines to steps.md (it only touched design-steps.md + implementation.md) → candidate follow-up set = ∅ → nothing executed; all steps.md items predate the batch and were left unchecked per protocol (do not execute pre-batch items).
+- The batch's actionable findings are tracked as design-steps.md 6–8 (unchecked, doc-only) — the design-steps amendment slice per turn 3 above; they are design-steps items, not steps.md items, and are out of scope for this steps-follow-up.
+- What the next step needs to know: run the design-steps amendment slice *before* any implementation slice — amend design.md (Mechanism → `:lint-as` single facility; AC2 → permit the `.gitignore` enabling edit; Context → 2.9.0-beta1 stale-cache provenance), then plan.md R3, then add the steps.md slice-2 `~:filename` provenance grep; re-check plan.md/steps.md coherence against amended design.md.
