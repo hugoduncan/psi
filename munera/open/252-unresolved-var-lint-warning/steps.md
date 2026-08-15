@@ -153,7 +153,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 7 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Add a committed, CI-runnable regression test guarding the registration —
+- [x] Add a committed, CI-runnable regression test guarding the registration —
       the task currently has no committed tests: AC1's lint proof, the negative
       control, and the AC2 root-config check are all manual/local/cache-dependent,
       so a removed or typo'd `:lint-as` entry and an AC2 root-config drift are
@@ -168,7 +168,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Placement is a decision (no component owns lint config): an existing
       tests.edn component test dir or a `spec/`-adjacent test; keep the assertion
       code out of the import dir itself (AC2 confinement)
-- [ ] Decide and record whether to commit the analysis-level proof (negative
+      — done (placement decision: `components/shared-config` — no component owns
+      lint config; shared-config is the closest semantic home and its test dir is
+      already in the `:unit` suite, so no tests.edn change; assertion code lives
+      in `components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      outside the import dir — AC2 confinement holds): `http-kit-import-registration-test`
+      + `root-config-ac2-invariant-test` read both config.edn files as EDN and
+      assert the lint-as registration and the exact `[(malli.core/=>)]` exclude;
+      verified `bb test --focus psi.shared-config.lint-config-test` → 2 tests /
+      3 assertions pass; `bb lint` still errors: 0, warnings: 0
+- [x] Decide and record whether to commit the analysis-level proof (negative
       control) as a test: a test that runs
       `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
       --dependencies --cache-dir <tmp>` then lints a probe ns (get/post resolve,
@@ -181,3 +190,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       analysis — mark `^:integration` or accept the runtime if filed. Accept or
       decline explicitly; do not leave the proof as an uncommitted manual probe
       only
+      — done (decision: ACCEPT, as `^:integration`): committed
+      `http-kit-defreq-analysis-level-resolution-test` — runs the pinned JVM
+      clj-kondo 2025.09.19 via `clojure -Sdeps` (same analyzer as the lint gate)
+      twice: jar `--dependencies --cache-dir <tmp>` populates a hermetic temp
+      cache, then a probe ns lint against that cache resolves get/post and flags
+      `definitely-not-a-var`; skips (passing) when the 2.8.0 jar is absent from
+      m2; `^:integration` meta keeps it out of `bb test` (unit/extensions
+      `:skip-meta [:integration]`) and runs in `bb clojure:test:integration` (CI
+      runs both); verified integration run → test passes (hermetic, never touches
+      repo `.clj-kondo/.cache`)
