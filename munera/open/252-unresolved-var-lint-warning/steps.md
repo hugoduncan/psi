@@ -768,3 +768,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       the named list; design.md Context's "slices 7-16" reference and plan.md
       decision 3 / R3's "slices 7-16" references mirrored (slices 7-18, with
       the third test named in decision 3). Doc-only reconciliation
+
+## Slice 20 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Narrow the semantics guard's whitespace blind spot: `normalize-whitespace`
+      in `with-channel-hook-semantics-guard-test` collapses runs of whitespace
+      in the RAW TEXT — including whitespace INSIDE string literals — so a
+      semantic change confined to literal spacing (e.g. the error message
+      `"No request or channel provided"` → `"No  request or channel provided"`;
+      verified 2026-08-15: `normalize-whitespace` returns equal strings for the
+      two forms) passes while the guard's stated property is "any semantic
+      change fails loudly". Fix: compare parsed forms structurally (read-string
+      both sides and compare, ignoring top-level whitespace by construction), or
+      strip only indentation/line-structure whitespace (per-line trim preserves
+      intra-literal spacing), or record the accepted gap explicitly in the
+      testing string
+- [ ] Make `with-channel-hook-semantics-guard-test` fail cleanly when the jar
+      export entry is missing: when `.getEntry` returns nil, `jar-export` is
+      nil — the `(is (some? jar-export))` fails but the subsequent
+      `(normalize-whitespace jar-export)` throws an NPE (verified 2026-08-15:
+      "Cannot invoke Object.toString() because s is null"), so the missing-entry
+      case reports a clojure.test ERROR instead of the clean assertion failure
+      it deserves. Wrap the equality in a `when-let`/nil guard (or assert
+      `some?` and return early) so the missing-entry and mismatch cases both
+      fail as plain assertion failures
+- [ ] Include out/err in `run-bounded`'s timeout ex-info: the 120s-bound path
+      throws `{:cmd cmd}` only, discarding the partial stdout/stderr drained in
+      the finally — a hung subprocess (cold `-Sdeps` stall, network fetch) that
+      hits the bound surfaces with zero context about where it stalled, and the
+      drained streams are only reachable by re-running with debugging. Capture
+      the drained `@out-f`/`@err-f` (or a bounded prefix) into the ex-info data
+      before throwing so the timeout diagnostic carries the partial output

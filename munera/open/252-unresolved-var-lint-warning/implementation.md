@@ -301,3 +301,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `with-channel-hook-semantics-guard-test` named, mirrored in design.md Context and
   plan.md decision 3 / R3. Doc-only reconciliation; no code/test changes, no lint
   surface touched.
+- implementation review 2026-08-15: added 3 steps to be addressed
