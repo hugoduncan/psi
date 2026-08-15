@@ -3,6 +3,11 @@
 - no inconsistency review feedback
 - architectural review (re-pass): no new actionable architectural-fit feedback — current design.md already resolves prior arch steps 1-3; committed mechanism (per-library import registration, analysis-level) conforms to λ lint(f), λ fix(bug), small, change_chain proof, localization. Scope boundary well-drawn; no SCOPE_QUESTION.
 - ambiguity review (re-pass): no new actionable ambiguity feedback — prior ambiguity items 1-2 resolved in current design.md (committed mechanism = analysis-level registration in the http-kit import dir; AC1 pins repo-wide lint as proof surface). The remaining facility "or" (analyze-call/namespace hook vs `:namespaces` `:defined-by` declaration) is an explicitly declared implementation choice with acceptance closure, not a fresh ambiguity — do not re-file.
+- inconsistency review (re-pass): no new actionable inconsistency feedback — design.md line/version/mechanism claims verified consistent against deps.edn, .clj-kondo artifacts, and task 251; remaining candidates already consumed by prior passes.
+
+## Design review context (re-pass — inconsistency)
+
+- Verified design.md cross-references: (1) `:lint` alias has no `--copy-configs`/classpath wiring — `.clj-kondo/imports/**/config.edn` auto-merges (proven by the working with-channel hook), so a `:namespaces` addition there applies without extra wiring; (2) task 251's 800-line limit lives in `bb.edn` (`commit-check:file-lengths`, `file-length-legacy-max-lines`) — design.md's "bb.edn change disjoint from this `.clj-kondo` change" holds.
 
 ## Design review context (re-pass — ambiguity)
 
