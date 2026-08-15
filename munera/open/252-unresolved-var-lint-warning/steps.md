@@ -203,7 +203,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 8 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Strengthen `http-kit-import-registration-test`'s hook assertion: the
+- [x] Strengthen `http-kit-import-registration-test`'s hook assertion: the
       server-side with-channel preservation check is only
       `(is (contains? (:hooks cfg) :analyze-call))` — a removed or changed
       `:analyze-call` mapping passes. The design's mechanism explicitly requires
@@ -211,14 +211,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Assert exact match:
       `(= {:analyze-call {org.httpkit.server/with-channel httpkit.with-channel/with-channel}} (:hooks cfg))`
       (current config.edn matches this shape exactly)
-- [ ] Extend the AC2 guard to root `:lint-as`: `root-config-ac2-invariant-test`
+      — done: hook assertion is now an exact match on `(:hooks cfg)`
+      (quoted map literal — unquoted would ClassNotFound on the class-resolving
+      compiler), verified by the unit suite (6 assertions pass)
+- [x] Extend the AC2 guard to root `:lint-as`: `root-config-ac2-invariant-test`
       asserts only `:unresolved-symbol :exclude` stays exactly
       `[(malli.core/=>)]` — plan.md decision 1's no-root-mirror choice (unlike
       the malli/promesa convention the root config's own comment documents)
       would be silently violated if `org.httpkit.client/defreq` were added to
       root `:lint-as`; that drift is undetectable today. Assert
       `org.httpkit.client/defreq` ∉ (keys (:lint-as root-config))
-- [ ] Harden the `clj-kondo-main` subprocess (skill infra-dep criterion —
+      — done: `root-config-ac2-invariant-test` now asserts
+      `(not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))` alongside
+      the exclude invariant
+- [x] Harden the `clj-kondo-main` subprocess (skill infra-dep criterion —
       injectable/nullable, no hang): (a) the `clojure` CLI binary is neither
       injectable nor nullable — a missing binary errors the `^:integration`
       test, unlike the jar-absent path which skips; skip (passing) when
@@ -229,9 +235,21 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       indefinitely — switch to a timeout-capable runner (e.g.
       `clojure.java.process` or `Process/waitFor` with a timeout) or record the
       accepted hang risk explicitly
-- [ ] Guard clj-kondo version-pin drift: `clj-kondo-deps` hardcodes
+      — done (both): (a) `clojure-bin` (via `shell/sh "which" "clojure"`) is
+      checked first in the skip guard — `clojure` absent on PATH skips passing,
+      mirroring the jar-absent skip; (b) `clj-kondo-main` now uses
+      ProcessBuilder + `waitFor(120s)` with concurrent stream draining
+      (non-daemon future threads terminated via destroyForcibly + stream drain
+      in a finally); a hung subprocess kills the process and throws loudly
+      instead of blocking the suite
+- [x] Guard clj-kondo version-pin drift: `clj-kondo-deps` hardcodes
       "2025.09.19" while deps.edn `:lint` `:extra-deps` pins it; on a clj-kondo
       bump the integration test silently keeps proving the OLD analyzer (R4's
       manual re-verification gives no failure signal). Assert the test's pinned
       version equals deps.edn's `:lint :extra-deps` clj-kondo version (or
       derive it), so the drift fails loudly instead of re-proving a stale pin
+      — done (derived): `clj-kondo-version` is read from deps.edn
+      `[:aliases :lint :extra-deps 'clj-kondo/clj-kondo :mvn/version]` (the
+      aliases live under `:aliases` at the top level) and `clj-kondo-deps` is
+      formatted from it — no separate hardcoded version; `clj-kondo-pin-sourced-from-deps-edn-test`
+      asserts the pin exists, so a removed/bumped entry fails loudly in `:unit`
