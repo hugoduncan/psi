@@ -485,3 +485,50 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `:test-paths`, `:integration` `:focus-meta` = `[:integration]`, and
       `:unit` `:skip-meta` = `[:integration]` (named in the follow-up's
       rationale — the ^:integration proofs stay out of `bb test`)
+
+## Slice 15 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Make the `^:integration` skip visible through kaocha's output capture:
+      slice-9's "make the skip visible" mechanism is DEFEATED — tests.edn sets
+      `:capture-output? true`, and kaocha 1.91.1392's capture-output plugin
+      (kaocha/plugin/capture_output.cljc: init-capture rebinds System/out+err to
+      a per-test buffer; kaocha/report.clj shows the buffer only in the FAILURE
+      report) swallows the `(println "SKIP task-252 …")` lines on the passing
+      (skipped) test. Verified 2026-08-15: forced-skip run
+      (`-J-Dpsi.lint-config-test.http-kit-jar=/nonexistent/http-kit.jar` +
+      `--focus integration --focus psi.shared-config.lint-config-test`) →
+      proof collapsed 171→155 assertions with ZERO signal — grep for "SKIP"
+      finds nothing, so a jar/clojure/git-absent skip is indistinguishable from
+      a real pass in runner output (the exact gap slice 9 set out to close; the
+      scry/bb.kaocha-runner path prints kaocha's process stdout, but the
+      println never reaches it under capture). Fix: set `:capture-output? false`
+      at tests.edn TOP level — kaocha 1.91.1392 honors it top-level only
+      (kaocha/config.clj normalize destructures `capture-output?` from the
+      root config; per-suite `:capture-output?` is dropped, verified in the jar
+      source), or pass `--no-capture-output` in the bb.edn suite tasks. Verify:
+      (a) forced-skip integration run now prints
+      `SKIP task-252 analysis-level proof: …` and `SKIP task-252 git
+      check-ignore ground truth: …` (verified with the `--no-capture-output`
+      CLI flag: the SKIP line appears mid-dots); (b) `bb test` (unit) and
+      `bb clojure:test:integration` still pass and their output volume is
+      acceptable with capture off; (c) scry's structured runner still records
+      results. Then guard the invariant: extend `tests-edn-suite-wiring-test`
+      (or add a unit test) asserting the chosen capture setting
+      (`:capture-output? false` at top level, or the task-level flag), so the
+      visible-skip invariant itself is guarded like the other tests.edn wiring
+- [ ] Guard the deps.edn `:lint` alias `:main-opts` against cache-disabling /
+      config-override flags: `lint-alias-lints-extensions-test` (slice 13)
+      asserts only path presence ("extensions", "bb.edn") — adding `--cache
+      false` (the exact design-step-9 masking class: with no cache the two
+      warnings vanish), `--config`/`--config-dir` overrides, or
+      `--dependencies` to the alias's `:main-opts` silently makes AC1
+      trivially clean while every test passes. `bb-edn-lint-task-wrapper-test`
+      (slice 14) closes this for the bb.edn WRAPPER only (`(shell "clojure
+      -M:lint")` exact), not for the alias itself. Fix: extend
+      `lint-alias-lints-extensions-test` (or add a test, same ns — read
+      deps.edn as EDN, no subprocess, runs anywhere) asserting `:main-opts`
+      contains NONE of `"--cache"`, `"--config"`, `"--config-dir"`,
+      `"--dependencies"` (verified 2026-08-15: current `:main-opts` is
+      `["-m" "clj-kondo.main" "--lint" "bb.edn" "deps.edn" ".lsp/config.edn"
+      ".psi/startup-prompts.edn" "bases" "components" "extensions" "spec"
+      "tests.edn" "extensions/tests.edn"]` — no such flags)

@@ -236,3 +236,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 - task-test-review 2026-08-15: added 4 steps to be addressed
 
 - addressed 4 review steps (slice 14): git-bin injectable+guard/exec-agreed (property override, same resolved value in guard+exec, shared bounded run-bounded runner), clj-kondo jar nullable+injectable (property override + derived m2 path + skip-guard existence check; override skips proof — 171→155 assertions), bb.edn lint wrapper guard (exact `(shell "clojure -M:lint")`; task key is symbol `lint`), tests.edn suite-wiring guard (`#kaocha/v1` tag reader; shared-config path in :unit/:integration test-paths, :integration focus-meta [:integration], :unit skip-meta [:integration]). Verified: unit focused 9 tests / 34 assertions; integration suite 32 tests / 171 assertions, no SKIP (both proofs ran); clj-kondo-jar nonexistent override → 155 (proof skipped, 17→1 assertions); git-bin real override → 171; `bb lint` errors: 0, warnings: 0; cljfmt clean
+
+- task-test-review 2026-08-15: added 2 steps to be addressed
