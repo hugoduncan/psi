@@ -231,3 +231,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 
 - task-test-review 2026-08-15: added 3 steps to be addressed
 - addressed 3 review steps (slice 12): http-kit jar path injectable (`psi.lint-config-test.http-kit-jar` property override, mirror of repo-root/clojure-bin; skip guard unchanged — verified: nonexistent override skips, real override runs full 17-assertion proof); .gitignore negation ORDER asserted (ignore-all line 4 precedes negations 5-6 — last-match-wins; 6 unit tests / 23 assertions); integration temp dir cleaned via `delete-recursively!` in try/finally (no /tmp/ck252* leak from the run; 9 pre-existing leaks from before the fix remain). Integration suite 31 tests / 168 assertions pass, no SKIP; `bb lint` errors: 0, warnings: 0; cljfmt clean.
+- task-test-review 2026-08-15: added 3 steps to be addressed
