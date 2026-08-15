@@ -253,3 +253,42 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       aliases live under `:aliases` at the top level) and `clj-kondo-deps` is
       formatted from it — no separate hardcoded version; `clj-kondo-pin-sourced-from-deps-edn-test`
       asserts the pin exists, so a removed/bumped entry fails loudly in `:unit`
+
+## Slice 9 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Derive the http-kit jar path from deps.edn (mirror of the slice-8 clj-kondo
+      pin derivation, same silent-stale-pin failure mode left open for http-kit):
+      `http-kit-jar` hardcodes the 2.8.0 path
+      (`~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar`), so R4's
+      http-kit bump re-verification gets no failure signal — on a bump the 2.8.0
+      jar either stays in m2 (the proof silently re-proves the OLD jar) or is
+      absent (the proof silently skips). Read
+      `[:deps 'http-kit/http-kit :mvn/version]` from root deps.edn (the pin
+      source; currently 2.8.0) and format `http-kit-jar` from it; add a unit
+      assertion (like `clj-kondo-pin-sourced-from-deps-edn-test`) that the pin
+      exists, so a removed/bumped entry fails loudly in `:unit`
+- [ ] Widen the AC2 root-config guard to AC2's general clause ("root
+      `.clj-kondo/config.edn` gains no http-client entries"): today
+      `root-config-ac2-invariant-test` asserts only `:unresolved-symbol :exclude`
+      exactness and `org.httpkit.client/defreq` ∉ root `:lint-as` — so e.g.
+      `org.httpkit.client/get` added to root `:lint-as`, or a root
+      `:hooks :analyze-call` entry for an http-kit var, passes while violating
+      AC2. Assert no `org.httpkit.client`-prefixed symbol occurs anywhere in the
+      parsed root config (walk the EDN for symbols whose namespace is
+      `org.httpkit.client`, covering `:lint-as`, `:hooks`, `:namespaces`, …), or
+      scope the guard explicitly to AC2's exact wording and record why the
+      narrower guard is the intended invariant
+- [ ] Make the `^:integration` skip visible: `(is (str "skipped: " reason))` is
+      always-truthy — clojure.test prints nothing for a passing truthy `is`, so a
+      skip (jar absent, or clojure not on PATH) is indistinguishable from a real
+      pass and the m2-cache-dependent CI guarantee vanishes with zero signal.
+      Print the reason to *out* (e.g. `(println "SKIP task-252 analysis-level
+      proof:" reason)`) before the truthy assert so runner output records why the
+      proof did not run
+- [ ] Make `repo-root` injectable/nullable (skill infra-dep criterion): it is
+      `(.getCanonicalPath (io/file "."))` — an ambient CWD dependency, neither
+      injectable nor nullable; a run from a non-root CWD (editor/nrepl runner,
+      component dir) fails with confusing file-not-found on the config reads.
+      Derive repo root by walking up from the test file's own source path (or
+      from `user.dir`) until `deps.edn` is found, or make it overridable via a
+      system property, failing with a clear message when no root is found

@@ -218,3 +218,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
 
 - task-test-review 2026-08-15: added 4 steps to be addressed
 - addressed 4 task-test-review steps (slice 8): hook exact-match assertion (quoted map, unit-suite verified), root `:lint-as` no-mirror guard (`org.httpkit.client/defreq` ∉ keys), subprocess hardening (`clojure`-absent skip + ProcessBuilder 120s timeout replacing timeout-less shell/sh), clj-kondo version derived from deps.edn `:aliases :lint :extra-deps` (drift fails loudly). Verified: `bb test --focus psi.shared-config.lint-config-test` → 3 tests / 6 assertions pass; integration test isolated → 1 test / 6 assertions pass; `clojure -M:lint` errors: 0, warnings: 0; cljfmt clean
+- task-test-review 2026-08-15: added 4 steps to be addressed
