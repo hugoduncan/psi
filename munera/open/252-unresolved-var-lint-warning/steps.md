@@ -488,7 +488,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 15 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Make the `^:integration` skip visible through kaocha's output capture:
+- [x] Make the `^:integration` skip visible through kaocha's output capture:
       slice-9's "make the skip visible" mechanism is DEFEATED — tests.edn sets
       `:capture-output? true`, and kaocha 1.91.1392's capture-output plugin
       (kaocha/plugin/capture_output.cljc: init-capture rebinds System/out+err to
@@ -516,7 +516,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (or add a unit test) asserting the chosen capture setting
       (`:capture-output? false` at top level, or the task-level flag), so the
       visible-skip invariant itself is guarded like the other tests.edn wiring
-- [ ] Guard the deps.edn `:lint` alias `:main-opts` against cache-disabling /
+      — done (tests.edn top-level `:capture-output? false` chosen — single
+      source of truth, honored by every kaocha invocation incl. scry's
+      in-process runner via config/load-config; comment added in tests.edn).
+      TWO additional discoveries required for (a) to actually hold on the
+      primary runner path: (1) scry's in-process kaocha adapter binds *out*/*
+      err* to a discarding writer around api/run (scry/kaocha.clj), so a plain
+      `(println …)` NEVER reaches runner output even with capture off — the
+      two skip sites now write the reason to System/out directly via a shared
+      `report-skip!` helper (untouched while capture is off; reaches the
+      runner's captured process stdout on both the scry and fallback paths);
+      (2) the git ground-truth skip guard gained a nonexistent-binary arm
+      (mirror of the http-kit/clj-kondo jar arms) so a stale override/which
+      result is a visible SKIP, not a loud subprocess error. Verified: (a)
+      forced-skip scry-path run prints `SKIP task-252 analysis-level proof:
+      /nonexistent/http-kit.jar not present` (JAVA_OPTS property override —
+      `-J-D` after `-m` lands in kaocha argv, not the JVM) and `SKIP task-252
+      git check-ignore ground truth: /nonexistent/git not present`; (b) full
+      `bb clojure:test:integration` 32 tests / 171 assertions exit 0 (no SKIP
+      — both proofs ran), unit suite 2693 passed / 1 failed — pre-existing
+      environmental `workflow-delegate-review-step-live-test` (unknown model
+      deepseek/deepseek-v4-flash; fails identically with capture on), output
+      volume acceptable (unit 56 lines, integration 2 lines, extensions 5
+      lines); (c) scry still records .scry-results EDN on failure (verified
+      via the unit failure). Guard: `tests-edn-suite-wiring-test` now asserts
+      top-level `:capture-output?` is false (root config only — suites carry
+      no capture setting). `bb lint` errors: 0 warnings: 0; `bb fmt:check`
+      clean; unit suite 9 tests / 39 assertions pass
+- [x] Guard the deps.edn `:lint` alias `:main-opts` against cache-disabling /
       config-override flags: `lint-alias-lints-extensions-test` (slice 13)
       asserts only path presence ("extensions", "bb.edn") — adding `--cache
       false` (the exact design-step-9 masking class: with no cache the two
@@ -532,3 +559,8 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `["-m" "clj-kondo.main" "--lint" "bb.edn" "deps.edn" ".lsp/config.edn"
       ".psi/startup-prompts.edn" "bases" "components" "extensions" "spec"
       "tests.edn" "extensions/tests.edn"]` — no such flags)
+      — done: `lint-alias-lints-extensions-test` gained a testing block
+      asserting none of the four flags appears in `:main-opts` (doseq over
+      `["--cache" "--config" "--config-dir" "--dependencies"]`; exact element
+      membership — the flags are clj-kondo CLI tokens, never legitimate path
+      values); unit suite 9 tests / 39 assertions pass

@@ -234,6 +234,20 @@
   (run-bounded (into [clojure-bin "-Sdeps" clj-kondo-deps
                       "-M" "-m" "clj-kondo.main"] args)))
 
+(defn- report-skip!
+  "Report a skipped ^:integration proof visibly in runner output.
+
+  A plain (println …) is swallowed on every runner path when the proof
+  skip-passes: kaocha's capture-output plugin buffers per-test output (shown
+  only in the failure report) and scry's in-process runner additionally binds
+  *out* to a discarding writer around api/run. Writing directly to System/out
+  reaches the runner's captured process stdout on both paths — it is untouched
+  while tests.edn keeps top-level :capture-output? false (slice-15 fix) — so a
+  jar/clojure/git-absent skip is distinguishable from a real pass in runner
+  output (slice-9's visible-skip mechanism, restored)."
+  [label reason]
+  (.println System/out (str "SKIP task-252 " label ": " reason)))
+
 (deftest http-kit-import-registration-test
   (testing "http-kit import config retains the defreq :lint-as registration"
     (let [cfg (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")]
@@ -335,7 +349,19 @@
       (is (some #{"extensions"} main-opts)
           ":lint :main-opts contains \"extensions\" (the dev-http test file lives under it)")
       (is (some #{"bb.edn"} main-opts)
-          ":lint :main-opts contains \"bb.edn\""))))
+          ":lint :main-opts contains \"bb.edn\"")
+      (testing "no cache-disabling / config-override flags (slice-15 follow-up:
+                lint-alias-lints-extensions-test's path presence assertions are
+                blind to a drift that makes AC1 trivially clean — adding
+                --cache false (with no cache the two warnings vanish — exactly
+                design-step 9's masking), --config/--config-dir overrides, or
+                --dependencies to the alias's :main-opts silently disables the
+                lint proof while every other test still passes. bb-edn-lint-task-wrapper-test
+                closes this for the bb.edn WRAPPER only ((shell \"clojure -M:lint\")
+                exact), not for the alias itself)"
+        (doseq [flag ["--cache" "--config" "--config-dir" "--dependencies"]]
+          (is (not (some #{flag} main-opts))
+              (str ":lint :main-opts must not contain " flag " (masks the AC1 warnings)")))))))
 
 (deftest gitignore-http-kit-import-tracking-test
   (testing ".gitignore keeps the http-kit import dir TRACKED (plan.md decision 2
@@ -405,12 +431,23 @@
             same silent-drift class the task already guards for .gitignore /
             lint-alias / pins. Read tests.edn as EDN with the #kaocha/v1 tag
             reader — no subprocess, runs anywhere."
-    (let [suites (:tests (read-edn "tests.edn" {:readers {'kaocha/v1 identity}}))
+    (let [cfg    (read-edn "tests.edn" {:readers {'kaocha/v1 identity}})
+          suites (:tests cfg)
           by-id  (fn [id] (first (filter #(= id (:id %)) suites)))
           unit   (by-id :unit)
           intg   (by-id :integration)]
       (is (some? unit) "tests.edn has a :unit suite")
       (is (some? intg) "tests.edn has an :integration suite")
+      (testing ":capture-output? is false at TOP level (slice-15 follow-up:
+                the ^:integration SKIP lines — the visible-skip mechanism from
+                slice 9 — are swallowed by kaocha's capture-output plugin while
+                :capture-output? is true; kaocha 1.91.1392 honors
+                :capture-output? at the root config only, so a per-suite
+                setting would be silently dropped. The tests.edn :unit and
+                :integration suites carry no capture setting — the root value
+                is the only one that takes effect)"
+        (is (false? (:capture-output? cfg))
+            "tests.edn top-level :capture-output? is false (SKIP lines reach runner output)"))
       (testing ":unit suite lists components/shared-config/test (runs the unit
                 invariants) and skips the ^:integration tests"
         (is (some #{"components/shared-config/test"} (:test-paths unit))
@@ -437,9 +474,20 @@
             injectable/nullable infra dep (psi.lint-config-test.git-bin
             override, else `which git`) and the SAME resolved git-bin feeds
             both the skip guard and the executed subprocess (bounded via
-            run-bounded — shell/sh has no :timeout)."
-    (if-let [reason (when (nil? git-bin) "git not on PATH")]
-      (do (println "SKIP task-252 git check-ignore ground truth:" reason)
+            run-bounded — shell/sh has no :timeout). Slice-15: the skip guard
+            also skips on a nonexistent git-bin (mirror of the http-kit/
+            clj-kondo jar arms) so a stale override or which result is a
+            visible SKIP, not a loud subprocess error — and the SKIP reason
+            reaches runner output via report-skip!."
+    (if-let [reason (cond
+                      (nil? git-bin)
+                      "git not on PATH"
+
+                      (not (.exists (io/file git-bin)))
+                      (str git-bin " not present")
+
+                      :else nil)]
+      (do (report-skip! "git check-ignore ground truth" reason)
           (is (str "skipped: " reason)))
       (let [http-kit-rel ".clj-kondo/imports/http-kit/http-kit/config.edn"
             malli-rel    ".clj-kondo/imports/metosin/malli/config.edn"
@@ -487,7 +535,7 @@
                       (str clj-kondo-jar " not present (pinned clj-kondo artifact)")
 
                       :else nil)]
-      (do (println "SKIP task-252 analysis-level proof:" reason)
+      (do (report-skip! "analysis-level proof" reason)
           (is (str "skipped: " reason)))
       (let [tmp          (doto (java.io.File/createTempFile "ck252" "")
                            (.delete)
