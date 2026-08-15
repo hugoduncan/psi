@@ -74,6 +74,18 @@ exist), with zero new warnings anywhere in the repo.
   `~$get` and `~$post` (present since 2026-08-15 rebuild; the pre-fix cache had
   neither). The explicit 2.8.0 rebuild command is the provenance anchor; the
   verb-set grep proves the rebuilt cache reflects the registered `defreq` vars.
+  **Not idempotently re-runnable** (design-step 6 follow-up, 2026-08-15):
+  clj-kondo's jar skip marker (`.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`,
+  written after any 2.8.0 jar analysis) makes a re-run of the rebuild print
+  "http-kit-2.8.0.jar was already linted, skipping" and silently keep the
+  existing ns cache — verified 2026-08-15: after a no-lint-as run rewrote the ns
+  cache without verbs, re-running the documented rebuild skipped and the wrong
+  cache persisted (`bb lint` still showed the two warnings); recovery required
+  clearing the skip marker + ns transit file and rebuilding. Slice-2 therefore
+  clears both before rebuilding:
+  `rm -f .clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.* .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+  (hardened recipe validated end-to-end 2026-08-15: rm → rebuild → transit
+  regenerated with `~$get`/`~$post`/`~$request` → `bb lint` `errors: 0, warnings: 0`).
 - Verification surface: `bb lint` ≡ `clojure -M:lint` (deps.edn `:lint` alias)
   lints bb.edn, deps.edn, .lsp/config.edn, .psi/startup-prompts.edn, bases/,
   components/, extensions/, spec/, tests.edn, extensions/tests.edn — the

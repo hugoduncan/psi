@@ -36,10 +36,19 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 2 — Cache rebuild
 
-- [x] Regenerate the http-kit ns analysis cache with the registration (from repo root):
+- [x] Regenerate the http-kit ns analysis cache with the registration (from repo root).
+      The rebuild is **not idempotently re-runnable**: clj-kondo's jar skip marker
+      (`.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`, written after any 2.8.0 jar
+      analysis) makes a re-run print "http-kit-2.8.0.jar was already linted, skipping"
+      and silently keep the existing ns cache — so clear the skip marker AND the ns
+      transit file first:
+      `rm -f .clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.* .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+      then
       `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar --dependencies`
       (findings suppressed by `--dependencies`; cache is written)
-- [x] Confirm the cache now registers the verbs:
+- [x] Confirm the cache now registers the verbs: assert the transit file exists
+      (`test -f .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` — grep on the
+      absent file fails loudly, the effective guard), then
       `grep -o '~\$\(get\|post\|request\)' .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
       → contains `~$get` and `~$post`
 
@@ -50,7 +59,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `warnings: 0`, and no new warnings anywhere in the repo
 - [x] Negative control (proves analysis-level resolution, not suppression): temporarily
       add `(defn- bogus [] @(http-client/definitely-not-a-var))` to the test ns →
-      `bb lint` flags it as unresolved; remove the probe → `bb lint` clean again
+      `bb lint` flags it as unresolved; remove the probe → `bb lint` clean again.
+      **Precondition (executes the plan-review note, explicit 2026-08-15):** must run
+      AFTER a successful slice-2 rebuild — with no/absent http-kit ns cache the jar is
+      never analyzed, the probe is silently unflagged (`errors: 0, warnings: 0`
+      trivially), and the control proves nothing
 - [x] Cross-check with the dev-loop command: `clojure -M:lint` reports the same clean
       result as `bb lint`
 
@@ -110,7 +123,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 6 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Harden the slice-2 provenance rebuild against clj-kondo's jar skip marker:
+- [x] Harden the slice-2 provenance rebuild against clj-kondo's jar skip marker:
       `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
       --dependencies` prints "http-kit-2.8.0.jar was already linted, skipping" and
       does NOT re-analyze when `.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`
@@ -125,9 +138,15 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       exists before the verb-set grep (grep on the absent file fails loudly —
       the effective guard); record in design.md Context that the rebuild command
       is not idempotently re-runnable without clearing the skip marker
-- [ ] Make slice-3's negative-control precondition explicit (executes the
+      — done: slice-2 hardened above (rm skip+transit → rebuild → assert transit
+      exists → verb-set grep), design.md Context records non-idempotency, hardened
+      recipe validated end-to-end 2026-08-15: rm → rebuild → transit regenerated
+      with `~$get`/`~$post`/`~$request` → `bb lint` `errors: 0, warnings: 0`
+- [x] Make slice-3's negative-control precondition explicit (executes the
       plan-review note recorded in implementation.md, still unexecuted in
       steps.md): the bogus-var probe must run AFTER a successful slice-2 rebuild
       — with no/absent cache the http-kit ns is never analyzed and the probe is
       silently unflagged, proving nothing (verified 2026-08-15: deleting the ns
       cache → `bb lint` trivially `errors: 0, warnings: 0`)
+      — done: slice-3 negative-control step now states the AFTER-slice-2-rebuild
+      precondition explicitly
