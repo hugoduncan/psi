@@ -374,3 +374,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   unchanged contract), nested-CWD + property-override + fail-loud exercised via
   clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check` clean;
   `bb commit-check:file-lengths` exit 0 (slice-23 split still under the gate).
+
+- implementation review 2026-08-15: added 2 steps to be addressed

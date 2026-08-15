@@ -953,3 +953,33 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       unchanged contract), nested-CWD + property-override + fail-loud all
       exercised via clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check`
       clean
+
+## Slice 24 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Make `with-channel-hook-impl-guard-test` fail cleanly on a deleted impl
+      file: the guard's stated purpose is detecting "a deleted or renamed hook
+      impl", but `(slurp impl-file)` runs in the let binding BEFORE any
+      assertion — including `(is (.exists impl-file) …)` — so the deletion case
+      throws FileNotFoundException and clojure.test reports an ERROR with the
+      exists assertion unreachable (verified 2026-08-15: moved
+      with_channel.clj aside → focused unit run "8 passed, 0 failed, 1
+      errored", no exists-assertion message). This is the same class of defect
+      slice 20 fixed in the integration test (jar-entry nil → NPE → ERROR,
+      nil-guarded to a plain assertion failure): read the impl only when it
+      exists (nil-guard / `when` the exists check, then parse) so a deleted or
+      renamed impl fails as a clean assertion FAIL with its message, never an
+      ERROR. Same parallel shape (mention, lower priority — covered by the
+      ls-files index arm): `http-kit-import-registration-test`'s `read-edn`
+      slurp on config.edn would likewise ERROR on whole-file deletion before
+      any assertion; entry-removal (file present) already fails cleanly
+- [ ] Fix the `.gitignore` order assertion's first-occurrence blind spot:
+      `gitignore-http-kit-import-tracking-test`'s `index-of` uses
+      `(first (keep-indexed …))` — the FIRST matching line — so a duplicate
+      `**/.clj-kondo/imports/*` line added BELOW the negation lines (gitignore
+      is last-match-wins: git re-ignores the http-kit import dir and the
+      registration silently drops out of future commits) passes the unit guard
+      while all three lines still exist in the right first-occurrence order.
+      The `^:integration` check-ignore ground-truth arm is the backstop, but
+      the unit guard's own order property is incomplete. Use the LAST index for
+      the ignore-all pattern (or assert no occurrence after the negations) so
+      the ordering invariant is complete in `:unit`
