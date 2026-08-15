@@ -388,3 +388,24 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   - no code/test changes; verified `bb lint` errors: 0, warnings: 0; shared-config tests untouched (doc-only)
 
 - implementation review 2026-08-15: added 2 steps to be addressed
+- addressed 2 review steps (slice 26): (1) run-bounded drain hardened against
+  an exceptionally-completed slurp future — `drain` now catches
+  ExecutionException (deref does not distinguish exceptional completion from
+  timeout) and returns a `{::drain-error "label: message"}` marker carrying the
+  exception message; the success path's failure check uses a `drain-failed?`
+  predicate (::unavailable ∨ map) so a read error on a forcibly-killed
+  process's stream throws the loud no-hang ex-info (message generalized to
+  cover the read-error case) instead of bypassing the designed failure shapes
+  with no captured output; the ex-info passes the marker through in :out/:err
+  (diagnostic shows WHY the drain failed). Verified: normal path unchanged;
+  throwing-slurp future → marker + drain-failed? true; timeout path (2s bound
+  vs sleep 300) still kills + captures partial :out. (2) dead typo'd
+  `.gitignore` line 3 (`**/.clj-konde/imports.claude/`) DELETED — intent
+  confirmed via history: d15150a5c's `.clj-konde/imports` (clj-kondo-imports
+  ignore, typo'd from the start — now realized by lines 4-6) was mangled by
+  0bf814fd ("exclude .claude/") into `.clj-konde/imports.claude/`; the
+  `.claude` intent is realized elsewhere (settings.local.json excluded by the
+  user's global gitignore; CLAUDE.md intentionally tracked), and the line
+  matches nothing — deletion is behavior-preserving, no new repo policy.
+  Verified: shared-config unit 9/39, integration 33/176 (both proofs ran, no
+  SKIP), `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean.

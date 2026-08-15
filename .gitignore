@@ -1,6 +1,5 @@
 *.elc
 .psi/project.local.edn
-**/.clj-konde/imports.claude/
 **/.clj-kondo/imports/*
 !.clj-kondo/imports/http-kit/
 !.clj-kondo/imports/http-kit/**

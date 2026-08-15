@@ -1055,7 +1055,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 26 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Harden `run-bounded`'s drain against an exceptionally-completed slurp
+- [x] Harden `run-bounded`'s drain against an exceptionally-completed slurp
       future: `drain` in `lint_config_test_support.clj` catches only
       `InterruptedException`, but `(deref f 500 ::unavailable)` on a future
       whose `slurp` THREW rethrows the wrapped `ExecutionException`
@@ -1070,7 +1070,22 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       captured output. Catch the future's exception in `drain` (return a
       marker like `::unavailable` or the message, or fold it into the
       ex-info) so every path yields the designed failure shape
-- [ ] Resolve the dead typo'd `.gitignore` line 3
+      — done: `drain` now catches `ExecutionException` (alongside
+      `InterruptedException`) and returns a `{::drain-error "label: message"}`
+      marker carrying the exception message; the ex-info construction passes
+      the marker through in `:out`/`:err` (the diagnostic shows WHY the drain
+      failed, not just `:unavailable`); the success path's failure check uses
+      a `drain-failed?` predicate (`::unavailable` ∨ map — the only map value
+      drain returns is the error marker), so a read error on the success path
+      throws the loud no-hang ex-info (message generalized to "could not be
+      drained … a descendant process is holding the pipe open or the stream
+      read failed") instead of returning the marker as bogus content.
+      Verified: normal path `{:exit 0 :out "hello\n"}` unchanged; a throwing
+      slurp future (IOException "Stream closed") → `{::drain-error "stdout:
+      java.io.IOException: Stream closed"}` with `drain-failed?` true (no
+      escape); timeout path (bound reduced to 2s vs `sleep 300`) still kills
+      and throws the ex-info with partial `:out "partial-out\n"` captured
+- [x] Resolve the dead typo'd `.gitignore` line 3
       (`**/.clj-konde/imports.claude/`): the pattern matches nothing
       (`.clj-konde` ≠ `.clj-kondo`; `imports.claude` ≠ `imports`) — it is a
       pre-existing typo (d3acaca096, 2026-04-09) sitting immediately above
@@ -1080,3 +1095,21 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `**/.clj-kondo/imports/` (the pre-task line this task replaced) or a
       Claude-imports ignore — fix the typo or delete the dead line after
       confirming intent
+      — done (DELETE branch — intent confirmed via git history): traced the
+      line's full history — d15150a5c added `.clj-konde/imports` (intent:
+      ignore `.clj-kondo/imports`, typo'd from the start); 0bf814fd (commit
+      message "exclude .claude/") MANGLED it into `.clj-konde/imports.claude/`
+      instead of adding a `.claude/` line; d3acaca096 made it recursive and
+      added the CORRECT `**/.clj-kondo/imports/` + `**/.clj-kondo/.cache/`
+      (the clj-kondo-imports intent realized there, and now by this task's
+      negation set lines 4-6). The `.claude` intent: `.claude/settings.local.json`
+      is excluded by the user's GLOBAL gitignore
+      (`~/.gitignore_global:1:.claude/settings.local.json`), and
+      `.claude/CLAUDE.md` is intentionally TRACKED — so a repo-level `.claude/`
+      rule would be a new policy (blanket-ignoring future shared .claude
+      content), not the original intent. Both underlying intents are realized
+      elsewhere; the line matches nothing (`find . -path "*clj-konde*"` → ∅).
+      Deleted the dead line — behavior-preserving, no new policy; the gitignore
+      unit guard (presence + LAST-ignore-all-ordering of lines 4-6) is
+      index-based, not absolute-line-number-based, so it stays green (9 unit
+      tests / 39 assertions pass)

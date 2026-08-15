@@ -252,17 +252,33 @@
   path (or in the finally) would then hang the suite indefinitely despite the
   documented bound. The success path therefore uses the same bounded deref
   and fails loudly — with the undrained :out/:err marked :unavailable — when
-  the streams do not close within the drain bound."
+  the streams do not close within the drain bound.
+
+  The drain also catches an exceptionally-completed slurp future (slice-26
+  follow-up): deref does not distinguish an exceptional completion from a
+  timeout, so a future whose slurp THREW (e.g. an IOException reading a
+  forcibly-killed process's stream on the kill paths — platform/timing-
+  dependent) rethrows the wrapped ExecutionException, which would bypass the
+  designed failure shapes — the slice-20 timeout ex-info carrying :out/:err
+  and the slice-21 loud no-hang failure — with no captured output. drain
+  therefore catches ExecutionException and returns a {::drain-error …} marker
+  carrying the exception message; the ex-info construction passes the marker
+  through in :out/:err (the diagnostic shows WHY the drain failed, not just
+  :unavailable) and the success path's failure check treats the marker as a
+  failed drain, so every path yields the designed failure shape."
   [cmd]
   (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
         proc (.start pb)
         out-f (future (slurp (.getInputStream proc)))
         err-f (future (slurp (.getErrorStream proc)))
+        drain-failed? (fn [x] (or (= ::unavailable x) (map? x)))
         drain (fn [f label]
                 (try (deref f 500 ::unavailable)
                      (catch InterruptedException _
-                       (str "<" label " interrupted>"))))]
+                       (str "<" label " interrupted>"))
+                     (catch java.util.concurrent.ExecutionException e
+                       {::drain-error (str label ": " (ex-message e))})))]
     (try
       (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
         (let [;; kill the process first so the pipe streams close and the
@@ -282,11 +298,11 @@
                                   :unavailable partial-err)})))
         (let [out (drain out-f "stdout")
               err (drain err-f "stderr")]
-          (when (or (= ::unavailable out) (= ::unavailable err))
-            (throw (ex-info (str "subprocess exited but its stdout/stderr did "
-                                 "not close within the drain bound — a "
-                                 "descendant process is holding the pipe open: "
-                                 (pr-str cmd))
+          (when (or (drain-failed? out) (drain-failed? err))
+            (throw (ex-info (str "subprocess exited but its stdout/stderr could "
+                                 "not be drained within the bound — a descendant "
+                                 "process is holding the pipe open or the stream "
+                                 "read failed: " (pr-str cmd))
                             {:cmd cmd
                              :out (if (= ::unavailable out) :unavailable out)
                              :err (if (= ::unavailable err) :unavailable err)})))
