@@ -831,3 +831,40 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       on the timeout path). Verified 2026-08-15 (process-timeout-ms
       alter-var-root'd to 2 s): `sh -c "echo partial-output-here; sleep 30"` →
       timeout ex-info carries `:out "partial-output-here\n"` and `:err ""`
+
+## Slice 21 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Bound the success-path stream drain in `run-bounded`
+      (`components/shared-config/test/psi/shared_config/lint_config_test.clj`):
+      the 120s bound covers `(.waitFor proc process-timeout-ms …)` ONLY — the
+      success branch returns `{:exit … :out @out-f :err @err-f}` with unbounded
+      derefs, so a subprocess that exits while a descendant still holds the
+      stdout/stderr pipe open (classic grandchild scenario — e.g. the `clojure`
+      CLI spawning a JVM that spawns a helper) never EOFs the slurp and the
+      suite hangs indefinitely despite the documented bound (the exact hang
+      class slice 8 set out to eliminate; slices 14/16/20 hardened the timeout
+      path only — kill-then-bounded-drain — and the docstring's "a hung
+      subprocess … blocks the suite indefinitely" is only partially true).
+      Fix: bound the drain on the success path too (e.g. bounded 3-arg deref
+      with a loud failure, or drain via `onExit`/a watchdog), so the whole
+      subprocess interaction — not just the process lifetime — is bounded.
+      Verify: simulate a pipe-holding grandchild (e.g.
+      `sh -c "echo out; (sleep 300) & wait"` with a reduced
+      process-timeout-ms) → suite fails loudly instead of hanging.
+- [ ] Bind `*read-eval*` false in the read-string-based compares
+      (`parse-forms` in `with-channel-hook-semantics-guard-test` and the
+      `read-string` in `with-channel-hook-impl-guard-test`): verified
+      2026-08-15 that `*read-eval*` defaults to `true` and
+      `(read-string "#=(+ 1 2)")` → `3` — the guards whose purpose is to
+      detect semantic drift in the tracked hook impl vs the pinned jar export
+      would themselves EXECUTE a `#=` reader-eval form on either side (a
+      drifted/malicious export or impl silently runs code during the
+      integration run instead of being compared); `#?` reader conditionals
+      additionally throw "Conditional read not allowed", a confusing failure
+      for a structural-compare guard. Fix: `(binding [*read-eval* false]
+      (read-string …))` — makes `#=` throw loudly instead of evaluating — and
+      pass `:read-cond :allow` if conditionals should compare rather than
+      error. Verify: `(binding [*read-eval* false] (read-string "#=(+ 1 2)"))`
+      throws; a fabricated `#=`-bearing jar export (via the
+      `psi.lint-config-test.http-kit-jar` override) fails loudly with no
+      evaluation side effect.
